@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** 2025-11-05
-**Status:** Draft - MVP Definiti
+**Status:** Draft - MVP Definition
 **Owner:** Product Team
 
 ---
