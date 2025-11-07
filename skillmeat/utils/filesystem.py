@@ -1,9 +1,10 @@
 """Filesystem utility functions for SkillMeat."""
 
 import hashlib
+import shutil
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Set, Union
 
 
 def compute_content_hash(path: Path) -> str:
@@ -88,3 +89,72 @@ def atomic_write(content: str, dest: Path) -> None:
         except Exception:
             pass  # Best effort cleanup
         raise
+
+
+class FilesystemManager:
+    """Handles file operations for artifacts."""
+
+    IGNORE_PATTERNS: Set[str] = {
+        ".git",
+        ".github",
+        ".gitignore",
+        "__pycache__",
+        "*.pyc",
+        "*.pyo",
+        "node_modules",
+        ".venv",
+        "venv",
+        "*.egg-info",
+        ".DS_Store",
+        "Thumbs.db",
+    }
+
+    @staticmethod
+    def copy_artifact(source: Path, destination: Path, artifact_type) -> None:
+        """Copy artifact files atomically.
+
+        Args:
+            source: Source path
+            destination: Destination path
+            artifact_type: Type of artifact (from ArtifactType enum)
+
+        Raises:
+            RuntimeError: Copy failed
+        """
+        # Use temp directory for atomic operation
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dest = Path(temp_dir) / "artifact"
+
+            if source.is_dir():
+                # Copy directory, excluding ignored patterns
+                shutil.copytree(
+                    source,
+                    temp_dest,
+                    ignore=shutil.ignore_patterns(*FilesystemManager.IGNORE_PATTERNS),
+                )
+            else:
+                # Copy single file
+                temp_dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, temp_dest)
+
+            # Atomic move to final destination
+            destination.parent.mkdir(parents=True, exist_ok=True)
+
+            # Remove destination if exists
+            if destination.exists():
+                FilesystemManager.remove_artifact(destination)
+
+            # Move from temp
+            shutil.move(str(temp_dest), str(destination))
+
+    @staticmethod
+    def remove_artifact(path: Path) -> None:
+        """Remove artifact files safely.
+
+        Args:
+            path: Path to artifact (file or directory)
+        """
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
