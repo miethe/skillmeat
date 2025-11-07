@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DATABASE_URL:*)",
+      "Bash(mkdir:*)",
+      "mcp__playwright__browser_navigate",
+      "Bash(curl:*)",
+      "mcp__playwright__browser_close",
+      "Bash(git restore:*)",
+      "Bash(tee:*)",
+      "Bash(timeout 180 pnpm test:*)",
+      "Bash(Task codebase-explorer \"Find all BlockEditor implementations, components, and related files including the prompt detail page at /prompts/{id}\")",
+      "Bash(git log:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

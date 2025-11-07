@@ -1,0 +1,586 @@
+{
+  "metadata": {
+    "projectName": "MeatyPrompts",
+    "version": "1.0.0",
+    "description": "Template configuration for claude-export customization. Contains all 50+ variables organized by category for reusable AI agent system.",
+    "author": "MeatyPrompts Team",
+    "configVersion": "1.0",
+    "lastUpdated": "2025-11-05",
+    "templateUrl": "https://github.com/meatyprompts/claude-export",
+    "documentationUrl": "https://github.com/meatyprompts/claude-export/blob/main/TEMPLATIZATION_GUIDE.md"
+  },
+
+  "identity": {
+    "PROJECT_NAME": {
+      "description": "Project or organization name used in agent descriptions, templates, and configuration",
+      "default": "MeatyPrompts",
+      "required": true,
+      "type": "string",
+      "examples": ["MeatyPrompts", "Acme Corp", "StartupXYZ", "CloudPlatform"]
+    },
+    "PROJECT_DESCRIPTION": {
+      "description": "Brief description of the project and its primary purpose",
+      "default": "Prompt management and authoring platform",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Prompt management and authoring platform",
+        "Enterprise project management solution",
+        "Real-time collaboration platform"
+      ]
+    },
+    "PROJECT_DOMAIN": {
+      "description": "Primary business domain or industry of the project",
+      "default": "Prompt Engineering & AI",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Prompt Engineering & AI",
+        "Project Management",
+        "Cloud Infrastructure",
+        "Healthcare Tech"
+      ]
+    }
+  },
+
+  "architecture": {
+    "PROJECT_ARCHITECTURE": {
+      "description": "System architecture description explaining how layers and components interact",
+      "default": "Router → Service → Repository → DB (layered architecture)",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Router → Service → Repository → DB (layered architecture)",
+        "Microservices with event-driven communication",
+        "Monolith with clear separation of concerns"
+      ]
+    },
+    "LAYER_ARCHITECTURE": {
+      "description": "Detailed breakdown of architectural layers from database to deployment",
+      "default": "1. Database Layer (schema, migrations, RLS)\n2. Repository Layer (data access, queries)\n3. Service Layer (business logic, DTOs)\n4. API Layer (routes, validation)\n5. UI Layer (components, hooks)\n6. Testing Layer (unit, integration, E2E)\n7. Documentation Layer (API, Storybook)\n8. Deployment Layer (feature flags, monitoring)",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "8-layer breakdown (DB → Repo → Service → API → UI → Tests → Docs → Deployment)",
+        "4-layer breakdown (DB → Backend → Frontend → Tests)",
+        "Event-driven layers with pub/sub messaging"
+      ]
+    },
+    "ARCHITECTURE_DIAGRAM": {
+      "description": "URL to architecture diagram or ASCII art representation of system architecture",
+      "default": "https://docs.meatyprompts.com/architecture.png",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "https://docs.example.com/architecture.png",
+        "https://excalidraw.com/shared/ABC123",
+        "See /docs/architecture/diagram.md"
+      ]
+    }
+  },
+
+  "standards": {
+    "PROJECT_STANDARDS": {
+      "description": "Core standards and patterns enforced across the codebase",
+      "default": "Layered architecture, DTOs in separate modules, RLS enforcement, OpenTelemetry observability, error envelopes, cursor pagination",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Layered architecture, DTOs separate, RLS enforcement, OpenTelemetry, error envelopes, cursor pagination",
+        "Microservices pattern, domain-driven design, CQRS separation",
+        "Component-driven development, Storybook documentation"
+      ]
+    },
+    "VALIDATION_RULES": {
+      "description": "Task completion and code validation criteria specific to the project",
+      "default": "MeatyPrompts patterns, error envelopes, pagination, RLS enforcement, observability instrumentation",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Error envelopes, cursor pagination, RLS, observability",
+        "TypeScript strict mode, test coverage >80%, no console.log",
+        "No TODO comments, documented public APIs, type coverage"
+      ]
+    },
+    "NAMING_CONVENTION": {
+      "description": "Naming conventions for tasks, issues, branches, and identifiers",
+      "default": "PREFIX-NUMBER format (e.g., FEAT-123), kebab-case slugs, semantic versioning",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "PREFIX-NUMBER (FEAT-123), kebab-case, semver",
+        "type/feature-name (feat/user-auth), conventional commits",
+        "[AREA] Description, domain/feature format"
+      ]
+    },
+    "CODE_QUALITY_STANDARDS": {
+      "description": "Code quality expectations and enforcement rules",
+      "default": "No SQL in services, DTOs separate from ORM, 80%+ test coverage, OpenTelemetry instrumentation",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "No SQL in services, DTOs separate, 80%+ coverage, OpenTelemetry",
+        "SonarQube grade A, no code smells, security scans passing",
+        "Type safety, linting compliance, security audit passing"
+      ]
+    }
+  },
+
+  "workflow": {
+    "PM_WORKFLOW": {
+      "description": "Primary product management tool and workflow system",
+      "default": "Linear",
+      "required": true,
+      "type": "string",
+      "enum": ["Linear", "Jira", "GitHub Issues", "Trello", "Azure DevOps", "Monday.com", "Asana", "ClickUp"],
+      "examples": ["Linear", "Jira", "GitHub Issues", "Trello"]
+    },
+    "TASK_TRACKER": {
+      "description": "Task tracking system name (often same as PM_WORKFLOW)",
+      "default": "Linear",
+      "required": true,
+      "type": "string",
+      "examples": ["Linear", "Jira", "GitHub Issues", "Azure DevOps"]
+    },
+    "SPRINT_DURATION": {
+      "description": "Sprint duration in days (use 'Continuous' for flow-based development)",
+      "default": "14",
+      "required": false,
+      "type": "string",
+      "examples": ["14", "21", "7", "Continuous", "None"]
+    },
+    "APPROVAL_WORKFLOW": {
+      "description": "Code review and approval process for PRs/MRs",
+      "default": "GitHub PR with 2 approvals",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "GitHub PR with 2 approvals",
+        "Single maintainer approval",
+        "Automated checks + 1 approval",
+        "CODEOWNERS + required reviews"
+      ]
+    }
+  },
+
+  "documentation": {
+    "DOC_POLICY": {
+      "description": "Documentation creation and maintenance policy",
+      "default": "Document only when explicitly needed, in allowed buckets, or for tracking. Avoid over-documentation.",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Document only when explicitly needed in allowed buckets",
+        "Comprehensive documentation for all public APIs",
+        "Minimal docs, prioritize code clarity over documentation"
+      ]
+    },
+    "DOC_BUCKETS": {
+      "description": "Allowed documentation categories and types",
+      "default": "User Documentation, Developer Documentation, Architecture & Design, README Files, Configuration, Testing, Product Planning, Tracking Documentation",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "User Docs, Developer Docs, Architecture, README, Config, Tests, Product, Tracking",
+        "API Docs, Integration Guides, Setup Guides, FAQs",
+        "Architecture ADRs, Design System, Component Specs"
+      ]
+    },
+    "ADR_PATH": {
+      "description": "Location where Architecture Decision Records are stored",
+      "default": "/docs/architecture/ADRs",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "/docs/architecture/ADRs",
+        "/adr",
+        "/docs/decisions",
+        "docs/decisions/adr"
+      ]
+    },
+    "DOC_FRONTMATTER": {
+      "description": "Required YAML frontmatter fields for documentation files",
+      "default": "title, description, audience, tags, created, updated, category, status, related",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "title, description, audience, tags, created, updated, category, status",
+        "title, author, date, tags",
+        "title, description only (minimal)"
+      ]
+    }
+  },
+
+  "observability": {
+    "OBSERVABILITY_REQUIRED": {
+      "description": "Whether observability (logging, tracing, metrics) is required in the project",
+      "default": "true",
+      "required": false,
+      "type": "boolean",
+      "examples": [true, false]
+    },
+    "LOGGING_FORMAT": {
+      "description": "Standard logging format for application logs",
+      "default": "Structured JSON",
+      "required": false,
+      "type": "string",
+      "examples": ["Structured JSON", "Plain text", "Custom format", "Bunyan format"]
+    },
+    "TRACING_ENABLED": {
+      "description": "Distributed tracing system and standard",
+      "default": "OpenTelemetry",
+      "required": false,
+      "type": "string",
+      "examples": ["OpenTelemetry", "Jaeger", "DataDog", "Honeycomb", "None"]
+    },
+    "METRICS_SYSTEM": {
+      "description": "Metrics collection and monitoring system",
+      "default": "OpenTelemetry",
+      "required": false,
+      "type": "string",
+      "examples": ["OpenTelemetry", "Prometheus", "DataDog", "CloudWatch"]
+    }
+  },
+
+  "permissions": {
+    "PERMISSIONS": {
+      "description": "Tool permissions configuration for Claude Code (deny/ask/allow rules)",
+      "default": {
+        "deny": [
+          "Read(./secrets/**)",
+          "Bash(rm -rf:*)"
+        ],
+        "ask": [
+          "Bash(git push:*)",
+          "Bash(docker:*)",
+          "Bash(npm install:*)",
+          "Bash(pnpm add:*)"
+        ],
+        "allow": [
+          "Bash(pnpm:*)",
+          "Bash(uv:*)",
+          "Bash(git status:*)",
+          "Bash(git diff:*)",
+          "Bash(git add:*)",
+          "Bash(git commit:*)",
+          "Read(./**)",
+          "Write(./**)",
+          "Edit",
+          "Grep",
+          "Glob"
+        ]
+      },
+      "required": false,
+      "type": "object",
+      "examples": [
+        "MeatyPrompts default permission set",
+        "Minimal permissions (read/write only)",
+        "Expanded permissions with docker/kubernetes"
+      ]
+    },
+    "HOOKS": {
+      "description": "Pre/post tool-use hooks for Claude Code integration",
+      "default": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "echo 'Checking file changes...'"
+              }
+            ]
+          }
+        ]
+      },
+      "required": false,
+      "type": "object",
+      "examples": [
+        "Pre-commit validation hooks",
+        "Post-tool cleanup hooks",
+        "Session start/end hooks"
+      ]
+    },
+    "AUTH_METHOD": {
+      "description": "Primary authentication method for the application",
+      "default": "Clerk",
+      "required": false,
+      "type": "string",
+      "examples": ["Clerk", "Auth0", "Custom JWT", "OAuth2", "SAML"]
+    },
+    "ENV_GATE_SECRET": {
+      "description": "Secret for development authentication bypass (32+ chars, generated)",
+      "default": "your-32-char-minimum-secret-key-here",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "Auto-generated 32+ character random string",
+        "Keep this secret in settings.local.json only"
+      ]
+    }
+  },
+
+  "paths": {
+    "PROJECT_PATHS": {
+      "description": "Project directory structure and key paths",
+      "default": {
+        "api": "services/api",
+        "web": "apps/web",
+        "mobile": "apps/mobile",
+        "ui": "packages/ui",
+        "tokens": "packages/tokens",
+        "docs": "docs",
+        "scripts": "scripts"
+      },
+      "required": true,
+      "type": "object",
+      "examples": [
+        "MeatyPrompts structure: api, web, mobile, ui, tokens",
+        "Monorepo with apps/ and packages/",
+        "Flat structure with src/, test/, docs/"
+      ]
+    },
+    "EXCLUDED_PATHS": {
+      "description": "Paths to exclude from analysis and symbol generation",
+      "default": "node_modules, .git, __pycache__, .pytest_cache, build, dist, coverage",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "node_modules, .git, __pycache__, build, dist",
+        "vendor, .env, secrets",
+        "*.tmp, .cache, .DS_Store"
+      ]
+    },
+    "SYMBOL_FILES": {
+      "description": "Symbol file locations and domain mappings",
+      "default": {
+        "api": "ai/symbols-api.json",
+        "ui": "ai/symbols-ui.json",
+        "web": "ai/symbols-web.json",
+        "apiTests": "ai/symbols-api-tests.json",
+        "uiTests": "ai/symbols-ui-tests.json"
+      },
+      "required": false,
+      "type": "object",
+      "examples": [
+        "Domain-specific symbol files by feature",
+        "Single unified symbol file",
+        "Layered symbol files by architecture tier"
+      ]
+    }
+  },
+
+  "technology": {
+    "FRONTEND_FRAMEWORK": {
+      "description": "Primary frontend framework and version",
+      "default": "React with Next.js",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "React with Next.js",
+        "Vue 3 with Nuxt",
+        "Svelte with SvelteKit",
+        "Angular 17"
+      ]
+    },
+    "BACKEND_LANGUAGE": {
+      "description": "Primary backend programming language and version",
+      "default": "Python 3.12",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Python 3.12",
+        "Node.js 18+",
+        "Go 1.21",
+        "Rust 1.70",
+        "Java 21"
+      ]
+    },
+    "BACKEND_FRAMEWORK": {
+      "description": "Primary backend framework and version",
+      "default": "FastAPI",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "FastAPI",
+        "Express",
+        "Django",
+        "Gin",
+        "Spring Boot"
+      ]
+    },
+    "DATABASE": {
+      "description": "Primary database system and ORM/driver",
+      "default": "PostgreSQL with SQLAlchemy ORM",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "PostgreSQL with SQLAlchemy ORM",
+        "MongoDB with Mongoose",
+        "MySQL with Prisma",
+        "DynamoDB with AWS SDK"
+      ]
+    },
+    "UI_LIBRARY": {
+      "description": "UI component library and styling approach",
+      "default": "Radix UI components",
+      "required": true,
+      "type": "string",
+      "examples": [
+        "Radix UI components",
+        "Material UI",
+        "Shadcn/ui",
+        "Chakra UI",
+        "Ant Design"
+      ]
+    },
+    "PACKAGE_MANAGER": {
+      "description": "Package manager for the project",
+      "default": "pnpm",
+      "required": false,
+      "type": "string",
+      "examples": ["pnpm", "npm", "yarn", "bun"]
+    },
+    "BUILD_TOOL": {
+      "description": "Primary build tool",
+      "default": "Turbo",
+      "required": false,
+      "type": "string",
+      "examples": ["Turbo", "Webpack", "Vite", "esbuild", "Gradle"]
+    },
+    "TESTING_FRAMEWORK": {
+      "description": "Primary testing framework",
+      "default": "Pytest (backend), Jest (frontend)",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "Pytest (backend), Jest (frontend)",
+        "Jest for all",
+        "Vitest (frontend), pytest (backend)"
+      ]
+    }
+  },
+
+  "examples": {
+    "PROJECT_EXAMPLES": {
+      "description": "Real code examples and patterns from the project codebase",
+      "default": "See examples/ directory for MeatyPrompts-specific examples",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "Code snippets showing project patterns",
+        "Architecture diagrams and system flow",
+        "Integration examples and use cases"
+      ]
+    },
+    "EXAMPLE_FEATURE": {
+      "description": "A real feature example to illustrate project patterns",
+      "default": "Real-time collaboration for prompts",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "User authentication flow",
+        "Real-time data synchronization",
+        "API endpoint creation"
+      ]
+    },
+    "EXAMPLE_ARCHITECTURE": {
+      "description": "Detailed example of the project's architecture",
+      "default": "Full MeatyPrompts 8-layer architecture with routers, services, repositories, and database",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "Complete 8-layer architecture breakdown",
+        "Microservices communication patterns",
+        "Event-driven workflow example"
+      ]
+    },
+    "EXAMPLE_ERROR_HANDLING": {
+      "description": "Example of proper error handling in the project",
+      "default": "ErrorResponse envelope with error code, message, details, and request_id",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "Error envelope with code, message, details",
+        "Try/catch with custom error types",
+        "Result type (Ok/Err) pattern"
+      ]
+    }
+  },
+
+  "agents": {
+    "COMPLEXITY_SCALE": {
+      "description": "Feature complexity assessment scale",
+      "default": "S (1-3 days), M (4-7 days), L (1-2 weeks), XL (3+ weeks)",
+      "required": false,
+      "type": "string",
+      "examples": [
+        "S/M/L/XL with day ranges",
+        "1-10 point scale",
+        "T-shirt sizing with sprint points"
+      ]
+    }
+  },
+
+  "subagents": {
+    "SUBAGENTS_CONFIG": {
+      "description": "Subagent configuration and invocation rules",
+      "default": {
+        "rules": [
+          {
+            "when": "codebase_exploration",
+            "agent": "codebase-explorer",
+            "confidence": 0.95
+          },
+          {
+            "when": "architecture_analysis",
+            "agent": "lead-architect",
+            "confidence": 0.9
+          },
+          {
+            "when": "documentation",
+            "agent": "documentation-writer",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "required": false,
+      "type": "object",
+      "examples": [
+        "Rule-based agent routing with confidence scores",
+        "Pattern-based agent selection",
+        "Domain-specific agent mapping"
+      ]
+    }
+  },
+
+  "version": {
+    "CONFIG_VERSION": {
+      "description": "Version of this configuration format (not project version)",
+      "default": "1.0.0",
+      "required": true,
+      "type": "string",
+      "examples": ["1.0.0", "1.1.0", "2.0.0"]
+    },
+    "SCHEMA_VERSION": {
+      "description": "Version of the configuration JSON schema",
+      "default": "1.0.0",
+      "required": true,
+      "type": "string",
+      "examples": ["1.0.0"]
+    }
+  },
+
+  "notes": {
+    "IMPORTANT_NOTES": "This template contains all 50+ variables organized by category. Each variable includes description, default value, required status, type, and examples. Use this as a reference for customizing the claude-export system for your project.",
+    "USAGE": "Replace default values with your project-specific values. Required variables must be customized. For new projects, start with this file and customize the identity, architecture, standards, and workflow sections.",
+    "CUSTOMIZATION_GUIDE": "See TEMPLATIZATION_GUIDE.md for comprehensive documentation on each variable, how they're used in agents/templates, and step-by-step customization instructions.",
+    "NEXT_STEPS": [
+      "1. Copy this file to your project as config/template-config.json or .claude-config.json",
+      "2. Replace all default values with your project-specific values",
+      "3. Create project-specific symbol files and configuration",
+      "4. Test with an agent: Task('codebase-explorer', 'Find all components')",
+      "5. Customize example files in examples/ directory"
+    ]
+  }
+}
