@@ -2,9 +2,9 @@
 
 <!--
 Template Variables (configure in config/template-config.json):
-- {{PROJECT_NAME}} - Project/organization name
-- {{TASK_TRACKER}} - Task tracking system name
-- {{COMPLEXITY_SCALE}} - Feature complexity assessment scale
+- SkillMeat - Project/organization name
+- GitHub Issues - Task tracking system name
+- S (1-3 days): Bug fixes, small features, documentation. M (4-7 days): CLI command implementation, storage layer changes. L (1-2 weeks): New artifact type support, GitHub integration changes. XL (3+ weeks): Collection management, web interface, marketplace integration - Feature complexity assessment scale
 -->
 
 Use this template when capturing new feature ideas from users, stakeholders, or internal teams.
@@ -128,7 +128,7 @@ Use this template when capturing new feature ideas from users, stakeholders, or 
 - [ ] Create PRD document
 - [ ] Generate ADRs for technical decisions
 - [ ] Create implementation plan
-- [ ] Set up {{TASK_TRACKER}} epic and tasks
+- [ ] Set up GitHub Issues epic and tasks
 
 ## Stakeholder Sign-off
 

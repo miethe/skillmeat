@@ -262,28 +262,28 @@ Used for structured data:
 ### In Agent Prompts
 
 ```markdown
-You are the {{PM_WORKFLOW}} orchestrator for {{PROJECT_NAME}}.
-Follow {{PROJECT_STANDARDS}} and {{LAYER_ARCHITECTURE}}.
+You are the GitHub Issues orchestrator for SkillMeat.
+Follow Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility and 1. Source Layer (GitHub, local sources).
 ```
 
 ### In Configuration Files
 
 ```json
 {
-  "projectName": "{{PROJECT_NAME}}",
-  "architecture": "{{PROJECT_ARCHITECTURE}}",
-  "paths": {{PROJECT_PATHS}}
+  "projectName": "SkillMeat",
+  "architecture": "Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes",
+  "paths": {
 }
 ```
 
 ### In Templates
 
 ```markdown
-## {{PROJECT_NAME}} Implementation
+## SkillMeat Implementation
 
-This project follows {{PROJECT_ARCHITECTURE}}.
+This project follows Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes.
 
-Standards: {{PROJECT_STANDARDS}}
+Standards: Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility
 ```
 
 ## Validation Rules

@@ -1,6 +1,6 @@
 {
   "$schema": "../symbols-config-schema.json",
-  "projectName": "{{PROJECT_NAME}}",
+  "projectName": "SkillMeat",
   "symbolsDir": "{{SYMBOLS_DIR}}",
   "domains": {
     "web": {

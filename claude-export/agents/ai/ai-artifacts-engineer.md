@@ -370,19 +370,19 @@ When creating AI artifacts, provide:
    - Invocation triggers tested
    - Boundaries clearly defined
 
-## {{PROJECT_NAME}}-Specific Patterns
+## SkillMeat-Specific Patterns
 
-When creating AI artifacts for {{PROJECT_NAME}}:
+When creating AI artifacts for SkillMeat:
 
 ```markdown
 ## Architecture Awareness
 
-This artifact follows {{PROJECT_ARCHITECTURE}}:
-{{LAYER_ARCHITECTURE}}
+This artifact follows Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes:
+1. Source Layer (GitHub, local sources)
 
 ## Standards Compliance
 
-All artifacts adhere to {{PROJECT_STANDARDS}}:
+All artifacts adhere to Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility:
 - Pattern compliance
 - Error handling
 - Testing requirements

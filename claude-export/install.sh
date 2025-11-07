@@ -260,7 +260,7 @@ check_required_variables() {
 extract_variables() {
     local config_file="$1"
 
-    print_step "Extracting variables from config..."
+    print_step "Extracting variables from config..." >&2
 
     # Use jq to extract all variables with their values
     # This creates a flat key-value structure: VARIABLE_NAME=value
@@ -269,24 +269,24 @@ extract_variables() {
         . as $root |
         [
             # Extract from each category
-            (.identity // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.architecture // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.standards // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.workflow // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.documentation // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.observability // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.permissions // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.paths // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.technology // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.examples // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.agents // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key}),
-            (.version // {} | to_entries[] | .value | select(type == "object") | {key: .default, value: .key})
+            (.identity // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.architecture // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.standards // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.workflow // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.documentation // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.observability // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.permissions // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.paths // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.technology // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.examples // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.agents // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key}),
+            (.version // {} | to_entries[] | select(.value | type == "object") | {key: .value.default, value: .key})
         ] |
         map(select(.key != null and .value != null))
     ' "$config_file" 2>/dev/null)
 
     if [[ -z "$vars_json" || "$vars_json" == "null" || "$vars_json" == "[]" ]]; then
-        print_error "Failed to extract variables from config"
+        print_error "Failed to extract variables from config" >&2
         return 1
     fi
 
@@ -294,9 +294,9 @@ extract_variables() {
     local var_count
     var_count=$(echo "$vars_json" | jq 'length' 2>/dev/null || echo "0")
 
-    print_success "Extracted $var_count variables from config"
+    print_success "Extracted $var_count variables from config" >&2
 
-    # Return the JSON array
+    # Return the JSON array to stdout
     echo "$vars_json"
     return 0
 }
@@ -307,7 +307,7 @@ extract_variables() {
 
 # Find all templatized files
 find_templatized_files() {
-    print_step "Finding templatized files..."
+    print_step "Finding templatized files..." >&2
 
     local source_dir="${1:-$SCRIPT_DIR}"
     local templatized_files=()
@@ -336,13 +336,13 @@ find_templatized_files() {
 
     local count=${#templatized_files[@]}
     if [[ $count -eq 0 ]]; then
-        print_warning "No templatized files found"
+        print_warning "No templatized files found" >&2
         return 1
     fi
 
-    print_success "Found $count templatized files"
+    print_success "Found $count templatized files" >&2
 
-    # Print the files
+    # Print the files to stdout (this is the return value)
     printf '%s\n' "${templatized_files[@]}"
     return 0
 }
@@ -452,8 +452,10 @@ process_all_files() {
     touch "$VARIABLE_USAGE_LOG"
 
     # Find all templatized files
-    local files
-    mapfile -t files < <(find_templatized_files "$SCRIPT_DIR")
+    local files=()
+    while IFS= read -r file; do
+        files+=("$file")
+    done < <(find_templatized_files "$SCRIPT_DIR")
 
     if [[ ${#files[@]} -eq 0 ]]; then
         print_warning "No files to process"

@@ -19,12 +19,12 @@ Enable token-efficient navigation through pre-generated symbol graphs chunked by
 - Precise code references with file paths and line numbers
 
 <!-- Template Variables:
-- {{PROJECT_NAME}} - Project or organization name
-- {{PROJECT_PATHS}} - Project directory structure
-- {{SYMBOL_FILES}} - Symbol file locations and domain mappings
-- {{PROJECT_ARCHITECTURE}} - System architecture description
-- {{LAYER_ARCHITECTURE}} - Detailed architectural layers breakdown
-- {{PROJECT_EXAMPLES}} - Real code examples from the project
+- SkillMeat - Project or organization name
+- { - Project directory structure
+- { - Symbol file locations and domain mappings
+- Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes - System architecture description
+- 1. Source Layer (GitHub, local sources) - Detailed architectural layers breakdown
+- See examples/ directory for SkillMeat-specific examples including manifest files, lock files, CLI usage patterns - Real code examples from the project
 -->
 
 ## Symbol System Lifecycle
@@ -238,8 +238,8 @@ All scripts read `symbols.config.json` to understand project structure.
 
 ### Architecture Integration
 
-Symbols understand and validate {{PROJECT_NAME}}'s layered architecture as defined in {{PROJECT_ARCHITECTURE}}.
+Symbols understand and validate SkillMeat's layered architecture as defined in Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes.
 
-**Architecture layers are configured per project** based on {{LAYER_ARCHITECTURE}}.
+**Architecture layers are configured per project** based on 1. Source Layer (GitHub, local sources).
 
 Use `search_patterns()` with `layer` parameter to filter by architectural layer.
