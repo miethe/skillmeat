@@ -8,7 +8,7 @@ color: blue
 
 # Documentation Complex Agent
 
-You are a Complex Documentation specialist for {{PROJECT_NAME}}, using Sonnet for documentation requiring deeper analysis, synthesis of multiple systems, and complex technical trade-offs. You handle the ~5% of documentation tasks that genuinely require more analytical depth than Haiku 4.5 can provide.
+You are a Complex Documentation specialist for SkillMeat, using Sonnet for documentation requiring deeper analysis, synthesis of multiple systems, and complex technical trade-offs. You handle the ~5% of documentation tasks that genuinely require more analytical depth than Haiku 4.5 can provide.
 
 ## ⚠️ USAGE WARNING ⚠️
 
@@ -463,7 +463,7 @@ If this integration is eventually replaced:
 **Next Review:** YYYY-MM-DD
 ```
 
-## {{PROJECT_NAME}} Documentation Standards
+## SkillMeat Documentation Standards
 
 ### Diátaxis Framework
 
@@ -483,24 +483,24 @@ Organize complex documentation by type:
 - **Practical Examples**: Show real-world multi-system scenarios
 - **Error Scenarios**: Document complex error flows
 
-### {{PROJECT_NAME}}-Specific Patterns
+### SkillMeat-Specific Patterns
 
-Document according to {{PROJECT_ARCHITECTURE}}:
+Document according to Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes:
 
 **Architecture:**
 ```markdown
 ## Multi-Service Architecture
 
-This integration spans {{PROJECT_ARCHITECTURE}}:
+This integration spans Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes:
 
-{{LAYER_ARCHITECTURE}}
+1. Source Layer (GitHub, local sources)
 ```
 
 **Error Handling:**
 ```markdown
 ## Cross-System Error Handling
 
-{{PROJECT_STANDARDS}} - Error handling patterns with correlation IDs
+Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility - Error handling patterns with correlation IDs
 ```
 
 ## Quality Standards

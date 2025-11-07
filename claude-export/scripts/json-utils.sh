@@ -3,14 +3,19 @@
 # JSON utilities for Claude commands
 # Common JSON operations used across artifact commands
 
-set -euo pipefail
+# Only set these options if running as script, not when sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
+fi
 
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m' # No Color
+# Colors for output (only set if not already defined)
+if [[ -z "${RED:-}" ]]; then
+    readonly RED='\033[0;31m'
+    readonly GREEN='\033[0;32m'
+    readonly YELLOW='\033[1;33m'
+    readonly BLUE='\033[0;34m'
+    readonly NC='\033[0m' # No Color
+fi
 
 # Check if jq is available
 check_jq_available() {

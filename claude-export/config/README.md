@@ -241,7 +241,7 @@ Each variable has metadata:
 Variables are used in agent prompts to customize behavior:
 
 ```markdown
-You are the {{PM_WORKFLOW}} orchestrator for {{PROJECT_NAME}}...
+You are the GitHub Issues orchestrator for SkillMeat...
 ```
 
 ### In Templates
@@ -251,9 +251,9 @@ Variables customize templates for your project:
 ```markdown
 ## Implementation Strategy
 
-Following {{PROJECT_NAME}} architecture patterns:
+Following SkillMeat architecture patterns:
 
-{{LAYER_ARCHITECTURE}}
+1. Source Layer (GitHub, local sources)
 ```
 
 ### In Configuration Files
@@ -262,9 +262,9 @@ Variables populate configuration files:
 
 ```json
 {
-  "projectName": "{{PROJECT_NAME}}",
-  "paths": {{PROJECT_PATHS}},
-  "permissions": {{PERMISSIONS}}
+  "projectName": "SkillMeat",
+  "paths": {,
+  "permissions": {
 }
 ```
 

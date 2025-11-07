@@ -1,5 +1,5 @@
 {
-  "_comment": "Subagent configuration for {{PROJECT_NAME}}. Customize 'domains' and 'invocation_rules' to match your project's technology stack and workflow patterns.",
+  "_comment": "Subagent configuration for SkillMeat. Customize 'domains' and 'invocation_rules' to match your project's technology stack and workflow patterns.",
   "_template_variables": {
     "PROJECT_NAME": "Replace with your project name (e.g., MeatyPrompts, AcmeApp)",
     "PROJECT_STANDARDS": "Replace with your project's coding standards and patterns",
@@ -12,7 +12,7 @@
     "backend-architect": {
       "description": "Analyzes backend architecture and proposes implementation approaches",
       "capabilities": ["analyze", "design", "review"],
-      "domains": ["{{BACKEND_LANGUAGE}}", "{{BACKEND_FRAMEWORK}}", "{{DATABASE}}", "{{ORM}}"],
+      "domains": ["Python 3.9+", "Click (CLI), FastAPI (Phase 3 web interface)", "SQLite (Phase 3 web interface, currently file-based TOML)", "{{ORM}}"],
       "_domains_examples": {
         "python_fastapi": ["python", "fastapi", "sqlalchemy", "postgresql"],
         "node_express": ["typescript", "express", "prisma", "postgresql"],
@@ -21,9 +21,9 @@
       "invocation": "@backend-architect <command> <args>"
     },
     "backend-developer": {
-      "description": "Implements backend code following {{PROJECT_NAME}} standards",
+      "description": "Implements backend code following SkillMeat standards",
       "capabilities": ["implement", "refactor", "optimize"],
-      "domains": ["{{BACKEND_LANGUAGE}}", "{{BACKEND_FRAMEWORK}}", "{{ORM}}", "{{MIGRATION_TOOL}}"],
+      "domains": ["Python 3.9+", "Click (CLI), FastAPI (Phase 3 web interface)", "{{ORM}}", "{{MIGRATION_TOOL}}"],
       "_domains_examples": {
         "python_fastapi": ["python", "fastapi", "sqlalchemy", "alembic"],
         "node_express": ["typescript", "express", "prisma", "migrations"],
@@ -32,9 +32,9 @@
       "invocation": "@backend-developer <command> <args>"
     },
     "frontend-developer": {
-      "description": "Implements frontend code using {{FRONTEND_FRAMEWORK}}",
+      "description": "Implements frontend code using React 18+ with TypeScript (Phase 3 only, currently CLI-only)",
       "capabilities": ["implement", "refactor", "optimize"],
-      "domains": ["{{FRONTEND_LANGUAGE}}", "{{FRONTEND_LIBRARY}}", "{{FRONTEND_FRAMEWORK}}", "{{CSS_FRAMEWORK}}"],
+      "domains": ["{{FRONTEND_LANGUAGE}}", "{{FRONTEND_LIBRARY}}", "React 18+ with TypeScript (Phase 3 only, currently CLI-only)", "{{CSS_FRAMEWORK}}"],
       "_domains_examples": {
         "react_nextjs": ["typescript", "react", "nextjs", "tailwind"],
         "vue_nuxt": ["typescript", "vue", "nuxt", "tailwind"],
@@ -45,7 +45,7 @@
     "ui-designer": {
       "description": "Creates and reviews UI components following design system",
       "capabilities": ["create-component", "review", "design"],
-      "domains": ["{{FRONTEND_LIBRARY}}", "{{CSS_FRAMEWORK}}", "{{UI_LIBRARY}}", "{{COMPONENT_DOCS}}"],
+      "domains": ["{{FRONTEND_LIBRARY}}", "{{CSS_FRAMEWORK}}", "Shadcn/ui (Phase 3, currently CLI-only with Rich)", "{{COMPONENT_DOCS}}"],
       "_domains_examples": {
         "radix_storybook": ["react", "tailwind", "radix", "storybook"],
         "material_ui": ["react", "mui", "emotion", "storybook"],

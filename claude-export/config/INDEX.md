@@ -205,24 +205,24 @@ ajv validate -s template-config-schema.json -d your-project-config.json
 ### With Agents
 Variables are used in agent prompts:
 ```markdown
-You are the {{PM_WORKFLOW}} orchestrator for {{PROJECT_NAME}}
+You are the GitHub Issues orchestrator for SkillMeat
 ```
 
 ### With Templates
 Variables customize templates:
 ```markdown
-## {{PROJECT_NAME}} Implementation
+## SkillMeat Implementation
 
-Following {{PROJECT_ARCHITECTURE}} patterns:
-{{LAYER_ARCHITECTURE}}
+Following Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes patterns:
+1. Source Layer (GitHub, local sources)
 ```
 
 ### With Scripts
 Variables configure behavior:
 ```json
 {
-  "projectName": "{{PROJECT_NAME}}",
-  "paths": {{PROJECT_PATHS}}
+  "projectName": "SkillMeat",
+  "paths": {
 }
 ```
 

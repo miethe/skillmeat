@@ -1,6 +1,6 @@
 {
   "$schema": "./symbols-config-schema.json",
-  "projectName": "{{PROJECT_NAME}}",
+  "projectName": "SkillMeat",
   "symbolsDir": "{{PROJECT_PATHS.symbolsDir}}",
   "domains": {
     "ui": {
@@ -11,12 +11,12 @@
     },
     "web": {
       "file": "symbols-web.json",
-      "description": "{{FRONTEND_FRAMEWORK}} web application - pages, app router, web-specific hooks and utilities",
+      "description": "React 18+ with TypeScript (Phase 3 only, currently CLI-only) web application - pages, app router, web-specific hooks and utilities",
       "enabled": true
     },
     "api": {
       "file": "symbols-api.json",
-      "description": "Unified backend API symbols - based on {{PROJECT_ARCHITECTURE}} (use apiLayers for targeted access)",
+      "description": "Unified backend API symbols - based on Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes (use apiLayers for targeted access)",
       "testFile": "symbols-api-tests.json",
       "enabled": true
     },
@@ -30,17 +30,17 @@
   "apiLayers": {
     "routers": {
       "file": "symbols-api-routers.json",
-      "description": "API route handlers - {{BACKEND_FRAMEWORK}} routers and HTTP endpoints with request/response handling",
+      "description": "API route handlers - Click (CLI), FastAPI (Phase 3 web interface) routers and HTTP endpoints with request/response handling",
       "enabled": true
     },
     "services": {
       "file": "symbols-api-services.json",
-      "description": "Business logic services - orchestration, validation, and domain operations (based on {{PROJECT_ARCHITECTURE}})",
+      "description": "Business logic services - orchestration, validation, and domain operations (based on Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes)",
       "enabled": true
     },
     "repositories": {
       "file": "symbols-api-repositories.json",
-      "description": "Data access layer - database queries, ORM operations ({{DATABASE}})",
+      "description": "Data access layer - database queries, ORM operations (SQLite (Phase 3 web interface, currently file-based TOML))",
       "enabled": true
     },
     "schemas": {
@@ -112,9 +112,9 @@
   },
   "metadata": {
     "version": "2.0",
-    "author": "{{PROJECT_NAME}} Development Team",
+    "author": "SkillMeat Development Team",
     "lastUpdated": "2025-10-31T00:00:00Z",
-    "description": "Symbol extraction configuration for {{PROJECT_NAME}} project. Supports domain-chunked symbols and layer-based API access for token-efficient codebase analysis. Architecture: {{PROJECT_ARCHITECTURE}}"
+    "description": "Symbol extraction configuration for SkillMeat project. Supports domain-chunked symbols and layer-based API access for token-efficient codebase analysis. Architecture: Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes"
   },
   "_template_notes": {
     "description": "This is a templatized configuration file. Replace {{VARIABLES}} with your project-specific values.",

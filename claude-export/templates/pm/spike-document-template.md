@@ -2,13 +2,13 @@
 
 <!--
 Template Variables (configure in config/template-config.json):
-- {{PROJECT_NAME}} - Project/organization name
-- {{PROJECT_ARCHITECTURE}} - System architecture description
-- {{LAYER_ARCHITECTURE}} - Detailed layer breakdown
-- {{PROJECT_STANDARDS}} - Core standards and patterns
-- {{CODE_QUALITY_STANDARDS}} - Quality requirements
-- {{ADR_PATH}} - Architecture Decision Records location
-- {{OBSERVABILITY_REQUIRED}} - Whether observability is required
+- SkillMeat - Project/organization name
+- Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes - System architecture description
+- 1. Source Layer (GitHub, local sources) - Detailed layer breakdown
+- Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility - Core standards and patterns
+- mypy type checking (strict mode), pytest coverage >80%, Black formatting required, flake8 linting (E9,F63,F7,F82 errors), docstrings on all public APIs, error handling for all user inputs, atomic file operations, no hardcoded paths, cross-platform testing - Quality requirements
+- /docs/architecture/decisions - Architecture Decision Records location
+- false - Whether observability is required
 -->
 
 Use this template for technical research and feasibility analysis.
@@ -40,7 +40,7 @@ Use this template for technical research and feasibility analysis.
 
 ## Technical Analysis
 
-### {{PROJECT_NAME}} Architecture Layer Impact
+### SkillMeat Architecture Layer Impact
 
 **UI Layer Changes:**
 - [ ] New UI components required
@@ -80,16 +80,16 @@ Use this template for technical research and feasibility analysis.
 
 ### Architecture Compliance Review
 
-**{{PROJECT_NAME}} Pattern Adherence:**
-- [ ] Follows {{PROJECT_ARCHITECTURE}}
+**SkillMeat Pattern Adherence:**
+- [ ] Follows Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes
 - [ ] Uses standard error envelope for errors
 - [ ] Implements pagination for lists
 - [ ] Maintains authentication integration
 - [ ] Uses standard UI components
-- [ ] {{OBSERVABILITY_REQUIRED}} - Includes observability instrumentation
+- [ ] false - Includes observability instrumentation
 
 **Compliance Notes:**
-[Any deviations from {{PROJECT_STANDARDS}} and justification]
+[Any deviations from Full type hints with mypy, >80% test coverage with pytest, Black code formatting, flake8 linting, docstrings on all public APIs, TOML configuration, Git-like CLI patterns, atomic file operations, cross-platform compatibility and justification]
 
 ### Alternative Approaches Considered
 
@@ -134,7 +134,7 @@ Use this template for technical research and feasibility analysis.
 - [ ] Business logic implementation
 - [ ] Service interface contracts
 - [ ] Error handling patterns
-- [ ] {{OBSERVABILITY_REQUIRED}} - Observability instrumentation
+- [ ] false - Observability instrumentation
 
 **Key Decisions**:
 - [Decision 1 with rationale]
@@ -172,7 +172,7 @@ Use this template for technical research and feasibility analysis.
 **Timeline**: [Estimated duration]
 **Dependencies**: [Prerequisites]
 
-- [ ] Unit tests (per {{CODE_QUALITY_STANDARDS}})
+- [ ] Unit tests (per mypy type checking (strict mode), pytest coverage >80%, Black formatting required, flake8 linting (E9,F63,F7,F82 errors), docstrings on all public APIs, error handling for all user inputs, atomic file operations, no hardcoded paths, cross-platform testing)
 - [ ] Integration tests for APIs
 - [ ] Component tests with user interactions
 - [ ] E2E tests for critical paths
@@ -185,9 +185,9 @@ Use this template for technical research and feasibility analysis.
 
 - [ ] API documentation updates
 - [ ] Component documentation
-- [ ] User guides and help documentation (per {{DOC_POLICY}})
+- [ ] User guides and help documentation (per Document only when explicitly needed - focus on code clarity. Required: README (module purpose), docstrings (all public APIs), setup guides, API documentation. Optional: architecture docs, how-to guides. Avoid: redundant documentation, over-documentation.)
 - [ ] Feature flag implementation
-- [ ] {{OBSERVABILITY_REQUIRED}} - Monitoring and alerting setup
+- [ ] false - Monitoring and alerting setup
 - [ ] Rollout plan execution
 
 ## Risk Assessment
@@ -287,7 +287,7 @@ Use this template for technical research and feasibility analysis.
 - **ADR Topic**: [Decision topic]
   - **Rationale**: [Why this needs an ADR]
   - **Timeline**: [When to create]
-  - **Location**: {{ADR_PATH}}
+  - **Location**: /docs/architecture/decisions
 
 ### Follow-up Research Questions
 - **Question**: [Research question]
