@@ -1,7 +1,9 @@
-"""Collection data model for SkillMeat."""
+"""Collection data model and manager for SkillMeat."""
 
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .artifact import Artifact, ArtifactType
@@ -125,3 +127,154 @@ class Collection:
             updated=updated,
             artifacts=artifacts,
         )
+
+
+class CollectionManager:
+    """Manages collection lifecycle and operations."""
+
+    def __init__(self, config=None):
+        """Initialize collection manager.
+
+        Args:
+            config: ConfigManager instance (creates default if None)
+        """
+        if config is None:
+            from skillmeat.config import ConfigManager
+
+            config = ConfigManager()
+        self.config = config
+
+        from skillmeat.storage.manifest import ManifestManager
+        from skillmeat.storage.lockfile import LockManager
+
+        self.manifest_mgr = ManifestManager()
+        self.lock_mgr = LockManager()
+
+    def init(self, name: str = "default") -> Collection:
+        """Initialize new collection.
+
+        Args:
+            name: Collection name
+
+        Returns:
+            Newly created Collection object
+
+        Raises:
+            ValueError: Collection already exists
+        """
+        collection_path = self.config.get_collection_path(name)
+
+        if collection_path.exists():
+            raise ValueError(f"Collection '{name}' already exists at {collection_path}")
+
+        # Create collection directory structure
+        collection_path.mkdir(parents=True, exist_ok=True)
+        (collection_path / "skills").mkdir(exist_ok=True)
+        (collection_path / "commands").mkdir(exist_ok=True)
+        (collection_path / "agents").mkdir(exist_ok=True)
+
+        # Create empty collection
+        collection = self.manifest_mgr.create_empty(collection_path, name)
+
+        # Create empty lock file
+        self.lock_mgr.write(collection_path, {})
+
+        # Set as active if it's the default
+        if name == "default":
+            self.config.set_active_collection(name)
+
+        return collection
+
+    def list_collections(self) -> List[str]:
+        """List all collection names.
+
+        Returns:
+            List of collection names
+        """
+        collections_dir = self.config.get_collections_dir()
+        if not collections_dir.exists():
+            return []
+
+        return [
+            d.name
+            for d in collections_dir.iterdir()
+            if d.is_dir() and (d / "collection.toml").exists()
+        ]
+
+    def get_active_collection_name(self) -> str:
+        """Get currently active collection name.
+
+        Returns:
+            Active collection name
+        """
+        return self.config.get_active_collection()
+
+    def switch_collection(self, name: str) -> None:
+        """Switch active collection.
+
+        Args:
+            name: Collection name to switch to
+
+        Raises:
+            ValueError: Collection doesn't exist
+        """
+        if name not in self.list_collections():
+            raise ValueError(f"Collection '{name}' does not exist")
+
+        self.config.set_active_collection(name)
+
+    def load_collection(self, name: Optional[str] = None) -> Collection:
+        """Load collection from disk.
+
+        Args:
+            name: Collection name (uses active if None)
+
+        Returns:
+            Collection object
+
+        Raises:
+            ValueError: Collection not found
+        """
+        name = name or self.get_active_collection_name()
+        collection_path = self.config.get_collection_path(name)
+
+        if not collection_path.exists():
+            raise ValueError(f"Collection '{name}' not found at {collection_path}")
+
+        return self.manifest_mgr.read(collection_path)
+
+    def save_collection(self, collection: Collection) -> None:
+        """Save collection to disk.
+
+        Args:
+            collection: Collection to save
+        """
+        collection_path = self.config.get_collection_path(collection.name)
+        collection.updated = datetime.utcnow()
+        self.manifest_mgr.write(collection_path, collection)
+
+    def delete_collection(self, name: str, confirm: bool = True) -> None:
+        """Delete collection.
+
+        Args:
+            name: Collection name
+            confirm: Require confirmation (safety check)
+
+        Raises:
+            ValueError: Collection not found or is active collection
+        """
+        if name == self.get_active_collection_name():
+            raise ValueError(
+                "Cannot delete active collection. Switch to another first."
+            )
+
+        collection_path = self.config.get_collection_path(name)
+        if not collection_path.exists():
+            raise ValueError(f"Collection '{name}' not found")
+
+        # Safety check
+        if confirm:
+            raise ValueError("Use confirm=False to actually delete")
+
+        # Delete collection directory
+        shutil.rmtree(collection_path)
