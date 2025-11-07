@@ -3,24 +3,26 @@ requires = ["setuptools>=75.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skillman"
-version = "0.4.0"
-description = "CLI tool for managing Claude skills from GitHub repositories"
+name = "skillmeat"
+version = "0.1.0-alpha"
+description = "Personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP, Hooks)"
 readme = "README.md"
 license = "MIT"
 license-files = []
 requires-python = ">=3.9"
 authors = [
-    {name = "Chris von Csefalvay", email = "chris@chrisvoncsefalvay.com"}
+    {name = "SkillMeat Contributors"}
 ]
 keywords = [
     "claude",
     "skills",
+    "commands",
+    "agents",
     "cli",
-    "tool",
-    "package-manager",
+    "collection-manager",
     "github",
-    "ai"
+    "ai",
+    "artifacts"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -48,10 +50,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/chrisvoncsefalvay/skillman"
-Documentation = "https://github.com/chrisvoncsefalvay/skillman#readme"
-Repository = "https://github.com/chrisvoncsefalvay/skillman.git"
-Issues = "https://github.com/chrisvoncsefalvay/skillman/issues"
+Homepage = "https://github.com/miethe/skillmeat"
+Documentation = "https://github.com/miethe/skillmeat#readme"
+Repository = "https://github.com/miethe/skillmeat.git"
+Issues = "https://github.com/miethe/skillmeat/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -63,10 +65,10 @@ dev = [
 ]
 
 [project.scripts]
-skillman = "skillman.cli:main"
+skillmeat = "skillmeat.cli:main"
 
 [tool.setuptools]
-packages = ["skillman"]
+packages = ["skillmeat"]
 
 [tool.setuptools.package-data]
-skillman = ["py.typed"]
+skillmeat = ["py.typed"]
