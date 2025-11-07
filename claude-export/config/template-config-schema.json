@@ -1,0 +1,554 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template Configuration Schema",
+  "description": "JSON Schema for validating template-config.json configuration files",
+  "type": "object",
+  "required": [
+    "metadata",
+    "identity",
+    "architecture",
+    "standards",
+    "workflow",
+    "documentation",
+    "technology",
+    "version"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Configuration metadata and versioning",
+      "required": ["projectName", "version", "configVersion"],
+      "properties": {
+        "projectName": {
+          "type": "string",
+          "description": "Project name from metadata",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "description": "Project version (semantic versioning)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Configuration description"
+        },
+        "author": {
+          "type": "string",
+          "description": "Configuration author"
+        },
+        "configVersion": {
+          "type": "string",
+          "description": "Configuration format version",
+          "pattern": "^\\d+\\.\\d+$"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Last update date (YYYY-MM-DD format)",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "templateUrl": {
+          "type": "string",
+          "description": "URL to template repository",
+          "format": "uri"
+        },
+        "documentationUrl": {
+          "type": "string",
+          "description": "URL to documentation",
+          "format": "uri"
+        }
+      }
+    },
+
+    "identity": {
+      "type": "object",
+      "description": "Project identity variables",
+      "required": ["PROJECT_NAME", "PROJECT_DESCRIPTION", "PROJECT_DOMAIN"],
+      "properties": {
+        "PROJECT_NAME": {
+          "type": "object",
+          "required": ["description", "default", "type"],
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string", "minLength": 1 },
+            "required": { "type": "boolean" },
+            "type": { "type": "string", "enum": ["string", "boolean", "object", "array"] },
+            "examples": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "PROJECT_DESCRIPTION": {
+          "type": "object",
+          "required": ["description", "default", "type"],
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string", "minLength": 1 },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "PROJECT_DOMAIN": {
+          "type": "object",
+          "required": ["description", "default", "type"],
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string", "minLength": 1 },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        }
+      }
+    },
+
+    "architecture": {
+      "type": "object",
+      "description": "Architecture-related variables",
+      "required": ["PROJECT_ARCHITECTURE", "LAYER_ARCHITECTURE"],
+      "properties": {
+        "PROJECT_ARCHITECTURE": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "LAYER_ARCHITECTURE": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "ARCHITECTURE_DIAGRAM": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        }
+      }
+    },
+
+    "standards": {
+      "type": "object",
+      "description": "Standards and validation variables",
+      "required": ["PROJECT_STANDARDS", "VALIDATION_RULES", "NAMING_CONVENTION", "CODE_QUALITY_STANDARDS"],
+      "properties": {
+        "PROJECT_STANDARDS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "VALIDATION_RULES": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "NAMING_CONVENTION": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "CODE_QUALITY_STANDARDS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        }
+      }
+    },
+
+    "workflow": {
+      "type": "object",
+      "description": "Workflow and process variables",
+      "required": ["PM_WORKFLOW", "TASK_TRACKER"],
+      "properties": {
+        "PM_WORKFLOW": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "enum": { "type": "array", "items": { "type": "string" } },
+            "examples": { "type": "array" }
+          }
+        },
+        "TASK_TRACKER": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "SPRINT_DURATION": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        },
+        "APPROVAL_WORKFLOW": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" },
+            "examples": { "type": "array" }
+          }
+        }
+      }
+    },
+
+    "documentation": {
+      "type": "object",
+      "description": "Documentation policy variables",
+      "required": ["DOC_POLICY", "DOC_BUCKETS", "ADR_PATH"],
+      "properties": {
+        "DOC_POLICY": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "DOC_BUCKETS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "ADR_PATH": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "DOC_FRONTMATTER": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "observability": {
+      "type": "object",
+      "description": "Observability configuration variables",
+      "properties": {
+        "OBSERVABILITY_REQUIRED": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "boolean" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "LOGGING_FORMAT": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "TRACING_ENABLED": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "METRICS_SYSTEM": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "permissions": {
+      "type": "object",
+      "description": "Permissions and security variables",
+      "properties": {
+        "PERMISSIONS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "object" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "HOOKS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "object" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "AUTH_METHOD": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "ENV_GATE_SECRET": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "paths": {
+      "type": "object",
+      "description": "Path and directory structure variables",
+      "required": ["PROJECT_PATHS"],
+      "properties": {
+        "PROJECT_PATHS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "object" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "EXCLUDED_PATHS": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "SYMBOL_FILES": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "object" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "technology": {
+      "type": "object",
+      "description": "Technology stack variables",
+      "required": [
+        "FRONTEND_FRAMEWORK",
+        "BACKEND_LANGUAGE",
+        "BACKEND_FRAMEWORK",
+        "DATABASE",
+        "UI_LIBRARY"
+      ],
+      "properties": {
+        "FRONTEND_FRAMEWORK": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "BACKEND_LANGUAGE": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "BACKEND_FRAMEWORK": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "DATABASE": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "UI_LIBRARY": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "PACKAGE_MANAGER": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "BUILD_TOOL": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "TESTING_FRAMEWORK": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "examples": {
+      "type": "object",
+      "description": "Example and pattern variables",
+      "properties": {
+        "PROJECT_EXAMPLES": { "type": "object" },
+        "EXAMPLE_FEATURE": { "type": "object" },
+        "EXAMPLE_ARCHITECTURE": { "type": "object" },
+        "EXAMPLE_ERROR_HANDLING": { "type": "object" }
+      }
+    },
+
+    "agents": {
+      "type": "object",
+      "description": "Agent configuration variables",
+      "properties": {
+        "COMPLEXITY_SCALE": { "type": "object" }
+      }
+    },
+
+    "subagents": {
+      "type": "object",
+      "description": "Subagent routing configuration",
+      "properties": {
+        "SUBAGENTS_CONFIG": { "type": "object" }
+      }
+    },
+
+    "version": {
+      "type": "object",
+      "description": "Configuration versioning",
+      "required": ["CONFIG_VERSION", "SCHEMA_VERSION"],
+      "properties": {
+        "CONFIG_VERSION": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        },
+        "SCHEMA_VERSION": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "default": { "type": "string" },
+            "required": { "type": "boolean" },
+            "type": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "notes": {
+      "type": "object",
+      "description": "Helpful notes and guidance",
+      "properties": {
+        "IMPORTANT_NOTES": { "type": "string" },
+        "USAGE": { "type": "string" },
+        "CUSTOMIZATION_GUIDE": { "type": "string" },
+        "NEXT_STEPS": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
