@@ -419,6 +419,14 @@ class ArtifactManager:
         Raises:
             ValueError: Artifact not found
         """
+        # Create auto-snapshot before removal
+        from skillmeat.core.version import VersionManager
+
+        version_mgr = VersionManager(self.collection_mgr)
+        version_mgr.auto_snapshot(
+            collection_name, f"Before removing {artifact_type.value}/{artifact_name}"
+        )
+
         collection = self.collection_mgr.load_collection(collection_name)
 
         # Find artifact
