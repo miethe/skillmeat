@@ -1,354 +1,403 @@
-# skillman: a CLI for managing Claude skills
+# SkillMeat: Personal Collection Manager for Claude Code Artifacts
 
-
-[![Tests and Build](https://github.com/chrisvoncsefalvay/skillman/workflows/Tests%20and%20Build/badge.svg)](https://github.com/chrisvoncsefalvay/skillman/actions/workflows/tests.yml)
-[![Code Quality](https://github.com/chrisvoncsefalvay/skillman/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/chrisvoncsefalvay/skillman/actions/workflows/quality.yml)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![Tests and Build](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Tests%20and%20Build/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/tests.yml)
+[![Code Quality](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/quality.yml)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI](https://img.shields.io/badge/PyPI-skillman-orange)](https://pypi.org/project/skillman/)
 
+**SkillMeat** is your personal collection manager for Claude Code configurations. It helps developers maintain, version, and deploy Claude artifacts (Skills, Commands, Agents, and more) across multiple projects with intelligent tracking and flexible deployment strategies.
 
+## What is SkillMeat?
 
-A Python CLI for managing Claude skills from GitHub repositories. Handles installation, versioning, and synchronisation of skills across user and project scopes -- mostly gracefully.
+SkillMeat is the evolution of `skillman`, providing a unified system for managing all types of Claude Code artifacts:
 
-## Installation
+- **Skills** - Specialized capabilities for Claude
+- **Commands** - Custom slash commands
+- **Agents** - Autonomous task executors
+- *More coming:* MCP servers, hooks, and custom configurations
 
-### Via pip (from PyPI)
+### Key Features
 
-Once published to PyPI:
+- **Collection-First Architecture** - Organize artifacts into named collections (work, personal, experimental)
+- **GitHub Integration** - Add artifacts directly from GitHub repositories with version tracking
+- **Smart Deployment** - Deploy from collection to projects with automatic tracking
+- **Version Management** - Snapshots and rollback for your entire collection
+- **Update Tracking** - Check for upstream changes and update with conflict resolution
+- **Multi-Collection Support** - Manage different sets of artifacts for different contexts
 
-```bash
-pip install skillman
-```
+## Quick Start
 
-### Via uv (recommended)
-
-The uv tool is a fast, all-in-one Python package installer and tool runner:
-
-```bash
-uv tool install skillman
-```
-
-Or run directly without installing:
-
-```bash
-uv run --with skillman skillman init
-```
-
-[Install uv](https://docs.astral.sh/uv/getting-started/installation/)
-
-### Via pipx
+### Installation
 
 ```bash
-pipx install skillman
+# Via pip (recommended)
+pip install skillmeat
+
+# Via uv (fast)
+uv tool install skillmeat
+
+# Via pipx
+pipx install skillmeat
 ```
 
-### From source (development)
-
-Clone the repository and install in development mode:
+### Basic Usage
 
 ```bash
-git clone https://github.com/chrisvoncsefalvay/skillman.git
-cd skillman
-pip install -e .
+# Initialize your collection
+skillmeat init
+
+# Add a skill from GitHub
+skillmeat add skill anthropics/skills/canvas
+
+# List your artifacts
+skillmeat list
+
+# Deploy to your project
+cd /path/to/your/project
+skillmeat deploy canvas
 ```
 
-Or with development dependencies:
+That's it! Your artifact is now available in your project's `.claude/` directory.
+
+## Why SkillMeat?
+
+### Before SkillMeat
+
+- Copy/paste Claude configurations between projects manually
+- No way to track upstream changes
+- Difficult to maintain consistency across projects
+- Separate tools for different artifact types
+
+### With SkillMeat
+
+- Centralized collection of all your Claude artifacts
+- Automatic upstream tracking and update notifications
+- Deploy artifacts to any project in seconds
+- One tool for Skills, Commands, Agents, and more
+- Version control with snapshots and rollback
+
+## Example Workflow
 
 ```bash
-pip install -e ".[dev]"
+# Create a collection
+skillmeat init
+
+# Add artifacts from GitHub
+skillmeat add skill anthropics/skills/python
+skillmeat add command user/repo/commands/review.md
+skillmeat add agent user/repo/agents/code-reviewer.md
+
+# Add local artifacts
+skillmeat add skill ./my-custom-skill
+
+# View your collection
+skillmeat list
+
+# Deploy to projects
+cd ~/projects/web-app
+skillmeat deploy python review code-reviewer
+
+cd ~/projects/api-server
+skillmeat deploy python code-reviewer
+
+# Check for updates
+skillmeat status
+
+# Create backup before changes
+skillmeat snapshot "Before cleanup"
+
+# Update artifacts
+skillmeat update python
 ```
 
-## Quick start
+## Documentation
 
-Create an empty manifest in your project:
+- **[Quickstart Guide](docs/quickstart.md)** - Get started in 5 minutes
+- **[Commands Reference](docs/commands.md)** - Complete CLI documentation
+- **[Migration Guide](docs/migration.md)** - Migrate from skillman
+- **[Examples](docs/examples.md)** - Real-world workflows and patterns
+
+## Core Concepts
+
+### Collections
+
+Collections are named groups of artifacts stored in `~/.skillmeat/collections/`. You can have multiple collections for different contexts:
 
 ```bash
-skillman init
+skillmeat collection create work
+skillmeat collection create personal
+skillmeat collection use work
 ```
 
-List installed skills:
+### Deployment
+
+Deployment copies artifacts from your collection to a project's `.claude/` directory while maintaining tracking:
 
 ```bash
-skillman list
+# Deploy to current directory
+skillmeat deploy my-skill
+
+# Deploy to specific project
+skillmeat deploy my-skill --project /path/to/project
+
+# Deploy multiple artifacts
+skillmeat deploy skill1 skill2 skill3
 ```
 
-## Commands
+### Versioning
 
-### skillman init
-
-Create empty skills.toml in current directory.
-
-### skillman add <skill-spec> [options]
-
-Add and install a skill from GitHub.
-
-By default, the tool displays a security warning before installation to help you make informed decisions about which skills to install.
-
-Options:
-- `-s, --scope <local|user>`: Installation scope (default: local)
-- `--no-verify`: Skip skill validation
-- `--force`: Overwrite existing skill
-- `--dangerously-skip-permissions`: Skip security warning (not recommended)
-
-Skill specification format:
-- Single skill repo: `username/reponame[@version]`
-- Skill in repository folder: `username/reponame/foldername[@version]`
-- Nested skill (multi-tier): `username/reponame/folder1/folder2/...[@version]`
-- Version: `@1.2.3` (tag), `@abc1234` (SHA), `@latest` or omitted (latest)
-
-Supports arbitrary nesting levels. The tool will look for SKILL.md in the specified path.
-
-Example:
+Snapshots preserve your entire collection state:
 
 ```bash
-skillman add anthropics/skills/canvas-design
-skillman add anthropics/skills/document-skills/docx
-skillman add myorg/repo/custom-skill@1.2.3
+# Create snapshot
+skillmeat snapshot "Before major changes"
+
+# View history
+skillmeat history
+
+# Rollback
+skillmeat rollback abc123d
 ```
 
-### skillman remove <skillname> [options]
+## Use Cases
 
-Remove skill from manifest and filesystem.
+### Solo Developer
 
-Options:
-- `-s, --scope <local|user>`: Only remove from specified scope
-- `--keep-files`: Remove only from manifest, keep installed files
+Maintain a personal library of your favorite Claude configurations and deploy them instantly to new projects.
 
-### skillman verify <skill-spec>
+### Team Lead
 
-Check if skill exists at source and has valid structure.
+Create standardized collections for your team and share setup instructions for consistent development environments.
 
-### skillman list [options]
+### Multi-Project Developer
 
-List installed skills with status.
+Manage different collections for different types of work (web dev, data science, DevOps) and switch between them effortlessly.
 
-Options:
-- `-s, --scope <local|user>`: Show only specified scope
+### Open Source Maintainer
 
-Status values:
-- synced: Installed and matches manifest version
-- outdated: Installed version differs from manifest
-- orphaned: Installed but not in manifest
-- missing: In manifest but not installed
-
-### skillman show <skillname>
-
-Display detailed skill information.
-
-### skillman update [<skillname>|--all] [--dry-run]
-
-Update installed skills to versions specified in manifest.
-
-Options:
-- `--all`: Update all skills
-- `--dry-run`: Show what would happen
-
-Examples:
-
-```bash
-skillman update canvas-design
-skillman update --all
-skillman update --dry-run
-```
-
-### skillman fetch [--dry-run]
-
-Fetch and update all skills (alias for update --all).
-
-### skillman sync [options]
-
-Synchronise skills between manifest and installed.
-
-Options:
-- `--up`: Update skills to latest matching manifest constraints
-- `--down`: Add installed-but-unlisted skills to manifest
-- `-y, --yes`: Don't prompt for confirmation
-- `--dry-run`: Show what would happen
-
-### skillman clean [options]
-
-Remove orphaned skills (installed but not in manifest).
-
-Options:
-- `-s, --scope <local|user>`: Clean only specified scope
-- `--dry-run`: Show what would happen
-- `-y, --yes`: Don't prompt for confirmation
-
-### skillman config <command> [args]
-
-Manage configuration.
-
-Subcommands:
-- `get <key>`: Get configuration value
-- `set <key> <value>`: Set configuration value
-- `list`: List all configuration values
-
-Configuration keys:
-- `default-scope`: Default installation scope (local or user)
-- `github-token`: GitHub token for private repositories
-
-Configuration file location: `~/.skillman/config.toml`
-
-Example:
-
-```bash
-skillman config set github-token your-token-here
-skillman config get default-scope
-skillman config list
-```
-
-## Installation paths
-
-Skills are installed to:
-- User scope: `~/.claude/skills/user/`
-- Project scope: `./.claude/skills/`
-
-## Manifest file
-
-Skills are declared in `skills.toml`:
-
-```toml
-[tool.skillman]
-version = "1.0.0"
-
-[[skills]]
-name = "canvas"
-source = "anthropics/skills/canvas-design"
-version = "latest"
-scope = "user"
-aliases = ["design"]
-
-[[skills]]
-name = "custom"
-source = "myorg/repo/custom-skill"
-version = "1.0.0"
-scope = "local"
-```
-
-## Security considerations
-
-Skills can execute code and access system resources. Before installing a skill, you should:
-
-1. **Install only from trusted sources**: Only install skills from repositories you trust or that have been recommended by reliable sources.
-
-2. **Review skill functionality**: Use `skillman verify` to examine what a skill does before installing it.
-
-3. **Understand permissions**: Skills can:
-   - Read, create, and modify files on your system
-   - Execute system commands
-   - Access and manipulate data
-
-4. **Permission warnings**: By default, skillman displays a security warning and asks for confirmation before installing any skill. This helps you make informed decisions.
-
-5. **Skipping warnings**: The `--dangerously-skip-permissions` flag allows skipping the security warning. This is not recommended except for trusted, well-known skills.
-
-For detailed information about skill security and permissions, see:
-[Using Skills in Claude - Security](https://support.claude.com/en/articles/12512180-using-skills-in-claude#h_2746475e70)
-
-## Skill metadata extraction
-
-Skillman automatically extracts metadata from SKILL.md front matter in YAML format:
-
-```yaml
----
-title: My Skill
-description: What this skill does
-license: MIT
-author: Author Name
-version: 1.0.0
-tags:
-  - documentation
-  - productivity
----
-
-# Skill content...
-```
-
-Extracted metadata is displayed when:
-
-- Verifying a skill: `skillman verify username/repo/skill`
-- Showing skill details: `skillman show skillname`
-
-If no YAML front matter is present, the first non-header paragraph from the markdown is used as the description.
-
-## Lock file
-
-`skills.lock` is automatically generated and maintains exact commit SHAs for reproducible installations. This file should be committed to version control.
-
-## Configuration
-
-Create `~/.skillman/config.toml` for global configuration:
-
-```toml
-default-scope = "local"
-github-token = "your-github-token"
-```
-
-Or use the `skillman config` command:
-
-```bash
-skillman config set github-token your-token
-```
-
-## Development
-
-Install development dependencies:
-
-```bash
-pip install -e ".[dev]"
-```
-
-Run tests:
-
-```bash
-pytest
-```
-
-Format code:
-
-```bash
-black skillman
-```
-
-Type check:
-
-```bash
-mypy skillman
-```
-
-## Requirements
-
-- Python 3.8+
-- click: CLI framework
-- rich: Formatted output
-- GitPython: Git operations
-- tomli/tomli_w: TOML parsing
-- requests: HTTP operations
+Track and manage Claude artifacts from multiple upstream sources, getting notified when updates are available.
 
 ## Architecture
 
-The tool is structured as follows:
+```
+Collection (Personal Library)
+  ~/.skillmeat/collections/default/
+  ├── collection.toml      # Manifest
+  ├── collection.lock      # Version lock
+  ├── skills/              # Skills
+  ├── commands/            # Commands
+  └── agents/              # Agents
+            │
+            ├── deploy → Project A (.claude/)
+            ├── deploy → Project B (.claude/)
+            └── deploy → Project C (.claude/)
+```
 
-- `cli.py`: Click-based CLI commands
-- `models.py`: Data models (Skill, Manifest, LockFile)
-- `config.py`: Configuration management
-- `github.py`: GitHub operations and skill validation
-- `installer.py`: Skill installation and management
-- `utils.py`: Utility functions for manifest and lock file handling
+## Configuration
 
-All output uses the Rich library for ASCII-compatible formatting (no Unicode box-drawing or emoji).
+Configure SkillMeat globally:
 
-## Error handling
+```bash
+# Set GitHub token (for private repos and higher rate limits)
+skillmeat config set github-token ghp_xxxxxxxxxxxxx
 
-The tool provides (mostly) clear error messages for:
-- Network failures (with retry suggestions)
-- Validation failures (showing what's wrong with the skill structure)
-- Conflict warnings (these are only warnings as Claude should determine how to actually resolve them)
-- Sync failures (showing which skills succeeded and which failed)
+# Set default collection
+skillmeat config set default-collection work
+
+# View all settings
+skillmeat config list
+```
+
+Configuration is stored in `~/.skillmeat/config.toml`.
+
+## Security
+
+SkillMeat takes security seriously. Artifacts can execute code and access system resources, so:
+
+- **Security warnings** are shown before installation
+- Only install from **trusted sources**
+- Use `verify` to inspect artifacts before adding
+- Review what artifacts do before deploying
+
+See [Using Skills in Claude - Security](https://support.claude.com/en/articles/12512180-using-skills-in-claude#h_2746475e70) for more information.
+
+## Migrating from skillman
+
+If you're using the original `skillman` tool, see our [Migration Guide](docs/migration.md) for step-by-step instructions.
+
+Key changes:
+- `skillman add <spec>` → `skillmeat add skill <spec>`
+- Project-level `skills.toml` → Collection-level `collection.toml`
+- Install to scope → Deploy from collection to projects
+
+## Development
+
+### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/chrisvoncsefalvay/skillmeat.git
+cd skillmeat
+
+# Install in development mode
+pip install -e ".[dev]"
+```
+
+### Testing
+
+```bash
+# Run all tests
+pytest -v --cov=skillmeat
+
+# Run specific test file
+pytest tests/test_cli.py -v
+
+# Type checking
+mypy skillmeat --ignore-missing-imports
+
+# Formatting
+black skillmeat
+
+# Linting
+flake8 skillmeat --count --select=E9,F63,F7,F82 --show-source --statistics
+```
+
+### Project Structure
+
+```
+skillmeat/
+├── skillmeat/
+│   ├── cli.py                 # CLI interface
+│   ├── core/                  # Core managers
+│   │   ├── collection.py      # Collection management
+│   │   ├── artifact.py        # Artifact operations
+│   │   ├── deployment.py      # Deployment system
+│   │   └── version.py         # Versioning & snapshots
+│   ├── sources/               # Source integrations
+│   │   ├── github.py          # GitHub source
+│   │   └── local.py           # Local filesystem
+│   ├── storage/               # Storage layer
+│   │   ├── manifest.py        # TOML manifests
+│   │   ├── lockfile.py        # Lock files
+│   │   └── snapshot.py        # Snapshot storage
+│   └── utils/                 # Utilities
+│       ├── validator.py       # Artifact validation
+│       └── metadata.py        # Metadata extraction
+├── tests/                     # Test suite
+├── docs/                      # Documentation
+└── README.md                  # This file
+```
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`pytest`)
+5. Run code quality checks (`black skillmeat && flake8 skillmeat`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+### Development Guidelines
+
+- Follow existing code style (Black formatting)
+- Add tests for new features
+- Update documentation as needed
+- Keep commits focused and atomic
+- Write descriptive commit messages
+
+## Requirements
+
+- Python 3.9+
+- Git 2.0+
+- Internet connection (for GitHub integration)
+
+### Python Dependencies
+
+- click - CLI framework
+- rich - Terminal output formatting
+- GitPython - Git operations
+- requests - HTTP client
+- tomli/tomllib - TOML parsing (Python 3.11+ uses built-in tomllib)
+
+## Roadmap
+
+### Current (MVP - Phase 1)
+
+- [x] Collection management
+- [x] Skills, Commands, Agents support
+- [x] GitHub and local sources
+- [x] Deployment tracking
+- [x] Snapshots and rollback
+- [x] Update checking
+
+### Phase 2: Intelligence & Sync
+
+- [ ] Cross-project search
+- [ ] Usage analytics
+- [ ] Smart merge strategies
+- [ ] Bidirectional sync (project → collection)
+
+### Phase 3: Advanced Features
+
+- [ ] Web interface
+- [ ] Team sharing and recommendations
+- [ ] MCP server management
+- [ ] Marketplace integration
+
+## FAQ
+
+**Q: What's the difference between skillman and skillmeat?**
+
+A: SkillMeat is the evolution of skillman with support for multiple artifact types (not just skills), collection-based organization, better versioning, and enhanced deployment tracking.
+
+**Q: Can I use both skillman and skillmeat?**
+
+A: Yes! They store data in different locations and won't conflict. See the [Migration Guide](docs/migration.md).
+
+**Q: Do artifacts get re-downloaded for each project?**
+
+A: No. Artifacts are stored once in your collection (`~/.skillmeat/`) and copied to projects when deployed.
+
+**Q: How do I share my collection with my team?**
+
+A: Document your collection setup commands (see [Examples](docs/examples.md#example-7-team-artifact-sharing)) or export your `collection.toml` manifest.
+
+**Q: Can I use private GitHub repositories?**
+
+A: Yes! Set your GitHub token: `skillmeat config set github-token ghp_xxxxx`
+
+**Q: What happens if I modify a deployed artifact?**
+
+A: SkillMeat tracks deployments and will detect modifications with `skillmeat status`.
+
+## Support
+
+- **Documentation:** See [docs/](docs/) directory
+- **Issues:** [GitHub Issues](https://github.com/chrisvoncsefalvay/skillmeat/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/chrisvoncsefalvay/skillmeat/discussions)
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
 
-Made with ❤️ in the Mile High City 🏔️ by [Chris von Csefalvay](https://chrisvoncsefalvay.com) and 🐶 Oliver.
+## Acknowledgments
+
+- Built on the foundation of the original `skillman` tool
+- Inspired by package managers like npm, pip, and brew
+- Powered by Claude Code and the Claude API
+
+## AI Development Context
+
+For AI assistants working with this codebase, see [CLAUDE.md](CLAUDE.md) for:
+- Project architecture and design decisions
+- Development setup and testing procedures
+- Code style guidelines
+- Implementation patterns
+
+---
+
+Made with ❤️ in the Mile High City 🏔️ by [Chris von Csefalvay](https://chrisvoncsefalvay.com)

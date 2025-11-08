@@ -7,8 +7,7 @@ name = "skillmeat"
 version = "0.1.0-alpha"
 description = "Personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP, Hooks)"
 readme = "README.md"
-license = "MIT"
-license-files = []
+license = {file = "LICENSE"}
 requires-python = ">=3.9"
 authors = [
     {name = "SkillMeat Contributors"}
@@ -68,7 +67,13 @@ dev = [
 skillmeat = "skillmeat.cli:main"
 
 [tool.setuptools]
-packages = ["skillmeat"]
+packages = [
+    "skillmeat",
+    "skillmeat.core",
+    "skillmeat.sources",
+    "skillmeat.storage",
+    "skillmeat.utils"
+]
 
 [tool.setuptools.package-data]
 skillmeat = ["py.typed"]

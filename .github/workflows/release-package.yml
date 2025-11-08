@@ -31,39 +31,39 @@ jobs:
       - name: Create source zip
         run: |
           mkdir -p release-artifacts
-          zip -r release-artifacts/skillman-source.zip skillman/ pyproject.toml README.md LICENSE MANIFEST.in -x "*/.*" "*/__pycache__/*" "*.egg-info/*"
+          zip -r release-artifacts/skillmeat-source.zip skillmeat/ pyproject.toml README.md LICENSE MANIFEST.in -x "*/.*" "*/__pycache__/*" "*.egg-info/*"
 
       - name: Create distribution zip
         run: |
           mkdir -p release-artifacts/dist
           cp dist/* release-artifacts/dist/
           cd release-artifacts
-          zip -r skillman-distributions.zip dist/
+          zip -r skillmeat-distributions.zip dist/
 
       - name: Create comprehensive release package
         run: |
-          mkdir -p skillman-release
-          cp -r skillman/ skillman-release/
-          cp pyproject.toml README.md LICENSE MANIFEST.in skillman-release/
-          cd skillman-release
-          zip -r ../release-artifacts/skillman-${{ github.event.release.tag_name }}-full.zip .
+          mkdir -p skillmeat-release
+          cp -r skillmeat/ skillmeat-release/
+          cp pyproject.toml README.md LICENSE MANIFEST.in skillmeat-release/
+          cd skillmeat-release
+          zip -r ../release-artifacts/skillmeat-${{ github.event.release.tag_name }}-full.zip .
 
       - name: Create standalone CLI package (Windows)
         run: |
           python -m pip install pyinstaller
-          pyinstaller --onefile --name skillman --distpath release-artifacts/standalone-windows skillman/cli.py
+          pyinstaller --onefile --name skillmeat --distpath release-artifacts/standalone-windows skillmeat/cli.py
         continue-on-error: true
 
       - name: Create standalone CLI package (macOS)
         run: |
           python -m pip install pyinstaller
-          pyinstaller --onefile --name skillman --distpath release-artifacts/standalone-macos skillman/cli.py
+          pyinstaller --onefile --name skillmeat --distpath release-artifacts/standalone-macos skillmeat/cli.py
         continue-on-error: true
 
       - name: Create standalone CLI package (Linux)
         run: |
           python -m pip install pyinstaller
-          pyinstaller --onefile --name skillman --distpath release-artifacts/standalone-linux skillman/cli.py
+          pyinstaller --onefile --name skillmeat --distpath release-artifacts/standalone-linux skillmeat/cli.py
         continue-on-error: true
 
       - name: Generate checksums
@@ -74,31 +74,31 @@ jobs:
       - name: Generate release manifest
         run: |
           cat > release-artifacts/MANIFEST.txt << 'EOF'
-          Skillman Release: ${{ github.event.release.tag_name }}
+          SkillMeat Release: ${{ github.event.release.tag_name }}
           Released: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
           Distribution Files:
-          - skillman-${{ github.event.release.tag_name }}-full.zip: Complete package with documentation
-          - skillman-source.zip: Source code only
-          - skillman-distributions.zip: Python distributions (wheel + source)
-          - dist/skillman-*.whl: Python wheel (install with pip)
-          - dist/skillman-*.tar.gz: Python source distribution (install with pip)
+          - skillmeat-${{ github.event.release.tag_name }}-full.zip: Complete package with documentation
+          - skillmeat-source.zip: Source code only
+          - skillmeat-distributions.zip: Python distributions (wheel + source)
+          - dist/skillmeat-*.whl: Python wheel (install with pip)
+          - dist/skillmeat-*.tar.gz: Python source distribution (install with pip)
 
           Installation:
 
           Recommended (uv):
-            uv tool install skillman
+            uv tool install skillmeat
 
           Alternative (pip):
-            pip install skillman
+            pip install skillmeat
 
           From source:
-            pip install dist/skillman-*.whl
+            pip install dist/skillmeat-*.whl
 
           Standalone (if available):
-            Windows: Use standalone-windows/skillman.exe
-            macOS: Use standalone-macos/skillman
-            Linux: Use standalone-linux/skillman
+            Windows: Use standalone-windows/skillmeat.exe
+            macOS: Use standalone-macos/skillmeat
+            Linux: Use standalone-linux/skillmeat
 
           Verification:
             sha256sum -c CHECKSUMS.txt
@@ -116,13 +116,13 @@ jobs:
         if: github.event_name == 'release'
         with:
           files: |
-            release-artifacts/skillman-source.zip
-            release-artifacts/skillman-distributions.zip
-            release-artifacts/skillman-${{ github.event.release.tag_name }}-full.zip
+            release-artifacts/skillmeat-source.zip
+            release-artifacts/skillmeat-distributions.zip
+            release-artifacts/skillmeat-${{ github.event.release.tag_name }}-full.zip
             release-artifacts/CHECKSUMS.txt
             release-artifacts/MANIFEST.txt
-            dist/skillman-*.whl
-            dist/skillman-*.tar.gz
+            dist/skillmeat-*.whl
+            dist/skillmeat-*.tar.gz
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
