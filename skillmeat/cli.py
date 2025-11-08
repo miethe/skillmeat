@@ -1087,6 +1087,239 @@ def collection_use(name: str):
 
 
 # ====================
+# Migration Command
+# ====================
+
+
+@main.command()
+@click.option(
+    "--from-skillman",
+    "from_skillman",
+    is_flag=True,
+    help="Migrate from skillman installation",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview migration without making changes",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing artifacts",
+)
+@click.option(
+    "--no-snapshot",
+    is_flag=True,
+    help="Skip creating initial snapshot",
+)
+@click.option(
+    "-y",
+    "--yes",
+    is_flag=True,
+    help="Skip confirmation prompts",
+)
+@click.argument("path", required=False, type=click.Path(exists=True, path_type=Path))
+def migrate(
+    from_skillman: bool,
+    dry_run: bool,
+    force: bool,
+    no_snapshot: bool,
+    yes: bool,
+    path: Optional[Path],
+):
+    """Migrate from skillman to skillmeat.
+
+    Automatically detects existing skillman installation and imports
+    configuration, skills, and metadata into skillmeat collection.
+
+    The migration:
+    - Detects skillman configuration and installed skills
+    - Creates default collection if needed
+    - Imports configuration (GitHub token, etc.)
+    - Imports skills from manifest and installed directories
+    - Creates snapshot for safety (unless --no-snapshot)
+
+    Examples:
+      skillmeat migrate --from-skillman              # Auto-detect and migrate
+      skillmeat migrate --from-skillman --dry-run    # Preview changes
+      skillmeat migrate --from-skillman --force      # Overwrite existing
+      skillmeat migrate --from-skillman skills.toml  # Specify manifest path
+    """
+    if not from_skillman:
+        console.print("[yellow]Please specify --from-skillman flag[/yellow]")
+        console.print("Usage: skillmeat migrate --from-skillman [PATH]")
+        return
+
+    try:
+        from skillmeat.utils.migration import SkillmanMigrator
+
+        # Initialize managers
+        collection_mgr = CollectionManager()
+        version_mgr = VersionManager()
+
+        # Create migrator
+        migrator = SkillmanMigrator(collection_mgr, version_mgr)
+
+        # Step 1: Find skillman installation
+        console.print("[cyan]Detecting skillman installation...[/cyan]")
+        installation = migrator.find_skillman_installation(path)
+
+        if not installation["found"]:
+            console.print("[yellow]No skillman installation found[/yellow]")
+            console.print("\nSearched for:")
+            console.print("  - ~/.skillman/config.toml")
+            console.print("  - ./skills.toml (or specified path)")
+            console.print("  - ~/.claude/skills/user/")
+            console.print("  - ./.claude/skills/")
+            console.print("\nNothing to migrate.")
+            return
+
+        # Display what was found
+        console.print("\n[green]Detected skillman installation:[/green]")
+        if installation["config_path"]:
+            console.print(f"  Config: {installation['config_path']}")
+        if installation["manifest_path"]:
+            console.print(
+                f"  Manifest: {installation['manifest_path']} ({installation['skill_count']} skills)"
+            )
+        if installation["user_skills_dir"]:
+            console.print(
+                f"  User skills: {installation['user_skills_dir']} ({installation['user_skill_count']} skills)"
+            )
+        if installation["local_skills_dir"]:
+            console.print(
+                f"  Local skills: {installation['local_skills_dir']} ({installation['local_skill_count']} skills)"
+            )
+
+        # Step 2: Preview migration plan
+        console.print("\n[cyan]Migration Plan:[/cyan]")
+        collections = collection_mgr.list_collections()
+        if "default" not in collections:
+            console.print("  ✓ Create default collection")
+        else:
+            console.print("  - Default collection already exists")
+
+        if installation["config_path"]:
+            console.print("  ✓ Import configuration (github-token, etc.)")
+
+        if installation["manifest_path"]:
+            console.print(f"  ✓ Import {installation['skill_count']} skills from manifest")
+
+        if installation["user_skills_dir"] and installation["user_skill_count"] > 0:
+            console.print(f"  ✓ Import {installation['user_skill_count']} skills from user directory")
+
+        if installation["local_skills_dir"] and installation["local_skill_count"] > 0:
+            console.print(f"  ✓ Import {installation['local_skill_count']} skills from local directory")
+
+        if not no_snapshot:
+            console.print("  ✓ Create snapshot 'Migrated from skillman'")
+
+        # Dry-run mode
+        if dry_run:
+            console.print("\n[yellow]Dry-run mode: No changes will be made[/yellow]")
+            return
+
+        # Step 3: Confirm migration
+        if not yes:
+            console.print()
+            if not Confirm.ask("Proceed with migration?"):
+                console.print("[yellow]Migration cancelled[/yellow]")
+                return
+
+        # Step 4: Create default collection if needed
+        console.print("\n[cyan]Migrating...[/cyan]")
+        if "default" not in collections:
+            collection_mgr.init("default")
+            console.print("[green]✓[/green] Created collection: default")
+
+        # Step 5: Import configuration
+        migration_results = []
+        if installation["config_path"]:
+            success, imported_keys = migrator.import_config()
+            if success:
+                console.print(f"[green]✓[/green] Imported configuration: {', '.join(imported_keys)}")
+            else:
+                console.print("[yellow]-[/yellow] No configuration to import")
+
+        # Step 6: Import skills from manifest
+        if installation["manifest_path"]:
+            result = migrator.import_skills_from_manifest(
+                installation["manifest_path"],
+                force=force,
+            )
+            migration_results.append(result)
+            if result.artifacts_imported > 0:
+                console.print(
+                    f"[green]✓[/green] Imported {result.artifacts_imported} skills from manifest"
+                )
+            if result.artifacts_skipped > 0:
+                console.print(
+                    f"[yellow]-[/yellow] Skipped {result.artifacts_skipped} skills (already exist)"
+                )
+
+        # Step 7: Import skills from user directory
+        if installation["user_skills_dir"] and installation["user_skill_count"] > 0:
+            result = migrator.import_skills_from_directory(
+                installation["user_skills_dir"],
+                force=force,
+            )
+            migration_results.append(result)
+            if result.artifacts_imported > 0:
+                console.print(
+                    f"[green]✓[/green] Imported {result.artifacts_imported} skills from user directory"
+                )
+            if result.artifacts_skipped > 0:
+                console.print(
+                    f"[yellow]-[/yellow] Skipped {result.artifacts_skipped} skills (already exist)"
+                )
+
+        # Step 8: Import skills from local directory
+        if installation["local_skills_dir"] and installation["local_skill_count"] > 0:
+            result = migrator.import_skills_from_directory(
+                installation["local_skills_dir"],
+                force=force,
+            )
+            migration_results.append(result)
+            if result.artifacts_imported > 0:
+                console.print(
+                    f"[green]✓[/green] Imported {result.artifacts_imported} skills from local directory"
+                )
+            if result.artifacts_skipped > 0:
+                console.print(
+                    f"[yellow]-[/yellow] Skipped {result.artifacts_skipped} skills (already exist)"
+                )
+
+        # Step 9: Create snapshot
+        if not no_snapshot:
+            success = migrator.create_migration_snapshot("Migrated from skillman")
+            if success:
+                console.print("[green]✓[/green] Created snapshot: 'Migrated from skillman'")
+            else:
+                console.print("[yellow]-[/yellow] Could not create snapshot")
+
+        # Step 10: Show migration report
+        if migration_results:
+            report = migrator.generate_report(migration_results)
+            console.print(report)
+
+        # Final instructions
+        console.print("\n[green]Migration complete![/green]")
+        console.print("\nNext steps:")
+        console.print("  1. Verify your collection: skillmeat list")
+        console.print("  2. Deploy to a project: skillmeat deploy --all")
+        console.print("  3. Your original skillman installation is unchanged")
+        console.print("\nFor more information: skillmeat --help")
+
+    except Exception as e:
+        console.print(f"[red]Error during migration: {e}[/red]")
+        import traceback
+
+        console.print(traceback.format_exc())
+        sys.exit(1)
+
+
+# ====================
 # Utility Commands
 # ====================
 
