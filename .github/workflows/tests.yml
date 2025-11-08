@@ -36,15 +36,15 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          flake8 skillman --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 skillman --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 skillmeat --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 skillmeat --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Type check with mypy
-        run: mypy skillman --ignore-missing-imports
+        run: mypy skillmeat --ignore-missing-imports
         continue-on-error: true
 
       - name: Run tests
-        run: pytest -v --cov=skillman --cov-report=xml
+        run: pytest -v --cov=skillmeat --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
