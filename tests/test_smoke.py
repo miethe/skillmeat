@@ -73,13 +73,14 @@ def test_cli_version():
 
 
 def test_cli_init_placeholder():
-    """Test that init command placeholder works."""
+    """Test that init command works (no longer a placeholder)."""
     from click.testing import CliRunner
     from skillmeat.cli import main
 
     runner = CliRunner()
     result = runner.invoke(main, ['init'])
 
+    # Init should succeed whether creating new or collection already exists
     assert result.exit_code == 0
-    assert 'under development' in result.output.lower()
-    assert '0.1.0-alpha' in result.output
+    # Should mention collection (either initialized or already exists)
+    assert 'collection' in result.output.lower()
