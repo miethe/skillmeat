@@ -10,12 +10,14 @@ import pytest
 def test_import_skillmeat():
     """Test that skillmeat package can be imported."""
     import skillmeat
+
     assert skillmeat is not None
 
 
 def test_version():
     """Test that version is defined and correct."""
     import skillmeat
+
     assert skillmeat.__version__ == "0.1.0-alpha"
     assert skillmeat.VERSION == "0.1.0-alpha"
 
@@ -23,12 +25,14 @@ def test_version():
 def test_cli_entry_point():
     """Test that CLI main function exists and is callable."""
     from skillmeat.cli import main
+
     assert callable(main)
 
 
 def test_package_metadata():
     """Test that package metadata is correctly set."""
     import skillmeat
+
     assert skillmeat.__license__ == "MIT"
     assert skillmeat.__author__ == "SkillMeat Contributors"
 
@@ -41,10 +45,10 @@ def test_core_modules_exist():
     import skillmeat.utils
 
     # Verify submodules exist (even if empty)
-    assert hasattr(skillmeat, 'core')
-    assert hasattr(skillmeat, 'sources')
-    assert hasattr(skillmeat, 'storage')
-    assert hasattr(skillmeat, 'utils')
+    assert hasattr(skillmeat, "core")
+    assert hasattr(skillmeat, "sources")
+    assert hasattr(skillmeat, "storage")
+    assert hasattr(skillmeat, "utils")
 
 
 def test_cli_help():
@@ -53,11 +57,11 @@ def test_cli_help():
     from skillmeat.cli import main
 
     runner = CliRunner()
-    result = runner.invoke(main, ['--help'])
+    result = runner.invoke(main, ["--help"])
 
     assert result.exit_code == 0
-    assert 'SkillMeat' in result.output
-    assert 'Personal collection manager' in result.output
+    assert "SkillMeat" in result.output
+    assert "Personal collection manager" in result.output
 
 
 def test_cli_version():
@@ -66,10 +70,10 @@ def test_cli_version():
     from skillmeat.cli import main
 
     runner = CliRunner()
-    result = runner.invoke(main, ['--version'])
+    result = runner.invoke(main, ["--version"])
 
     assert result.exit_code == 0
-    assert '0.1.0-alpha' in result.output
+    assert "0.1.0-alpha" in result.output
 
 
 def test_cli_init_placeholder():
@@ -78,9 +82,9 @@ def test_cli_init_placeholder():
     from skillmeat.cli import main
 
     runner = CliRunner()
-    result = runner.invoke(main, ['init'])
+    result = runner.invoke(main, ["init"])
 
     # Init should succeed whether creating new or collection already exists
     assert result.exit_code == 0
     # Should mention collection (either initialized or already exists)
-    assert 'collection' in result.output.lower()
+    assert "collection" in result.output.lower()

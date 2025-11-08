@@ -6,7 +6,11 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from skillmeat.cli import main
-from tests.conftest import create_minimal_skill, create_minimal_command, create_minimal_agent
+from tests.conftest import (
+    create_minimal_skill,
+    create_minimal_command,
+    create_minimal_agent,
+)
 
 
 class TestVerifyCommand:
@@ -16,7 +20,9 @@ class TestVerifyCommand:
         """Test verifying a local skill."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_skill_dir), '--type', 'skill'])
+        result = runner.invoke(
+            main, ["verify", str(sample_skill_dir), "--type", "skill"]
+        )
 
         assert result.exit_code == 0
         assert "Valid artifact" in result.output
@@ -26,7 +32,9 @@ class TestVerifyCommand:
         """Test verifying a local command."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_command_file), '--type', 'command'])
+        result = runner.invoke(
+            main, ["verify", str(sample_command_file), "--type", "command"]
+        )
 
         assert result.exit_code == 0
         assert "Valid artifact" in result.output
@@ -36,7 +44,9 @@ class TestVerifyCommand:
         """Test verifying a local agent."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_agent_file), '--type', 'agent'])
+        result = runner.invoke(
+            main, ["verify", str(sample_agent_file), "--type", "agent"]
+        )
 
         assert result.exit_code == 0
         assert "Valid artifact" in result.output
@@ -46,7 +56,7 @@ class TestVerifyCommand:
         """Test verifying non-existent path."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', '/nonexistent/path', '--type', 'skill'])
+        result = runner.invoke(main, ["verify", "/nonexistent/path", "--type", "skill"])
 
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
@@ -59,7 +69,7 @@ class TestVerifyCommand:
         invalid_skill = tmp_path / "invalid-skill"
         invalid_skill.mkdir()
 
-        result = runner.invoke(main, ['verify', str(invalid_skill), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(invalid_skill), "--type", "skill"])
 
         assert result.exit_code == 1
         assert "Invalid" in result.output
@@ -68,7 +78,9 @@ class TestVerifyCommand:
         """Test that verify shows artifact metadata."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_skill_dir), '--type', 'skill'])
+        result = runner.invoke(
+            main, ["verify", str(sample_skill_dir), "--type", "skill"]
+        )
 
         assert result.exit_code == 0
         assert "Valid artifact" in result.output
@@ -79,7 +91,7 @@ class TestVerifyCommand:
         runner = isolated_cli_runner
 
         # Try without --type (should fail)
-        result = runner.invoke(main, ['verify', str(sample_skill_dir)])
+        result = runner.invoke(main, ["verify", str(sample_skill_dir)])
 
         # Should show error about missing type
         assert result.exit_code == 2  # Click missing required option error
@@ -88,13 +100,17 @@ class TestVerifyCommand:
         """Test verify with invalid type."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_skill_dir), '--type', 'invalid'])
+        result = runner.invoke(
+            main, ["verify", str(sample_skill_dir), "--type", "invalid"]
+        )
 
         # Should show error about invalid choice
         assert result.exit_code == 2
 
-    @patch('skillmeat.sources.github.GitHubSource.fetch')
-    def test_verify_github_spec(self, mock_fetch, isolated_cli_runner, sample_skill_dir, tmp_path):
+    @patch("skillmeat.sources.github.GitHubSource.fetch")
+    def test_verify_github_spec(
+        self, mock_fetch, isolated_cli_runner, sample_skill_dir, tmp_path
+    ):
         """Test verifying GitHub artifact spec."""
         runner = isolated_cli_runner
 
@@ -115,13 +131,15 @@ class TestVerifyCommand:
 
         mock_fetch.side_effect = mock_fetch_impl
 
-        result = runner.invoke(main, ['verify', 'user/repo/test-skill', '--type', 'skill'])
+        result = runner.invoke(
+            main, ["verify", "user/repo/test-skill", "--type", "skill"]
+        )
 
         assert result.exit_code == 0
         assert "Valid artifact" in result.output
         assert "Verifying GitHub artifact" in result.output
 
-    @patch('skillmeat.sources.github.GitHubSource.fetch')
+    @patch("skillmeat.sources.github.GitHubSource.fetch")
     def test_verify_github_invalid(self, mock_fetch, isolated_cli_runner, tmp_path):
         """Test verifying invalid GitHub artifact."""
         runner = isolated_cli_runner
@@ -135,7 +153,9 @@ class TestVerifyCommand:
 
         mock_fetch.side_effect = mock_fetch_impl
 
-        result = runner.invoke(main, ['verify', 'user/repo/invalid-skill', '--type', 'skill'])
+        result = runner.invoke(
+            main, ["verify", "user/repo/invalid-skill", "--type", "skill"]
+        )
 
         assert result.exit_code == 1
         assert "Invalid" in result.output
@@ -150,7 +170,7 @@ class TestVerifyMetadataDisplay:
 
         skill = create_minimal_skill(tmp_path, "titled-skill")
 
-        result = runner.invoke(main, ['verify', str(skill), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill), "--type", "skill"])
 
         assert result.exit_code == 0
         assert "Title:" in result.output or "Test Skill" in result.output
@@ -161,7 +181,7 @@ class TestVerifyMetadataDisplay:
 
         skill = create_minimal_skill(tmp_path, "described-skill")
 
-        result = runner.invoke(main, ['verify', str(skill), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill), "--type", "skill"])
 
         assert result.exit_code == 0
         # Should show description in output
@@ -172,7 +192,7 @@ class TestVerifyMetadataDisplay:
 
         skill = create_minimal_skill(tmp_path, "versioned-skill")
 
-        result = runner.invoke(main, ['verify', str(skill), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill), "--type", "skill"])
 
         assert result.exit_code == 0
         assert "Version:" in result.output or "1.0.0" in result.output
@@ -185,7 +205,8 @@ class TestVerifyMetadataDisplay:
         skill_dir = tmp_path / "authored-skill"
         skill_dir.mkdir()
         skill_md = skill_dir / "SKILL.md"
-        skill_md.write_text("""---
+        skill_md.write_text(
+            """---
 title: Authored Skill
 description: A skill with author
 version: 1.0.0
@@ -195,9 +216,10 @@ author: Test Author
 # Authored Skill
 
 Content here.
-""")
+"""
+        )
 
-        result = runner.invoke(main, ['verify', str(skill_dir), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill_dir), "--type", "skill"])
 
         assert result.exit_code == 0
         if "Author:" in result.output:
@@ -211,7 +233,8 @@ Content here.
         skill_dir = tmp_path / "tagged-skill"
         skill_dir.mkdir()
         skill_md = skill_dir / "SKILL.md"
-        skill_md.write_text("""---
+        skill_md.write_text(
+            """---
 title: Tagged Skill
 description: A skill with tags
 version: 1.0.0
@@ -223,9 +246,10 @@ tags:
 # Tagged Skill
 
 Content here.
-""")
+"""
+        )
 
-        result = runner.invoke(main, ['verify', str(skill_dir), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill_dir), "--type", "skill"])
 
         assert result.exit_code == 0
         if "Tags:" in result.output:
@@ -240,32 +264,46 @@ class TestVerifyWorkflows:
         runner = isolated_cli_runner
 
         # Verify first
-        verify_result = runner.invoke(main, ['verify', str(sample_skill_dir), '--type', 'skill'])
+        verify_result = runner.invoke(
+            main, ["verify", str(sample_skill_dir), "--type", "skill"]
+        )
         assert verify_result.exit_code == 0
         assert "Valid artifact" in verify_result.output
 
         # Now add with confidence
-        runner.invoke(main, ['init'])
+        runner.invoke(main, ["init"])
         add_result = runner.invoke(
             main,
-            ['add', 'skill', str(sample_skill_dir), '--dangerously-skip-permissions']
+            ["add", "skill", str(sample_skill_dir), "--dangerously-skip-permissions"],
         )
         assert add_result.exit_code == 0
 
-    def test_verify_all_types(self, isolated_cli_runner, sample_skill_dir, sample_command_file, sample_agent_file):
+    def test_verify_all_types(
+        self,
+        isolated_cli_runner,
+        sample_skill_dir,
+        sample_command_file,
+        sample_agent_file,
+    ):
         """Test verifying all artifact types."""
         runner = isolated_cli_runner
 
         # Verify skill
-        skill_result = runner.invoke(main, ['verify', str(sample_skill_dir), '--type', 'skill'])
+        skill_result = runner.invoke(
+            main, ["verify", str(sample_skill_dir), "--type", "skill"]
+        )
         assert skill_result.exit_code == 0
 
         # Verify command
-        command_result = runner.invoke(main, ['verify', str(sample_command_file), '--type', 'command'])
+        command_result = runner.invoke(
+            main, ["verify", str(sample_command_file), "--type", "command"]
+        )
         assert command_result.exit_code == 0
 
         # Verify agent
-        agent_result = runner.invoke(main, ['verify', str(sample_agent_file), '--type', 'agent'])
+        agent_result = runner.invoke(
+            main, ["verify", str(sample_agent_file), "--type", "agent"]
+        )
         assert agent_result.exit_code == 0
 
     def test_verify_multiple_artifacts(self, isolated_cli_runner, tmp_path):
@@ -279,11 +317,13 @@ class TestVerifyWorkflows:
 
         # Verify each
         for skill in [skill1, skill2, skill3]:
-            result = runner.invoke(main, ['verify', str(skill), '--type', 'skill'])
+            result = runner.invoke(main, ["verify", str(skill), "--type", "skill"])
             assert result.exit_code == 0
 
-    @patch('skillmeat.sources.github.GitHubSource.fetch')
-    def test_verify_github_before_add(self, mock_fetch, isolated_cli_runner, sample_skill_dir, tmp_path):
+    @patch("skillmeat.sources.github.GitHubSource.fetch")
+    def test_verify_github_before_add(
+        self, mock_fetch, isolated_cli_runner, sample_skill_dir, tmp_path
+    ):
         """Test workflow: verify GitHub spec → add."""
         runner = isolated_cli_runner
 
@@ -302,14 +342,16 @@ class TestVerifyWorkflows:
         mock_fetch.side_effect = mock_fetch_impl
 
         # Verify GitHub spec
-        verify_result = runner.invoke(main, ['verify', 'user/repo/test-skill', '--type', 'skill'])
+        verify_result = runner.invoke(
+            main, ["verify", "user/repo/test-skill", "--type", "skill"]
+        )
         assert verify_result.exit_code == 0
 
         # Now can add with confidence
-        runner.invoke(main, ['init'])
+        runner.invoke(main, ["init"])
         add_result = runner.invoke(
             main,
-            ['add', 'skill', 'user/repo/test-skill', '--dangerously-skip-permissions']
+            ["add", "skill", "user/repo/test-skill", "--dangerously-skip-permissions"],
         )
         assert add_result.exit_code == 0
 
@@ -324,7 +366,7 @@ class TestVerifyEdgeCases:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
 
-        result = runner.invoke(main, ['verify', str(empty_dir), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(empty_dir), "--type", "skill"])
 
         assert result.exit_code == 1
         assert "Invalid" in result.output
@@ -337,7 +379,7 @@ class TestVerifyEdgeCases:
         skill_dir.mkdir()
         (skill_dir / "other-file.txt").write_text("content")
 
-        result = runner.invoke(main, ['verify', str(skill_dir), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(skill_dir), "--type", "skill"])
 
         assert result.exit_code == 1
         assert "Invalid" in result.output
@@ -350,12 +392,14 @@ class TestVerifyEdgeCases:
         cmd_file = tmp_path / "command.txt"
         cmd_file.write_text("---\ntitle: Test\n---\nContent")
 
-        result = runner.invoke(main, ['verify', str(cmd_file), '--type', 'command'])
+        result = runner.invoke(main, ["verify", str(cmd_file), "--type", "command"])
 
         # May fail validation depending on implementation
         # Either way, should handle gracefully
 
-    def test_verify_with_relative_path(self, isolated_cli_runner, sample_skill_dir, monkeypatch):
+    def test_verify_with_relative_path(
+        self, isolated_cli_runner, sample_skill_dir, monkeypatch
+    ):
         """Test verifying with relative path."""
         runner = isolated_cli_runner
 
@@ -363,7 +407,7 @@ class TestVerifyEdgeCases:
         monkeypatch.chdir(sample_skill_dir.parent)
 
         # Use relative path
-        result = runner.invoke(main, ['verify', './test-skill', '--type', 'skill'])
+        result = runner.invoke(main, ["verify", "./test-skill", "--type", "skill"])
 
         assert result.exit_code == 0
 
@@ -371,7 +415,9 @@ class TestVerifyEdgeCases:
         """Test verifying with absolute path."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['verify', str(sample_skill_dir.resolve()), '--type', 'skill'])
+        result = runner.invoke(
+            main, ["verify", str(sample_skill_dir.resolve()), "--type", "skill"]
+        )
 
         assert result.exit_code == 0
 
@@ -383,7 +429,7 @@ class TestVerifyEdgeCases:
         symlink = tmp_path / "skill-link"
         symlink.symlink_to(sample_skill_dir)
 
-        result = runner.invoke(main, ['verify', str(symlink), '--type', 'skill'])
+        result = runner.invoke(main, ["verify", str(symlink), "--type", "skill"])
 
         # Should handle symlinks correctly
         assert result.exit_code in [0, 1]

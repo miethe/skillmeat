@@ -78,9 +78,7 @@ def init(name: str):
         # Check if collection already exists
         collections = collection_mgr.list_collections()
         if name in collections:
-            console.print(
-                f"[yellow]Collection '{name}' already exists[/yellow]"
-            )
+            console.print(f"[yellow]Collection '{name}' already exists[/yellow]")
             return
 
         # Initialize collection
@@ -157,7 +155,9 @@ def cmd_list(artifact_type: Optional[str], collection: Optional[str], tags: bool
                 artifact.origin,
             ]
             if tags:
-                tag_str = ", ".join(artifact.metadata.tags) if artifact.metadata.tags else ""
+                tag_str = (
+                    ", ".join(artifact.metadata.tags) if artifact.metadata.tags else ""
+                )
                 row.append(tag_str)
             table.add_row(*row)
 
@@ -234,7 +234,9 @@ def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
     is_flag=True,
     help="Remove from collection but keep files on disk",
 )
-def remove(name: str, artifact_type: Optional[str], collection: Optional[str], keep_files: bool):
+def remove(
+    name: str, artifact_type: Optional[str], collection: Optional[str], keep_files: bool
+):
     """Remove artifact from collection.
 
     By default, removes both the collection entry and the files.
@@ -336,7 +338,9 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(f"[green]Added {artifact_type.value}: {artifact.name}[/green]")
+            console.print(
+                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
+            )
 
         else:
             # Local path
@@ -356,7 +360,9 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(f"[green]Added {artifact_type.value}: {artifact.name}[/green]")
+            console.print(
+                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
+            )
 
     except ValueError as e:
         console.print(f"[red]Invalid specification: {e}[/red]")
@@ -710,9 +716,13 @@ def status(collection: Optional[str], project: Optional[Path]):
         up_to_date = update_info.get("up_to_date", [])
 
         if updates_available:
-            console.print(f"\n[yellow]Updates available ({len(updates_available)}):[/yellow]")
+            console.print(
+                f"\n[yellow]Updates available ({len(updates_available)}):[/yellow]"
+            )
             for info in updates_available:
-                console.print(f"  {info['name']} ({info['type']}): {info['current_version']} -> {info['latest_version']}")
+                console.print(
+                    f"  {info['name']} ({info['type']}): {info['current_version']} -> {info['latest_version']}"
+                )
 
         if up_to_date:
             console.print(f"\n[green]Up to date ({len(up_to_date)}):[/green]")
@@ -1204,13 +1214,19 @@ def migrate(
             console.print("  ✓ Import configuration (github-token, etc.)")
 
         if installation["manifest_path"]:
-            console.print(f"  ✓ Import {installation['skill_count']} skills from manifest")
+            console.print(
+                f"  ✓ Import {installation['skill_count']} skills from manifest"
+            )
 
         if installation["user_skills_dir"] and installation["user_skill_count"] > 0:
-            console.print(f"  ✓ Import {installation['user_skill_count']} skills from user directory")
+            console.print(
+                f"  ✓ Import {installation['user_skill_count']} skills from user directory"
+            )
 
         if installation["local_skills_dir"] and installation["local_skill_count"] > 0:
-            console.print(f"  ✓ Import {installation['local_skill_count']} skills from local directory")
+            console.print(
+                f"  ✓ Import {installation['local_skill_count']} skills from local directory"
+            )
 
         if not no_snapshot:
             console.print("  ✓ Create snapshot 'Migrated from skillman'")
@@ -1238,7 +1254,9 @@ def migrate(
         if installation["config_path"]:
             success, imported_keys = migrator.import_config()
             if success:
-                console.print(f"[green]✓[/green] Imported configuration: {', '.join(imported_keys)}")
+                console.print(
+                    f"[green]✓[/green] Imported configuration: {', '.join(imported_keys)}"
+                )
             else:
                 console.print("[yellow]-[/yellow] No configuration to import")
 
@@ -1294,7 +1312,9 @@ def migrate(
         if not no_snapshot:
             success = migrator.create_migration_snapshot("Migrated from skillman")
             if success:
-                console.print("[green]✓[/green] Created snapshot: 'Migrated from skillman'")
+                console.print(
+                    "[green]✓[/green] Created snapshot: 'Migrated from skillman'"
+                )
             else:
                 console.print("[yellow]-[/yellow] Could not create snapshot")
 
@@ -1477,13 +1497,17 @@ def verify(spec: str, artifact_type: str):
                         if extracted_metadata.title:
                             console.print(f"  Title: {extracted_metadata.title}")
                         if extracted_metadata.description:
-                            console.print(f"  Description: {extracted_metadata.description}")
+                            console.print(
+                                f"  Description: {extracted_metadata.description}"
+                            )
                         if extracted_metadata.author:
                             console.print(f"  Author: {extracted_metadata.author}")
                         if extracted_metadata.version:
                             console.print(f"  Version: {extracted_metadata.version}")
                         if extracted_metadata.tags:
-                            console.print(f"  Tags: {', '.join(extracted_metadata.tags)}")
+                            console.print(
+                                f"  Tags: {', '.join(extracted_metadata.tags)}"
+                            )
                 else:
                     console.print(f"[red]Invalid: {error_msg}[/red]")
                     sys.exit(1)

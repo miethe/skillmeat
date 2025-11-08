@@ -49,9 +49,7 @@ scope = "user"
     manifest_path = Path("skills.toml")
     manifest_path.write_text(manifest_content)
 
-    result = runner.invoke(
-        main, ["migrate", "--from-skillman", "--dry-run"]
-    )
+    result = runner.invoke(main, ["migrate", "--from-skillman", "--dry-run"])
 
     assert result.exit_code == 0
     assert "Detected skillman installation" in result.output
@@ -129,7 +127,8 @@ def test_migrate_with_user_skills_directory(isolated_cli_runner):
     skill_dir = user_skills_dir / "test-skill"
     skill_dir.mkdir()
     skill_md = skill_dir / "SKILL.md"
-    skill_md.write_text("""---
+    skill_md.write_text(
+        """---
 title: Test Skill
 description: A test skill
 ---
@@ -137,7 +136,8 @@ description: A test skill
 # Test Skill
 
 This is a test skill.
-""")
+"""
+    )
 
     result = runner.invoke(
         main,
@@ -210,7 +210,9 @@ scope = "user"
     assert result.exit_code == 0
 
 
-def test_migrate_with_local_skills_directory(isolated_cli_runner, monkeypatch, tmp_path):
+def test_migrate_with_local_skills_directory(
+    isolated_cli_runner, monkeypatch, tmp_path
+):
     """Test migrate imports skills from local directory."""
     runner = isolated_cli_runner
     monkeypatch.chdir(tmp_path)
@@ -223,7 +225,8 @@ def test_migrate_with_local_skills_directory(isolated_cli_runner, monkeypatch, t
     skill_dir = local_skills_dir / "local-skill"
     skill_dir.mkdir()
     skill_md = skill_dir / "SKILL.md"
-    skill_md.write_text("""---
+    skill_md.write_text(
+        """---
 title: Local Skill
 description: A local test skill
 ---
@@ -231,7 +234,8 @@ description: A local test skill
 # Local Skill
 
 This is a local test skill.
-""")
+"""
+    )
 
     result = runner.invoke(
         main,
