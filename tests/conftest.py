@@ -21,6 +21,7 @@ import pytest
 # Temporary Directory Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def temp_collection(tmp_path):
     """Create a temporary collection directory.
@@ -102,16 +103,13 @@ def isolated_fs(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(home_dir))
     monkeypatch.chdir(work_dir)
 
-    return {
-        "home": home_dir,
-        "cwd": work_dir,
-        "tmp": tmp_path
-    }
+    return {"home": home_dir, "cwd": work_dir, "tmp": tmp_path}
 
 
 # =============================================================================
 # Sample Artifact Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def sample_artifacts():
@@ -186,6 +184,7 @@ def sample_agent_file(sample_artifacts, tmp_path):
 # =============================================================================
 # Mock GitHub Client
 # =============================================================================
+
 
 @pytest.fixture
 def mock_github_client():
@@ -263,6 +262,7 @@ def mock_github_source(sample_artifacts):
 # Configuration and Environment
 # =============================================================================
 
+
 @pytest.fixture
 def clean_env(monkeypatch):
     """Clean environment variables for isolated testing.
@@ -306,6 +306,7 @@ def mock_config():
 # CLI Testing Utilities
 # =============================================================================
 
+
 @pytest.fixture
 def cli_runner():
     """Create a Click CLI test runner.
@@ -320,6 +321,7 @@ def cli_runner():
             assert result.exit_code == 0
     """
     from click.testing import CliRunner
+
     return CliRunner()
 
 
@@ -344,6 +346,7 @@ def isolated_cli_runner(tmp_path, monkeypatch):
 # Helper Functions
 # =============================================================================
 
+
 def create_minimal_skill(path: Path, name: str = "test-skill") -> Path:
     """Create a minimal valid skill directory for testing.
 
@@ -358,7 +361,8 @@ def create_minimal_skill(path: Path, name: str = "test-skill") -> Path:
     skill_dir.mkdir(parents=True, exist_ok=True)
 
     skill_md = skill_dir / "SKILL.md"
-    skill_md.write_text("""---
+    skill_md.write_text(
+        """---
 title: Test Skill
 description: A minimal test skill
 version: 1.0.0
@@ -367,7 +371,8 @@ version: 1.0.0
 # Test Skill
 
 Minimal skill for testing.
-""")
+"""
+    )
 
     return skill_dir
 
@@ -383,7 +388,8 @@ def create_minimal_command(path: Path, name: str = "test-command.md") -> Path:
         Path: Path to created command file
     """
     command_file = path / name
-    command_file.write_text("""---
+    command_file.write_text(
+        """---
 title: Test Command
 description: A minimal test command
 version: 1.0.0
@@ -392,7 +398,8 @@ version: 1.0.0
 # Test Command
 
 Minimal command for testing.
-""")
+"""
+    )
 
     return command_file
 
@@ -408,7 +415,8 @@ def create_minimal_agent(path: Path, name: str = "test-agent.md") -> Path:
         Path: Path to created agent file
     """
     agent_file = path / name
-    agent_file.write_text("""---
+    agent_file.write_text(
+        """---
 title: Test Agent
 description: A minimal test agent
 version: 1.0.0
@@ -417,7 +425,8 @@ version: 1.0.0
 # Test Agent
 
 Minimal agent for testing.
-""")
+"""
+    )
 
     return agent_file
 

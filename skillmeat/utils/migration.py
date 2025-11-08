@@ -158,9 +158,7 @@ class SkillmanMigrator:
 
         return result
 
-    def _parse_skillman_manifest(
-        self, manifest_path: Path
-    ) -> List[SkillmanSkill]:
+    def _parse_skillman_manifest(self, manifest_path: Path) -> List[SkillmanSkill]:
         """Parse skillman's skills.toml file.
 
         Args:
@@ -386,8 +384,11 @@ class SkillmanMigrator:
                     # Remove if exists (for --force)
                     if exists:
                         collection.artifacts = [
-                            a for a in collection.artifacts
-                            if not (a.name == skill.name and a.type == ArtifactType.SKILL)
+                            a
+                            for a in collection.artifacts
+                            if not (
+                                a.name == skill.name and a.type == ArtifactType.SKILL
+                            )
                         ]
 
                     # Add to collection
@@ -401,14 +402,20 @@ class SkillmanMigrator:
 
                     lock_mgr = LockManager()
                     if artifact.upstream:
-                        lock = lock_mgr.read(collection_path) if lock_mgr.exists(collection_path) else None
+                        lock = (
+                            lock_mgr.read(collection_path)
+                            if lock_mgr.exists(collection_path)
+                            else None
+                        )
                         if lock is None:
                             # Create new lock
                             from skillmeat.storage.lockfile import LockFile
+
                             lock = LockFile(version="1.0.0", entries=[])
 
                         # Add or update entry
                         from skillmeat.storage.lockfile import LockEntry
+
                         lock_entry = LockEntry(
                             name=artifact.name,
                             artifact_type=artifact.type.value,
@@ -420,8 +427,12 @@ class SkillmanMigrator:
 
                         # Remove existing entry if present
                         lock.entries = [
-                            e for e in lock.entries
-                            if not (e.name == artifact.name and e.artifact_type == artifact.type.value)
+                            e
+                            for e in lock.entries
+                            if not (
+                                e.name == artifact.name
+                                and e.artifact_type == artifact.type.value
+                            )
                         ]
                         lock.entries.append(lock_entry)
 
@@ -461,7 +472,9 @@ class SkillmanMigrator:
             return result
 
         collection_name = self.collection_mgr.config.get_active_collection()
-        collection_path = self.collection_mgr.config.get_collection_path(collection_name)
+        collection_path = self.collection_mgr.config.get_collection_path(
+            collection_name
+        )
         skills_target_dir = collection_path / "skills"
         skills_target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -533,7 +546,8 @@ class SkillmanMigrator:
                 # Remove if exists (for --force)
                 if exists:
                     collection.artifacts = [
-                        a for a in collection.artifacts
+                        a
+                        for a in collection.artifacts
                         if not (a.name == skill_name and a.type == ArtifactType.SKILL)
                     ]
 

@@ -14,7 +14,7 @@ class TestConfigListCommand:
         """Test listing when no config is set."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'list'])
+        result = runner.invoke(main, ["config", "list"])
 
         assert result.exit_code == 0
         # Should show empty or no configuration message
@@ -24,9 +24,9 @@ class TestConfigListCommand:
         runner = isolated_cli_runner
 
         # Set some config values
-        runner.invoke(main, ['config', 'set', 'test-key', 'test-value'])
+        runner.invoke(main, ["config", "set", "test-key", "test-value"])
 
-        result = runner.invoke(main, ['config', 'list'])
+        result = runner.invoke(main, ["config", "list"])
 
         assert result.exit_code == 0
         assert "Configuration" in result.output
@@ -38,9 +38,11 @@ class TestConfigListCommand:
         runner = isolated_cli_runner
 
         # Set GitHub token
-        runner.invoke(main, ['config', 'set', 'github-token', 'ghp_1234567890abcdefghij'])
+        runner.invoke(
+            main, ["config", "set", "github-token", "ghp_1234567890abcdefghij"]
+        )
 
-        result = runner.invoke(main, ['config', 'list'])
+        result = runner.invoke(main, ["config", "list"])
 
         assert result.exit_code == 0
         assert "github-token" in result.output
@@ -53,10 +55,10 @@ class TestConfigListCommand:
         runner = isolated_cli_runner
 
         # Set multiple values
-        runner.invoke(main, ['config', 'set', 'default-collection', 'work'])
-        runner.invoke(main, ['config', 'set', 'update-strategy', 'upstream'])
+        runner.invoke(main, ["config", "set", "default-collection", "work"])
+        runner.invoke(main, ["config", "set", "update-strategy", "upstream"])
 
-        result = runner.invoke(main, ['config', 'list'])
+        result = runner.invoke(main, ["config", "list"])
 
         assert result.exit_code == 0
         assert "default-collection" in result.output
@@ -73,10 +75,10 @@ class TestConfigGetCommand:
         runner = isolated_cli_runner
 
         # Set value
-        runner.invoke(main, ['config', 'set', 'test-key', 'test-value'])
+        runner.invoke(main, ["config", "set", "test-key", "test-value"])
 
         # Get value
-        result = runner.invoke(main, ['config', 'get', 'test-key'])
+        result = runner.invoke(main, ["config", "get", "test-key"])
 
         assert result.exit_code == 0
         assert "test-key" in result.output
@@ -86,7 +88,7 @@ class TestConfigGetCommand:
         """Test getting non-existent key."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'get', 'nonexistent'])
+        result = runner.invoke(main, ["config", "get", "nonexistent"])
 
         assert result.exit_code == 0
         assert "not set" in result.output
@@ -96,10 +98,12 @@ class TestConfigGetCommand:
         runner = isolated_cli_runner
 
         # Set token
-        runner.invoke(main, ['config', 'set', 'github-token', 'ghp_1234567890abcdefghij'])
+        runner.invoke(
+            main, ["config", "set", "github-token", "ghp_1234567890abcdefghij"]
+        )
 
         # Get token
-        result = runner.invoke(main, ['config', 'get', 'github-token'])
+        result = runner.invoke(main, ["config", "get", "github-token"])
 
         assert result.exit_code == 0
         assert "github-token" in result.output
@@ -111,9 +115,9 @@ class TestConfigGetCommand:
         """Test getting default-collection setting."""
         runner = isolated_cli_runner
 
-        runner.invoke(main, ['config', 'set', 'default-collection', 'work'])
+        runner.invoke(main, ["config", "set", "default-collection", "work"])
 
-        result = runner.invoke(main, ['config', 'get', 'default-collection'])
+        result = runner.invoke(main, ["config", "get", "default-collection"])
 
         assert result.exit_code == 0
         assert "work" in result.output
@@ -122,9 +126,9 @@ class TestConfigGetCommand:
         """Test getting update-strategy setting."""
         runner = isolated_cli_runner
 
-        runner.invoke(main, ['config', 'set', 'update-strategy', 'upstream'])
+        runner.invoke(main, ["config", "set", "update-strategy", "upstream"])
 
-        result = runner.invoke(main, ['config', 'get', 'update-strategy'])
+        result = runner.invoke(main, ["config", "get", "update-strategy"])
 
         assert result.exit_code == 0
         assert "upstream" in result.output
@@ -137,13 +141,13 @@ class TestConfigSetCommand:
         """Test setting a new configuration key."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'new-key', 'new-value'])
+        result = runner.invoke(main, ["config", "set", "new-key", "new-value"])
 
         assert result.exit_code == 0
         assert "Set new-key" in result.output
 
         # Verify it was set
-        get_result = runner.invoke(main, ['config', 'get', 'new-key'])
+        get_result = runner.invoke(main, ["config", "get", "new-key"])
         assert "new-value" in get_result.output
 
     def test_set_existing_key(self, isolated_cli_runner):
@@ -151,16 +155,16 @@ class TestConfigSetCommand:
         runner = isolated_cli_runner
 
         # Set initial value
-        runner.invoke(main, ['config', 'set', 'test-key', 'initial-value'])
+        runner.invoke(main, ["config", "set", "test-key", "initial-value"])
 
         # Update value
-        result = runner.invoke(main, ['config', 'set', 'test-key', 'updated-value'])
+        result = runner.invoke(main, ["config", "set", "test-key", "updated-value"])
 
         assert result.exit_code == 0
         assert "Set test-key" in result.output
 
         # Verify it was updated
-        get_result = runner.invoke(main, ['config', 'get', 'test-key'])
+        get_result = runner.invoke(main, ["config", "get", "test-key"])
         assert "updated-value" in get_result.output
         assert "initial-value" not in get_result.output
 
@@ -168,7 +172,7 @@ class TestConfigSetCommand:
         """Test setting GitHub token."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'github-token', 'ghp_test123'])
+        result = runner.invoke(main, ["config", "set", "github-token", "ghp_test123"])
 
         assert result.exit_code == 0
         assert "Set github-token" in result.output
@@ -177,36 +181,38 @@ class TestConfigSetCommand:
         """Test setting default collection."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'default-collection', 'work'])
+        result = runner.invoke(main, ["config", "set", "default-collection", "work"])
 
         assert result.exit_code == 0
 
         # Verify
-        get_result = runner.invoke(main, ['config', 'get', 'default-collection'])
+        get_result = runner.invoke(main, ["config", "get", "default-collection"])
         assert "work" in get_result.output
 
     def test_set_update_strategy(self, isolated_cli_runner):
         """Test setting update strategy."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'update-strategy', 'upstream'])
+        result = runner.invoke(main, ["config", "set", "update-strategy", "upstream"])
 
         assert result.exit_code == 0
 
         # Verify
-        get_result = runner.invoke(main, ['config', 'get', 'update-strategy'])
+        get_result = runner.invoke(main, ["config", "get", "update-strategy"])
         assert "upstream" in get_result.output
 
     def test_set_value_with_spaces(self, isolated_cli_runner):
         """Test setting value that contains spaces."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'description', 'value with spaces'])
+        result = runner.invoke(
+            main, ["config", "set", "description", "value with spaces"]
+        )
 
         assert result.exit_code == 0
 
         # Verify
-        get_result = runner.invoke(main, ['config', 'get', 'description'])
+        get_result = runner.invoke(main, ["config", "get", "description"])
         assert "value with spaces" in get_result.output
 
     def test_set_overwrites_previous_value(self, isolated_cli_runner):
@@ -214,13 +220,13 @@ class TestConfigSetCommand:
         runner = isolated_cli_runner
 
         # Set first value
-        runner.invoke(main, ['config', 'set', 'key', 'value1'])
+        runner.invoke(main, ["config", "set", "key", "value1"])
 
         # Set second value
-        runner.invoke(main, ['config', 'set', 'key', 'value2'])
+        runner.invoke(main, ["config", "set", "key", "value2"])
 
         # Get should return second value
-        result = runner.invoke(main, ['config', 'get', 'key'])
+        result = runner.invoke(main, ["config", "get", "key"])
         assert "value2" in result.output
         assert "value1" not in result.output
 
@@ -233,11 +239,11 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set value
-        set_result = runner.invoke(main, ['config', 'set', 'test-key', 'test-value'])
+        set_result = runner.invoke(main, ["config", "set", "test-key", "test-value"])
         assert set_result.exit_code == 0
 
         # Get value
-        get_result = runner.invoke(main, ['config', 'get', 'test-key'])
+        get_result = runner.invoke(main, ["config", "get", "test-key"])
         assert get_result.exit_code == 0
         assert "test-value" in get_result.output
 
@@ -246,12 +252,12 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set multiple values
-        runner.invoke(main, ['config', 'set', 'key1', 'value1'])
-        runner.invoke(main, ['config', 'set', 'key2', 'value2'])
-        runner.invoke(main, ['config', 'set', 'key3', 'value3'])
+        runner.invoke(main, ["config", "set", "key1", "value1"])
+        runner.invoke(main, ["config", "set", "key2", "value2"])
+        runner.invoke(main, ["config", "set", "key3", "value3"])
 
         # List all
-        list_result = runner.invoke(main, ['config', 'list'])
+        list_result = runner.invoke(main, ["config", "list"])
         assert list_result.exit_code == 0
         assert "key1" in list_result.output
         assert "key2" in list_result.output
@@ -262,16 +268,18 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set token
-        set_result = runner.invoke(main, ['config', 'set', 'github-token', 'ghp_test123'])
+        set_result = runner.invoke(
+            main, ["config", "set", "github-token", "ghp_test123"]
+        )
         assert set_result.exit_code == 0
 
         # Get token (should be masked)
-        get_result = runner.invoke(main, ['config', 'get', 'github-token'])
+        get_result = runner.invoke(main, ["config", "get", "github-token"])
         assert get_result.exit_code == 0
         assert "ghp_test123" not in get_result.output
 
         # List config (token should be masked)
-        list_result = runner.invoke(main, ['config', 'list'])
+        list_result = runner.invoke(main, ["config", "list"])
         assert list_result.exit_code == 0
         assert "ghp_test123" not in list_result.output
 
@@ -280,13 +288,13 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set value
-        runner.invoke(main, ['config', 'set', 'test-key', 'test-value'])
+        runner.invoke(main, ["config", "set", "test-key", "test-value"])
 
         # Run other commands
-        runner.invoke(main, ['init'])
+        runner.invoke(main, ["init"])
 
         # Get value should still work
-        get_result = runner.invoke(main, ['config', 'get', 'test-key'])
+        get_result = runner.invoke(main, ["config", "get", "test-key"])
         assert get_result.exit_code == 0
         assert "test-value" in get_result.output
 
@@ -295,12 +303,12 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set common configuration
-        runner.invoke(main, ['config', 'set', 'github-token', 'ghp_example123'])
-        runner.invoke(main, ['config', 'set', 'default-collection', 'work'])
-        runner.invoke(main, ['config', 'set', 'update-strategy', 'prompt'])
+        runner.invoke(main, ["config", "set", "github-token", "ghp_example123"])
+        runner.invoke(main, ["config", "set", "default-collection", "work"])
+        runner.invoke(main, ["config", "set", "update-strategy", "prompt"])
 
         # List all
-        result = runner.invoke(main, ['config', 'list'])
+        result = runner.invoke(main, ["config", "list"])
         assert result.exit_code == 0
         assert "github-token" in result.output
         assert "default-collection" in result.output
@@ -313,13 +321,13 @@ class TestConfigWorkflows:
         runner = isolated_cli_runner
 
         # Set initial values
-        runner.invoke(main, ['config', 'set', 'update-strategy', 'prompt'])
+        runner.invoke(main, ["config", "set", "update-strategy", "prompt"])
 
         # Update values
-        runner.invoke(main, ['config', 'set', 'update-strategy', 'upstream'])
+        runner.invoke(main, ["config", "set", "update-strategy", "upstream"])
 
         # Verify updated
-        result = runner.invoke(main, ['config', 'get', 'update-strategy'])
+        result = runner.invoke(main, ["config", "get", "update-strategy"])
         assert "upstream" in result.output
         assert "prompt" not in result.output
 
@@ -331,7 +339,7 @@ class TestConfigEdgeCases:
         """Test setting config with empty value."""
         runner = isolated_cli_runner
 
-        result = runner.invoke(main, ['config', 'set', 'empty-key', ''])
+        result = runner.invoke(main, ["config", "set", "empty-key", ""])
 
         # Should handle gracefully
         assert result.exit_code in [0, 1]
@@ -341,11 +349,11 @@ class TestConfigEdgeCases:
         runner = isolated_cli_runner
 
         # Set value with special characters
-        result = runner.invoke(main, ['config', 'set', 'special', 'value@#$%'])
+        result = runner.invoke(main, ["config", "set", "special", "value@#$%"])
 
         if result.exit_code == 0:
             # Verify
-            get_result = runner.invoke(main, ['config', 'get', 'special'])
+            get_result = runner.invoke(main, ["config", "get", "special"])
             assert "value@#$%" in get_result.output
 
     def test_config_key_case_sensitivity(self, isolated_cli_runner):
@@ -353,10 +361,10 @@ class TestConfigEdgeCases:
         runner = isolated_cli_runner
 
         # Set lowercase
-        runner.invoke(main, ['config', 'set', 'lowercase', 'value1'])
+        runner.invoke(main, ["config", "set", "lowercase", "value1"])
 
         # Try to get with different case
-        result = runner.invoke(main, ['config', 'get', 'LOWERCASE'])
+        result = runner.invoke(main, ["config", "get", "LOWERCASE"])
 
         # Behavior depends on implementation
         # Could be case-sensitive or case-insensitive
@@ -366,7 +374,7 @@ class TestConfigEdgeCases:
         runner = isolated_cli_runner
 
         # Set config without init
-        result = runner.invoke(main, ['config', 'set', 'test-key', 'test-value'])
+        result = runner.invoke(main, ["config", "set", "test-key", "test-value"])
 
         # Should work (config is global)
         assert result.exit_code == 0
