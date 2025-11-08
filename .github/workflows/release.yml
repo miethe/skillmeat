@@ -46,7 +46,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           body: |
-            # Skillman ${{ github.ref_name }}
+            # SkillMeat ${{ github.ref_name }}
 
             ## What's New
 
@@ -56,26 +56,26 @@ jobs:
 
             ### Recommended (uv)
             ```bash
-            uv tool install skillman
+            uv tool install skillmeat
             ```
 
             ### With pip
             ```bash
-            pip install skillman
+            pip install skillmeat
             ```
 
             ### With pipx
             ```bash
-            pipx install skillman
+            pipx install skillmeat
             ```
 
             ## Release Assets
 
-            - **skillman-*.whl** - Python wheel (recommended for pip)
-            - **skillman-*.tar.gz** - Source distribution
-            - **skillman-source.zip** - Source code archive
-            - **skillman-distributions.zip** - All Python distributions
-            - **skillman-${{ github.ref_name }}-full.zip** - Complete package with docs
+            - **skillmeat-*.whl** - Python wheel (recommended for pip)
+            - **skillmeat-*.tar.gz** - Source distribution
+            - **skillmeat-source.zip** - Source code archive
+            - **skillmeat-distributions.zip** - All Python distributions
+            - **skillmeat-${{ github.ref_name }}-full.zip** - Complete package with docs
             - **CHECKSUMS.txt** - SHA256 checksums for verification
             - **MANIFEST.txt** - Release manifest and installation guide
 
@@ -88,7 +88,7 @@ jobs:
 
             ## Documentation
 
-            - [README](https://github.com/chrisvoncsefalvay/skillman#readme)
+            - [README](https://github.com/miethe/skillmeat#readme)
 
             ## Notes
 
