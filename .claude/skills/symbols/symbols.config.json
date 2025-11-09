@@ -1,0 +1,146 @@
+{
+  "$schema": "./symbols-config-schema.json",
+  "projectName": "SkillMeat",
+  "symbolsDir": "{{PROJECT_PATHS.symbolsDir}}",
+  "domains": {
+    "ui": {
+      "file": "symbols-ui.json",
+      "description": "UI primitives from {{PROJECT_PATHS.ui}} - reusable components, hooks, and utilities",
+      "testFile": "symbols-ui-tests.json",
+      "enabled": true
+    },
+    "web": {
+      "file": "symbols-web.json",
+      "description": "React 18+ with TypeScript (Phase 3 only, currently CLI-only) web application - pages, app router, web-specific hooks and utilities",
+      "enabled": true
+    },
+    "api": {
+      "file": "symbols-api.json",
+      "description": "Unified backend API symbols - based on Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes (use apiLayers for targeted access)",
+      "testFile": "symbols-api-tests.json",
+      "enabled": true
+    },
+    "shared": {
+      "file": "symbols-web.json",
+      "description": "Shared utilities and types - configure based on your project structure",
+      "testFile": "symbols-shared-tests.json",
+      "enabled": true
+    }
+  },
+  "apiLayers": {
+    "routers": {
+      "file": "symbols-api-routers.json",
+      "description": "API route handlers - Click (CLI), FastAPI (Phase 3 web interface) routers and HTTP endpoints with request/response handling",
+      "enabled": true
+    },
+    "services": {
+      "file": "symbols-api-services.json",
+      "description": "Business logic services - orchestration, validation, and domain operations (based on Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes)",
+      "enabled": true
+    },
+    "repositories": {
+      "file": "symbols-api-repositories.json",
+      "description": "Data access layer - database queries, ORM operations (SQLite (Phase 3 web interface, currently file-based TOML))",
+      "enabled": true
+    },
+    "schemas": {
+      "file": "symbols-api-schemas.json",
+      "description": "Data Transfer Objects (DTOs) - models for API serialization and validation",
+      "enabled": true
+    },
+    "cores": {
+      "file": "symbols-api-cores.json",
+      "description": "Core utilities and foundations - auth, observability, middleware, error handling",
+      "enabled": true
+    }
+  },
+  "extraction": {
+    "python": {
+      "directories": [
+        "{{PROJECT_PATHS.api}}"
+      ],
+      "extensions": [
+        ".py"
+      ],
+      "excludes": [
+        "__pycache__",
+        "*.pyc",
+        ".pytest_cache",
+        ".venv",
+        "venv",
+        ".tox",
+        "*.egg-info",
+        "build",
+        "dist",
+        ".mypy_cache",
+        ".ruff_cache"
+      ],
+      "excludeTests": true,
+      "excludePrivate": false
+    },
+    "typescript": {
+      "directories": [
+        "{{PROJECT_PATHS.web}}",
+        "{{PROJECT_PATHS.mobile}}",
+        "{{PROJECT_PATHS.ui}}",
+        "{{PROJECT_PATHS.tokens}}"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx"
+      ],
+      "excludes": [
+        "node_modules/",
+        "*.test.*",
+        "*.spec.*",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "dist/",
+        "build/",
+        ".next/",
+        ".expo/",
+        "out/",
+        "coverage/",
+        ".turbo/",
+        "*.d.ts"
+      ],
+      "excludeTests": true,
+      "excludePrivate": false
+    }
+  },
+  "metadata": {
+    "version": "2.0",
+    "author": "SkillMeat Development Team",
+    "lastUpdated": "2025-10-31T00:00:00Z",
+    "description": "Symbol extraction configuration for SkillMeat project. Supports domain-chunked symbols and layer-based API access for token-efficient codebase analysis. Architecture: Collection (Personal Library) → Projects (Local .claude/ directories) → Deployment Engine → User/Local Scopes"
+  },
+  "_template_notes": {
+    "description": "This is a templatized configuration file. Replace {{VARIABLES}} with your project-specific values.",
+    "required_variables": [
+      "PROJECT_NAME - Your project name",
+      "PROJECT_PATHS.symbolsDir - Directory for symbol files (e.g., 'ai')",
+      "PROJECT_PATHS.api - Backend API directory path",
+      "PROJECT_PATHS.web - Web app directory path",
+      "PROJECT_PATHS.mobile - Mobile app directory path (optional)",
+      "PROJECT_PATHS.ui - UI package directory path (optional)",
+      "PROJECT_PATHS.tokens - Tokens package directory path (optional)",
+      "FRONTEND_FRAMEWORK - Frontend framework name (e.g., 'Next.js', 'React')",
+      "BACKEND_FRAMEWORK - Backend framework name (e.g., 'FastAPI', 'Express')",
+      "DATABASE - Database and ORM (e.g., 'PostgreSQL with SQLAlchemy')",
+      "PROJECT_ARCHITECTURE - Architecture pattern description",
+      "LAYER_ARCHITECTURE - Detailed layer breakdown"
+    ],
+    "customization_steps": [
+      "1. Replace all {{VARIABLE}} placeholders with your project values",
+      "2. Update domains section to match your project structure",
+      "3. Configure apiLayers to match your backend architecture",
+      "4. Update extraction.python.directories with your backend paths",
+      "5. Update extraction.typescript.directories with your frontend paths",
+      "6. Adjust excludes patterns for your build/dependency directories",
+      "7. Remove _template_notes section after customization"
+    ],
+    "see_also": "config/template-config.json for complete variable documentation"
+  }
+}
