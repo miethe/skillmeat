@@ -333,8 +333,8 @@ def _add_artifact_from_spec(
                 spec=spec,
                 artifact_type=artifact_type,
                 collection_name=collection,
-                override_name=name,
-                verify=not no_verify,
+                custom_name=name,
+                tags=None,
                 force=force,
             )
 
@@ -352,11 +352,11 @@ def _add_artifact_from_spec(
             console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
 
             artifact = artifact_mgr.add_from_local(
-                local_path=local_path,
+                path=str(local_path),
                 artifact_type=artifact_type,
                 collection_name=collection,
-                override_name=name,
-                verify=not no_verify,
+                custom_name=name,
+                tags=None,
                 force=force,
             )
 
