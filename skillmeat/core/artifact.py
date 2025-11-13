@@ -218,6 +218,7 @@ class ArtifactManager:
         collection_name: Optional[str] = None,
         custom_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        force: bool = False,
     ) -> Artifact:
         """Add artifact from GitHub.
 
@@ -227,12 +228,13 @@ class ArtifactManager:
             collection_name: Target collection (uses active if None)
             custom_name: Custom artifact name (derives from spec if None)
             tags: Optional tags to add
+            force: If True, overwrite existing artifact
 
         Returns:
             Added Artifact object
 
         Raises:
-            ValueError: Invalid spec or artifact already exists
+            ValueError: Invalid spec or artifact already exists (when force=False)
             RuntimeError: Fetch or validation failed
         """
         from skillmeat.sources.github import ArtifactSpec
@@ -258,9 +260,15 @@ class ArtifactManager:
         # Check for duplicates (composite key)
         existing = collection.find_artifact(artifact_name, artifact_type)
         if existing:
-            raise ValueError(
-                f"Artifact '{artifact_name}' of type '{artifact_type.value}' already exists in collection"
-            )
+            if force:
+                # Remove existing artifact before adding new one
+                self.remove(artifact_name, artifact_type, collection_name)
+                # Reload collection after removal
+                collection = self.collection_mgr.load_collection(collection_name)
+            else:
+                raise ValueError(
+                    f"Artifact '{artifact_name}' of type '{artifact_type.value}' already exists in collection"
+                )
 
         # Determine storage path within collection
         collection_path = self.collection_mgr.config.get_collection_path(
@@ -320,6 +328,7 @@ class ArtifactManager:
         collection_name: Optional[str] = None,
         custom_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        force: bool = False,
     ) -> Artifact:
         """Add artifact from local filesystem.
 
@@ -329,12 +338,13 @@ class ArtifactManager:
             collection_name: Target collection (uses active if None)
             custom_name: Custom artifact name (derives from path if None)
             tags: Optional tags to add
+            force: If True, overwrite existing artifact
 
         Returns:
             Added Artifact object
 
         Raises:
-            ValueError: Invalid path or artifact already exists
+            ValueError: Invalid path or artifact already exists (when force=False)
             RuntimeError: Fetch or validation failed
         """
         # Load collection
@@ -352,9 +362,15 @@ class ArtifactManager:
         # Check for duplicates
         existing = collection.find_artifact(artifact_name, artifact_type)
         if existing:
-            raise ValueError(
-                f"Artifact '{artifact_name}' of type '{artifact_type.value}' already exists"
-            )
+            if force:
+                # Remove existing artifact before adding new one
+                self.remove(artifact_name, artifact_type, collection_name)
+                # Reload collection after removal
+                collection = self.collection_mgr.load_collection(collection_name)
+            else:
+                raise ValueError(
+                    f"Artifact '{artifact_name}' of type '{artifact_type.value}' already exists"
+                )
 
         # Determine storage path
         collection_path = self.collection_mgr.config.get_collection_path(
