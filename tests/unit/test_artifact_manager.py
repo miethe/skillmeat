@@ -11,6 +11,7 @@ from skillmeat.core.artifact import (
     ArtifactManager,
     ArtifactMetadata,
     ArtifactType,
+    UpdateStrategy,
 )
 from skillmeat.core.collection import CollectionManager
 from skillmeat.sources.base import FetchResult
@@ -476,11 +477,207 @@ def test_check_updates_with_updates(
         assert updates["test-skill::skill"].latest_version == "v1.1.0"
 
 
-def test_update_raises_not_implemented(artifact_manager, test_collection):
-    """Test update functionality raises NotImplementedError."""
-    with pytest.raises(NotImplementedError, match="Phase 5"):
-        artifact_manager.update(
-            artifact_name="test-skill",
+def test_update_github_artifact_applies_new_version(
+    artifact_manager, test_collection, tmp_path
+):
+    """Ensure GitHub artifacts pull latest upstream content."""
+    initial_dir = tmp_path / "initial-skill"
+    initial_dir.mkdir()
+    (initial_dir / "SKILL.md").write_text("# Skill\n\nInitial content.")
+
+    updated_dir = tmp_path / "updated-skill"
+    updated_dir.mkdir()
+    (updated_dir / "SKILL.md").write_text("# Skill\n\nUpdated content.")
+
+    initial_fetch = FetchResult(
+        artifact_path=initial_dir,
+        metadata=ArtifactMetadata(title="Initial Skill"),
+        resolved_sha="abc123def456",
+        resolved_version="v1.0.0",
+        upstream_url="https://github.com/user/repo/tree/abc123def456/path/to/test-skill",
+    )
+
+    updated_fetch = FetchResult(
+        artifact_path=updated_dir,
+        metadata=ArtifactMetadata(title="Updated Skill"),
+        resolved_sha="def999abc000",
+        resolved_version="v1.1.0",
+        upstream_url="https://github.com/user/repo/tree/def999abc000/path/to/test-skill",
+    )
+
+    with patch.object(
+        artifact_manager.github_source, "fetch", side_effect=[initial_fetch, updated_fetch]
+    ):
+        artifact_manager.add_from_github(
+            spec="user/repo/path/to/test-skill@latest",
             artifact_type=ArtifactType.SKILL,
             collection_name="test-collection",
         )
+
+        from skillmeat.sources.base import UpdateInfo
+
+        update_info = UpdateInfo(
+            current_sha="abc123def456",
+            latest_sha="def999abc000",
+            current_version="v1.0.0",
+            latest_version="v1.1.0",
+            has_update=True,
+        )
+
+        with patch.object(
+            artifact_manager.github_source, "check_updates", return_value=update_info
+        ):
+            with patch.object(artifact_manager, "_auto_snapshot") as mock_snapshot:
+                result = artifact_manager.update(
+                    artifact_name="test-skill",
+                    artifact_type=ArtifactType.SKILL,
+                    collection_name="test-collection",
+                    strategy=UpdateStrategy.TAKE_UPSTREAM,
+                )
+
+    assert result.updated is True
+    assert result.status == "updated_github"
+    assert result.previous_version == "v1.0.0"
+    assert result.new_version == "v1.1.0"
+    assert result.previous_sha == "abc123def456"
+    assert result.new_sha == "def999abc000"
+    mock_snapshot.assert_called_once()
+
+    collection_path = artifact_manager.collection_mgr.config.get_collection_path(
+        "test-collection"
+    )
+    skill_file = collection_path / "skills" / "test-skill" / "SKILL.md"
+    assert skill_file.read_text() == "# Skill\n\nUpdated content."
+
+    lock_entry = artifact_manager.collection_mgr.lock_mgr.get_entry(
+        collection_path, "test-skill", ArtifactType.SKILL
+    )
+    assert lock_entry is not None
+    assert lock_entry.resolved_sha == "def999abc000"
+
+
+def test_update_respects_keep_local_strategy(
+    artifact_manager, test_collection, tmp_path
+):
+    """Ensure local modifications are preserved when strategy=local."""
+    skill_dir = tmp_path / "skill"
+    skill_dir.mkdir()
+    skill_md = skill_dir / "SKILL.md"
+    skill_md.write_text("# Skill\n\nOriginal content.")
+
+    fetch_result = FetchResult(
+        artifact_path=skill_dir,
+        metadata=ArtifactMetadata(title="Skill"),
+        resolved_sha="abc111",
+        resolved_version="v1.0.0",
+        upstream_url="https://github.com/user/repo/tree/abc111/skills/test-skill",
+    )
+
+    with patch.object(artifact_manager.github_source, "fetch", return_value=fetch_result):
+        artifact_manager.add_from_github(
+            spec="user/repo/skills/test-skill@latest",
+            artifact_type=ArtifactType.SKILL,
+            collection_name="test-collection",
+        )
+
+    collection_path = artifact_manager.collection_mgr.config.get_collection_path(
+        "test-collection"
+    )
+    local_skill = collection_path / "skills" / "test-skill" / "SKILL.md"
+    local_skill.write_text("# Skill\n\nLocally modified content.")
+
+    from skillmeat.sources.base import UpdateInfo
+
+    update_info = UpdateInfo(
+        current_sha="abc111",
+        latest_sha="def222",
+        current_version="v1.0.0",
+        latest_version="v1.1.0",
+        has_update=True,
+    )
+
+    with patch.object(
+        artifact_manager.github_source, "check_updates", return_value=update_info
+    ), patch.object(
+        artifact_manager.github_source, "fetch"
+    ) as mock_fetch, patch.object(
+        artifact_manager, "_auto_snapshot"
+    ) as mock_snapshot:
+        result = artifact_manager.update(
+            artifact_name="test-skill",
+            artifact_type=ArtifactType.SKILL,
+            collection_name="test-collection",
+            strategy=UpdateStrategy.KEEP_LOCAL,
+        )
+
+    assert result.updated is False
+    assert result.status == "local_changes_kept"
+    assert result.local_modifications is True
+    mock_fetch.assert_not_called()
+    mock_snapshot.assert_not_called()
+    assert "Locally modified" in local_skill.read_text()
+
+
+def test_update_refreshes_local_artifacts(
+    artifact_manager, test_collection, tmp_path
+):
+    """Local artifacts should refresh metadata and lock entries."""
+    local_dir = tmp_path / "local-skill"
+    local_dir.mkdir()
+    local_file = local_dir / "SKILL.md"
+    local_file.write_text(
+        "---\n"
+        "title: Local Skill\n"
+        "version: 1.0.0\n"
+        "---\n"
+        "\n"
+        "Initial body\n"
+    )
+
+    fetch_result = FetchResult(
+        artifact_path=local_dir,
+        metadata=ArtifactMetadata(title="Local Skill", version="1.0.0"),
+        resolved_sha=None,
+        resolved_version=None,
+        upstream_url=None,
+    )
+
+    with patch.object(artifact_manager.local_source, "fetch", return_value=fetch_result):
+        artifact_manager.add_from_local(
+            path=str(local_dir),
+            artifact_type=ArtifactType.SKILL,
+            collection_name="test-collection",
+        )
+
+    collection_path = artifact_manager.collection_mgr.config.get_collection_path(
+        "test-collection"
+    )
+    stored_skill = collection_path / "skills" / "local-skill"
+    stored_file = stored_skill / "SKILL.md"
+    stored_file.write_text(
+        "---\n"
+        "title: Updated Local Skill\n"
+        "version: 1.1.0\n"
+        "---\n"
+        "\n"
+        "Updated body\n"
+    )
+
+    with patch.object(artifact_manager, "_auto_snapshot"):
+        result = artifact_manager.update(
+            artifact_name="local-skill",
+            artifact_type=ArtifactType.SKILL,
+            collection_name="test-collection",
+        )
+
+    assert result.updated is True
+    assert result.status == "refreshed_local"
+    collection = artifact_manager.collection_mgr.load_collection("test-collection")
+    artifact = collection.find_artifact("local-skill", ArtifactType.SKILL)
+    assert artifact.metadata.title == "Updated Local Skill"
+    assert artifact.metadata.version == "1.1.0"
+
+    lock_entry = artifact_manager.collection_mgr.lock_mgr.get_entry(
+        collection_path, "local-skill", ArtifactType.SKILL
+    )
+    assert lock_entry is not None

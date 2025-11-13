@@ -6,6 +6,9 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
+from rich.prompt import Confirm
 
 # Handle tomli/tomllib import for different Python versions
 if sys.version_info >= (3, 11):
@@ -180,6 +183,20 @@ class Artifact:
             last_updated=last_updated,
             tags=data.get("tags", []),
         )
+
+
+@dataclass
+class UpdateResult:
+    """Result of attempting to update an artifact."""
+
+    artifact: Artifact
+    updated: bool
+    status: str
+    previous_version: Optional[str] = None
+    new_version: Optional[str] = None
+    previous_sha: Optional[str] = None
+    new_sha: Optional[str] = None
+    local_modifications: bool = False
 
 
 class ArtifactManager:
@@ -551,25 +568,258 @@ class ArtifactManager:
     def update(
         self,
         artifact_name: str,
-        artifact_type: ArtifactType,
+        artifact_type: Optional[ArtifactType] = None,
         collection_name: Optional[str] = None,
         strategy: UpdateStrategy = UpdateStrategy.PROMPT,
-    ) -> Artifact:
-        """Update artifact from upstream.
+    ) -> UpdateResult:
+        """Update artifact from upstream or refresh local artifacts.
 
         Args:
             artifact_name: Artifact name
-            artifact_type: Artifact type
+            artifact_type: Artifact type (required if ambiguous)
             collection_name: Collection name (uses active if None)
             strategy: Update strategy (PROMPT, TAKE_UPSTREAM, KEEP_LOCAL)
 
         Returns:
-            Updated Artifact object
+            UpdateResult describing outcome
 
         Raises:
-            ValueError: Artifact not found or no upstream
-            RuntimeError: Update failed
-            NotImplementedError: Update functionality (deferred to Phase 5)
+            ValueError: Artifact not found or unsupported origin
         """
-        # Implementation deferred to Phase 5 (complex logic with prompts)
-        raise NotImplementedError("Update functionality will be implemented in Phase 5")
+        collection = self.collection_mgr.load_collection(collection_name)
+        artifact = collection.find_artifact(artifact_name, artifact_type)
+
+        if not artifact:
+            raise ValueError(f"Artifact '{artifact_name}' not found")
+
+        if artifact.origin == "github":
+            return self._update_github_artifact(collection, artifact, strategy)
+        if artifact.origin == "local":
+            return self._refresh_local_artifact(collection, artifact)
+
+        raise ValueError(f"Unsupported artifact origin: {artifact.origin}")
+
+    def _update_github_artifact(
+        self, collection, artifact: Artifact, strategy: UpdateStrategy
+    ) -> UpdateResult:
+        """Update GitHub-backed artifact."""
+        if not artifact.upstream:
+            return UpdateResult(
+                artifact=artifact,
+                updated=False,
+                status="no_upstream",
+                previous_version=artifact.resolved_version,
+                new_version=artifact.resolved_version,
+                previous_sha=artifact.resolved_sha,
+                new_sha=artifact.resolved_sha,
+            )
+
+        collection_path, artifact_path = self._get_artifact_paths(collection, artifact)
+        has_local_modifications = self._detect_local_modifications(
+            collection_path, artifact, artifact_path
+        )
+
+        update_info = self.github_source.check_updates(artifact)
+        if not update_info or not update_info.has_update:
+            return UpdateResult(
+                artifact=artifact,
+                updated=False,
+                status="up_to_date",
+                previous_version=artifact.resolved_version,
+                new_version=artifact.resolved_version,
+                previous_sha=artifact.resolved_sha,
+                new_sha=artifact.resolved_sha,
+                local_modifications=has_local_modifications,
+            )
+
+        if has_local_modifications:
+            if strategy == UpdateStrategy.KEEP_LOCAL:
+                return UpdateResult(
+                    artifact=artifact,
+                    updated=False,
+                    status="local_changes_kept",
+                    previous_version=artifact.resolved_version,
+                    new_version=artifact.resolved_version,
+                    previous_sha=artifact.resolved_sha,
+                    new_sha=artifact.resolved_sha,
+                    local_modifications=True,
+                )
+            if strategy == UpdateStrategy.PROMPT:
+                prompt = (
+                    f"Local modifications detected for "
+                    f"{artifact.type.value}/{artifact.name}. "
+                    "Overwrite with upstream changes?"
+                )
+                if not Confirm.ask(prompt, default=False):
+                    return UpdateResult(
+                        artifact=artifact,
+                        updated=False,
+                        status="cancelled",
+                        previous_version=artifact.resolved_version,
+                        new_version=artifact.resolved_version,
+                        previous_sha=artifact.resolved_sha,
+                        new_sha=artifact.resolved_sha,
+                        local_modifications=True,
+                    )
+
+        previous_version = artifact.resolved_version
+        previous_sha = artifact.resolved_sha
+
+        override_version = update_info.latest_sha or artifact.version_spec
+        spec = self._build_spec_from_artifact(artifact, version_override=override_version)
+
+        self._auto_snapshot(
+            collection.name,
+            artifact,
+            f"Before updating {artifact.type.value}/{artifact.name}",
+        )
+
+        fetch_result = self.github_source.fetch(spec, artifact.type)
+
+        self.filesystem_mgr.copy_artifact(
+            fetch_result.artifact_path, artifact_path, artifact.type
+        )
+
+        artifact.metadata = fetch_result.metadata
+        artifact.upstream = fetch_result.upstream_url or artifact.upstream
+        artifact.resolved_sha = fetch_result.resolved_sha or update_info.latest_sha
+        artifact.resolved_version = (
+            fetch_result.resolved_version
+            if fetch_result.resolved_version is not None
+            else update_info.latest_version or artifact.resolved_version
+        )
+        artifact.last_updated = datetime.utcnow()
+
+        self.collection_mgr.save_collection(collection)
+
+        new_hash = self.compute_content_hash(artifact_path)
+        self.collection_mgr.lock_mgr.update_entry(
+            collection_path,
+            artifact.name,
+            artifact.type,
+            artifact.upstream,
+            artifact.resolved_sha,
+            artifact.resolved_version,
+            new_hash,
+        )
+
+        return UpdateResult(
+            artifact=artifact,
+            updated=True,
+            status="updated_github",
+            previous_version=previous_version,
+            new_version=artifact.resolved_version,
+            previous_sha=previous_sha,
+            new_sha=artifact.resolved_sha,
+            local_modifications=has_local_modifications,
+        )
+
+    def _refresh_local_artifact(self, collection, artifact: Artifact) -> UpdateResult:
+        """Refresh metadata/hash for local artifacts."""
+        collection_path, artifact_path = self._get_artifact_paths(collection, artifact)
+
+        try:
+            from skillmeat.utils.metadata import extract_artifact_metadata
+
+            metadata = extract_artifact_metadata(artifact_path, artifact.type)
+        except Exception:
+            metadata = artifact.metadata
+
+        previous_version = artifact.metadata.version
+
+        self._auto_snapshot(
+            collection.name,
+            artifact,
+            f"Before refreshing {artifact.type.value}/{artifact.name}",
+        )
+
+        artifact.metadata = metadata
+        artifact.last_updated = datetime.utcnow()
+
+        self.collection_mgr.save_collection(collection)
+
+        new_hash = self.compute_content_hash(artifact_path)
+        self.collection_mgr.lock_mgr.update_entry(
+            collection_path,
+            artifact.name,
+            artifact.type,
+            None,
+            None,
+            None,
+            new_hash,
+        )
+
+        return UpdateResult(
+            artifact=artifact,
+            updated=True,
+            status="refreshed_local",
+            previous_version=previous_version,
+            new_version=metadata.version,
+        )
+
+    def _get_artifact_paths(self, collection, artifact: Artifact) -> tuple[Path, Path]:
+        """Return collection and artifact paths (validate existence)."""
+        collection_path = self.collection_mgr.config.get_collection_path(
+            collection.name
+        )
+        artifact_path = collection_path / artifact.path
+
+        if not artifact_path.exists():
+            raise ValueError(
+                f"Artifact files missing for {artifact.type.value}/{artifact.name}"
+            )
+
+        return collection_path, artifact_path
+
+    def _detect_local_modifications(
+        self, collection_path: Path, artifact: Artifact, artifact_path: Path
+    ) -> bool:
+        """Check if artifact has diverged from lock entry."""
+        lock_entry = self.collection_mgr.lock_mgr.get_entry(
+            collection_path, artifact.name, artifact.type
+        )
+
+        if not lock_entry:
+            return False
+
+        try:
+            current_hash = self.compute_content_hash(artifact_path)
+        except FileNotFoundError:
+            return False
+
+        return current_hash != lock_entry.content_hash
+
+    def _build_spec_from_artifact(
+        self, artifact: Artifact, version_override: Optional[str] = None
+    ) -> str:
+        """Reconstruct GitHub spec from stored upstream URL."""
+        if not artifact.upstream:
+            raise ValueError(
+                f"Artifact '{artifact.name}' does not have an upstream reference"
+            )
+
+        parsed = urlparse(artifact.upstream)
+        parts = parsed.path.strip("/").split("/")
+
+        if len(parts) < 3 or parts[2] != "tree":
+            raise ValueError(f"Unsupported upstream URL format: {artifact.upstream}")
+
+        username, repo = parts[0], parts[1]
+        path_parts = parts[4:] if len(parts) > 4 else []
+        rel_path = "/".join(path_parts) if path_parts else ""
+        version_spec = version_override or artifact.version_spec or "latest"
+
+        if rel_path:
+            return f"{username}/{repo}/{rel_path}@{version_spec}"
+        return f"{username}/{repo}@{version_spec}"
+
+    def _auto_snapshot(self, collection_name: str, artifact: Artifact, message: str):
+        """Create safety snapshot before mutating artifact."""
+        from skillmeat.core.version import VersionManager
+
+        try:
+            version_mgr = VersionManager(self.collection_mgr)
+            version_mgr.auto_snapshot(collection_name, message)
+        except Exception:
+            # Snapshot best-effort; don't block updates if snapshot fails
+            pass
