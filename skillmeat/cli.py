@@ -352,7 +352,7 @@ def _add_artifact_from_spec(
             console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
 
             artifact = artifact_mgr.add_from_local(
-                path=local_path,
+                path=str(local_path),
                 artifact_type=artifact_type,
                 collection_name=collection,
                 custom_name=name,
