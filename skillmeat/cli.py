@@ -335,6 +335,7 @@ def _add_artifact_from_spec(
                 collection_name=collection,
                 custom_name=name,
                 tags=None,
+                force=force,
             )
 
             console.print(
@@ -356,6 +357,7 @@ def _add_artifact_from_spec(
                 collection_name=collection,
                 custom_name=name,
                 tags=None,
+                force=force,
             )
 
             console.print(
