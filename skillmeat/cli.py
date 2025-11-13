@@ -789,6 +789,45 @@ def update(
       skillmeat update my-skill         # Update one artifact
       skillmeat update my-skill --strategy upstream  # Force upstream
     """
+    status_messages = {
+        "no_upstream": "No upstream information stored; re-add from GitHub to enable updates.",
+        "up_to_date": "Already up to date.",
+        "local_changes_kept": "Local modifications preserved (use --strategy upstream to overwrite).",
+        "cancelled": "Update cancelled.",
+    }
+
+    def _format_version(version: Optional[str], sha: Optional[str]) -> str:
+        if version:
+            return version
+        if sha:
+            return sha[:7]
+        return "latest"
+
+    def _print_update_result(result):
+        if not hasattr(result, "updated"):
+            console.print(f"[green]Updated {name}[/green]")
+            return
+
+        artifact_name = getattr(getattr(result, "artifact", None), "name", name)
+
+        if result.updated:
+            if result.status == "updated_github":
+                old_label = _format_version(result.previous_version, result.previous_sha)
+                new_label = _format_version(result.new_version, result.new_sha)
+                console.print(
+                    f"[green]Updated {artifact_name}[/green]: {old_label} -> {new_label}"
+                )
+            elif result.status == "refreshed_local":
+                console.print(
+                    f"[green]Refreshed local artifact {artifact_name}[/green]"
+                )
+            else:
+                console.print(f"[green]Updated {artifact_name}[/green]")
+            return
+
+        message = status_messages.get(result.status, "No changes applied.")
+        console.print(f"[yellow]{artifact_name}: {message}[/yellow]")
+
     try:
         if not name:
             console.print("[yellow]Please specify artifact name to update[/yellow]")
@@ -804,12 +843,13 @@ def update(
         # Update artifact
         console.print(f"[cyan]Updating {name}...[/cyan]")
 
-        artifact_mgr.update(
-            name=name,
+        result = artifact_mgr.update(
+            artifact_name=name,
             artifact_type=type_filter,
             collection_name=collection,
             strategy=strategy_enum,
         )
+        _print_update_result(result)
 
     except ValueError as e:
         console.print(f"[yellow]{e}[/yellow]")
