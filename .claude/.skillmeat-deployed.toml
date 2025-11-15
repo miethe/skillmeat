@@ -6,3 +6,12 @@ deployed_at = "2025-11-13T13:49:37.793701"
 artifact_path = "skills/chrome-devtools"
 collection_sha = "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6ddbe"
 local_modifications = false
+
+[[deployed]]
+artifact_name = "notebooklm-skill"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-11-15T15:01:24.707340"
+artifact_path = "skills/notebooklm-skill"
+collection_sha = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
+local_modifications = false
