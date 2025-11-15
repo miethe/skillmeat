@@ -1,0 +1,8 @@
+Line with no trailing whitespace
+Line with trailing spaces
+Line with trailing tab
+	Line starting with tab
+    Line starting with spaces
+
+Line with CRLF (if preserved)
+Line with mixed    spaces	and	tabs

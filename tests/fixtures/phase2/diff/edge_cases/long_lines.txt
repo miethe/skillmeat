@@ -1,0 +1,5 @@
+Short line.
+This is a very long line that contains a lot of text to test how the diff engine handles lines that exceed typical line length limits and might need to be wrapped or handled specially when displaying diffs to users in a terminal or other constrained display environment where line wrapping becomes important for readability.
+Another short line.
+Yet another extremely long line that goes on and on and on with repeated content to make it even longer: Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Final short line.

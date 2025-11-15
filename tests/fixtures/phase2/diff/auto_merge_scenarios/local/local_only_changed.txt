@@ -1,0 +1,4 @@
+Modified content line 1.
+Original content line 2.
+Original content line 3.
+Additional line added locally.

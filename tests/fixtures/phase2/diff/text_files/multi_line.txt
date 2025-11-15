@@ -1,0 +1,7 @@
+Line 1: This is a multi-line document.
+Line 2: It contains multiple lines of text.
+Line 3: Each line has different content.
+Line 4: This helps test line-by-line diff operations.
+Line 5: Including additions and deletions.
+Line 6: And modifications to existing lines.
+Line 7: The document ends here.
