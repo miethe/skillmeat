@@ -1,6 +1,7 @@
 """Filesystem utility functions for SkillMeat."""
 
 import hashlib
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -78,6 +79,8 @@ def atomic_write(content: str, dest: Path) -> None:
         # Write content to temp file
         with open(temp_fd, "w", encoding="utf-8") as f:
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())  # Ensure data is physically written to disk
 
         # Atomic rename
         temp_path_obj = Path(temp_path)
