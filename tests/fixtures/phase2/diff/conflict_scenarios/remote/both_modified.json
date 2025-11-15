@@ -1,0 +1,12 @@
+{
+  "name": "example-project",
+  "version": "1.2.0",
+  "description": "Updated description - REMOTE",
+  "author": "New Author",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "package1": "1.0.0",
+    "package2": "3.0.0",
+    "new-remote-package": "2.0.0"
+  }
+}

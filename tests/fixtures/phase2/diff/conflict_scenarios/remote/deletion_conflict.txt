@@ -1,0 +1,5 @@
+This file will be deleted locally but modified remotely.
+Modified content line 1 - CHANGED REMOTELY.
+Original content line 2.
+New line added remotely.
+Original content line 3.
