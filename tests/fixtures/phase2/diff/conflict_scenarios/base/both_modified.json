@@ -1,0 +1,11 @@
+{
+  "name": "example-project",
+  "version": "1.0.0",
+  "description": "Original description",
+  "author": "Original Author",
+  "license": "MIT",
+  "dependencies": {
+    "package1": "1.0.0",
+    "package2": "2.0.0"
+  }
+}

@@ -10,7 +10,13 @@ import hashlib
 from pathlib import Path
 from typing import List, Optional, Set
 
-from ..models import FileDiff, DiffResult
+from ..models import (
+    FileDiff,
+    DiffResult,
+    ConflictMetadata,
+    ThreeWayDiffResult,
+    DiffStats,
+)
 
 
 # Default patterns to ignore during directory comparison
@@ -366,18 +372,354 @@ class DiffEngine:
         return files
 
     def three_way_diff(
-        self, base_path: Path, local_path: Path, upstream_path: Path
-    ) -> None:
+        self,
+        base_path: Path,
+        local_path: Path,
+        remote_path: Path,
+        ignore_patterns: Optional[List[str]] = None,
+    ) -> ThreeWayDiffResult:
         """Perform three-way diff for merge conflict detection.
 
+        Compares base, local, and remote versions to identify:
+        - Auto-mergeable changes (only one version changed)
+        - Conflicts requiring manual resolution (both versions changed)
+        - Deletions and additions
+
+        Three-way diff logic:
+        - If base == local == remote: NO CHANGE (unchanged)
+        - If base == local, remote changed: AUTO-MERGE (use remote)
+        - If base == remote, local changed: AUTO-MERGE (use local)
+        - If base != local != remote: CONFLICT (manual resolution)
+        - If file deleted in one version: CONFLICT (user decides)
+        - If file added in both with different content: CONFLICT
+
         Args:
-            base_path: Base/original version path
-            local_path: Local modified version path
-            upstream_path: Upstream modified version path
+            base_path: Path to base/ancestor version (common ancestor)
+            local_path: Path to local modified version
+            remote_path: Path to remote/upstream modified version
+            ignore_patterns: Optional list of patterns to ignore (extends defaults)
+
+        Returns:
+            ThreeWayDiffResult with auto_mergeable files and conflicts
 
         Raises:
-            NotImplementedError: Will be implemented in Phase 1 P1-002
+            FileNotFoundError: If any path doesn't exist
+            NotADirectoryError: If any path is not a directory
+
+        Example:
+            >>> engine = DiffEngine()
+            >>> result = engine.three_way_diff(
+            ...     Path("base"), Path("local"), Path("remote")
+            ... )
+            >>> print(f"Auto-mergeable: {len(result.auto_mergeable)}")
+            >>> print(f"Conflicts: {len(result.conflicts)}")
         """
-        raise NotImplementedError(
-            "DiffEngine.three_way_diff() will be implemented in Phase 1 P1-002"
+        # Validate paths exist
+        for path, name in [
+            (base_path, "base"),
+            (local_path, "local"),
+            (remote_path, "remote"),
+        ]:
+            if not path.exists():
+                raise FileNotFoundError(f"{name.capitalize()} path not found: {path}")
+            if not path.is_dir():
+                raise NotADirectoryError(
+                    f"{name.capitalize()} path is not a directory: {path}"
+                )
+
+        # Merge ignore patterns with defaults
+        patterns = DEFAULT_IGNORE_PATTERNS.copy()
+        if ignore_patterns:
+            patterns.extend(ignore_patterns)
+
+        # Collect files from all three versions
+        base_files = self._collect_files(base_path, patterns)
+        local_files = self._collect_files(local_path, patterns)
+        remote_files = self._collect_files(remote_path, patterns)
+
+        # Get all unique files across all versions
+        all_files = base_files | local_files | remote_files
+
+        # Initialize result
+        result = ThreeWayDiffResult(
+            base_path=base_path, local_path=local_path, remote_path=remote_path
         )
+
+        stats = DiffStats()
+        stats.files_compared = len(all_files)
+
+        # Analyze each file
+        for rel_path in sorted(all_files):
+            conflict_or_merge = self._analyze_three_way_file(
+                rel_path, base_path, local_path, remote_path, patterns
+            )
+
+            if conflict_or_merge is None:
+                # No change
+                stats.files_unchanged += 1
+            elif isinstance(conflict_or_merge, ConflictMetadata):
+                # Conflict detected
+                if conflict_or_merge.auto_mergeable:
+                    result.auto_mergeable.append(rel_path)
+                    stats.auto_mergeable += 1
+                    stats.files_changed += 1
+                else:
+                    result.conflicts.append(conflict_or_merge)
+                    stats.files_conflicted += 1
+            else:
+                # Should not reach here
+                pass
+
+        result.stats = stats
+        return result
+
+    def _analyze_three_way_file(
+        self,
+        rel_path: str,
+        base_path: Path,
+        local_path: Path,
+        remote_path: Path,
+        ignore_patterns: List[str],
+    ) -> Optional[ConflictMetadata]:
+        """Analyze a single file in three-way diff.
+
+        Args:
+            rel_path: Relative path to the file
+            base_path: Base directory path
+            local_path: Local directory path
+            remote_path: Remote directory path
+            ignore_patterns: Patterns to ignore
+
+        Returns:
+            ConflictMetadata if changes/conflicts detected, None if unchanged
+        """
+        base_file = base_path / rel_path
+        local_file = local_path / rel_path
+        remote_file = remote_path / rel_path
+
+        # Check which versions exist
+        base_exists = base_file.exists() and base_file.is_file()
+        local_exists = local_file.exists() and local_file.is_file()
+        remote_exists = remote_file.exists() and remote_file.is_file()
+
+        # Case 1: File doesn't exist in base (newly added)
+        if not base_exists:
+            if local_exists and remote_exists:
+                # Added in both versions - check if identical
+                if self._files_identical(local_file, remote_file):
+                    # Same content added in both - auto-merge
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="add_add",
+                        base_content=None,
+                        local_content=self._read_file_safe(local_file),
+                        remote_content=self._read_file_safe(remote_file),
+                        auto_mergeable=True,
+                        merge_strategy="use_local",  # Both are same
+                        is_binary=not self._is_text_file(local_file),
+                    )
+                else:
+                    # Different content added - conflict
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="add_add",
+                        base_content=None,
+                        local_content=self._read_file_safe(local_file),
+                        remote_content=self._read_file_safe(remote_file),
+                        auto_mergeable=False,
+                        merge_strategy="manual",
+                        is_binary=not self._is_text_file(local_file),
+                    )
+            elif local_exists and not remote_exists:
+                # Only added locally - auto-merge (use local)
+                return ConflictMetadata(
+                    file_path=rel_path,
+                    conflict_type="content",
+                    base_content=None,
+                    local_content=self._read_file_safe(local_file),
+                    remote_content=None,
+                    auto_mergeable=True,
+                    merge_strategy="use_local",
+                    is_binary=not self._is_text_file(local_file),
+                )
+            elif remote_exists and not local_exists:
+                # Only added remotely - auto-merge (use remote)
+                return ConflictMetadata(
+                    file_path=rel_path,
+                    conflict_type="content",
+                    base_content=None,
+                    local_content=None,
+                    remote_content=self._read_file_safe(remote_file),
+                    auto_mergeable=True,
+                    merge_strategy="use_remote",
+                    is_binary=not self._is_text_file(remote_file),
+                )
+            else:
+                # Should not happen (file in all_files but doesn't exist anywhere)
+                return None
+
+        # Case 2: File exists in base
+        else:
+            base_content = self._read_file_safe(base_file)
+            local_content = self._read_file_safe(local_file) if local_exists else None
+            remote_content = (
+                self._read_file_safe(remote_file) if remote_exists else None
+            )
+
+            # Check if binary
+            is_binary = not self._is_text_file(base_file)
+
+            # Sub-case: File deleted in both versions
+            if not local_exists and not remote_exists:
+                # Both deleted - auto-merge (delete)
+                return ConflictMetadata(
+                    file_path=rel_path,
+                    conflict_type="deletion",
+                    base_content=base_content,
+                    local_content=None,
+                    remote_content=None,
+                    auto_mergeable=True,
+                    merge_strategy="use_local",  # Both agree on deletion
+                    is_binary=is_binary,
+                )
+
+            # Sub-case: File deleted locally but modified remotely
+            if not local_exists and remote_exists:
+                if self._files_identical(base_file, remote_file):
+                    # Remote unchanged, local deleted - auto-merge (delete)
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="deletion",
+                        base_content=base_content,
+                        local_content=None,
+                        remote_content=remote_content,
+                        auto_mergeable=True,
+                        merge_strategy="use_local",
+                        is_binary=is_binary,
+                    )
+                else:
+                    # Remote modified, local deleted - conflict
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="deletion",
+                        base_content=base_content,
+                        local_content=None,
+                        remote_content=remote_content,
+                        auto_mergeable=False,
+                        merge_strategy="manual",
+                        is_binary=is_binary,
+                    )
+
+            # Sub-case: File deleted remotely but modified locally
+            if not remote_exists and local_exists:
+                if self._files_identical(base_file, local_file):
+                    # Local unchanged, remote deleted - auto-merge (delete)
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="deletion",
+                        base_content=base_content,
+                        local_content=local_content,
+                        remote_content=None,
+                        auto_mergeable=True,
+                        merge_strategy="use_remote",
+                        is_binary=is_binary,
+                    )
+                else:
+                    # Local modified, remote deleted - conflict
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="deletion",
+                        base_content=base_content,
+                        local_content=local_content,
+                        remote_content=None,
+                        auto_mergeable=False,
+                        merge_strategy="manual",
+                        is_binary=is_binary,
+                    )
+
+            # Sub-case: File exists in all three versions
+            if local_exists and remote_exists:
+                # Check all three for equality
+                base_local_same = self._files_identical(base_file, local_file)
+                base_remote_same = self._files_identical(base_file, remote_file)
+                local_remote_same = self._files_identical(local_file, remote_file)
+
+                # No changes at all
+                if base_local_same and base_remote_same:
+                    return None
+
+                # Only remote changed
+                if base_local_same and not base_remote_same:
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="content",
+                        base_content=base_content,
+                        local_content=local_content,
+                        remote_content=remote_content,
+                        auto_mergeable=True,
+                        merge_strategy="use_remote",
+                        is_binary=is_binary,
+                    )
+
+                # Only local changed
+                if base_remote_same and not base_local_same:
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="content",
+                        base_content=base_content,
+                        local_content=local_content,
+                        remote_content=remote_content,
+                        auto_mergeable=True,
+                        merge_strategy="use_local",
+                        is_binary=is_binary,
+                    )
+
+                # Both changed - check if they changed to the same thing
+                if local_remote_same:
+                    # Both changed identically - auto-merge
+                    return ConflictMetadata(
+                        file_path=rel_path,
+                        conflict_type="both_modified",
+                        base_content=base_content,
+                        local_content=local_content,
+                        remote_content=remote_content,
+                        auto_mergeable=True,
+                        merge_strategy="use_local",  # Both are same
+                        is_binary=is_binary,
+                    )
+
+                # Both changed differently - conflict
+                return ConflictMetadata(
+                    file_path=rel_path,
+                    conflict_type="both_modified",
+                    base_content=base_content,
+                    local_content=local_content,
+                    remote_content=remote_content,
+                    auto_mergeable=False,
+                    merge_strategy="manual",
+                    is_binary=is_binary,
+                )
+
+        return None
+
+    def _read_file_safe(self, file_path: Path) -> Optional[str]:
+        """Safely read file content, returning None for binary files.
+
+        Args:
+            file_path: Path to file
+
+        Returns:
+            File content as string, or None if binary or unreadable
+        """
+        if not file_path.exists():
+            return None
+
+        try:
+            # Check if binary first
+            if not self._is_text_file(file_path):
+                return None
+
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+        except Exception:
+            return None

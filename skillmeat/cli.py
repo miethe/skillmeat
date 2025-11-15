@@ -13,6 +13,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Confirm
+from rich.syntax import Syntax
+from rich.progress import track
+from rich.panel import Panel
 
 from skillmeat import __version__
 from skillmeat.config import ConfigManager
@@ -20,6 +23,7 @@ from skillmeat.core.collection import CollectionManager
 from skillmeat.core.artifact import ArtifactManager, ArtifactType, UpdateStrategy
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.core.version import VersionManager
+from skillmeat.core.diff_engine import DiffEngine
 from skillmeat.sources.github import GitHubSource
 from skillmeat.sources.local import LocalSource
 from skillmeat.utils.validator import ArtifactValidator
@@ -1590,6 +1594,381 @@ def verify(spec: str, artifact_type: str):
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+
+# ====================
+# Diff Commands
+# ====================
+
+
+@main.group()
+def diff():
+    """Compare artifacts and detect changes.
+
+    Provides tools for comparing files and directories, including
+    three-way diffs for merge conflict detection.
+    """
+    pass
+
+
+@diff.command(name="files")
+@click.argument("file1", type=click.Path(exists=True))
+@click.argument("file2", type=click.Path(exists=True))
+@click.option(
+    "--context",
+    "-c",
+    default=3,
+    type=int,
+    help="Number of context lines to show around changes (default: 3)",
+)
+@click.option(
+    "--color/--no-color",
+    default=True,
+    help="Enable/disable colored output (default: enabled)",
+)
+def diff_files_cmd(file1: str, file2: str, context: int, color: bool):
+    """Compare two files and show differences.
+
+    Displays a unified diff showing the changes between FILE1 and FILE2.
+    For text files, shows line-by-line differences with syntax highlighting.
+    For binary files, reports only that they differ.
+
+    \\b
+    Examples:
+      skillmeat diff files old.md new.md
+      skillmeat diff files old.md new.md --context 5
+      skillmeat diff files old.md new.md --no-color
+    """
+    try:
+        file1_path = Path(file1).resolve()
+        file2_path = Path(file2).resolve()
+
+        # Create diff engine
+        engine = DiffEngine()
+
+        # Perform diff
+        result = engine.diff_files(file1_path, file2_path)
+
+        # Display results
+        _display_file_diff(result, file1_path, file2_path, color)
+
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}", err=True)
+        sys.exit(1)
+
+
+@diff.command(name="dirs")
+@click.argument("dir1", type=click.Path(exists=True, file_okay=False))
+@click.argument("dir2", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--ignore",
+    "-i",
+    multiple=True,
+    help="Patterns to ignore (can be specified multiple times)",
+)
+@click.option(
+    "--limit",
+    "-l",
+    default=100,
+    type=int,
+    help="Maximum number of files to show (default: 100)",
+)
+@click.option(
+    "--stats-only",
+    is_flag=True,
+    help="Show only statistics, not individual file diffs",
+)
+def diff_dirs_cmd(dir1: str, dir2: str, ignore: tuple, limit: int, stats_only: bool):
+    """Compare two directories and show differences.
+
+    Recursively compares all files in DIR1 and DIR2, showing which files
+    were added, removed, or modified. Respects ignore patterns to skip
+    certain files and directories.
+
+    \\b
+    Examples:
+      skillmeat diff dirs old_version/ new_version/
+      skillmeat diff dirs old/ new/ --ignore "*.pyc" --ignore "__pycache__"
+      skillmeat diff dirs old/ new/ --limit 50
+      skillmeat diff dirs old/ new/ --stats-only
+    """
+    try:
+        dir1_path = Path(dir1).resolve()
+        dir2_path = Path(dir2).resolve()
+
+        # Create diff engine
+        engine = DiffEngine()
+
+        # Perform diff
+        console.print("[cyan]Comparing directories...[/cyan]")
+        result = engine.diff_directories(
+            dir1_path, dir2_path, ignore_patterns=list(ignore) if ignore else None
+        )
+
+        # Display results
+        _display_directory_diff(result, limit, stats_only)
+
+    except (FileNotFoundError, NotADirectoryError) as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}", err=True)
+        sys.exit(1)
+
+
+@diff.command(name="three-way")
+@click.argument("base", type=click.Path(exists=True, file_okay=False))
+@click.argument("local", type=click.Path(exists=True, file_okay=False))
+@click.argument("remote", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--ignore",
+    "-i",
+    multiple=True,
+    help="Patterns to ignore (can be specified multiple times)",
+)
+@click.option(
+    "--conflicts-only",
+    is_flag=True,
+    help="Show only files with conflicts, not auto-mergeable files",
+)
+def diff_three_way_cmd(
+    base: str, local: str, remote: str, ignore: tuple, conflicts_only: bool
+):
+    """Perform three-way diff for merge conflict detection.
+
+    Compares BASE (common ancestor), LOCAL (your changes), and REMOTE
+    (upstream changes) to identify auto-mergeable changes and conflicts.
+    This is useful for understanding what will happen during an update.
+
+    \\b
+    Three-way diff logic:
+      - If only LOCAL changed: auto-merge (use local)
+      - If only REMOTE changed: auto-merge (use remote)
+      - If both changed the same: auto-merge (use either)
+      - If both changed differently: CONFLICT (manual resolution)
+
+    \\b
+    Examples:
+      skillmeat diff three-way base/ local/ remote/
+      skillmeat diff three-way base/ local/ remote/ --conflicts-only
+      skillmeat diff three-way base/ local/ remote/ --ignore "*.pyc"
+    """
+    try:
+        base_path = Path(base).resolve()
+        local_path = Path(local).resolve()
+        remote_path = Path(remote).resolve()
+
+        # Create diff engine
+        engine = DiffEngine()
+
+        # Perform three-way diff
+        console.print("[cyan]Performing three-way diff...[/cyan]")
+        result = engine.three_way_diff(
+            base_path, local_path, remote_path, ignore_patterns=list(ignore) if ignore else None
+        )
+
+        # Display results
+        _display_three_way_diff(result, conflicts_only)
+
+    except (FileNotFoundError, NotADirectoryError) as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}", err=True)
+        sys.exit(1)
+
+
+# ====================
+# Diff Display Helpers
+# ====================
+
+
+def _display_file_diff(
+    result, file1_path: Path, file2_path: Path, use_color: bool
+) -> None:
+    """Display diff for a single file comparison.
+
+    Args:
+        result: FileDiff object
+        file1_path: Path to first file
+        file2_path: Path to second file
+        use_color: Whether to use colored output
+    """
+    # Display file headers
+    console.print(f"\n[bold cyan]--- {file1_path}[/bold cyan]")
+    console.print(f"[bold cyan]+++ {file2_path}[/bold cyan]")
+
+    # Handle different status types
+    if result.status == "unchanged":
+        console.print("\n[green]Files are identical[/green]")
+        return
+
+    if result.status == "binary":
+        console.print(f"\n[yellow]{result.unified_diff}[/yellow]")
+        return
+
+    # Display unified diff for modified files
+    if result.unified_diff:
+        if use_color:
+            # Use Rich syntax highlighting for diff
+            syntax = Syntax(
+                result.unified_diff,
+                "diff",
+                theme="monokai",
+                line_numbers=False,
+                word_wrap=False,
+            )
+            console.print(syntax)
+        else:
+            console.print(result.unified_diff)
+
+    # Display statistics
+    console.print()
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("Label", style="cyan")
+    table.add_column("Value", style="magenta", justify="right")
+
+    table.add_row("Lines added", f"+{result.lines_added}")
+    table.add_row("Lines removed", f"-{result.lines_removed}")
+
+    console.print(table)
+
+
+def _display_directory_diff(result, limit: int, stats_only: bool) -> None:
+    """Display diff for a directory comparison.
+
+    Args:
+        result: DiffResult object
+        limit: Maximum number of files to show
+        stats_only: If True, show only statistics
+    """
+    # Check if we need to limit output
+    total_changes = result.total_files_changed
+    limited = total_changes > limit
+
+    if limited and not stats_only:
+        console.print(
+            f"[yellow]Showing {limit} of {total_changes} changed files. "
+            f"Use --limit to adjust or --stats-only for summary.[/yellow]\n"
+        )
+
+    # Display summary table
+    table = Table(title="Diff Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", style="magenta", justify="right")
+
+    table.add_row("Files Added", str(len(result.files_added)))
+    table.add_row("Files Removed", str(len(result.files_removed)))
+    table.add_row("Files Modified", str(len(result.files_modified)))
+    table.add_row("Files Unchanged", str(len(result.files_unchanged)))
+    table.add_row("Lines Added", f"+{result.total_lines_added}")
+    table.add_row("Lines Removed", f"-{result.total_lines_removed}")
+
+    console.print(table)
+    console.print()
+
+    # If stats-only, we're done
+    if stats_only:
+        return
+
+    # Display added files
+    if result.files_added:
+        added_list = result.files_added[:limit] if limited else result.files_added
+        console.print("[green]Added files:[/green]")
+        for file_path in added_list:
+            console.print(f"  [green]+[/green] {file_path}")
+        console.print()
+
+    # Display removed files
+    if result.files_removed:
+        removed_list = result.files_removed[:limit] if limited else result.files_removed
+        console.print("[red]Removed files:[/red]")
+        for file_path in removed_list:
+            console.print(f"  [red]-[/red] {file_path}")
+        console.print()
+
+    # Display modified files
+    if result.files_modified:
+        modified_list = result.files_modified[:limit] if limited else result.files_modified
+        console.print("[yellow]Modified files:[/yellow]")
+        for file_diff in modified_list:
+            if file_diff.status == "binary":
+                console.print(f"  [yellow]~[/yellow] {file_diff.path} (binary)")
+            else:
+                console.print(
+                    f"  [yellow]~[/yellow] {file_diff.path} "
+                    f"([green]+{file_diff.lines_added}[/green] "
+                    f"[red]-{file_diff.lines_removed}[/red])"
+                )
+        console.print()
+
+
+def _display_three_way_diff(result, conflicts_only: bool) -> None:
+    """Display three-way diff results.
+
+    Args:
+        result: ThreeWayDiffResult object
+        conflicts_only: If True, show only conflicts
+    """
+    # Display summary statistics
+    table = Table(title="Three-Way Diff Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", style="magenta", justify="right")
+
+    table.add_row("Files Compared", str(result.stats.files_compared))
+    table.add_row("Files Unchanged", str(result.stats.files_unchanged))
+    table.add_row("Auto-mergeable", str(result.stats.auto_mergeable))
+    table.add_row("Conflicts", str(result.stats.files_conflicted))
+
+    console.print(table)
+    console.print()
+
+    # Display auto-mergeable files (unless conflicts-only)
+    if not conflicts_only and result.auto_mergeable:
+        console.print(f"[green]Auto-mergeable files ({len(result.auto_mergeable)}):[/green]")
+        for file_path in result.auto_mergeable:
+            console.print(f"  [green]✓[/green] {file_path}")
+        console.print()
+
+    # Display conflicts
+    if result.conflicts:
+        console.print(f"[red]Conflicts requiring manual resolution ({len(result.conflicts)}):[/red]")
+        for conflict in result.conflicts:
+            _display_conflict(conflict)
+        console.print()
+    elif not result.auto_mergeable:
+        console.print("[green]No changes detected[/green]")
+    elif conflicts_only:
+        console.print("[green]No conflicts detected[/green]")
+
+
+def _display_conflict(conflict) -> None:
+    """Display a single conflict.
+
+    Args:
+        conflict: ConflictMetadata object
+    """
+    # Determine conflict description
+    if conflict.conflict_type == "both_modified":
+        desc = "Both versions modified"
+    elif conflict.conflict_type == "deletion":
+        desc = "Deleted in one version, modified in other"
+    elif conflict.conflict_type == "add_add":
+        desc = "Added in both versions with different content"
+    else:
+        desc = "Content conflict"
+
+    # Add binary indicator
+    if conflict.is_binary:
+        desc += " (binary file)"
+
+    # Display conflict header
+    console.print(f"  [red]✗[/red] {conflict.file_path}")
+    console.print(f"    [dim]{desc}[/dim]")
+    console.print(f"    [dim]Strategy: {conflict.merge_strategy}[/dim]")
 
 
 # ====================
