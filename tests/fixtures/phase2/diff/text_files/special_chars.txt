@@ -1,0 +1,18 @@
+Special Characters and Unicode Test File
+
+ASCII Special Characters:
+!@#$%^&*()_+-=[]{}|;':",./<>?`~
+
+Unicode Characters:
+- Greek: α β γ δ ε ζ η θ
+- Math: ∀ ∃ ∈ ∉ ∑ ∏ √ ∞
+- Emoji: 🔥 ✅ ❌ 🎯 📝
+- Accented: café résumé naïve
+- CJK: 你好世界 こんにちは 안녕하세요
+- Arabic: مرحبا بك
+- Symbols: © ® ™ € £ ¥
+
+Whitespace variations:
+	Tab character
+  Multiple  spaces
+Line with trailing spaces

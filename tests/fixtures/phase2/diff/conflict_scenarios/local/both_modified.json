@@ -1,0 +1,12 @@
+{
+  "name": "example-project",
+  "version": "1.1.0",
+  "description": "Updated description - LOCAL",
+  "author": "Original Author",
+  "license": "MIT",
+  "dependencies": {
+    "package1": "1.0.0",
+    "package2": "2.0.0",
+    "new-local-package": "1.0.0"
+  }
+}

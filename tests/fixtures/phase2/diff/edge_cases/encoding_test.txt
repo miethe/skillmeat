@@ -1,0 +1,13 @@
+UTF-8 Encoding Test File
+
+Latin characters: abcdefghijklmnopqrstuvwxyz
+Numbers: 0123456789
+Symbols: !@#$%^&*()_+-=[]{}|;':",./<>?
+
+Extended ASCII: áéíóú ÁÉÍÓÚ ñÑ ¿¡
+
+Special cases:
+- Zero-width space: ​ (U+200B)
+- Non-breaking space:   (U+00A0)
+- Em dash: — (U+2014)
+- Ellipsis: … (U+2026)

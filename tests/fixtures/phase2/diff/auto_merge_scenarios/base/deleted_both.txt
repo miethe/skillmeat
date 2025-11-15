@@ -1,0 +1,2 @@
+This file will be deleted in both local and remote.
+It should auto-merge as a deletion.
