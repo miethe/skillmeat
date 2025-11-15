@@ -1,5 +1,6 @@
 """Core artifact data models and manager for SkillMeat."""
 
+import logging
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -820,6 +821,10 @@ class ArtifactManager:
         try:
             version_mgr = VersionManager(self.collection_mgr)
             version_mgr.auto_snapshot(collection_name, message)
-        except Exception:
+        except Exception as e:
             # Snapshot best-effort; don't block updates if snapshot fails
-            pass
+            # But log warning so user knows rollback may not be available
+            logging.warning(
+                f"Failed to create snapshot before updating {artifact.name}: {e}. "
+                "Rollback may not be available if update fails."
+            )
