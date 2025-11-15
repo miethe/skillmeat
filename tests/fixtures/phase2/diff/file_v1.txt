@@ -1,0 +1,5 @@
+This is the first version of the file.
+It contains some initial content.
+Line three has some text.
+This line will be removed.
+Final line here.
