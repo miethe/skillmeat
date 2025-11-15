@@ -245,3 +245,94 @@ class ThreeWayDiffResult:
             parts.append(f"{len(self.conflicts)} conflicts")
 
         return ", ".join(parts)
+
+
+@dataclass
+class MergeStats:
+    """Statistics for a merge operation.
+
+    Attributes:
+        total_files: Total number of files involved in merge
+        auto_merged: Number of files successfully auto-merged
+        conflicts: Number of files with unresolved conflicts
+        binary_conflicts: Number of binary files with conflicts
+    """
+
+    total_files: int = 0
+    auto_merged: int = 0
+    conflicts: int = 0
+    binary_conflicts: int = 0
+
+    @property
+    def has_conflicts(self) -> bool:
+        """Return True if any conflicts exist."""
+        return self.conflicts > 0
+
+    @property
+    def success_rate(self) -> float:
+        """Return percentage of files successfully auto-merged."""
+        if self.total_files == 0:
+            return 100.0
+        return (self.auto_merged / self.total_files) * 100
+
+    def summary(self) -> str:
+        """Generate a human-readable summary."""
+        if self.total_files == 0:
+            return "No files to merge"
+
+        parts = []
+        if self.auto_merged > 0:
+            parts.append(f"{self.auto_merged} auto-merged")
+        if self.conflicts > 0:
+            parts.append(f"{self.conflicts} conflicts")
+        if self.binary_conflicts > 0:
+            parts.append(f"{self.binary_conflicts} binary conflicts")
+
+        summary = ", ".join(parts) if parts else "No changes"
+        summary += f" ({self.success_rate:.1f}% success)"
+
+        return summary
+
+
+@dataclass
+class MergeResult:
+    """Result of a merge operation.
+
+    Attributes:
+        success: True if fully auto-merged, False if conflicts exist
+        merged_content: Merged content for single file merges (may include markers)
+        conflicts: List of unresolved conflicts
+        auto_merged: List of successfully auto-merged file paths
+        stats: Statistics about the merge operation
+        output_path: Path where merged results were written (if applicable)
+    """
+
+    success: bool
+    merged_content: Optional[str] = None
+    conflicts: List[ConflictMetadata] = field(default_factory=list)
+    auto_merged: List[str] = field(default_factory=list)
+    stats: MergeStats = field(default_factory=MergeStats)
+    output_path: Optional[Path] = None
+
+    @property
+    def has_conflicts(self) -> bool:
+        """Return True if any conflicts exist."""
+        return len(self.conflicts) > 0
+
+    @property
+    def total_files(self) -> int:
+        """Return total number of files processed."""
+        return len(self.auto_merged) + len(self.conflicts)
+
+    def summary(self) -> str:
+        """Generate a human-readable summary."""
+        if self.success:
+            return f"Merge successful: {len(self.auto_merged)} files auto-merged"
+
+        parts = []
+        if self.auto_merged:
+            parts.append(f"{len(self.auto_merged)} auto-merged")
+        if self.conflicts:
+            parts.append(f"{len(self.conflicts)} conflicts")
+
+        return "Merge completed with " + ", ".join(parts)
