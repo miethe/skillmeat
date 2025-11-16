@@ -816,7 +816,9 @@ def update(
 
         if result.updated:
             if result.status == "updated_github":
-                old_label = _format_version(result.previous_version, result.previous_sha)
+                old_label = _format_version(
+                    result.previous_version, result.previous_sha
+                )
                 new_label = _format_version(result.new_version, result.new_sha)
                 console.print(
                     f"[green]Updated {artifact_name}[/green]: {old_label} -> {new_label}"
@@ -1767,7 +1769,10 @@ def diff_three_way_cmd(
         # Perform three-way diff
         console.print("[cyan]Performing three-way diff...[/cyan]")
         result = engine.three_way_diff(
-            base_path, local_path, remote_path, ignore_patterns=list(ignore) if ignore else None
+            base_path,
+            local_path,
+            remote_path,
+            ignore_patterns=list(ignore) if ignore else None,
         )
 
         # Display results
@@ -1778,6 +1783,219 @@ def diff_three_way_cmd(
         sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error:[/red] {str(e)}", err=True)
+        sys.exit(1)
+
+
+@diff.command(name="artifact")
+@click.argument("name")
+@click.option(
+    "--upstream",
+    is_flag=True,
+    help="Compare with upstream version",
+)
+@click.option(
+    "--project",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Compare with artifact in another project",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+@click.option(
+    "--type",
+    "-t",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    default=None,
+    help="Artifact type (required if name is ambiguous)",
+)
+@click.option(
+    "--summary-only",
+    is_flag=True,
+    help="Show only diff summary, not full file-by-file diff",
+)
+@click.option(
+    "--limit",
+    "-l",
+    default=100,
+    type=int,
+    help="Maximum number of changed files to show (default: 100)",
+)
+def diff_artifact_cmd(
+    name: str,
+    upstream: bool,
+    project: Optional[Path],
+    collection: Optional[str],
+    artifact_type: Optional[str],
+    summary_only: bool,
+    limit: int,
+):
+    """Compare artifact versions and show differences.
+
+    Compares a local artifact with its upstream source or with the same
+    artifact in another project. Shows which files changed, with detailed
+    diffs and statistics.
+
+    \\b
+    Comparison modes:
+      --upstream: Compare local artifact with latest upstream version
+      --project PATH: Compare local artifact with same artifact in another project
+
+    \\b
+    Examples:
+      skillmeat diff artifact my-skill --upstream
+      skillmeat diff artifact my-skill --project /path/to/other/project
+      skillmeat diff artifact my-skill --upstream --summary-only
+      skillmeat diff artifact my-skill --upstream --limit 50
+    """
+    try:
+        from skillmeat.core.artifact import ArtifactManager, ArtifactType
+
+        # Validate that exactly one comparison mode is specified
+        if upstream and project:
+            console.print(
+                "[red]Error:[/red] Cannot specify both --upstream and --project"
+            )
+            sys.exit(1)
+
+        if not upstream and not project:
+            console.print(
+                "[red]Error:[/red] Must specify either --upstream or --project"
+            )
+            sys.exit(1)
+
+        # Initialize artifact manager
+        artifact_mgr = ArtifactManager()
+
+        # Convert type string to enum if provided
+        type_filter = ArtifactType(artifact_type) if artifact_type else None
+
+        # Get local artifact
+        console.print(f"[cyan]Locating artifact '{name}'...[/cyan]")
+        try:
+            artifact = artifact_mgr.get_artifact(
+                name=name,
+                artifact_type=type_filter,
+                collection_name=collection,
+            )
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            sys.exit(1)
+
+        # Get local artifact path
+        local_path = artifact_mgr._get_artifact_storage_path(
+            artifact.name,
+            artifact.type,
+            collection or artifact_mgr.collection_mgr.get_active_collection_name(),
+        )
+
+        if not local_path.exists():
+            console.print(f"[red]Error:[/red] Artifact path not found: {local_path}")
+            sys.exit(1)
+
+        # Determine comparison target
+        if upstream:
+            # Compare with upstream
+            console.print(f"[cyan]Fetching upstream version...[/cyan]")
+
+            # Check if artifact has upstream info
+            if not artifact.origin or not artifact.origin.startswith(("http", "git")):
+                console.print(
+                    f"[yellow]Warning:[/yellow] Artifact '{name}' has no upstream source"
+                )
+                console.print("  This artifact may have been added from a local path.")
+                console.print(
+                    "  Use --project to compare with another project instead."
+                )
+                sys.exit(1)
+
+            # Fetch upstream version
+            try:
+                fetch_result = artifact_mgr.fetch_update(
+                    artifact_name=name,
+                    artifact_type=type_filter,
+                    collection_name=collection,
+                )
+
+                if not fetch_result.success:
+                    console.print(
+                        f"[red]Error:[/red] Failed to fetch upstream: {fetch_result.error or 'Unknown error'}"
+                    )
+                    sys.exit(1)
+
+                remote_path = fetch_result.temp_workspace
+
+                # Display comparison info
+                console.print(f"\n[bold]Comparing:[/bold] {name} (local) vs upstream")
+                if fetch_result.latest_version:
+                    console.print(
+                        f"[dim]Upstream version: {fetch_result.latest_version}[/dim]"
+                    )
+
+            except Exception as e:
+                console.print(f"[red]Error fetching upstream:[/red] {str(e)}")
+                sys.exit(1)
+
+        elif project:
+            # Compare with project artifact
+            console.print(f"[cyan]Locating artifact in project {project}...[/cyan]")
+
+            # Determine artifact path in project
+            # Artifacts can be in .claude/skills/, .claude/commands/, or .claude/agents/
+            artifact_subdir = {
+                "skill": "skills",
+                "command": "commands",
+                "agent": "agents",
+            }.get(artifact.type.value, "skills")
+
+            remote_path = project / ".claude" / artifact_subdir / artifact.name
+
+            if not remote_path.exists():
+                console.print(
+                    f"[red]Error:[/red] Artifact '{name}' not found in project {project}"
+                )
+                console.print(f"  Expected path: {remote_path}")
+                sys.exit(1)
+
+            # Display comparison info
+            console.print(
+                f"\n[bold]Comparing:[/bold] {name} (local) vs project ({project.name})"
+            )
+
+        # Perform diff
+        console.print("[cyan]Computing diff...[/cyan]")
+        engine = DiffEngine()
+
+        result = engine.diff_directories(
+            local_path,
+            remote_path,
+            ignore_patterns=[".git", "__pycache__", "*.pyc", ".DS_Store"],
+        )
+
+        # Display results
+        console.print()
+        _display_artifact_diff(result, name, limit, summary_only)
+
+        # Clean up temp workspace if we fetched upstream
+        if upstream and fetch_result.temp_workspace:
+            try:
+                import shutil
+
+                shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
+            except Exception:
+                pass
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {str(e)}")
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
         sys.exit(1)
 
 
@@ -1892,7 +2110,9 @@ def _display_directory_diff(result, limit: int, stats_only: bool) -> None:
 
     # Display modified files
     if result.files_modified:
-        modified_list = result.files_modified[:limit] if limited else result.files_modified
+        modified_list = (
+            result.files_modified[:limit] if limited else result.files_modified
+        )
         console.print("[yellow]Modified files:[/yellow]")
         for file_diff in modified_list:
             if file_diff.status == "binary":
@@ -1928,14 +2148,18 @@ def _display_three_way_diff(result, conflicts_only: bool) -> None:
 
     # Display auto-mergeable files (unless conflicts-only)
     if not conflicts_only and result.auto_mergeable:
-        console.print(f"[green]Auto-mergeable files ({len(result.auto_mergeable)}):[/green]")
+        console.print(
+            f"[green]Auto-mergeable files ({len(result.auto_mergeable)}):[/green]"
+        )
         for file_path in result.auto_mergeable:
             console.print(f"  [green]✓[/green] {file_path}")
         console.print()
 
     # Display conflicts
     if result.conflicts:
-        console.print(f"[red]Conflicts requiring manual resolution ({len(result.conflicts)}):[/red]")
+        console.print(
+            f"[red]Conflicts requiring manual resolution ({len(result.conflicts)}):[/red]"
+        )
         for conflict in result.conflicts:
             _display_conflict(conflict)
         console.print()
@@ -1969,6 +2193,1015 @@ def _display_conflict(conflict) -> None:
     console.print(f"  [red]✗[/red] {conflict.file_path}")
     console.print(f"    [dim]{desc}[/dim]")
     console.print(f"    [dim]Strategy: {conflict.merge_strategy}[/dim]")
+
+
+def _display_artifact_diff(
+    result, artifact_name: str, limit: int, summary_only: bool
+) -> None:
+    """Display diff for an artifact comparison.
+
+    Enhanced version of _display_directory_diff with artifact-specific formatting.
+
+    Args:
+        result: DiffResult object
+        artifact_name: Name of the artifact being compared
+        limit: Maximum number of files to show
+        summary_only: If True, show only statistics
+    """
+    # Check if we need to limit output
+    total_changes = result.total_files_changed
+    limited = total_changes > limit
+
+    if limited and not summary_only:
+        console.print(
+            f"[yellow]Showing {limit} of {total_changes} changed files. "
+            f"Use --limit to adjust or --summary-only for summary.[/yellow]\n"
+        )
+
+    # Display summary table with artifact context
+    table = Table(title=f"Diff Summary: {artifact_name}", show_header=True, box=None)
+    table.add_column("Metric", style="cyan", no_wrap=True)
+    table.add_column("Count", style="magenta", justify="right", no_wrap=True)
+
+    # Calculate total files (including unchanged)
+    total_files = (
+        len(result.files_added)
+        + len(result.files_removed)
+        + len(result.files_modified)
+        + len(result.files_unchanged)
+    )
+
+    table.add_row("Total Files", str(total_files))
+    table.add_row(
+        "Files Added",
+        f"[green]{len(result.files_added)}[/green]" if result.files_added else "0",
+    )
+    table.add_row(
+        "Files Removed",
+        f"[red]{len(result.files_removed)}[/red]" if result.files_removed else "0",
+    )
+    table.add_row(
+        "Files Modified",
+        (
+            f"[yellow]{len(result.files_modified)}[/yellow]"
+            if result.files_modified
+            else "0"
+        ),
+    )
+    table.add_row("Files Unchanged", f"[dim]{len(result.files_unchanged)}[/dim]")
+
+    # Add line stats if available
+    if result.total_lines_added or result.total_lines_removed:
+        table.add_row("Lines Added", f"[green]+{result.total_lines_added}[/green]")
+        table.add_row("Lines Removed", f"[red]-{result.total_lines_removed}[/red]")
+
+    console.print(table)
+    console.print()
+
+    # If no changes, we're done
+    if not result.has_changes:
+        console.print("[green]No changes detected[/green]")
+        return
+
+    # If stats-only, we're done
+    if summary_only:
+        return
+
+    # Display added files
+    if result.files_added:
+        added_list = result.files_added[:limit] if limited else result.files_added
+        console.print(
+            f"[green]Added ({len(added_list)} of {len(result.files_added)}):[/green]"
+            if limited
+            else f"[green]Added files:[/green]"
+        )
+        for file_path in added_list:
+            console.print(f"  [green]+[/green] {file_path}")
+        console.print()
+
+    # Display removed files
+    if result.files_removed:
+        remaining_limit = limit - len(result.files_added) if limited else limit
+        removed_list = (
+            result.files_removed[:remaining_limit] if limited else result.files_removed
+        )
+        console.print(
+            f"[red]Removed ({len(removed_list)} of {len(result.files_removed)}):[/red]"
+            if limited
+            else f"[red]Removed files:[/red]"
+        )
+        for file_path in removed_list:
+            console.print(f"  [red]-[/red] {file_path}")
+        console.print()
+
+    # Display modified files with detailed stats
+    if result.files_modified:
+        files_shown = len(result.files_added) + len(result.files_removed)
+        remaining_limit = (
+            max(0, limit - files_shown) if limited else len(result.files_modified)
+        )
+        modified_list = (
+            result.files_modified[:remaining_limit]
+            if limited
+            else result.files_modified
+        )
+
+        console.print(
+            f"[yellow]Modified ({len(modified_list)} of {len(result.files_modified)}):[/yellow]"
+            if limited
+            else f"[yellow]Modified files:[/yellow]"
+        )
+
+        for file_diff in modified_list:
+            if file_diff.status == "binary":
+                console.print(
+                    f"  [yellow]~[/yellow] {file_diff.path} [dim](binary)[/dim]"
+                )
+            else:
+                # Show file with change stats
+                console.print(
+                    f"  [yellow]~[/yellow] {file_diff.path} "
+                    f"[dim]([green]+{file_diff.lines_added}[/green] "
+                    f"[red]-{file_diff.lines_removed}[/red])[/dim]"
+                )
+        console.print()
+
+    # Add helpful footer if limited
+    if limited:
+        console.print(
+            f"[dim]Showing {min(limit, total_changes)} of {total_changes} changed files.[/dim]"
+        )
+        console.print(
+            f"[dim]Use '--limit {total_changes}' to see all changes or '--summary-only' for stats only.[/dim]"
+        )
+
+
+# ====================
+# Search Commands
+# ====================
+
+
+@main.command()
+@click.argument("query")
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection to search (default: active collection)",
+)
+@click.option(
+    "--type",
+    "-t",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    default=None,
+    help="Filter by artifact type",
+)
+@click.option(
+    "--search-type",
+    type=click.Choice(["metadata", "content", "both"]),
+    default="both",
+    help="Search metadata, content, or both (default: both)",
+)
+@click.option(
+    "--tags",
+    help="Filter by tags (comma-separated)",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=50,
+    help="Maximum results to show (default: 50)",
+)
+@click.option(
+    "--projects",
+    "-p",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Search across specific project paths (can specify multiple)",
+)
+@click.option(
+    "--discover",
+    is_flag=True,
+    help="Auto-discover all Claude projects in configured search roots",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Disable cache for fresh results",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+def search(
+    query: str,
+    collection: Optional[str],
+    artifact_type: Optional[str],
+    search_type: str,
+    tags: Optional[str],
+    limit: int,
+    projects: tuple,
+    discover: bool,
+    no_cache: bool,
+    output_json: bool,
+):
+    """Search artifacts by metadata or content.
+
+    Search can be performed on a collection or across multiple projects.
+    Use --projects to specify project paths or --discover to auto-find projects.
+
+    \b
+    Examples:
+      # Search in collection
+      skillmeat search "authentication"
+      skillmeat search "error handling" --search-type content
+      skillmeat search "productivity" --tags documentation
+
+      # Cross-project search
+      skillmeat search "testing" --projects ~/projects/app1 ~/projects/app2
+      skillmeat search "api" --discover
+
+      # JSON output
+      skillmeat search "database" --json
+    """
+    try:
+        from skillmeat.core.search import SearchManager
+
+        search_mgr = SearchManager()
+
+        # Parse tags if provided
+        tag_list = None
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(",")]
+
+        # Determine search mode: collection or cross-project
+        if projects or discover:
+            # Cross-project search
+            project_paths = None
+            if projects:
+                project_paths = [Path(p).resolve() for p in projects]
+
+            # Perform cross-project search
+            result = search_mgr.search_projects(
+                query=query,
+                project_paths=project_paths,
+                search_type=search_type,
+                artifact_types=[ArtifactType(artifact_type)] if artifact_type else None,
+                tags=tag_list,
+                limit=limit,
+                use_cache=not no_cache,
+            )
+
+            # Display results
+            if output_json:
+                _display_search_json(result, cross_project=True)
+            else:
+                _display_search_results(result, cross_project=True)
+
+        else:
+            # Collection search
+            result = search_mgr.search_collection(
+                query=query,
+                collection_name=collection,
+                search_type=search_type,
+                artifact_types=[ArtifactType(artifact_type)] if artifact_type else None,
+                tags=tag_list,
+                limit=limit,
+            )
+
+            # Display results
+            if output_json:
+                _display_search_json(result, cross_project=False)
+            else:
+                _display_search_results(result, cross_project=False)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection to check (default: active collection)",
+)
+@click.option(
+    "--projects",
+    "-p",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Check for duplicates across specific projects",
+)
+@click.option(
+    "--threshold",
+    "-t",
+    type=float,
+    default=0.85,
+    help="Similarity threshold (0.0-1.0, default: 0.85)",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Disable cache for fresh results",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+def find_duplicates(
+    collection: Optional[str],
+    projects: tuple,
+    threshold: float,
+    no_cache: bool,
+    output_json: bool,
+):
+    """Find duplicate or similar artifacts.
+
+    Compares artifacts based on content, structure, metadata, and file count
+    to identify potential duplicates. Default threshold is 0.85 (85% similar).
+
+    \b
+    Examples:
+      # Find duplicates across projects
+      skillmeat find-duplicates --projects ~/projects/app1 ~/projects/app2
+
+      # Find duplicates in collection
+      skillmeat find-duplicates --collection default
+
+      # Stricter matching (90% similarity)
+      skillmeat find-duplicates --threshold 0.9
+
+      # JSON output
+      skillmeat find-duplicates --json
+    """
+    try:
+        # Validate threshold
+        if not 0.0 <= threshold <= 1.0:
+            console.print(
+                "[red]Error:[/red] Threshold must be between 0.0 and 1.0", err=True
+            )
+            sys.exit(1)
+
+        from skillmeat.core.search import SearchManager
+
+        search_mgr = SearchManager()
+
+        # Convert project paths
+        project_paths = None
+        if projects:
+            project_paths = [Path(p).resolve() for p in projects]
+
+        # Find duplicates
+        console.print(
+            f"[cyan]Finding duplicates (threshold: {threshold:.0%})...[/cyan]"
+        )
+        duplicates = search_mgr.find_duplicates(
+            threshold=threshold, project_paths=project_paths, use_cache=not no_cache
+        )
+
+        # Display results
+        if output_json:
+            _display_duplicates_json(duplicates, threshold)
+        else:
+            _display_duplicates_results(duplicates, threshold)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]", err=True)
+        sys.exit(1)
+
+
+# ====================
+# Search Display Helpers
+# ====================
+
+
+def _display_search_results(result, cross_project: bool = False) -> None:
+    """Display search results with Rich formatting.
+
+    Args:
+        result: SearchResult object
+        cross_project: Whether this is a cross-project search
+    """
+    if not result.has_matches:
+        console.print(f"\n[yellow]No results found for '{result.query}'[/yellow]")
+        console.print("\n[dim]Try:")
+        console.print("  - Using different search terms")
+        console.print("  - Changing --search-type to 'content' or 'metadata'")
+        console.print("  - Removing tag filters")
+        console.print("[/dim]")
+        return
+
+    # Header
+    search_mode = "Cross-Project Search" if cross_project else "Collection Search"
+    console.print(f"\n[bold]{search_mode}:[/bold] {result.summary()}")
+    console.print(f'[dim]Query: "{result.query}" | Type: {result.search_type}[/dim]\n')
+
+    # Create results table
+    table = Table(title=f"Matches ({result.total_count})")
+    table.add_column("Artifact", style="cyan", no_wrap=False)
+    table.add_column("Type", style="green", width=10)
+    table.add_column("Score", justify="right", style="yellow", width=8)
+    table.add_column("Match", style="blue", width=10)
+    table.add_column("Context", style="dim")
+
+    if cross_project:
+        # Add project column for cross-project search
+        table.add_column("Project", style="magenta", width=20)
+
+    for match in result.matches:
+        # Truncate context to fit
+        context = match.context
+        if len(context) > 80:
+            context = context[:77] + "..."
+
+        # Build row
+        row = [
+            match.artifact_name,
+            match.artifact_type,
+            f"{match.score:.1f}",
+            match.match_type,
+            context,
+        ]
+
+        if cross_project:
+            # Add project name
+            project_name = "N/A"
+            if match.project_path:
+                # Extract project name from .claude parent directory
+                project_name = match.project_path.parent.name
+            row.append(project_name)
+
+        table.add_row(*row)
+
+    console.print(table)
+
+    # Footer with helpful tips
+    console.print(f"\n[dim]Showing top {len(result.matches)} results[/dim]")
+    if result.total_count >= result.matches.__len__():
+        console.print("[dim]Use --limit N to see more results[/dim]")
+    console.print("[dim]Use --json for machine-readable output[/dim]")
+
+
+def _display_search_json(result, cross_project: bool = False) -> None:
+    """Display search results as JSON.
+
+    Args:
+        result: SearchResult object
+        cross_project: Whether this is a cross-project search
+    """
+    import json as json_lib
+
+    output = {
+        "query": result.query,
+        "search_type": result.search_type,
+        "total_count": result.total_count,
+        "search_time": result.search_time,
+        "used_ripgrep": result.used_ripgrep,
+        "matches": [
+            {
+                "artifact_name": m.artifact_name,
+                "artifact_type": m.artifact_type,
+                "score": m.score,
+                "match_type": m.match_type,
+                "context": m.context,
+                "line_number": m.line_number,
+                "metadata": m.metadata,
+                "project_path": str(m.project_path) if m.project_path else None,
+            }
+            for m in result.matches
+        ],
+    }
+
+    click.echo(json_lib.dumps(output, indent=2))
+
+
+def _display_duplicates_results(duplicates, threshold: float) -> None:
+    """Display duplicate detection results with Rich formatting.
+
+    Args:
+        duplicates: List of DuplicatePair objects
+        threshold: Similarity threshold used
+    """
+    if not duplicates:
+        console.print(
+            f"\n[green]No duplicates found (threshold: {threshold:.0%})[/green]"
+        )
+        console.print("\n[dim]Try:")
+        console.print("  - Lowering the threshold (e.g., --threshold 0.7)")
+        console.print("  - Checking more projects with --projects")
+        console.print("[/dim]")
+        return
+
+    # Header
+    console.print(f"\n[bold]Duplicate Artifacts Found:[/bold] {len(duplicates)} pairs")
+    console.print(f"[dim]Similarity threshold: {threshold:.0%}[/dim]\n")
+
+    # Create results table
+    table = Table(title="Duplicates")
+    table.add_column("Artifact 1", style="cyan", no_wrap=False)
+    table.add_column("Artifact 2", style="cyan", no_wrap=False)
+    table.add_column("Similarity", justify="right", style="yellow", width=12)
+    table.add_column("Reasons", style="green")
+
+    for dup in duplicates:
+        # Format similarity percentage
+        similarity_pct = f"{dup.similarity_score:.0%}"
+
+        # Format reasons
+        reasons = ", ".join(dup.match_reasons[:3])  # Show top 3 reasons
+        if len(dup.match_reasons) > 3:
+            reasons += f" +{len(dup.match_reasons) - 3} more"
+
+        table.add_row(dup.artifact1_name, dup.artifact2_name, similarity_pct, reasons)
+
+    console.print(table)
+
+    # Show paths for first few duplicates
+    console.print("\n[bold]Duplicate Paths:[/bold]")
+    for i, dup in enumerate(duplicates[:5], 1):
+        console.print(
+            f"\n[cyan]{i}. {dup.artifact1_name} vs {dup.artifact2_name}[/cyan]"
+        )
+        console.print(f"   [dim]{dup.artifact1_path}[/dim]")
+        console.print(f"   [dim]{dup.artifact2_path}[/dim]")
+
+    if len(duplicates) > 5:
+        console.print(f"\n[dim]... and {len(duplicates) - 5} more pairs[/dim]")
+
+    # Footer with helpful tips
+    console.print(
+        f"\n[dim]Use --threshold {min(threshold + 0.05, 1.0):.2f} for stricter matching[/dim]"
+    )
+    console.print("[dim]Use --json for machine-readable output[/dim]")
+
+
+def _display_duplicates_json(duplicates, threshold: float) -> None:
+    """Display duplicate detection results as JSON.
+
+    Args:
+        duplicates: List of DuplicatePair objects
+        threshold: Similarity threshold used
+    """
+    import json as json_lib
+
+    output = {
+        "threshold": threshold,
+        "duplicate_count": len(duplicates),
+        "duplicates": [
+            {
+                "artifact1": {
+                    "name": d.artifact1_name,
+                    "path": str(d.artifact1_path),
+                },
+                "artifact2": {
+                    "name": d.artifact2_name,
+                    "path": str(d.artifact2_path),
+                },
+                "similarity": d.similarity_score,
+                "match_reasons": d.match_reasons,
+            }
+            for d in duplicates
+        ],
+    }
+
+    click.echo(json_lib.dumps(output, indent=2))
+
+
+# ====================
+# Sync Commands
+# ====================
+
+
+@main.command(name="sync-check")
+@click.argument("project_path", type=click.Path(exists=True))
+@click.option(
+    "-c",
+    "--collection",
+    help="Collection to check against (default: from deployment metadata)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+def sync_check_cmd(project_path, collection, output_json):
+    """Check for drift between project and collection.
+
+    Compares deployed artifacts in PROJECT_PATH with the source collection
+    to detect changes, additions, or removals.
+
+    Examples:
+        skillmeat sync-check /path/to/project
+        skillmeat sync-check /path/to/project --collection my-collection
+        skillmeat sync-check /path/to/project --json
+    """
+    from pathlib import Path
+    from skillmeat.core.collection import CollectionManager
+    from skillmeat.core.sync import SyncManager
+
+    try:
+        project_path = Path(project_path)
+
+        # Initialize managers
+        collection_mgr = CollectionManager()
+        sync_mgr = SyncManager(collection_manager=collection_mgr)
+
+        # Check for drift
+        drift_results = sync_mgr.check_drift(project_path, collection)
+
+        # Display results
+        if output_json:
+            _display_sync_check_json(drift_results)
+        else:
+            _display_sync_check_results(drift_results, project_path)
+
+        # Exit code: 0 if no drift, 1 if drift detected
+        sys.exit(0 if not drift_results else 1)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        logger.exception("Sync check failed")
+        sys.exit(1)
+
+
+def _display_sync_check_results(drift_results, project_path: Path) -> None:
+    """Display sync check results with Rich formatting.
+
+    Args:
+        drift_results: List of DriftDetectionResult objects
+        project_path: Path to project
+    """
+    if not drift_results:
+        console.print("\n[green]No drift detected. Project is in sync.[/green]")
+        console.print(f"\n[dim]Project: {project_path}[/dim]")
+        return
+
+    # Header
+    console.print(
+        f"\n[bold]Drift Detection Results:[/bold] {len(drift_results)} artifacts"
+    )
+    console.print(f"[dim]Project: {project_path}[/dim]\n")
+
+    # Create results table
+    table = Table(title="Drifted Artifacts")
+    table.add_column("Artifact", style="cyan", no_wrap=False)
+    table.add_column("Type", style="blue", width=10)
+    table.add_column("Drift Type", style="yellow", width=15)
+    table.add_column("Recommendation", style="green")
+    table.add_column("Last Deployed", style="dim")
+
+    for result in drift_results:
+        # Format drift type
+        drift_type_display = result.drift_type.replace("_", " ").title()
+
+        # Format recommendation
+        recommendation = result.recommendation.replace("_", " ").title()
+
+        # Format last deployed
+        last_deployed = result.last_deployed or "Never"
+        if result.last_deployed:
+            # Truncate ISO timestamp to date only
+            last_deployed = result.last_deployed[:10]
+
+        table.add_row(
+            result.artifact_name,
+            result.artifact_type,
+            drift_type_display,
+            recommendation,
+            last_deployed,
+        )
+
+    console.print(table)
+
+    # Show details for each drifted artifact
+    console.print("\n[bold]Drift Details:[/bold]")
+    for result in drift_results:
+        console.print(f"\n[cyan]{result.artifact_name}[/cyan] ({result.artifact_type})")
+        console.print(f"  Drift Type: {result.drift_type}")
+        console.print(f"  Recommendation: {result.recommendation}")
+
+        if result.collection_sha:
+            console.print(f"  Collection SHA: {result.collection_sha[:12]}...")
+        if result.project_sha:
+            console.print(f"  Project SHA: {result.project_sha[:12]}...")
+        if result.collection_version:
+            console.print(f"  Collection Version: {result.collection_version}")
+        if result.project_version:
+            console.print(f"  Project Version: {result.project_version}")
+
+    # Footer
+    console.print("\n[dim]Use skillmeat sync-pull to synchronize changes[/dim]")
+
+
+def _display_sync_check_json(drift_results) -> None:
+    """Display sync check results as JSON.
+
+    Args:
+        drift_results: List of DriftDetectionResult objects
+    """
+    import json as json_lib
+
+    output = {
+        "drift_detected": len(drift_results) > 0,
+        "drift_count": len(drift_results),
+        "artifacts": [
+            {
+                "name": r.artifact_name,
+                "type": r.artifact_type,
+                "drift_type": r.drift_type,
+                "collection_sha": r.collection_sha,
+                "project_sha": r.project_sha,
+                "collection_version": r.collection_version,
+                "project_version": r.project_version,
+                "last_deployed": r.last_deployed,
+                "recommendation": r.recommendation,
+            }
+            for r in drift_results
+        ],
+    }
+
+    click.echo(json_lib.dumps(output, indent=2))
+
+
+@main.command(name="sync-pull")
+@click.argument("project_path", type=click.Path(exists=True))
+@click.option(
+    "--artifacts",
+    help="Specific artifacts to sync (comma-separated)",
+)
+@click.option(
+    "--strategy",
+    type=click.Choice(["overwrite", "merge", "fork", "prompt"]),
+    default="prompt",
+    help="Sync strategy (default: prompt)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview what would be synced without making changes",
+)
+@click.option(
+    "--no-interactive",
+    is_flag=True,
+    help="Non-interactive mode (use with --strategy)",
+)
+@click.option(
+    "-c",
+    "--collection",
+    help="Collection to sync to (default: from deployment metadata)",
+)
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+@click.option(
+    "--with-rollback",
+    is_flag=True,
+    help="Create snapshot before sync and offer rollback on failure",
+)
+def sync_pull_cmd(
+    project_path, artifacts, strategy, dry_run, no_interactive, collection, output_json, with_rollback
+):
+    """Pull artifacts from project to collection.
+
+    Syncs modified artifacts from a project back to the collection.
+    Useful for capturing local changes made to deployed artifacts.
+
+    Examples:
+        skillmeat sync-pull /path/to/project
+        skillmeat sync-pull /path/to/project --strategy overwrite
+        skillmeat sync-pull /path/to/project --artifacts skill1,skill2
+        skillmeat sync-pull /path/to/project --dry-run
+        skillmeat sync-pull /path/to/project --strategy merge --no-interactive
+        skillmeat sync-pull /path/to/project --json
+    """
+    from pathlib import Path
+    from skillmeat.core.collection import CollectionManager
+    from skillmeat.core.sync import SyncManager
+
+    try:
+        project_path = Path(project_path)
+
+        # Parse artifact list
+        artifact_list = None
+        if artifacts:
+            artifact_list = [a.strip() for a in artifacts.split(",")]
+
+        # Initialize managers
+        collection_mgr = CollectionManager()
+
+        # Initialize snapshot manager if rollback requested
+        snapshot_mgr = None
+        if with_rollback:
+            from skillmeat.storage.snapshot import SnapshotManager
+            from pathlib import Path as P
+
+            snapshots_dir = P.home() / ".skillmeat" / "snapshots"
+            snapshot_mgr = SnapshotManager(snapshots_dir)
+
+        sync_mgr = SyncManager(
+            collection_manager=collection_mgr,
+            snapshot_manager=snapshot_mgr
+        )
+
+        # Perform sync pull (with or without rollback)
+        if with_rollback:
+            result = sync_mgr.sync_from_project_with_rollback(
+                project_path=project_path,
+                artifact_names=artifact_list,
+                strategy=strategy,
+                dry_run=dry_run,
+                interactive=not no_interactive,
+            )
+        else:
+            result = sync_mgr.sync_from_project(
+                project_path=project_path,
+                artifact_names=artifact_list,
+                strategy=strategy,
+                dry_run=dry_run,
+                interactive=not no_interactive,
+            )
+
+        # Display results
+        if output_json:
+            _display_sync_pull_json(result)
+        else:
+            _display_sync_pull_results(result)
+
+        # Exit codes:
+        # 0 = success or no_changes
+        # 1 = partial (some conflicts)
+        # 2 = cancelled or rolled_back
+        if result.status in ["success", "no_changes", "dry_run"]:
+            sys.exit(0)
+        elif result.status == "partial":
+            sys.exit(1)
+        else:  # cancelled or rolled_back
+            sys.exit(2)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        logger.exception("Sync pull failed")
+        sys.exit(1)
+
+
+@main.command(name="sync-preview")
+@click.argument("project_path", type=click.Path(exists=True))
+@click.option(
+    "--artifacts",
+    help="Specific artifacts to preview (comma-separated)",
+)
+@click.option(
+    "-c",
+    "--collection",
+    help="Collection to sync to (default: from deployment metadata)",
+)
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+def sync_preview_cmd(project_path, artifacts, collection, output_json):
+    """Preview sync changes without applying them.
+
+    Shows what would be synced from a project back to the collection
+    without making any actual changes. This is an alias for
+    'sync-pull --dry-run' with more intuitive naming.
+
+    Examples:
+        skillmeat sync-preview /path/to/project
+        skillmeat sync-preview /path/to/project --artifacts skill1,skill2
+        skillmeat sync-preview /path/to/project --json
+    """
+    # Delegate to sync-pull with dry_run=True
+    ctx = click.get_current_context()
+    ctx.invoke(
+        sync_pull_cmd,
+        project_path=project_path,
+        artifacts=artifacts,
+        strategy="prompt",  # Default strategy for preview
+        dry_run=True,  # Force dry-run mode
+        no_interactive=False,  # Keep preview output
+        collection=collection,
+        output_json=output_json,
+    )
+
+
+def _display_sync_pull_results(result) -> None:
+    """Display sync pull results with Rich formatting.
+
+    Args:
+        result: SyncResult object
+    """
+    # Header
+    console.print(f"\n[bold]Sync Pull Results[/bold]")
+    console.print(f"Status: [{_get_status_color(result.status)}]{result.status}[/]")
+    console.print(f"Message: {result.message}\n")
+
+    # Synced artifacts
+    if result.artifacts_synced:
+        console.print("[green]Synced Artifacts:[/green]")
+        for artifact in result.artifacts_synced:
+            console.print(f"  [cyan]{artifact}[/cyan]")
+        console.print()
+
+    # Conflicts
+    if result.conflicts:
+        console.print("[yellow]Conflicts:[/yellow]")
+        for conflict in result.conflicts:
+            console.print(f"  [yellow]{conflict.artifact_name}[/yellow]")
+            if hasattr(conflict, "conflict_files") and conflict.conflict_files:
+                console.print(f"    Files: {', '.join(conflict.conflict_files[:5])}")
+                if len(conflict.conflict_files) > 5:
+                    console.print(
+                        f"    ... and {len(conflict.conflict_files) - 5} more"
+                    )
+        console.print()
+
+    # Summary
+    if result.status == "success":
+        console.print(
+            f"[green]Successfully synced {len(result.artifacts_synced)} artifacts[/green]"
+        )
+    elif result.status == "partial":
+        console.print(
+            f"[yellow]Partial sync: {len(result.artifacts_synced)} synced, "
+            f"{len(result.conflicts)} conflicts[/yellow]"
+        )
+    elif result.status == "no_changes":
+        console.print("[dim]No artifacts to sync[/dim]")
+    elif result.status == "dry_run":
+        console.print(
+            f"[cyan]Dry run: Would sync {len(result.artifacts_synced)} artifacts[/cyan]"
+        )
+    elif result.status == "cancelled":
+        console.print("[yellow]Sync cancelled by user[/yellow]")
+
+
+def _display_sync_pull_json(result) -> None:
+    """Display sync pull results as JSON.
+
+    Args:
+        result: SyncResult object
+    """
+    import json as json_lib
+
+    output = {
+        "status": result.status,
+        "message": result.message,
+        "artifacts_synced": result.artifacts_synced,
+        "conflicts": [
+            {
+                "artifact_name": c.artifact_name,
+                "error": c.error if hasattr(c, "error") else None,
+                "conflict_files": (
+                    c.conflict_files if hasattr(c, "conflict_files") else []
+                ),
+            }
+            for c in result.conflicts
+        ],
+    }
+
+    click.echo(json_lib.dumps(output, indent=2))
+
+
+def _get_status_color(status: str) -> str:
+    """Get color for status display.
+
+    Args:
+        status: Status string
+
+    Returns:
+        Rich color tag
+    """
+    color_map = {
+        "success": "green",
+        "partial": "yellow",
+        "cancelled": "yellow",
+        "no_changes": "dim",
+        "dry_run": "cyan",
+    }
+    return color_map.get(status, "white")
 
 
 # ====================

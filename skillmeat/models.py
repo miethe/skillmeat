@@ -6,7 +6,7 @@ application for representing artifacts, diffs, and other core entities.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Dict, Literal
+from typing import List, Optional, Dict, Literal, Any
 
 
 @dataclass
@@ -305,6 +305,7 @@ class MergeResult:
         auto_merged: List of successfully auto-merged file paths
         stats: Statistics about the merge operation
         output_path: Path where merged results were written (if applicable)
+        error: Error message if merge failed (None if successful)
     """
 
     success: bool
@@ -313,6 +314,7 @@ class MergeResult:
     auto_merged: List[str] = field(default_factory=list)
     stats: MergeStats = field(default_factory=MergeStats)
     output_path: Optional[Path] = None
+    error: Optional[str] = None
 
     @property
     def has_conflicts(self) -> bool:
@@ -336,3 +338,352 @@ class MergeResult:
             parts.append(f"{len(self.conflicts)} conflicts")
 
         return "Merge completed with " + ", ".join(parts)
+
+
+@dataclass
+class SearchCacheEntry:
+    """Cache entry for cross-project search index.
+
+    Attributes:
+        index: List of project index dictionaries
+        created_at: Timestamp when cache entry was created
+        ttl: Time-to-live in seconds (default 60s)
+    """
+
+    index: List[Dict[str, Any]]
+    created_at: float  # time.time() timestamp
+    ttl: float = 60.0
+
+    def is_expired(self) -> bool:
+        """Check if cache entry has expired.
+
+        Returns:
+            True if cache entry is expired
+        """
+        import time
+
+        return time.time() - self.created_at > self.ttl
+
+
+@dataclass
+class SearchMatch:
+    """Single artifact search result match.
+
+    Attributes:
+        artifact_name: Name of the artifact
+        artifact_type: Type of artifact (skill, command, agent)
+        score: Relevance score (higher is better)
+        match_type: Where the match was found ("metadata", "content", or "both")
+        context: Snippet showing match context
+        line_number: Line number for content matches (None for metadata matches)
+        metadata: Artifact metadata dictionary
+        project_path: Path to project containing this artifact (for cross-project search)
+    """
+
+    artifact_name: str
+    artifact_type: str  # ArtifactType.value
+    score: float
+    match_type: str  # "metadata", "content", or "both"
+    context: str
+    line_number: Optional[int] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    project_path: Optional[Path] = None
+
+    def __post_init__(self):
+        """Validate match type."""
+        valid_types = {"metadata", "content", "both"}
+        if self.match_type not in valid_types:
+            raise ValueError(
+                f"Invalid match_type '{self.match_type}'. Must be one of {valid_types}"
+            )
+
+
+@dataclass
+class SearchResult:
+    """Result of a search operation across collection artifacts.
+
+    Attributes:
+        query: Original search query string
+        matches: List of SearchMatch objects ordered by relevance score
+        total_count: Total number of matches found
+        search_time: Time taken to perform search in seconds
+        used_ripgrep: Whether ripgrep was used for content search
+        search_type: Type of search performed ("metadata", "content", or "both")
+    """
+
+    query: str
+    matches: List[SearchMatch] = field(default_factory=list)
+    total_count: int = 0
+    search_time: float = 0.0
+    used_ripgrep: bool = False
+    search_type: str = "both"
+
+    @property
+    def has_matches(self) -> bool:
+        """Return True if any matches were found."""
+        return self.total_count > 0
+
+    def summary(self) -> str:
+        """Generate a human-readable summary of search results."""
+        if not self.has_matches:
+            return f"No results found for '{self.query}'"
+
+        parts = []
+        parts.append(f"{self.total_count} result{'s' if self.total_count != 1 else ''}")
+        parts.append(f"in {self.search_time:.2f}s")
+
+        if self.used_ripgrep:
+            parts.append("(ripgrep)")
+        else:
+            parts.append("(python)")
+
+        return " ".join(parts)
+
+
+@dataclass
+class ArtifactFingerprint:
+    """Fingerprint for duplicate detection.
+
+    Attributes:
+        artifact_path: Path to artifact directory
+        artifact_name: Name of the artifact
+        artifact_type: Type of artifact (skill, command, agent)
+        content_hash: SHA256 hash of all file contents
+        metadata_hash: Hash of title/description
+        structure_hash: Hash of file tree structure
+        title: Artifact title from metadata
+        description: Artifact description from metadata
+        tags: List of tags from metadata
+        file_count: Number of files in artifact
+        total_size: Total size of all files in bytes
+    """
+
+    artifact_path: Path
+    artifact_name: str
+    artifact_type: str
+    content_hash: str
+    metadata_hash: str
+    structure_hash: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    file_count: int = 0
+    total_size: int = 0
+
+    def compute_similarity(self, other: "ArtifactFingerprint") -> float:
+        """Calculate similarity score (0.0 to 1.0).
+
+        Uses weighted multi-factor comparison:
+        - Content match (50%): Exact content hash match
+        - Structure match (20%): File tree structure match
+        - Metadata match (20%): Title, description, tag similarity
+        - File count similarity (10%): Relative file count similarity
+
+        Args:
+            other: Another ArtifactFingerprint to compare
+
+        Returns:
+            Similarity score from 0.0 (no similarity) to 1.0 (identical)
+        """
+        score = 0.0
+
+        # Exact content match (highest weight: 50%)
+        if self.content_hash == other.content_hash:
+            score += 0.5
+
+        # Structure match (20%)
+        if self.structure_hash == other.structure_hash:
+            score += 0.2
+
+        # Metadata match (20%)
+        metadata_score = self._compare_metadata(other)
+        score += metadata_score * 0.2
+
+        # File count similarity (10%)
+        if self.file_count > 0 and other.file_count > 0:
+            count_similarity = min(self.file_count, other.file_count) / max(
+                self.file_count, other.file_count
+            )
+            score += count_similarity * 0.1
+
+        return score
+
+    def _compare_metadata(self, other: "ArtifactFingerprint") -> float:
+        """Compare metadata fields (0.0 to 1.0).
+
+        Args:
+            other: Another ArtifactFingerprint to compare
+
+        Returns:
+            Metadata similarity score from 0.0 to 1.0
+        """
+        score = 0.0
+        count = 0
+
+        # Title similarity (exact match only for simplicity)
+        if self.title and other.title:
+            score += 1.0 if self.title.lower() == other.title.lower() else 0.0
+            count += 1
+
+        # Description similarity (exact match)
+        if self.description and other.description:
+            score += (
+                1.0 if self.description.lower() == other.description.lower() else 0.0
+            )
+            count += 1
+
+        # Tag overlap (Jaccard similarity)
+        if self.tags and other.tags:
+            self_tags = set(t.lower() for t in self.tags)
+            other_tags = set(t.lower() for t in other.tags)
+            if self_tags or other_tags:
+                jaccard = len(self_tags & other_tags) / len(self_tags | other_tags)
+                score += jaccard
+                count += 1
+
+        return score / count if count > 0 else 0.0
+
+
+@dataclass
+class DuplicatePair:
+    """Pair of potentially duplicate artifacts.
+
+    Attributes:
+        artifact1_path: Path to first artifact
+        artifact1_name: Name of first artifact
+        artifact2_path: Path to second artifact
+        artifact2_name: Name of second artifact
+        similarity_score: Similarity score (0.0 to 1.0)
+        match_reasons: List of reasons why artifacts are similar
+    """
+
+    artifact1_path: Path
+    artifact1_name: str
+    artifact2_path: Path
+    artifact2_name: str
+    similarity_score: float
+    match_reasons: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DeploymentRecord:
+    """Tracks artifact deployment to a project.
+
+    Attributes:
+        name: Name of the deployed artifact
+        artifact_type: Type of artifact (skill, command, agent)
+        source: Source identifier (e.g., "github:user/repo/path")
+        version: Version string (e.g., "1.2.0", "latest")
+        sha: Content hash from collection at deployment time
+        deployed_at: ISO 8601 timestamp of deployment
+        deployed_from: Collection path the artifact was deployed from
+    """
+
+    name: str
+    artifact_type: str  # ArtifactType.value
+    source: str
+    version: str
+    sha: str
+    deployed_at: str  # ISO 8601 timestamp
+    deployed_from: str  # Path as string for TOML serialization
+
+
+@dataclass
+class DeploymentMetadata:
+    """Metadata for .skillmeat-deployed.toml file.
+
+    Attributes:
+        collection: Name of the collection artifacts were deployed from
+        deployed_at: ISO 8601 timestamp of last deployment
+        skillmeat_version: SkillMeat version used for deployment
+        artifacts: List of DeploymentRecord objects
+    """
+
+    collection: str
+    deployed_at: str  # ISO 8601 timestamp
+    skillmeat_version: str
+    artifacts: List[DeploymentRecord] = field(default_factory=list)
+
+
+@dataclass
+class DriftDetectionResult:
+    """Result of drift detection between collection and project.
+
+    Attributes:
+        artifact_name: Name of the artifact
+        artifact_type: Type of artifact (skill, command, agent)
+        drift_type: Type of drift detected
+        collection_sha: SHA from collection (None if removed)
+        project_sha: SHA from project (None if added)
+        collection_version: Version in collection (None if removed)
+        project_version: Version in project (None if added)
+        last_deployed: ISO 8601 timestamp of last deployment (None if never deployed)
+        recommendation: Recommended sync action
+    """
+
+    artifact_name: str
+    artifact_type: str  # ArtifactType.value
+    drift_type: Literal[
+        "modified",  # Artifact modified in collection
+        "added",  # Artifact added to collection (not in project)
+        "removed",  # Artifact removed from collection
+        "version_mismatch",  # Version changed but content may be same
+    ]
+    collection_sha: Optional[str] = None
+    project_sha: Optional[str] = None
+    collection_version: Optional[str] = None
+    project_version: Optional[str] = None
+    last_deployed: Optional[str] = None  # ISO 8601 timestamp
+    recommendation: str = "review_manually"  # Default recommendation
+
+    def __post_init__(self):
+        """Validate drift type."""
+        valid_types = {"modified", "added", "removed", "version_mismatch"}
+        if self.drift_type not in valid_types:
+            raise ValueError(
+                f"Invalid drift_type '{self.drift_type}'. Must be one of {valid_types}"
+            )
+
+
+@dataclass
+class ArtifactSyncResult:
+    """Result of syncing individual artifact.
+
+    Attributes:
+        artifact_name: Name of the artifact
+        success: True if sync succeeded
+        has_conflict: True if conflicts were encountered
+        error: Error message if sync failed (None if successful)
+        conflict_files: List of files with conflicts
+    """
+
+    artifact_name: str
+    success: bool
+    has_conflict: bool = False
+    error: Optional[str] = None
+    conflict_files: List[str] = field(default_factory=list)
+
+
+@dataclass
+class SyncResult:
+    """Result of sync operation.
+
+    Attributes:
+        status: Status of sync operation
+        artifacts_synced: List of artifact names that were synced
+        conflicts: List of ArtifactSyncResult for artifacts with conflicts
+        message: Human-readable message about the sync
+    """
+
+    status: str  # "success", "partial", "cancelled", "no_changes", "dry_run"
+    artifacts_synced: List[str] = field(default_factory=list)
+    conflicts: List[Any] = field(default_factory=list)
+    message: str = ""
+
+    def __post_init__(self):
+        """Validate status value."""
+        valid_statuses = {"success", "partial", "cancelled", "no_changes", "dry_run"}
+        if self.status not in valid_statuses:
+            raise ValueError(
+                f"Invalid status '{self.status}'. Must be one of {valid_statuses}"
+            )
