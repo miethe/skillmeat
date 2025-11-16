@@ -84,6 +84,7 @@ packages = [
     "skillmeat.api.middleware",
     "skillmeat.core",
     "skillmeat.core.auth",
+    "skillmeat.core.sharing",
     "skillmeat.sources",
     "skillmeat.storage",
     "skillmeat.utils",
