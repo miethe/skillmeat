@@ -7,20 +7,12 @@ and ensures bundle schema compliance.
 import hashlib
 import json
 import logging
-import sys
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-if sys.version_info >= (3, 11):
-    import tomllib
-
-    TOML_LOADS = tomllib.loads
-else:
-    import tomli as tomllib
-
-    TOML_LOADS = tomllib.loads
+from skillmeat.utils.toml_compat import loads as toml_loads
 
 logger = logging.getLogger(__name__)
 
@@ -484,7 +476,7 @@ class BundleValidator:
         try:
             with zf.open("bundle.toml") as f:
                 manifest_content = f.read().decode("utf-8")
-                manifest_data = TOML_LOADS(manifest_content)
+                manifest_data = toml_loads(manifest_content)
 
         except Exception as e:
             issues.append(
