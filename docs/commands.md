@@ -31,6 +31,26 @@ Complete reference for all SkillMeat CLI commands.
   - [config list](#config-list)
   - [config get](#config-get)
   - [config set](#config-set)
+- [Phase 2: Diff Commands](#phase-2-diff-commands)
+  - [diff files](#diff-files)
+  - [diff dirs](#diff-dirs)
+  - [diff three-way](#diff-three-way)
+  - [diff artifact](#diff-artifact)
+- [Phase 2: Search Commands](#phase-2-search-commands)
+  - [search](#search)
+  - [find-duplicates](#find-duplicates)
+- [Phase 2: Sync Commands](#phase-2-sync-commands)
+  - [sync check](#sync-check)
+  - [sync pull](#sync-pull)
+  - [sync preview](#sync-preview)
+- [Phase 2: Analytics Commands](#phase-2-analytics-commands)
+  - [analytics usage](#analytics-usage)
+  - [analytics top](#analytics-top)
+  - [analytics cleanup](#analytics-cleanup)
+  - [analytics trends](#analytics-trends)
+  - [analytics export](#analytics-export)
+  - [analytics stats](#analytics-stats)
+  - [analytics clear](#analytics-clear)
 - [Utilities](#utilities)
   - [verify](#verify)
 
@@ -819,6 +839,745 @@ Set github-token
 **Notes:**
 - GitHub token format: `ghp_` followed by alphanumeric characters
 - [Create GitHub token](https://github.com/settings/tokens)
+
+---
+
+## Phase 2: Diff Commands
+
+Diff commands compare files and directories to detect changes, with support for three-way merges and conflict detection.
+
+### diff files
+
+Compare two individual files and show unified differences.
+
+**Syntax:**
+```bash
+skillmeat diff files FILE1 FILE2 [OPTIONS]
+```
+
+**Arguments:**
+- `FILE1` - Path to first file
+- `FILE2` - Path to second file
+
+**Options:**
+- `-c, --context INTEGER` - Context lines around changes (default: 3)
+- `--color/--no-color` - Enable/disable colored output (default: enabled)
+
+**Examples:**
+```bash
+# Compare two files with default context
+skillmeat diff files ./old-skill.md ./new-skill.md
+
+# Show 5 lines of context
+skillmeat diff files ./script1.py ./script2.py --context 5
+
+# Disable colored output
+skillmeat diff files ./file1.txt ./file2.txt --no-color
+```
+
+**Output:**
+```
+--- ./old-skill.md
++++ ./new-skill.md
+@@ -1,5 +1,6 @@
+ # Skill Name
+ Description here
++New line added
+
+ ## Usage
+ Example usage
+```
+
+---
+
+### diff dirs
+
+Compare two directories recursively and show structure differences.
+
+**Syntax:**
+```bash
+skillmeat diff dirs DIR1 DIR2 [OPTIONS]
+```
+
+**Arguments:**
+- `DIR1` - Path to first directory
+- `DIR2` - Path to second directory
+
+**Options:**
+- `--ignore TEXT` - Patterns to ignore (can use multiple times)
+- `--limit INTEGER` - Max file diffs to show (default: 50)
+- `--stats-only` - Show only statistics
+
+**Examples:**
+```bash
+# Compare artifact directories
+skillmeat diff dirs ./canvas-v1 ./canvas-v2
+
+# Ignore build artifacts
+skillmeat diff dirs ./src1 ./src2 --ignore "*.pyc" --ignore "dist/"
+
+# Show only statistics
+skillmeat diff dirs ./project1 ./project2 --stats-only
+```
+
+**Output:**
+```
+Directory Comparison
+  Files added:     5
+  Files removed:   2
+  Files modified:  8
+
+Modified Files:
+  M main.py (42 additions, 18 deletions)
+  M README.md (5 additions, 3 deletions)
+```
+
+---
+
+### diff three-way
+
+Perform three-way diff for detecting merge conflicts.
+
+**Syntax:**
+```bash
+skillmeat diff three-way BASE LOCAL REMOTE [OPTIONS]
+```
+
+**Arguments:**
+- `BASE` - Base/original version
+- `LOCAL` - Local version
+- `REMOTE` - Remote version
+
+**Options:**
+- `-o, --output PATH` - Write merged result to file
+- `--algorithm TEXT` - Merge algorithm (default: auto)
+
+**Examples:**
+```bash
+# Detect merge conflicts
+skillmeat diff three-way ./base-skill ./local-skill ./upstream-skill
+
+# Write merged result
+skillmeat diff three-way ./base.md ./local.md ./upstream.md --output ./merged.md
+```
+
+**Output (with conflicts):**
+```
+<<<<<<< LOCAL
+Local changes here
+=======
+Remote changes here
+>>>>>>> REMOTE
+```
+
+---
+
+### diff artifact
+
+Compare artifact between versions or against upstream.
+
+**Syntax:**
+```bash
+skillmeat diff artifact ARTIFACT [OPTIONS]
+```
+
+**Arguments:**
+- `ARTIFACT` - Artifact name
+
+**Options:**
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-t, --type [skill|command|agent]` - Artifact type (if ambiguous)
+- `--upstream` - Compare against upstream
+- `--previous` - Compare against previous version
+- `--snapshot TEXT` - Compare against snapshot ID
+- `--context INTEGER` - Context lines (default: 3)
+- `--stats-only` - Show only statistics
+
+**Examples:**
+```bash
+# Check what changed in artifact
+skillmeat diff artifact canvas
+
+# Compare against upstream
+skillmeat diff artifact pdf-extractor --upstream
+
+# Compare against previous version
+skillmeat diff artifact code-reviewer --previous
+
+# Show only stats
+skillmeat diff artifact my-skill --stats-only
+```
+
+---
+
+## Phase 2: Search Commands
+
+Search commands help find and discover artifacts across collections and projects.
+
+### search
+
+Search artifacts by metadata or content.
+
+**Syntax:**
+```bash
+skillmeat search QUERY [OPTIONS]
+```
+
+**Arguments:**
+- `QUERY` - Search query
+
+**Options:**
+- `-c, --collection TEXT` - Collection to search (default: active)
+- `-t, --type [skill|command|agent]` - Filter by type
+- `--search-type [metadata|content|both]` - Search scope (default: both)
+- `--tags TEXT` - Filter by tags (comma-separated)
+- `-l, --limit INTEGER` - Max results (default: 50)
+- `-p, --projects PATH` - Project paths to search (multiple allowed)
+- `--discover` - Auto-discover projects
+- `--no-cache` - Disable cache
+- `--json` - Output as JSON
+
+**Examples:**
+```bash
+# Search in collection
+skillmeat search "authentication"
+
+# Search content only
+skillmeat search "error handling" --search-type content
+
+# Filter by tags
+skillmeat search "productivity" --tags documentation,utilities
+
+# Cross-project search
+skillmeat search "testing" --projects ~/projects/app1 ~/projects/app2
+
+# Auto-discover projects
+skillmeat search "api" --discover
+
+# Get JSON output
+skillmeat search "database" --json
+
+# Combine filters
+skillmeat search "auth" --type command --tags security --limit 20
+```
+
+**Output:**
+```
+Artifacts matching 'authentication'
+
+Name              Type     Collection   Tags                  Score
+────────────────────────────────────────────────────────────────────
+auth-handler      skill    default      security,core         0.95
+login-validator   command  default      validation,auth       0.88
+oauth-integrator  skill    default      integration,security  0.82
+```
+
+---
+
+### find-duplicates
+
+Detect duplicate or similar artifacts.
+
+**Syntax:**
+```bash
+skillmeat find-duplicates [OPTIONS]
+```
+
+**Options:**
+- `-c, --collection TEXT` - Collection to check (default: active)
+- `-p, --projects PATH` - Project paths (multiple allowed)
+- `-t, --threshold FLOAT` - Similarity threshold 0.0-1.0 (default: 0.85)
+- `--no-cache` - Disable cache
+- `--json` - Output as JSON
+
+**Examples:**
+```bash
+# Find duplicates in collection
+skillmeat find-duplicates
+
+# Find across projects
+skillmeat find-duplicates --projects ~/projects/app1 ~/projects/app2
+
+# Use stricter threshold (95%)
+skillmeat find-duplicates --threshold 0.95
+
+# Use looser threshold (70%)
+skillmeat find-duplicates --threshold 0.70
+
+# Get JSON output
+skillmeat find-duplicates --json
+```
+
+**Output:**
+```
+Duplicate Detection Results
+
+Group 1: 2 similar artifacts (95% match)
+  canvas-v1        (skill, collection: default)
+  canvas-redesign  (skill, collection: default)
+  Recommendation: Review and consolidate
+
+Group 2: 3 similar artifacts (87% match)
+  pdf-reader       (skill, collection: default)
+  pdf-extractor    (skill, collection: work)
+  doc-parser       (command, collection: work)
+  Recommendation: Check for code reuse
+```
+
+---
+
+## Phase 2: Sync Commands
+
+Sync commands handle bidirectional synchronization between projects and collections.
+
+### sync check
+
+Check for drift between project and collection.
+
+**Syntax:**
+```bash
+skillmeat sync check PROJECT_PATH [OPTIONS]
+```
+
+**Arguments:**
+- `PROJECT_PATH` - Path to project root
+
+**Options:**
+- `-c, --collection TEXT` - Collection (default: from deployment metadata)
+- `--json` - Output as JSON
+
+**Examples:**
+```bash
+# Check project in current directory
+skillmeat sync check /path/to/project
+
+# Check against specific collection
+skillmeat sync check /path/to/project --collection work
+
+# Get JSON output
+skillmeat sync check /path/to/project --json
+```
+
+**Output (No Drift):**
+```
+No drift detected. Project is in sync.
+
+Project: /path/to/project
+```
+
+**Output (With Drift):**
+```
+Drift Detection Results: 3 artifacts
+
+Artifact       Type     Drift Type              Recommendation
+────────────────────────────────────────────────────────────────
+canvas         skill    UPSTREAM_CHANGED        SYNC_UPSTREAM
+pdf-extractor  skill    MODIFIED_LOCALLY        REVIEW_CHANGES
+code-reviewer  command  REMOVED_FROM_COLLECTION VERIFY_AND_REMOVE
+```
+
+**Exit Codes:**
+- `0` - No drift detected
+- `1` - Drift detected
+- `2` - Error
+
+---
+
+### sync pull
+
+Sync changes from project to collection.
+
+**Syntax:**
+```bash
+skillmeat sync pull PROJECT_PATH [ARTIFACTS...] [OPTIONS]
+```
+
+**Arguments:**
+- `PROJECT_PATH` - Path to project root
+- `ARTIFACTS...` - Specific artifact names (optional)
+
+**Options:**
+- `-c, --collection TEXT` - Collection (default: from metadata)
+- `--strategy [overwrite|merge|fork]` - Sync strategy
+- `--force` - Skip confirmation
+
+**Sync Strategies:**
+- `overwrite` - Collection version takes precedence
+- `merge` - Auto-merge if possible
+- `fork` - Create new artifact for diverged version
+
+**Examples:**
+```bash
+# Sync all drifted artifacts
+skillmeat sync pull /path/to/project
+
+# Sync specific artifacts
+skillmeat sync pull /path/to/project canvas pdf-extractor
+
+# Force overwrite from collection
+skillmeat sync pull /path/to/project --strategy overwrite --force
+
+# Merge changes
+skillmeat sync pull /path/to/project --strategy merge
+```
+
+**Output:**
+```
+Syncing artifacts from project...
+
+canvas (skill)
+  Status: SYNCED (merged)
+  Changes: 15 additions, 3 deletions
+
+pdf-extractor (skill)
+  Status: CONFLICT
+  Action: Manual merge required
+```
+
+---
+
+### sync preview
+
+Preview sync changes before applying.
+
+**Syntax:**
+```bash
+skillmeat sync preview PROJECT_PATH [ARTIFACTS...] [OPTIONS]
+```
+
+**Arguments:**
+- `PROJECT_PATH` - Path to project root
+- `ARTIFACTS...` - Specific artifact names (optional)
+
+**Options:**
+- `-c, --collection TEXT` - Collection (default: from metadata)
+- `--json` - Output as JSON
+
+**Examples:**
+```bash
+# Preview all changes
+skillmeat sync preview /path/to/project
+
+# Preview specific artifacts
+skillmeat sync preview /path/to/project canvas pdf-extractor
+
+# Get JSON output
+skillmeat sync preview /path/to/project --json
+```
+
+**Output:**
+```
+Sync Preview: /path/to/project
+
+canvas (skill)
+  Status: WOULD_SYNC
+  Changes: 12 additions, 5 deletions
+  Files: +2, -1, M 3
+
+Total artifacts to sync: 2
+Potential conflicts: 1
+
+Run 'skillmeat sync pull' to apply changes
+```
+
+---
+
+## Phase 2: Analytics Commands
+
+Analytics commands track usage patterns and provide insights about artifact operations.
+
+### analytics usage
+
+View artifact usage statistics.
+
+**Syntax:**
+```bash
+skillmeat analytics usage [ARTIFACT] [OPTIONS]
+```
+
+**Arguments:**
+- `ARTIFACT` - Artifact name (optional, shows all if omitted)
+
+**Options:**
+- `--days INTEGER` - Time window in days (default: 30)
+- `-t, --type [skill|command|agent]` - Filter by type
+- `-c, --collection TEXT` - Filter by collection
+- `--format [table|json]` - Output format (default: table)
+- `--sort-by [total_events|deploy_count|update_count|last_used|artifact_name]` - Sort field
+
+**Examples:**
+```bash
+# Show usage for all artifacts (30-day window)
+skillmeat analytics usage
+
+# Show usage for specific artifact
+skillmeat analytics usage canvas
+
+# Show all skills
+skillmeat analytics usage --type skill
+
+# From last 90 days
+skillmeat analytics usage --days 90
+
+# Sort by recency
+skillmeat analytics usage --sort-by last_used
+
+# Get JSON output
+skillmeat analytics usage --format json
+```
+
+**Output:**
+```
+Artifact Usage
+
+Name              Type     Total Events   Deploy   Update   Last Used
+──────────────────────────────────────────────────────────────────────
+canvas            skill    47             12       8        2024-01-15
+pdf-extractor     skill    23             5        3        2024-01-10
+code-reviewer     command  15             2        1        2024-01-05
+```
+
+---
+
+### analytics top
+
+List top artifacts by metric.
+
+**Syntax:**
+```bash
+skillmeat analytics top [OPTIONS]
+```
+
+**Options:**
+- `--limit INTEGER` - Number to show (default: 10)
+- `--metric [total_events|deploy_count|update_count|sync_count|search_count]` - Ranking metric (default: total_events)
+- `-t, --type [skill|command|agent]` - Filter by type
+- `--format [table|json]` - Output format (default: table)
+
+**Examples:**
+```bash
+# Top 10 artifacts
+skillmeat analytics top
+
+# Top 20 by deploys
+skillmeat analytics top --limit 20 --metric deploy_count
+
+# Top skills by updates
+skillmeat analytics top --metric update_count --type skill
+
+# Get JSON
+skillmeat analytics top --format json
+```
+
+**Output:**
+```
+Top 10 Artifacts by Total Events
+
+Rank   Name              Type     Total Events   Deploy   Update
+──────────────────────────────────────────────────────────────────
+1      canvas            skill    47             12       8
+2      pdf-extractor     skill    23             5        3
+3      code-reviewer     command  15             2        1
+```
+
+---
+
+### analytics cleanup
+
+Show cleanup suggestions for unused artifacts.
+
+**Syntax:**
+```bash
+skillmeat analytics cleanup [OPTIONS]
+```
+
+**Options:**
+- `--inactivity-days INTEGER` - Inactivity threshold in days (default: 90)
+- `-c, --collection TEXT` - Filter by collection
+- `--format [table|json]` - Output format (default: table)
+- `--show-size` - Show disk space estimates
+
+**Examples:**
+```bash
+# Get cleanup suggestions
+skillmeat analytics cleanup
+
+# Use stricter threshold (60 days)
+skillmeat analytics cleanup --inactivity-days 60
+
+# Show disk space
+skillmeat analytics cleanup --show-size
+
+# Get JSON output
+skillmeat analytics cleanup --format json
+```
+
+**Output:**
+```
+Cleanup Suggestions
+
+Unused (90+ days): 5 artifacts
+  auth-legacy      skill      Last used: 2023-09-20    Size: 245 KB
+  deprecated-api   command    Last used: 2023-08-15    Size: 128 KB
+
+Never Deployed: 3 artifacts
+  experimental     skill      Created: 2024-01-01      Size: 156 KB
+
+Estimated space savings: 1.2 MB
+```
+
+---
+
+### analytics trends
+
+Display usage trends over time.
+
+**Syntax:**
+```bash
+skillmeat analytics trends [ARTIFACT] [OPTIONS]
+```
+
+**Arguments:**
+- `ARTIFACT` - Artifact name (optional)
+
+**Options:**
+- `--period [7d|30d|90d|all]` - Time period (default: 30d)
+- `--format [table|json]` - Output format (default: table)
+
+**Examples:**
+```bash
+# Overall trends (30 days)
+skillmeat analytics trends
+
+# Specific artifact
+skillmeat analytics trends canvas
+
+# Last 7 days
+skillmeat analytics trends --period 7d
+
+# All-time trends
+skillmeat analytics trends canvas --period all
+```
+
+**Output:**
+```
+Usage Trends: canvas (30-day period)
+
+Week 1 (Jan 1-7):   ████░░░░░░ 4 events
+Week 2 (Jan 8-14):  ██████░░░░ 6 events
+Week 3 (Jan 15-21): ████████░░ 8 events
+Week 4 (Jan 22-28): ██████░░░░ 6 events
+
+Event Breakdown:
+  Deployments: 12  ████░░
+  Updates:      8  ███░░░
+```
+
+---
+
+### analytics export
+
+Export comprehensive analytics report to file.
+
+**Syntax:**
+```bash
+skillmeat analytics export OUTPUT_PATH [OPTIONS]
+```
+
+**Arguments:**
+- `OUTPUT_PATH` - Path where report will be saved
+
+**Options:**
+- `--format [json|csv]` - Export format (default: json)
+- `-c, --collection TEXT` - Filter by collection
+
+**Examples:**
+```bash
+# Export to JSON
+skillmeat analytics export report.json
+
+# Export to CSV
+skillmeat analytics export report.csv --format csv
+
+# Export for specific collection
+skillmeat analytics export work-report.json --collection work
+```
+
+**Output:**
+```
+Exporting analytics report...
+Report exported successfully!
+  File: /path/to/report.json
+  Size: 256.4 KB
+  Format: JSON
+```
+
+---
+
+### analytics stats
+
+Show analytics database statistics.
+
+**Syntax:**
+```bash
+skillmeat analytics stats
+```
+
+**Examples:**
+```bash
+skillmeat analytics stats
+```
+
+**Output:**
+```
+Analytics Database Statistics
+
+Total Events:      247
+Total Artifacts:   12
+Date Range:        2023-10-01 to 2024-01-15 (107 days)
+
+Event Type Breakdown:
+  Deployments: 45   (18.2%)
+  Updates:     32   (13.0%)
+  Syncs:       28   (11.3%)
+  Searches:   142   (57.5%)
+
+Database Size:     1.2 MB
+```
+
+---
+
+### analytics clear
+
+Clear old analytics data.
+
+**Syntax:**
+```bash
+skillmeat analytics clear [OPTIONS]
+```
+
+**Options:**
+- `--older-than-days INTEGER` - Delete events older than N days
+- `--confirm` - Skip confirmation
+
+**Examples:**
+```bash
+# Clear events older than 180 days
+skillmeat analytics clear --older-than-days 180 --confirm
+
+# Clear with confirmation
+skillmeat analytics clear --older-than-days 90
+```
+
+**Output:**
+```
+This will delete analytics events older than 180 days.
+Continue? [y/N]: y
+
+Deleted 1,247 events
+Space freed: 245 MB
+Remaining events: 2,156
+```
 
 ---
 

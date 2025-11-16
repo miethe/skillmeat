@@ -101,38 +101,77 @@ class MergeEngine:
         # Count total files
         stats.total_files = len(diff_result.auto_mergeable) + len(diff_result.conflicts)
 
-        # If output_path provided, create it
+        # If output_path provided, create it with error handling
         if output_path:
-            output_path.mkdir(parents=True, exist_ok=True)
-            result.output_path = output_path
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+                result.output_path = output_path
+            except PermissionError as e:
+                result.success = False
+                result.error = f"Permission denied creating output directory: {e}"
+                result.stats = stats
+                return result
+            except OSError as e:
+                result.success = False
+                result.error = f"Failed to create output directory: {e}"
+                result.stats = stats
+                return result
 
-        # Process auto-mergeable files
-        # For these, we need to re-analyze to get the metadata
-        for file_path in diff_result.auto_mergeable:
-            metadata = self.diff_engine._analyze_three_way_file(
-                file_path, base_path, local_path, remote_path, self.ignore_patterns
-            )
-            if metadata and metadata.auto_mergeable:
-                self._auto_merge_file(
-                    metadata, base_path, local_path, remote_path, output_path
-                )
-                result.auto_merged.append(file_path)
-                stats.auto_merged += 1
+        # Track files we've written for rollback on error
+        transaction_log = []
 
-        # Process conflicts
-        for metadata in diff_result.conflicts:
-            if metadata.is_binary:
-                # Binary conflict - cannot merge
-                result.conflicts.append(metadata)
-                stats.conflicts += 1
-                stats.binary_conflicts += 1
-            else:
-                # Text conflict - generate markers
-                self._handle_text_conflict(
-                    metadata, base_path, local_path, remote_path, output_path
+        try:
+            # Process auto-mergeable files
+            # For these, we need to re-analyze to get the metadata
+            for file_path in diff_result.auto_mergeable:
+                metadata = self.diff_engine._analyze_three_way_file(
+                    file_path, base_path, local_path, remote_path, self.ignore_patterns
                 )
-                result.conflicts.append(metadata)
-                stats.conflicts += 1
+                if metadata and metadata.auto_mergeable:
+                    self._auto_merge_file(
+                        metadata, base_path, local_path, remote_path, output_path
+                    )
+                    result.auto_merged.append(file_path)
+                    stats.auto_merged += 1
+
+                    # Track for rollback
+                    if output_path:
+                        transaction_log.append(output_path / file_path)
+
+            # Process conflicts
+            for metadata in diff_result.conflicts:
+                if metadata.is_binary:
+                    # Binary conflict - cannot merge
+                    result.conflicts.append(metadata)
+                    stats.conflicts += 1
+                    stats.binary_conflicts += 1
+                else:
+                    # Text conflict - generate markers
+                    self._handle_text_conflict(
+                        metadata, base_path, local_path, remote_path, output_path
+                    )
+                    result.conflicts.append(metadata)
+                    stats.conflicts += 1
+
+                    # Track for rollback
+                    if output_path:
+                        transaction_log.append(output_path / metadata.file_path)
+
+        except (PermissionError, OSError, IOError) as e:
+            # Rollback: delete all files we created
+            for file_path in transaction_log:
+                try:
+                    if file_path.exists():
+                        file_path.unlink()
+                except Exception:
+                    # Best effort cleanup - ignore errors
+                    pass
+
+            # Return error result
+            result.success = False
+            result.error = f"Merge failed and rolled back: {e}"
+            result.stats = stats
+            return result
 
         # Set success based on whether we have conflicts
         result.success = len(result.conflicts) == 0
