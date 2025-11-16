@@ -18,7 +18,7 @@ from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
 from .dependencies import app_state
-from .routers import health
+from .routers import health, collections, artifacts, analytics
 
 logger = logging.getLogger(__name__)
 
@@ -175,11 +175,13 @@ def create_app(settings: APISettings = None) -> FastAPI:
     # Health check router (no API prefix, for load balancers)
     app.include_router(health.router)
 
-    # Future routers will be added here under API prefix:
-    # app.include_router(collections.router, prefix=settings.api_prefix)
-    # app.include_router(artifacts.router, prefix=settings.api_prefix)
+    # API routers under API prefix
+    app.include_router(collections.router, prefix=settings.api_prefix, tags=["collections"])
+    app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
+    app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
+
+    # Future routers will be added here:
     # app.include_router(deployments.router, prefix=settings.api_prefix)
-    # app.include_router(analytics.router, prefix=settings.api_prefix)
     # app.include_router(marketplace.router, prefix=settings.api_prefix)
 
     # Root endpoint
