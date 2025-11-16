@@ -170,3 +170,12 @@ $RECYCLE.BIN/
 
 # Project-specific
 skills.lock
+
+# Node.js / Next.js (for web interface)
+node_modules/
+.next/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+pnpm-lock.yaml
+skillmeat/web/.env.local

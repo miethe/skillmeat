@@ -1,0 +1,401 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SkillMeat API",
+    "description": "REST API for SkillMeat collection manager",
+    "version": "0.1.0-alpha",
+    "x-api-version": "v1",
+    "x-package-version": "0.1.0-alpha"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Basic health check",
+        "description": "Basic health check endpoint that returns service status.\n    Used for simple availability checks by load balancers.\n\n    Returns HTTP 200 if service is running.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/detailed": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Detailed health check",
+        "description": "Detailed health check endpoint that includes component status and system information.\n    Used for comprehensive monitoring and diagnostics.\n\n    Checks the health of:\n    - Collection manager\n    - Configuration manager\n    - File system access\n\n    Returns HTTP 200 if all components are healthy.\n    Returns HTTP 503 if any critical component is unhealthy.",
+        "operationId": "detailed_health_check_health_detailed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedHealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness check",
+        "description": "Readiness check endpoint for Kubernetes and container orchestrators.\n    Indicates whether the service is ready to accept traffic.\n\n    Returns HTTP 200 if service is ready.\n    Returns HTTP 503 if service is not ready (still initializing).",
+        "operationId": "readiness_check_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readiness Check Health Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness check",
+        "description": "Liveness check endpoint for Kubernetes and container orchestrators.\n    Indicates whether the service is alive (not deadlocked/crashed).\n\n    Returns HTTP 200 if service is alive.\n    Should never return 503 unless the service is truly unresponsive.",
+        "operationId": "liveness_check_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Liveness Check Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "root"
+        ],
+        "summary": "API root",
+        "description": "Returns basic API information and available endpoints",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "root"
+        ],
+        "summary": "API version",
+        "description": "Returns detailed version information",
+        "operationId": "version_info_api_v1_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Version Info Api V1 Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DetailedHealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Service status (healthy, degraded, unhealthy)",
+            "examples": [
+              "healthy"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "Current timestamp in ISO format",
+            "examples": [
+              "2024-11-16T12:00:00.000Z"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "SkillMeat version",
+            "examples": [
+              "0.1.0-alpha"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "description": "Application environment",
+            "examples": [
+              "development"
+            ]
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Seconds",
+            "description": "Service uptime in seconds",
+            "examples": [
+              3600.5
+            ]
+          },
+          "components": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Components",
+            "description": "Health status of individual components",
+            "examples": [
+              {
+                "collection_manager": {
+                  "details": "operational",
+                  "status": "healthy"
+                },
+                "config_manager": {
+                  "details": "operational",
+                  "status": "healthy"
+                }
+              }
+            ]
+          },
+          "system_info": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "System Info",
+            "description": "System information",
+            "examples": [
+              {
+                "platform": "Linux",
+                "platform_version": "5.15.0",
+                "python_version": "3.11.0"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "environment",
+          "components",
+          "system_info"
+        ],
+        "title": "DetailedHealthStatus",
+        "description": "Detailed health check response with component status."
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Service status (healthy, degraded, unhealthy)",
+            "examples": [
+              "healthy"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "Current timestamp in ISO format",
+            "examples": [
+              "2024-11-16T12:00:00.000Z"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "SkillMeat version",
+            "examples": [
+              "0.1.0-alpha"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "description": "Application environment",
+            "examples": [
+              "development"
+            ]
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Seconds",
+            "description": "Service uptime in seconds",
+            "examples": [
+              3600.5
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "environment"
+        ],
+        "title": "HealthStatus",
+        "description": "Health check response model."
+      },
+      "HTTPValidationError": {
+        "title": "HTTPValidationError",
+        "type": "object",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "title": "ValidationError",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "loc": {
+            "title": "Location",
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "title": "ErrorResponse",
+        "type": "object",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "detail"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token authentication"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server"
+    },
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Local development API"
+    }
+  ]
+}

@@ -46,6 +46,14 @@ dependencies = [
     "tomli_w>=1.0.0",
     "requests>=2.25.0",
     "PyYAML>=6.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.6",
+    "PyJWT>=2.8.0",
+    "cryptography>=41.0.0",
+    "keyring>=24.0.0",
 ]
 
 [project.urls]
@@ -62,6 +70,7 @@ dev = [
     "black>=22.0.0",
     "flake8>=4.0.0",
     "mypy>=0.950",
+    "httpx>=0.25.0",
 ]
 
 [project.scripts]
@@ -70,10 +79,15 @@ skillmeat = "skillmeat.cli:main"
 [tool.setuptools]
 packages = [
     "skillmeat",
+    "skillmeat.api",
+    "skillmeat.api.routers",
+    "skillmeat.api.middleware",
     "skillmeat.core",
+    "skillmeat.core.auth",
     "skillmeat.sources",
     "skillmeat.storage",
-    "skillmeat.utils"
+    "skillmeat.utils",
+    "skillmeat.web"
 ]
 
 [tool.setuptools.package-data]
