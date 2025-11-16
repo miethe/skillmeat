@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/header';
 import { Navigation } from '@/components/navigation';
+import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
@@ -35,13 +36,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <div className="flex min-h-screen flex-col">
-          <Header />
-          <div className="flex flex-1">
-            <Navigation />
-            <main className="flex-1 p-6">{children}</main>
+        <Providers>
+          <div className="flex min-h-screen flex-col">
+            <Header />
+            <div className="flex flex-1">
+              <Navigation />
+              <main className="flex-1 p-6">{children}</main>
+            </div>
           </div>
-        </div>
+        </Providers>
       </body>
     </html>
   );
