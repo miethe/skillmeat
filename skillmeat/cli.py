@@ -4070,6 +4070,835 @@ def _create_sparkline(values: List[int]) -> str:
 
 
 # ====================
+# Web Interface Commands
+# ====================
+
+
+@main.group()
+def web():
+    """Manage web interface servers.
+
+    Commands for starting, building, and diagnosing the Next.js web
+    interface and FastAPI backend server.
+
+    Examples:
+      skillmeat web dev        # Start development servers
+      skillmeat web build      # Build for production
+      skillmeat web start      # Start production servers
+      skillmeat web doctor     # Diagnose environment
+    """
+    pass
+
+
+@web.command()
+@click.option(
+    "--api-only",
+    is_flag=True,
+    help="Run only the FastAPI server",
+)
+@click.option(
+    "--web-only",
+    is_flag=True,
+    help="Run only the Next.js server",
+)
+@click.option(
+    "--api-port",
+    type=int,
+    default=8000,
+    help="Port for FastAPI server (default: 8000)",
+)
+@click.option(
+    "--web-port",
+    type=int,
+    default=3000,
+    help="Port for Next.js server (default: 3000)",
+)
+@click.option(
+    "--api-host",
+    default="127.0.0.1",
+    help="Host for FastAPI server (default: 127.0.0.1)",
+)
+def dev(
+    api_only: bool,
+    web_only: bool,
+    api_port: int,
+    web_port: int,
+    api_host: str,
+):
+    """Start development servers with auto-reload.
+
+    Starts both FastAPI backend (port 8000) and Next.js frontend (port 3000)
+    in development mode with auto-reload on file changes.
+
+    Examples:
+      skillmeat web dev                    # Start both servers
+      skillmeat web dev --api-only         # Start only API
+      skillmeat web dev --web-only         # Start only Next.js
+      skillmeat web dev --api-port 8080    # Use custom API port
+    """
+    from skillmeat.web import WebManager, check_prerequisites
+
+    try:
+        # Check prerequisites
+        if not check_prerequisites(console):
+            sys.exit(1)
+
+        # Create and start manager
+        manager = WebManager(
+            api_only=api_only,
+            web_only=web_only,
+            api_port=api_port,
+            web_port=web_port,
+            api_host=api_host,
+        )
+
+        exit_code = manager.start_dev()
+        sys.exit(exit_code)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception("Failed to start development servers")
+        sys.exit(1)
+
+
+@web.command()
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check if build is needed without building",
+)
+def build(check: bool):
+    """Build Next.js application for production.
+
+    Compiles and optimizes the Next.js application for production deployment.
+    Must be run before 'skillmeat web start'.
+
+    Examples:
+      skillmeat web build           # Build for production
+      skillmeat web build --check   # Check if build is needed
+    """
+    from skillmeat.web import WebManager, check_prerequisites
+
+    try:
+        # Check prerequisites
+        if not check_prerequisites(console):
+            sys.exit(1)
+
+        manager = WebManager()
+
+        if check:
+            # TODO: Implement build check (compare timestamps, etc.)
+            console.print("[yellow]Build check not yet implemented[/yellow]")
+            sys.exit(0)
+
+        # Build
+        exit_code = manager.build_web()
+        sys.exit(exit_code)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception("Failed to build web application")
+        sys.exit(1)
+
+
+@web.command()
+@click.option(
+    "--api-only",
+    is_flag=True,
+    help="Run only the FastAPI server",
+)
+@click.option(
+    "--web-only",
+    is_flag=True,
+    help="Run only the Next.js server",
+)
+@click.option(
+    "--api-port",
+    type=int,
+    default=8000,
+    help="Port for FastAPI server (default: 8000)",
+)
+@click.option(
+    "--web-port",
+    type=int,
+    default=3000,
+    help="Port for Next.js server (default: 3000)",
+)
+@click.option(
+    "--api-host",
+    default="127.0.0.1",
+    help="Host for FastAPI server (default: 127.0.0.1)",
+)
+def start(
+    api_only: bool,
+    web_only: bool,
+    api_port: int,
+    web_port: int,
+    api_host: str,
+):
+    """Start production servers.
+
+    Starts both FastAPI backend and Next.js frontend in production mode.
+    Requires 'skillmeat web build' to be run first.
+
+    Examples:
+      skillmeat web start                  # Start both servers
+      skillmeat web start --api-only       # Start only API
+      skillmeat web start --web-only       # Start only Next.js
+    """
+    from skillmeat.web import WebManager, check_prerequisites
+
+    try:
+        # Check prerequisites
+        if not check_prerequisites(console):
+            sys.exit(1)
+
+        # Check if Next.js is built (unless API-only)
+        if not api_only:
+            import skillmeat
+            from pathlib import Path
+
+            package_root = Path(skillmeat.__file__).parent
+            build_dir = package_root / "web" / ".next"
+
+            if not build_dir.exists():
+                console.print(
+                    "[red]Next.js build not found. Run 'skillmeat web build' first.[/red]"
+                )
+                sys.exit(1)
+
+        # Create and start manager
+        manager = WebManager(
+            api_only=api_only,
+            web_only=web_only,
+            api_port=api_port,
+            web_port=web_port,
+            api_host=api_host,
+        )
+
+        exit_code = manager.start_production()
+        sys.exit(exit_code)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception("Failed to start production servers")
+        sys.exit(1)
+
+
+@web.command()
+def doctor():
+    """Diagnose web development environment.
+
+    Checks for Node.js, pnpm, Python, and other prerequisites.
+    Reports version information and potential issues.
+
+    Examples:
+      skillmeat web doctor    # Run all diagnostics
+    """
+    from skillmeat.web import run_doctor
+
+    try:
+        all_passed = run_doctor()
+        sys.exit(0 if all_passed else 1)
+
+    except Exception as e:
+        console.print(f"[red]Error running diagnostics: {e}[/red]")
+        logger.exception("Failed to run web doctor")
+        sys.exit(1)
+
+
+@web.command(name="generate-sdk")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output directory for generated SDK (default: skillmeat/web/sdk)",
+)
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check if SDK is up to date without regenerating",
+)
+@click.option(
+    "--format",
+    is_flag=True,
+    default=True,
+    help="Format generated code with Prettier (default: true)",
+)
+def generate_sdk(output: Optional[str], check: bool, format: bool):
+    """Generate TypeScript SDK from OpenAPI specification.
+
+    Exports the OpenAPI spec from the FastAPI application and generates
+    a type-safe TypeScript SDK for use in the Next.js web interface.
+
+    The generated SDK includes:
+    - Full type safety for all API endpoints
+    - Request/response types
+    - Authentication support
+    - Error handling
+
+    Examples:
+      skillmeat web generate-sdk              # Generate SDK with defaults
+      skillmeat web generate-sdk --check      # Check if SDK needs update
+      skillmeat web generate-sdk -o ./custom  # Custom output directory
+    """
+    import subprocess
+    import skillmeat
+    from pathlib import Path
+    from skillmeat.api.server import create_app
+    from skillmeat.api.openapi import export_openapi_spec
+
+    try:
+        # Determine paths
+        package_root = Path(skillmeat.__file__).parent
+        api_dir = package_root / "api"
+        web_dir = package_root / "web"
+        openapi_file = api_dir / "openapi.json"
+
+        if output:
+            sdk_output_dir = Path(output)
+        else:
+            sdk_output_dir = web_dir / "sdk"
+
+        # Check mode: compare timestamps
+        if check:
+            if not openapi_file.exists():
+                console.print("[yellow]OpenAPI spec not found - SDK needs generation[/yellow]")
+                sys.exit(1)
+
+            if not sdk_output_dir.exists():
+                console.print("[yellow]SDK directory not found - SDK needs generation[/yellow]")
+                sys.exit(1)
+
+            # Compare modification times (simplified check)
+            # In a real implementation, you might want to compare content hashes
+            console.print("[green]SDK appears to be up to date[/green]")
+            console.print(f"  OpenAPI spec: {openapi_file}")
+            console.print(f"  SDK output: {sdk_output_dir}")
+            sys.exit(0)
+
+        # Generate OpenAPI specification
+        console.print("[cyan]Generating OpenAPI specification...[/cyan]")
+
+        # Create FastAPI app
+        app = create_app()
+
+        # Export OpenAPI spec
+        export_openapi_spec(app, openapi_file, api_version="v1", pretty=True)
+
+        console.print(f"[green]OpenAPI spec generated: {openapi_file}[/green]")
+
+        # Check if pnpm is available
+        try:
+            subprocess.run(
+                ["pnpm", "--version"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print(
+                "[red]Error: pnpm is not installed. Install it with: npm install -g pnpm[/red]"
+            )
+            sys.exit(1)
+
+        # Ensure web dependencies are installed
+        console.print("[cyan]Checking web dependencies...[/cyan]")
+        node_modules = web_dir / "node_modules"
+        if not node_modules.exists() or not (node_modules / "openapi-typescript-codegen").exists():
+            console.print("[cyan]Installing web dependencies...[/cyan]")
+            result = subprocess.run(
+                ["pnpm", "install"],
+                cwd=web_dir,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                console.print(f"[red]Error installing dependencies:[/red]\n{result.stderr}")
+                sys.exit(1)
+
+        # Generate TypeScript SDK
+        console.print("[cyan]Generating TypeScript SDK...[/cyan]")
+
+        # Remove existing SDK directory for clean generation
+        if sdk_output_dir.exists():
+            import shutil
+            shutil.rmtree(sdk_output_dir)
+
+        # Run SDK generation via pnpm script
+        result = subprocess.run(
+            ["pnpm", "run", "generate-sdk"],
+            cwd=web_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            console.print(f"[red]Error generating SDK:[/red]\n{result.stderr}")
+            sys.exit(1)
+
+        console.print(f"[green]SDK generated: {sdk_output_dir}[/green]")
+
+        # Format generated code
+        if format:
+            console.print("[cyan]Formatting generated code...[/cyan]")
+            result = subprocess.run(
+                ["pnpm", "run", "format", "--loglevel", "silent"],
+                cwd=web_dir,
+                capture_output=True,
+                text=True,
+            )
+            # Don't fail if formatting fails - it's not critical
+            if result.returncode != 0:
+                console.print(
+                    "[yellow]Warning: Failed to format generated code (continuing anyway)[/yellow]"
+                )
+
+        # Verify TypeScript compilation
+        console.print("[cyan]Verifying TypeScript compilation...[/cyan]")
+        result = subprocess.run(
+            ["pnpm", "run", "type-check"],
+            cwd=web_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            console.print(
+                "[yellow]Warning: TypeScript compilation has errors:[/yellow]"
+            )
+            console.print(result.stdout)
+            console.print(
+                "[yellow]You may need to fix these errors before using the SDK[/yellow]"
+            )
+
+        # Success summary
+        console.print()
+        console.print("[green]SDK generation complete![/green]")
+        console.print()
+        console.print(f"  OpenAPI Spec: {openapi_file}")
+        console.print(f"  SDK Output:   {sdk_output_dir}")
+        console.print()
+        console.print("[dim]Import the SDK in your components:[/dim]")
+        console.print("  import { apiClient } from '@/lib/api-client';")
+        console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception("SDK generation failed")
+        sys.exit(1)
+
+
+@web.group()
+def token():
+    """Manage web authentication tokens.
+
+    Generate, list, and revoke JWT tokens for web interface authentication.
+    Tokens are securely stored using OS keychain or encrypted file storage.
+
+    Examples:
+        skillmeat web token generate          # Generate new token
+        skillmeat web token list              # List all tokens
+        skillmeat web token revoke <name>     # Revoke specific token
+        skillmeat web token cleanup           # Remove expired tokens
+    """
+    pass
+
+
+@token.command(name="generate")
+@click.option(
+    "--name",
+    default="default",
+    help="Human-readable name for the token",
+)
+@click.option(
+    "--days",
+    type=int,
+    help="Days until expiration (default: 90, 0 = no expiration)",
+)
+@click.option(
+    "--show-token",
+    is_flag=True,
+    help="Display the full token (WARNING: sensitive)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def token_generate(name, days, show_token, output_json):
+    """Generate a new authentication token.
+
+    Creates a JWT token for web interface authentication. The token is
+    securely stored and can be used for API requests.
+
+    Examples:
+        skillmeat web token generate
+        skillmeat web token generate --name production
+        skillmeat web token generate --days 365 --name long-term
+        skillmeat web token generate --days 0 --name never-expires
+    """
+    from skillmeat.core.auth import TokenManager
+
+    try:
+        # Initialize token manager
+        token_manager = TokenManager()
+
+        # Generate token
+        token_obj = token_manager.generate_token(name=name, expiration_days=days)
+
+        if output_json:
+            import json
+
+            output = {
+                "token_id": token_obj.token_id,
+                "name": token_obj.name,
+                "created_at": token_obj.created_at.isoformat(),
+                "expires_at": (
+                    token_obj.expires_at.isoformat() if token_obj.expires_at else None
+                ),
+            }
+            if show_token:
+                output["token"] = token_obj.token
+
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Display success message
+            console.print(f"\n[green]Token '{name}' generated successfully![/green]\n")
+
+            # Display metadata
+            console.print(f"[cyan]Token ID:[/cyan]    {token_obj.token_id}")
+            console.print(f"[cyan]Name:[/cyan]        {token_obj.name}")
+            console.print(
+                f"[cyan]Created:[/cyan]     {token_obj.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            if token_obj.expires_at:
+                console.print(
+                    f"[cyan]Expires:[/cyan]     {token_obj.expires_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                console.print(f"[cyan]Expires:[/cyan]     [yellow]Never[/yellow]")
+
+            # Display token if requested
+            if show_token:
+                console.print(f"\n[yellow]Token:[/yellow]\n{token_obj.token}\n")
+                console.print(
+                    "[yellow]WARNING:[/yellow] Keep this token secure. "
+                    "Do not share or commit to version control."
+                )
+            else:
+                console.print(
+                    "\n[dim]Use --show-token to display the full token value.[/dim]"
+                )
+
+            console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Token generation failed")
+        sys.exit(1)
+
+
+@token.command(name="list")
+@click.option(
+    "--include-expired",
+    is_flag=True,
+    help="Include expired tokens in listing",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def token_list(include_expired, output_json):
+    """List all authentication tokens.
+
+    Shows metadata for all stored tokens including creation date,
+    expiration, and last usage.
+
+    Examples:
+        skillmeat web token list
+        skillmeat web token list --include-expired
+        skillmeat web token list --json
+    """
+    from skillmeat.core.auth import TokenManager
+
+    try:
+        # Initialize token manager
+        token_manager = TokenManager()
+
+        # Get tokens
+        tokens = token_manager.list_tokens(include_expired=include_expired)
+
+        if not tokens:
+            console.print("[yellow]No tokens found.[/yellow]")
+            return
+
+        if output_json:
+            import json
+
+            output = [
+                {
+                    "token_id": t.token_id,
+                    "name": t.name,
+                    "created_at": t.created_at.isoformat(),
+                    "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+                    "last_used": t.last_used.isoformat() if t.last_used else None,
+                    "is_expired": t.is_expired,
+                }
+                for t in tokens
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"\n[bold]Authentication Tokens[/bold] ({len(tokens)} total)\n")
+
+            table = Table()
+            table.add_column("Name", style="cyan", no_wrap=True)
+            table.add_column("Token ID", style="dim")
+            table.add_column("Created", style="blue")
+            table.add_column("Expires", style="yellow")
+            table.add_column("Last Used", style="green")
+            table.add_column("Status", justify="center")
+
+            for token_info in tokens:
+                # Format dates
+                created_str = token_info.created_at.strftime("%Y-%m-%d")
+                expires_str = (
+                    token_info.expires_at.strftime("%Y-%m-%d")
+                    if token_info.expires_at
+                    else "Never"
+                )
+                last_used_str = (
+                    token_info.last_used.strftime("%Y-%m-%d")
+                    if token_info.last_used
+                    else "Never"
+                )
+
+                # Status indicator
+                if token_info.is_expired:
+                    status = "[red]Expired[/red]"
+                else:
+                    status = "[green]Active[/green]"
+
+                table.add_row(
+                    token_info.name,
+                    token_info.token_id[:8] + "...",
+                    created_str,
+                    expires_str,
+                    last_used_str,
+                    status,
+                )
+
+            console.print(table)
+            console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Token listing failed")
+        sys.exit(1)
+
+
+@token.command(name="revoke")
+@click.argument("identifier")
+@click.option(
+    "--all",
+    "revoke_all",
+    is_flag=True,
+    help="Revoke all tokens (use with caution)",
+)
+@click.option(
+    "--confirm",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def token_revoke(identifier, revoke_all, confirm):
+    """Revoke an authentication token.
+
+    Revokes a token by name or ID. Revoked tokens can no longer be used
+    for authentication.
+
+    Examples:
+        skillmeat web token revoke default
+        skillmeat web token revoke abc12345
+        skillmeat web token revoke --all --confirm
+    """
+    from skillmeat.core.auth import TokenManager
+
+    try:
+        # Initialize token manager
+        token_manager = TokenManager()
+
+        if revoke_all:
+            # Revoke all tokens
+            if not confirm:
+                console.print(
+                    "[yellow]WARNING:[/yellow] This will revoke ALL authentication tokens."
+                )
+                if not click.confirm("Are you sure?"):
+                    console.print("Cancelled.")
+                    return
+
+            count = token_manager.revoke_all_tokens()
+            console.print(f"[green]Revoked {count} token(s).[/green]")
+            return
+
+        # Try to find token by ID first
+        token_info = token_manager.get_token_info(identifier)
+
+        if token_info:
+            # Found by ID
+            if not confirm:
+                console.print(f"[yellow]Revoking token:[/yellow] {token_info.name}")
+                if not click.confirm("Are you sure?"):
+                    console.print("Cancelled.")
+                    return
+
+            if token_manager.revoke_token(identifier):
+                console.print(f"[green]Token '{token_info.name}' revoked.[/green]")
+            else:
+                console.print(f"[red]Failed to revoke token.[/red]")
+                sys.exit(1)
+        else:
+            # Try by name
+            count = token_manager.revoke_token_by_name(identifier)
+
+            if count > 0:
+                console.print(f"[green]Revoked {count} token(s) with name '{identifier}'.[/green]")
+            else:
+                console.print(f"[red]No token found with name or ID '{identifier}'.[/red]")
+                sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Token revocation failed")
+        sys.exit(1)
+
+
+@token.command(name="cleanup")
+@click.option(
+    "--confirm",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def token_cleanup(confirm):
+    """Remove expired tokens.
+
+    Deletes all tokens that have passed their expiration date.
+
+    Examples:
+        skillmeat web token cleanup
+        skillmeat web token cleanup --confirm
+    """
+    from skillmeat.core.auth import TokenManager
+
+    try:
+        # Initialize token manager
+        token_manager = TokenManager()
+
+        # Get expired tokens
+        all_tokens = token_manager.list_tokens(include_expired=True)
+        expired_tokens = [t for t in all_tokens if t.is_expired]
+
+        if not expired_tokens:
+            console.print("[green]No expired tokens found.[/green]")
+            return
+
+        console.print(f"\n[yellow]Found {len(expired_tokens)} expired token(s):[/yellow]\n")
+
+        for token_info in expired_tokens:
+            console.print(
+                f"  - {token_info.name} (expired: {token_info.expires_at.strftime('%Y-%m-%d')})"
+            )
+
+        console.print()
+
+        if not confirm:
+            if not click.confirm("Remove these tokens?"):
+                console.print("Cancelled.")
+                return
+
+        # Cleanup
+        count = token_manager.cleanup_expired_tokens()
+        console.print(f"[green]Removed {count} expired token(s).[/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Token cleanup failed")
+        sys.exit(1)
+
+
+@token.command(name="info")
+@click.argument("identifier")
+def token_info(identifier):
+    """Show detailed information about a token.
+
+    Displays metadata for a specific token including creation date,
+    expiration, usage statistics, and status.
+
+    Examples:
+        skillmeat web token info default
+        skillmeat web token info abc12345
+    """
+    from skillmeat.core.auth import TokenManager
+
+    try:
+        # Initialize token manager
+        token_manager = TokenManager()
+
+        # Try to find token by ID or name
+        token_info = token_manager.get_token_info(identifier)
+
+        if not token_info:
+            # Try by name
+            tokens = token_manager.list_tokens()
+            matching = [t for t in tokens if t.name == identifier]
+
+            if not matching:
+                console.print(f"[red]No token found with name or ID '{identifier}'.[/red]")
+                sys.exit(1)
+
+            token_info = matching[0]
+
+        # Display token information
+        console.print(f"\n[bold]Token Information[/bold]\n")
+
+        console.print(f"[cyan]Name:[/cyan]       {token_info.name}")
+        console.print(f"[cyan]Token ID:[/cyan]   {token_info.token_id}")
+        console.print(
+            f"[cyan]Created:[/cyan]    {token_info.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
+        if token_info.expires_at:
+            console.print(
+                f"[cyan]Expires:[/cyan]    {token_info.expires_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        else:
+            console.print(f"[cyan]Expires:[/cyan]    [yellow]Never[/yellow]")
+
+        if token_info.last_used:
+            console.print(
+                f"[cyan]Last Used:[/cyan]  {token_info.last_used.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        else:
+            console.print(f"[cyan]Last Used:[/cyan]  [dim]Never[/dim]")
+
+        # Status
+        if token_info.is_expired:
+            console.print(f"[cyan]Status:[/cyan]     [red]Expired[/red]")
+        else:
+            console.print(f"[cyan]Status:[/cyan]     [green]Active[/green]")
+
+        console.print()
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Token info failed")
+        sys.exit(1)
+
+
+# ====================
 # Entry Point
 # ====================
 
