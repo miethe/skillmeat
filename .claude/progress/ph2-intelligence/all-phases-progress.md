@@ -524,16 +524,52 @@ Phase 2 layers intelligence on top of the SkillMeat collection core by introduci
 ## Phase 4: Analytics & Insights
 
 **Duration**: 2 weeks (Weeks 13-14)
-**Status**: Pending
+**Status**: In Progress
+**Progress**: 20% (1/5 tasks complete)
 
 ### Tasks
 
-- [ ] **P4-001**: Schema & Storage
+- [x] **P4-001**: Schema & Storage
   - **Description**: Initialize SQLite DB, migrations, connection mgmt, retention policy
   - **Acceptance**: Tables + indexes from PRD exist; vacuum + rotation supported
   - **Estimate**: 3 pts
   - **Assigned Subagent(s)**: data-layer-expert
   - **Dependencies**: P3-003
+  - **Completed**: 2025-11-16
+  - **Implementation**: Created AnalyticsDB class with SQLite database management
+  - **Key Deliverables**:
+    - `AnalyticsDB` class in `skillmeat/storage/analytics.py` (804 lines)
+    - Events table with indexes (id, event_type, artifact_name, artifact_type, collection, project_path, timestamp, metadata)
+    - Usage summary table with aggregated statistics (deploy/update/sync/remove/search counts)
+    - Version-based migration system (SCHEMA_VERSION = 1)
+    - WAL mode enabled for better concurrency
+    - Retry logic for database locked scenarios
+    - Retention policy via cleanup_old_events() method (default: 90 days)
+    - Vacuum support for space reclamation
+    - Connection management with context manager support
+    - Analytics configuration in ConfigManager (enabled, retention-days, db-path)
+    - Test suite: `tests/unit/test_analytics.py` (51 tests, 50 passing, 1 skipped)
+  - **Files Created**:
+    - `skillmeat/storage/analytics.py` (804 lines)
+    - `tests/unit/test_analytics.py` (51 tests)
+  - **Files Modified**:
+    - `skillmeat/storage/__init__.py`: Added AnalyticsDB export
+    - `skillmeat/config.py`: Added analytics config methods (is_analytics_enabled, get_analytics_retention_days, get_analytics_db_path)
+    - `tests/unit/test_config.py`: Added 6 analytics config tests
+  - **Test Results**: 50/51 tests passing (1 skipped due to sqlite3 limitation)
+  - **Database Features**:
+    - Default location: ~/.skillmeat/analytics.db
+    - Configurable via config.toml analytics.db-path
+    - WAL mode for concurrent access
+    - Foreign key enforcement enabled
+    - Row factory for dict-like access
+    - Exponential backoff retry on database locked (3 attempts, 100ms initial delay)
+  - **Acceptance Criteria**: 5/5 met (100%) ✅
+    - ✅ Tables + indexes exist
+    - ✅ Vacuum + rotation supported
+    - ✅ Connection management with WAL mode
+    - ✅ Migrations for schema evolution
+    - ✅ Retention policy implementation
 
 - [ ] **P4-002**: Event Tracking Hooks
   - **Description**: Emit analytics events from deploy/update/sync/remove flows

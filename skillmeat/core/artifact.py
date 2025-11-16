@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 import requests
 from rich.prompt import Confirm
 
+from skillmeat.utils.logging import redact_path
+
 # Handle tomli/tomllib import for different Python versions
 if sys.version_info >= (3, 11):
     import tomllib
@@ -113,9 +115,36 @@ class Artifact:
     tags: List[str] = field(default_factory=list)
 
     def __post_init__(self):
-        """Validate artifact configuration."""
+        """Validate artifact configuration.
+
+        Security: This validation prevents path traversal attacks by ensuring
+        artifact names cannot contain path separators or directory references.
+        See security review CRITICAL-1 for details.
+        """
         if not self.name:
             raise ValueError("Artifact name cannot be empty")
+
+        # CRITICAL SECURITY: Prevent path traversal attacks
+        # Artifact names must be simple identifiers without path components
+        if "/" in self.name or "\\" in self.name:
+            raise ValueError(
+                f"Invalid artifact name '{self.name}': "
+                "artifact names cannot contain path separators (/ or \\)"
+            )
+
+        if ".." in self.name:
+            raise ValueError(
+                f"Invalid artifact name '{self.name}': "
+                "artifact names cannot contain parent directory references (..)"
+            )
+
+        # Prevent hidden/system files (security consideration)
+        if self.name.startswith("."):
+            raise ValueError(
+                f"Invalid artifact name '{self.name}': "
+                "artifact names cannot start with '.'"
+            )
+
         if self.origin not in ("local", "github"):
             raise ValueError(
                 f"Invalid origin: {self.origin}. Must be 'local' or 'github'."
@@ -503,6 +532,15 @@ class ArtifactManager:
             collection_path, artifact_name, artifact_type
         )
 
+        # Track remove event
+        self._record_remove_event(
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection.name,
+            reason="user_action",
+            from_project=False,
+        )
+
     def list_artifacts(
         self,
         collection_name: Optional[str] = None,
@@ -704,7 +742,7 @@ class ArtifactManager:
 
             logging.info(
                 f"Fetched update for {artifact.type.value}/{artifact.name} "
-                f"to {temp_workspace}"
+                f"to {redact_path(temp_workspace)}"
             )
 
             return UpdateFetchResult(
@@ -1218,6 +1256,16 @@ class ArtifactManager:
             if fetch_result.temp_workspace and fetch_result.temp_workspace.exists():
                 shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
 
+            # Track successful update event
+            self._record_update_event(
+                artifact=artifact,
+                strategy=strategy,
+                version_before=previous_version,
+                version_after=artifact.resolved_version,
+                conflicts_detected=0,  # Would need to track this from merge
+                rollback=False,
+            )
+
             return UpdateResult(
                 artifact=artifact,
                 updated=True,
@@ -1244,6 +1292,16 @@ class ArtifactManager:
                     snapshot_mgr.restore_snapshot(snapshot, collection_path)
 
                     logging.info(f"Successfully rolled back to snapshot {snapshot.id}")
+
+                    # Track rollback event
+                    self._record_update_event(
+                        artifact=artifact,
+                        strategy=strategy,
+                        version_before=previous_version,
+                        version_after=previous_version,  # Rolled back
+                        conflicts_detected=0,
+                        rollback=True,
+                    )
                 except Exception as rollback_error:
                     logging.error(
                         f"CRITICAL: Rollback failed: {rollback_error}. "
@@ -1731,6 +1789,90 @@ class ArtifactManager:
         if rel_path:
             return f"{username}/{repo}/{rel_path}@{version_spec}"
         return f"{username}/{repo}@{version_spec}"
+
+    def _record_update_event(
+        self,
+        artifact: Artifact,
+        strategy: str,
+        version_before: Optional[str] = None,
+        version_after: Optional[str] = None,
+        conflicts_detected: int = 0,
+        rollback: bool = False,
+        user_choice: Optional[str] = None,
+    ) -> None:
+        """Record update event for analytics.
+
+        Args:
+            artifact: Artifact being updated
+            strategy: Update strategy (overwrite, merge, prompt)
+            version_before: Optional version before update
+            version_after: Optional version after update
+            conflicts_detected: Number of conflicts detected
+            rollback: Whether update was rolled back
+            user_choice: Optional user choice (proceed, cancel)
+        """
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            # Get collection name
+            collection_name = "default"
+            try:
+                collection = self.collection_mgr.get_active_collection()
+                collection_name = collection.name if collection else "default"
+            except Exception:
+                pass
+
+            # Record update event
+            with EventTracker() as tracker:
+                tracker.track_update(
+                    artifact_name=artifact.name,
+                    artifact_type=artifact.type.value,
+                    collection_name=collection_name,
+                    strategy=strategy,
+                    version_before=version_before,
+                    version_after=version_after,
+                    conflicts_detected=conflicts_detected,
+                    user_choice=user_choice,
+                    rollback=rollback,
+                )
+
+        except Exception as e:
+            # Never fail update due to analytics
+            logging.debug(f"Failed to record update analytics: {e}")
+
+    def _record_remove_event(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        collection_name: str,
+        reason: str = "user_action",
+        from_project: bool = False,
+    ) -> None:
+        """Record remove event for analytics.
+
+        Args:
+            artifact_name: Name of artifact being removed
+            artifact_type: Type of artifact
+            collection_name: Name of collection
+            reason: Reason for removal (default: user_action)
+            from_project: Whether removing from project (default: False)
+        """
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            # Record remove event
+            with EventTracker() as tracker:
+                tracker.track_remove(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    reason=reason,
+                    from_project=from_project,
+                )
+
+        except Exception as e:
+            # Never fail remove due to analytics
+            logging.debug(f"Failed to record remove analytics: {e}")
 
     def _auto_snapshot(self, collection_name: str, artifact: Artifact, message: str):
         """Create safety snapshot before mutating artifact.

@@ -163,6 +163,17 @@ class DeploymentManager:
             )
             deployments.append(deployment)
 
+            # Track deploy event
+            self._record_deploy_event(
+                artifact_name=artifact.name,
+                artifact_type=artifact.type.value,
+                collection_name=collection.name,
+                project_path=project_path,
+                version=artifact.metadata.version,
+                sha=content_hash,
+                success=True,
+            )
+
         return deployments
 
     def deploy_all(
@@ -224,6 +235,22 @@ class DeploymentManager:
             project_path, artifact_name, artifact_type.value
         )
 
+        # Track remove event (from project)
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            with EventTracker() as tracker:
+                tracker.track_remove(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type.value,
+                    collection_name=deployment.from_collection,
+                    reason="user_action",
+                    from_project=True,
+                )
+        except Exception as e:
+            # Never fail undeploy due to analytics
+            console.print(f"[dim]Debug: Failed to record remove analytics: {e}[/dim]")
+
     def list_deployments(self, project_path: Optional[Path] = None) -> List[Deployment]:
         """List all deployed artifacts in project.
 
@@ -278,3 +305,42 @@ class DeploymentManager:
             # This will be expanded in later phases
 
         return status
+
+    def _record_deploy_event(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        collection_name: str,
+        project_path: Path,
+        version: Optional[str] = None,
+        sha: Optional[str] = None,
+        success: bool = True,
+    ) -> None:
+        """Record deploy event for analytics.
+
+        Args:
+            artifact_name: Name of artifact deployed
+            artifact_type: Type of artifact
+            collection_name: Name of collection
+            project_path: Path to project
+            version: Optional artifact version
+            sha: Optional artifact SHA
+            success: Whether deployment succeeded
+        """
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            with EventTracker() as tracker:
+                tracker.track_deploy(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    project_path=str(project_path),
+                    version=version,
+                    sha=sha,
+                    success=success,
+                )
+
+        except Exception as e:
+            # Never fail deploy due to analytics
+            console.print(f"[dim]Debug: Failed to record deploy analytics: {e}[/dim]")

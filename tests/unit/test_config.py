@@ -28,6 +28,11 @@ def test_config_manager_initialization(config_manager, temp_config_dir):
     assert config["settings"]["default-collection"] == "default"
     assert config["settings"]["update-strategy"] == "prompt"
 
+    # Check analytics defaults
+    assert "analytics" in config
+    assert config["analytics"]["enabled"] is True
+    assert config["analytics"]["retention-days"] == 90
+
 
 def test_get_existing_key(config_manager):
     """Test getting existing config value."""
@@ -165,3 +170,39 @@ def test_multiple_managers_same_directory(temp_config_dir):
     value = manager2.get("test.key")
 
     assert value == "value1"
+
+
+def test_is_analytics_enabled_default(config_manager):
+    """Test analytics enabled by default."""
+    assert config_manager.is_analytics_enabled() is True
+
+
+def test_is_analytics_enabled_disabled(config_manager):
+    """Test disabling analytics."""
+    config_manager.set("analytics.enabled", False)
+    assert config_manager.is_analytics_enabled() is False
+
+
+def test_get_analytics_retention_days_default(config_manager):
+    """Test default analytics retention period."""
+    assert config_manager.get_analytics_retention_days() == 90
+
+
+def test_get_analytics_retention_days_custom(config_manager):
+    """Test custom analytics retention period."""
+    config_manager.set("analytics.retention-days", 30)
+    assert config_manager.get_analytics_retention_days() == 30
+
+
+def test_get_analytics_db_path_default(config_manager, temp_config_dir):
+    """Test default analytics database path."""
+    path = config_manager.get_analytics_db_path()
+    assert path == temp_config_dir / "analytics.db"
+
+
+def test_get_analytics_db_path_custom(config_manager, tmp_path):
+    """Test custom analytics database path."""
+    custom_path = tmp_path / "custom" / "analytics.db"
+    config_manager.set("analytics.db-path", str(custom_path))
+    path = config_manager.get_analytics_db_path()
+    assert path == custom_path

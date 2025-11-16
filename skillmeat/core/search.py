@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from skillmeat.utils.logging import redact_path
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.models import (
     ArtifactFingerprint,
@@ -181,6 +182,15 @@ class SearchManager:
             all_matches = all_matches[:limit]
 
         search_time = time.time() - start_time
+
+        # Track search events for top results (limit to 5 to avoid spam)
+        self._record_search_events(
+            query=query,
+            matches=all_matches[:5],  # Only track top 5
+            total_results=len(all_matches),
+            search_type=search_type,
+            collection_name=collection.name,
+        )
 
         return SearchResult(
             query=query,
@@ -477,7 +487,7 @@ class SearchManager:
                                 )
                 except (IOError, OSError, UnicodeDecodeError) as e:
                     # Skip files we can't read
-                    logging.debug(f"Skipping file {file_path}: {e}")
+                    logging.debug(f"Skipping file {redact_path(file_path)}: {e}")
                     continue
 
         return matches
@@ -505,7 +515,7 @@ class SearchManager:
 
                 searchable_files.append(path)
         except (OSError, IOError) as e:
-            logging.debug(f"Error walking directory {root_path}: {e}")
+            logging.debug(f"Error walking directory {redact_path(root_path)}: {e}")
 
         return searchable_files
 
@@ -729,6 +739,16 @@ class SearchManager:
 
         search_time = time.time() - start_time
 
+        # Track search events for top results (limit to 5 to avoid spam)
+        # For cross-project search, use "cross-project" as collection name
+        self._record_search_events(
+            query=query,
+            matches=all_matches[:5],  # Only track top 5
+            total_results=len(all_matches),
+            search_type=search_type,
+            collection_name="cross-project",
+        )
+
         return SearchResult(
             query=query,
             matches=all_matches,
@@ -766,7 +786,7 @@ class SearchManager:
         projects = []
         for root in roots:
             if not root.exists():
-                logging.warning(f"Project root does not exist: {root}")
+                logging.warning(f"Project root does not exist: {redact_path(root)}")
                 continue
 
             # Find all .claude directories
@@ -778,7 +798,7 @@ class SearchManager:
                     if claude_dir.is_dir():
                         projects.append(claude_dir)
             except (OSError, IOError) as e:
-                logging.warning(f"Error walking directory {root}: {e}")
+                logging.warning(f"Error walking directory {redact_path(root)}: {e}")
                 continue
 
         return projects
@@ -819,7 +839,7 @@ class SearchManager:
                     directories.append(entry)
                     walk_level(entry, depth + 1)
             except (OSError, IOError, PermissionError) as e:
-                logging.debug(f"Cannot access {current_dir}: {e}")
+                logging.debug(f"Cannot access {redact_path(current_dir)}: {e}")
 
         walk_level(root, 1)
         return directories
@@ -876,7 +896,7 @@ class SearchManager:
                             }
                         )
                 except (OSError, IOError) as e:
-                    logging.warning(f"Error reading skills directory {skills_dir}: {e}")
+                    logging.warning(f"Error reading skills directory {redact_path(skills_dir)}: {e}")
 
             # Get directory mtime for cache invalidation
             try:
@@ -1298,7 +1318,7 @@ class SearchManager:
             # Skip large files
             try:
                 if file_path.stat().st_size > MAX_FILE_SIZE:
-                    logging.debug(f"Skipping large file: {file_path}")
+                    logging.debug(f"Skipping large file: {redact_path(file_path)}")
                     continue
             except (OSError, IOError):
                 continue
@@ -1309,7 +1329,7 @@ class SearchManager:
                     hasher.update(f.read())
             except (OSError, IOError, PermissionError):
                 # Skip unreadable files
-                logging.debug(f"Cannot read file: {file_path}")
+                logging.debug(f"Cannot read file: {redact_path(file_path)}")
                 continue
 
         return hasher.hexdigest()
@@ -1456,3 +1476,41 @@ class SearchManager:
             return True
 
         return False
+
+    def _record_search_events(
+        self,
+        query: str,
+        matches: List,
+        total_results: int,
+        search_type: str,
+        collection_name: str,
+    ) -> None:
+        """Record search events for analytics (top results only).
+
+        Args:
+            query: Search query
+            matches: List of SearchMatch objects (limited to top results)
+            total_results: Total number of search results
+            search_type: Type of search (metadata, content, both)
+            collection_name: Name of collection searched
+        """
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            # Record each match as a search event
+            with EventTracker() as tracker:
+                for rank, match in enumerate(matches, start=1):
+                    tracker.track_search(
+                        artifact_name=match.artifact_name,
+                        artifact_type=match.artifact_type,
+                        collection_name=collection_name,
+                        query=query,
+                        search_type=search_type,
+                        score=match.score,
+                        rank=rank,
+                        total_results=total_results,
+                    )
+
+        except Exception as e:
+            # Never fail search due to analytics
+            logger.debug(f"Failed to record search analytics: {e}")
