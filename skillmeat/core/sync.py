@@ -16,6 +16,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
+from skillmeat.utils.logging import redact_path
 from skillmeat.models import (
     DeploymentRecord,
     DeploymentMetadata,
@@ -72,7 +73,7 @@ class SyncManager:
         # Load deployment metadata
         metadata = self._load_deployment_metadata(project_path)
         if not metadata:
-            logger.info(f"No deployment metadata found at {project_path}")
+            logger.info(f"No deployment metadata found at {redact_path(project_path)}")
             return []
 
         # Use collection from metadata if not specified
@@ -181,7 +182,7 @@ class SyncManager:
                 try:
                     hasher.update(file_path.read_bytes())
                 except (PermissionError, OSError) as e:
-                    logger.warning(f"Could not read {file_path}: {e}")
+                    logger.warning(f"Could not read {redact_path(file_path)}: {e}")
                     continue
 
         return hasher.hexdigest()
@@ -1034,19 +1035,34 @@ class SyncManager:
             project_path, artifact_name, artifact_type
         )
         if not project_artifact_path:
-            return ArtifactSyncResult(
+            result = ArtifactSyncResult(
                 artifact_name=artifact_name,
                 success=False,
                 error=f"Artifact not found in project: {artifact_name}",
             )
+            # Track failed sync
+            self._record_artifact_sync_event(
+                artifact_name, artifact_type, strategy, "error",
+                project_path=project_path,
+                sha_before=drift.collection_sha,
+                error_message=result.error,
+            )
+            return result
 
         # Get collection path
         if not self.collection_mgr:
-            return ArtifactSyncResult(
+            result = ArtifactSyncResult(
                 artifact_name=artifact_name,
                 success=False,
                 error="Collection manager not available",
             )
+            # Track failed sync
+            self._record_artifact_sync_event(
+                artifact_name, artifact_type, strategy, "error",
+                project_path=project_path,
+                error_message=result.error,
+            )
+            return result
 
         try:
             # Get collection from drift metadata
@@ -1094,11 +1110,20 @@ class SyncManager:
                 strategy = strategy_map[choice]
 
             if strategy == "skip":
-                return ArtifactSyncResult(
+                result = ArtifactSyncResult(
                     artifact_name=artifact_name, success=False, error="Skipped by user"
                 )
+                # Track cancelled sync
+                self._record_artifact_sync_event(
+                    artifact_name, artifact_type, strategy, "cancelled",
+                    project_path=project_path,
+                    sha_before=drift.collection_sha,
+                    sha_after=drift.project_sha,
+                )
+                return result
 
-            # Execute strategy
+            # Execute strategy and track event
+            conflicts_count = 0
             if strategy == "overwrite":
                 self._sync_overwrite(project_artifact_path, collection_artifact_path)
             elif strategy == "merge":
@@ -1106,27 +1131,59 @@ class SyncManager:
                     project_artifact_path, collection_artifact_path, artifact_name
                 )
                 if merge_result.has_conflict:
+                    conflicts_count = len(merge_result.conflict_files)
+                    # Track sync with conflicts
+                    self._record_artifact_sync_event(
+                        artifact_name, artifact_type, strategy, "conflict",
+                        project_path=project_path,
+                        sha_before=drift.collection_sha,
+                        sha_after=drift.project_sha,
+                        conflicts_detected=conflicts_count,
+                    )
                     return ArtifactSyncResult(
                         artifact_name=artifact_name,
                         success=True,  # Merge completed, but has conflicts
                         has_conflict=True,
-                        conflict_files=[c.file_path for c in merge_result.conflicts],
+                        conflict_files=merge_result.conflict_files,
                     )
             elif strategy == "fork":
                 self._sync_fork(
                     project_artifact_path, collection_path, artifact_name, artifact_type
                 )
             else:
-                return ArtifactSyncResult(
+                result = ArtifactSyncResult(
                     artifact_name=artifact_name,
                     success=False,
                     error=f"Unknown strategy: {strategy}",
                 )
+                # Track error
+                self._record_artifact_sync_event(
+                    artifact_name, artifact_type, strategy, "error",
+                    project_path=project_path,
+                    error_message=result.error,
+                )
+                return result
+
+            # Track successful sync
+            self._record_artifact_sync_event(
+                artifact_name, artifact_type, strategy, "success",
+                project_path=project_path,
+                sha_before=drift.collection_sha,
+                sha_after=drift.project_sha,
+                conflicts_detected=conflicts_count,
+            )
 
             return ArtifactSyncResult(artifact_name=artifact_name, success=True)
 
         except Exception as e:
             logger.error(f"Failed to sync artifact {artifact_name}: {e}")
+            # Track error
+            self._record_artifact_sync_event(
+                artifact_name, artifact_type, strategy, "error",
+                project_path=project_path,
+                sha_before=drift.collection_sha,
+                error_message=str(e),
+            )
             return ArtifactSyncResult(
                 artifact_name=artifact_name, success=False, error=str(e)
             )
@@ -1362,13 +1419,69 @@ class SyncManager:
             except Exception as e:
                 logger.warning(f"Failed to update lock for {artifact_name}: {e}")
 
+    def _record_artifact_sync_event(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        sync_type: str,
+        result: str,
+        project_path: Optional[Path] = None,
+        sha_before: Optional[str] = None,
+        sha_after: Optional[str] = None,
+        conflicts_detected: int = 0,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Record individual artifact sync event for analytics.
+
+        Args:
+            artifact_name: Name of artifact synced
+            artifact_type: Type of artifact (skill, command, agent)
+            sync_type: Type of sync (overwrite, merge, fork)
+            result: Result of sync (success, conflict, error, cancelled)
+            project_path: Optional path to project
+            sha_before: Optional SHA before sync
+            sha_after: Optional SHA after sync
+            conflicts_detected: Number of conflicts detected (default: 0)
+            error_message: Optional error message if result is error
+        """
+        try:
+            from skillmeat.core.analytics import EventTracker
+
+            # Get collection name from collection manager
+            collection_name = None
+            if self.collection_mgr:
+                try:
+                    collection = self.collection_mgr.get_active_collection()
+                    collection_name = collection.name if collection else "default"
+                except Exception:
+                    collection_name = "default"
+
+            # Record sync event
+            with EventTracker() as tracker:
+                tracker.track_sync(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name or "default",
+                    sync_type=sync_type,
+                    result=result,
+                    project_path=str(project_path) if project_path else None,
+                    sha_before=sha_before,
+                    sha_after=sha_after,
+                    conflicts_detected=conflicts_detected,
+                    error_message=error_message,
+                )
+
+        except Exception as e:
+            # Never fail sync due to analytics
+            logger.debug(f"Failed to record sync analytics: {e}")
+
     def _record_sync_event(self, sync_type: str, artifact_names: List[str]) -> None:
-        """Record sync event for analytics.
+        """Record sync event for analytics (legacy method for batch tracking).
 
         Args:
             sync_type: Type of sync ("pull" or "push")
             artifact_names: List of artifact names synced
         """
-        # Stub for P4-002 analytics integration
+        # This method is now mostly for logging - individual events are
+        # tracked per-artifact in _record_artifact_sync_event
         logger.info(f"Sync {sync_type}: {len(artifact_names)} artifacts")
-        # Future: Record to analytics DB

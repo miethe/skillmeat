@@ -43,7 +43,11 @@ class ConfigManager:
                 "settings": {
                     "default-collection": "default",
                     "update-strategy": "prompt",
-                }
+                },
+                "analytics": {
+                    "enabled": True,
+                    "retention-days": 90,
+                },
             }
             self.write(default_config)
 
@@ -201,3 +205,30 @@ class ConfigManager:
             Path to collection directory
         """
         return self.get_collections_dir() / name
+
+    def is_analytics_enabled(self) -> bool:
+        """Check if analytics tracking is enabled.
+
+        Returns:
+            True if analytics is enabled, False otherwise
+        """
+        return self.get("analytics.enabled", True)
+
+    def get_analytics_retention_days(self) -> int:
+        """Get analytics retention period in days.
+
+        Returns:
+            Number of days to retain analytics events (0 = keep forever)
+        """
+        return self.get("analytics.retention-days", 90)
+
+    def get_analytics_db_path(self) -> Path:
+        """Get analytics database path.
+
+        Returns:
+            Path to analytics database file
+        """
+        custom_path = self.get("analytics.db-path")
+        if custom_path:
+            return Path(custom_path)
+        return self.config_dir / "analytics.db"

@@ -4,10 +4,11 @@ This module provides the complete command-line interface for SkillMeat,
 a personal collection manager for Claude Code artifacts.
 """
 
+import logging
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import click
 from rich.console import Console
@@ -30,6 +31,9 @@ from skillmeat.utils.validator import ArtifactValidator
 
 # Console for output
 console = Console(force_terminal=True, legacy_windows=False)
+
+# Logger for error tracking
+logger = logging.getLogger(__name__)
 
 
 # ====================
@@ -3202,6 +3206,867 @@ def _get_status_color(status: str) -> str:
         "dry_run": "cyan",
     }
     return color_map.get(status, "white")
+
+
+# ====================
+# Analytics Commands
+# ====================
+
+
+@main.group()
+def analytics():
+    """View and manage artifact usage analytics.
+
+    Analytics tracks artifact deployments, updates, syncs, searches, and removals
+    to help you understand usage patterns and identify cleanup opportunities.
+
+    Examples:
+        skillmeat analytics usage              # View all artifact usage
+        skillmeat analytics top --limit 10     # Top 10 artifacts
+        skillmeat analytics cleanup            # Cleanup suggestions
+        skillmeat analytics stats              # Database statistics
+    """
+    pass
+
+
+@analytics.command()
+@click.argument("artifact", required=False)
+@click.option(
+    "--days",
+    type=int,
+    default=30,
+    help="Time window in days (default: 30)",
+)
+@click.option(
+    "--type",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    help="Filter by artifact type",
+)
+@click.option(
+    "--collection",
+    help="Filter by collection name",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format (default: table)",
+)
+@click.option(
+    "--sort-by",
+    type=click.Choice([
+        "total_events", "deploy_count", "update_count",
+        "last_used", "artifact_name"
+    ]),
+    default="total_events",
+    help="Sort results by field (default: total_events)",
+)
+def usage(artifact, days, artifact_type, collection, output_format, sort_by):
+    """View artifact usage statistics.
+
+    Show usage statistics for one or more artifacts, including event counts,
+    last usage time, and usage trends.
+
+    Examples:
+        skillmeat analytics usage                     # All artifacts
+        skillmeat analytics usage canvas              # Specific artifact
+        skillmeat analytics usage --type skill        # All skills
+        skillmeat analytics usage --format json       # JSON output
+        skillmeat analytics usage --sort-by last_used # Sort by recency
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Get usage data
+        usage_data = manager.get_artifact_usage(
+            artifact_name=artifact,
+            artifact_type=artifact_type,
+            collection_name=collection,
+        )
+
+        # Handle single vs multiple artifacts
+        if artifact:
+            # Single artifact
+            if not usage_data:
+                console.print(f"[yellow]No usage data found for '{artifact}'[/yellow]")
+                sys.exit(0)
+            artifacts = [usage_data]
+        else:
+            # Multiple artifacts
+            artifacts = usage_data.get("artifacts", [])
+            if not artifacts:
+                console.print("[yellow]No usage data available.[/yellow]\n")
+                console.print("Deploy or update artifacts to start collecting analytics.")
+                sys.exit(0)
+
+        # Sort artifacts
+        reverse = sort_by != "artifact_name"
+        artifacts_sorted = sorted(
+            artifacts,
+            key=lambda x: x.get(sort_by) if x.get(sort_by) is not None else "",
+            reverse=reverse
+        )
+
+        # Display results
+        if output_format == "json":
+            import json as json_lib
+            output = {
+                "artifacts": artifacts_sorted,
+                "total_count": len(artifacts_sorted),
+                "filters": {
+                    "artifact": artifact,
+                    "type": artifact_type,
+                    "collection": collection,
+                    "days": days,
+                }
+            }
+            click.echo(json_lib.dumps(output, indent=2, default=str))
+        else:
+            _display_usage_table(artifacts_sorted)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics usage command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+@click.option(
+    "--limit",
+    type=int,
+    default=10,
+    help="Number of top artifacts to show (default: 10)",
+)
+@click.option(
+    "--metric",
+    type=click.Choice([
+        "total_events", "deploy_count", "update_count",
+        "sync_count", "search_count"
+    ]),
+    default="total_events",
+    help="Sort by metric (default: total_events)",
+)
+@click.option(
+    "--type",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    help="Filter by artifact type",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format (default: table)",
+)
+def top(limit, metric, artifact_type, output_format):
+    """List top artifacts by metric.
+
+    Show the most frequently used artifacts ranked by total events,
+    deploys, updates, or other metrics.
+
+    Examples:
+        skillmeat analytics top                          # Top 10 by events
+        skillmeat analytics top --limit 20               # Top 20
+        skillmeat analytics top --metric deploy_count    # Top by deploys
+        skillmeat analytics top --type skill             # Top skills only
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Get top artifacts
+        top_artifacts = manager.get_top_artifacts(
+            artifact_type=artifact_type,
+            metric=metric,
+            limit=limit,
+        )
+
+        if not top_artifacts:
+            console.print("[yellow]No usage data available.[/yellow]\n")
+            console.print("Deploy or update artifacts to start collecting analytics.")
+            sys.exit(0)
+
+        # Display results
+        if output_format == "json":
+            import json as json_lib
+            output = {
+                "top_artifacts": top_artifacts,
+                "count": len(top_artifacts),
+                "metric": metric,
+                "limit": limit,
+            }
+            click.echo(json_lib.dumps(output, indent=2, default=str))
+        else:
+            _display_top_table(top_artifacts, metric, limit)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics top command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+@click.option(
+    "--inactivity-days",
+    type=int,
+    default=90,
+    help="Inactivity threshold in days (default: 90)",
+)
+@click.option(
+    "--collection",
+    help="Filter by collection name",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format (default: table)",
+)
+@click.option(
+    "--show-size",
+    is_flag=True,
+    help="Show estimated disk space for each artifact",
+)
+def cleanup(inactivity_days, collection, output_format, show_size):
+    """Show cleanup suggestions for unused artifacts.
+
+    Identify artifacts that haven't been used recently, were never deployed,
+    or have low usage, along with estimated disk space savings.
+
+    Examples:
+        skillmeat analytics cleanup                      # Default suggestions
+        skillmeat analytics cleanup --inactivity-days 60 # 60-day threshold
+        skillmeat analytics cleanup --show-size          # Show disk usage
+        skillmeat analytics cleanup --format json        # JSON output
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Get cleanup suggestions
+        suggestions = manager.get_cleanup_suggestions(collection_name=collection)
+
+        if not any([
+            suggestions.get("unused_90_days"),
+            suggestions.get("never_deployed"),
+            suggestions.get("low_usage"),
+        ]):
+            console.print("[green]No cleanup suggestions. All artifacts are actively used![/green]")
+            sys.exit(0)
+
+        # Display results
+        if output_format == "json":
+            import json as json_lib
+            click.echo(json_lib.dumps(suggestions, indent=2, default=str))
+        else:
+            _display_cleanup_suggestions(suggestions, inactivity_days, show_size)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics cleanup command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+@click.argument("artifact", required=False)
+@click.option(
+    "--period",
+    type=click.Choice(["7d", "30d", "90d", "all"]),
+    default="30d",
+    help="Time period (default: 30d)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format (default: table)",
+)
+def trends(artifact, period, output_format):
+    """Display usage trends over time.
+
+    Show how artifact usage has changed over different time periods,
+    with breakdowns by event type (deploy, update, sync, search).
+
+    Examples:
+        skillmeat analytics trends                  # Overall trends (30d)
+        skillmeat analytics trends canvas           # Specific artifact
+        skillmeat analytics trends --period 7d      # Last 7 days
+        skillmeat analytics trends --period all     # All time
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Get trends
+        trends_data = manager.get_usage_trends(
+            artifact_name=artifact,
+            time_period=period,
+        )
+
+        if not trends_data:
+            console.print("[yellow]No trend data available for this period.[/yellow]")
+            sys.exit(0)
+
+        # Display results
+        if output_format == "json":
+            import json as json_lib
+            click.echo(json_lib.dumps(trends_data, indent=2, default=str))
+        else:
+            _display_trends(trends_data, artifact, period)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics trends command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+@click.argument("output_path", type=click.Path())
+@click.option(
+    "--format",
+    "export_format",
+    type=click.Choice(["json", "csv"]),
+    default="json",
+    help="Export format (default: json)",
+)
+@click.option(
+    "--collection",
+    help="Filter by collection name",
+)
+def export(output_path, export_format, collection):
+    """Export comprehensive analytics report to file.
+
+    Generate a full analytics report including usage statistics,
+    top artifacts, cleanup suggestions, and trends.
+
+    Examples:
+        skillmeat analytics export report.json            # Export to JSON
+        skillmeat analytics export report.csv --format csv # Export to CSV
+        skillmeat analytics export report.json --collection work
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+    from pathlib import Path
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Convert to Path
+        output_file = Path(output_path)
+
+        # Show progress
+        with console.status("[cyan]Exporting analytics report...[/cyan]"):
+            manager.export_usage_report(
+                output_path=output_file,
+                format=export_format,
+                collection_name=collection,
+            )
+
+        # Get file size
+        file_size_bytes = output_file.stat().st_size
+        file_size_kb = file_size_bytes / 1024
+
+        console.print(f"[green]Report exported successfully![/green]")
+        console.print(f"  File: {output_file}")
+        console.print(f"  Size: {file_size_kb:.1f} KB")
+        console.print(f"  Format: {export_format.upper()}")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics export command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+def stats():
+    """Show analytics database statistics.
+
+    Display summary statistics about the analytics database, including
+    total events, artifacts tracked, date range, and event type breakdown.
+
+    Examples:
+        skillmeat analytics stats
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Get stats from database
+        db_stats = manager.db.get_stats()
+
+        if db_stats["total_events"] == 0:
+            console.print("[yellow]Analytics database is empty.[/yellow]\n")
+            console.print("Deploy or update artifacts to start collecting analytics.")
+            sys.exit(0)
+
+        _display_stats(db_stats, config)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics stats command failed")
+        sys.exit(1)
+
+
+@analytics.command()
+@click.option(
+    "--older-than-days",
+    type=int,
+    help="Delete events older than N days",
+)
+@click.option(
+    "--confirm",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def clear(older_than_days, confirm):
+    """Clear old analytics data.
+
+    Remove analytics events older than a specified number of days
+    to free up disk space and maintain database performance.
+
+    Examples:
+        skillmeat analytics clear --older-than-days 180 --confirm
+        skillmeat analytics clear --older-than-days 90
+    """
+    from skillmeat.core.usage_reports import UsageReportManager
+
+    try:
+        # Initialize manager
+        config = ConfigManager()
+
+        # Check if analytics enabled
+        if not config.is_analytics_enabled():
+            console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
+            console.print("To enable analytics:")
+            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            sys.exit(2)
+
+        manager = UsageReportManager(config)
+
+        # Default to retention policy from config
+        if older_than_days is None:
+            older_than_days = config.get("analytics.retention_days", 365)
+
+        # Get current stats
+        db_stats = manager.db.get_stats()
+        total_events = db_stats.get("total_events", 0)
+
+        if total_events == 0:
+            console.print("[yellow]Analytics database is empty. Nothing to clear.[/yellow]")
+            sys.exit(0)
+
+        # Show warning
+        console.print(f"[bold]Clear Analytics Data[/bold]\n")
+        console.print(f"This will delete events older than [cyan]{older_than_days}[/cyan] days.")
+        console.print(f"Current total events: [cyan]{total_events:,}[/cyan]\n")
+
+        # Confirm
+        if not confirm:
+            if not Confirm.ask("Continue?", default=False):
+                console.print("[yellow]Operation cancelled.[/yellow]")
+                sys.exit(0)
+
+        # Calculate cutoff date
+        from datetime import datetime, timedelta
+        cutoff_date = datetime.now() - timedelta(days=older_than_days)
+
+        # Delete old events
+        with console.status("[cyan]Clearing old analytics data...[/cyan]"):
+            deleted_count = manager.db.delete_events_before(cutoff_date)
+
+        if deleted_count > 0:
+            console.print(f"[green]Deleted {deleted_count:,} events[/green]")
+            console.print(f"[green]Database cleaned successfully![/green]")
+        else:
+            console.print("[yellow]No events matched the criteria.[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Analytics clear command failed")
+        sys.exit(1)
+
+
+# Helper functions for analytics display
+
+
+def _display_usage_table(artifacts: List[Dict]) -> None:
+    """Display usage statistics in table format.
+
+    Args:
+        artifacts: List of artifact usage dictionaries
+    """
+    console.print("\n[bold]Artifact Usage Statistics[/bold]\n")
+
+    table = Table()
+    table.add_column("Artifact", style="cyan", no_wrap=True)
+    table.add_column("Type", style="blue", width=10)
+    table.add_column("Events", style="green", justify="right")
+    table.add_column("Last Used", style="yellow")
+    table.add_column("Deploys", style="magenta", justify="right")
+    table.add_column("Updates", style="magenta", justify="right")
+    table.add_column("Trend", justify="center")
+
+    for artifact in artifacts:
+        # Format last used
+        last_used = artifact.get("last_used")
+        days_since = artifact.get("days_since_last_use")
+        if days_since is not None:
+            if days_since == 0:
+                last_used_str = "Today"
+            elif days_since == 1:
+                last_used_str = "1 day ago"
+            else:
+                last_used_str = f"{days_since} days ago"
+        elif last_used:
+            last_used_str = str(last_used)[:10]
+        else:
+            last_used_str = "Never"
+
+        # Format trend with symbols
+        trend = artifact.get("usage_trend", "stable")
+        trend_symbols = {
+            "increasing": "[green]↑[/green]",
+            "decreasing": "[red]↓[/red]",
+            "stable": "[yellow]—[/yellow]",
+        }
+        trend_display = trend_symbols.get(trend, "—")
+
+        table.add_row(
+            artifact.get("artifact_name", ""),
+            artifact.get("artifact_type", ""),
+            str(artifact.get("total_events", 0)),
+            last_used_str,
+            str(artifact.get("deploy_count", 0)),
+            str(artifact.get("update_count", 0)),
+            trend_display,
+        )
+
+    console.print(table)
+    console.print()
+
+
+def _display_top_table(artifacts: List[Dict], metric: str, limit: int) -> None:
+    """Display top artifacts in table format with bars.
+
+    Args:
+        artifacts: List of top artifact dictionaries
+        metric: Metric used for ranking
+        limit: Number of artifacts shown
+    """
+    metric_labels = {
+        "total_events": "Total Events",
+        "deploy_count": "Deployments",
+        "update_count": "Updates",
+        "sync_count": "Syncs",
+        "search_count": "Searches",
+    }
+    metric_label = metric_labels.get(metric, metric)
+
+    console.print(f"\n[bold]Top {limit} Artifacts by {metric_label}[/bold]\n")
+
+    # Find max value for bar scaling
+    max_value = max((a.get(metric, 0) for a in artifacts), default=1)
+    bar_width = 30
+
+    for i, artifact in enumerate(artifacts, 1):
+        name = artifact.get("artifact_name", "Unknown")
+        value = artifact.get(metric, 0)
+        artifact_type = artifact.get("artifact_type", "")
+
+        # Create bar
+        bar_length = int((value / max_value) * bar_width) if max_value > 0 else 0
+        bar = "█" * bar_length
+
+        console.print(
+            f"{i:2}. [cyan]{name:20}[/cyan] "
+            f"[dim]({artifact_type})[/dim] "
+            f"[green]{bar}[/green] {value:,} {metric_label.lower()}"
+        )
+
+    console.print()
+
+
+def _display_cleanup_suggestions(
+    suggestions: Dict,
+    inactivity_days: int,
+    show_size: bool
+) -> None:
+    """Display cleanup suggestions in formatted panels.
+
+    Args:
+        suggestions: Cleanup suggestions dictionary
+        inactivity_days: Inactivity threshold
+        show_size: Whether to show size estimates
+    """
+    console.print("\n[bold]Cleanup Suggestions[/bold]\n")
+
+    # Unused artifacts
+    unused = suggestions.get("unused_90_days", [])
+    if unused:
+        panel_content = []
+        for artifact in unused[:10]:  # Show max 10
+            name = artifact.get("name", "")
+            days = artifact.get("days_ago", 0)
+            panel_content.append(f"• {name} ([dim]{days} days ago[/dim])")
+
+        if len(unused) > 10:
+            panel_content.append(f"\n[dim]... and {len(unused) - 10} more[/dim]")
+
+        panel = Panel(
+            "\n".join(panel_content),
+            title=f"[yellow]Unused ({inactivity_days}+ days)[/yellow]",
+            border_style="yellow",
+        )
+        console.print(panel)
+
+    # Never deployed
+    never_deployed = suggestions.get("never_deployed", [])
+    if never_deployed:
+        panel_content = []
+        for artifact in never_deployed[:10]:
+            name = artifact.get("name", "")
+            days = artifact.get("days_since_added", 0)
+            events = artifact.get("total_events", 0)
+            panel_content.append(
+                f"• {name} ([dim]added {days} days ago, {events} events[/dim])"
+            )
+
+        if len(never_deployed) > 10:
+            panel_content.append(f"\n[dim]... and {len(never_deployed) - 10} more[/dim]")
+
+        panel = Panel(
+            "\n".join(panel_content),
+            title="[red]Never Deployed[/red]",
+            border_style="red",
+        )
+        console.print(panel)
+
+    # Low usage
+    low_usage = suggestions.get("low_usage", [])
+    if low_usage:
+        panel_content = []
+        for artifact in low_usage[:10]:
+            name = artifact.get("name", "")
+            events = artifact.get("total_events", 0)
+            panel_content.append(f"• {name} ([dim]{events} events[/dim])")
+
+        if len(low_usage) > 10:
+            panel_content.append(f"\n[dim]... and {len(low_usage) - 10} more[/dim]")
+
+        panel = Panel(
+            "\n".join(panel_content),
+            title="[blue]Low Usage[/blue]",
+            border_style="blue",
+        )
+        console.print(panel)
+
+    # Summary
+    total_mb = suggestions.get("total_reclaimable_mb", 0)
+    summary = suggestions.get("summary", "")
+
+    if total_mb > 0 or summary:
+        console.print()
+        if total_mb > 0:
+            console.print(f"[bold]Total reclaimable space:[/bold] [green]{total_mb:.1f} MB[/green]")
+        if summary:
+            console.print(f"\n{summary}")
+        console.print()
+
+
+def _display_trends(trends_data: Dict, artifact: Optional[str], period: str) -> None:
+    """Display usage trends with ASCII visualization.
+
+    Args:
+        trends_data: Trends data dictionary
+        artifact: Artifact name (if specific)
+        period: Time period
+    """
+    period_labels = {
+        "7d": "Last 7 Days",
+        "30d": "Last 30 Days",
+        "90d": "Last 90 Days",
+        "all": "All Time",
+    }
+    period_label = period_labels.get(period, period)
+
+    if artifact:
+        console.print(f"\n[bold]Usage Trends for '{artifact}' ({period_label})[/bold]\n")
+    else:
+        console.print(f"\n[bold]Usage Trends ({period_label})[/bold]\n")
+
+    # Event type trends
+    event_types = [
+        ("deploy_trend", "Deploys", "green"),
+        ("update_trend", "Updates", "blue"),
+        ("sync_trend", "Syncs", "yellow"),
+        ("search_trend", "Searches", "magenta"),
+    ]
+
+    for trend_key, label, color in event_types:
+        trend_data = trends_data.get(trend_key, [])
+        if trend_data:
+            values = [item.get("count", 0) for item in trend_data]
+            total = sum(values)
+
+            # Create sparkline
+            sparkline = _create_sparkline(values)
+
+            console.print(f"[{color}]{label:12}[/{color}] {sparkline} [dim]({total:,} total)[/dim]")
+
+    # Summary
+    total_by_day = trends_data.get("total_events_by_day", {})
+    if total_by_day:
+        max_day = max(total_by_day.items(), key=lambda x: x[1], default=(None, 0))
+        if max_day[0]:
+            console.print(f"\n[bold]Peak activity:[/bold] {max_day[0]} ([green]{max_day[1]:,} events[/green])")
+
+    console.print()
+
+
+def _display_stats(db_stats: Dict, config: ConfigManager) -> None:
+    """Display analytics database statistics.
+
+    Args:
+        db_stats: Database statistics dictionary
+        config: Configuration manager
+    """
+    console.print("\n[bold]Analytics Database Statistics[/bold]\n")
+
+    # Basic stats
+    console.print(f"[cyan]Total Events:[/cyan]     {db_stats.get('total_events', 0):,}")
+    console.print(f"[cyan]Total Artifacts:[/cyan]  {db_stats.get('unique_artifacts', 0):,}")
+
+    # Date range
+    earliest = db_stats.get("earliest_event")
+    latest = db_stats.get("latest_event")
+    if earliest and latest:
+        console.print(f"[cyan]Date Range:[/cyan]       {earliest[:10]} to {latest[:10]}")
+
+    # Database size
+    db_path = config.get_analytics_db_path()
+    if db_path and db_path.exists():
+        size_bytes = db_path.stat().st_size
+        size_mb = size_bytes / (1024 * 1024)
+        console.print(f"[cyan]Database Size:[/cyan]    {size_mb:.2f} MB")
+
+    # Events by type
+    console.print("\n[bold]Events by Type:[/bold]")
+
+    event_counts = db_stats.get("events_by_type", {})
+    total = db_stats.get("total_events", 0)
+
+    for event_type, count in sorted(event_counts.items(), key=lambda x: x[1], reverse=True):
+        percentage = (count / total * 100) if total > 0 else 0
+        bar_length = int(percentage / 2)  # Max 50 chars
+        bar = "█" * bar_length
+
+        console.print(
+            f"  [green]{bar:50}[/green] "
+            f"[cyan]{event_type:10}[/cyan] "
+            f"{count:6,} ({percentage:5.1f}%)"
+        )
+
+    console.print()
+
+
+def _create_sparkline(values: List[int]) -> str:
+    """Create ASCII sparkline from values.
+
+    Args:
+        values: List of numeric values
+
+    Returns:
+        String sparkline using block characters
+    """
+    if not values:
+        return ""
+
+    # Unicode block characters for sparklines
+    blocks = " ▁▂▃▄▅▆▇█"
+
+    min_val = min(values)
+    max_val = max(values)
+
+    if max_val == min_val:
+        return blocks[4] * len(values)  # Middle block for flat line
+
+    # Scale to 0-8 range
+    scaled = [
+        int((v - min_val) / (max_val - min_val) * 8)
+        for v in values
+    ]
+
+    return "".join(blocks[s] for s in scaled)
 
 
 # ====================
