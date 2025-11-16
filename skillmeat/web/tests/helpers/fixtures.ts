@@ -162,7 +162,7 @@ export const mockProjects = [
  * API response builders
  */
 export const buildApiResponse = {
-  artifacts: (filters?: any) => ({
+  artifacts: (_filters?: any) => ({
     artifacts: mockArtifacts,
     total: mockArtifacts.length,
     page: 1,

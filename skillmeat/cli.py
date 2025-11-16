@@ -4899,6 +4899,1717 @@ def token_info(identifier):
 
 
 # ====================
+# Bundle Commands (Team Sharing)
+# ====================
+
+
+@main.group()
+def bundle():
+    """Create, import, and manage artifact bundles for team sharing.
+
+    Bundles allow packaging and sharing collections of artifacts between teams,
+    projects, and installations with comprehensive conflict resolution.
+
+    Examples:
+        skillmeat bundle create my-bundle            # Create bundle
+        skillmeat bundle inspect bundle.zip          # Inspect bundle
+        skillmeat bundle import bundle.zip           # Import bundle
+        skillmeat bundle import bundle.zip --strategy=merge
+    """
+    pass
+
+
+@bundle.command(name="create")
+@click.argument("name")
+@click.option(
+    "--description",
+    "-d",
+    help="Bundle description",
+    prompt="Enter bundle description",
+)
+@click.option(
+    "--author",
+    "-a",
+    help="Author name or email",
+    prompt="Enter author name or email",
+)
+@click.option(
+    "--artifact",
+    "-r",
+    "artifacts",
+    multiple=True,
+    help="Artifact to include (can be specified multiple times: -r skill1 -r skill2)",
+)
+@click.option(
+    "--type",
+    "-t",
+    "artifact_types",
+    type=click.Choice(["skill", "command", "agent"]),
+    multiple=True,
+    help="Include all artifacts of type (can be specified multiple times)",
+)
+@click.option(
+    "--all",
+    "include_all",
+    is_flag=True,
+    help="Include all artifacts from collection",
+)
+@click.option(
+    "--version",
+    "-v",
+    default="1.0.0",
+    help="Bundle version (default: 1.0.0)",
+)
+@click.option(
+    "--license",
+    "-l",
+    default="MIT",
+    help="License identifier (default: MIT)",
+)
+@click.option(
+    "--tags",
+    help="Comma-separated tags for categorization",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output path (default: ./<name>.skillmeat-pack)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    help="Source collection (default: active collection)",
+)
+@click.option(
+    "--compression",
+    type=click.Choice(["default", "none", "maximum"]),
+    default="default",
+    help="Compression level",
+)
+@click.option(
+    "--sign",
+    is_flag=True,
+    help="Sign bundle with Ed25519 signature",
+)
+@click.option(
+    "--signing-key-id",
+    help="Signing key ID (uses default if not specified)",
+)
+def bundle_create(
+    name,
+    description,
+    author,
+    artifacts,
+    artifact_types,
+    include_all,
+    version,
+    license,
+    tags,
+    output,
+    collection,
+    compression,
+    sign,
+    signing_key_id,
+):
+    """Create a new artifact bundle.
+
+    Creates a .skillmeat-pack archive containing selected artifacts
+    from the collection with manifest and integrity hashing.
+
+    Examples:
+        # Interactive mode
+        skillmeat bundle create my-bundle
+
+        # Include specific artifacts
+        skillmeat bundle create my-bundle -r skill1 -r skill2 \\
+            -d "My bundle" -a "user@example.com"
+
+        # Include all skills
+        skillmeat bundle create my-bundle --type skill \\
+            -d "All skills" -a "user@example.com"
+
+        # Include everything
+        skillmeat bundle create my-bundle --all \\
+            -d "Complete collection" -a "user@example.com"
+    """
+    from skillmeat.core.sharing import BundleBuilder, BundleValidationError
+    import zipfile
+
+    try:
+        # Parse tags
+        tag_list = []
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(",")]
+
+        # Determine compression level
+        compression_map = {
+            "default": zipfile.ZIP_DEFLATED,
+            "none": zipfile.ZIP_STORED,
+            "maximum": zipfile.ZIP_BZIP2,
+        }
+        compression_level = compression_map[compression]
+
+        # Initialize bundle builder
+        console.print(f"\n[cyan]Creating bundle '{name}'...[/cyan]\n")
+
+        builder = BundleBuilder(
+            name=name,
+            description=description,
+            author=author,
+            version=version,
+            license=license,
+            tags=tag_list,
+            collection_name=collection,
+            compression_level=compression_level,
+        )
+
+        # Add artifacts
+        artifact_count = 0
+
+        if include_all:
+            # Add all artifacts
+            console.print("[cyan]Adding all artifacts from collection...[/cyan]")
+            artifact_count = builder.add_all_artifacts()
+
+        elif artifact_types:
+            # Add all artifacts of specified types
+            for artifact_type_str in artifact_types:
+                artifact_type = ArtifactType(artifact_type_str)
+                console.print(f"[cyan]Adding all {artifact_type.value}s...[/cyan]")
+                count = builder.add_artifacts_by_type(artifact_type)
+                artifact_count += count
+
+        elif artifacts:
+            # Add specific artifacts
+            for artifact_name in artifacts:
+                try:
+                    builder.add_artifact(artifact_name)
+                    artifact_count += 1
+                    console.print(f"[green]Added:[/green] {artifact_name}")
+                except ValueError as e:
+                    console.print(f"[yellow]Warning:[/yellow] {e}")
+
+        else:
+            # Interactive mode - prompt to select artifacts
+            console.print("[yellow]No artifacts specified. Use interactive selection:[/yellow]\n")
+
+            from skillmeat.core.artifact import ArtifactManager
+
+            artifact_mgr = ArtifactManager()
+            available_artifacts = artifact_mgr.list_artifacts(collection_name=collection)
+
+            if not available_artifacts:
+                console.print("[red]No artifacts available in collection.[/red]")
+                sys.exit(1)
+
+            # Display available artifacts
+            console.print(f"[bold]Available Artifacts ({len(available_artifacts)}):[/bold]\n")
+            for idx, artifact in enumerate(available_artifacts, 1):
+                console.print(
+                    f"  {idx}. {artifact.name} ({artifact.type.value}) - {artifact.metadata.title or 'No title'}"
+                )
+
+            console.print(
+                "\n[dim]Enter artifact numbers to include (comma-separated) or 'all':[/dim]"
+            )
+            selection = click.prompt("Selection", type=str, default="all")
+
+            if selection.lower() == "all":
+                artifact_count = builder.add_all_artifacts()
+            else:
+                # Parse selections
+                try:
+                    indices = [int(idx.strip()) for idx in selection.split(",")]
+                    for idx in indices:
+                        if 1 <= idx <= len(available_artifacts):
+                            artifact = available_artifacts[idx - 1]
+                            builder.add_artifact(artifact.name, artifact.type)
+                            artifact_count += 1
+                            console.print(f"[green]Added:[/green] {artifact.name}")
+                        else:
+                            console.print(f"[yellow]Warning:[/yellow] Invalid index {idx}")
+                except ValueError:
+                    console.print("[red]Error: Invalid selection format.[/red]")
+                    sys.exit(1)
+
+        if artifact_count == 0:
+            console.print("[red]Error: No artifacts were added to bundle.[/red]")
+            sys.exit(1)
+
+        console.print(f"\n[green]Added {artifact_count} artifact(s) to bundle[/green]\n")
+
+        # Determine output path
+        if output:
+            output_path = Path(output)
+        else:
+            output_path = Path.cwd() / f"{name}.skillmeat-pack"
+
+        # Build bundle
+        console.print(f"[cyan]Building bundle archive...[/cyan]")
+        bundle_obj = builder.build(output_path, sign=sign, signing_key_id=signing_key_id)
+
+        # Success summary
+        console.print()
+        console.print("[green]Bundle created successfully![/green]")
+        console.print()
+        console.print(f"  Name:        {bundle_obj.metadata.name}")
+        console.print(f"  Version:     {bundle_obj.metadata.version}")
+        console.print(f"  Artifacts:   {bundle_obj.artifact_count}")
+        console.print(f"  Files:       {bundle_obj.total_files}")
+        console.print(f"  Bundle hash: {bundle_obj.bundle_hash[:20]}...")
+
+        if hasattr(bundle_obj, 'signature') and bundle_obj.signature:
+            console.print(f"  Signed by:   {bundle_obj.signature.signer_name} <{bundle_obj.signature.signer_email}>")
+            console.print(f"  Fingerprint: {bundle_obj.signature.key_fingerprint[:16]}...")
+
+        console.print(f"  Output:      {output_path}")
+        console.print()
+
+    except BundleValidationError as e:
+        console.print(f"[red]Validation Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Bundle creation failed")
+        sys.exit(1)
+
+
+@bundle.command(name="inspect")
+@click.argument("bundle_file", type=click.Path(exists=True))
+@click.option(
+    "--verify",
+    is_flag=True,
+    help="Verify bundle integrity (hash check)",
+)
+@click.option(
+    "--list-files",
+    is_flag=True,
+    help="List all files in each artifact",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def bundle_inspect(bundle_file, verify, list_files, output_json):
+    """Inspect a bundle file.
+
+    Displays bundle metadata, artifact listing, and optionally
+    verifies integrity using cryptographic hashes.
+
+    Examples:
+        skillmeat bundle inspect my-bundle.skillmeat-pack
+        skillmeat bundle inspect my-bundle.skillmeat-pack --verify
+        skillmeat bundle inspect my-bundle.skillmeat-pack --list-files
+        skillmeat bundle inspect my-bundle.skillmeat-pack --json
+    """
+    from skillmeat.core.sharing import inspect_bundle, BundleValidationError
+
+    try:
+        bundle_path = Path(bundle_file)
+
+        # Inspect bundle
+        console.print(f"\n[cyan]Inspecting bundle: {bundle_path.name}[/cyan]\n")
+        bundle_obj = inspect_bundle(bundle_path)
+
+        if output_json:
+            # JSON output
+            import json
+
+            output = bundle_obj.to_dict()
+            output["bundle_path"] = str(bundle_path)
+            console.print(json.dumps(output, indent=2))
+            return
+
+        # Display metadata
+        console.print("[bold]Bundle Metadata[/bold]")
+        console.print(f"  Name:        {bundle_obj.metadata.name}")
+        console.print(f"  Description: {bundle_obj.metadata.description}")
+        console.print(f"  Author:      {bundle_obj.metadata.author}")
+        console.print(f"  Version:     {bundle_obj.metadata.version}")
+        console.print(f"  License:     {bundle_obj.metadata.license}")
+        console.print(f"  Created:     {bundle_obj.metadata.created_at}")
+
+        if bundle_obj.metadata.tags:
+            console.print(f"  Tags:        {', '.join(bundle_obj.metadata.tags)}")
+
+        if bundle_obj.metadata.homepage:
+            console.print(f"  Homepage:    {bundle_obj.metadata.homepage}")
+
+        if bundle_obj.metadata.repository:
+            console.print(f"  Repository:  {bundle_obj.metadata.repository}")
+
+        # Display artifact summary
+        console.print()
+        console.print(f"[bold]Artifacts[/bold] ({bundle_obj.artifact_count} total)")
+        console.print()
+
+        # Create table
+        table = Table()
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="blue")
+        table.add_column("Version", style="yellow")
+        table.add_column("Scope", style="green")
+        table.add_column("Files", style="magenta", justify="right")
+
+        for artifact in bundle_obj.artifacts:
+            table.add_row(
+                artifact.name,
+                artifact.type,
+                artifact.version,
+                artifact.scope,
+                str(len(artifact.files)),
+            )
+
+        console.print(table)
+
+        # List files if requested
+        if list_files:
+            console.print()
+            console.print("[bold]Artifact Files[/bold]")
+            console.print()
+
+            for artifact in bundle_obj.artifacts:
+                console.print(f"[cyan]{artifact.type}/{artifact.name}:[/cyan]")
+                for file_path in sorted(artifact.files)[:10]:  # Limit to 10
+                    console.print(f"  - {file_path}")
+                if len(artifact.files) > 10:
+                    console.print(f"  ... and {len(artifact.files) - 10} more files")
+                console.print()
+
+        # Verify integrity if requested
+        if verify:
+            console.print()
+            console.print("[cyan]Verifying bundle integrity...[/cyan]")
+
+            from skillmeat.core.sharing import BundleHasher
+
+            manifest_dict = bundle_obj.to_dict()
+            artifact_hashes = [artifact.hash for artifact in bundle_obj.artifacts]
+
+            is_valid = BundleHasher.verify_bundle_integrity(manifest_dict, artifact_hashes)
+
+            if is_valid:
+                console.print("[green]Bundle integrity verified![/green]")
+                console.print(f"  Bundle hash: {bundle_obj.bundle_hash}")
+            else:
+                console.print("[red]WARNING: Bundle integrity check failed![/red]")
+                console.print("[red]Bundle may have been tampered with or corrupted.[/red]")
+                sys.exit(1)
+
+        console.print()
+
+    except BundleValidationError as e:
+        console.print(f"[red]Validation Error:[/red] {e}")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Bundle inspection failed")
+        sys.exit(1)
+
+
+@bundle.command(name="import")
+@click.argument("bundle_file", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--collection",
+    "-c",
+    help="Target collection (default: active collection)",
+)
+@click.option(
+    "--strategy",
+    type=click.Choice(["merge", "fork", "skip", "interactive"]),
+    default="interactive",
+    help="Conflict resolution strategy (default: interactive)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview import without making changes",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force import even if validation warnings exist",
+)
+@click.option(
+    "--hash",
+    "expected_hash",
+    help="Expected SHA-256 hash for verification",
+)
+def bundle_import(
+    bundle_file: Path,
+    collection: Optional[str],
+    strategy: str,
+    dry_run: bool,
+    force: bool,
+    expected_hash: Optional[str],
+):
+    """Import artifact bundle into collection.
+
+    Imports a bundle ZIP file containing artifacts and their metadata.
+    Provides multiple strategies for handling conflicts with existing artifacts.
+
+    Strategies:
+      merge:       Overwrite existing artifacts with imported ones
+      fork:        Create new versions with suffix (e.g., 'skill-imported')
+      skip:        Keep existing, don't import conflicting artifacts
+      interactive: Prompt for each conflict (default)
+
+    Security:
+      All bundles are validated before import, including:
+      - Hash verification (if --hash provided)
+      - Path traversal prevention
+      - Zip bomb detection
+      - Schema validation
+
+    Examples:
+        # Interactive import (prompts for conflicts)
+        skillmeat bundle import bundle.zip
+
+        # Always merge (overwrite existing)
+        skillmeat bundle import bundle.zip --strategy=merge
+
+        # Fork conflicts (create duplicates)
+        skillmeat bundle import bundle.zip --strategy=fork
+
+        # Preview without changes
+        skillmeat bundle import bundle.zip --dry-run
+
+        # Verify bundle hash
+        skillmeat bundle import bundle.zip --hash abc123...
+
+        # Import to specific collection
+        skillmeat bundle import bundle.zip --collection=work
+    """
+    from skillmeat.core.sharing.importer import BundleImporter
+
+    try:
+        # Initialize importer
+        importer = BundleImporter()
+
+        # Perform import
+        console.print(
+            f"\n[bold]Importing bundle:[/bold] {bundle_file.name}\n"
+        )
+
+        result = importer.import_bundle(
+            bundle_path=bundle_file,
+            collection_name=collection,
+            strategy=strategy,
+            dry_run=dry_run,
+            force=force,
+            expected_hash=expected_hash,
+            console=console,
+        )
+
+        # Display result
+        if result.success:
+            if dry_run:
+                console.print("\n[green]Dry run completed successfully[/green]")
+            else:
+                console.print(f"\n[green]{result.summary()}[/green]")
+
+                # Show imported artifacts
+                if result.artifacts:
+                    console.print("\n[bold]Imported Artifacts:[/bold]")
+                    table = Table()
+                    table.add_column("Name", style="cyan")
+                    table.add_column("Type", style="blue")
+                    table.add_column("Resolution", style="yellow")
+                    table.add_column("Notes")
+
+                    for artifact in result.artifacts:
+                        notes = ""
+                        if artifact.resolution == "forked":
+                            notes = f"Created as: {artifact.new_name}"
+                        elif artifact.reason:
+                            notes = artifact.reason
+
+                        table.add_row(
+                            artifact.name,
+                            artifact.type,
+                            artifact.resolution,
+                            notes,
+                        )
+
+                    console.print(table)
+                    console.print()
+
+            # Show warnings
+            if result.warnings:
+                console.print("\n[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  - {warning}")
+
+        else:
+            console.print(f"\n[red]Import failed[/red]")
+
+            # Show errors
+            if result.errors:
+                console.print("\n[red]Errors:[/red]")
+                for error in result.errors:
+                    console.print(f"  - {error}")
+
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Bundle import failed")
+        sys.exit(1)
+
+
+# ====================
+# Vault Commands (Team Vault Connectors)
+# ====================
+
+
+@main.group()
+def vault():
+    """Manage team vault connectors for bundle hosting.
+
+    Vaults provide pluggable storage backends for hosting bundles in team
+    environments. Supports Git repositories, S3 buckets, and local file systems.
+
+    Examples:
+        skillmeat vault add team-git git git@github.com:team/vault.git
+        skillmeat vault list
+        skillmeat vault push my-bundle.skillmeat-pack
+        skillmeat vault pull my-bundle-v1.0.0
+    """
+    pass
+
+
+@vault.command(name="add")
+@click.argument("name")
+@click.argument("vault_type", type=click.Choice(["git", "s3", "local"]))
+@click.argument("url_or_path")
+@click.option(
+    "--branch",
+    "-b",
+    default="main",
+    help="Git branch (for git vaults, default: main)",
+)
+@click.option(
+    "--region",
+    "-r",
+    default="us-east-1",
+    help="AWS region (for s3 vaults, default: us-east-1)",
+)
+@click.option(
+    "--prefix",
+    "-p",
+    default="",
+    help="S3 key prefix (for s3 vaults)",
+)
+@click.option(
+    "--endpoint-url",
+    help="Custom S3 endpoint URL (for S3-compatible services)",
+)
+@click.option(
+    "--set-default",
+    is_flag=True,
+    help="Set as default vault",
+)
+@click.option(
+    "--read-only",
+    is_flag=True,
+    help="Configure as read-only vault",
+)
+def vault_add(
+    name,
+    vault_type,
+    url_or_path,
+    branch,
+    region,
+    prefix,
+    endpoint_url,
+    set_default,
+    read_only,
+):
+    """Add a new vault configuration.
+
+    Examples:
+        # Add Git vault
+        skillmeat vault add team-git git git@github.com:team/vault.git
+
+        # Add S3 vault
+        skillmeat vault add team-s3 s3 my-bucket --region us-west-2
+
+        # Add local vault for testing
+        skillmeat vault add local-dev local ~/.skillmeat/vault
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import (
+            VaultConfig,
+            VaultConfigManager,
+        )
+
+        vault_mgr = VaultConfigManager()
+
+        # Build vault configuration based on type
+        vault_config_dict = {}
+
+        if vault_type == "git":
+            vault_config_dict["url"] = url_or_path
+            vault_config_dict["branch"] = branch
+        elif vault_type == "s3":
+            vault_config_dict["bucket"] = url_or_path
+            vault_config_dict["region"] = region
+            if prefix:
+                vault_config_dict["prefix"] = prefix
+            if endpoint_url:
+                vault_config_dict["endpoint_url"] = endpoint_url
+        elif vault_type == "local":
+            vault_config_dict["path"] = url_or_path
+
+        # Create vault config
+        vault_config = VaultConfig(
+            name=name,
+            type=vault_type,
+            config=vault_config_dict,
+            read_only=read_only,
+            is_default=set_default,
+        )
+
+        # Add vault
+        vault_mgr.add_vault(vault_config)
+
+        console.print(f"[green]Vault '{name}' added successfully[/green]")
+        console.print(f"  Type: {vault_type}")
+        console.print(f"  Location: {url_or_path}")
+        if read_only:
+            console.print("  Mode: Read-only")
+        if set_default:
+            console.print("  [cyan]Set as default vault[/cyan]")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to add vault")
+        sys.exit(1)
+
+
+@vault.command(name="list")
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show detailed vault configuration",
+)
+def vault_list(verbose):
+    """List all configured vaults.
+
+    Examples:
+        skillmeat vault list
+        skillmeat vault list --verbose
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+
+        vault_mgr = VaultConfigManager()
+        vault_names = vault_mgr.list_vaults()
+
+        if not vault_names:
+            console.print("[yellow]No vaults configured[/yellow]")
+            console.print("\nAdd a vault with: skillmeat vault add <name> <type> <url>")
+            return
+
+        default_vault = vault_mgr.get_default_vault()
+
+        console.print(f"[bold]Configured Vaults ({len(vault_names)}):[/bold]\n")
+
+        if verbose:
+            # Detailed view
+            for vault_name in vault_names:
+                vault = vault_mgr.get_vault(vault_name)
+                is_default = vault_name == default_vault
+
+                console.print(f"[cyan]{vault_name}[/cyan]" + (" [green](default)[/green]" if is_default else ""))
+                console.print(f"  Type: {vault.type}")
+                console.print(f"  Read-only: {vault.read_only}")
+
+                # Type-specific details
+                if vault.type == "git":
+                    console.print(f"  URL: {vault.config.get('url')}")
+                    console.print(f"  Branch: {vault.config.get('branch', 'main')}")
+                elif vault.type == "s3":
+                    console.print(f"  Bucket: {vault.config.get('bucket')}")
+                    console.print(f"  Region: {vault.config.get('region', 'us-east-1')}")
+                    if vault.config.get('prefix'):
+                        console.print(f"  Prefix: {vault.config.get('prefix')}")
+                elif vault.type == "local":
+                    console.print(f"  Path: {vault.config.get('path')}")
+
+                console.print()
+        else:
+            # Simple table view
+            table = Table()
+            table.add_column("Name", style="cyan")
+            table.add_column("Type", style="blue")
+            table.add_column("Location")
+            table.add_column("Flags", style="yellow")
+
+            for vault_name in vault_names:
+                vault = vault_mgr.get_vault(vault_name)
+                is_default = vault_name == default_vault
+
+                # Get location string
+                if vault.type == "git":
+                    location = vault.config.get("url", "")
+                elif vault.type == "s3":
+                    location = vault.config.get("bucket", "")
+                elif vault.type == "local":
+                    location = vault.config.get("path", "")
+                else:
+                    location = ""
+
+                # Build flags
+                flags = []
+                if is_default:
+                    flags.append("default")
+                if vault.read_only:
+                    flags.append("read-only")
+
+                table.add_row(
+                    vault_name,
+                    vault.type,
+                    location,
+                    ", ".join(flags) if flags else "",
+                )
+
+            console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to list vaults")
+        sys.exit(1)
+
+
+@vault.command(name="remove")
+@click.argument("name")
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Force removal without confirmation",
+)
+def vault_remove(name, force):
+    """Remove a vault configuration.
+
+    Examples:
+        skillmeat vault remove team-git
+        skillmeat vault remove old-vault --force
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+
+        vault_mgr = VaultConfigManager()
+
+        # Check if vault exists
+        vault = vault_mgr.get_vault(name)
+        if not vault:
+            console.print(f"[yellow]Vault '{name}' not found[/yellow]")
+            sys.exit(1)
+
+        # Confirm removal
+        if not force:
+            from rich.prompt import Confirm
+
+            if not Confirm.ask(f"Remove vault '{name}'?"):
+                console.print("[yellow]Cancelled[/yellow]")
+                return
+
+        # Remove vault
+        vault_mgr.remove_vault(name)
+
+        # Also remove credentials
+        vault_mgr.delete_credentials(name, vault.type)
+
+        console.print(f"[green]Vault '{name}' removed[/green]")
+
+    except ValueError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to remove vault")
+        sys.exit(1)
+
+
+@vault.command(name="set-default")
+@click.argument("name")
+def vault_set_default(name):
+    """Set default vault for push/pull operations.
+
+    Examples:
+        skillmeat vault set-default team-git
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+
+        vault_mgr = VaultConfigManager()
+
+        # Set default
+        vault_mgr.set_default_vault(name)
+
+        console.print(f"[green]Default vault set to '{name}'[/green]")
+
+    except ValueError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to set default vault")
+        sys.exit(1)
+
+
+@vault.command(name="auth")
+@click.argument("name")
+@click.option(
+    "--username",
+    "-u",
+    help="Username for HTTPS Git or access key ID for S3",
+)
+@click.option(
+    "--password",
+    "-p",
+    help="Password/token for HTTPS Git or secret key for S3",
+    hide_input=True,
+)
+@click.option(
+    "--ssh-key",
+    help="Path to SSH private key (for Git vaults)",
+    type=click.Path(exists=True),
+)
+def vault_auth(name, username, password, ssh_key):
+    """Configure authentication for a vault.
+
+    Credentials are stored securely in OS keychain or encrypted file storage.
+
+    Examples:
+        # Git HTTPS authentication
+        skillmeat vault auth team-git --username myuser --password
+
+        # Git SSH authentication
+        skillmeat vault auth team-git --ssh-key ~/.ssh/id_rsa
+
+        # S3 authentication
+        skillmeat vault auth team-s3 --username AKIAIOSFODNN7EXAMPLE --password
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+
+        vault_mgr = VaultConfigManager()
+
+        # Get vault config
+        vault = vault_mgr.get_vault(name)
+        if not vault:
+            console.print(f"[yellow]Vault '{name}' not found[/yellow]")
+            sys.exit(1)
+
+        # Build credentials based on vault type
+        credentials = {}
+
+        if vault.type == "git":
+            if ssh_key:
+                credentials["ssh_key_path"] = ssh_key
+            elif username and password:
+                credentials["username"] = username
+                credentials["password"] = password
+            elif username or password:
+                console.print("[yellow]Both username and password are required for HTTPS authentication[/yellow]")
+                sys.exit(1)
+            else:
+                console.print("[yellow]Provide either --ssh-key or --username/--password[/yellow]")
+                sys.exit(1)
+
+        elif vault.type == "s3":
+            if username and password:
+                credentials["access_key_id"] = username
+                credentials["secret_access_key"] = password
+            else:
+                console.print("[yellow]Both --username (access key) and --password (secret key) are required for S3[/yellow]")
+                sys.exit(1)
+
+        elif vault.type == "local":
+            console.print("[yellow]Local vaults do not require authentication[/yellow]")
+            return
+
+        # Store credentials
+        vault_mgr.store_credentials(name, vault.type, credentials)
+
+        console.print(f"[green]Credentials stored for vault '{name}'[/green]")
+        console.print("[dim]Credentials are encrypted and stored securely[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to configure vault authentication")
+        sys.exit(1)
+
+
+@vault.command(name="push")
+@click.argument("bundle_path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--vault",
+    "-v",
+    help="Vault name (default: default vault)",
+)
+@click.option(
+    "--progress/--no-progress",
+    default=True,
+    help="Show upload progress",
+)
+def vault_push(bundle_path, vault, progress):
+    """Upload bundle to team vault.
+
+    Examples:
+        skillmeat vault push my-bundle.skillmeat-pack
+        skillmeat vault push my-bundle.skillmeat-pack --vault team-s3
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+        from skillmeat.core.sharing.vault.factory import VaultFactory
+        from skillmeat.core.sharing.builder import inspect_bundle
+        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+
+        vault_mgr = VaultConfigManager()
+
+        # Determine vault to use
+        vault_name = vault or vault_mgr.get_default_vault()
+        if not vault_name:
+            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
+            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            sys.exit(1)
+
+        # Get vault config
+        vault_config = vault_mgr.get_vault_with_credentials(vault_name)
+        if not vault_config:
+            console.print(f"[yellow]Vault '{vault_name}' not found[/yellow]")
+            sys.exit(1)
+
+        # Inspect bundle to get metadata
+        console.print("[cyan]Inspecting bundle...[/cyan]")
+        bundle = inspect_bundle(bundle_path)
+
+        # Create vault connector
+        connector = VaultFactory.create(
+            vault_id=vault_config.name,
+            vault_type=vault_config.type,
+            config=vault_config.config,
+            read_only=vault_config.read_only,
+        )
+
+        # Authenticate
+        console.print(f"[cyan]Authenticating with vault '{vault_name}'...[/cyan]")
+        connector.authenticate()
+
+        # Push bundle
+        console.print(f"[cyan]Uploading bundle to vault...[/cyan]")
+
+        if progress:
+            with Progress(
+                *Progress.get_default_columns(),
+                BarColumn(),
+                DownloadColumn(),
+                TransferSpeedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress_bar:
+                task = progress_bar.add_task(
+                    f"[cyan]Uploading {bundle.metadata.name}",
+                    total=bundle_path.stat().st_size,
+                )
+
+                def progress_callback(info):
+                    progress_bar.update(task, completed=info.current)
+
+                bundle_id = connector.push(
+                    bundle_path,
+                    bundle.metadata,
+                    bundle.bundle_hash,
+                    progress_callback=progress_callback,
+                )
+        else:
+            bundle_id = connector.push(
+                bundle_path,
+                bundle.metadata,
+                bundle.bundle_hash,
+            )
+
+        console.print(f"[green]Bundle uploaded successfully[/green]")
+        console.print(f"  Bundle ID: {bundle_id}")
+        console.print(f"  Vault: {vault_name}")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to push bundle to vault")
+        sys.exit(1)
+
+
+@vault.command(name="pull")
+@click.argument("bundle_id")
+@click.option(
+    "--vault",
+    "-v",
+    help="Vault name (default: default vault)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    help="Output directory (default: current directory)",
+)
+@click.option(
+    "--progress/--no-progress",
+    default=True,
+    help="Show download progress",
+)
+def vault_pull(bundle_id, vault, output, progress):
+    """Download bundle from team vault.
+
+    Examples:
+        skillmeat vault pull my-bundle-v1.0.0
+        skillmeat vault pull my-bundle-v1.0.0 --vault team-s3 --output ./bundles
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+        from skillmeat.core.sharing.vault.factory import VaultFactory
+        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+
+        vault_mgr = VaultConfigManager()
+
+        # Determine vault to use
+        vault_name = vault or vault_mgr.get_default_vault()
+        if not vault_name:
+            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
+            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            sys.exit(1)
+
+        # Get vault config
+        vault_config = vault_mgr.get_vault_with_credentials(vault_name)
+        if not vault_config:
+            console.print(f"[yellow]Vault '{vault_name}' not found[/yellow]")
+            sys.exit(1)
+
+        # Determine output directory
+        destination = output or Path.cwd()
+
+        # Create vault connector
+        connector = VaultFactory.create(
+            vault_id=vault_config.name,
+            vault_type=vault_config.type,
+            config=vault_config.config,
+            read_only=vault_config.read_only,
+        )
+
+        # Authenticate
+        console.print(f"[cyan]Authenticating with vault '{vault_name}'...[/cyan]")
+        connector.authenticate()
+
+        # Get metadata to show size
+        metadata = connector.get_metadata(bundle_id)
+
+        # Pull bundle
+        console.print(f"[cyan]Downloading bundle from vault...[/cyan]")
+
+        if progress:
+            with Progress(
+                *Progress.get_default_columns(),
+                BarColumn(),
+                DownloadColumn(),
+                TransferSpeedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress_bar:
+                task = progress_bar.add_task(
+                    f"[cyan]Downloading {metadata.name}",
+                    total=metadata.size_bytes,
+                )
+
+                def progress_callback(info):
+                    progress_bar.update(task, completed=info.current)
+
+                bundle_path = connector.pull(
+                    bundle_id,
+                    destination,
+                    progress_callback=progress_callback,
+                )
+        else:
+            bundle_path = connector.pull(bundle_id, destination)
+
+        console.print(f"[green]Bundle downloaded successfully[/green]")
+        console.print(f"  Location: {bundle_path}")
+        console.print(f"  Name: {metadata.name} v{metadata.version}")
+        console.print(f"  Size: {metadata.size_bytes:,} bytes")
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to pull bundle from vault")
+        sys.exit(1)
+
+
+@vault.command(name="ls")
+@click.option(
+    "--vault",
+    "-v",
+    help="Vault name (default: default vault)",
+)
+@click.option(
+    "--filter",
+    "-f",
+    help="Filter bundles by name",
+)
+@click.option(
+    "--tag",
+    "-t",
+    multiple=True,
+    help="Filter bundles by tag (can be specified multiple times)",
+)
+@click.option(
+    "--verbose",
+    is_flag=True,
+    help="Show detailed bundle information",
+)
+def vault_ls(vault, filter, tag, verbose):
+    """List bundles in team vault.
+
+    Examples:
+        skillmeat vault ls
+        skillmeat vault ls --vault team-git
+        skillmeat vault ls --filter "backend" --tag python
+    """
+    try:
+        from skillmeat.core.sharing.vault.config import VaultConfigManager
+        from skillmeat.core.sharing.vault.factory import VaultFactory
+
+        vault_mgr = VaultConfigManager()
+
+        # Determine vault to use
+        vault_name = vault or vault_mgr.get_default_vault()
+        if not vault_name:
+            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
+            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            sys.exit(1)
+
+        # Get vault config
+        vault_config = vault_mgr.get_vault_with_credentials(vault_name)
+        if not vault_config:
+            console.print(f"[yellow]Vault '{vault_name}' not found[/yellow]")
+            sys.exit(1)
+
+        # Create vault connector
+        connector = VaultFactory.create(
+            vault_id=vault_config.name,
+            vault_type=vault_config.type,
+            config=vault_config.config,
+            read_only=vault_config.read_only,
+        )
+
+        # Authenticate
+        console.print(f"[cyan]Authenticating with vault '{vault_name}'...[/cyan]")
+        connector.authenticate()
+
+        # List bundles
+        console.print("[cyan]Fetching bundle list...[/cyan]")
+        bundles = connector.list(
+            name_filter=filter,
+            tag_filter=list(tag) if tag else None,
+        )
+
+        if not bundles:
+            console.print("[yellow]No bundles found in vault[/yellow]")
+            return
+
+        console.print(f"\n[bold]Bundles in '{vault_name}' ({len(bundles)}):[/bold]\n")
+
+        if verbose:
+            # Detailed view
+            for bundle in bundles:
+                console.print(f"[cyan]{bundle.bundle_id}[/cyan]")
+                console.print(f"  Name: {bundle.name} v{bundle.version}")
+                console.print(f"  Description: {bundle.description}")
+                console.print(f"  Author: {bundle.author}")
+                console.print(f"  Uploaded: {bundle.uploaded_at}")
+                console.print(f"  Size: {bundle.size_bytes:,} bytes")
+                console.print(f"  Hash: {bundle.bundle_hash[:20]}...")
+                if bundle.tags:
+                    console.print(f"  Tags: {', '.join(bundle.tags)}")
+                console.print()
+        else:
+            # Table view
+            table = Table()
+            table.add_column("Bundle ID", style="cyan")
+            table.add_column("Version", style="blue")
+            table.add_column("Description")
+            table.add_column("Author", style="green")
+            table.add_column("Size", justify="right")
+
+            for bundle in bundles:
+                # Format size
+                size_mb = bundle.size_bytes / (1024 * 1024)
+                size_str = f"{size_mb:.2f} MB" if size_mb >= 1 else f"{bundle.size_bytes:,} B"
+
+                table.add_row(
+                    bundle.bundle_id,
+                    bundle.version,
+                    bundle.description[:50] + "..." if len(bundle.description) > 50 else bundle.description,
+                    bundle.author,
+                    size_str,
+                )
+
+            console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Failed to list vault bundles")
+        sys.exit(1)
+
+
+# ====================
+# Signing Commands (Bundle Cryptographic Signing)
+# ====================
+
+
+@main.group()
+def sign():
+    """Manage cryptographic signing for bundles.
+
+    Sign bundles with Ed25519 digital signatures for integrity verification.
+    Manage signing keys and trusted public keys.
+
+    Examples:
+        skillmeat sign generate-key --name "John Doe" --email "john@example.com"
+        skillmeat bundle create my-bundle --sign
+        skillmeat sign verify my-bundle.skillmeat-pack
+        skillmeat sign list-keys
+    """
+    pass
+
+
+@sign.command(name="generate-key")
+@click.option(
+    "--name",
+    "-n",
+    required=True,
+    help="Key owner name",
+)
+@click.option(
+    "--email",
+    "-e",
+    required=True,
+    help="Key owner email",
+)
+def generate_key(name, email):
+    """Generate a new Ed25519 signing key pair.
+
+    Creates a new signing key and stores it securely in the OS keychain
+    (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+    or encrypted file storage as fallback.
+
+    Examples:
+        skillmeat sign generate-key -n "John Doe" -e "john@example.com"
+        skillmeat sign generate-key --name "Jane Smith" --email "jane@example.com"
+    """
+    try:
+        from skillmeat.core.signing import KeyManager
+
+        console.print("[cyan]Generating Ed25519 signing key...[/cyan]")
+
+        key_manager = KeyManager()
+
+        # Generate key pair
+        key_pair = key_manager.generate_key_pair(name, email)
+
+        # Store key pair
+        signing_key = key_manager.store_key_pair(key_pair)
+
+        console.print("[green]Signing key generated successfully![/green]")
+        console.print(f"\n[bold]Key Details:[/bold]")
+        console.print(f"  Key ID: {signing_key.key_id}")
+        console.print(f"  Fingerprint: {signing_key.fingerprint}")
+        console.print(f"  Name: {signing_key.name}")
+        console.print(f"  Email: {signing_key.email}")
+        console.print(f"  Created: {signing_key.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        console.print("\n[yellow]Keep your private key secure![/yellow]")
+        console.print("You can now sign bundles with: skillmeat bundle create --sign")
+
+    except Exception as e:
+        console.print(f"[red]Error generating key:[/red] {e}")
+        logger.exception("Failed to generate signing key")
+        sys.exit(1)
+
+
+@sign.command(name="list-keys")
+@click.option(
+    "--type",
+    "-t",
+    type=click.Choice(["signing", "trusted", "all"]),
+    default="all",
+    help="Type of keys to list (default: all)",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show detailed information",
+)
+def list_keys(type, verbose):
+    """List all signing and trusted keys.
+
+    Examples:
+        skillmeat sign list-keys
+        skillmeat sign list-keys --type signing
+        skillmeat sign list-keys -v
+    """
+    try:
+        from skillmeat.core.signing import KeyManager
+
+        key_manager = KeyManager()
+
+        # List signing keys
+        if type in ("signing", "all"):
+            signing_keys = key_manager.list_signing_keys()
+
+            if signing_keys:
+                console.print(f"\n[bold]Signing Keys ({len(signing_keys)}):[/bold]")
+
+                if verbose:
+                    for key in signing_keys:
+                        console.print(f"\n[cyan]Key ID: {key.key_id}[/cyan]")
+                        console.print(f"  Fingerprint: {key.fingerprint}")
+                        console.print(f"  Name: {key.name}")
+                        console.print(f"  Email: {key.email}")
+                        console.print(f"  Created: {key.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                else:
+                    table = Table()
+                    table.add_column("Key ID", style="cyan")
+                    table.add_column("Name", style="green")
+                    table.add_column("Email")
+                    table.add_column("Created")
+
+                    for key in signing_keys:
+                        table.add_row(
+                            key.key_id,
+                            key.name,
+                            key.email,
+                            key.created_at.strftime("%Y-%m-%d"),
+                        )
+
+                    console.print(table)
+            else:
+                console.print("\n[yellow]No signing keys found[/yellow]")
+                console.print("Generate one with: skillmeat sign generate-key")
+
+        # List trusted public keys
+        if type in ("trusted", "all"):
+            public_keys = key_manager.list_public_keys()
+
+            if public_keys:
+                console.print(f"\n[bold]Trusted Public Keys ({len(public_keys)}):[/bold]")
+
+                if verbose:
+                    for key in public_keys:
+                        console.print(f"\n[cyan]Key ID: {key.key_id}[/cyan]")
+                        console.print(f"  Fingerprint: {key.fingerprint}")
+                        console.print(f"  Name: {key.name}")
+                        console.print(f"  Email: {key.email}")
+                        console.print(f"  Imported: {key.imported_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                        console.print(f"  Trusted: {'Yes' if key.trusted else 'No'}")
+                else:
+                    table = Table()
+                    table.add_column("Key ID", style="cyan")
+                    table.add_column("Name", style="green")
+                    table.add_column("Email")
+                    table.add_column("Imported")
+                    table.add_column("Trusted", justify="center")
+
+                    for key in public_keys:
+                        table.add_row(
+                            key.key_id,
+                            key.name,
+                            key.email,
+                            key.imported_at.strftime("%Y-%m-%d"),
+                            "✓" if key.trusted else "✗",
+                        )
+
+                    console.print(table)
+            else:
+                console.print("\n[yellow]No trusted public keys found[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error listing keys:[/red] {e}")
+        logger.exception("Failed to list keys")
+        sys.exit(1)
+
+
+@sign.command(name="export-key")
+@click.argument("key_id")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output file path (default: <key_id>.pub)",
+)
+def export_key(key_id, output):
+    """Export public key for sharing.
+
+    Exports the public key portion of a signing key so others can verify
+    bundles you sign.
+
+    Examples:
+        skillmeat sign export-key abc123def456
+        skillmeat sign export-key abc123def456 -o my-key.pub
+    """
+    try:
+        from skillmeat.core.signing import KeyManager
+
+        key_manager = KeyManager()
+
+        # Export public key
+        public_key_pem = key_manager.export_public_key(key_id)
+
+        if not public_key_pem:
+            console.print(f"[red]Key {key_id} not found[/red]")
+            sys.exit(1)
+
+        # Determine output path
+        if not output:
+            output = f"{key_id}.pub"
+
+        output_path = Path(output)
+
+        # Write to file
+        output_path.write_text(public_key_pem)
+
+        console.print(f"[green]Public key exported to:[/green] {output_path}")
+        console.print("\nShare this file with others to allow them to verify your signatures.")
+
+    except Exception as e:
+        console.print(f"[red]Error exporting key:[/red] {e}")
+        logger.exception("Failed to export key")
+        sys.exit(1)
+
+
+@sign.command(name="import-key")
+@click.argument("key_file", type=click.Path(exists=True))
+@click.option(
+    "--name",
+    "-n",
+    required=True,
+    help="Key owner name",
+)
+@click.option(
+    "--email",
+    "-e",
+    required=True,
+    help="Key owner email",
+)
+@click.option(
+    "--trust/--no-trust",
+    default=True,
+    help="Mark key as trusted (default: yes)",
+)
+def import_key(key_file, name, email, trust):
+    """Import a trusted public key.
+
+    Import a public key from someone else to verify bundles they sign.
+    Only bundles signed with trusted keys will pass verification.
+
+    Examples:
+        skillmeat sign import-key john-doe.pub -n "John Doe" -e "john@example.com"
+        skillmeat sign import-key key.pub --name "Jane" --email "jane@example.com" --no-trust
+    """
+    try:
+        from skillmeat.core.signing import KeyManager
+
+        key_file_path = Path(key_file)
+
+        # Read public key
+        public_key_pem = key_file_path.read_text()
+
+        console.print(f"[cyan]Importing public key from {key_file}...[/cyan]")
+
+        key_manager = KeyManager()
+
+        # Import public key
+        public_key = key_manager.import_public_key(public_key_pem, name, email, trust)
+
+        console.print("[green]Public key imported successfully![/green]")
+        console.print(f"\n[bold]Key Details:[/bold]")
+        console.print(f"  Key ID: {public_key.key_id}")
+        console.print(f"  Fingerprint: {public_key.fingerprint}")
+        console.print(f"  Name: {public_key.name}")
+        console.print(f"  Email: {public_key.email}")
+        console.print(f"  Trusted: {'Yes' if public_key.trusted else 'No'}")
+
+        if trust:
+            console.print(
+                "\n[green]This key is now trusted for bundle verification.[/green]"
+            )
+        else:
+            console.print(
+                "\n[yellow]This key is imported but not trusted.[/yellow]"
+            )
+
+    except Exception as e:
+        console.print(f"[red]Error importing key:[/red] {e}")
+        logger.exception("Failed to import key")
+        sys.exit(1)
+
+
+@sign.command(name="revoke")
+@click.argument("key_id")
+@click.option(
+    "--type",
+    "-t",
+    type=click.Choice(["signing", "trusted"]),
+    required=True,
+    help="Type of key to revoke",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def revoke_key(key_id, type, force):
+    """Revoke a signing or trusted key.
+
+    For signing keys: This will delete your private key. You won't be able to
+    sign bundles with this key anymore.
+
+    For trusted keys: This will remove trust in the key. Bundles signed with
+    this key will no longer pass verification.
+
+    Examples:
+        skillmeat sign revoke abc123def456 --type signing
+        skillmeat sign revoke abc123def456 --type trusted --force
+    """
+    try:
+        from skillmeat.core.signing import KeyManager
+
+        key_manager = KeyManager()
+
+        # Load key to show details
+        if type == "signing":
+            key_pair = key_manager.load_private_key(key_id)
+            if not key_pair:
+                console.print(f"[red]Signing key {key_id} not found[/red]")
+                sys.exit(1)
+
+            console.print(f"[bold]Signing Key:[/bold]")
+            console.print(f"  Key ID: {key_pair.key_id}")
+            console.print(f"  Fingerprint: {key_pair.fingerprint}")
+            console.print(f"  Name: {key_pair.name}")
+            console.print(f"  Email: {key_pair.email}")
+        else:
+            public_key = key_manager.load_public_key(key_id)
+            if not public_key:
+                console.print(f"[red]Trusted key {key_id} not found[/red]")
+                sys.exit(1)
+
+            console.print(f"[bold]Trusted Public Key:[/bold]")
+            console.print(f"  Key ID: {public_key.key_id}")
+            console.print(f"  Fingerprint: {public_key.fingerprint}")
+            console.print(f"  Name: {public_key.name}")
+            console.print(f"  Email: {public_key.email}")
+
+        # Confirm revocation
+        if not force:
+            if type == "signing":
+                warning = "\n[yellow]WARNING: This will delete your private key permanently![/yellow]"
+            else:
+                warning = "\n[yellow]This will remove trust in this public key.[/yellow]"
+
+            console.print(warning)
+            if not Confirm.ask(f"Are you sure you want to revoke this key?"):
+                console.print("[yellow]Revocation cancelled[/yellow]")
+                return
+
+        # Revoke key
+        if type == "signing":
+            deleted = key_manager.delete_private_key(key_id)
+        else:
+            deleted = key_manager.revoke_public_key(key_id)
+
+        if deleted:
+            console.print(f"[green]Key {key_id} revoked successfully[/green]")
+        else:
+            console.print(f"[red]Failed to revoke key {key_id}[/red]")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error revoking key:[/red] {e}")
+        logger.exception("Failed to revoke key")
+        sys.exit(1)
+
+
+@sign.command(name="verify")
+@click.argument("bundle_path", type=click.Path(exists=True))
+@click.option(
+    "--require-signature",
+    is_flag=True,
+    help="Fail if bundle is unsigned",
+)
+def verify_bundle(bundle_path, require_signature):
+    """Verify bundle signature.
+
+    Verifies the cryptographic signature of a bundle to ensure it hasn't
+    been tampered with and was signed by a trusted key.
+
+    Examples:
+        skillmeat sign verify my-bundle.skillmeat-pack
+        skillmeat sign verify bundle.skillmeat-pack --require-signature
+    """
+    try:
+        from skillmeat.core.signing import BundleVerifier, KeyManager
+
+        bundle_path = Path(bundle_path)
+
+        console.print(f"[cyan]Verifying bundle signature...[/cyan]")
+
+        key_manager = KeyManager()
+        verifier = BundleVerifier(key_manager)
+
+        # Verify bundle
+        result = verifier.verify_bundle_file(bundle_path, require_signature)
+
+        # Display result
+        console.print()
+        if result.valid:
+            console.print(f"[green]{result.summary()}[/green]")
+
+            if result.signature_data:
+                console.print(f"\n[bold]Signature Details:[/bold]")
+                console.print(f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>")
+                console.print(f"  Fingerprint: {result.signature_data.key_fingerprint}")
+                console.print(f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                console.print(f"  Algorithm: {result.signature_data.algorithm}")
+        else:
+            console.print(f"[red]{result.summary()}[/red]")
+            console.print(f"\n[bold]Status:[/bold] {result.status.value}")
+            console.print(f"[bold]Message:[/bold] {result.message}")
+
+            if result.signature_data:
+                console.print(f"\n[bold]Signature Details:[/bold]")
+                console.print(f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>")
+                console.print(f"  Fingerprint: {result.signature_data.key_fingerprint}")
+                console.print(f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error verifying bundle:[/red] {e}")
+        logger.exception("Failed to verify bundle")
+        sys.exit(1)
+
+
+# ====================
 # Entry Point
 # ====================
 
