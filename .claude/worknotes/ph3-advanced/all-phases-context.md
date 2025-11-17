@@ -129,11 +129,23 @@ skillmeat/
 
 ## Important Learnings & Gotchas
 
-*(To be populated as implementation progresses)*
+**Phase 3 Learnings:**
 
+1. **MCP Metadata Model**: Security-first validation order prevents path traversal attacks. Always validate security concerns before regex patterns.
+
+2. **Deployment Orchestrator**: Platform-specific settings.json locations require careful testing. Atomic operations with backup/restore are essential for production safety.
+
+3. **Config UI**: React Query with optimistic updates provides excellent UX. Security warnings before deployment prevent accidental server exposure.
+
+4. **Health Checks**: Log parsing is more reliable than process monitoring for MCP servers launched by Claude Desktop. 30-second cache TTL balances freshness with I/O performance.
+
+5. **Documentation**: Comprehensive examples and troubleshooting flowcharts reduce support burden. Real-world scenarios help users understand feature value.
+
+**General Gotchas:**
 - Node + Python dual runtime adds setup complexity → use `skillmeat web doctor` for diagnostics
 - Bundle signing key management critical → recommend hardware-backed keys optional
 - MCP deployment misconfigurations can break local editors → implement preview + rollback
+- Claude Desktop log formats may change → health checker should be resilient to format changes
 
 ---
 
@@ -142,8 +154,8 @@ skillmeat/
 - **Phase 0** (Platform): ✅ COMPLETE (5/5 tasks)
 - **Phase 1** (Web UI): ✅ COMPLETE (5/5 tasks)
 - **Phase 2** (Team Sharing): ✅ COMPLETE (5/5 tasks)
-- **Phase 3** (MCP Management): 🔄 IN PROGRESS (0/5 tasks - starting P3-001)
-- **Phase 4** (Marketplace): ⏳ PENDING (awaiting Phase 3)
+- **Phase 3** (MCP Management): ✅ COMPLETE (5/5 tasks)
+- **Phase 4** (Marketplace): ⏳ PENDING (awaiting Phase 3 - NOW READY)
 - **Phase 5** (Testing & Hardening): ⏳ PENDING (awaiting Phases 0-4)
 - **Phase 6** (Documentation & Release): ⏳ PENDING (awaiting all features)
 
@@ -157,9 +169,13 @@ skillmeat/
 - Phases 0-2 completed successfully
 
 ### Session 2 (2025-11-17)
-- Starting Phase 3: MCP Server Management
-- Delegating P3-001 (MCP Metadata Model) to integration-expert and data-layer-expert
-- Focus: Extend manifests to track MCP servers (name, repo, env vars)
+- ✅ COMPLETED Phase 3: MCP Server Management (5/5 tasks)
+- P3-001: MCP Metadata Model - data-layer-expert (46 tests)
+- P3-002: Deployment Orchestrator - python-backend-engineer (28 tests)
+- P3-003: Config UI - frontend-developer (35+ tests)
+- P3-004: Health Checks - python-backend-engineer (37 tests)
+- P3-005: Tests & Docs - documentation-writer (16 integration tests, 5,000+ lines docs)
+- Total: 162+ tests, comprehensive documentation, production-ready MCP management
 
 ---
 
