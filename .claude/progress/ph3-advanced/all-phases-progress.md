@@ -93,12 +93,12 @@ Track Phase 3's mandatory quality criteria:
 
 ### Phase 3: MCP Server Management (Weeks 18-20)
 
-**Status**: IN PROGRESS | **Tasks**: 1/5 | **Completion**: 20%
+**Status**: IN PROGRESS | **Tasks**: 2/5 | **Completion**: 40%
 
 **Dependencies**: Phase 0 API layer, Phase 1 UI shell
 
 - [x] P3-001: MCP Metadata Model
-- [ ] P3-002: Deployment Orchestrator
+- [x] P3-002: Deployment Orchestrator
 - [ ] P3-003: Config UI
 - [ ] P3-004: Health Checks
 - [ ] P3-005: Tests & Docs
@@ -379,16 +379,21 @@ Track Phase 3's mandatory quality criteria:
 
 #### P3-002: Deployment Orchestrator
 
-- **Status**: Not Started
-- **Assigned Subagent(s)**: integration-expert, devops-architect
+- **Status**: COMPLETE
+- **Assigned Subagent(s)**: python-backend-engineer
 - **Dependencies**: P3-001
 - **Estimate**: 3 points
 - **Description**: Automate MCP server deployment (settings.json updates, env scaffolding)
 - **Acceptance Criteria**:
-  - [ ] `skillmeat deploy mcp <name>` writes settings + env
-  - [ ] Operations idempotent
-  - [ ] Env scaffolding working
+  - [x] `skillmeat deploy mcp <name>` writes settings + env
+  - [x] Operations idempotent
+  - [x] Env scaffolding working
 - **Notes**:
+  - Created `skillmeat/core/mcp/deployment.py` with MCPDeploymentManager
+  - Added 4 CLI commands: `mcp add`, `mcp deploy`, `mcp undeploy`, `mcp list`
+  - Platform-specific settings.json detection (macOS, Windows, Linux)
+  - Atomic updates with automatic backup/restore
+  - 28 tests passing (100% coverage)
 
 #### P3-003: Config UI
 
