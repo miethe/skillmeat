@@ -1,0 +1,209 @@
+name: Test Failure Triage
+
+on:
+  workflow_run:
+    workflows: ["Comprehensive Test Matrix"]
+    types:
+      - completed
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage-failures:
+    name: Analyze and Report Test Failures
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+
+      - name: Install analysis dependencies
+        run: |
+          pip install PyYAML junitparser
+
+      - name: Parse test failures
+        id: parse_failures
+        run: |
+          python scripts/parse_test_failures.py
+        continue-on-error: true
+
+      - name: Generate failure summary
+        id: summary
+        run: |
+          if [ -f test-failures.json ]; then
+            echo "failures_found=true" >> $GITHUB_OUTPUT
+
+            # Create a summary for the issue
+            cat > failure_summary.md <<EOF
+          ## Test Failure Report
+
+          **Workflow Run:** ${{ github.event.workflow_run.html_url }}
+          **Triggered by:** ${{ github.event.workflow_run.head_commit.author.name }}
+          **Commit:** ${{ github.event.workflow_run.head_sha }}
+          **Branch:** ${{ github.event.workflow_run.head_branch }}
+          **Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ---
+
+          ### Failed Test Summary
+
+          EOF
+
+            # Add parsed failures if available
+            if [ -f test-failures-summary.txt ]; then
+              cat test-failures-summary.txt >> failure_summary.md
+            else
+              echo "Test failure details could not be parsed. Please check the workflow logs." >> failure_summary.md
+            fi
+
+            cat >> failure_summary.md <<EOF
+
+          ---
+
+          ### Action Items
+
+          - [ ] Review test failures and determine root cause
+          - [ ] Fix failing tests or update test expectations
+          - [ ] Verify fixes with local test run
+          - [ ] Re-run CI workflow to confirm resolution
+
+          ### Useful Commands
+
+          \`\`\`bash
+          # Run failed tests locally
+          pytest -v --lf  # Python tests (last failed)
+          cd skillmeat/web && pnpm test  # Frontend tests
+
+          # Run specific test markers
+          pytest -v -m "unit"  # Unit tests only
+          pytest -v -m "integration"  # Integration tests only
+
+          # Run with coverage
+          pytest -v --cov=skillmeat --cov-report=html
+          \`\`\`
+
+          ---
+
+          **Automated by:** Test Failure Triage Workflow
+          EOF
+          else
+            echo "failures_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for existing failure issue
+        id: check_issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'test-failure,automated',
+              state: 'open'
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.includes('Test Failures') &&
+              issue.labels.some(label => label.name === 'test-failure')
+            );
+
+            if (existingIssue) {
+              core.setOutput('issue_number', existingIssue.number);
+              core.setOutput('issue_exists', 'true');
+            } else {
+              core.setOutput('issue_exists', 'false');
+            }
+
+      - name: Create or update failure issue
+        if: steps.summary.outputs.failures_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '';
+
+            try {
+              summary = fs.readFileSync('failure_summary.md', 'utf8');
+            } catch (error) {
+              summary = `Test failures detected in workflow run: ${{ github.event.workflow_run.html_url }}`;
+            }
+
+            const issueExists = '${{ steps.check_issue.outputs.issue_exists }}' === 'true';
+            const issueNumber = '${{ steps.check_issue.outputs.issue_number }}';
+
+            if (issueExists) {
+              // Add comment to existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(issueNumber),
+                body: summary
+              });
+
+              console.log(`Updated existing issue #${issueNumber}`);
+            } else {
+              // Create new issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Test Failures - ${new Date().toISOString().split('T')[0]}`,
+                body: summary,
+                labels: ['test-failure', 'automated', 'bug']
+              });
+
+              console.log(`Created new issue #${issue.data.number}`);
+            }
+
+      - name: Add workflow run comment
+        if: steps.summary.outputs.failures_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = '${{ github.event.workflow_run.html_url }}';
+            const sha = '${{ github.event.workflow_run.head_sha }}';
+            const branch = '${{ github.event.workflow_run.head_branch }}';
+
+            console.log(`Test failures detected in workflow: ${runUrl}`);
+            console.log(`Commit: ${sha}`);
+            console.log(`Branch: ${branch}`);
+
+      - name: Upload failure analysis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-analysis
+          path: |
+            test-failures.json
+            failure_summary.md
+            test-failures-summary.txt
+          retention-days: 90
+
+  notify-team:
+    name: Notify Team of Failures
+    runs-on: ubuntu-latest
+    needs: triage-failures
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+
+    steps:
+      - name: Send notification
+        run: |
+          echo "Test failures detected. Team notification would be sent here."
+          echo "Configure Slack, Discord, or email notifications as needed."
+          # Example: curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"Test failures in ${{ github.repository }}"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

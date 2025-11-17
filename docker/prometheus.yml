@@ -1,0 +1,37 @@
+# Prometheus configuration for SkillMeat observability
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'skillmeat'
+    environment: 'development'
+
+# Scrape configurations
+scrape_configs:
+  # SkillMeat API metrics
+  - job_name: 'skillmeat-api'
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+        labels:
+          service: 'api'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+# Alerting rules (optional)
+# rule_files:
+#   - '/etc/prometheus/alerts/*.yml'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - 'alertmanager:9093'
