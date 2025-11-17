@@ -18,7 +18,8 @@ from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
 from .dependencies import app_state
-from .routers import analytics, artifacts, bundles, collections, health, mcp
+from .middleware.rate_limit import RateLimitMiddleware
+from .routers import analytics, artifacts, bundles, collections, health, marketplace, mcp
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,16 @@ def create_app(settings: APISettings = None) -> FastAPI:
         )
         logger.info(f"CORS enabled with origins: {settings.cors_origins}")
 
+    # Add rate limiting middleware for marketplace endpoints
+    app.add_middleware(
+        RateLimitMiddleware,
+        public_limit=60,  # 60 requests/minute for public
+        authenticated_limit=300,  # 300 requests/minute for authenticated
+        window_seconds=60,
+        excluded_paths=["/health", "/docs", "/redoc", "/openapi.json", "/"],
+    )
+    logger.info("Rate limiting enabled (public: 60/min, authenticated: 300/min)")
+
     # Add exception handlers
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -181,10 +192,10 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
+    app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
 
     # Future routers will be added here:
     # app.include_router(deployments.router, prefix=settings.api_prefix)
-    # app.include_router(marketplace.router, prefix=settings.api_prefix)
 
     # Root endpoint
     @app.get(
