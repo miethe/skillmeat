@@ -243,3 +243,106 @@ class DeploymentResponse(BaseModel):
                 "args": ["-y", "@anthropic/mcp-filesystem"],
             }
         }
+
+
+class HealthCheckResponse(BaseModel):
+    """Response schema for MCP server health check."""
+
+    server_name: str = Field(
+        description="Name of the MCP server",
+    )
+    status: str = Field(
+        description="Health status (healthy, degraded, unhealthy, unknown, not_deployed)",
+        examples=["healthy", "degraded", "unhealthy", "unknown", "not_deployed"],
+    )
+    deployed: bool = Field(
+        description="Whether server is deployed to Claude Desktop",
+    )
+    last_seen: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp of last log entry",
+    )
+    error_count: int = Field(
+        default=0,
+        description="Number of recent errors",
+    )
+    warning_count: int = Field(
+        default=0,
+        description="Number of recent warnings",
+    )
+    recent_errors: List[str] = Field(
+        default_factory=list,
+        description="List of recent error messages",
+    )
+    recent_warnings: List[str] = Field(
+        default_factory=list,
+        description="List of recent warning messages",
+    )
+    checked_at: str = Field(
+        description="ISO 8601 timestamp of health check",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "server_name": "filesystem",
+                "status": "healthy",
+                "deployed": True,
+                "last_seen": "2025-01-15T10:30:00Z",
+                "error_count": 0,
+                "warning_count": 1,
+                "recent_errors": [],
+                "recent_warnings": ["Slow response time (2.5s)"],
+                "checked_at": "2025-01-15T10:35:00Z",
+            }
+        }
+
+
+class AllServersHealthResponse(BaseModel):
+    """Response schema for health check of all servers."""
+
+    servers: Dict[str, HealthCheckResponse] = Field(
+        description="Health status for each server",
+    )
+    total: int = Field(
+        description="Total number of servers checked",
+    )
+    healthy: int = Field(
+        default=0,
+        description="Number of healthy servers",
+    )
+    degraded: int = Field(
+        default=0,
+        description="Number of degraded servers",
+    )
+    unhealthy: int = Field(
+        default=0,
+        description="Number of unhealthy servers",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "servers": {
+                    "filesystem": {
+                        "server_name": "filesystem",
+                        "status": "healthy",
+                        "deployed": True,
+                        "last_seen": "2025-01-15T10:30:00Z",
+                        "error_count": 0,
+                        "warning_count": 0,
+                        "recent_errors": [],
+                        "recent_warnings": [],
+                        "checked_at": "2025-01-15T10:35:00Z",
+                    }
+                },
+                "total": 1,
+                "healthy": 1,
+                "degraded": 0,
+                "unhealthy": 0,
+            }
+        }
