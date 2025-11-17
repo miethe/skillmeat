@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Home, Package, GitBranch, Users, Database, Settings } from 'lucide-react';
+import { Home, Package, GitBranch, Users, Database, Settings, Store } from 'lucide-react';
 
 const navItems = [
   {
@@ -15,6 +15,11 @@ const navItems = [
     title: 'Collection',
     href: '/collection',
     icon: Package,
+  },
+  {
+    title: 'Marketplace',
+    href: '/marketplace',
+    icon: Store,
   },
   {
     title: 'Projects',
@@ -46,7 +51,7 @@ export function Navigation() {
       <nav className="space-y-1 p-4">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

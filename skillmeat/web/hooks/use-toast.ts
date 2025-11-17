@@ -14,19 +14,14 @@ export interface ToastProps {
 
 export function useToast() {
   const toast = ({ title, description, variant }: ToastProps) => {
-    const message = description ? (
-      <div>
-        <div className="font-semibold">{title}</div>
-        <div className="text-sm text-muted-foreground">{description}</div>
-      </div>
-    ) : (
-      title
-    );
-
     if (variant === "destructive") {
-      sonnerToast.error(message);
+      sonnerToast.error(title, {
+        description,
+      });
     } else {
-      sonnerToast.success(message);
+      sonnerToast.success(title, {
+        description,
+      });
     }
   };
 
