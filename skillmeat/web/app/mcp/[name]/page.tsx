@@ -70,8 +70,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
 
   // Data fetching
   const { data: server, isLoading, error } = useMcpServer(serverName);
-  const { data: deploymentStatus, isLoading: statusLoading } =
-    useMcpDeploymentStatus(serverName);
+  const { data: deploymentStatus } = useMcpDeploymentStatus(serverName);
 
   // Mutations
   const updateMutation = useUpdateMcpServer(serverName);
