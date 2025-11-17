@@ -1,0 +1,3010 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SkillMeat API",
+    "description": "REST API for SkillMeat collection manager",
+    "version": "0.1.0-alpha",
+    "x-api-version": "v1",
+    "x-package-version": "0.1.0-alpha"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Basic health check",
+        "description": "Basic health check endpoint that returns service status.\n    Used for simple availability checks by load balancers.\n\n    Returns HTTP 200 if service is running.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/detailed": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Detailed health check",
+        "description": "Detailed health check endpoint that includes component status and system information.\n    Used for comprehensive monitoring and diagnostics.\n\n    Checks the health of:\n    - Collection manager\n    - Configuration manager\n    - File system access\n\n    Returns HTTP 200 if all components are healthy.\n    Returns HTTP 503 if any critical component is unhealthy.",
+        "operationId": "detailed_health_check_health_detailed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedHealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness check",
+        "description": "Readiness check endpoint for Kubernetes and container orchestrators.\n    Indicates whether the service is ready to accept traffic.\n\n    Returns HTTP 200 if service is ready.\n    Returns HTTP 503 if service is not ready (still initializing).",
+        "operationId": "readiness_check_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readiness Check Health Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness check",
+        "description": "Liveness check endpoint for Kubernetes and container orchestrators.\n    Indicates whether the service is alive (not deadlocked/crashed).\n\n    Returns HTTP 200 if service is alive.\n    Should never return 503 unless the service is truly unresponsive.",
+        "operationId": "liveness_check_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Liveness Check Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "tags": [
+          "collections",
+          "collections"
+        ],
+        "summary": "List all collections",
+        "description": "Retrieve a paginated list of all collections with metadata",
+        "operationId": "list_collections_api_v1_collections_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor for pagination (next page)",
+              "title": "After"
+            },
+            "description": "Cursor for pagination (next page)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved collections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{collection_id}": {
+      "get": {
+        "tags": [
+          "collections",
+          "collections"
+        ],
+        "summary": "Get collection details",
+        "description": "Retrieve detailed information about a specific collection",
+        "operationId": "get_collection_api_v1_collections__collection_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{collection_id}/artifacts": {
+      "get": {
+        "tags": [
+          "collections",
+          "collections"
+        ],
+        "summary": "List artifacts in collection",
+        "description": "Retrieve a paginated list of artifacts within a specific collection",
+        "operationId": "list_collection_artifacts_api_v1_collections__collection_id__artifacts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor for pagination (next page)",
+              "title": "After"
+            },
+            "description": "Cursor for pagination (next page)"
+          },
+          {
+            "name": "artifact_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact type (skill, command, agent)",
+              "title": "Artifact Type"
+            },
+            "description": "Filter by artifact type (skill, command, agent)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionArtifactsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "List all artifacts",
+        "description": "Retrieve a paginated list of artifacts across all collections",
+        "operationId": "list_artifacts_api_v1_artifacts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor for pagination (next page)",
+              "title": "After"
+            },
+            "description": "Cursor for pagination (next page)"
+          },
+          {
+            "name": "artifact_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact type (skill, command, agent)",
+              "title": "Artifact Type"
+            },
+            "description": "Filter by artifact type (skill, command, agent)"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by collection name",
+              "title": "Collection"
+            },
+            "description": "Filter by collection name"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tags (comma-separated)",
+              "title": "Tags"
+            },
+            "description": "Filter by tags (comma-separated)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get artifact details",
+        "description": "Retrieve detailed information about a specific artifact",
+        "operationId": "get_artifact_api_v1_artifacts__artifact_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved artifact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/upstream": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Check upstream status",
+        "description": "Check for updates and upstream status for an artifact",
+        "operationId": "check_artifact_upstream_api_v1_artifacts__artifact_id__upstream_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully checked upstream status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactUpstreamResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/summary": {
+      "get": {
+        "tags": [
+          "analytics",
+          "analytics"
+        ],
+        "summary": "Get analytics summary",
+        "description": "Retrieve overall statistics and analytics summary",
+        "operationId": "get_analytics_summary_api_v1_analytics_summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved analytics summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Analytics disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/top-artifacts": {
+      "get": {
+        "tags": [
+          "analytics",
+          "analytics"
+        ],
+        "summary": "Get top artifacts by usage",
+        "description": "Retrieve most used artifacts sorted by usage frequency",
+        "operationId": "get_top_artifacts_api_v1_analytics_top_artifacts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items per page (max 100)",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Number of items per page (max 100)"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor for pagination (next page)",
+              "title": "After"
+            },
+            "description": "Cursor for pagination (next page)"
+          },
+          {
+            "name": "artifact_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by artifact type (skill, command, agent)",
+              "title": "Artifact Type"
+            },
+            "description": "Filter by artifact type (skill, command, agent)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved top artifacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopArtifactsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Analytics disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/trends": {
+      "get": {
+        "tags": [
+          "analytics",
+          "analytics"
+        ],
+        "summary": "Get usage trends over time",
+        "description": "Retrieve time-series usage data for trend analysis",
+        "operationId": "get_usage_trends_api_v1_analytics_trends_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Aggregation period (hour, day, week, month)",
+              "default": "day",
+              "title": "Period"
+            },
+            "description": "Aggregation period (hour, day, week, month)"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Number of days of history (max 365)",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "Number of days of history (max 365)"
+          },
+          {
+            "name": "args",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Args"
+            }
+          },
+          {
+            "name": "kwargs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Kwargs"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved usage trends",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrendsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Analytics disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/import": {
+      "post": {
+        "tags": [
+          "bundles",
+          "bundles"
+        ],
+        "summary": "Import artifact bundle",
+        "description": "Import a bundle ZIP file into collection with conflict resolution",
+        "operationId": "import_bundle_api_v1_bundles_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_bundle_api_v1_bundles_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bundle imported successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bundle or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Import failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/bundles/validate": {
+      "post": {
+        "tags": [
+          "bundles",
+          "bundles"
+        ],
+        "summary": "Validate bundle without importing",
+        "description": "Check bundle integrity and validity without importing",
+        "operationId": "validate_bundle_api_v1_bundles_validate_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validate_bundle_api_v1_bundles_validate_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation completed (check is_valid field)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleValidationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "root"
+        ],
+        "summary": "API root",
+        "description": "Returns basic API information and available endpoints",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "root"
+        ],
+        "summary": "API version",
+        "description": "Returns detailed version information",
+        "operationId": "version_info_api_v1_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Version Info Api V1 Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalyticsSummaryResponse": {
+        "properties": {
+          "total_collections": {
+            "type": "integer",
+            "title": "Total Collections",
+            "description": "Total number of collections",
+            "examples": [
+              1
+            ]
+          },
+          "total_artifacts": {
+            "type": "integer",
+            "title": "Total Artifacts",
+            "description": "Total number of artifacts across all collections",
+            "examples": [
+              15
+            ]
+          },
+          "total_deployments": {
+            "type": "integer",
+            "title": "Total Deployments",
+            "description": "Total number of deployments",
+            "examples": [
+              42
+            ]
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events",
+            "description": "Total number of tracked events",
+            "examples": [
+              1337
+            ]
+          },
+          "artifacts_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Artifacts By Type",
+            "description": "Count of artifacts by type",
+            "examples": [
+              {
+                "agent": 2,
+                "command": 3,
+                "skill": 10
+              }
+            ]
+          },
+          "recent_activity_count": {
+            "type": "integer",
+            "title": "Recent Activity Count",
+            "description": "Number of events in the last 24 hours",
+            "examples": [
+              23
+            ]
+          },
+          "most_deployed_artifact": {
+            "type": "string",
+            "title": "Most Deployed Artifact",
+            "description": "Name of the most frequently deployed artifact",
+            "examples": [
+              "pdf-skill"
+            ]
+          },
+          "last_activity": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Activity",
+            "description": "Timestamp of most recent activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_collections",
+          "total_artifacts",
+          "total_deployments",
+          "total_events",
+          "artifacts_by_type",
+          "recent_activity_count",
+          "most_deployed_artifact",
+          "last_activity"
+        ],
+        "title": "AnalyticsSummaryResponse",
+        "description": "Overall analytics summary.\n\nProvides high-level statistics about the collection and usage patterns.",
+        "example": {
+          "artifacts_by_type": {
+            "agent": 2,
+            "command": 3,
+            "skill": 10
+          },
+          "last_activity": "2024-11-16T15:30:00Z",
+          "most_deployed_artifact": "pdf-skill",
+          "recent_activity_count": 23,
+          "total_artifacts": 15,
+          "total_collections": 1,
+          "total_deployments": 42,
+          "total_events": 1337
+        }
+      },
+      "ArtifactListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of items for this page"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo",
+            "description": "Pagination metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "ArtifactListResponse",
+        "description": "Paginated response for artifact listings."
+      },
+      "ArtifactMetadataResponse": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Artifact title",
+            "examples": [
+              "PDF Processing Skill"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Artifact description",
+            "examples": [
+              "Extract and analyze PDF documents"
+            ]
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author",
+            "description": "Artifact author",
+            "examples": [
+              "Anthropic"
+            ]
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License",
+            "description": "Artifact license",
+            "examples": [
+              "MIT"
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Artifact version from metadata",
+            "examples": [
+              "1.2.3"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Artifact tags",
+            "examples": [
+              [
+                "document",
+                "pdf",
+                "productivity"
+              ]
+            ]
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dependencies",
+            "description": "Required dependencies",
+            "examples": [
+              [
+                "python-magic",
+                "PyPDF2"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ArtifactMetadataResponse",
+        "description": "Artifact metadata from SKILL.md / COMMAND.md / AGENT.md."
+      },
+      "ArtifactResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Artifact composite key (type:name)",
+            "examples": [
+              "skill:pdf"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name",
+            "examples": [
+              "pdf"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Artifact type",
+            "examples": [
+              "skill"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Source specification",
+            "examples": [
+              "anthropics/skills/pdf"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Version specification",
+            "examples": [
+              "latest"
+            ]
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Artifact aliases",
+            "examples": [
+              [
+                "pdf-processor",
+                "doc-reader"
+              ]
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactMetadataResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Artifact metadata"
+          },
+          "upstream": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactUpstreamInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream tracking information"
+          },
+          "added": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added",
+            "description": "Timestamp when artifact was added to collection"
+          },
+          "updated": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated",
+            "description": "Timestamp of last update"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "source",
+          "version",
+          "added",
+          "updated"
+        ],
+        "title": "ArtifactResponse",
+        "description": "Response schema for a single artifact.\n\nProvides complete artifact information including metadata,\ndeployment status, and upstream tracking.",
+        "example": {
+          "added": "2024-11-16T12:00:00Z",
+          "aliases": [
+            "pdf-processor"
+          ],
+          "id": "skill:pdf",
+          "metadata": {
+            "author": "Anthropic",
+            "description": "Extract and analyze PDF documents",
+            "license": "MIT",
+            "tags": [
+              "document",
+              "pdf"
+            ],
+            "title": "PDF Processing Skill"
+          },
+          "name": "pdf",
+          "source": "anthropics/skills/pdf",
+          "type": "skill",
+          "updated": "2024-11-16T15:30:00Z",
+          "upstream": {
+            "current_sha": "abc123",
+            "has_local_modifications": false,
+            "tracking_enabled": true,
+            "update_available": true,
+            "upstream_sha": "def456"
+          },
+          "version": "latest"
+        }
+      },
+      "ArtifactSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name",
+            "examples": [
+              "pdf-skill"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Artifact type (skill, command, agent)",
+            "examples": [
+              "skill"
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Current version",
+            "examples": [
+              "1.2.3"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Source specification",
+            "examples": [
+              "anthropics/skills/pdf"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "source"
+        ],
+        "title": "ArtifactSummary",
+        "description": "Summary of an artifact within a collection.\n\nLightweight artifact representation for collection listings."
+      },
+      "ArtifactUpstreamInfo": {
+        "properties": {
+          "tracking_enabled": {
+            "type": "boolean",
+            "title": "Tracking Enabled",
+            "description": "Whether upstream tracking is enabled",
+            "examples": [
+              true
+            ]
+          },
+          "current_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Sha",
+            "description": "Current installed version SHA",
+            "examples": [
+              "abc123def456"
+            ]
+          },
+          "upstream_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Sha",
+            "description": "Latest upstream version SHA",
+            "examples": [
+              "def789ghi012"
+            ]
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available",
+            "description": "Whether an update is available",
+            "examples": [
+              true
+            ]
+          },
+          "has_local_modifications": {
+            "type": "boolean",
+            "title": "Has Local Modifications",
+            "description": "Whether local modifications exist",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracking_enabled",
+          "update_available",
+          "has_local_modifications"
+        ],
+        "title": "ArtifactUpstreamInfo",
+        "description": "Upstream tracking information for an artifact."
+      },
+      "ArtifactUpstreamResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact composite key",
+            "examples": [
+              "skill:pdf"
+            ]
+          },
+          "tracking_enabled": {
+            "type": "boolean",
+            "title": "Tracking Enabled",
+            "description": "Whether upstream tracking is enabled",
+            "examples": [
+              true
+            ]
+          },
+          "current_version": {
+            "type": "string",
+            "title": "Current Version",
+            "description": "Current installed version",
+            "examples": [
+              "1.2.3"
+            ]
+          },
+          "current_sha": {
+            "type": "string",
+            "title": "Current Sha",
+            "description": "Current version SHA",
+            "examples": [
+              "abc123def456"
+            ]
+          },
+          "upstream_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Version",
+            "description": "Latest upstream version",
+            "examples": [
+              "1.3.0"
+            ]
+          },
+          "upstream_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Sha",
+            "description": "Latest upstream SHA",
+            "examples": [
+              "def789ghi012"
+            ]
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available",
+            "description": "Whether an update is available",
+            "examples": [
+              true
+            ]
+          },
+          "has_local_modifications": {
+            "type": "boolean",
+            "title": "Has Local Modifications",
+            "description": "Whether local modifications exist",
+            "examples": [
+              false
+            ]
+          },
+          "last_checked": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Checked",
+            "description": "Timestamp of last upstream check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "tracking_enabled",
+          "current_version",
+          "current_sha",
+          "update_available",
+          "has_local_modifications",
+          "last_checked"
+        ],
+        "title": "ArtifactUpstreamResponse",
+        "description": "Response for upstream status check.\n\nProvides detailed information about available updates and\nlocal modifications.",
+        "example": {
+          "artifact_id": "skill:pdf",
+          "current_sha": "abc123def456",
+          "current_version": "1.2.3",
+          "has_local_modifications": false,
+          "last_checked": "2024-11-16T15:30:00Z",
+          "tracking_enabled": true,
+          "update_available": true,
+          "upstream_sha": "def789ghi012",
+          "upstream_version": "1.3.0"
+        }
+      },
+      "Body_import_bundle_api_v1_bundles_import_post": {
+        "properties": {
+          "bundle_file": {
+            "type": "string",
+            "format": "binary",
+            "title": "Bundle File",
+            "description": "Bundle ZIP file to import"
+          },
+          "strategy": {
+            "type": "string",
+            "title": "Strategy",
+            "description": "Conflict resolution strategy (merge, fork, skip, interactive)",
+            "default": "interactive"
+          },
+          "collection_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Name",
+            "description": "Target collection (uses active if None)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Preview import without making changes",
+            "default": false
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Force import even with validation warnings",
+            "default": false
+          },
+          "expected_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Hash",
+            "description": "Expected SHA-256 hash for verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_file"
+        ],
+        "title": "Body_import_bundle_api_v1_bundles_import_post"
+      },
+      "Body_validate_bundle_api_v1_bundles_validate_post": {
+        "properties": {
+          "bundle_file": {
+            "type": "string",
+            "format": "binary",
+            "title": "Bundle File",
+            "description": "Bundle ZIP file to validate"
+          },
+          "expected_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Hash",
+            "description": "Expected SHA-256 hash for verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_file"
+        ],
+        "title": "Body_validate_bundle_api_v1_bundles_validate_post"
+      },
+      "BundleImportResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether import succeeded"
+          },
+          "imported_count": {
+            "type": "integer",
+            "title": "Imported Count",
+            "description": "Number of new artifacts imported",
+            "default": 0
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count",
+            "description": "Number of artifacts skipped",
+            "default": 0
+          },
+          "forked_count": {
+            "type": "integer",
+            "title": "Forked Count",
+            "description": "Number of artifacts forked",
+            "default": 0
+          },
+          "merged_count": {
+            "type": "integer",
+            "title": "Merged Count",
+            "description": "Number of artifacts merged (overwritten)",
+            "default": 0
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedArtifactResponse"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "description": "Details of imported artifacts"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "description": "Error messages if import failed"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Warning messages"
+          },
+          "bundle_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Hash",
+            "description": "SHA-256 hash of imported bundle"
+          },
+          "import_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Time",
+            "description": "Timestamp of import operation"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Human-readable summary",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "BundleImportResponse",
+        "description": "Response from bundle import operation.",
+        "example": {
+          "artifacts": [
+            {
+              "name": "python-skill",
+              "resolution": "imported",
+              "type": "skill"
+            },
+            {
+              "name": "existing-skill",
+              "new_name": "existing-skill-imported",
+              "reason": "user chose: fork",
+              "resolution": "forked",
+              "type": "skill"
+            }
+          ],
+          "bundle_hash": "abc123def456...",
+          "errors": [],
+          "forked_count": 1,
+          "import_time": "2025-11-16T12:00:00Z",
+          "imported_count": 3,
+          "merged_count": 0,
+          "skipped_count": 1,
+          "success": true,
+          "summary": "Import successful: 4 artifacts imported, 1 skipped",
+          "warnings": [
+            "Hidden file detected in bundle"
+          ]
+        }
+      },
+      "BundleValidationResponse": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid",
+            "description": "Whether bundle is valid"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssueResponse"
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Validation issues found"
+          },
+          "bundle_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Hash",
+            "description": "SHA-256 hash of bundle"
+          },
+          "artifact_count": {
+            "type": "integer",
+            "title": "Artifact Count",
+            "description": "Number of artifacts in bundle",
+            "default": 0
+          },
+          "total_size_bytes": {
+            "type": "integer",
+            "title": "Total Size Bytes",
+            "description": "Total bundle size in bytes",
+            "default": 0
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Human-readable summary",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid"
+        ],
+        "title": "BundleValidationResponse",
+        "description": "Response from bundle validation.",
+        "example": {
+          "artifact_count": 5,
+          "bundle_hash": "abc123def456...",
+          "is_valid": true,
+          "issues": [
+            {
+              "category": "security",
+              "file_path": ".hidden/file.txt",
+              "message": "Hidden file detected",
+              "severity": "warning"
+            }
+          ],
+          "summary": "Bundle valid: 5 artifacts, 1.00 MB",
+          "total_size_bytes": 1048576
+        }
+      },
+      "CollectionArtifactsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of items for this page"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo",
+            "description": "Pagination metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "CollectionArtifactsResponse",
+        "description": "Paginated response for artifacts within a collection.\n\nReturns lightweight artifact summaries for efficient collection browsing."
+      },
+      "CollectionListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of items for this page"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo",
+            "description": "Pagination metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "CollectionListResponse",
+        "description": "Paginated response for collection listings.\n\nExtends the generic paginated response with collection-specific items."
+      },
+      "CollectionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Collection unique identifier",
+            "examples": [
+              "default"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Collection name",
+            "examples": [
+              "default"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Collection format version",
+            "examples": [
+              "1.0.0"
+            ]
+          },
+          "artifact_count": {
+            "type": "integer",
+            "title": "Artifact Count",
+            "description": "Number of artifacts in collection",
+            "examples": [
+              5
+            ]
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created",
+            "description": "Collection creation timestamp"
+          },
+          "updated": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated",
+            "description": "Last update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "artifact_count",
+          "created",
+          "updated"
+        ],
+        "title": "CollectionResponse",
+        "description": "Response schema for a single collection.\n\nProvides complete collection metadata including artifact count\nand timestamps.",
+        "example": {
+          "artifact_count": 5,
+          "created": "2024-11-16T12:00:00Z",
+          "id": "default",
+          "name": "default",
+          "updated": "2024-11-16T15:30:00Z",
+          "version": "1.0.0"
+        }
+      },
+      "DetailedHealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Service status (healthy, degraded, unhealthy)",
+            "examples": [
+              "healthy"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "Current timestamp in ISO format",
+            "examples": [
+              "2024-11-16T12:00:00.000Z"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "SkillMeat version",
+            "examples": [
+              "0.1.0-alpha"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "description": "Application environment",
+            "examples": [
+              "development"
+            ]
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Seconds",
+            "description": "Service uptime in seconds",
+            "examples": [
+              3600.5
+            ]
+          },
+          "components": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Components",
+            "description": "Health status of individual components",
+            "examples": [
+              {
+                "collection_manager": {
+                  "details": "operational",
+                  "status": "healthy"
+                },
+                "config_manager": {
+                  "details": "operational",
+                  "status": "healthy"
+                }
+              }
+            ]
+          },
+          "system_info": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "System Info",
+            "description": "System information",
+            "examples": [
+              {
+                "platform": "Linux",
+                "platform_version": "5.15.0",
+                "python_version": "3.11.0"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "environment",
+          "components",
+          "system_info"
+        ],
+        "title": "DetailedHealthStatus",
+        "description": "Detailed health check response with component status."
+      },
+      "ErrorResponse": {
+        "title": "ErrorResponse",
+        "type": "object",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "detail"
+        ]
+      },
+      "HTTPValidationError": {
+        "title": "HTTPValidationError",
+        "type": "object",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "HealthStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Service status (healthy, degraded, unhealthy)",
+            "examples": [
+              "healthy"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "Current timestamp in ISO format",
+            "examples": [
+              "2024-11-16T12:00:00.000Z"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "SkillMeat version",
+            "examples": [
+              "0.1.0-alpha"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "description": "Application environment",
+            "examples": [
+              "development"
+            ]
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Seconds",
+            "description": "Service uptime in seconds",
+            "examples": [
+              3600.5
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "environment"
+        ],
+        "title": "HealthStatus",
+        "description": "Health check response model."
+      },
+      "ImportedArtifactResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Artifact type (skill, command, agent)"
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "How conflict was resolved (imported, forked, skipped, merged)"
+          },
+          "new_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Name",
+            "description": "New name if forked"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Reason for resolution decision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "resolution"
+        ],
+        "title": "ImportedArtifactResponse",
+        "description": "Single imported artifact in import result."
+      },
+      "PageInfo": {
+        "properties": {
+          "has_next_page": {
+            "type": "boolean",
+            "title": "Has Next Page",
+            "description": "Whether there are more items after this page",
+            "examples": [
+              true
+            ]
+          },
+          "has_previous_page": {
+            "type": "boolean",
+            "title": "Has Previous Page",
+            "description": "Whether there are items before this page",
+            "examples": [
+              false
+            ]
+          },
+          "start_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Cursor",
+            "description": "Cursor pointing to the first item in this page",
+            "examples": [
+              "Y3Vyc29yOjA="
+            ]
+          },
+          "end_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Cursor",
+            "description": "Cursor pointing to the last item in this page",
+            "examples": [
+              "Y3Vyc29yOjk="
+            ]
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count",
+            "description": "Total number of items (may be expensive to compute)",
+            "examples": [
+              42
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_next_page",
+          "has_previous_page"
+        ],
+        "title": "PageInfo",
+        "description": "Cursor-based pagination information.\n\nProvides information about the current page and navigation cursors\nfor efficient pagination of large datasets."
+      },
+      "TopArtifactItem": {
+        "properties": {
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Artifact name",
+            "examples": [
+              "pdf-skill"
+            ]
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Artifact type",
+            "examples": [
+              "skill"
+            ]
+          },
+          "deployment_count": {
+            "type": "integer",
+            "title": "Deployment Count",
+            "description": "Number of times deployed",
+            "examples": [
+              25
+            ]
+          },
+          "usage_count": {
+            "type": "integer",
+            "title": "Usage Count",
+            "description": "Total usage events",
+            "examples": [
+              150
+            ]
+          },
+          "last_used": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Used",
+            "description": "Timestamp of last usage"
+          },
+          "collections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "Collections containing this artifact",
+            "examples": [
+              [
+                "default",
+                "work"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_name",
+          "artifact_type",
+          "deployment_count",
+          "usage_count",
+          "last_used",
+          "collections"
+        ],
+        "title": "TopArtifactItem",
+        "description": "Single artifact in the top artifacts list.\n\nRepresents an artifact with its usage statistics.",
+        "example": {
+          "artifact_name": "pdf-skill",
+          "artifact_type": "skill",
+          "collections": [
+            "default"
+          ],
+          "deployment_count": 25,
+          "last_used": "2024-11-16T15:30:00Z",
+          "usage_count": 150
+        }
+      },
+      "TopArtifactsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TopArtifactItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of items for this page"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo",
+            "description": "Pagination metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "TopArtifactsResponse",
+        "description": "Paginated response for top artifacts by usage.\n\nReturns artifacts sorted by usage frequency with pagination support."
+      },
+      "TrendDataPoint": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "Start of time period"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "Time period type (hour, day, week, month)",
+            "examples": [
+              "day"
+            ]
+          },
+          "deployment_count": {
+            "type": "integer",
+            "title": "Deployment Count",
+            "description": "Number of deployments in this period",
+            "examples": [
+              5
+            ]
+          },
+          "usage_count": {
+            "type": "integer",
+            "title": "Usage Count",
+            "description": "Total usage events in this period",
+            "examples": [
+              42
+            ]
+          },
+          "unique_artifacts": {
+            "type": "integer",
+            "title": "Unique Artifacts",
+            "description": "Number of unique artifacts used in this period",
+            "examples": [
+              3
+            ]
+          },
+          "top_artifact": {
+            "type": "string",
+            "title": "Top Artifact",
+            "description": "Most used artifact in this period",
+            "examples": [
+              "pdf-skill"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "period",
+          "deployment_count",
+          "usage_count",
+          "unique_artifacts",
+          "top_artifact"
+        ],
+        "title": "TrendDataPoint",
+        "description": "Single data point in a usage trend.\n\nRepresents aggregated usage data for a specific time period.",
+        "example": {
+          "deployment_count": 5,
+          "period": "day",
+          "timestamp": "2024-11-16T00:00:00Z",
+          "top_artifact": "pdf-skill",
+          "unique_artifacts": 3,
+          "usage_count": 42
+        }
+      },
+      "TrendsResponse": {
+        "properties": {
+          "period_type": {
+            "type": "string",
+            "title": "Period Type",
+            "description": "Aggregation period (hour, day, week, month)",
+            "examples": [
+              "day"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Date",
+            "description": "Start of trend period"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Date",
+            "description": "End of trend period"
+          },
+          "data_points": {
+            "items": {
+              "$ref": "#/components/schemas/TrendDataPoint"
+            },
+            "type": "array",
+            "title": "Data Points",
+            "description": "Time-series data points"
+          },
+          "total_periods": {
+            "type": "integer",
+            "title": "Total Periods",
+            "description": "Number of periods in the response",
+            "examples": [
+              30
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_type",
+          "start_date",
+          "end_date",
+          "data_points",
+          "total_periods"
+        ],
+        "title": "TrendsResponse",
+        "description": "Response for usage trends over time.\n\nProvides time-series data for usage patterns and trends.",
+        "example": {
+          "data_points": [
+            {
+              "deployment_count": 5,
+              "period": "day",
+              "timestamp": "2024-11-16T00:00:00Z",
+              "top_artifact": "pdf-skill",
+              "unique_artifacts": 3,
+              "usage_count": 42
+            }
+          ],
+          "end_date": "2024-11-16T00:00:00Z",
+          "period_type": "day",
+          "start_date": "2024-10-17T00:00:00Z",
+          "total_periods": 30
+        }
+      },
+      "ValidationError": {
+        "title": "ValidationError",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "loc": {
+            "title": "Location",
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        }
+      },
+      "ValidationErrorDetail": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field",
+            "description": "Name of the field that failed validation",
+            "examples": [
+              "name"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Error message describing the validation failure",
+            "examples": [
+              "Field is required"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Type of validation error",
+            "examples": [
+              "value_error.missing"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "message",
+          "type"
+        ],
+        "title": "ValidationErrorDetail",
+        "description": "Validation error detail for a single field.\n\nProvides structured information about validation errors\nthat occur during request processing."
+      },
+      "ValidationIssueResponse": {
+        "properties": {
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "description": "Issue severity (error, warning, info)"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Issue category (security, schema, integrity, size)"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Issue message"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path",
+            "description": "File path if issue relates to specific file"
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "category",
+          "message"
+        ],
+        "title": "ValidationIssueResponse",
+        "description": "Single validation issue."
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server"
+    },
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Local development API"
+    }
+  ]
+}
