@@ -1,0 +1,402 @@
+name: Performance Tests
+
+on:
+  # Run weekly on Sundays at midnight UTC
+  schedule:
+    - cron: '0 0 * * 0'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - operations
+          - frontend
+          - load
+
+  # Run on pull requests that modify performance-critical code
+  pull_request:
+    paths:
+      - 'skillmeat/api/**'
+      - 'skillmeat/core/**'
+      - 'skillmeat/web/**'
+      - 'tests/performance/**'
+      - '.github/workflows/performance.yml'
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # Job 1: API Benchmarks
+  api-benchmarks:
+    name: API Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'api' || github.event_name == 'schedule' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install requests
+
+      - name: Start API server
+        run: |
+          python -m skillmeat.api.server &
+          echo $! > api_server.pid
+          # Wait for server to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 1; done' || exit 1
+
+      - name: Run API benchmarks
+        run: |
+          python tests/performance/benchmark_api.py \
+            --samples 50 \
+            --output benchmark_api_results.json \
+            --check-server
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f api_server.pid ]; then
+            kill $(cat api_server.pid) || true
+          fi
+
+      - name: Upload API benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-benchmark-results
+          path: benchmark_api_results.json
+          retention-days: 30
+
+      - name: Comment PR with results (if PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('benchmark_api_results.json', 'utf8'));
+
+            let comment = '## 📊 API Performance Benchmark Results\n\n';
+            comment += '| Endpoint | Mean | P95 | P99 | Status |\n';
+            comment += '|----------|------|-----|-----|--------|\n';
+
+            for (const endpoint of results.endpoints) {
+              const status = endpoint.success_rate >= 99 ? '✅' : '⚠️';
+              comment += `| ${endpoint.endpoint} | ${endpoint.mean.toFixed(0)}ms | ${endpoint.p95.toFixed(0)}ms | ${endpoint.p99.toFixed(0)}ms | ${status} |\n`;
+            }
+
+            if (results.sla_violations && results.sla_violations.length > 0) {
+              comment += '\n### ⚠️ SLA Violations\n\n';
+              for (const violation of results.sla_violations) {
+                comment += `- **${violation.endpoint}**: ${violation.metric} ${violation.actual} (target: ${violation.target})\n`;
+              }
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Job 2: Operation Benchmarks
+  operation-benchmarks:
+    name: Core Operation Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'operations' || github.event_name == 'schedule' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run operation benchmarks
+        run: |
+          python tests/performance/benchmark_operations.py \
+            --iterations 5 \
+            --output benchmark_ops_results.json
+
+      - name: Upload operation benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: operation-benchmark-results
+          path: benchmark_ops_results.json
+          retention-days: 30
+
+  # Job 3: Frontend Performance Tests
+  frontend-performance:
+    name: Frontend Performance Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'frontend' || github.event_name == 'schedule' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: skillmeat/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production bundle
+        working-directory: skillmeat/web
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: Install Playwright browsers
+        working-directory: skillmeat/web
+        run: pnpm playwright:install
+
+      - name: Start web server
+        working-directory: skillmeat/web
+        run: |
+          pnpm start &
+          echo $! > web_server.pid
+          # Wait for server to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done' || exit 1
+
+      - name: Run Web Vitals tests
+        working-directory: skillmeat/web
+        run: pnpm test:performance
+
+      - name: Run Lighthouse tests
+        working-directory: skillmeat/web
+        run: pnpm test:lighthouse --url http://localhost:3000
+
+      - name: Stop web server
+        if: always()
+        working-directory: skillmeat/web
+        run: |
+          if [ -f web_server.pid ]; then
+            kill $(cat web_server.pid) || true
+          fi
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: skillmeat/web/lighthouse-reports/
+          retention-days: 30
+
+      - name: Upload Playwright test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-performance-results
+          path: skillmeat/web/playwright-report/
+          retention-days: 30
+
+  # Job 4: Load Testing
+  load-testing:
+    name: Load Testing with Locust
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'load' || github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install locust
+
+      - name: Start API server
+        run: |
+          python -m skillmeat.api.server &
+          echo $! > api_server.pid
+          timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 1; done' || exit 1
+
+      - name: Run load tests
+        run: |
+          locust -f tests/performance/locustfile.py \
+                 --headless \
+                 --users 50 \
+                 --spawn-rate 5 \
+                 --run-time 3m \
+                 --host http://localhost:8000 \
+                 --html locust_report.html \
+                 --csv locust_results
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f api_server.pid ]; then
+            kill $(cat api_server.pid) || true
+          fi
+
+      - name: Upload Locust reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-reports
+          path: |
+            locust_report.html
+            locust_results*.csv
+          retention-days: 30
+
+  # Job 5: SLA Compliance Check
+  sla-check:
+    name: SLA Compliance Check
+    runs-on: ubuntu-latest
+    needs: [api-benchmarks, operation-benchmarks]
+    if: always() && (github.event.inputs.test_type == 'all' || github.event_name == 'schedule' || github.event_name == 'pull_request')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download API benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: api-benchmark-results
+        continue-on-error: true
+
+      - name: Download operation benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: operation-benchmark-results
+        continue-on-error: true
+
+      - name: Run SLA compliance check
+        run: |
+          python tests/performance/check_slas.py \
+            --api-results benchmark_api_results.json \
+            --ops-results benchmark_ops_results.json
+
+      - name: Create performance summary
+        if: always()
+        run: |
+          echo "# Performance Test Summary" > performance_summary.md
+          echo "" >> performance_summary.md
+          echo "## Test Run Information" >> performance_summary.md
+          echo "- **Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> performance_summary.md
+          echo "- **Trigger**: ${{ github.event_name }}" >> performance_summary.md
+          echo "- **Branch**: ${{ github.ref_name }}" >> performance_summary.md
+          echo "" >> performance_summary.md
+
+          if [ -f benchmark_api_results.json ]; then
+            echo "## API Benchmarks" >> performance_summary.md
+            echo "✅ Completed" >> performance_summary.md
+          else
+            echo "## API Benchmarks" >> performance_summary.md
+            echo "❌ Failed or Skipped" >> performance_summary.md
+          fi
+
+          if [ -f benchmark_ops_results.json ]; then
+            echo "## Operation Benchmarks" >> performance_summary.md
+            echo "✅ Completed" >> performance_summary.md
+          else
+            echo "## Operation Benchmarks" >> performance_summary.md
+            echo "❌ Failed or Skipped" >> performance_summary.md
+          fi
+
+          cat performance_summary.md
+
+      - name: Upload performance summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-summary
+          path: performance_summary.md
+          retention-days: 90
+
+  # Job 6: Performance Report
+  performance-report:
+    name: Generate Performance Report
+    runs-on: ubuntu-latest
+    needs: [api-benchmarks, operation-benchmarks, frontend-performance, load-testing, sla-check]
+    if: always() && github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate comprehensive report
+        run: |
+          echo "# Weekly Performance Report" > weekly_report.md
+          echo "" >> weekly_report.md
+          echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> weekly_report.md
+          echo "" >> weekly_report.md
+
+          echo "## Test Results" >> weekly_report.md
+          echo "" >> weekly_report.md
+
+          # List all downloaded artifacts
+          find . -name "*.json" -o -name "*.html" | while read file; do
+            echo "- $file" >> weekly_report.md
+          done
+
+          cat weekly_report.md
+
+      - name: Upload weekly report
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-performance-report
+          path: weekly_report.md
+          retention-days: 365

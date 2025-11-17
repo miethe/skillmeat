@@ -55,6 +55,7 @@ dependencies = [
     "cryptography>=41.0.0",
     "keyring>=24.0.0",
     "jsonschema>=4.0.0",
+    "prometheus-client>=0.19.0",
 ]
 
 [project.urls]
@@ -94,7 +95,8 @@ packages = [
     "skillmeat.utils",
     "skillmeat.web",
     "skillmeat.marketplace",
-    "skillmeat.marketplace.brokers"
+    "skillmeat.marketplace.brokers",
+    "skillmeat.observability"
 ]
 
 [tool.setuptools.package-data]
