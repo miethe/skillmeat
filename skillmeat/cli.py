@@ -698,6 +698,7 @@ def mcp():
       - deploy: Deploy MCP server to Claude Desktop
       - undeploy: Remove MCP server from Claude Desktop
       - list: List MCP servers in collection
+      - health: Check health of deployed MCP servers
     """
     pass
 
@@ -1026,6 +1027,253 @@ def mcp_list(collection: Optional[str], deployed: bool):
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@mcp.command(name="health")
+@click.option(
+    "--server",
+    "-s",
+    default=None,
+    help="Check specific server (default: check all deployed servers)",
+)
+@click.option(
+    "--watch",
+    "-w",
+    is_flag=True,
+    help="Continuous monitoring mode (refresh every N seconds)",
+)
+@click.option(
+    "--interval",
+    "-i",
+    default=5,
+    type=int,
+    help="Watch interval in seconds (default: 5)",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Force fresh health check (ignore cache)",
+)
+def mcp_health(
+    server: Optional[str],
+    watch: bool,
+    interval: int,
+    no_cache: bool,
+):
+    """Check health of deployed MCP servers.
+
+    Monitors MCP server health by analyzing:
+    - Deployment status in Claude Desktop settings.json
+    - Claude Desktop log files for errors and warnings
+    - Server initialization and connection status
+
+    Examples:
+      skillmeat mcp health
+      skillmeat mcp health --server filesystem
+      skillmeat mcp health --watch --interval 10
+    """
+    try:
+        from datetime import datetime
+
+        from rich.table import Table
+
+        from skillmeat.config import ConfigManager
+        from skillmeat.core.mcp.deployment import MCPDeploymentManager
+        from skillmeat.core.mcp.health import HealthStatus, MCPHealthChecker
+
+        # Get configuration
+        config = ConfigManager()
+        github_token = config.get("settings.github-token")
+
+        # Create health checker
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+        health_checker = MCPHealthChecker(deployment_manager=deployment_mgr)
+
+        def display_health_results(results: dict):
+            """Display health check results in table format."""
+            if not results:
+                console.print("[yellow]No deployed MCP servers found[/yellow]")
+                console.print("[cyan]Use 'skillmeat mcp deploy' to deploy a server[/cyan]")
+                return
+
+            # Color mapping for status
+            status_colors = {
+                HealthStatus.HEALTHY: "green",
+                HealthStatus.DEGRADED: "yellow",
+                HealthStatus.UNHEALTHY: "red",
+                HealthStatus.UNKNOWN: "dim",
+                HealthStatus.NOT_DEPLOYED: "dim",
+            }
+
+            # Status symbols
+            status_symbols = {
+                HealthStatus.HEALTHY: "✓",
+                HealthStatus.DEGRADED: "⚠",
+                HealthStatus.UNHEALTHY: "✗",
+                HealthStatus.UNKNOWN: "?",
+                HealthStatus.NOT_DEPLOYED: "-",
+            }
+
+            # Create table
+            table = Table(title=f"MCP Server Health ({len(results)} servers)")
+            table.add_column("Server", style="cyan")
+            table.add_column("Status", style="white")
+            table.add_column("Last Seen", style="blue")
+            table.add_column("Errors", style="red")
+            table.add_column("Warnings", style="yellow")
+
+            for server_name, result in sorted(results.items()):
+                # Format last seen
+                if result.last_seen:
+                    now = datetime.utcnow()
+                    delta = now - result.last_seen
+                    if delta.total_seconds() < 60:
+                        last_seen_str = f"{int(delta.total_seconds())}s ago"
+                    elif delta.total_seconds() < 3600:
+                        last_seen_str = f"{int(delta.total_seconds() / 60)}m ago"
+                    elif delta.total_seconds() < 86400:
+                        last_seen_str = f"{int(delta.total_seconds() / 3600)}h ago"
+                    else:
+                        last_seen_str = f"{int(delta.total_seconds() / 86400)}d ago"
+                else:
+                    last_seen_str = "Never"
+
+                # Format status with color and symbol
+                status_color = status_colors.get(result.status, "white")
+                status_symbol = status_symbols.get(result.status, "")
+                status_str = f"[{status_color}]{status_symbol} {result.status.value.title()}[/{status_color}]"
+
+                table.add_row(
+                    server_name,
+                    status_str,
+                    last_seen_str,
+                    str(result.error_count),
+                    str(result.warning_count),
+                )
+
+            console.print(table)
+
+            # Summary
+            healthy = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
+            degraded = sum(1 for r in results.values() if r.status == HealthStatus.DEGRADED)
+            unhealthy = sum(1 for r in results.values() if r.status == HealthStatus.UNHEALTHY)
+
+            console.print()
+            console.print(
+                f"[green]Healthy: {healthy}[/green]  "
+                f"[yellow]Degraded: {degraded}[/yellow]  "
+                f"[red]Unhealthy: {unhealthy}[/red]"
+            )
+
+        def display_single_server_health(result):
+            """Display detailed health information for a single server."""
+            console.print(f"\n[bold cyan]Server:[/bold cyan] {result.server_name}")
+
+            # Status with color
+            status_colors = {
+                HealthStatus.HEALTHY: "green",
+                HealthStatus.DEGRADED: "yellow",
+                HealthStatus.UNHEALTHY: "red",
+                HealthStatus.UNKNOWN: "dim",
+                HealthStatus.NOT_DEPLOYED: "dim",
+            }
+            status_color = status_colors.get(result.status, "white")
+            console.print(f"[bold]Status:[/bold] [{status_color}]{result.status.value.title()}[/{status_color}]")
+
+            console.print(f"[bold]Deployed:[/bold] {'Yes' if result.deployed else 'No'}")
+
+            if result.last_seen:
+                now = datetime.utcnow()
+                delta = now - result.last_seen
+                if delta.total_seconds() < 60:
+                    last_seen_str = f"{int(delta.total_seconds())} seconds ago"
+                elif delta.total_seconds() < 3600:
+                    last_seen_str = f"{int(delta.total_seconds() / 60)} minutes ago"
+                elif delta.total_seconds() < 86400:
+                    last_seen_str = f"{int(delta.total_seconds() / 3600)} hours ago"
+                else:
+                    last_seen_str = f"{int(delta.total_seconds() / 86400)} days ago"
+                console.print(f"[bold]Last Seen:[/bold] {last_seen_str}")
+            else:
+                console.print("[bold]Last Seen:[/bold] Never")
+
+            console.print(f"[bold]Error Count:[/bold] {result.error_count}")
+            console.print(f"[bold]Warning Count:[/bold] {result.warning_count}")
+
+            # Recent errors
+            if result.recent_errors:
+                console.print("\n[bold red]Recent Errors:[/bold red]")
+                for i, error in enumerate(result.recent_errors, 1):
+                    console.print(f"  {i}. {error}")
+            else:
+                console.print("\n[green]No recent errors[/green]")
+
+            # Recent warnings
+            if result.recent_warnings:
+                console.print("\n[bold yellow]Recent Warnings:[/bold yellow]")
+                for i, warning in enumerate(result.recent_warnings, 1):
+                    console.print(f"  {i}. {warning}")
+            else:
+                console.print("\n[green]No recent warnings[/green]")
+
+            console.print()
+
+        # Watch mode
+        if watch:
+            import time
+
+            console.print(f"[cyan]Watching MCP server health (interval: {interval}s). Press Ctrl+C to stop.[/cyan]\n")
+
+            try:
+                while True:
+                    # Clear screen (cross-platform)
+                    import os
+                    os.system("cls" if os.name == "nt" else "clear")
+
+                    console.print(f"[dim]Last updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC[/dim]\n")
+
+                    # Check health
+                    if server:
+                        result = health_checker.check_server_health(server, use_cache=not no_cache)
+                        display_single_server_health(result)
+                    else:
+                        results = health_checker.check_all_servers(use_cache=not no_cache)
+                        display_health_results(results)
+
+                    # Wait for interval
+                    time.sleep(interval)
+
+            except KeyboardInterrupt:
+                console.print("\n[cyan]Health monitoring stopped[/cyan]")
+                return
+
+        # Single check mode
+        else:
+            if server:
+                # Check specific server
+                result = health_checker.check_server_health(server, use_cache=not no_cache)
+
+                if result.status == HealthStatus.NOT_DEPLOYED:
+                    console.print(f"[yellow]Server '{server}' is not deployed to Claude Desktop[/yellow]")
+                    console.print("[cyan]Use 'skillmeat mcp deploy' to deploy it[/cyan]")
+                    sys.exit(1)
+
+                display_single_server_health(result)
+
+            else:
+                # Check all servers
+                results = health_checker.check_all_servers(use_cache=not no_cache)
+                display_health_results(results)
+
+    except KeyboardInterrupt:
+        console.print("\n[cyan]Health check cancelled[/cyan]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)
 
 

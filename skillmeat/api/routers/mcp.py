@@ -18,15 +18,18 @@ from skillmeat.api.dependencies import (
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.mcp import (
+    AllServersHealthResponse,
     DeploymentRequest,
     DeploymentResponse,
     DeploymentStatusResponse,
+    HealthCheckResponse,
     MCPServerCreateRequest,
     MCPServerListResponse,
     MCPServerResponse,
     MCPServerUpdateRequest,
 )
 from skillmeat.core.mcp.deployment import MCPDeploymentManager
+from skillmeat.core.mcp.health import MCPHealthChecker, HealthStatus
 from skillmeat.core.mcp.metadata import MCPServerMetadata, MCPServerStatus
 
 logger = logging.getLogger(__name__)
@@ -284,7 +287,9 @@ async def create_mcp_server(
         # Save collection
         collection_mgr.save_collection(coll, collection_name)
 
-        logger.info(f"Created MCP server '{request.name}' in collection '{collection_name}'")
+        logger.info(
+            f"Created MCP server '{request.name}' in collection '{collection_name}'"
+        )
         return metadata_to_response(server)
 
     except HTTPException:
@@ -555,9 +560,13 @@ async def deploy_mcp_server(
             return DeploymentResponse(
                 success=True,
                 message=message,
-                settings_path=str(result.settings_path) if result.settings_path else None,
+                settings_path=(
+                    str(result.settings_path) if result.settings_path else None
+                ),
                 backup_path=str(result.backup_path) if result.backup_path else None,
-                env_file_path=str(result.env_file_path) if result.env_file_path else None,
+                env_file_path=(
+                    str(result.env_file_path) if result.env_file_path else None
+                ),
                 command=result.command,
                 args=result.args,
             )
@@ -748,8 +757,174 @@ async def get_deployment_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting deployment status for '{name}': {e}", exc_info=True)
+        logger.error(
+            f"Error getting deployment status for '{name}': {e}", exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get deployment status: {str(e)}",
+        )
+
+
+@router.get(
+    "/servers/{name}/health",
+    response_model=HealthCheckResponse,
+    summary="Check MCP server health",
+    description="Get health status for a specific MCP server",
+    responses={
+        200: {"description": "Successfully retrieved health status"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_server_health(
+    name: str,
+    config_mgr: ConfigManagerDep,
+    token: TokenDep,
+    use_cache: bool = Query(
+        default=True,
+        description="Use cached results (30 second TTL)",
+    ),
+) -> HealthCheckResponse:
+    """Get health status for a specific MCP server.
+
+    Checks:
+    - Whether server is deployed to settings.json
+    - Claude Desktop log files for server status
+    - Recent errors and warnings
+
+    Args:
+        name: Server name
+        config_mgr: Config manager dependency
+        token: Authentication token
+        use_cache: Whether to use cached results
+
+    Returns:
+        Health check result
+
+    Raises:
+        HTTPException: On error
+    """
+    try:
+        logger.info(f"Checking health for MCP server: {name} (use_cache={use_cache})")
+
+        # Get GitHub token if configured
+        github_token = config_mgr.get("github-token")
+
+        # Create health checker
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+        health_checker = MCPHealthChecker(deployment_manager=deployment_mgr)
+
+        # Check server health
+        result = health_checker.check_server_health(name, use_cache=use_cache)
+
+        # Convert to API response
+        return HealthCheckResponse(
+            server_name=result.server_name,
+            status=result.status.value,
+            deployed=result.deployed,
+            last_seen=result.last_seen.isoformat() if result.last_seen else None,
+            error_count=result.error_count,
+            warning_count=result.warning_count,
+            recent_errors=result.recent_errors,
+            recent_warnings=result.recent_warnings,
+            checked_at=result.checked_at.isoformat(),
+        )
+
+    except Exception as e:
+        logger.error(f"Error checking health for '{name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check server health: {str(e)}",
+        )
+
+
+@router.get(
+    "/health",
+    response_model=AllServersHealthResponse,
+    summary="Check all MCP servers health",
+    description="Get health status for all deployed MCP servers",
+    responses={
+        200: {"description": "Successfully retrieved health status for all servers"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_all_servers_health(
+    config_mgr: ConfigManagerDep,
+    token: TokenDep,
+    use_cache: bool = Query(
+        default=True,
+        description="Use cached results (30 second TTL)",
+    ),
+) -> AllServersHealthResponse:
+    """Get health status for all deployed MCP servers.
+
+    Checks all servers deployed to Claude Desktop settings.json
+    and returns their health status.
+
+    Args:
+        config_mgr: Config manager dependency
+        token: Authentication token
+        use_cache: Whether to use cached results
+
+    Returns:
+        Health status for all servers
+
+    Raises:
+        HTTPException: On error
+    """
+    try:
+        logger.info(f"Checking health for all MCP servers (use_cache={use_cache})")
+
+        # Get GitHub token if configured
+        github_token = config_mgr.get("github-token")
+
+        # Create health checker
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+        health_checker = MCPHealthChecker(deployment_manager=deployment_mgr)
+
+        # Check all servers
+        results = health_checker.check_all_servers(use_cache=use_cache)
+
+        # Convert to API response
+        server_responses = {}
+        healthy_count = 0
+        degraded_count = 0
+        unhealthy_count = 0
+
+        for server_name, result in results.items():
+            server_responses[server_name] = HealthCheckResponse(
+                server_name=result.server_name,
+                status=result.status.value,
+                deployed=result.deployed,
+                last_seen=result.last_seen.isoformat() if result.last_seen else None,
+                error_count=result.error_count,
+                warning_count=result.warning_count,
+                recent_errors=result.recent_errors,
+                recent_warnings=result.recent_warnings,
+                checked_at=result.checked_at.isoformat(),
+            )
+
+            # Count by status
+            if result.status == HealthStatus.HEALTHY:
+                healthy_count += 1
+            elif result.status == HealthStatus.DEGRADED:
+                degraded_count += 1
+            elif result.status == HealthStatus.UNHEALTHY:
+                unhealthy_count += 1
+
+        return AllServersHealthResponse(
+            servers=server_responses,
+            total=len(results),
+            healthy=healthy_count,
+            degraded=degraded_count,
+            unhealthy=unhealthy_count,
+        )
+
+    except Exception as e:
+        logger.error(f"Error checking health for all servers: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check servers health: {str(e)}",
         )
