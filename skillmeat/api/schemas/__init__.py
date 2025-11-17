@@ -28,6 +28,17 @@ from .analytics import (
     TrendDataPoint,
     TrendsResponse,
 )
+from .marketplace import (
+    ListingResponse,
+    ListingDetailResponse,
+    ListingsPageResponse,
+    InstallRequest,
+    InstallResponse,
+    PublishRequest,
+    PublishResponse,
+    BrokerInfo,
+    BrokerListResponse,
+)
 
 __all__ = [
     # Common
@@ -51,4 +62,14 @@ __all__ = [
     "TopArtifactsResponse",
     "TrendDataPoint",
     "TrendsResponse",
+    # Marketplace
+    "ListingResponse",
+    "ListingDetailResponse",
+    "ListingsPageResponse",
+    "InstallRequest",
+    "InstallResponse",
+    "PublishRequest",
+    "PublishResponse",
+    "BrokerInfo",
+    "BrokerListResponse",
 ]
