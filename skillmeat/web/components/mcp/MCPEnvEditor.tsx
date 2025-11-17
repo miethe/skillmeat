@@ -35,13 +35,19 @@ export function MCPEnvEditor({
 
   const handleKeyChange = (index: number, key: string) => {
     const newEnvVars = [...envVars];
-    newEnvVars[index] = { ...newEnvVars[index], key };
+    const current = newEnvVars[index];
+    if (!current) return;
+
+    newEnvVars[index] = { ...current, key };
     onChange(newEnvVars);
   };
 
   const handleValueChange = (index: number, value: string) => {
     const newEnvVars = [...envVars];
-    newEnvVars[index] = { ...newEnvVars[index], value };
+    const current = newEnvVars[index];
+    if (!current) return;
+
+    newEnvVars[index] = { ...current, value };
     onChange(newEnvVars);
   };
 
