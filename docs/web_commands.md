@@ -321,27 +321,36 @@ skillmeat web dev --api-port 8080 --web-port 3001
 
 ## Dependencies
 
-**New Dependencies Added:**
+- **New Dependencies Added:**
+
 - None (all dependencies already in `pyproject.toml`)
   - `requests` ≥2.25.0 (for health checks)
   - `fastapi` ≥0.104.0
   - `uvicorn[standard]` ≥0.24.0
 
-**External Requirements:**
+- **External Requirements:**
+
 - Node.js ≥18.18.0
 - pnpm ≥8.0.0
+
+## Dependency Installation & Packaging
+
+- **Install locally:** `python -m pip install --upgrade pip build` followed by `python -m pip install --editable .` to pull `pyproject.toml`'s dependencies (including `fastapi` and `uvicorn`) into your virtual environment. Use `python -m pip install fastapi uvicorn[standard]` only when you need to augment an environment outside the project.
+- **Package for reuse:** `python -m build` produces wheel/sdist artifacts in `dist/`; install those on other machines with `python -m pip install dist/skillmeat-*.whl` or upload them to your private index. The metadata already records `fastapi`/`uvicorn`, so downstream installs inherit the same requirements.
 
 ## Files Modified/Created
 
 ### Created Files
 
-**Core Implementation:**
+- **Core Implementation:**
+
 - `/home/user/skillmeat/skillmeat/web/__init__.py` - Package exports
 - `/home/user/skillmeat/skillmeat/web/requirements.py` - Prerequisites checker
 - `/home/user/skillmeat/skillmeat/web/doctor.py` - Environment diagnostics
 - `/home/user/skillmeat/skillmeat/web/manager.py` - Process manager
 
 **Tests:**
+
 - `/home/user/skillmeat/tests/web/__init__.py` - Test package
 - `/home/user/skillmeat/tests/web/test_requirements.py` - Requirements tests
 - `/home/user/skillmeat/tests/web/test_doctor.py` - Doctor tests
@@ -366,6 +375,7 @@ skillmeat web dev --api-port 8080 --web-port 3001
 - [x] Logs from both servers combined with prefixes ✅
 
 **Bonus Features Implemented:**
+
 - Color-coded log output
 - Health checks for both servers
 - Port availability checking
