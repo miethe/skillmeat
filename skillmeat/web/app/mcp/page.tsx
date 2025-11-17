@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useMcpServers,
   useCreateMcpServer,
-  useDeleteMcpServer,
 } from "@/hooks/useMcpServers";
 import { MCPServerList } from "@/components/mcp/MCPServerList";
 import { MCPServerForm } from "@/components/mcp/MCPServerForm";
@@ -26,17 +25,14 @@ export default function McpPage() {
 
   // State
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [selectedServer, setSelectedServer] = useState<MCPServer | undefined>();
 
   // Data fetching
   const { data, isLoading, error, refetch } = useMcpServers();
 
   // Mutations
   const createMutation = useCreateMcpServer();
-  const deleteMutation = useDeleteMcpServer();
 
   const handleAddServer = () => {
-    setSelectedServer(undefined);
     setShowAddDialog(true);
   };
 

@@ -8,24 +8,10 @@ import {
   Plus,
   RefreshCcw,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import type { MCPServer, MCPServerFilters, MCPServerStatus } from "@/types/mcp";
 import { MCPServerCard } from "./MCPServerCard";
 
@@ -36,13 +22,6 @@ interface MCPServerListProps {
   onAddServer: () => void;
   onRefresh?: () => void;
 }
-
-const statusColors: Record<MCPServerStatus, string> = {
-  installed: "bg-green-500/10 text-green-600 border-green-500/20",
-  not_installed: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-  updating: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  error: "bg-red-500/10 text-red-600 border-red-500/20",
-};
 
 function MCPServerListSkeleton() {
   return (
@@ -128,22 +107,22 @@ export function MCPServerList({
             />
           </div>
 
-          <Select
-            value={filters.status}
-            onValueChange={handleStatusFilterChange}
-          >
-            <SelectTrigger className="w-[150px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="installed">Installed</SelectItem>
-              <SelectItem value="not_installed">Not Installed</SelectItem>
-              <SelectItem value="updating">Updating</SelectItem>
-              <SelectItem value="error">Error</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-[150px]">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select
+                value={filters.status}
+                onChange={(e) => handleStatusFilterChange(e.target.value)}
+                className="w-full"
+              >
+                <option value="all">All Status</option>
+                <option value="installed">Installed</option>
+                <option value="not_installed">Not Installed</option>
+                <option value="updating">Updating</option>
+                <option value="error">Error</option>
+              </Select>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

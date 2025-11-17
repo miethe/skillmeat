@@ -235,7 +235,6 @@ export function useUndeployMcpServer(name: string, collection?: string) {
  * Hook for batch operations (select multiple servers)
  */
 export function useMcpBatchOperations(collection?: string) {
-  const queryClient = useQueryClient();
   const deleteMutation = useDeleteMcpServer(collection);
 
   const deleteMultiple = async (names: string[]) => {
