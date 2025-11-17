@@ -4,9 +4,9 @@ Handles importing artifact bundles into collections with comprehensive validatio
 conflict resolution, and rollback support.
 """
 
+import json
 import logging
 import shutil
-import sys
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
@@ -14,14 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-if sys.version_info >= (3, 11):
-    import tomllib
-
-    TOML_LOADS = tomllib.loads
-else:
-    import tomli as tomllib
-
-    TOML_LOADS = tomllib.loads
+from skillmeat.utils.toml_compat import loads as toml_loads
 
 from rich.console import Console
 
@@ -180,10 +173,8 @@ class BundleImporter:
             verifier = BundleVerifier(key_manager)
 
             # Read manifest from bundle
-            import zipfile
-
             with zipfile.ZipFile(bundle_path, "r") as zf:
-                manifest_data = __import__("json").loads(
+                manifest_data = json.loads(
                     zf.read("manifest.json")
                 )
 
@@ -436,7 +427,7 @@ class BundleImporter:
             raise FileNotFoundError(f"Manifest not found: {manifest_path}")
 
         with open(manifest_path, "rb") as f:
-            return TOML_LOADS(f.read().decode("utf-8"))
+            return toml_loads(f.read().decode("utf-8"))
 
     def _detect_conflicts(
         self, manifest_data: Dict[str, Any], collection: Collection

@@ -159,26 +159,6 @@ class KeychainStorage(TokenStorage):
         """
         return f"token:{token_id}"
 
-    def store(self, token_id: str, token_data: str) -> None:
-        """Store a token in the keychain.
-
-        Args:
-            token_id: Unique identifier for the token
-            token_data: Serialized token data (JSON string)
-
-        Raises:
-            StorageError: If storage operation fails
-        """
-        if not self.available:
-            raise RuntimeError("Keychain storage not available")
-
-        try:
-            key_name = self._get_key_name(token_id)
-            self.keyring.set_password(self.SERVICE_NAME, key_name, token_data)
-            logger.debug(f"Token stored in keychain: {token_id[:8]}...")
-        except self.KeyringError as e:
-            raise RuntimeError(f"Failed to store token in keychain: {e}")
-
     def retrieve(self, token_id: str) -> Optional[str]:
         """Retrieve a token from the keychain.
 
@@ -202,33 +182,6 @@ class KeychainStorage(TokenStorage):
             return token_data
         except self.KeyringError as e:
             raise RuntimeError(f"Failed to retrieve token from keychain: {e}")
-
-    def delete(self, token_id: str) -> bool:
-        """Delete a token from the keychain.
-
-        Args:
-            token_id: Unique identifier for the token
-
-        Returns:
-            True if token was deleted, False if not found
-
-        Raises:
-            StorageError: If deletion operation fails
-        """
-        if not self.available:
-            raise RuntimeError("Keychain storage not available")
-
-        try:
-            key_name = self._get_key_name(token_id)
-            # Check if token exists first
-            if self.keyring.get_password(self.SERVICE_NAME, key_name) is None:
-                return False
-
-            self.keyring.delete_password(self.SERVICE_NAME, key_name)
-            logger.debug(f"Token deleted from keychain: {token_id[:8]}...")
-            return True
-        except self.KeyringError as e:
-            raise RuntimeError(f"Failed to delete token from keychain: {e}")
 
     def list_tokens(self) -> List[str]:
         """List all stored token IDs.

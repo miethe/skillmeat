@@ -154,16 +154,22 @@ class ProgressInfo:
     Attributes:
         current: Current bytes transferred
         total: Total bytes to transfer
-        percentage: Progress percentage (0-100)
         operation: Operation type ("upload" or "download")
         bundle_name: Name of bundle being transferred
+        percentage: Progress percentage (0-100), computed property
     """
 
     current: int
     total: int
-    percentage: float
     operation: str
     bundle_name: str
+
+    @property
+    def percentage(self) -> float:
+        """Progress percentage (0-100), computed from current and total."""
+        if self.total == 0:
+            return 0.0
+        return (self.current / self.total) * 100
 
 
 # Type alias for progress callbacks
@@ -429,11 +435,9 @@ class VaultConnector(ABC):
         Returns:
             ProgressInfo instance
         """
-        percentage = (current / total * 100) if total > 0 else 0.0
         return ProgressInfo(
             current=current,
             total=total,
-            percentage=percentage,
             operation=operation,
             bundle_name=bundle_name,
         )

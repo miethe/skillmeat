@@ -38,7 +38,7 @@ class BundleImportRequest(BaseModel):
         description="Expected SHA-256 hash for verification",
     )
 
-    @field_validator("strategy")
+    @field_validator("strategy", mode="after")
     @classmethod
     def validate_strategy(cls, v: str) -> str:
         """Validate strategy is one of allowed values."""
