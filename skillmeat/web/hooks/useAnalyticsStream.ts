@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { AnalyticsEvent } from '@/types/analytics';
 
 // Environment configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'dev-key-12345';
 
