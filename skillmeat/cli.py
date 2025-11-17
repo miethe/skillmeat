@@ -25,6 +25,7 @@ from skillmeat.core.artifact import ArtifactManager, ArtifactType, UpdateStrateg
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.core.version import VersionManager
 from skillmeat.core.diff_engine import DiffEngine
+from skillmeat.core.mcp import MCPDeploymentManager, MCPServerMetadata
 from skillmeat.sources.github import GitHubSource
 from skillmeat.sources.local import LocalSource
 from skillmeat.utils.validator import ArtifactValidator
@@ -680,6 +681,599 @@ def undeploy(
         sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+# ====================
+# MCP Server Management
+# ====================
+
+
+@main.group()
+def mcp():
+    """Manage MCP (Model Context Protocol) servers.
+
+    Use subcommands to manage MCP servers in your collection:
+      - add: Add MCP server to collection
+      - deploy: Deploy MCP server to Claude Desktop
+      - undeploy: Remove MCP server from Claude Desktop
+      - list: List MCP servers in collection
+      - health: Check health of deployed MCP servers
+    """
+    pass
+
+
+@mcp.command(name="add")
+@click.argument("name")
+@click.argument("repo")
+@click.option(
+    "--version",
+    "-v",
+    default="latest",
+    help="Version specification (latest, v1.0.0, SHA, branch)",
+)
+@click.option(
+    "--env",
+    "-e",
+    multiple=True,
+    help="Environment variables (format: KEY=value)",
+)
+@click.option(
+    "--description",
+    "-d",
+    default=None,
+    help="Description of the MCP server",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+def mcp_add(
+    name: str,
+    repo: str,
+    version: str,
+    env: tuple,
+    description: Optional[str],
+    collection: Optional[str],
+):
+    """Add MCP server to collection.
+
+    NAME: Unique identifier for the MCP server
+    REPO: GitHub repository (user/repo or full URL)
+
+    Examples:
+      skillmeat mcp add filesystem anthropics/mcp-filesystem
+      skillmeat mcp add filesystem anthropics/mcp-filesystem --version v1.0.0
+      skillmeat mcp add custom user/mcp-server --env ROOT_PATH=/home/user
+    """
+    try:
+        collection_mgr = CollectionManager()
+        collection_obj = collection_mgr.load_collection(collection)
+
+        # Parse environment variables
+        env_vars = {}
+        for env_pair in env:
+            if "=" not in env_pair:
+                console.print(f"[yellow]Invalid env format: {env_pair}. Use KEY=value[/yellow]")
+                sys.exit(1)
+            key, value = env_pair.split("=", 1)
+            env_vars[key] = value
+
+        # Create MCP server metadata
+        server = MCPServerMetadata(
+            name=name,
+            repo=repo,
+            version=version,
+            env_vars=env_vars,
+            description=description,
+        )
+
+        # Add to collection
+        collection_obj.add_mcp_server(server)
+        collection_mgr.save_collection(collection_obj)
+
+        console.print(f"[green]Added MCP server '{name}' to collection[/green]")
+        console.print(f"  Repository: {repo}")
+        console.print(f"  Version: {version}")
+        if env_vars:
+            console.print(f"  Environment variables: {len(env_vars)}")
+
+    except ValueError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@mcp.command(name="deploy")
+@click.argument("name")
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+@click.option(
+    "--project",
+    "-p",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    help="Project path for project-specific deployment",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be deployed without making changes",
+)
+@click.option(
+    "--backup/--no-backup",
+    default=True,
+    help="Create backup of settings.json before deployment (default: yes)",
+)
+@click.option(
+    "--dangerously-skip-permissions",
+    is_flag=True,
+    help="Skip permission warnings (not recommended)",
+)
+def mcp_deploy(
+    name: str,
+    collection: Optional[str],
+    project: Optional[Path],
+    dry_run: bool,
+    backup: bool,
+    dangerously_skip_permissions: bool,
+):
+    """Deploy MCP server to Claude Desktop settings.json.
+
+    NAME: Name of the MCP server to deploy
+
+    This command:
+    1. Resolves the MCP server repository and version
+    2. Clones the repository and reads package.json
+    3. Creates a backup of Claude Desktop settings.json
+    4. Updates settings.json with server configuration
+    5. Scaffolds environment variables if needed
+
+    Examples:
+      skillmeat mcp deploy filesystem
+      skillmeat mcp deploy filesystem --dry-run
+      skillmeat mcp deploy filesystem --project ~/myproject
+      skillmeat mcp deploy filesystem --no-backup
+    """
+    try:
+        # Security warning
+        if not dangerously_skip_permissions:
+            console.print("[yellow]Security warning: MCP servers can execute code and access system resources.[/yellow]")
+            console.print()
+            console.print("Before deploying an MCP server, please consider:")
+            console.print("  - Install only from trusted sources")
+            console.print("  - Review what the server does before use")
+            console.print("  - MCP servers can access files and system commands")
+            console.print()
+
+            if not dry_run:
+                if not Confirm.ask("Do you want to continue?", default=False):
+                    console.print("[yellow]Deployment cancelled[/yellow]")
+                    return
+
+        # Load collection and find MCP server
+        collection_mgr = CollectionManager()
+        collection_obj = collection_mgr.load_collection(collection)
+
+        server = collection_obj.find_mcp_server(name)
+        if server is None:
+            console.print(f"[red]MCP server '{name}' not found in collection[/red]")
+            console.print("[yellow]Use 'skillmeat mcp add' to add it first[/yellow]")
+            sys.exit(1)
+
+        # Get GitHub token from config
+        config = ConfigManager()
+        github_token = config.get("settings.github-token")
+
+        # Deploy server
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+        result = deployment_mgr.deploy_server(
+            server=server,
+            project_path=project,
+            dry_run=dry_run,
+            backup=backup,
+        )
+
+        if result.success:
+            if not dry_run:
+                # Update collection with new status
+                collection_mgr.save_collection(collection_obj)
+
+            console.print()
+            console.print(Panel(
+                f"[green]MCP server '{result.server_name}' deployed successfully[/green]\n\n"
+                f"Command: {result.command}\n"
+                f"Args: {' '.join(result.args or [])}\n"
+                f"Settings: {result.settings_path}\n"
+                + (f"Backup: {result.backup_path}\n" if result.backup_path else "")
+                + (f"Environment: {result.env_file_path}\n" if result.env_file_path else "")
+                + "\n[yellow]Next steps:[/yellow]\n"
+                + "1. Restart Claude Desktop to load the new MCP server\n"
+                + "2. Check Claude Desktop logs if server doesn't appear\n"
+                + (f"3. Update environment variables in {result.env_file_path}" if result.env_file_path else ""),
+                title="Deployment Complete",
+                border_style="green",
+            ))
+        else:
+            console.print(f"[red]Deployment failed: {result.error_message}[/red]")
+            sys.exit(1)
+
+    except ValueError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@mcp.command(name="undeploy")
+@click.argument("name")
+@click.option(
+    "--backup/--no-backup",
+    default=True,
+    help="Create backup before removing (default: yes)",
+)
+def mcp_undeploy(name: str, backup: bool):
+    """Remove MCP server from Claude Desktop settings.json.
+
+    NAME: Name of the MCP server to remove
+
+    Examples:
+      skillmeat mcp undeploy filesystem
+      skillmeat mcp undeploy filesystem --no-backup
+    """
+    try:
+        config = ConfigManager()
+        github_token = config.get("settings.github-token")
+
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+
+        # Check if server is deployed
+        if not deployment_mgr.is_server_deployed(name):
+            console.print(f"[yellow]MCP server '{name}' is not deployed[/yellow]")
+            return
+
+        # Undeploy
+        success = deployment_mgr.undeploy_server(name)
+
+        if success:
+            console.print(f"[green]MCP server '{name}' removed from Claude Desktop[/green]")
+            console.print("[yellow]Restart Claude Desktop to apply changes[/yellow]")
+        else:
+            console.print(f"[yellow]Failed to undeploy server '{name}'[/yellow]")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@mcp.command(name="list")
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+@click.option(
+    "--deployed",
+    is_flag=True,
+    help="Show deployment status in Claude Desktop",
+)
+def mcp_list(collection: Optional[str], deployed: bool):
+    """List MCP servers in collection.
+
+    Examples:
+      skillmeat mcp list
+      skillmeat mcp list --deployed
+      skillmeat mcp list --collection work
+    """
+    try:
+        collection_mgr = CollectionManager()
+        collection_obj = collection_mgr.load_collection(collection)
+
+        servers = collection_obj.list_mcp_servers()
+
+        if not servers:
+            console.print("[yellow]No MCP servers in collection[/yellow]")
+            console.print("[cyan]Use 'skillmeat mcp add' to add one[/cyan]")
+            return
+
+        # Get deployment status if requested
+        deployment_status = {}
+        if deployed:
+            config = ConfigManager()
+            github_token = config.get("settings.github-token")
+            deployment_mgr = MCPDeploymentManager(github_token=github_token)
+            deployed_servers = deployment_mgr.get_deployed_servers()
+            for server_name in deployed_servers:
+                deployment_status[server_name] = True
+
+        # Create table
+        table = Table(title=f"MCP Servers ({len(servers)})")
+        table.add_column("Name", style="cyan")
+        table.add_column("Repository", style="blue")
+        table.add_column("Version", style="green")
+        table.add_column("Status", style="yellow")
+        if deployed:
+            table.add_column("Deployed", style="magenta")
+
+        for server in servers:
+            row = [
+                server.name,
+                server.repo,
+                server.version,
+                server.status.value,
+            ]
+            if deployed:
+                is_deployed = deployment_status.get(server.name, False)
+                row.append("Yes" if is_deployed else "No")
+            table.add_row(*row)
+
+        console.print(table)
+
+        # Show summary
+        if deployed:
+            deployed_count = sum(1 for s in servers if deployment_status.get(s.name, False))
+            console.print(f"\n[cyan]{deployed_count} of {len(servers)} servers deployed to Claude Desktop[/cyan]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@mcp.command(name="health")
+@click.option(
+    "--server",
+    "-s",
+    default=None,
+    help="Check specific server (default: check all deployed servers)",
+)
+@click.option(
+    "--watch",
+    "-w",
+    is_flag=True,
+    help="Continuous monitoring mode (refresh every N seconds)",
+)
+@click.option(
+    "--interval",
+    "-i",
+    default=5,
+    type=int,
+    help="Watch interval in seconds (default: 5)",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Force fresh health check (ignore cache)",
+)
+def mcp_health(
+    server: Optional[str],
+    watch: bool,
+    interval: int,
+    no_cache: bool,
+):
+    """Check health of deployed MCP servers.
+
+    Monitors MCP server health by analyzing:
+    - Deployment status in Claude Desktop settings.json
+    - Claude Desktop log files for errors and warnings
+    - Server initialization and connection status
+
+    Examples:
+      skillmeat mcp health
+      skillmeat mcp health --server filesystem
+      skillmeat mcp health --watch --interval 10
+    """
+    try:
+        from datetime import datetime
+
+        from rich.table import Table
+
+        from skillmeat.config import ConfigManager
+        from skillmeat.core.mcp.deployment import MCPDeploymentManager
+        from skillmeat.core.mcp.health import HealthStatus, MCPHealthChecker
+
+        # Get configuration
+        config = ConfigManager()
+        github_token = config.get("settings.github-token")
+
+        # Create health checker
+        deployment_mgr = MCPDeploymentManager(github_token=github_token)
+        health_checker = MCPHealthChecker(deployment_manager=deployment_mgr)
+
+        def display_health_results(results: dict):
+            """Display health check results in table format."""
+            if not results:
+                console.print("[yellow]No deployed MCP servers found[/yellow]")
+                console.print("[cyan]Use 'skillmeat mcp deploy' to deploy a server[/cyan]")
+                return
+
+            # Color mapping for status
+            status_colors = {
+                HealthStatus.HEALTHY: "green",
+                HealthStatus.DEGRADED: "yellow",
+                HealthStatus.UNHEALTHY: "red",
+                HealthStatus.UNKNOWN: "dim",
+                HealthStatus.NOT_DEPLOYED: "dim",
+            }
+
+            # Status symbols
+            status_symbols = {
+                HealthStatus.HEALTHY: "✓",
+                HealthStatus.DEGRADED: "⚠",
+                HealthStatus.UNHEALTHY: "✗",
+                HealthStatus.UNKNOWN: "?",
+                HealthStatus.NOT_DEPLOYED: "-",
+            }
+
+            # Create table
+            table = Table(title=f"MCP Server Health ({len(results)} servers)")
+            table.add_column("Server", style="cyan")
+            table.add_column("Status", style="white")
+            table.add_column("Last Seen", style="blue")
+            table.add_column("Errors", style="red")
+            table.add_column("Warnings", style="yellow")
+
+            for server_name, result in sorted(results.items()):
+                # Format last seen
+                if result.last_seen:
+                    now = datetime.utcnow()
+                    delta = now - result.last_seen
+                    if delta.total_seconds() < 60:
+                        last_seen_str = f"{int(delta.total_seconds())}s ago"
+                    elif delta.total_seconds() < 3600:
+                        last_seen_str = f"{int(delta.total_seconds() / 60)}m ago"
+                    elif delta.total_seconds() < 86400:
+                        last_seen_str = f"{int(delta.total_seconds() / 3600)}h ago"
+                    else:
+                        last_seen_str = f"{int(delta.total_seconds() / 86400)}d ago"
+                else:
+                    last_seen_str = "Never"
+
+                # Format status with color and symbol
+                status_color = status_colors.get(result.status, "white")
+                status_symbol = status_symbols.get(result.status, "")
+                status_str = f"[{status_color}]{status_symbol} {result.status.value.title()}[/{status_color}]"
+
+                table.add_row(
+                    server_name,
+                    status_str,
+                    last_seen_str,
+                    str(result.error_count),
+                    str(result.warning_count),
+                )
+
+            console.print(table)
+
+            # Summary
+            healthy = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
+            degraded = sum(1 for r in results.values() if r.status == HealthStatus.DEGRADED)
+            unhealthy = sum(1 for r in results.values() if r.status == HealthStatus.UNHEALTHY)
+
+            console.print()
+            console.print(
+                f"[green]Healthy: {healthy}[/green]  "
+                f"[yellow]Degraded: {degraded}[/yellow]  "
+                f"[red]Unhealthy: {unhealthy}[/red]"
+            )
+
+        def display_single_server_health(result):
+            """Display detailed health information for a single server."""
+            console.print(f"\n[bold cyan]Server:[/bold cyan] {result.server_name}")
+
+            # Status with color
+            status_colors = {
+                HealthStatus.HEALTHY: "green",
+                HealthStatus.DEGRADED: "yellow",
+                HealthStatus.UNHEALTHY: "red",
+                HealthStatus.UNKNOWN: "dim",
+                HealthStatus.NOT_DEPLOYED: "dim",
+            }
+            status_color = status_colors.get(result.status, "white")
+            console.print(f"[bold]Status:[/bold] [{status_color}]{result.status.value.title()}[/{status_color}]")
+
+            console.print(f"[bold]Deployed:[/bold] {'Yes' if result.deployed else 'No'}")
+
+            if result.last_seen:
+                now = datetime.utcnow()
+                delta = now - result.last_seen
+                if delta.total_seconds() < 60:
+                    last_seen_str = f"{int(delta.total_seconds())} seconds ago"
+                elif delta.total_seconds() < 3600:
+                    last_seen_str = f"{int(delta.total_seconds() / 60)} minutes ago"
+                elif delta.total_seconds() < 86400:
+                    last_seen_str = f"{int(delta.total_seconds() / 3600)} hours ago"
+                else:
+                    last_seen_str = f"{int(delta.total_seconds() / 86400)} days ago"
+                console.print(f"[bold]Last Seen:[/bold] {last_seen_str}")
+            else:
+                console.print("[bold]Last Seen:[/bold] Never")
+
+            console.print(f"[bold]Error Count:[/bold] {result.error_count}")
+            console.print(f"[bold]Warning Count:[/bold] {result.warning_count}")
+
+            # Recent errors
+            if result.recent_errors:
+                console.print("\n[bold red]Recent Errors:[/bold red]")
+                for i, error in enumerate(result.recent_errors, 1):
+                    console.print(f"  {i}. {error}")
+            else:
+                console.print("\n[green]No recent errors[/green]")
+
+            # Recent warnings
+            if result.recent_warnings:
+                console.print("\n[bold yellow]Recent Warnings:[/bold yellow]")
+                for i, warning in enumerate(result.recent_warnings, 1):
+                    console.print(f"  {i}. {warning}")
+            else:
+                console.print("\n[green]No recent warnings[/green]")
+
+            console.print()
+
+        # Watch mode
+        if watch:
+            import time
+
+            console.print(f"[cyan]Watching MCP server health (interval: {interval}s). Press Ctrl+C to stop.[/cyan]\n")
+
+            try:
+                while True:
+                    # Clear screen (cross-platform)
+                    import os
+                    os.system("cls" if os.name == "nt" else "clear")
+
+                    console.print(f"[dim]Last updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC[/dim]\n")
+
+                    # Check health
+                    if server:
+                        result = health_checker.check_server_health(server, use_cache=not no_cache)
+                        display_single_server_health(result)
+                    else:
+                        results = health_checker.check_all_servers(use_cache=not no_cache)
+                        display_health_results(results)
+
+                    # Wait for interval
+                    time.sleep(interval)
+
+            except KeyboardInterrupt:
+                console.print("\n[cyan]Health monitoring stopped[/cyan]")
+                return
+
+        # Single check mode
+        else:
+            if server:
+                # Check specific server
+                result = health_checker.check_server_health(server, use_cache=not no_cache)
+
+                if result.status == HealthStatus.NOT_DEPLOYED:
+                    console.print(f"[yellow]Server '{server}' is not deployed to Claude Desktop[/yellow]")
+                    console.print("[cyan]Use 'skillmeat mcp deploy' to deploy it[/cyan]")
+                    sys.exit(1)
+
+                display_single_server_health(result)
+
+            else:
+                # Check all servers
+                results = health_checker.check_all_servers(use_cache=not no_cache)
+                display_health_results(results)
+
+    except KeyboardInterrupt:
+        console.print("\n[cyan]Health check cancelled[/cyan]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)
 
 

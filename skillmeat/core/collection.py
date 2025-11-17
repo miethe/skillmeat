@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .artifact import Artifact, ArtifactType
+from .mcp.metadata import MCPServerMetadata
 
 
 @dataclass
@@ -18,6 +19,7 @@ class Collection:
     artifacts: List[Artifact]
     created: datetime
     updated: datetime
+    mcp_servers: List[MCPServerMetadata] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate collection configuration."""
@@ -93,9 +95,73 @@ class Collection:
                 return True
         return False
 
+    def find_mcp_server(self, name: str) -> Optional[MCPServerMetadata]:
+        """Find MCP server by name.
+
+        Args:
+            name: MCP server name
+
+        Returns:
+            MCPServerMetadata if found, None otherwise
+        """
+        for server in self.mcp_servers:
+            if server.name == name:
+                return server
+        return None
+
+    def add_mcp_server(self, server: MCPServerMetadata) -> None:
+        """Add MCP server to collection.
+
+        Args:
+            server: MCPServerMetadata to add
+
+        Raises:
+            ValueError: If MCP server with same name already exists
+        """
+        existing = self.find_mcp_server(server.name)
+        if existing is not None:
+            raise ValueError(
+                f"MCP server '{server.name}' already exists in collection"
+            )
+        self.mcp_servers.append(server)
+
+    def remove_mcp_server(self, name: str) -> bool:
+        """Remove MCP server by name.
+
+        Args:
+            name: MCP server name
+
+        Returns:
+            True if removed, False if not found
+        """
+        for i, server in enumerate(self.mcp_servers):
+            if server.name == name:
+                self.mcp_servers.pop(i)
+                return True
+        return False
+
+    def list_mcp_servers(self) -> List[MCPServerMetadata]:
+        """List all MCP servers in the collection.
+
+        Returns:
+            List of MCPServerMetadata objects
+        """
+        return self.mcp_servers.copy()
+
+    def get_mcp_server(self, name: str) -> Optional[MCPServerMetadata]:
+        """Get MCP server by name (alias for find_mcp_server).
+
+        Args:
+            name: MCP server name
+
+        Returns:
+            MCPServerMetadata if found, None otherwise
+        """
+        return self.find_mcp_server(name)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for TOML serialization."""
-        return {
+        result = {
             "collection": {
                 "name": self.name,
                 "version": self.version,
@@ -105,11 +171,20 @@ class Collection:
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
         }
 
+        # Add MCP servers if present
+        if self.mcp_servers:
+            result["mcp_servers"] = [
+                server.to_dict() for server in self.mcp_servers
+            ]
+
+        return result
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Collection":
         """Create from dictionary (TOML deserialization)."""
         collection_data = data.get("collection", {})
         artifacts_data = data.get("artifacts", [])
+        mcp_servers_data = data.get("mcp_servers", [])
 
         # Parse datetimes
         created = datetime.fromisoformat(collection_data["created"])
@@ -120,12 +195,19 @@ class Collection:
             Artifact.from_dict(artifact_data) for artifact_data in artifacts_data
         ]
 
+        # Parse MCP servers
+        mcp_servers = [
+            MCPServerMetadata.from_dict(server_data)
+            for server_data in mcp_servers_data
+        ]
+
         return cls(
             name=collection_data["name"],
             version=collection_data["version"],
             created=created,
             updated=updated,
             artifacts=artifacts,
+            mcp_servers=mcp_servers,
         )
 
 
