@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from skillmeat.api.dependencies import APIKeyDep, ConfigManagerDep
+from skillmeat.api.dependencies import ConfigManagerDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.analytics import (
     AnalyticsSummaryResponse,
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/analytics",
     tags=["analytics"],
-    dependencies=[Depends(APIKeyDep)],  # All endpoints require API key
+    dependencies=[Depends(verify_api_key)],  # All endpoints require API key
 )
 
 

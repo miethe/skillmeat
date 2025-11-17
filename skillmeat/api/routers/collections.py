@@ -11,9 +11,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
-    APIKeyDep,
     ArtifactManagerDep,
     CollectionManagerDep,
+    verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.collections import (
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/collections",
     tags=["collections"],
-    dependencies=[Depends(APIKeyDep)],  # All endpoints require API key
+    dependencies=[Depends(verify_api_key)],  # All endpoints require API key
 )
 
 
