@@ -7204,6 +7204,534 @@ def verify_bundle(bundle_path, require_signature):
 
 
 # ====================
+# Marketplace Commands
+# ====================
+
+
+@main.group()
+def marketplace():
+    """Marketplace publishing and discovery commands.
+
+    Publish bundles to marketplaces, check submission status, and manage
+    marketplace listings.
+
+    Examples:
+      skillmeat marketplace publish my-bundle.skillmeat-pack
+      skillmeat marketplace status sub-2025-11-17-abc123
+      skillmeat marketplace submissions
+    """
+    pass
+
+
+@marketplace.command(name="publish")
+@click.argument("bundle_path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--name",
+    "-n",
+    help="Listing name (required)",
+)
+@click.option(
+    "--description",
+    "-d",
+    help="Description (required)",
+)
+@click.option(
+    "--category",
+    "-c",
+    type=click.Choice(["skill", "command", "agent", "hook", "mcp-server", "bundle"]),
+    help="Category (required)",
+)
+@click.option(
+    "--version",
+    "-v",
+    help="Version (default: from bundle)",
+)
+@click.option(
+    "--license",
+    "-l",
+    help="License identifier (default: from bundle)",
+)
+@click.option(
+    "--tags",
+    "-t",
+    help="Comma-separated tags",
+)
+@click.option(
+    "--homepage",
+    help="Homepage URL",
+)
+@click.option(
+    "--repository",
+    help="Repository URL",
+)
+@click.option(
+    "--broker",
+    "-b",
+    default="skillmeat",
+    help="Marketplace broker name (default: skillmeat)",
+)
+@click.option(
+    "--sign/--no-sign",
+    default=True,
+    help="Sign bundle before publishing (default: yes)",
+)
+@click.option(
+    "--key-id",
+    help="Signing key ID (uses default if not specified)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Validate without publishing",
+)
+def publish_bundle_cmd(
+    bundle_path: Path,
+    name: Optional[str],
+    description: Optional[str],
+    category: Optional[str],
+    version: Optional[str],
+    license: Optional[str],
+    tags: Optional[str],
+    homepage: Optional[str],
+    repository: Optional[str],
+    broker: str,
+    sign: bool,
+    key_id: Optional[str],
+    dry_run: bool,
+):
+    """Publish a bundle to a marketplace.
+
+    Validates metadata, checks license compatibility, signs the bundle,
+    and submits it to the specified marketplace broker.
+
+    Examples:
+      skillmeat marketplace publish my-bundle.skillmeat-pack
+      skillmeat marketplace publish bundle.skillmeat-pack --broker skillmeat
+      skillmeat marketplace publish bundle.skillmeat-pack --dry-run
+    """
+    try:
+        from skillmeat.core.marketplace.publisher import PublisherService
+        from skillmeat.core.marketplace.service import MarketplaceService
+        from skillmeat.core.sharing.builder import inspect_bundle
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+
+        console.print(Panel(
+            "[bold cyan]Publishing Bundle to Marketplace[/bold cyan]",
+            expand=False,
+        ))
+        console.print()
+
+        # Initialize services
+        marketplace_service = MarketplaceService()
+        publisher_service = PublisherService()
+
+        # Register available brokers
+        for broker_name, broker_instance in marketplace_service._brokers.items():
+            publisher_service.register_broker(broker_instance)
+
+        # Inspect bundle to get metadata
+        console.print("[cyan]Inspecting bundle...[/cyan]")
+        bundle = inspect_bundle(bundle_path)
+
+        # Display bundle info
+        console.print(f"  Bundle: {bundle.metadata.name}")
+        console.print(f"  Artifacts: {bundle.artifact_count}")
+        console.print(f"  Version: {bundle.metadata.version}")
+        console.print()
+
+        # Collect metadata
+        metadata_dict = {}
+
+        # Name
+        if name:
+            metadata_dict["name"] = name
+        else:
+            from rich.prompt import Prompt
+            metadata_dict["name"] = Prompt.ask(
+                "[cyan]Listing name[/cyan]",
+                default=bundle.metadata.name,
+            )
+
+        # Description
+        if description:
+            metadata_dict["description"] = description
+        else:
+            from rich.prompt import Prompt
+            metadata_dict["description"] = Prompt.ask(
+                "[cyan]Description[/cyan]",
+                default=bundle.metadata.description,
+            )
+
+        # Category
+        if category:
+            metadata_dict["category"] = category
+        else:
+            from rich.prompt import Prompt
+            metadata_dict["category"] = Prompt.ask(
+                "[cyan]Category[/cyan]",
+                choices=["skill", "command", "agent", "hook", "mcp-server", "bundle"],
+                default="bundle" if bundle.artifact_count > 1 else "skill",
+            )
+
+        # Version
+        if version:
+            metadata_dict["version"] = version
+        else:
+            metadata_dict["version"] = bundle.metadata.version
+
+        # License
+        if license:
+            metadata_dict["license"] = license
+        else:
+            metadata_dict["license"] = bundle.metadata.license
+
+        # Tags
+        if tags:
+            metadata_dict["tags"] = [t.strip() for t in tags.split(",")]
+        else:
+            metadata_dict["tags"] = bundle.metadata.tags
+
+        # URLs
+        if homepage:
+            metadata_dict["homepage"] = homepage
+        elif bundle.metadata.homepage:
+            metadata_dict["homepage"] = bundle.metadata.homepage
+
+        if repository:
+            metadata_dict["repository"] = repository
+        elif bundle.metadata.repository:
+            metadata_dict["repository"] = bundle.metadata.repository
+
+        # Sign bundle
+        metadata_dict["sign_bundle"] = sign
+
+        # Validate metadata
+        console.print("[cyan]Validating metadata...[/cyan]")
+        validated_metadata, suggestions = publisher_service.validate_metadata(
+            metadata_dict, with_suggestions=True
+        )
+
+        # Display validation summary
+        console.print("[green]✓[/green] Metadata valid")
+        console.print()
+
+        # Display suggestions if any
+        if suggestions:
+            console.print("[yellow]Suggestions:[/yellow]")
+            for suggestion in suggestions:
+                console.print(f"  • {suggestion}")
+            console.print()
+
+        # Validate license
+        console.print("[cyan]Validating license compatibility...[/cyan]")
+        license_result = publisher_service.validate_license(
+            bundle_path, validated_metadata.license
+        )
+
+        if license_result.is_valid:
+            console.print("[green]✓[/green] License validation passed")
+        else:
+            console.print("[red]✗[/red] License validation failed")
+            for error in license_result.errors:
+                console.print(f"  [red]• {error}[/red]")
+            sys.exit(1)
+
+        # Display warnings
+        if license_result.warnings:
+            console.print("[yellow]License warnings:[/yellow]")
+            for warning in license_result.warnings:
+                console.print(f"  [yellow]• {warning}[/yellow]")
+
+        console.print()
+
+        # Check signing key if needed
+        if sign:
+            console.print("[cyan]Checking signing key...[/cyan]")
+            if not publisher_service.check_signing_key_available():
+                console.print(
+                    "[red]No signing key available. Generate one with:[/red]"
+                )
+                console.print("  skillmeat sign generate-key")
+                sys.exit(1)
+            console.print("[green]✓[/green] Signing key available")
+            console.print()
+
+        # Dry-run mode
+        if dry_run:
+            console.print("[yellow]Dry-run mode: No changes will be made[/yellow]")
+            console.print()
+            console.print("[green]Bundle is ready for publication![/green]")
+            return
+
+        # Confirm publication
+        console.print("[bold]Ready to publish:[/bold]")
+        console.print(f"  Name: {validated_metadata.name}")
+        console.print(f"  Description: {validated_metadata.description[:60]}...")
+        console.print(f"  Category: {validated_metadata.category}")
+        console.print(f"  Version: {validated_metadata.version}")
+        console.print(f"  License: {validated_metadata.license}")
+        console.print(f"  Broker: {broker}")
+        console.print(f"  Sign: {'Yes' if sign else 'No'}")
+        console.print()
+
+        if not Confirm.ask("Proceed with publication?", default=True):
+            console.print("[yellow]Publication cancelled[/yellow]")
+            return
+
+        # Publish bundle
+        console.print()
+        console.print("[cyan]Publishing to marketplace...[/cyan]")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Uploading bundle...", total=None)
+
+            result = publisher_service.publish_bundle(
+                bundle_path=bundle_path,
+                metadata=validated_metadata,
+                broker_name=broker,
+                validate_license=False,  # Already validated
+                sign_bundle=sign,
+                key_id=key_id,
+                dry_run=False,
+            )
+
+            progress.remove_task(task)
+
+        console.print()
+
+        # Display result
+        if result.success:
+            console.print(Panel(
+                f"[green]Published Successfully![/green]\n\n"
+                f"Submission ID: {result.listing_id or 'N/A'}\n"
+                f"Status: pending_moderation\n"
+                f"Expected Review: 1-2 business days\n\n"
+                + (f"Listing URL: {result.listing_url}\n\n" if result.listing_url else "")
+                + f"Track status: skillmeat marketplace status {result.listing_id}",
+                title="Success",
+                expand=False,
+            ))
+
+            if result.warnings:
+                console.print()
+                console.print("[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  • {warning}")
+        else:
+            console.print(f"[red]Publication failed:[/red] {result.message}")
+            if result.errors:
+                for error in result.errors:
+                    console.print(f"  • {error}")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error publishing bundle:[/red] {e}")
+        logger.exception("Failed to publish bundle")
+        sys.exit(1)
+
+
+@marketplace.command(name="status")
+@click.argument("submission_id")
+def submission_status_cmd(submission_id: str):
+    """Check the status of a marketplace submission.
+
+    Shows the current moderation status, submission details, and any
+    feedback from the marketplace.
+
+    Examples:
+      skillmeat marketplace status sub-2025-11-17-abc123
+    """
+    try:
+        from skillmeat.core.marketplace.publisher import PublisherService
+
+        publisher_service = PublisherService()
+
+        # Get submission
+        submission = publisher_service.get_submission_status(submission_id)
+
+        if not submission:
+            console.print(f"[red]Submission not found:[/red] {submission_id}")
+            sys.exit(1)
+
+        # Display submission details
+        console.print(Panel(
+            f"[bold]Submission Status[/bold]",
+            expand=False,
+        ))
+        console.print()
+
+        # Status with color
+        status_color = {
+            "pending": "yellow",
+            "validating": "cyan",
+            "approved": "green",
+            "rejected": "red",
+            "published": "green",
+            "failed": "red",
+        }.get(submission.status.value, "white")
+
+        console.print(f"[bold]Submission ID:[/bold] {submission.submission_id}")
+        console.print(f"[bold]Status:[/bold] [{status_color}]{submission.status.value}[/{status_color}]")
+        console.print(f"[bold]Broker:[/bold] {submission.broker_name}")
+        console.print()
+
+        console.print(f"[bold]Metadata:[/bold]")
+        console.print(f"  Name: {submission.metadata.get('name', 'N/A')}")
+        console.print(f"  Version: {submission.metadata.get('version', 'N/A')}")
+        console.print(f"  Category: {submission.metadata.get('category', 'N/A')}")
+        console.print(f"  License: {submission.metadata.get('license', 'N/A')}")
+        console.print()
+
+        console.print(f"[bold]Timeline:[/bold]")
+        console.print(f"  Created: {submission.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        console.print(f"  Updated: {submission.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        console.print()
+
+        if submission.listing_id:
+            console.print(f"[bold]Listing ID:[/bold] {submission.listing_id}")
+            console.print()
+
+        if submission.moderation_feedback:
+            console.print(f"[bold]Moderation Feedback:[/bold]")
+            console.print(f"  {submission.moderation_feedback}")
+            console.print()
+
+        if submission.error_message:
+            console.print(f"[bold red]Error:[/bold red]")
+            console.print(f"  {submission.error_message}")
+            console.print()
+
+        # Status-specific messages
+        if submission.status.value == "pending":
+            console.print("[yellow]Your submission is pending review.[/yellow]")
+            console.print("Expected review time: 1-2 business days")
+        elif submission.status.value == "approved":
+            console.print("[green]Your submission has been approved![/green]")
+            console.print("It will be published shortly.")
+        elif submission.status.value == "published":
+            console.print("[green]Your submission is now published![/green]")
+        elif submission.status.value == "rejected":
+            console.print("[red]Your submission was rejected.[/red]")
+            console.print("Review the moderation feedback above.")
+        elif submission.status.value == "failed":
+            console.print("[red]Submission failed due to an error.[/red]")
+
+    except Exception as e:
+        console.print(f"[red]Error checking submission status:[/red] {e}")
+        logger.exception("Failed to check submission status")
+        sys.exit(1)
+
+
+@marketplace.command(name="submissions")
+@click.option(
+    "--broker",
+    "-b",
+    help="Filter by broker name",
+)
+@click.option(
+    "--status",
+    "-s",
+    type=click.Choice(["pending", "validating", "approved", "rejected", "published", "failed"]),
+    help="Filter by status",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=20,
+    help="Maximum number of results (default: 20)",
+)
+def list_submissions_cmd(
+    broker: Optional[str],
+    status: Optional[str],
+    limit: int,
+):
+    """List all marketplace submissions.
+
+    Shows a table of all submissions with their current status.
+
+    Examples:
+      skillmeat marketplace submissions
+      skillmeat marketplace submissions --status published
+      skillmeat marketplace submissions --broker skillmeat --limit 10
+    """
+    try:
+        from skillmeat.core.marketplace.publisher import PublisherService
+        from skillmeat.core.marketplace.submission import SubmissionStatus
+
+        publisher_service = PublisherService()
+
+        # Convert status string to enum
+        status_enum = None
+        if status:
+            status_enum = SubmissionStatus(status)
+
+        # List submissions
+        submissions = publisher_service.list_submissions(
+            broker_name=broker,
+            status=status_enum,
+            limit=limit,
+        )
+
+        if not submissions:
+            console.print("[yellow]No submissions found[/yellow]")
+            return
+
+        # Display submissions table
+        table = Table(title="Marketplace Submissions", show_header=True)
+        table.add_column("Submission ID", style="cyan")
+        table.add_column("Name", style="white")
+        table.add_column("Version", style="white")
+        table.add_column("Status", style="white")
+        table.add_column("Broker", style="white")
+        table.add_column("Created", style="white")
+
+        for submission in submissions:
+            # Status with color
+            status_color = {
+                "pending": "yellow",
+                "validating": "cyan",
+                "approved": "green",
+                "rejected": "red",
+                "published": "green",
+                "failed": "red",
+            }.get(submission.status.value, "white")
+
+            status_text = f"[{status_color}]{submission.status.value}[/{status_color}]"
+
+            table.add_row(
+                submission.submission_id,
+                submission.metadata.get("name", "N/A"),
+                submission.metadata.get("version", "N/A"),
+                status_text,
+                submission.broker_name,
+                submission.created_at.strftime("%Y-%m-%d"),
+            )
+
+        console.print()
+        console.print(table)
+        console.print()
+
+        # Display stats
+        stats = publisher_service.get_submission_stats()
+        console.print(f"[bold]Total submissions:[/bold] {stats['total']}")
+        console.print(
+            f"  Published: {stats['published']} | "
+            f"Pending: {stats['pending']} | "
+            f"Rejected: {stats['rejected']}"
+        )
+
+    except Exception as e:
+        console.print(f"[red]Error listing submissions:[/red] {e}")
+        logger.exception("Failed to list submissions")
+        sys.exit(1)
+
+
+# ====================
 # Entry Point
 # ====================
 
