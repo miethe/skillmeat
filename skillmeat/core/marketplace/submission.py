@@ -56,6 +56,8 @@ class Submission(BaseModel):
         listing_id: Marketplace listing ID (if published)
         moderation_feedback: Feedback from moderation (if rejected)
         error_message: Error message (if failed)
+        consent_log_id: ID of consent log entry (if applicable)
+        compliance_report: Compliance report data (if applicable)
     """
 
     model_config = ConfigDict(
@@ -75,6 +77,10 @@ class Submission(BaseModel):
         None, description="Moderation feedback"
     )
     error_message: Optional[str] = Field(None, description="Error message if failed")
+    consent_log_id: Optional[str] = Field(None, description="Consent log ID")
+    compliance_report: Optional[Dict[str, Any]] = Field(
+        None, description="Compliance report data"
+    )
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for storage.
@@ -93,6 +99,8 @@ class Submission(BaseModel):
             "listing_id": self.listing_id,
             "moderation_feedback": self.moderation_feedback,
             "error_message": self.error_message,
+            "consent_log_id": self.consent_log_id,
+            "compliance_report": self.compliance_report,
         }
 
     @classmethod
@@ -116,6 +124,8 @@ class Submission(BaseModel):
             listing_id=data.get("listing_id"),
             moderation_feedback=data.get("moderation_feedback"),
             error_message=data.get("error_message"),
+            consent_log_id=data.get("consent_log_id"),
+            compliance_report=data.get("compliance_report"),
         )
 
 

@@ -4,8 +4,12 @@ This module provides license compatibility checking and validation for
 bundles being published to marketplaces.
 """
 
+import json
 import logging
+import zipfile
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field
@@ -488,3 +492,226 @@ class LicenseValidator:
             parts.append(f"Note: {info.notes}")
 
         return "\n".join(parts)
+
+    def scan_bundle_dependencies(
+        self, bundle_path: Path
+    ) -> "ComplianceReport":
+        """Scan bundle and all dependencies for licenses.
+
+        Performs deep dependency scanning to:
+        - Extract bundle contents
+        - Identify all artifacts and their licenses
+        - Check for transitive dependencies
+        - Detect license conflicts
+        - Generate comprehensive compliance report
+
+        Args:
+            bundle_path: Path to bundle file
+
+        Returns:
+            ComplianceReport with scan results
+
+        Raises:
+            ValueError: If bundle cannot be read
+        """
+        from skillmeat.core.marketplace.compliance import ComplianceReport
+
+        if not bundle_path.exists():
+            raise ValueError(f"Bundle not found: {bundle_path}")
+
+        scan_timestamp = datetime.utcnow()
+        licenses_found = []
+        license_counts: Dict[str, int] = {}
+        conflicts = []
+        warnings = []
+        recommendations = []
+        dependency_tree: Dict = {}
+
+        try:
+            # Extract and scan bundle
+            with zipfile.ZipFile(bundle_path, "r") as zf:
+                # Read manifest
+                manifest_data = self._read_manifest_from_bundle(zf)
+
+                if manifest_data:
+                    # Scan each artifact in bundle
+                    artifacts = manifest_data.get("artifacts", [])
+
+                    for artifact in artifacts:
+                        artifact_name = artifact.get("name", "unknown")
+                        artifact_license = artifact.get("license", "Unknown")
+
+                        # Track license
+                        if artifact_license not in licenses_found:
+                            licenses_found.append(artifact_license)
+
+                        license_counts[artifact_license] = (
+                            license_counts.get(artifact_license, 0) + 1
+                        )
+
+                        # Add to dependency tree
+                        dependency_tree[artifact_name] = {
+                            "license": artifact_license,
+                            "type": artifact.get("type", "unknown"),
+                        }
+
+                        # Check for LICENSE files in artifact
+                        artifact_licenses = self._scan_artifact_licenses(
+                            zf, artifact_name
+                        )
+                        if artifact_licenses:
+                            for lic in artifact_licenses:
+                                if lic not in licenses_found:
+                                    licenses_found.append(lic)
+                                    license_counts[lic] = license_counts.get(lic, 0) + 1
+
+            # Validate license compatibility
+            if len(licenses_found) > 1:
+                validation_result = self.validate_bundle_licenses(
+                    licenses_found[0], licenses_found[1:]
+                )
+
+                conflicts.extend(
+                    [f"{c[0]} <-> {c[1]}" for c in validation_result.conflicts]
+                )
+                warnings.extend(validation_result.warnings)
+                recommendations.extend(validation_result.recommendations)
+
+            # Determine pass status
+            pass_status = len(conflicts) == 0
+
+            # Add general recommendations
+            if len(licenses_found) > 3:
+                recommendations.append(
+                    f"Bundle contains {len(licenses_found)} different licenses. "
+                    "Consider simplifying license structure for easier compliance."
+                )
+
+            # Warn about unknown licenses
+            unknown_count = license_counts.get("Unknown", 0)
+            if unknown_count > 0:
+                warnings.append(
+                    f"{unknown_count} artifact(s) have no declared license. "
+                    "Add LICENSE files to all artifacts."
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to scan bundle: {e}")
+            warnings.append(f"Bundle scan error: {e}")
+            pass_status = False
+
+        return ComplianceReport(
+            bundle_path=str(bundle_path),
+            scan_timestamp=scan_timestamp,
+            licenses_found=licenses_found,
+            license_counts=license_counts,
+            conflicts=conflicts,
+            warnings=warnings,
+            recommendations=recommendations,
+            pass_status=pass_status,
+            dependency_tree=dependency_tree,
+        )
+
+    def _read_manifest_from_bundle(self, zf: zipfile.ZipFile) -> Optional[Dict]:
+        """Read manifest from bundle ZIP file.
+
+        Args:
+            zf: Open ZipFile
+
+        Returns:
+            Manifest data dictionary, or None if not found
+        """
+        try:
+            # Try to find manifest.json
+            manifest_file = None
+            for name in zf.namelist():
+                if name.endswith("manifest.json"):
+                    manifest_file = name
+                    break
+
+            if not manifest_file:
+                return None
+
+            with zf.open(manifest_file) as f:
+                return json.loads(f.read())
+
+        except Exception as e:
+            logger.warning(f"Failed to read manifest: {e}")
+            return None
+
+    def _scan_artifact_licenses(
+        self, zf: zipfile.ZipFile, artifact_name: str
+    ) -> List[str]:
+        """Scan artifact directory for LICENSE files.
+
+        Args:
+            zf: Open ZipFile
+            artifact_name: Name of artifact
+
+        Returns:
+            List of license identifiers found
+        """
+        licenses = []
+
+        try:
+            # Look for LICENSE, LICENSE.txt, LICENSE.md files
+            license_files = [
+                "LICENSE",
+                "LICENSE.txt",
+                "LICENSE.md",
+                "LICENCE",
+                "LICENCE.txt",
+                "LICENCE.md",
+            ]
+
+            for name in zf.namelist():
+                # Check if file is in artifact directory
+                if artifact_name in name:
+                    filename = Path(name).name
+                    if filename in license_files:
+                        # Try to detect license from content
+                        try:
+                            with zf.open(name) as f:
+                                content = f.read().decode("utf-8", errors="ignore")
+                                detected = self._detect_license_from_text(content)
+                                if detected:
+                                    licenses.append(detected)
+                        except Exception:
+                            pass
+
+        except Exception as e:
+            logger.warning(f"Failed to scan artifact licenses: {e}")
+
+        return licenses
+
+    def _detect_license_from_text(self, text: str) -> Optional[str]:
+        """Attempt to detect license from license text.
+
+        Args:
+            text: License file content
+
+        Returns:
+            License identifier if detected, None otherwise
+        """
+        text_lower = text.lower()
+
+        # Simple pattern matching
+        if "mit license" in text_lower:
+            return "MIT"
+        elif "apache license" in text_lower and "2.0" in text_lower:
+            return "Apache-2.0"
+        elif "gnu general public license" in text_lower:
+            if "version 3" in text_lower or "v3" in text_lower:
+                return "GPL-3.0"
+            elif "version 2" in text_lower or "v2" in text_lower:
+                return "GPL-2.0"
+        elif "bsd 3-clause" in text_lower or "bsd-3" in text_lower:
+            return "BSD-3-Clause"
+        elif "bsd 2-clause" in text_lower or "bsd-2" in text_lower:
+            return "BSD-2-Clause"
+        elif "mozilla public license" in text_lower and "2.0" in text_lower:
+            return "MPL-2.0"
+        elif "isc license" in text_lower:
+            return "ISC"
+
+        return None

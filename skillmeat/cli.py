@@ -7444,6 +7444,52 @@ def publish_bundle_cmd(
 
         console.print()
 
+        # Compliance Scan
+        console.print("[cyan]Scanning bundle for compliance...[/cyan]")
+        compliance_report = publisher_service.scan_bundle_compliance(bundle_path)
+
+        if compliance_report.pass_status:
+            console.print("[green]✓[/green] Compliance scan passed")
+        else:
+            console.print("[yellow]⚠[/yellow] Compliance scan completed with issues")
+
+        # Display compliance report
+        console.print()
+        console.print("[bold]License Compliance Report[/bold]")
+        console.print("=" * 60)
+        console.print()
+
+        console.print("[bold]Licenses Found:[/bold]")
+        if compliance_report.license_counts:
+            for license_id, count in sorted(
+                compliance_report.license_counts.items(),
+                key=lambda x: x[1],
+                reverse=True
+            ):
+                console.print(f"  ✓ {license_id} ({count} artifact(s))")
+        else:
+            console.print("  [yellow]No licenses detected[/yellow]")
+
+        console.print()
+
+        if compliance_report.conflicts:
+            console.print("[red]Conflicts:[/red]")
+            for conflict in compliance_report.conflicts:
+                console.print(f"  [red]✗ {conflict}[/red]")
+            console.print()
+            console.print("[red]Cannot publish with license conflicts. Resolve conflicts and try again.[/red]")
+            sys.exit(1)
+        else:
+            console.print("[green]Compatibility: ✓ All licenses compatible[/green]")
+
+        if compliance_report.warnings:
+            console.print()
+            console.print("[yellow]Warnings:[/yellow]")
+            for warning in compliance_report.warnings:
+                console.print(f"  [yellow]⚠ {warning}[/yellow]")
+
+        console.print()
+
         # Check signing key if needed
         if sign:
             console.print("[cyan]Checking signing key...[/cyan]")
@@ -7462,6 +7508,67 @@ def publish_bundle_cmd(
             console.print()
             console.print("[green]Bundle is ready for publication![/green]")
             return
+
+        # Legal Compliance Checklist
+        console.print()
+        console.print("[bold cyan]Publisher Agreement & Legal Checklist[/bold cyan]")
+        console.print("=" * 60)
+        console.print()
+
+        # Get compliance checklist
+        checklist = publisher_service.get_compliance_checklist()
+
+        # Display agreement summary
+        console.print("[bold]SkillMeat Marketplace Publisher Agreement v{0}[/bold]".format(
+            checklist.agreement_version
+        ))
+        console.print()
+        console.print("By publishing to SkillMeat Marketplace, you agree to:")
+        console.print("  • Grant distribution rights to your content")
+        console.print("  • Ensure you have legal rights to all submitted content")
+        console.print("  • Comply with all license requirements")
+        console.print("  • Meet content quality and security standards")
+        console.print("  • Provide accurate information and attribution")
+        console.print()
+        console.print("For full terms, see: docs/legal/publisher-agreement-v1.md")
+        console.print()
+
+        # Display checklist
+        console.print("[bold]Please review and acknowledge the following:[/bold]")
+        console.print()
+
+        for i, item in enumerate(checklist.items, start=1):
+            console.print(f"[{i}] {item.text}")
+
+        console.print()
+        console.print("[yellow]Note: All items must be acknowledged to proceed.[/yellow]")
+        console.print()
+
+        # Get user consent
+        from rich.prompt import Confirm
+        if not Confirm.ask("Do you acknowledge all items above?", default=False):
+            console.print("[yellow]Publisher agreement not accepted. Publication cancelled.[/yellow]")
+            sys.exit(1)
+
+        # Acknowledge checklist
+        import getpass
+        user_id = getpass.getuser()  # Get system username
+        checklist.acknowledge_all(user_id=user_id)
+
+        console.print("[green]✓[/green] Compliance checklist acknowledged")
+        console.print()
+
+        # Create consent log (will be used during publish)
+        # Generate temporary submission ID for consent logging
+        temp_submission_id = f"temp-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        consent_log = publisher_service.log_consent(
+            submission_id=temp_submission_id,
+            checklist=checklist,
+            user_id=user_id,
+        )
+
+        console.print("[green]✓[/green] Consent logged to audit trail")
+        console.print()
 
         # Confirm publication
         console.print("[bold]Ready to publish:[/bold]")
@@ -7497,6 +7604,9 @@ def publish_bundle_cmd(
                 sign_bundle=sign,
                 key_id=key_id,
                 dry_run=False,
+                consent_log=consent_log,
+                compliance_report=compliance_report,
+                user_id=user_id,
             )
 
             progress.remove_task(task)

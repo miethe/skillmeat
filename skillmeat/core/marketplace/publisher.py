@@ -11,7 +11,15 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from skillmeat.config import ConfigManager
+from skillmeat.core.marketplace.agreements import PublisherAgreementManager
+from skillmeat.core.marketplace.audit import AuditLogger
 from skillmeat.core.marketplace.broker import MarketplaceBroker
+from skillmeat.core.marketplace.compliance import (
+    ComplianceChecklist,
+    ComplianceManager,
+    ComplianceReport,
+    ConsentLog,
+)
 from skillmeat.core.marketplace.license import LicenseValidator, LicenseValidationResult
 from skillmeat.core.marketplace.metadata import (
     MetadataValidator,
@@ -77,6 +85,9 @@ class PublisherService:
         metadata_validator: Optional[MetadataValidator] = None,
         license_validator: Optional[LicenseValidator] = None,
         key_manager: Optional[KeyManager] = None,
+        compliance_manager: Optional[ComplianceManager] = None,
+        audit_logger: Optional[AuditLogger] = None,
+        agreement_manager: Optional[PublisherAgreementManager] = None,
     ):
         """Initialize publisher service.
 
@@ -86,12 +97,18 @@ class PublisherService:
             metadata_validator: Metadata validator (creates new if None)
             license_validator: License validator (creates new if None)
             key_manager: Key manager for signing (creates new if None)
+            compliance_manager: Compliance manager (creates new if None)
+            audit_logger: Audit logger (creates new if None)
+            agreement_manager: Agreement manager (creates new if None)
         """
         self.config_manager = config_manager or ConfigManager()
         self.submission_store = submission_store or SubmissionStore(self.config_manager)
         self.metadata_validator = metadata_validator or MetadataValidator()
         self.license_validator = license_validator or LicenseValidator()
         self.key_manager = key_manager or KeyManager()
+        self.compliance_manager = compliance_manager or ComplianceManager()
+        self.audit_logger = audit_logger or AuditLogger()
+        self.agreement_manager = agreement_manager or PublisherAgreementManager()
 
         # Registry of marketplace brokers
         self._brokers: Dict[str, MarketplaceBroker] = {}
@@ -210,6 +227,8 @@ class PublisherService:
         metadata: PublisherMetadata,
         broker_name: str,
         publish_result: PublishResult,
+        consent_log: Optional[ConsentLog] = None,
+        compliance_report: Optional[ComplianceReport] = None,
     ) -> Submission:
         """Create and store a submission record.
 
@@ -218,6 +237,8 @@ class PublisherService:
             metadata: Publisher metadata
             broker_name: Marketplace broker name
             publish_result: Result from marketplace publish operation
+            consent_log: Consent log (optional)
+            compliance_report: Compliance report (optional)
 
         Returns:
             Submission record
@@ -229,6 +250,18 @@ class PublisherService:
             # Generate submission ID (use listing_id from marketplace if available)
             submission_id = publish_result.listing_id or self._generate_submission_id()
 
+            # Prepare compliance report data
+            compliance_data = None
+            if compliance_report:
+                compliance_data = {
+                    "scan_timestamp": compliance_report.scan_timestamp.isoformat(),
+                    "licenses_found": compliance_report.licenses_found,
+                    "license_counts": compliance_report.license_counts,
+                    "conflicts": compliance_report.conflicts,
+                    "warnings": compliance_report.warnings,
+                    "pass_status": compliance_report.pass_status,
+                }
+
             # Create submission
             submission = Submission(
                 submission_id=submission_id,
@@ -239,6 +272,8 @@ class PublisherService:
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
                 listing_id=publish_result.listing_id,
+                consent_log_id=consent_log.consent_id if consent_log else None,
+                compliance_report=compliance_data,
             )
 
             # Store submission
@@ -260,6 +295,9 @@ class PublisherService:
         sign_bundle: bool = True,
         key_id: Optional[str] = None,
         dry_run: bool = False,
+        consent_log: Optional[ConsentLog] = None,
+        compliance_report: Optional[ComplianceReport] = None,
+        user_id: Optional[str] = None,
     ) -> PublishResult:
         """Publish a bundle to a marketplace.
 
@@ -273,6 +311,9 @@ class PublisherService:
             sign_bundle: Whether to sign the bundle
             key_id: Signing key ID (uses default if None)
             dry_run: Validate without actually publishing
+            consent_log: Consent log from compliance checklist (optional)
+            compliance_report: Compliance scan report (optional)
+            user_id: User identifier for audit logging (optional)
 
         Returns:
             PublishResult
@@ -352,7 +393,32 @@ class PublisherService:
                     metadata=metadata,
                     broker_name=broker_name,
                     publish_result=publish_result,
+                    consent_log=consent_log,
+                    compliance_report=compliance_report,
                 )
+
+                # Log publication to audit trail
+                if user_id:
+                    self.audit_logger.log_publication(
+                        submission_id=submission.submission_id,
+                        user_id=user_id,
+                        details={
+                            "bundle_path": str(bundle_path),
+                            "broker_name": broker_name,
+                            "metadata": metadata.model_dump(),
+                            "has_consent": consent_log is not None,
+                            "has_compliance_report": compliance_report is not None,
+                        },
+                    )
+
+                    # Log bundle signing if performed
+                    if sign_bundle and metadata.sign_bundle:
+                        self.audit_logger.log_bundle_signing(
+                            submission_id=submission.submission_id,
+                            user_id=user_id,
+                            bundle_path=str(bundle_path),
+                            key_id=key_id,
+                        )
 
                 logger.info(
                     f"Successfully published bundle. Submission ID: {submission.submission_id}"
@@ -486,3 +552,109 @@ class PublisherService:
             License explanation text
         """
         return self.license_validator.explain_license(license_id)
+
+    def scan_bundle_compliance(self, bundle_path: Path) -> ComplianceReport:
+        """Scan bundle for compliance issues.
+
+        Args:
+            bundle_path: Path to bundle file
+
+        Returns:
+            ComplianceReport
+
+        Raises:
+            PublisherError: If scan fails
+        """
+        try:
+            return self.license_validator.scan_bundle_dependencies(bundle_path)
+        except Exception as e:
+            raise PublisherError(f"Compliance scan failed: {e}")
+
+    def get_compliance_checklist(
+        self, version: Optional[str] = None
+    ) -> ComplianceChecklist:
+        """Get compliance checklist for publisher.
+
+        Args:
+            version: Checklist version (uses latest if None)
+
+        Returns:
+            ComplianceChecklist
+        """
+        agreement_version = self.agreement_manager.get_current_version()
+        return self.compliance_manager.get_checklist(
+            version=version or "1.0.0",
+            agreement_version=agreement_version,
+        )
+
+    def validate_compliance_consent(self, checklist: ComplianceChecklist) -> bool:
+        """Validate that compliance checklist is complete.
+
+        Args:
+            checklist: Compliance checklist
+
+        Returns:
+            True if valid, False otherwise
+        """
+        return self.compliance_manager.validate_consent(checklist)
+
+    def log_consent(
+        self,
+        submission_id: str,
+        checklist: ComplianceChecklist,
+        user_id: str,
+        ip_address: Optional[str] = None,
+    ) -> ConsentLog:
+        """Log user consent for compliance.
+
+        Args:
+            submission_id: Submission identifier
+            checklist: Acknowledged checklist
+            user_id: User identifier
+            ip_address: IP address (optional)
+
+        Returns:
+            ConsentLog
+
+        Raises:
+            PublisherError: If consent logging fails
+        """
+        try:
+            # Create consent log
+            consent_log = self.compliance_manager.create_consent_log(
+                submission_id=submission_id,
+                checklist=checklist,
+                user_id=user_id,
+                ip_address=ip_address,
+            )
+
+            # Log to audit trail
+            self.audit_logger.log_consent(consent_log)
+
+            return consent_log
+
+        except Exception as e:
+            raise PublisherError(f"Failed to log consent: {e}")
+
+    def get_publisher_agreement(self, version: Optional[str] = None) -> str:
+        """Get publisher agreement text.
+
+        Args:
+            version: Agreement version (uses current if None)
+
+        Returns:
+            Agreement text
+        """
+        agreement = self.agreement_manager.get_agreement(version)
+        return agreement.content
+
+    def get_agreement_summary(self, version: Optional[str] = None) -> str:
+        """Get brief summary of publisher agreement.
+
+        Args:
+            version: Agreement version (uses current if None)
+
+        Returns:
+            Summary text
+        """
+        return self.agreement_manager.get_agreement_summary(version)
