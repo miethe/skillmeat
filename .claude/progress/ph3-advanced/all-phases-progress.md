@@ -93,11 +93,11 @@ Track Phase 3's mandatory quality criteria:
 
 ### Phase 3: MCP Server Management (Weeks 18-20)
 
-**Status**: Blocked | **Tasks**: 5/5 | **Completion**: 0%
+**Status**: IN PROGRESS | **Tasks**: 1/5 | **Completion**: 20%
 
 **Dependencies**: Phase 0 API layer, Phase 1 UI shell
 
-- [ ] P3-001: MCP Metadata Model
+- [x] P3-001: MCP Metadata Model
 - [ ] P3-002: Deployment Orchestrator
 - [ ] P3-003: Config UI
 - [ ] P3-004: Health Checks
@@ -362,16 +362,20 @@ Track Phase 3's mandatory quality criteria:
 
 #### P3-001: MCP Metadata Model
 
-- **Status**: Not Started
-- **Assigned Subagent(s)**: integration-expert, data-layer-expert
+- **Status**: COMPLETE
+- **Assigned Subagent(s)**: data-layer-expert
 - **Dependencies**: P0-001
 - **Estimate**: 2 points
 - **Description**: Extend manifests to track MCP servers (name, repo, env vars)
 - **Acceptance Criteria**:
-  - [ ] `collection.toml` stores MCP entries
-  - [ ] Schema validation working
-  - [ ] Metadata model complete
+  - [x] `collection.toml` stores MCP entries
+  - [x] Schema validation working
+  - [x] Metadata model complete
 - **Notes**:
+  - Created `skillmeat/core/mcp/metadata.py` with MCPServerMetadata model
+  - Extended Collection class with MCP server CRUD operations
+  - 46 tests passing, full backward compatibility maintained
+  - Security-first validation (path traversal, name validation, repo URL validation)
 
 #### P3-002: Deployment Orchestrator
 

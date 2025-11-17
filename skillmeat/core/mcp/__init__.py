@@ -5,5 +5,11 @@ servers in SkillMeat collections.
 """
 
 from .metadata import MCPServerMetadata, MCPServerStatus
+from .deployment import MCPDeploymentManager, DeploymentResult
 
-__all__ = ["MCPServerMetadata", "MCPServerStatus"]
+__all__ = [
+    "MCPServerMetadata",
+    "MCPServerStatus",
+    "MCPDeploymentManager",
+    "DeploymentResult",
+]
