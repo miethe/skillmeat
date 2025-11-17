@@ -54,6 +54,7 @@ dependencies = [
     "PyJWT>=2.8.0",
     "cryptography>=41.0.0",
     "keyring>=24.0.0",
+    "jsonschema>=4.0.0",
 ]
 
 [project.urls]
@@ -86,10 +87,14 @@ packages = [
     "skillmeat.core",
     "skillmeat.core.auth",
     "skillmeat.core.sharing",
+    "skillmeat.core.signing",
+    "skillmeat.core.mcp",
     "skillmeat.sources",
     "skillmeat.storage",
     "skillmeat.utils",
-    "skillmeat.web"
+    "skillmeat.web",
+    "skillmeat.marketplace",
+    "skillmeat.marketplace.brokers"
 ]
 
 [tool.setuptools.package-data]
