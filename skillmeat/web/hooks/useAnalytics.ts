@@ -39,6 +39,8 @@ async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
         last_activity: new Date().toISOString(),
       };
     }
+    // eslint-disable-next-line no-console
+    console.error("[analytics] Failed to fetch summary from API", error);
     throw error;
   }
 }
