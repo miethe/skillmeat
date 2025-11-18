@@ -4,7 +4,7 @@
  * These hooks provide data fetching, caching, and state management for marketplace operations.
  */
 
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tantml/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
 import type {
   MarketplaceListing,
