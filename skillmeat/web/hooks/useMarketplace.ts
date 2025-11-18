@@ -6,8 +6,8 @@
 
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
+import { ApiError, apiRequest } from "@/lib/api";
 import type {
-  MarketplaceListing,
   MarketplaceListingDetail,
   MarketplaceFilters,
   ListingsPageResponse,
@@ -17,9 +17,6 @@ import type {
   PublishRequest,
   PublishResponse,
 } from "@/types/marketplace";
-
-// API base URL - adjust based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 // Query keys
 const marketplaceKeys = {
@@ -52,42 +49,28 @@ async function fetchListings(
   if (cursor) params.append("cursor", cursor);
   params.append("limit", limit.toString());
 
-  const response = await fetch(`${API_BASE_URL}/marketplace/listings?${params}`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch listings: ${response.statusText}`);
-  }
-
-  return response.json();
+  return apiRequest<ListingsPageResponse>(`/marketplace/listings?${params}`);
 }
 
 /**
  * Fetch single listing detail
  */
 async function fetchListingDetail(listingId: string): Promise<MarketplaceListingDetail> {
-  const response = await fetch(`${API_BASE_URL}/marketplace/listings/${listingId}`);
-
-  if (!response.ok) {
-    if (response.status === 404) {
+  try {
+    return await apiRequest<MarketplaceListingDetail>(`/marketplace/listings/${listingId}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
       throw new Error(`Listing not found: ${listingId}`);
     }
-    throw new Error(`Failed to fetch listing: ${response.statusText}`);
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
  * Fetch available brokers
  */
 async function fetchBrokers(): Promise<BrokerInfo[]> {
-  const response = await fetch(`${API_BASE_URL}/marketplace/brokers`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch brokers: ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  const data = await apiRequest<{ brokers: BrokerInfo[] }>(`/marketplace/brokers`);
   return data.brokers;
 }
 
@@ -95,40 +78,34 @@ async function fetchBrokers(): Promise<BrokerInfo[]> {
  * Install a marketplace listing
  */
 async function installListing(request: InstallRequest): Promise<InstallResponse> {
-  const response = await fetch(`${API_BASE_URL}/marketplace/install`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to install listing: ${response.statusText}`);
+  try {
+    return await apiRequest<InstallResponse>(`/marketplace/install`, {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw new Error(error.message);
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
  * Publish a bundle to marketplace
  */
 async function publishBundle(request: PublishRequest): Promise<PublishResponse> {
-  const response = await fetch(`${API_BASE_URL}/marketplace/publish`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to publish bundle: ${response.statusText}`);
+  try {
+    return await apiRequest<PublishResponse>(`/marketplace/publish`, {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw new Error(error.message);
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
