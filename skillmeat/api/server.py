@@ -100,6 +100,10 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.add_middleware(ObservabilityMiddleware)
     logger.info("Observability middleware enabled")
 
+    app.add_middleware(RateLimitMiddleware, rate_limiter=get_rate_limiter())
+    logger.info("RateLimit middleware enabled")
+    
+
     # Configure CORS middleware
     if settings.cors_enabled:
         app.add_middleware(
