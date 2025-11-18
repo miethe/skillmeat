@@ -14,7 +14,9 @@ import type {
   ArtifactScope,
   ArtifactType,
 } from "@/types/artifact";
-import { ApiError, apiRequest } from "@/lib/api";
+import { ApiError, apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
 
 interface ApiPageInfo {
   has_next_page: boolean;
@@ -363,19 +365,33 @@ async function fetchArtifactsFromApi(
     params.set("artifact_type", filters.type);
   }
 
-  const response = await apiRequest<ApiArtifactListResponse>(
-    `/artifacts?${params.toString()}`
-  );
+  try {
+    const response = await apiRequest<ApiArtifactListResponse>(
+      `/artifacts?${params.toString()}`
+    );
 
-  const mappedArtifacts = response.items.map(mapApiArtifact);
-  const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
+    const mappedArtifacts = response.items.map(mapApiArtifact);
+    const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
 
-  return {
-    artifacts: filtered,
-    total: response.page_info?.total_count ?? filtered.length,
-    page: 1,
-    pageSize: filtered.length,
-  };
+    return {
+      artifacts: filtered,
+      total: response.page_info?.total_count ?? filtered.length,
+      page: 1,
+      pageSize: filtered.length,
+    };
+  } catch (error) {
+    if (USE_MOCKS) {
+      const mockArtifacts = generateMockArtifacts();
+      const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
+      return {
+        artifacts: filtered,
+        total: filtered.length,
+        page: 1,
+        pageSize: filtered.length,
+      };
+    }
+    throw error;
+  }
 }
 
 async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
@@ -383,7 +399,7 @@ async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
     const artifact = await apiRequest<ApiArtifact>(`/artifacts/${id}`);
     return mapApiArtifact(artifact);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
+    if (USE_MOCKS && error instanceof ApiError && error.status === 404) {
       return null;
     }
     throw error;
@@ -400,26 +416,10 @@ export function useArtifacts(
   return useQuery({
     queryKey: artifactKeys.list(filters, sort),
     queryFn: async (): Promise<ArtifactsResponse> => {
-      try {
-        return await fetchArtifactsFromApi(filters, sort);
-      } catch (error) {
-        if (error instanceof ApiError) {
-          console.error("Failed to load artifacts from API", error);
-        }
-
-        const mockArtifacts = generateMockArtifacts();
-        const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
-
-        return {
-          artifacts: filtered,
-          total: filtered.length,
-          page: 1,
-          pageSize: filtered.length,
-        };
-      }
+      return await fetchArtifactsFromApi(filters, sort);
     },
     staleTime: 30000, // Consider data fresh for 30 seconds
-  });
+    });
 }
 
 /**
@@ -429,16 +429,7 @@ export function useArtifact(id: string) {
   return useQuery({
     queryKey: artifactKeys.detail(id),
     queryFn: async (): Promise<Artifact | null> => {
-      try {
-        return await fetchArtifactFromApi(id);
-      } catch (error) {
-        if (error instanceof ApiError) {
-          console.error(`Failed to fetch artifact ${id} from API`, error);
-        }
-
-        const mockArtifacts = generateMockArtifacts();
-        return mockArtifacts.find((a) => a.id === id) || null;
-      }
+      return await fetchArtifactFromApi(id);
     },
     enabled: !!id,
   });

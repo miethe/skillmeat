@@ -12,7 +12,9 @@ import type {
   TimePeriod,
 } from '@/types/analytics';
 
-import { ApiError, apiRequest } from '@/lib/api';
+import { ApiError, apiConfig, apiRequest } from '@/lib/api';
+
+const USE_MOCKS = apiConfig.useMocks;
 
 /**
  * Fetch analytics summary
@@ -21,7 +23,7 @@ async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   try {
     return await apiRequest<AnalyticsSummary>('/analytics/summary');
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+    if (USE_MOCKS && error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       return {
         total_collections: 1,
         total_artifacts: 15,
@@ -58,7 +60,7 @@ async function fetchTopArtifacts(
       `/analytics/top-artifacts?${params.toString()}`
     );
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+    if (USE_MOCKS && error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       return {
         items: [
           {
@@ -127,7 +129,7 @@ async function fetchUsageTrends(period: TimePeriod, days: number): Promise<Trend
   try {
     return await apiRequest<TrendsResponse>(`/analytics/trends?${params.toString()}`);
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+    if (USE_MOCKS && error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       // Generate mock trend data
       const dataPoints = [];
       const now = new Date();
