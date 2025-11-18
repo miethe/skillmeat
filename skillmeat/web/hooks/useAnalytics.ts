@@ -12,26 +12,16 @@ import type {
   TimePeriod,
 } from '@/types/analytics';
 
-// Environment configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
-
-// Mock API key for development (should be replaced with proper auth)
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'dev-key-12345';
+import { ApiError, apiRequest } from '@/lib/api';
 
 /**
  * Fetch analytics summary
  */
 async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
-  const response = await fetch(`${API_BASE_URL}/api/${API_VERSION}/analytics/summary`, {
-    headers: {
-      'X-API-Key': API_KEY,
-    },
-  });
-
-  if (!response.ok) {
-    // Return mock data if API is not available
-    if (response.status === 404 || response.status === 503) {
+  try {
+    return await apiRequest<AnalyticsSummary>('/analytics/summary');
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       return {
         total_collections: 1,
         total_artifacts: 15,
@@ -47,10 +37,8 @@ async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
         last_activity: new Date().toISOString(),
       };
     }
-    throw new Error('Failed to fetch analytics summary');
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
@@ -65,18 +53,12 @@ async function fetchTopArtifacts(
     ...(artifactType && { artifact_type: artifactType }),
   });
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/${API_VERSION}/analytics/top-artifacts?${params}`,
-    {
-      headers: {
-        'X-API-Key': API_KEY,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    // Return mock data if API is not available
-    if (response.status === 404 || response.status === 503) {
+  try {
+    return await apiRequest<TopArtifactsResponse>(
+      `/analytics/top-artifacts?${params.toString()}`
+    );
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       return {
         items: [
           {
@@ -129,10 +111,8 @@ async function fetchTopArtifacts(
         },
       };
     }
-    throw new Error('Failed to fetch top artifacts');
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
@@ -144,18 +124,10 @@ async function fetchUsageTrends(period: TimePeriod, days: number): Promise<Trend
     days: days.toString(),
   });
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/${API_VERSION}/analytics/trends?${params}`,
-    {
-      headers: {
-        'X-API-Key': API_KEY,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    // Return mock data if API is not available
-    if (response.status === 404 || response.status === 503) {
+  try {
+    return await apiRequest<TrendsResponse>(`/analytics/trends?${params.toString()}`);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       // Generate mock trend data
       const dataPoints = [];
       const now = new Date();
@@ -186,10 +158,8 @@ async function fetchUsageTrends(period: TimePeriod, days: number): Promise<Trend
         total_periods: dataPoints.length,
       };
     }
-    throw new Error('Failed to fetch usage trends');
+    throw error;
   }
-
-  return response.json();
 }
 
 // Query keys

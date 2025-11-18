@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from skillmeat.api.config import get_settings
 from skillmeat.core.auth import TokenManager
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,15 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 # Global token manager instance (initialized in lifespan)
 _token_manager: Optional[TokenManager] = None
+
+
+def is_auth_enabled() -> bool:
+    """Check whether bearer authentication is enabled."""
+    try:
+        settings = get_settings()
+        return getattr(settings, "auth_enabled", False)
+    except Exception:
+        return False
 
 
 def get_token_manager() -> TokenManager:
@@ -48,6 +58,10 @@ def verify_token(
     Raises:
         HTTPException: If token is missing or invalid
     """
+    # Skip auth enforcement when disabled (development default)
+    if not is_auth_enabled():
+        return credentials.credentials if credentials else "dev-token"
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -83,6 +97,10 @@ def optional_verify_token(
     Raises:
         HTTPException: If token is provided but invalid
     """
+    # Skip auth enforcement when disabled (development default)
+    if not is_auth_enabled():
+        return credentials.credentials if credentials else None
+
     if not credentials:
         return None
 
@@ -158,6 +176,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from next middleware
         """
+        # Skip auth when disabled
+        if not is_auth_enabled():
+            return await call_next(request)
+
         # Check if path requires authentication
         path = request.url.path
         requires_auth = self._requires_auth(path)

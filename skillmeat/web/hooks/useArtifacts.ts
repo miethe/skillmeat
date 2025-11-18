@@ -2,7 +2,7 @@
  * React Query hooks for artifact data fetching
  *
  * These hooks provide data fetching, caching, and state management for artifacts.
- * Currently uses mock data until API endpoints are ready (P1-004).
+ * Uses live API data with mock fallbacks to keep the UI responsive offline.
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,53 @@ import type {
   ArtifactFilters,
   ArtifactSort,
   ArtifactsResponse,
+  ArtifactScope,
+  ArtifactType,
 } from "@/types/artifact";
+import { ApiError, apiRequest } from "@/lib/api";
+
+interface ApiPageInfo {
+  has_next_page: boolean;
+  has_previous_page: boolean;
+  start_cursor: string | null;
+  end_cursor: string | null;
+  total_count: number;
+}
+
+interface ApiArtifactMetadata {
+  title?: string;
+  description?: string;
+  license?: string;
+  author?: string;
+  version?: string;
+  tags?: string[];
+}
+
+interface ApiArtifactUpstream {
+  tracking_enabled: boolean;
+  current_sha?: string;
+  upstream_sha?: string;
+  update_available: boolean;
+  has_local_modifications: boolean;
+}
+
+interface ApiArtifact {
+  id: string;
+  name: string;
+  type: ArtifactType;
+  source: string;
+  version?: string;
+  aliases?: string[];
+  metadata?: ApiArtifactMetadata;
+  upstream?: ApiArtifactUpstream;
+  added: string;
+  updated: string;
+}
+
+interface ApiArtifactListResponse {
+  items: ApiArtifact[];
+  page_info: ApiPageInfo;
+}
 
 // Mock data generator for development
 const generateMockArtifacts = (): Artifact[] => {
@@ -182,6 +228,54 @@ const generateMockArtifacts = (): Artifact[] => {
   ];
 };
 
+const DEFAULT_ARTIFACT_LIMIT = 200;
+
+const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
+  const metadata = artifact.metadata || {};
+  const upstream = artifact.upstream;
+  const updatedAt = artifact.updated || artifact.added;
+  const isOutdated = upstream?.update_available ?? false;
+  const scope: ArtifactScope = artifact.source === "local" ? "local" : "user";
+
+  return {
+    id: artifact.id,
+    name: artifact.name,
+    type: artifact.type,
+    scope,
+    status: isOutdated ? "outdated" : "active",
+    version: artifact.version || metadata.version,
+    source: artifact.source,
+    metadata: {
+      title: metadata.title || artifact.name,
+      description: metadata.description || "",
+      license: metadata.license,
+      author: metadata.author,
+      version: metadata.version || artifact.version,
+      tags: metadata.tags || [],
+    },
+    upstreamStatus: {
+      hasUpstream: Boolean(upstream?.tracking_enabled),
+      upstreamUrl:
+        artifact.source?.startsWith("http") || artifact.source?.includes("github.com")
+          ? artifact.source
+          : undefined,
+      upstreamVersion: upstream?.upstream_sha,
+      currentVersion: upstream?.current_sha || artifact.version,
+      isOutdated,
+      lastChecked: updatedAt,
+    },
+    usageStats: {
+      totalDeployments: 0,
+      activeProjects: 0,
+      lastUsed: updatedAt,
+      usageCount: 0,
+    },
+    createdAt: artifact.added,
+    updatedAt,
+    aliases: artifact.aliases || [],
+  };
+};
+
 // Filter and sort artifacts
 const filterAndSortArtifacts = (
   artifacts: Artifact[],
@@ -257,6 +351,45 @@ const artifactKeys = {
   detail: (id: string) => [...artifactKeys.details(), id] as const,
 };
 
+async function fetchArtifactsFromApi(
+  filters: ArtifactFilters,
+  sort: ArtifactSort
+): Promise<ArtifactsResponse> {
+  const params = new URLSearchParams({
+    limit: DEFAULT_ARTIFACT_LIMIT.toString(),
+  });
+
+  if (filters.type && filters.type !== "all") {
+    params.set("artifact_type", filters.type);
+  }
+
+  const response = await apiRequest<ApiArtifactListResponse>(
+    `/artifacts?${params.toString()}`
+  );
+
+  const mappedArtifacts = response.items.map(mapApiArtifact);
+  const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
+
+  return {
+    artifacts: filtered,
+    total: response.page_info?.total_count ?? filtered.length,
+    page: 1,
+    pageSize: filtered.length,
+  };
+}
+
+async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
+  try {
+    const artifact = await apiRequest<ApiArtifact>(`/artifacts/${id}`);
+    return mapApiArtifact(artifact);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 /**
  * Hook to fetch and filter artifacts
  */
@@ -267,21 +400,23 @@ export function useArtifacts(
   return useQuery({
     queryKey: artifactKeys.list(filters, sort),
     queryFn: async (): Promise<ArtifactsResponse> => {
-      // TODO: Replace with actual API call when P1-004 is complete
-      // const response = await apiClient.artifacts.listArtifacts({ ...filters, ...sort });
+      try {
+        return await fetchArtifactsFromApi(filters, sort);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          console.error("Failed to load artifacts from API", error);
+        }
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+        const mockArtifacts = generateMockArtifacts();
+        const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
 
-      const mockArtifacts = generateMockArtifacts();
-      const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
-
-      return {
-        artifacts: filtered,
-        total: filtered.length,
-        page: 1,
-        pageSize: filtered.length,
-      };
+        return {
+          artifacts: filtered,
+          total: filtered.length,
+          page: 1,
+          pageSize: filtered.length,
+        };
+      }
     },
     staleTime: 30000, // Consider data fresh for 30 seconds
   });
@@ -294,14 +429,16 @@ export function useArtifact(id: string) {
   return useQuery({
     queryKey: artifactKeys.detail(id),
     queryFn: async (): Promise<Artifact | null> => {
-      // TODO: Replace with actual API call when P1-004 is complete
-      // const artifact = await apiClient.artifacts.getArtifact({ id });
+      try {
+        return await fetchArtifactFromApi(id);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          console.error(`Failed to fetch artifact ${id} from API`, error);
+        }
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const mockArtifacts = generateMockArtifacts();
-      return mockArtifacts.find((a) => a.id === id) || null;
+        const mockArtifacts = generateMockArtifacts();
+        return mockArtifacts.find((a) => a.id === id) || null;
+      }
     },
     enabled: !!id,
   });
@@ -315,12 +452,7 @@ export function useUpdateArtifact() {
 
   return useMutation({
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
-      // TODO: Replace with actual API call when P1-004 is complete
-      // const updated = await apiClient.artifacts.updateArtifact({ id: artifact.id, data: artifact });
-
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
+      // TODO: Replace with actual API call when artifact update endpoint is available
       return artifact;
     },
     onSuccess: () => {
@@ -338,12 +470,7 @@ export function useDeleteArtifact() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // TODO: Replace with actual API call when P1-004 is complete
-      // await apiClient.artifacts.deleteArtifact({ id });
-
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
+      // TODO: Replace with actual API call when artifact delete endpoint is available
       return id;
     },
     onSuccess: () => {
