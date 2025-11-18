@@ -381,6 +381,7 @@ async function fetchArtifactsFromApi(
     };
   } catch (error) {
     if (USE_MOCKS) {
+      console.warn("[artifacts] API failed, falling back to mock data", error);
       const mockArtifacts = generateMockArtifacts();
       const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
       return {
@@ -402,6 +403,7 @@ async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
     if (USE_MOCKS && error instanceof ApiError && error.status === 404) {
       return null;
     }
+    console.error(`[artifacts] Failed to fetch artifact ${id} from API`, error);
     throw error;
   }
 }

@@ -3,6 +3,7 @@ const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
 const ENABLE_API_MOCKS = process.env.NEXT_PUBLIC_ENABLE_API_MOCKS === "true";
+const ENABLE_API_TRACE = process.env.NEXT_PUBLIC_API_TRACE === "true";
 
 export const apiConfig = {
   baseUrl: API_BASE_URL,
@@ -10,6 +11,7 @@ export const apiConfig = {
   apiKey: API_KEY,
   apiToken: API_TOKEN,
   useMocks: ENABLE_API_MOCKS,
+  trace: ENABLE_API_TRACE,
 };
 
 export class ApiError extends Error {
@@ -26,6 +28,14 @@ export class ApiError extends Error {
 function buildApiUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${API_BASE_URL}/api/${API_VERSION}${normalizedPath}`;
+}
+
+function trace(event: string, detail: Record<string, unknown>) {
+  if (!ENABLE_API_TRACE) return;
+  const timestamp = new Date().toISOString();
+  // Console-only tracing to avoid external dependencies
+  // eslint-disable-next-line no-console
+  console.info(`[api-trace] ${timestamp} ${event}`, detail);
 }
 
 export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
@@ -56,14 +66,24 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     headers: buildApiHeaders(init?.headers),
   };
 
-  const response = await fetch(buildApiUrl(path), requestInit);
+  const url = buildApiUrl(path);
+  trace("request:start", { url, method: requestInit.method || "GET" });
+
+  const response = await fetch(url, requestInit);
   const contentType = response.headers.get("content-type");
   const isJson = contentType?.includes("application/json");
   const body = isJson ? await response.json() : undefined;
 
   if (!response.ok) {
+    trace("request:error", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      body,
+    });
     throw new ApiError("Request failed", response.status, body);
   }
 
+  trace("request:success", { url, status: response.status });
   return body as T;
 }
