@@ -664,6 +664,11 @@ async def update_artifact(
 
         # Update metadata fields if provided
         if update_request.metadata is not None:
+            # Ensure artifact has metadata object
+            if artifact.metadata is None:
+                from skillmeat.core.artifact import ArtifactMetadata
+                artifact.metadata = ArtifactMetadata()
+
             metadata_updates = update_request.metadata
             if metadata_updates.title is not None:
                 artifact.metadata.title = metadata_updates.title
