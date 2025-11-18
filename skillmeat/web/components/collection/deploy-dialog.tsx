@@ -41,10 +41,9 @@ export function DeployDialog({
   ]);
 
   const deployMutation = useDeploy({
-    onSuccess: (data) => {
-      if (data.streamUrl) {
-        setStreamUrl(data.streamUrl);
-      }
+    onSuccess: () => {
+      // Deployment successful - show completion
+      handleComplete(true);
     },
     onError: () => {
       setIsDeploying(false);
