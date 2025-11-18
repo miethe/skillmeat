@@ -19,7 +19,7 @@ from skillmeat import __version__ as skillmeat_version
 from .config import APISettings, get_settings
 from .dependencies import app_state
 from .routers import analytics, artifacts, bundles, collections, health, marketplace, mcp
-from .middleware import ObservabilityMiddleware
+from .middleware import ObservabilityMiddleware, RateLimitMiddleware, get_rate_limiter
 
 logger = logging.getLogger(__name__)
 

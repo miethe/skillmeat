@@ -26,7 +26,8 @@ from skillmeat.api.schemas.marketplace import (
     PublishResponse,
 )
 from skillmeat.api.utils.cache import get_cache_manager
-from skillmeat.core.sharing.bundle import Bundle, BundleImporter
+from skillmeat.core.sharing.bundle import Bundle
+from skillmeat.core.sharing.importer import BundleImporter
 from skillmeat.marketplace.broker import (
     DownloadError,
     MarketplaceBrokerError,
