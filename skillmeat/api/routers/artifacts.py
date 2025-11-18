@@ -6,9 +6,10 @@ Provides REST API for managing artifacts within collections.
 import base64
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -17,6 +18,8 @@ from skillmeat.api.dependencies import (
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
+    ArtifactDeployRequest,
+    ArtifactDeployResponse,
     ArtifactListResponse,
     ArtifactMetadataResponse,
     ArtifactResponse,
@@ -25,6 +28,7 @@ from skillmeat.api.schemas.artifacts import (
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.deployment import DeploymentManager
 
 logger = logging.getLogger(__name__)
 
@@ -507,7 +511,9 @@ async def check_artifact_upstream(
             return ArtifactUpstreamResponse(
                 artifact_id=artifact_id,
                 tracking_enabled=True,
-                current_version=artifact.resolved_version or artifact.version_spec or "unknown",
+                current_version=artifact.resolved_version
+                or artifact.version_spec
+                or "unknown",
                 current_sha=artifact.resolved_sha or "unknown",
                 upstream_version=None,
                 upstream_sha=None,
@@ -529,12 +535,18 @@ async def check_artifact_upstream(
         return ArtifactUpstreamResponse(
             artifact_id=artifact_id,
             tracking_enabled=True,
-            current_version=artifact.resolved_version or artifact.version_spec or "unknown",
+            current_version=artifact.resolved_version
+            or artifact.version_spec
+            or "unknown",
             current_sha=artifact.resolved_sha or "unknown",
             upstream_version=upstream_version,
             upstream_sha=upstream_sha,
             update_available=has_update,
-            has_local_modifications=getattr(update_info, "has_local_modifications", False) if update_info else False,
+            has_local_modifications=(
+                getattr(update_info, "has_local_modifications", False)
+                if update_info
+                else False
+            ),
             last_checked=datetime.utcnow(),
         )
 
@@ -548,4 +560,253 @@ async def check_artifact_upstream(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check upstream status: {str(e)}",
+        )
+
+
+@router.post(
+    "/{artifact_id}/deploy",
+    response_model=ArtifactDeployResponse,
+    summary="Deploy artifact to project",
+    description="Deploy artifact from collection to project's .claude/ directory",
+    responses={
+        200: {"description": "Artifact deployed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def deploy_artifact(
+    artifact_id: str,
+    request: ArtifactDeployRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> ArtifactDeployResponse:
+    """Deploy artifact from collection to project.
+
+    Copies the artifact to the project's .claude/ directory and tracks
+    the deployment in .skillmeat-deployed.toml.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        request: Deployment request with project_path and overwrite flag
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+        collection: Optional collection name
+
+    Returns:
+        Deployment result
+
+    Raises:
+        HTTPException: If artifact not found or on error
+    """
+    try:
+        logger.info(
+            f"Deploying artifact: {artifact_id} to {request.project_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Validate project path
+        project_path = Path(request.project_path)
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project path does not exist: {request.project_path}",
+            )
+
+        # Get or create collection
+        if collection:
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            collection_name = collection
+        else:
+            collections = collection_mgr.list_collections()
+            if not collections:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No collections found",
+                )
+            collection_name = collections[0]
+
+        # Load collection and find artifact
+        coll = collection_mgr.load_collection(collection_name)
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+            )
+
+        # Create deployment manager
+        deployment_mgr = DeploymentManager(collection_mgr=collection_mgr)
+
+        # Deploy artifact
+        try:
+            deployments = deployment_mgr.deploy_artifacts(
+                artifact_names=[artifact_name],
+                collection_name=collection_name,
+                project_path=project_path,
+                artifact_type=artifact_type,
+            )
+
+            if not deployments:
+                # Deployment was skipped (likely user declined overwrite prompt)
+                return ArtifactDeployResponse(
+                    success=False,
+                    message=f"Deployment of '{artifact_name}' was skipped",
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type.value,
+                    error_message="Deployment cancelled or artifact not found",
+                )
+
+            deployment = deployments[0]
+
+            # Determine deployed path
+            deployed_path = project_path / ".claude" / deployment.artifact_path
+            logger.info(
+                f"Artifact '{artifact_name}' deployed successfully to {deployed_path}"
+            )
+
+            return ArtifactDeployResponse(
+                success=True,
+                message=f"Artifact '{artifact_name}' deployed successfully",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                deployed_path=str(deployed_path),
+            )
+
+        except ValueError as e:
+            # Business logic error (e.g., artifact not found)
+            logger.warning(f"Deployment failed for '{artifact_name}': {e}")
+            return ArtifactDeployResponse(
+                success=False,
+                message=f"Deployment failed: {str(e)}",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                error_message=str(e),
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deploying artifact '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to deploy artifact: {str(e)}",
+        )
+
+
+@router.post(
+    "/{artifact_id}/undeploy",
+    response_model=ArtifactDeployResponse,
+    summary="Undeploy artifact from project",
+    description="Remove deployed artifact from project's .claude/ directory",
+    responses={
+        200: {"description": "Artifact undeployed successfully"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def undeploy_artifact(
+    artifact_id: str,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    project_path: str = Body(..., embed=True, description="Project path"),
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> ArtifactDeployResponse:
+    """Remove deployed artifact from project.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+        project_path: Project directory path
+        collection: Optional collection name
+
+    Returns:
+        Undeploy result
+
+    Raises:
+        HTTPException: If artifact not found or on error
+    """
+    try:
+        logger.info(f"Undeploying artifact: {artifact_id} from {project_path}")
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Validate project path
+        proj_path = Path(project_path)
+        if not proj_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project path does not exist: {project_path}",
+            )
+
+        # Create deployment manager
+        deployment_mgr = DeploymentManager(collection_mgr=collection_mgr)
+
+        # Undeploy artifact
+        try:
+            deployment_mgr.undeploy(
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                project_path=proj_path,
+            )
+
+            logger.info(f"Artifact '{artifact_name}' undeployed successfully")
+
+            return ArtifactDeployResponse(
+                success=True,
+                message=f"Artifact '{artifact_name}' undeployed successfully",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+            )
+
+        except ValueError as e:
+            # Business logic error (e.g., artifact not deployed)
+            logger.warning(f"Undeploy failed for '{artifact_name}': {e}")
+            return ArtifactDeployResponse(
+                success=False,
+                message=f"Undeploy failed: {str(e)}",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                error_message=str(e),
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error undeploying artifact '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to undeploy artifact: {str(e)}",
         )

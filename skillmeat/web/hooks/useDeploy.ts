@@ -7,6 +7,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/api";
 
 export interface DeployRequest {
   artifactId: string;
@@ -20,8 +21,10 @@ export interface DeployRequest {
 export interface DeployResponse {
   success: boolean;
   message: string;
-  deploymentId?: string;
-  streamUrl?: string;
+  artifact_name: string;
+  artifact_type: string;
+  deployed_path?: string;
+  error_message?: string;
 }
 
 export interface DeployError {
@@ -44,28 +47,28 @@ export function useDeploy(options: UseDeployOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: DeployRequest): Promise<DeployResponse> => {
-      // TODO: Replace with actual API call when backend endpoints are ready
-      // const response = await fetch("/api/v1/deploy", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(request),
-      // });
-      //
-      // if (!response.ok) {
-      //   throw new Error("Deploy failed");
-      // }
-      //
-      // return response.json();
+      // Construct artifact_id in format "type:name"
+      const artifactId = `${request.artifactType}:${request.artifactName}`;
 
-      // Mock implementation for development
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call backend API
+      const response = await apiRequest<DeployResponse>(
+        `/artifacts/${artifactId}/deploy`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_path: request.projectPath,
+            overwrite: request.overwrite ?? false,
+          }),
+        }
+      );
 
-      return {
-        success: true,
-        message: `Successfully deployed ${request.artifactName}`,
-        deploymentId: `deploy-${Date.now()}`,
-        streamUrl: `/api/v1/deploy/${request.artifactId}/stream`,
-      };
+      // Check if deployment was successful
+      if (!response.success) {
+        throw new Error(response.error_message || response.message || "Deploy failed");
+      }
+
+      return response;
     },
 
     onSuccess: (data, variables) => {
@@ -111,15 +114,34 @@ export function useUndeploy(options: UseDeployOptions = {}) {
     mutationFn: async (request: {
       artifactId: string;
       artifactName: string;
+      artifactType: string;
       projectPath?: string;
     }): Promise<DeployResponse> => {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Construct artifact_id in format "type:name"
+      const artifactId = `${request.artifactType}:${request.artifactName}`;
 
-      return {
-        success: true,
-        message: `Successfully removed ${request.artifactName}`,
-      };
+      if (!request.projectPath) {
+        throw new Error("Project path is required for undeploy");
+      }
+
+      // Call backend API
+      const response = await apiRequest<DeployResponse>(
+        `/artifacts/${artifactId}/undeploy`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_path: request.projectPath,
+          }),
+        }
+      );
+
+      // Check if undeploy was successful
+      if (!response.success) {
+        throw new Error(response.error_message || response.message || "Undeploy failed");
+      }
+
+      return response;
     },
 
     onSuccess: (data, variables) => {

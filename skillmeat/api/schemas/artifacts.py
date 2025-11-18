@@ -220,3 +220,47 @@ class ArtifactUpstreamResponse(BaseModel):
                 "last_checked": "2024-11-16T15:30:00Z",
             }
         }
+
+
+class ArtifactDeployRequest(BaseModel):
+    """Request schema for deploying an artifact."""
+
+    project_path: str = Field(
+        description="Path to target project directory",
+        examples=["/Users/me/my-project"],
+    )
+    overwrite: bool = Field(
+        default=False,
+        description="Overwrite existing artifact if already deployed",
+    )
+
+
+class ArtifactDeployResponse(BaseModel):
+    """Response schema for artifact deployment."""
+
+    success: bool = Field(description="Whether deployment succeeded")
+    message: str = Field(description="Human-readable result message")
+    artifact_name: str = Field(description="Name of deployed artifact")
+    artifact_type: str = Field(description="Type of artifact (skill/command/agent)")
+    deployed_path: Optional[str] = Field(
+        default=None,
+        description="Path where artifact was deployed",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="Error details if deployment failed",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Artifact 'pdf' deployed successfully",
+                "artifact_name": "pdf",
+                "artifact_type": "skill",
+                "deployed_path": "/Users/me/my-project/.claude/skills/pdf",
+                "error_message": None,
+            }
+        }

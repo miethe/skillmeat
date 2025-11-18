@@ -6,6 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, apiRequest } from "@/lib/api";
 import type {
   DeploymentRequest,
   DeploymentResponse,
@@ -15,9 +16,6 @@ import type {
   MCPServerListResponse,
   MCPServerUpdateRequest,
 } from "@/types/mcp";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-const API_PREFIX = "/api/v1";
 
 // Query keys
 export const mcpQueryKeys = {
@@ -31,32 +29,6 @@ export const mcpQueryKeys = {
   status: (name: string) => [...mcpQueryKeys.all, "status", name] as const,
 };
 
-// API helper function
-async function fetchApi<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
-  const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
-
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": apiKey,
-      ...options?.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      detail: response.statusText,
-    }));
-    throw new Error(error.detail || `API error: ${response.status}`);
-  }
-
-  return response.json();
-}
-
 // Query hooks
 
 /**
@@ -67,7 +39,7 @@ export function useMcpServers(collection?: string) {
     queryKey: mcpQueryKeys.list(collection),
     queryFn: async (): Promise<MCPServerListResponse> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<MCPServerListResponse>(`/mcp/servers${params}`);
+      return apiRequest<MCPServerListResponse>(`/mcp/servers${params}`);
     },
     staleTime: 30000, // Cache for 30 seconds
   });
@@ -81,7 +53,7 @@ export function useMcpServer(name: string, collection?: string) {
     queryKey: mcpQueryKeys.detail(name, collection),
     queryFn: async (): Promise<MCPServer> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<MCPServer>(`/mcp/servers/${name}${params}`);
+      return apiRequest<MCPServer>(`/mcp/servers/${name}${params}`);
     },
     enabled: !!name,
     staleTime: 30000,
@@ -95,7 +67,7 @@ export function useMcpDeploymentStatus(name: string) {
   return useQuery({
     queryKey: mcpQueryKeys.status(name),
     queryFn: async (): Promise<DeploymentStatus> => {
-      return fetchApi<DeploymentStatus>(`/mcp/servers/${name}/status`);
+      return apiRequest<DeploymentStatus>(`/mcp/servers/${name}/status`);
     },
     enabled: !!name,
     staleTime: 10000, // Refresh more frequently for status
@@ -116,7 +88,7 @@ export function useCreateMcpServer(collection?: string) {
       data: MCPServerCreateRequest
     ): Promise<MCPServer> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<MCPServer>(`/mcp/servers${params}`, {
+      return apiRequest<MCPServer>(`/mcp/servers${params}`, {
         method: "POST",
         body: JSON.stringify(data),
       });
@@ -139,7 +111,7 @@ export function useUpdateMcpServer(name: string, collection?: string) {
       data: MCPServerUpdateRequest
     ): Promise<MCPServer> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<MCPServer>(`/mcp/servers/${name}${params}`, {
+      return apiRequest<MCPServer>(`/mcp/servers/${name}${params}`, {
         method: "PUT",
         body: JSON.stringify(data),
       });
@@ -163,7 +135,7 @@ export function useDeleteMcpServer(collection?: string) {
   return useMutation({
     mutationFn: async (name: string): Promise<void> => {
       const params = collection ? `?collection=${collection}` : "";
-      await fetchApi<void>(`/mcp/servers/${name}${params}`, {
+      await apiRequest<void>(`/mcp/servers/${name}${params}`, {
         method: "DELETE",
       });
     },
@@ -185,7 +157,7 @@ export function useDeployMcpServer(name: string, collection?: string) {
       request: DeploymentRequest = {}
     ): Promise<DeploymentResponse> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<DeploymentResponse>(
+      return apiRequest<DeploymentResponse>(
         `/mcp/servers/${name}/deploy${params}`,
         {
           method: "POST",
@@ -213,7 +185,7 @@ export function useUndeployMcpServer(name: string, collection?: string) {
   return useMutation({
     mutationFn: async (): Promise<DeploymentResponse> => {
       const params = collection ? `?collection=${collection}` : "";
-      return fetchApi<DeploymentResponse>(
+      return apiRequest<DeploymentResponse>(
         `/mcp/servers/${name}/undeploy${params}`,
         {
           method: "POST",
