@@ -230,7 +230,7 @@ const generateMockArtifacts = (): Artifact[] => {
   ];
 };
 
-const DEFAULT_ARTIFACT_LIMIT = 200;
+const DEFAULT_ARTIFACT_LIMIT = 100;
 
 const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
   const metadata = artifact.metadata || {};
