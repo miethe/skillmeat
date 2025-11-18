@@ -18,7 +18,8 @@ from skillmeat import __version__ as skillmeat_version
 
 from .config import APISettings, get_settings
 from .dependencies import app_state
-from .routers import analytics, artifacts, bundles, collections, health, mcp
+from .routers import analytics, artifacts, bundles, collections, health, marketplace, mcp
+from .middleware import ObservabilityMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,14 @@ def create_app(settings: APISettings = None) -> FastAPI:
         redoc_url="/redoc" if settings.is_development else None,
         openapi_url=f"{settings.api_prefix}/openapi.json",
     )
+
+    # Add observability middleware (should be added early to track all requests)
+    app.add_middleware(ObservabilityMiddleware)
+    logger.info("Observability middleware enabled")
+
+    app.add_middleware(RateLimitMiddleware, rate_limiter=get_rate_limiter())
+    logger.info("RateLimit middleware enabled")
+    
 
     # Configure CORS middleware
     if settings.cors_enabled:
@@ -171,6 +180,15 @@ def create_app(settings: APISettings = None) -> FastAPI:
             logger.debug(f"Response status: {response.status_code}")
             return response
 
+    # Mount Prometheus metrics endpoint
+    try:
+        from prometheus_client import make_asgi_app
+        metrics_app = make_asgi_app()
+        app.mount("/metrics", metrics_app)
+        logger.info("Prometheus metrics endpoint enabled at /metrics")
+    except ImportError:
+        logger.warning("prometheus_client not installed, metrics endpoint disabled")
+
     # Include routers
     # Health check router (no API prefix, for load balancers)
     app.include_router(health.router)
@@ -181,10 +199,10 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
+    app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
 
     # Future routers will be added here:
     # app.include_router(deployments.router, prefix=settings.api_prefix)
-    # app.include_router(marketplace.router, prefix=settings.api_prefix)
 
     # Root endpoint
     @app.get(

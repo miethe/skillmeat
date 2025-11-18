@@ -7204,6 +7204,918 @@ def verify_bundle(bundle_path, require_signature):
 
 
 # ====================
+# Marketplace Commands
+# ====================
+
+
+@main.command(name="marketplace-search")
+@click.argument("query", required=False)
+@click.option(
+    "--broker",
+    "-b",
+    default=None,
+    help="Specific broker to search (default: all enabled brokers)",
+)
+@click.option(
+    "--tags",
+    "-t",
+    default=None,
+    help="Filter by tags (comma-separated)",
+)
+@click.option(
+    "--license",
+    "-l",
+    default=None,
+    help="Filter by license",
+)
+@click.option(
+    "--page",
+    "-p",
+    default=1,
+    type=int,
+    help="Page number (default: 1)",
+)
+@click.option(
+    "--page-size",
+    "-s",
+    default=20,
+    type=int,
+    help="Results per page (default: 20)",
+)
+def marketplace_search(query, broker, tags, license, page, page_size):
+    """Search marketplace for artifact bundles.
+
+    Browse available artifacts from configured marketplace brokers.
+    Search across all enabled brokers or specify a specific one.
+
+    Examples:
+      skillmeat marketplace-search python
+      skillmeat marketplace-search --broker skillmeat --tags productivity
+      skillmeat marketplace-search "code review" --license MIT
+    """
+    try:
+        from skillmeat.marketplace import get_broker_registry
+
+        console.print("[cyan]Searching marketplace...[/cyan]")
+
+        # Get broker registry
+        registry = get_broker_registry()
+
+        # Build filters
+        filters = {}
+        if query:
+            filters["query"] = query
+
+        if tags:
+            filters["tags"] = [t.strip() for t in tags.split(",")]
+
+        if license:
+            filters["license"] = license
+
+        # Get brokers to search
+        if broker:
+            brokers = [registry.get_broker(broker)]
+            if brokers[0] is None:
+                console.print(f"[red]Broker '{broker}' not found[/red]")
+                console.print(f"\nAvailable brokers: {', '.join(registry.list_brokers())}")
+                sys.exit(1)
+        else:
+            brokers = registry.get_enabled_brokers()
+
+        if not brokers:
+            console.print("[yellow]No brokers enabled[/yellow]")
+            console.print("\nEnable brokers in ~/.skillmeat/marketplace.toml")
+            sys.exit(1)
+
+        # Search each broker
+        all_listings = []
+        for b in brokers:
+            try:
+                console.print(f"\n[dim]Searching {b.name}...[/dim]")
+                listings = b.listings(filters=filters, page=page, page_size=page_size)
+                all_listings.extend([(b.name, listing) for listing in listings])
+            except Exception as e:
+                console.print(f"[yellow]Warning: {b.name} search failed: {e}[/yellow]")
+                continue
+
+        # Display results
+        if not all_listings:
+            console.print("\n[yellow]No results found[/yellow]")
+            return
+
+        console.print(f"\n[green]Found {len(all_listings)} result(s)[/green]")
+
+        # Create table
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Broker", style="dim")
+        table.add_column("Listing ID", style="cyan")
+        table.add_column("Name", style="bold")
+        table.add_column("Publisher")
+        table.add_column("License")
+        table.add_column("Artifacts", justify="right")
+        table.add_column("Tags")
+
+        for broker_name, listing in all_listings:
+            table.add_row(
+                broker_name,
+                listing.listing_id,
+                listing.name,
+                listing.publisher,
+                listing.license,
+                str(listing.artifact_count),
+                ", ".join(listing.tags[:3]) + ("..." if len(listing.tags) > 3 else ""),
+            )
+
+        console.print()
+        console.print(table)
+
+        console.print(f"\n[dim]Page {page}[/dim]")
+        console.print(f"[dim]Use 'skillmeat marketplace-install <listing-id>' to install[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error searching marketplace:[/red] {e}")
+        logger.exception("Failed to search marketplace")
+        sys.exit(1)
+
+
+@main.command(name="marketplace-install")
+@click.argument("listing_id")
+@click.option(
+    "--broker",
+    "-b",
+    default=None,
+    help="Broker to use (auto-detected from listing_id if not specified)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Target collection (default: active collection)",
+)
+@click.option(
+    "--strategy",
+    "-s",
+    type=click.Choice(["merge", "fork", "skip", "interactive"]),
+    default="interactive",
+    help="Conflict resolution strategy",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force install even with validation warnings",
+)
+def marketplace_install(listing_id, broker, collection, strategy, force):
+    """Install bundle from marketplace.
+
+    Downloads and imports a bundle from the marketplace into your collection.
+    Automatically verifies signatures if present.
+
+    Examples:
+      skillmeat marketplace-install skillmeat-42
+      skillmeat marketplace-install claudehub-python-tools --broker claudehub
+      skillmeat marketplace-install listing-123 --strategy merge
+    """
+    try:
+        from skillmeat.marketplace import get_broker_registry
+        from skillmeat.core.sharing.importer import BundleImporter
+
+        console.print(f"[cyan]Installing bundle from marketplace...[/cyan]")
+
+        # Get broker registry
+        registry = get_broker_registry()
+
+        # Determine broker from listing_id if not specified
+        if not broker:
+            # Try to detect from listing_id prefix
+            if listing_id.startswith("skillmeat-"):
+                broker = "skillmeat"
+            elif listing_id.startswith("claudehub-"):
+                broker = "claudehub"
+            else:
+                # Use first enabled broker
+                brokers = registry.get_enabled_brokers()
+                if not brokers:
+                    console.print("[red]No brokers enabled[/red]")
+                    sys.exit(1)
+                broker = brokers[0].name
+
+            console.print(f"[dim]Using broker: {broker}[/dim]")
+
+        # Get broker
+        broker_obj = registry.get_broker(broker)
+        if not broker_obj:
+            console.print(f"[red]Broker '{broker}' not found[/red]")
+            console.print(f"\nAvailable brokers: {', '.join(registry.list_brokers())}")
+            sys.exit(1)
+
+        # Download bundle
+        console.print(f"[cyan]Downloading bundle {listing_id}...[/cyan]")
+        bundle_path = broker_obj.download(listing_id)
+
+        console.print(f"[green]Downloaded to {bundle_path}[/green]")
+
+        # Import bundle
+        console.print(f"\n[cyan]Importing bundle...[/cyan]")
+
+        config = ConfigManager()
+        collection_name = collection or config.get_active_collection()
+
+        importer = BundleImporter(collection_name)
+        result = importer.import_bundle(
+            bundle_path,
+            strategy=strategy,
+            force=force,
+        )
+
+        # Display result
+        console.print()
+        if result.success:
+            console.print("[green]Import successful![/green]")
+            console.print(f"  Imported: {result.imported_count}")
+            console.print(f"  Skipped: {result.skipped_count}")
+            console.print(f"  Forked: {result.forked_count}")
+            console.print(f"  Merged: {result.merged_count}")
+        else:
+            console.print("[red]Import failed[/red]")
+            for error in result.errors:
+                console.print(f"  [red]- {error}[/red]")
+            sys.exit(1)
+
+        if result.warnings:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in result.warnings:
+                console.print(f"  [yellow]- {warning}[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error installing from marketplace:[/red] {e}")
+        logger.exception("Failed to install from marketplace")
+        sys.exit(1)
+
+
+@main.command(name="marketplace-publish")
+@click.argument("bundle_path", type=click.Path(exists=True))
+@click.option(
+    "--broker",
+    "-b",
+    default="skillmeat",
+    help="Broker to publish to (default: skillmeat)",
+)
+@click.option(
+    "--title",
+    default=None,
+    help="Bundle title (required if not in metadata)",
+)
+@click.option(
+    "--description",
+    "-d",
+    default=None,
+    help="Description (required if not in metadata, 100-5000 chars)",
+)
+@click.option(
+    "--tags",
+    "-t",
+    default=None,
+    help="Comma-separated tags (required if not in metadata)",
+)
+@click.option(
+    "--license",
+    "-l",
+    default=None,
+    help="SPDX license ID (required if not in metadata)",
+)
+@click.option(
+    "--publisher-name",
+    default=None,
+    help="Publisher name (required if not in metadata)",
+)
+@click.option(
+    "--publisher-email",
+    default=None,
+    help="Publisher email (required if not in metadata)",
+)
+@click.option(
+    "--homepage",
+    default=None,
+    help="Homepage URL",
+)
+@click.option(
+    "--repository",
+    default=None,
+    help="Repository URL",
+)
+@click.option(
+    "--documentation",
+    default=None,
+    help="Documentation URL",
+)
+@click.option(
+    "--price",
+    "-p",
+    default=0,
+    type=int,
+    help="Price in cents (default: 0 = free)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Validate without publishing",
+)
+@click.option(
+    "--skip-security",
+    is_flag=True,
+    default=False,
+    help="Skip security scanning (dangerous!)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Bypass warnings (use with caution)",
+)
+def marketplace_publish(
+    bundle_path,
+    broker,
+    title,
+    description,
+    tags,
+    license,
+    publisher_name,
+    publisher_email,
+    homepage,
+    repository,
+    documentation,
+    price,
+    dry_run,
+    skip_security,
+    force,
+):
+    """Publish bundle to marketplace with comprehensive validation.
+
+    Validates bundle integrity, metadata, license compatibility, and security
+    before publishing to the specified marketplace broker.
+
+    Examples:
+      skillmeat marketplace-publish my-bundle.skillmeat-pack \\
+        --title "My Bundle" \\
+        --description "A comprehensive collection of productivity tools..." \\
+        --tags "productivity,automation" \\
+        --license "MIT" \\
+        --publisher-name "John Doe" \\
+        --publisher-email "john@example.com"
+
+      # Dry run to validate without publishing
+      skillmeat marketplace-publish bundle.skillmeat-pack --dry-run
+
+      # Force publish despite warnings
+      skillmeat marketplace-publish bundle.skillmeat-pack --force
+    """
+    try:
+        from skillmeat.marketplace import (
+            get_broker_registry,
+            PublishingWorkflow,
+            PublishMetadata,
+            PublisherMetadata,
+        )
+        from skillmeat.core.sharing.builder import inspect_bundle
+
+        console.print("[cyan]Publishing bundle to marketplace...[/cyan]\n")
+
+        bundle_path_obj = Path(bundle_path)
+
+        # Step 1: Load bundle
+        console.print("[dim]Loading bundle...[/dim]")
+        bundle = inspect_bundle(bundle_path_obj)
+        console.print(f"[green]Loaded bundle: {bundle.metadata.name}[/green]\n")
+
+        # Step 2: Build publish metadata
+        # Use bundle metadata as defaults, override with CLI args
+        publish_title = title or bundle.metadata.name
+        publish_description = description or bundle.metadata.description
+        publish_tags = tags.split(",") if tags else bundle.metadata.tags
+        publish_license = license or bundle.metadata.license
+        pub_name = publisher_name or bundle.metadata.author
+        pub_email = publisher_email or f"{bundle.metadata.author}@example.com"
+
+        # Validate required fields
+        missing_fields = []
+        if not publish_title:
+            missing_fields.append("--title")
+        if not publish_description or len(publish_description) < 100:
+            missing_fields.append("--description (min 100 chars)")
+        if not publish_tags:
+            missing_fields.append("--tags")
+        if not publish_license:
+            missing_fields.append("--license")
+        if not pub_name:
+            missing_fields.append("--publisher-name")
+        if not pub_email or "@" not in pub_email:
+            missing_fields.append("--publisher-email")
+
+        if missing_fields:
+            console.print("[red]Missing required fields:[/red]")
+            for field in missing_fields:
+                console.print(f"  [red]- {field}[/red]")
+            console.print("\nPlease provide all required metadata fields.")
+            sys.exit(1)
+
+        # Create metadata objects
+        try:
+            publisher = PublisherMetadata(
+                name=pub_name,
+                email=pub_email,
+                homepage=homepage,
+            )
+
+            metadata = PublishMetadata(
+                title=publish_title,
+                description=publish_description,
+                tags=publish_tags,
+                license=publish_license,
+                publisher=publisher,
+                homepage=homepage,
+                repository=repository,
+                documentation=documentation,
+                price=price,
+            )
+        except Exception as e:
+            console.print(f"[red]Metadata validation failed:[/red] {e}")
+            sys.exit(1)
+
+        # Display bundle and metadata info
+        console.print("[bold]Bundle Information:[/bold]")
+        console.print(f"  Name: {bundle.metadata.name}")
+        console.print(f"  Version: {bundle.metadata.version}")
+        console.print(f"  Artifacts: {bundle.artifact_count}")
+        console.print(f"  Files: {bundle.total_files}")
+        console.print()
+        console.print("[bold]Publishing Metadata:[/bold]")
+        console.print(f"  Title: {metadata.title}")
+        console.print(f"  Description: {metadata.description[:80]}...")
+        console.print(f"  Tags: {', '.join(metadata.tags)}")
+        console.print(f"  License: {metadata.license}")
+        console.print(f"  Publisher: {publisher.name} <{publisher.email}>")
+        console.print(f"  Price: ${price / 100:.2f}" if price > 0 else "  Price: Free")
+        console.print()
+
+        # Step 3: Get broker
+        registry = get_broker_registry()
+        broker_obj = registry.get_broker(broker)
+
+        if not broker_obj:
+            console.print(f"[red]Broker '{broker}' not found[/red]")
+            console.print(f"\nAvailable brokers: {', '.join(registry.list_brokers())}")
+            sys.exit(1)
+
+        # Step 4: Run validation workflow
+        console.print("[cyan]Running validation checks...[/cyan]")
+        workflow = PublishingWorkflow()
+
+        # Prepare bundle
+        console.print("  [dim]Validating bundle integrity...[/dim]")
+        workflow.prepare_bundle(bundle_path_obj)
+
+        # Check all requirements
+        console.print("  [dim]Checking marketplace requirements...[/dim]")
+        validation_report = workflow.check_requirements(
+            bundle, bundle_path_obj, metadata
+        )
+
+        # Display validation results
+        console.print()
+        if validation_report.passed:
+            console.print("[green]All validation checks passed![/green]")
+        else:
+            console.print("[red]Validation failed![/red]")
+
+        if validation_report.errors:
+            console.print("\n[red]Errors:[/red]")
+            for error in validation_report.errors:
+                console.print(f"  [red]- {error}[/red]")
+
+        if validation_report.warnings:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in validation_report.warnings:
+                console.print(f"  [yellow]- {warning}[/yellow]")
+
+        # Security scan results
+        if "security_scan" in validation_report.details:
+            scan = validation_report.details["security_scan"]
+            if scan.get("file_violations"):
+                console.print("\n[red]Security violations by file:[/red]")
+                for file_path, violations in scan["file_violations"].items():
+                    console.print(f"  {file_path}:")
+                    for violation in violations:
+                        console.print(f"    [red]- {violation}[/red]")
+
+        # Fail if validation didn't pass
+        if not validation_report.passed:
+            console.print("\n[red]Cannot publish: Validation failed[/red]")
+            sys.exit(1)
+
+        # Stop here if dry-run
+        if dry_run:
+            console.print("\n[cyan]Dry run complete - bundle is ready to publish[/cyan]")
+            return
+
+        # Step 5: Confirm publish (unless forced)
+        if not force:
+            console.print()
+            if not Confirm.ask(f"[yellow]Publish to {broker}?[/yellow]"):
+                console.print("[dim]Cancelled[/dim]")
+                return
+
+        # Step 6: Submit for publishing
+        console.print(f"\n[cyan]Submitting to {broker}...[/cyan]")
+
+        submission = workflow.submit_for_review(
+            bundle=bundle,
+            bundle_path=bundle_path_obj,
+            metadata=metadata,
+            broker=broker_obj,
+        )
+
+        # Display result
+        console.print()
+        if submission.is_approved:
+            console.print("[green]Bundle published successfully![/green]")
+            console.print(f"  Submission ID: {submission.submission_id}")
+            if submission.listing_url:
+                console.print(f"  Listing URL: {submission.listing_url}")
+        elif submission.is_pending or submission.is_in_review:
+            console.print("[yellow]Bundle submitted for review[/yellow]")
+            console.print(f"  Submission ID: {submission.submission_id}")
+            console.print(f"  Status: {submission.status}")
+            console.print(f"  Broker: {submission.broker_name}")
+            console.print(
+                "\nYou can track the submission status with:"
+            )
+            console.print(
+                f"  skillmeat marketplace-status {submission.submission_id}"
+            )
+        elif submission.is_rejected:
+            console.print("[red]Submission rejected[/red]")
+            console.print(f"  Submission ID: {submission.submission_id}")
+            if submission.feedback:
+                console.print(f"\nFeedback:\n{submission.feedback}")
+            sys.exit(1)
+        else:
+            console.print(f"[yellow]Submission status: {submission.status}[/yellow]")
+            console.print(f"  Submission ID: {submission.submission_id}")
+
+        if submission.warnings:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in submission.warnings:
+                console.print(f"  [yellow]- {warning}[/yellow]")
+
+        if submission.errors:
+            console.print("\n[red]Errors:[/red]")
+            for error in submission.errors:
+                console.print(f"  [red]- {error}[/red]")
+
+    except Exception as e:
+        console.print(f"[red]Error publishing to marketplace:[/red] {e}")
+        logger.exception("Failed to publish to marketplace")
+        sys.exit(1)
+
+
+# ====================
+# Compliance Commands
+# ====================
+
+
+@main.command()
+@click.argument("bundle_path", type=click.Path(exists=True))
+def compliance_scan(bundle_path):
+    """Scan bundle for license compliance.
+
+    Scans all files in the bundle for license headers, copyright notices,
+    and detects license conflicts.
+
+    Examples:
+      skillmeat compliance-scan my-bundle.zip
+    """
+    try:
+        from skillmeat.marketplace.compliance import LicenseScanner
+
+        bundle_path_obj = Path(bundle_path)
+
+        console.print(f"[cyan]Scanning bundle for licenses: {bundle_path}[/cyan]")
+
+        scanner = LicenseScanner()
+        report = scanner.scan_bundle(bundle_path_obj)
+
+        # Display results
+        console.print()
+        console.print(f"[bold]License Scan Results[/bold]")
+        console.print(f"  Declared License: {report.declared_license}")
+        console.print(f"  Files Scanned: {len(report.detected_licenses)}")
+        console.print(f"  Unique Licenses: {len(report.unique_licenses)}")
+        console.print()
+
+        # Show detected licenses
+        if report.unique_licenses:
+            console.print("[bold]Detected Licenses:[/bold]")
+            for lic in sorted(report.unique_licenses):
+                count = sum(
+                    1
+                    for d in report.detected_licenses
+                    if d.detected_license == lic
+                )
+                console.print(f"  - {lic} ({count} files)")
+            console.print()
+
+        # Show conflicts
+        if report.has_conflicts:
+            console.print("[red]License Conflicts:[/red]")
+            for conflict in report.conflicts:
+                console.print(f"  [red]- {conflict}[/red]")
+            console.print()
+
+        # Show files without licenses
+        if report.has_missing_licenses:
+            console.print(
+                f"[yellow]Files without license headers: {len(report.missing_licenses)}[/yellow]"
+            )
+            if len(report.missing_licenses) <= 10:
+                for file_path in report.missing_licenses[:10]:
+                    console.print(f"  [dim]- {file_path}[/dim]")
+            else:
+                for file_path in report.missing_licenses[:10]:
+                    console.print(f"  [dim]- {file_path}[/dim]")
+                console.print(f"  [dim]... and {len(report.missing_licenses) - 10} more[/dim]")
+            console.print()
+
+        # Show recommendations
+        if report.recommendations:
+            console.print("[cyan]Recommendations:[/cyan]")
+            for rec in report.recommendations:
+                console.print(f"  - {rec}")
+            console.print()
+
+        # Attribution required?
+        if report.attribution_required:
+            console.print(
+                "[yellow]Attribution required for this license[/yellow]"
+            )
+            console.print("  Run: skillmeat compliance-checklist <bundle-path>")
+
+    except Exception as e:
+        console.print(f"[red]Error scanning bundle:[/red] {e}")
+        logger.exception("Failed to scan bundle")
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("bundle_path", type=click.Path(exists=True))
+@click.option(
+    "--license",
+    "-l",
+    help="Override declared license (SPDX identifier)",
+)
+def compliance_checklist(bundle_path, license):
+    """Generate compliance checklist for bundle.
+
+    Creates a comprehensive legal compliance checklist based on the
+    bundle's license and contents.
+
+    Examples:
+      skillmeat compliance-checklist my-bundle.zip
+      skillmeat compliance-checklist my-bundle.zip --license MIT
+    """
+    try:
+        from skillmeat.marketplace.compliance import (
+            LicenseScanner,
+            ComplianceChecklistGenerator,
+        )
+        from skillmeat.core.sharing.importer import BundleImporter
+
+        bundle_path_obj = Path(bundle_path)
+
+        console.print(f"[cyan]Generating compliance checklist: {bundle_path}[/cyan]")
+
+        # Load bundle to get metadata
+        importer = BundleImporter()
+        bundle = importer._load_bundle(bundle_path_obj)
+
+        # Determine license
+        if not license:
+            # Try to get from bundle metadata
+            license = bundle.metadata.license or "Unknown"
+
+        # Generate checklist
+        generator = ComplianceChecklistGenerator()
+        checklist = generator.create_checklist(
+            bundle_id=bundle.metadata.name,
+            license=license,
+            metadata=bundle.metadata.__dict__,
+        )
+
+        # Display checklist
+        console.print()
+        console.print(f"[bold]Compliance Checklist[/bold]")
+        console.print(f"  Bundle: {bundle.metadata.name}")
+        console.print(f"  License: {license}")
+        console.print(
+            f"  Items: {len(checklist.items)} ({sum(1 for i in checklist.items if i.required)} required)"
+        )
+        console.print()
+
+        # Group items by category
+        categories = {}
+        for item in checklist.items:
+            if item.category not in categories:
+                categories[item.category] = []
+            categories[item.category].append(item)
+
+        # Display by category
+        for category, items in sorted(categories.items()):
+            console.print(f"[bold]{category.upper()}:[/bold]")
+            for item in items:
+                marker = "[red]*[/red]" if item.required else " "
+                console.print(f"  {marker} [ ] {item.question}")
+                if item.help_text:
+                    console.print(f"      [dim]{item.help_text}[/dim]")
+            console.print()
+
+        console.print(
+            "[dim]Items marked with [red]*[/red] are required for publication[/dim]"
+        )
+        console.print()
+        console.print(
+            f"To record consent: skillmeat compliance-consent {checklist.checklist_id}"
+        )
+
+        # Save checklist to temp location for reference
+        checklist_file = Path.home() / ".skillmeat" / "compliance" / f"{checklist.checklist_id}.json"
+        checklist_file.parent.mkdir(parents=True, exist_ok=True)
+
+        import json
+        with open(checklist_file, "w") as f:
+            json.dump(checklist.to_dict(), f, indent=2)
+
+        console.print(f"[dim]Checklist saved: {checklist_file}[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error generating checklist:[/red] {e}")
+        logger.exception("Failed to generate checklist")
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("checklist_id")
+@click.option(
+    "--publisher-email",
+    "-e",
+    required=True,
+    help="Publisher email address",
+)
+def compliance_consent(checklist_id, publisher_email):
+    """Record compliance consent for checklist.
+
+    Records publisher consent to compliance checklist items with
+    cryptographic signature for legal audit trail.
+
+    Examples:
+      skillmeat compliance-consent <id> --publisher-email user@example.com
+    """
+    try:
+        from skillmeat.marketplace.compliance import ConsentLogger
+        import json
+
+        # Load checklist
+        checklist_file = Path.home() / ".skillmeat" / "compliance" / f"{checklist_id}.json"
+        if not checklist_file.exists():
+            console.print(f"[red]Checklist not found: {checklist_id}[/red]")
+            console.print("[dim]Run compliance-checklist first to generate a checklist[/dim]")
+            sys.exit(1)
+
+        with open(checklist_file, "r") as f:
+            checklist_data = json.load(f)
+
+        console.print(f"[cyan]Recording compliance consent[/cyan]")
+        console.print(f"  Checklist: {checklist_id}")
+        console.print(f"  Publisher: {publisher_email}")
+        console.print()
+
+        # Interactive consent collection
+        consents = {}
+        for item in checklist_data["items"]:
+            if item["required"]:
+                console.print(f"[bold]{item['question']}[/bold]")
+                if item.get("help_text"):
+                    console.print(f"[dim]{item['help_text']}[/dim]")
+
+                consent = Confirm.ask("Do you confirm?", default=True)
+                consents[item["id"]] = consent
+                console.print()
+
+        # Record consent
+        logger_obj = ConsentLogger()
+        record = logger_obj.record_consent(
+            checklist_id=checklist_id,
+            bundle_id=checklist_data["bundle_id"],
+            publisher_email=publisher_email,
+            consents=consents,
+        )
+
+        # Display result
+        console.print("[green]Consent recorded successfully![/green]")
+        console.print(f"  Consent ID: {record.consent_id}")
+        console.print(f"  Signature: {record.signature[:32]}...")
+        console.print(f"  Timestamp: {record.timestamp.isoformat()}")
+        console.print()
+
+        # Check if all required items consented
+        all_consented = all(consents.values())
+        if all_consented:
+            console.print("[green]All required items confirmed[/green]")
+        else:
+            console.print("[yellow]Warning: Not all required items confirmed[/yellow]")
+            console.print("[dim]Publication may be rejected[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error recording consent:[/red] {e}")
+        logger.exception("Failed to record consent")
+        sys.exit(1)
+
+
+@main.command()
+@click.option(
+    "--publisher",
+    "-p",
+    help="Filter by publisher email",
+)
+def compliance_history(publisher):
+    """View compliance consent history.
+
+    Shows history of recorded compliance consents, optionally filtered
+    by publisher email.
+
+    Examples:
+      skillmeat compliance-history
+      skillmeat compliance-history --publisher user@example.com
+    """
+    try:
+        from skillmeat.marketplace.compliance import ConsentLogger
+
+        logger_obj = ConsentLogger()
+        records = logger_obj.get_consent_history(publisher_email=publisher)
+
+        if not records:
+            console.print("[dim]No consent records found[/dim]")
+            return
+
+        console.print(f"[cyan]Compliance Consent History[/cyan]")
+        console.print(f"  Total Records: {len(records)}")
+        console.print()
+
+        # Create table
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Date", style="dim")
+        table.add_column("Consent ID")
+        table.add_column("Bundle ID")
+        table.add_column("Publisher")
+        table.add_column("Items", justify="right")
+        table.add_column("Complete", justify="center")
+
+        for record in records[:20]:  # Show last 20
+            date = record.timestamp.strftime("%Y-%m-%d %H:%M")
+            consent_id_short = record.consent_id[:8]
+            all_consented = all(record.consents.values())
+            complete_mark = "[green]✓[/green]" if all_consented else "[yellow]○[/yellow]"
+
+            table.add_row(
+                date,
+                consent_id_short,
+                record.bundle_id,
+                record.publisher_email,
+                str(len(record.consents)),
+                complete_mark,
+            )
+
+        console.print(table)
+
+        if len(records) > 20:
+            console.print(f"\n[dim]Showing 20 of {len(records)} records[/dim]")
+
+        # Show statistics
+        stats = logger_obj.get_statistics()
+        console.print()
+        console.print("[bold]Statistics:[/bold]")
+        console.print(f"  Total Consents: {stats['total_consents']}")
+        console.print(f"  Unique Publishers: {stats['unique_publishers']}")
+        console.print(f"  Unique Bundles: {stats['unique_bundles']}")
+        console.print(f"  Full Consents: {stats['full_consents']}")
+        console.print(f"  Partial Consents: {stats['partial_consents']}")
+
+    except Exception as e:
+        console.print(f"[red]Error retrieving consent history:[/red] {e}")
+        logger.exception("Failed to retrieve consent history")
+        sys.exit(1)
+
+
+# ====================
 # Entry Point
 # ====================
 

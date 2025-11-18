@@ -1,0 +1,46 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Scrape JSON logs from SkillMeat API
+  - job_name: skillmeat-api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: skillmeat-api
+          __path__: /var/log/skillmeat/*.log
+
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            logger: logger
+            message: message
+            trace_id: trace_id
+            request_id: request_id
+
+      # Extract labels
+      - labels:
+          level:
+          logger:
+          trace_id:
+          request_id:
+
+      # Set timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+
+      # Output format
+      - output:
+          source: message
