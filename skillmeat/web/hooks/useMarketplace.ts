@@ -4,7 +4,7 @@
  * These hooks provide data fetching, caching, and state management for marketplace operations.
  */
 
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tantml/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
 import type {
   MarketplaceListing,
@@ -19,7 +19,7 @@ import type {
 } from "@/types/marketplace";
 
 // API base URL - adjust based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 // Query keys
 const marketplaceKeys = {
