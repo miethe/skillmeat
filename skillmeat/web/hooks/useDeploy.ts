@@ -7,6 +7,9 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
 
 export interface DeployRequest {
   artifactId: string;
@@ -44,28 +47,27 @@ export function useDeploy(options: UseDeployOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: DeployRequest): Promise<DeployResponse> => {
-      // TODO: Replace with actual API call when backend endpoints are ready
-      // const response = await fetch("/api/v1/deploy", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(request),
-      // });
-      //
-      // if (!response.ok) {
-      //   throw new Error("Deploy failed");
-      // }
-      //
-      // return response.json();
+      try {
+        const response = await apiRequest<DeployResponse>("/deploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        });
+        return response;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[deploy] Deploy API failed, falling back to mock", error);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Mock implementation for development
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      return {
-        success: true,
-        message: `Successfully deployed ${request.artifactName}`,
-        deploymentId: `deploy-${Date.now()}`,
-        streamUrl: `/api/v1/deploy/${request.artifactId}/stream`,
-      };
+          return {
+            success: true,
+            message: `Successfully deployed ${request.artifactName}`,
+            deploymentId: `deploy-${Date.now()}`,
+            streamUrl: `/api/v1/deploy/${request.artifactId}/stream`,
+          };
+        }
+        throw error;
+      }
     },
 
     onSuccess: (data, variables) => {
@@ -113,13 +115,25 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       artifactName: string;
       projectPath?: string;
     }): Promise<DeployResponse> => {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        const response = await apiRequest<DeployResponse>("/deploy/undeploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        });
+        return response;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[deploy] Undeploy API failed, falling back to mock", error);
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
-      return {
-        success: true,
-        message: `Successfully removed ${request.artifactName}`,
-      };
+          return {
+            success: true,
+            message: `Successfully removed ${request.artifactName}`,
+          };
+        }
+        throw error;
+      }
     },
 
     onSuccess: (data, variables) => {

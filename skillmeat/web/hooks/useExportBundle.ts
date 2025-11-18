@@ -8,6 +8,9 @@ import type {
   Bundle,
   ShareLink,
 } from "@/types/bundle";
+import { apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
 
 export interface ExportProgress {
   step: "preparing" | "collecting" | "compressing" | "uploading" | "generating-link" | "complete";
@@ -35,13 +38,19 @@ export function useExportBundle({
 
   return useMutation({
     mutationFn: async (request: ExportRequest): Promise<ExportBundleResult> => {
-      // TODO: Replace with actual API call when P2-001 and P2-003 are complete
-      // const response = await apiClient.bundles.exportBundle({ data: request });
+      try {
+        const response = await apiRequest<ExportBundleResult>("/bundles/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        });
+        return response;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Export API failed, falling back to mock", error);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock response
+          // Mock response
       const bundle: Bundle = {
         id: `bundle-${Date.now()}`,
         metadata: request.metadata,
@@ -96,11 +105,14 @@ export function useExportBundle({
         bundle.vault = request.options.vault;
       }
 
-      return {
-        bundle,
-        downloadUrl: `/api/bundles/${bundle.id}/download`,
-        streamUrl: `/api/bundles/${bundle.id}/export/stream`,
-      };
+          return {
+            bundle,
+            downloadUrl: `/api/bundles/${bundle.id}/download`,
+            streamUrl: `/api/bundles/${bundle.id}/export/stream`,
+          };
+        }
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Invalidate bundle queries
@@ -116,6 +128,7 @@ export function useExportBundle({
 
 /**
  * Hook to validate export request before executing
+ * Note: Uses client-side validation as no backend validation endpoint exists
  */
 export function useValidateExport() {
   return useMutation({
@@ -125,7 +138,7 @@ export function useValidateExport() {
       warnings: string[];
       estimatedSize: number;
     }> => {
-      // TODO: Replace with actual API call
+      // Client-side validation
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       const errors: string[] = [];

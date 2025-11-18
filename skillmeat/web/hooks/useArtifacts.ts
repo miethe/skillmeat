@@ -445,8 +445,20 @@ export function useUpdateArtifact() {
 
   return useMutation({
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
-      // TODO: Replace with actual API call when artifact update endpoint is available
-      return artifact;
+      try {
+        const response = await apiRequest<ApiArtifact>(`/artifacts/${artifact.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(artifact),
+        });
+        return mapApiArtifact(response);
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[artifacts] Update API failed, falling back to mock", error);
+          return artifact as Artifact;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalidate and refetch artifacts
@@ -463,8 +475,18 @@ export function useDeleteArtifact() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // TODO: Replace with actual API call when artifact delete endpoint is available
-      return id;
+      try {
+        await apiRequest<void>(`/artifacts/${id}`, {
+          method: "DELETE",
+        });
+        return id;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[artifacts] Delete API failed, falling back to mock", error);
+          return id;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalidate and refetch artifacts

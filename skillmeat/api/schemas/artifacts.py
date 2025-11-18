@@ -220,3 +220,70 @@ class ArtifactUpstreamResponse(BaseModel):
                 "last_checked": "2024-11-16T15:30:00Z",
             }
         }
+
+
+class ArtifactUpdateMetadataRequest(BaseModel):
+    """Request schema for updating artifact metadata fields."""
+
+    title: Optional[str] = Field(
+        default=None,
+        description="Artifact title",
+        examples=["PDF Processing Skill"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Artifact description",
+        examples=["Extract and analyze PDF documents"],
+    )
+    author: Optional[str] = Field(
+        default=None,
+        description="Artifact author",
+        examples=["Anthropic"],
+    )
+    license: Optional[str] = Field(
+        default=None,
+        description="Artifact license",
+        examples=["MIT"],
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Artifact tags",
+        examples=[["document", "pdf", "productivity"]],
+    )
+
+
+class ArtifactUpdateRequest(BaseModel):
+    """Request schema for updating an artifact.
+
+    Allows updating metadata and tags. Note: aliases are not yet
+    implemented in the backend but are included for future compatibility.
+    """
+
+    aliases: Optional[List[str]] = Field(
+        default=None,
+        description="Artifact aliases (not yet implemented)",
+        examples=[["pdf-processor", "doc-reader"]],
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Artifact tags",
+        examples=[["document", "pdf", "productivity"]],
+    )
+    metadata: Optional[ArtifactUpdateMetadataRequest] = Field(
+        default=None,
+        description="Artifact metadata to update",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "tags": ["document", "pdf", "productivity"],
+                "metadata": {
+                    "title": "Enhanced PDF Processor",
+                    "description": "Advanced PDF extraction and analysis",
+                    "tags": ["document", "pdf"],
+                },
+            }
+        }

@@ -437,6 +437,242 @@ class TestCheckArtifactUpstream:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+class TestUpdateArtifact:
+    """Test PUT /api/v1/artifacts/{artifact_id} endpoint."""
+
+    def test_update_artifact_tags_success(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test updating artifact tags."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+
+        # Mock save
+        mock_collection_manager.save_collection.return_value = None
+        mock_collection_manager.lock_mgr.update_entry.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.compute_content_hash",
+            return_value="abc123hash",
+        ):
+            response = client.put(
+                "/api/v1/artifacts/skill:pdf-skill",
+                json={"tags": ["updated", "tags"]},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == "pdf-skill"
+
+    def test_update_artifact_metadata_success(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test updating artifact metadata."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.compute_content_hash",
+            return_value="abc123hash",
+        ):
+            response = client.put(
+                "/api/v1/artifacts/skill:pdf-skill",
+                json={
+                    "metadata": {
+                        "title": "Updated PDF Skill",
+                        "description": "Updated description",
+                    }
+                },
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == "pdf-skill"
+
+    def test_update_artifact_not_found(self, client, mock_collection_manager):
+        """Test updating a non-existent artifact."""
+        mock_collection = MagicMock()
+        mock_collection.find_artifact.return_value = None
+        mock_collection_manager.load_collection.return_value = mock_collection
+
+        mock_art_mgr = MagicMock()
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_art_mgr,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ):
+            response = client.put(
+                "/api/v1/artifacts/skill:nonexistent",
+                json={"tags": ["test"]},
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_update_artifact_invalid_id(self, client):
+        """Test updating artifact with invalid ID format."""
+        response = client.put(
+            "/api/v1/artifacts/invalid-id",
+            json={"tags": ["test"]},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_update_artifact_with_aliases_warning(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test updating artifact aliases logs warning (not implemented yet)."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+        mock_collection_manager.config.get_collection_path.return_value = "/path/to/collection"
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.compute_content_hash",
+            return_value="abc123hash",
+        ):
+            # Aliases should be accepted but not applied (logged warning)
+            response = client.put(
+                "/api/v1/artifacts/skill:pdf-skill",
+                json={"aliases": ["pdf-processor"]},
+            )
+
+        # Should succeed but aliases not applied
+        assert response.status_code == status.HTTP_200_OK
+
+
+class TestDeleteArtifact:
+    """Test DELETE /api/v1/artifacts/{artifact_id} endpoint."""
+
+    def test_delete_artifact_success(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test deleting an artifact."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+
+        # Mock remove operation
+        mock_artifact_manager.remove.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ):
+            response = client.delete("/api/v1/artifacts/skill:pdf-skill")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_delete_artifact_not_found(self, client, mock_collection_manager):
+        """Test deleting a non-existent artifact."""
+        # Mock collection loading with no artifact found
+        mock_collection = MagicMock()
+        mock_collection.find_artifact.return_value = None
+        mock_collection_manager.load_collection.return_value = mock_collection
+
+        mock_art_mgr = MagicMock()
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_art_mgr,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ):
+            response = client.delete("/api/v1/artifacts/skill:nonexistent")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_delete_artifact_invalid_id(self, client):
+        """Test deleting artifact with invalid ID format."""
+        response = client.delete("/api/v1/artifacts/invalid-id")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_delete_artifact_with_collection_filter(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test deleting artifact with collection filter."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+
+        # Mock remove operation
+        mock_artifact_manager.remove.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ):
+            response = client.delete(
+                "/api/v1/artifacts/skill:pdf-skill?collection=default"
+            )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_delete_artifact_manager_error(
+        self, client, mock_artifact, mock_artifact_manager, mock_collection_manager
+    ):
+        """Test delete when artifact manager raises error."""
+        # Mock collection loading
+        mock_collection = MagicMock()
+        mock_collection.name = "default"
+        mock_collection.find_artifact.return_value = mock_artifact
+        mock_collection_manager.load_collection.return_value = mock_collection
+
+        # Mock remove operation to raise ValueError
+        mock_artifact_manager.remove.side_effect = ValueError("Artifact not found")
+
+        with patch(
+            "skillmeat.api.routers.artifacts.ArtifactManagerDep",
+            return_value=mock_artifact_manager,
+        ), patch(
+            "skillmeat.api.routers.artifacts.CollectionManagerDep",
+            return_value=mock_collection_manager,
+        ):
+            response = client.delete("/api/v1/artifacts/skill:pdf-skill")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
 class TestArtifactsAuth:
     """Test authentication for artifacts endpoints."""
 

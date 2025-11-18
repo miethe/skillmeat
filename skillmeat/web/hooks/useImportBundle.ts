@@ -9,6 +9,9 @@ import type {
   BundlePreview,
   BundleSource,
 } from "@/types/bundle";
+import { apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
 
 export interface ImportProgress {
   step: "uploading" | "validating" | "resolving" | "installing" | "complete";
@@ -31,62 +34,71 @@ export function usePreviewBundle(source: BundleSource | null, enabled: boolean =
     queryFn: async (): Promise<BundlePreview | null> => {
       if (!source) return null;
 
-      // TODO: Replace with actual API call when P2-002 is complete
-      // const preview = await apiClient.bundles.previewBundle({ source });
+      try {
+        const response = await apiRequest<BundlePreview>("/bundles/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source }),
+        });
+        return response;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Preview API failed, falling back to mock", error);
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Mock preview
-      return {
-        bundle: {
-          id: "preview-bundle",
-          metadata: {
-            name: "Sample Bundle",
-            description: "A sample bundle for testing",
-            tags: ["test", "sample"],
-            author: "Test User",
-            version: "1.0.0",
-            createdAt: new Date().toISOString(),
-          },
-          artifacts: [
-            {
-              artifact: {
-                id: "1",
-                name: "canvas-design",
-                type: "skill",
-                scope: "user",
-                status: "active",
-                version: "v2.1.0",
-                metadata: {
-                  title: "Canvas Design",
-                  description: "Create visual designs",
-                },
-                upstreamStatus: { hasUpstream: false, isOutdated: false },
-                usageStats: {
-                  totalDeployments: 0,
-                  activeProjects: 0,
-                  usageCount: 0,
-                },
+          // Mock preview
+          return {
+            bundle: {
+              id: "preview-bundle",
+              metadata: {
+                name: "Sample Bundle",
+                description: "A sample bundle for testing",
+                tags: ["test", "sample"],
+                author: "Test User",
+                version: "1.0.0",
                 createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
               },
+              artifacts: [
+                {
+                  artifact: {
+                    id: "1",
+                    name: "canvas-design",
+                    type: "skill",
+                    scope: "user",
+                    status: "active",
+                    version: "v2.1.0",
+                    metadata: {
+                      title: "Canvas Design",
+                      description: "Create visual designs",
+                    },
+                    upstreamStatus: { hasUpstream: false, isOutdated: false },
+                    usageStats: {
+                      totalDeployments: 0,
+                      activeProjects: 0,
+                      usageCount: 0,
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  },
+                },
+              ],
+              exportedAt: new Date().toISOString(),
+              exportedBy: "test-user",
+              format: "zip",
+              size: 1024 * 1024,
+              checksumSha256: "mock-checksum",
             },
-          ],
-          exportedAt: new Date().toISOString(),
-          exportedBy: "test-user",
-          format: "zip",
-          size: 1024 * 1024,
-          checksumSha256: "mock-checksum",
-        },
-        conflicts: [],
-        newArtifacts: ["1"],
-        existingArtifacts: [],
-        willImport: 1,
-        willSkip: 0,
-        willMerge: 0,
-        willFork: 0,
-      };
+            conflicts: [],
+            newArtifacts: ["1"],
+            existingArtifacts: [],
+            willImport: 1,
+            willSkip: 0,
+            willMerge: 0,
+            willFork: 0,
+          };
+        }
+        throw error;
+      }
     },
     enabled: enabled && !!source,
     staleTime: 0, // Always fetch fresh preview
@@ -106,28 +118,37 @@ export function useImportBundle({
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_request: ImportRequest): Promise<ImportBundleResult> => {
-      // TODO: Replace with actual API call when P2-002 is complete
-      // const response = await apiClient.bundles.importBundle({ data: request });
+    mutationFn: async (request: ImportRequest): Promise<ImportBundleResult> => {
+      try {
+        const response = await apiRequest<ImportBundleResult>("/bundles/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        });
+        return response;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Import API failed, falling back to mock", error);
+          await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+          // Mock response
+          const result: ImportResult = {
+            success: true,
+            imported: ["1"],
+            skipped: [],
+            merged: [],
+            forked: [],
+            errors: [],
+            summary: "Successfully imported 1 artifact",
+          };
 
-      // Mock response
-      const result: ImportResult = {
-        success: true,
-        imported: ["1"],
-        skipped: [],
-        merged: [],
-        forked: [],
-        errors: [],
-        summary: "Successfully imported 1 artifact",
-      };
-
-      return {
-        result,
-        streamUrl: `/api/bundles/import/stream`,
-      };
+          return {
+            result,
+            streamUrl: `/api/bundles/import/stream`,
+          };
+        }
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Invalidate artifact and bundle queries
@@ -144,6 +165,7 @@ export function useImportBundle({
 
 /**
  * Hook to validate import request before executing
+ * Note: Uses client-side validation as no backend validation endpoint exists
  */
 export function useValidateImport() {
   return useMutation({
@@ -152,7 +174,7 @@ export function useValidateImport() {
       errors: string[];
       warnings: string[];
     }> => {
-      // TODO: Replace with actual API call
+      // Client-side validation
       await new Promise((resolve) => setTimeout(resolve, 300));
 
       const errors: string[] = [];
