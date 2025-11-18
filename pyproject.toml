@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skillmeat"
-version = "0.1.0-alpha"
+version = "0.3.0-beta"
 description = "Personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP, Hooks)"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -54,6 +54,8 @@ dependencies = [
     "PyJWT>=2.8.0",
     "cryptography>=41.0.0",
     "keyring>=24.0.0",
+    "jsonschema>=4.0.0",
+    "prometheus-client>=0.19.0",
 ]
 
 [project.urls]
@@ -86,10 +88,15 @@ packages = [
     "skillmeat.core",
     "skillmeat.core.auth",
     "skillmeat.core.sharing",
+    "skillmeat.core.signing",
+    "skillmeat.core.mcp",
     "skillmeat.sources",
     "skillmeat.storage",
     "skillmeat.utils",
-    "skillmeat.web"
+    "skillmeat.web",
+    "skillmeat.marketplace",
+    "skillmeat.marketplace.brokers",
+    "skillmeat.observability"
 ]
 
 [tool.setuptools.package-data]
