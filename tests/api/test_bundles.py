@@ -4,11 +4,10 @@ Tests bundle import, validation, preview, and management endpoints.
 """
 
 import io
-import json
 import tempfile
 import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -723,8 +722,6 @@ class TestBundleShareLinkEndpoints:
             },
             headers={"Authorization": f"Bearer {mock_auth_token}"},
         )
-
-        after_request = datetime.utcnow()
 
         assert response.status_code == 200
 

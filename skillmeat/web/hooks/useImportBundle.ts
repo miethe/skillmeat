@@ -35,10 +35,25 @@ export function usePreviewBundle(source: BundleSource | null, enabled: boolean =
       if (!source) return null;
 
       try {
+        // Create FormData for multipart upload
+        const formData = new FormData();
+
+        // Handle different source types
+        if (source.type === "file") {
+          formData.append("bundle_file", source.file);
+        } else if (source.type === "url") {
+          // For URL sources, we need to fetch the file first
+          // This is a limitation - the backend expects a file upload
+          throw new Error("URL source type not yet supported for preview");
+        } else if (source.type === "vault") {
+          // Vault sources also not supported directly
+          throw new Error("Vault source type not yet supported for preview");
+        }
+
         const response = await apiRequest<BundlePreview>("/bundles/preview", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source }),
+          body: formData,
+          // Don't set Content-Type header - browser will set it with boundary
         });
         return response;
       } catch (error) {
@@ -120,10 +135,28 @@ export function useImportBundle({
   return useMutation({
     mutationFn: async (request: ImportRequest): Promise<ImportBundleResult> => {
       try {
+        // Create FormData for multipart upload
+        const formData = new FormData();
+
+        // Handle bundle source
+        if (request.source.type === "file") {
+          formData.append("bundle_file", request.source.file);
+        } else if (request.source.type === "url") {
+          // URL sources need different handling
+          throw new Error("URL source type not yet supported for import");
+        } else if (request.source.type === "vault") {
+          // Vault sources need different handling
+          throw new Error("Vault source type not yet supported for import");
+        }
+
+        // The backend expects form fields, but the current ImportRequest
+        // type may not have all needed fields. Add them as they become available.
+        // TODO: Update ImportRequest type to match backend schema
+
         const response = await apiRequest<ImportBundleResult>("/bundles/import", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request),
+          body: formData,
+          // Don't set Content-Type header - browser will set it with boundary
         });
         return response;
       } catch (error) {

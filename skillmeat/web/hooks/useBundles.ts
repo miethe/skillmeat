@@ -72,11 +72,11 @@ export function useBundles(filter?: "created" | "imported" | "all") {
           params.set("filter", filter);
         }
 
-        const response = await apiRequest<{ items: BundleListItem[] }>(
+        const response = await apiRequest<{ bundles: BundleListItem[] }>(
           `/bundles${params.toString() ? `?${params.toString()}` : ""}`
         );
 
-        return response.items || [];
+        return response.bundles || [];
       } catch (error) {
         if (USE_MOCKS) {
           console.warn("[bundles] API failed, falling back to mock data", error);
