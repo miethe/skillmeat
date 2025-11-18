@@ -140,6 +140,12 @@ class APISettings(BaseSettings):
         description="API key for authentication (if enabled)",
     )
 
+    # Token authentication
+    auth_enabled: bool = Field(
+        default=False,
+        description="Require bearer token authentication for API routes",
+    )
+
     # Rate limiting
     rate_limit_enabled: bool = Field(
         default=False,

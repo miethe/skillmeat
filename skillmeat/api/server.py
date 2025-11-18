@@ -48,6 +48,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.env.value}")
     logger.info(f"API Version: {settings.api_version}")
     logger.info(f"Host: {settings.host}:{settings.port}")
+    logger.info(
+        "Authentication: %s",
+        "enabled (Bearer tokens required)" if settings.auth_enabled else "disabled",
+    )
 
     # Configure logging
     settings.configure_logging()

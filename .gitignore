@@ -171,6 +171,10 @@ $RECYCLE.BIN/
 # Project-specific
 skills.lock
 
+# Allow tracked helpers in the web lib directory
+!skillmeat/web/lib/
+!skillmeat/web/lib/api.ts
+
 # Node.js / Next.js (for web interface)
 node_modules/
 .next/

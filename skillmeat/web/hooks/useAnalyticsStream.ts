@@ -9,10 +9,12 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AnalyticsEvent } from '@/types/analytics';
 
+import { apiConfig } from '@/lib/api';
+
 // Environment configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'dev-key-12345';
+const API_BASE_URL = apiConfig.baseUrl;
+const API_VERSION = apiConfig.version;
+const API_KEY = apiConfig.apiKey || 'dev-key-12345';
 
 export interface UseAnalyticsStreamOptions {
   enabled?: boolean;
