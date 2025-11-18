@@ -2,12 +2,14 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
+const ENABLE_API_MOCKS = process.env.NEXT_PUBLIC_ENABLE_API_MOCKS === "true";
 
 export const apiConfig = {
   baseUrl: API_BASE_URL,
   version: API_VERSION,
   apiKey: API_KEY,
   apiToken: API_TOKEN,
+  useMocks: ENABLE_API_MOCKS,
 };
 
 export class ApiError extends Error {
