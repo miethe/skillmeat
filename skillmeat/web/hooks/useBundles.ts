@@ -8,6 +8,9 @@ import type {
   BundleAnalytics,
   ShareLink,
 } from "@/types/bundle";
+import { apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
 
 // Mock data generator
 const generateMockBundles = (): BundleListItem[] => {
@@ -63,20 +66,32 @@ export function useBundles(filter?: "created" | "imported" | "all") {
   return useQuery({
     queryKey: ["bundles", filter],
     queryFn: async (): Promise<BundleListItem[]> => {
-      // TODO: Replace with actual API call when P2-001 is complete
-      // const bundles = await apiClient.bundles.listBundles({ filter });
+      try {
+        const params = new URLSearchParams();
+        if (filter && filter !== "all") {
+          params.set("filter", filter);
+        }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+        const response = await apiRequest<{ bundles: BundleListItem[] }>(
+          `/bundles${params.toString() ? `?${params.toString()}` : ""}`
+        );
 
-      let bundles = generateMockBundles();
+        return response.bundles || [];
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] API failed, falling back to mock data", error);
+          let bundles = generateMockBundles();
 
-      if (filter === "created") {
-        bundles = bundles.filter((b) => !b.isImported);
-      } else if (filter === "imported") {
-        bundles = bundles.filter((b) => b.isImported);
+          if (filter === "created") {
+            bundles = bundles.filter((b) => !b.isImported);
+          } else if (filter === "imported") {
+            bundles = bundles.filter((b) => b.isImported);
+          }
+
+          return bundles;
+        }
+        throw error;
       }
-
-      return bundles;
     },
     staleTime: 30000,
   });
@@ -91,27 +106,35 @@ export function useBundleAnalytics(bundleId: string | null) {
     queryFn: async (): Promise<BundleAnalytics | null> => {
       if (!bundleId) return null;
 
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      return {
-        bundleId,
-        downloads: 42,
-        uniqueDownloaders: 15,
-        lastDownloaded: new Date(Date.now() - 3600000).toISOString(),
-        popularArtifacts: [
-          {
-            artifactId: "1",
-            artifactName: "canvas-design",
-            downloads: 25,
-          },
-          {
-            artifactId: "2",
-            artifactName: "docx-processor",
-            downloads: 17,
-          },
-        ],
-      };
+      try {
+        const analytics = await apiRequest<BundleAnalytics>(
+          `/bundles/${bundleId}/analytics`
+        );
+        return analytics;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Analytics API failed, falling back to mock data", error);
+          return {
+            bundleId,
+            downloads: 42,
+            uniqueDownloaders: 15,
+            lastDownloaded: new Date(Date.now() - 3600000).toISOString(),
+            popularArtifacts: [
+              {
+                artifactId: "1",
+                artifactName: "canvas-design",
+                downloads: 25,
+              },
+              {
+                artifactId: "2",
+                artifactName: "docx-processor",
+                downloads: 17,
+              },
+            ],
+          };
+        }
+        throw error;
+      }
     },
     enabled: !!bundleId,
   });
@@ -125,9 +148,18 @@ export function useDeleteBundle() {
 
   return useMutation({
     mutationFn: async (bundleId: string) => {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return bundleId;
+      try {
+        await apiRequest<void>(`/bundles/${bundleId}`, {
+          method: "DELETE",
+        });
+        return bundleId;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Delete API failed, falling back to mock", error);
+          return bundleId;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bundles"] });
@@ -149,9 +181,20 @@ export function useUpdateShareLink() {
       bundleId: string;
       updates: Partial<ShareLink>;
     }) => {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return { bundleId, updates };
+      try {
+        const response = await apiRequest<ShareLink>(`/bundles/${bundleId}/share`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+        return { bundleId, updates: response };
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Update share link API failed, falling back to mock", error);
+          return { bundleId, updates };
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bundles"] });
@@ -167,9 +210,18 @@ export function useRevokeShareLink() {
 
   return useMutation({
     mutationFn: async (bundleId: string) => {
-      // TODO: Replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return bundleId;
+      try {
+        await apiRequest<void>(`/bundles/${bundleId}/share`, {
+          method: "DELETE",
+        });
+        return bundleId;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn("[bundles] Revoke share link API failed, falling back to mock", error);
+          return bundleId;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bundles"] });
