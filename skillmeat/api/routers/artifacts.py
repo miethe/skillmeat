@@ -23,6 +23,7 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactListResponse,
     ArtifactMetadataResponse,
     ArtifactResponse,
+    ArtifactUpdateRequest,
     ArtifactUpstreamInfo,
     ArtifactUpstreamResponse,
 )
@@ -560,6 +561,291 @@ async def check_artifact_upstream(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check upstream status: {str(e)}",
+        )
+
+
+@router.put(
+    "/{artifact_id}",
+    response_model=ArtifactResponse,
+    summary="Update artifact",
+    description="Update artifact metadata, tags, and aliases",
+    responses={
+        200: {"description": "Successfully updated artifact"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def update_artifact(
+    artifact_id: str,
+    update_request: ArtifactUpdateRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> ArtifactResponse:
+    """Update an artifact's metadata, tags, and aliases.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        update_request: Update request containing new values
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+        collection: Optional collection filter
+
+    Returns:
+        Updated artifact details
+
+    Raises:
+        HTTPException: If artifact not found or on error
+    """
+    try:
+        logger.info(f"Updating artifact: {artifact_id} (collection={collection})")
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact and its collection
+        artifact = None
+        collection_name = collection
+        target_collection = None
+
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                target_collection = collection_mgr.load_collection(collection)
+                artifact = target_collection.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    target_collection = collection_mgr.load_collection(coll_name)
+                    artifact = target_collection.find_artifact(
+                        artifact_name, artifact_type
+                    )
+                    collection_name = coll_name
+                    break  # Found it
+                except ValueError:
+                    continue
+
+        if not artifact or not target_collection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Track if anything was updated
+        updated = False
+
+        # Update tags if provided
+        if update_request.tags is not None:
+            artifact.tags = update_request.tags
+            updated = True
+            logger.info(f"Updated tags for {artifact_id}: {update_request.tags}")
+
+        # Update metadata fields if provided
+        if update_request.metadata is not None:
+            # Ensure artifact has metadata object
+            if artifact.metadata is None:
+                from skillmeat.core.artifact import ArtifactMetadata
+                artifact.metadata = ArtifactMetadata()
+
+            metadata_updates = update_request.metadata
+            if metadata_updates.title is not None:
+                artifact.metadata.title = metadata_updates.title
+                updated = True
+            if metadata_updates.description is not None:
+                artifact.metadata.description = metadata_updates.description
+                updated = True
+            if metadata_updates.author is not None:
+                artifact.metadata.author = metadata_updates.author
+                updated = True
+            if metadata_updates.license is not None:
+                artifact.metadata.license = metadata_updates.license
+                updated = True
+            if metadata_updates.tags is not None:
+                artifact.metadata.tags = metadata_updates.tags
+                updated = True
+
+            if updated:
+                logger.info(f"Updated metadata for {artifact_id}")
+
+        # Log warning for aliases (not yet implemented)
+        if update_request.aliases is not None:
+            logger.warning(
+                f"Aliases update requested for {artifact_id} but aliases are not yet implemented"
+            )
+
+        # Update last_updated timestamp if anything changed
+        if updated:
+            artifact.last_updated = datetime.utcnow()
+
+            # Save collection
+            collection_mgr.save_collection(target_collection)
+
+            # Update lock file (content hash may not have changed, but metadata did)
+            collection_path = collection_mgr.config.get_collection_path(collection_name)
+            artifact_path = collection_path / artifact.path
+
+            # Compute content hash for lock file
+            from skillmeat.utils.filesystem import compute_content_hash
+
+            content_hash = compute_content_hash(artifact_path)
+            collection_mgr.lock_mgr.update_entry(
+                collection_path,
+                artifact.name,
+                artifact.type,
+                artifact.upstream,
+                artifact.resolved_sha,
+                artifact.resolved_version,
+                content_hash,
+            )
+
+            logger.info(f"Successfully updated artifact: {artifact_id}")
+        else:
+            logger.info(f"No changes made to artifact: {artifact_id}")
+
+        return artifact_to_response(artifact)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating artifact '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update artifact: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{artifact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete artifact",
+    description="Remove an artifact from the collection",
+    responses={
+        204: {"description": "Successfully deleted artifact"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def delete_artifact(
+    artifact_id: str,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> None:
+    """Delete an artifact from the collection.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+        collection: Optional collection filter
+
+    Raises:
+        HTTPException: If artifact not found or on error
+    """
+    try:
+        logger.info(f"Deleting artifact: {artifact_id} (collection={collection})")
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact to determine its collection if not specified
+        collection_name = collection
+        found = False
+
+        if collection:
+            # Check specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                target_collection = collection_mgr.load_collection(collection)
+                artifact = target_collection.find_artifact(artifact_name, artifact_type)
+                if artifact:
+                    found = True
+                    collection_name = collection
+            except ValueError:
+                pass  # Not found
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    target_collection = collection_mgr.load_collection(coll_name)
+                    artifact = target_collection.find_artifact(
+                        artifact_name, artifact_type
+                    )
+                    if artifact:
+                        found = True
+                        collection_name = coll_name
+                        break
+                except ValueError:
+                    continue
+
+        if not found:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Remove artifact using artifact manager
+        # This handles filesystem cleanup, collection update, and lock file update
+        try:
+            artifact_mgr.remove(artifact_name, artifact_type, collection_name)
+            logger.info(f"Successfully deleted artifact: {artifact_id}")
+        except ValueError as e:
+            # Artifact not found (race condition)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found: {str(e)}",
+            )
+
+        # Return 204 No Content (no body)
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting artifact '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete artifact: {str(e)}",
         )
 
 
