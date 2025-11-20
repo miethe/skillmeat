@@ -423,6 +423,65 @@ class SyncManager:
                 dest_path.unlink()
         temp_target.replace(dest_path)
 
+    def resolve_conflicts(
+        self,
+        project_path: Path,
+        artifact_name: str,
+        artifact_type: str,
+        resolution: str = "ours",
+        collection_name: Optional[str] = None,
+    ) -> SyncResult:
+        """Resolve conflicts by overwriting with chosen side (ours=collection, theirs=project).
+
+        This is a pragmatic resolver that avoids merge markers by selecting a side
+        and replacing the other tier atomically.
+        """
+        resolution = resolution.lower()
+        if resolution not in {"ours", "theirs"}:
+            raise ValueError("resolution must be 'ours' or 'theirs'")
+
+        collection = self.collection_mgr.load_collection(collection_name)
+        collection_path = self.collection_mgr.config.get_collection_path(collection.name)
+        artifact_type_plural = self._get_artifact_type_plural(artifact_type)
+
+        # Locate paths
+        coll_path = collection_path / artifact_type_plural
+        proj_path = project_path / ".claude" / artifact_type_plural
+        if artifact_type in {"command", "agent"}:
+            coll_artifact = coll_path / f"{artifact_name}.md"
+            proj_artifact = proj_path / f"{artifact_name}.md"
+        else:
+            coll_artifact = coll_path / artifact_name
+            proj_artifact = proj_path / artifact_name
+
+        if resolution == "ours":
+            # Overwrite project with collection copy
+            self._atomic_replace_artifact(coll_artifact, proj_artifact)
+        else:
+            # Overwrite collection with project copy
+            self._atomic_replace_artifact(proj_artifact, coll_artifact)
+            # Update lock hash when taking project version
+            try:
+                new_hash = compute_content_hash(coll_artifact)
+                self.collection_mgr.lock_mgr.update_entry(
+                    collection_path,
+                    artifact_name,
+                    ArtifactType(artifact_type),
+                    upstream=None,
+                    resolved_sha=None,
+                    resolved_version=None,
+                    content_hash=new_hash,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to update lock after resolve: {exc}")
+
+        return SyncResult(
+            status="success",
+            artifacts_synced=[artifact_name],
+            conflicts=[],
+            message=f"Resolved conflicts for {artifact_type}/{artifact_name} with '{resolution}'",
+        )
+
     def _compute_project_artifact_hash(
         self, project_path: Path, artifact_name: str, artifact_type: str
     ) -> Optional[str]:

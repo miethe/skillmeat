@@ -340,16 +340,44 @@ async def version_history(
 )
 async def resolve_conflicts(
     request: ResolveRequest,
+    sync_mgr: SyncManager = Depends(get_sync_manager),
     token: TokenDep = None,
 ) -> ResolveResponse:
     """Placeholder endpoint for conflict resolution.
 
-    Currently not implemented; returns 501 to signal future support.
+    Currently supports coarse resolutions:
+    - ours: overwrite project with collection version
+    - theirs: overwrite collection with project version
     """
-    return ResolveResponse(
-        status="not_implemented",
-        message="Conflict resolution API not implemented yet.",
-    )
+    if not request.project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required for conflict resolution",
+        )
+
+    try:
+        result = sync_mgr.resolve_conflicts(
+            project_path=Path(request.project_path),
+            artifact_name=request.artifact_name,
+            artifact_type=request.artifact_type,
+            resolution=request.resolution,
+            collection_name=request.collection,
+        )
+        return ResolveResponse(
+            status=result.status,
+            message=result.message,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Conflict resolution failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
 
     try:
         project_path = Path(request.project_path)
