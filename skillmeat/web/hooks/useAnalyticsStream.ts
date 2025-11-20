@@ -229,15 +229,16 @@ export function useAnalyticsStream(options: UseAnalyticsStreamOptions = {}) {
     isMountedRef.current = true;
 
     if (enabled) {
-      // Try SSE first, fall back to polling
-      connectSSE();
+      // Use polling until SSE endpoint is implemented
+      // TODO: Re-enable SSE once /api/v1/analytics/stream endpoint is added
+      startPolling();
     }
 
     return () => {
       isMountedRef.current = false;
       disconnect();
     };
-  }, [enabled, connectSSE, disconnect]);
+  }, [enabled, startPolling, disconnect]);
 
   return {
     status,
