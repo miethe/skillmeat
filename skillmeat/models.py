@@ -5,8 +5,10 @@ application for representing artifacts, diffs, and other core entities.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Dict, Literal, Any
+from typing import Any, Dict, List, Literal, Optional
 
 
 @dataclass
@@ -217,6 +219,90 @@ class ThreeWayDiffResult:
     auto_mergeable: List[str] = field(default_factory=list)
     conflicts: List[ConflictMetadata] = field(default_factory=list)
     stats: DiffStats = field(default_factory=DiffStats)
+
+
+class SyncStatus(str, Enum):
+    """Synchronization status across tiers."""
+
+    SYNCED = "synced"
+    MODIFIED = "modified"
+    OUTDATED = "outdated"
+    CONFLICT = "conflict"
+    DIVERGED = "diverged"
+
+
+@dataclass
+class ConflictInfo:
+    """Structured conflict payload captured during merge/sync."""
+
+    file_path: str
+    conflict_type: Literal["content", "deletion", "both_modified", "add_add"]
+    ours_hash: Optional[str] = None
+    theirs_hash: Optional[str] = None
+    base_hash: Optional[str] = None
+    resolution: Optional[Literal["ours", "theirs", "manual", "pending"]] = "pending"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dict for TOML/JSON persistence."""
+        data: Dict[str, Any] = {
+            "file_path": self.file_path,
+            "conflict_type": self.conflict_type,
+            "resolution": self.resolution,
+        }
+        if self.ours_hash:
+            data["ours_hash"] = self.ours_hash
+        if self.theirs_hash:
+            data["theirs_hash"] = self.theirs_hash
+        if self.base_hash:
+            data["base_hash"] = self.base_hash
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ConflictInfo":
+        """Deserialize from stored representation."""
+        return cls(
+            file_path=data["file_path"],
+            conflict_type=data["conflict_type"],
+            ours_hash=data.get("ours_hash"),
+            theirs_hash=data.get("theirs_hash"),
+            base_hash=data.get("base_hash"),
+            resolution=data.get("resolution", "pending"),
+        )
+
+
+@dataclass
+class ArtifactVersion:
+    """Represents a single artifact version within lineage."""
+
+    hash: str
+    timestamp: datetime
+    source: Literal["upstream", "collection", "project", "local"] = "collection"
+    parent_hash: Optional[str] = None
+    message: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dict."""
+        data: Dict[str, Any] = {
+            "hash": self.hash,
+            "timestamp": self.timestamp.isoformat(),
+            "source": self.source,
+        }
+        if self.parent_hash:
+            data["parent_hash"] = self.parent_hash
+        if self.message:
+            data["message"] = self.message
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ArtifactVersion":
+        """Deserialize from stored representation."""
+        return cls(
+            hash=data["hash"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            source=data.get("source", "collection"),
+            parent_hash=data.get("parent_hash"),
+            message=data.get("message"),
+        )
 
     @property
     def has_conflicts(self) -> bool:

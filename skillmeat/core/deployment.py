@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.prompt import Confirm
 
 from skillmeat.core.artifact import Artifact, ArtifactType
+from skillmeat.models import ConflictInfo, SyncStatus
 from skillmeat.utils.filesystem import FilesystemManager, compute_content_hash
 
 console = Console()
@@ -36,6 +37,12 @@ class Deployment:
     version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
     last_modified_check: Optional[datetime] = None  # Last drift check timestamp
     modification_detected_at: Optional[datetime] = None  # When modification was first detected
+    sync_status: SyncStatus = SyncStatus.SYNCED
+    upstream_ref: Optional[str] = None  # e.g., github URL for provenance
+    upstream_version: Optional[str] = None  # tag/version string
+    upstream_sha: Optional[str] = None  # commit SHA for provenance
+    last_upstream_check: Optional[datetime] = None
+    pending_conflicts: List[ConflictInfo] = field(default_factory=list)
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -64,6 +71,26 @@ class Deployment:
 
         if self.modification_detected_at:
             result["modification_detected_at"] = self.modification_detected_at.isoformat()
+
+        if self.sync_status:
+            result["sync_status"] = self.sync_status.value
+
+        if self.upstream_ref:
+            result["upstream_ref"] = self.upstream_ref
+
+        if self.upstream_version:
+            result["upstream_version"] = self.upstream_version
+
+        if self.upstream_sha:
+            result["upstream_sha"] = self.upstream_sha
+
+        if self.last_upstream_check:
+            result["last_upstream_check"] = self.last_upstream_check.isoformat()
+
+        if self.pending_conflicts:
+            result["pending_conflicts"] = [
+                conflict.to_dict() for conflict in self.pending_conflicts
+            ]
 
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
@@ -94,6 +121,18 @@ class Deployment:
         version_lineage = data.get("version_lineage")
         if version_lineage is None:
             version_lineage = [content_hash]
+        elif content_hash not in version_lineage:
+            version_lineage = [content_hash] + version_lineage
+
+        sync_status = SyncStatus(data.get("sync_status", SyncStatus.SYNCED.value))
+        last_upstream_check = None
+        if "last_upstream_check" in data:
+            last_upstream_check = datetime.fromisoformat(data["last_upstream_check"])
+
+        pending_conflicts = [
+            ConflictInfo.from_dict(conflict)
+            for conflict in data.get("pending_conflicts", [])
+        ]
 
         return cls(
             artifact_name=data["artifact_name"],
@@ -107,6 +146,12 @@ class Deployment:
             version_lineage=version_lineage,
             last_modified_check=last_modified_check,
             modification_detected_at=modification_detected_at,
+            sync_status=sync_status,
+            upstream_ref=data.get("upstream_ref"),
+            upstream_version=data.get("upstream_version"),
+            upstream_sha=data.get("upstream_sha"),
+            last_upstream_check=last_upstream_check,
+            pending_conflicts=pending_conflicts,
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
@@ -204,6 +249,7 @@ class DeploymentManager:
 
             # Compute content hash
             content_hash = compute_content_hash(dest_path)
+            version_lineage = [content_hash]
 
             # Record deployment
             DeploymentTracker.record_deployment(
@@ -217,8 +263,17 @@ class DeploymentManager:
                 from_collection=collection.name,
                 deployed_at=datetime.now(),
                 artifact_path=dest_path.relative_to(dest_base),
-                collection_sha=content_hash,
+                content_hash=content_hash,
                 local_modifications=False,
+                parent_hash=None,
+                version_lineage=version_lineage,
+                sync_status=SyncStatus.SYNCED,
+                upstream_ref=artifact.upstream,
+                upstream_version=artifact.resolved_version,
+                upstream_sha=artifact.resolved_sha,
+                last_upstream_check=None,
+                pending_conflicts=[],
+                collection_sha=content_hash,
             )
             deployments.append(deployment)
 

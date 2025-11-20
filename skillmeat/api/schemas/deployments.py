@@ -161,7 +161,37 @@ class DeploymentInfo(BaseModel):
     from_collection: str = Field(description="Source collection name")
     deployed_at: datetime = Field(description="Deployment timestamp")
     artifact_path: str = Field(description="Relative path within .claude/")
-    collection_sha: str = Field(description="SHA at deployment time")
+    collection_sha: str = Field(description="SHA at deployment time (deprecated; see content_hash)")
+    content_hash: Optional[str] = Field(
+        default=None,
+        description="Canonical content hash at deployment time",
+    )
+    parent_hash: Optional[str] = Field(
+        default=None,
+        description="Parent hash when deployed (previous version hash)",
+    )
+    version_lineage: List[str] = Field(
+        default_factory=list,
+        description="Ordered list of version hashes, newest first",
+    )
+    last_modified_check: Optional[datetime] = Field(
+        default=None, description="Timestamp of last drift check"
+    )
+    modification_detected_at: Optional[datetime] = Field(
+        default=None, description="When local modification was first detected"
+    )
+    upstream_ref: Optional[str] = Field(
+        default=None, description="Upstream reference (e.g., github URL)"
+    )
+    upstream_version: Optional[str] = Field(
+        default=None, description="Resolved upstream version/tag"
+    )
+    upstream_sha: Optional[str] = Field(
+        default=None, description="Resolved upstream commit SHA"
+    )
+    last_upstream_check: Optional[datetime] = Field(
+        default=None, description="Last time upstream was checked for updates"
+    )
     local_modifications: bool = Field(
         default=False,
         description="Whether local modifications detected",
@@ -169,6 +199,10 @@ class DeploymentInfo(BaseModel):
     sync_status: Optional[str] = Field(
         default=None,
         description="Sync status: synced, modified, outdated",
+    )
+    pending_conflicts: List[dict] = Field(
+        default_factory=list,
+        description="Structured conflict entries awaiting resolution",
     )
 
     class Config:
@@ -182,8 +216,18 @@ class DeploymentInfo(BaseModel):
                 "deployed_at": "2025-11-18T12:00:00Z",
                 "artifact_path": "skills/pdf",
                 "collection_sha": "abc123def456",
+                "content_hash": "abc123def456",
+                "parent_hash": "xyz789",
+                "version_lineage": ["abc123def456", "xyz789"],
+                "last_modified_check": "2025-11-18T12:05:00Z",
+                "modification_detected_at": None,
+                "upstream_ref": "https://github.com/org/repo/tree/main/skills/pdf",
+                "upstream_version": "v1.2.0",
+                "upstream_sha": "abc123def456",
+                "last_upstream_check": "2025-11-18T12:01:00Z",
                 "local_modifications": False,
                 "sync_status": "synced",
+                "pending_conflicts": [],
             }
         }
 

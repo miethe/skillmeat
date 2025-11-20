@@ -75,7 +75,7 @@ class DeploymentTracker:
         project_path: Path,
         artifact: Artifact,
         collection_name: str,
-        collection_sha: str,
+        content_hash: str,
     ) -> None:
         """Record new deployment or update existing.
 
@@ -83,9 +83,10 @@ class DeploymentTracker:
             project_path: Project root directory
             artifact: Artifact being deployed
             collection_name: Source collection name
-            collection_sha: SHA of artifact content
+            content_hash: SHA of artifact content
         """
         from datetime import datetime
+        from skillmeat.models import SyncStatus
 
         deployments = DeploymentTracker.read_deployments(project_path)
 
@@ -107,14 +108,37 @@ class DeploymentTracker:
                 existing = i
                 break
 
+        parent_hash = None
+        version_lineage = [content_hash]
+        if existing is not None:
+            parent_hash = deployments[existing].content_hash
+            if deployments[existing].version_lineage:
+                version_lineage.extend(
+                    [
+                        h
+                        for h in deployments[existing].version_lineage
+                        if h != content_hash
+                    ]
+                )
+            elif parent_hash:
+                version_lineage.append(parent_hash)
+
         deployment = Deployment(
             artifact_name=artifact.name,
             artifact_type=artifact.type.value,
             from_collection=collection_name,
             deployed_at=datetime.now(),
             artifact_path=artifact_path,
-            collection_sha=collection_sha,
+            content_hash=content_hash,
             local_modifications=False,
+            parent_hash=parent_hash,
+            version_lineage=version_lineage,
+            sync_status=SyncStatus.SYNCED,
+            upstream_ref=artifact.upstream,
+            upstream_version=artifact.resolved_version,
+            upstream_sha=artifact.resolved_sha,
+            pending_conflicts=[],
+            collection_sha=content_hash,
         )
 
         if existing is not None:
@@ -202,4 +226,4 @@ class DeploymentTracker:
         current_hash = compute_content_hash(artifact_full_path)
 
         # Compare with deployment SHA
-        return current_hash != deployment.collection_sha
+        return current_hash != deployment.content_hash
