@@ -6,10 +6,12 @@ deployed projects, including drift detection and deployment tracking.
 
 import hashlib
 import logging
+import shutil
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -18,6 +20,7 @@ else:
 
 from skillmeat.utils.logging import redact_path
 from skillmeat.utils.filesystem import compute_content_hash
+from skillmeat.core.artifact import ArtifactType
 from skillmeat.models import (
     DeploymentRecord,
     DeploymentMetadata,
@@ -26,6 +29,7 @@ from skillmeat.models import (
     ArtifactSyncResult,
     SyncStatus,
 )
+from skillmeat.storage.deployment import DeploymentTracker
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +174,135 @@ class SyncManager:
                 )
 
         return drift_results
+
+    def sync_project_from_collection(
+        self,
+        project_path: Path,
+        collection_name: Optional[str] = None,
+        artifact_names: Optional[List[str]] = None,
+        dry_run: bool = True,
+    ) -> SyncResult:
+        """Apply drift resolution from collection → project with atomic staging.
+
+        Args:
+            project_path: Project root
+            collection_name: Optional collection override
+            artifact_names: Optional filter list
+            dry_run: If True, preview only
+
+        Returns:
+            SyncResult summarizing applied or previewed changes
+        """
+        drift_results = self.check_drift(project_path, collection_name)
+        if artifact_names:
+            drift_results = [
+                d for d in drift_results if d.artifact_name in artifact_names
+            ]
+
+        if not drift_results:
+            return SyncResult(status="no_changes", message="No drift detected")
+
+        synced: List[str] = []
+        conflicts: List[ArtifactSyncResult] = []
+
+        # Determine collection path once
+        coll = self.collection_mgr.load_collection(collection_name)
+        collection_path = self.collection_mgr.config.get_collection_path(coll.name)
+
+        for drift in drift_results:
+            # Only handle collection->project pushes for added/modified/outdated
+            if drift.drift_type not in {"added", "modified"}:
+                continue
+
+            try:
+                self._apply_collection_artifact_to_project(
+                    collection_path=collection_path,
+                    collection_name=coll.name,
+                    project_path=project_path,
+                    artifact_name=drift.artifact_name,
+                    artifact_type=drift.artifact_type,
+                    dry_run=dry_run,
+                )
+                synced.append(drift.artifact_name)
+            except Exception as exc:  # noqa: BLE001
+                conflicts.append(
+                    ArtifactSyncResult(
+                        artifact_name=drift.artifact_name,
+                        success=False,
+                        has_conflict=False,
+                        error=str(exc),
+                    )
+                )
+
+        status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
+        return SyncResult(status=status, artifacts_synced=synced, conflicts=conflicts)
+
+    def _apply_collection_artifact_to_project(
+        self,
+        collection_path: Path,
+        collection_name: str,
+        project_path: Path,
+        artifact_name: str,
+        artifact_type: str,
+        dry_run: bool,
+    ) -> None:
+        """Stage and atomically apply collection artifact into project."""
+        artifact_type_plural = self._get_artifact_type_plural(artifact_type)
+        collection = self.collection_mgr.load_collection(collection_name)
+        collection_artifact = collection.find_artifact(
+            artifact_name, artifact_type=ArtifactType(artifact_type)
+        )
+        if not collection_artifact:
+            raise ValueError(
+                f"Artifact {artifact_type}/{artifact_name} not found in collection"
+            )
+
+        source_path = collection_path / artifact_type_plural
+        if artifact_type in {"command", "agent"}:
+            source_path = source_path / f"{artifact_name}.md"
+        else:
+            source_path = source_path / artifact_name
+
+        dest_base = project_path / ".claude" / artifact_type_plural
+        dest_path = (
+            dest_base / f"{artifact_name}.md"
+            if artifact_type in {"command", "agent"}
+            else dest_base / artifact_name
+        )
+
+        if dry_run:
+            return
+
+        # Stage copy in temp workspace then atomically move into place
+        with tempfile.TemporaryDirectory(prefix="skillmeat_sync_stage_") as tmpdir:
+            staging_root = Path(tmpdir)
+            staged_dest = staging_root / dest_path.relative_to(project_path)
+            staged_dest.parent.mkdir(parents=True, exist_ok=True)
+
+            if source_path.is_file():
+                staged_dest.write_bytes(source_path.read_bytes())
+            else:
+                shutil.copytree(source_path, staged_dest, dirs_exist_ok=True)
+
+            # Ensure destination base exists
+            dest_base.mkdir(parents=True, exist_ok=True)
+
+            if dest_path.exists():
+                if dest_path.is_dir():
+                    shutil.rmtree(dest_path)
+                else:
+                    dest_path.unlink()
+
+            staged_dest.replace(dest_path)
+
+        # Update deployment tracker with new content hash
+        content_hash = compute_content_hash(dest_path)
+        DeploymentTracker.record_deployment(
+            project_path=project_path,
+            artifact=collection_artifact,
+            collection_name=collection_name,
+            content_hash=content_hash,
+        )
 
     def _compute_project_artifact_hash(
         self, project_path: Path, artifact_name: str, artifact_type: str
