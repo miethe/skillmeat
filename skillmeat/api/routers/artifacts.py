@@ -1400,7 +1400,7 @@ async def sync_artifact(
     """
     try:
         logger.info(
-            f"Syncing artifact: {artifact_id} from {request.project_path} (collection={collection})"
+            f"Syncing artifact: {artifact_id} from {request.project_path or 'upstream'} (collection={collection})"
         )
 
         # Parse artifact ID
@@ -1411,6 +1411,21 @@ async def sync_artifact(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Handle upstream sync (no project_path provided)
+        if not request.project_path:
+            logger.info(f"Syncing {artifact_id} from upstream source")
+            # TODO: Implement upstream sync - fetch from GitHub and update collection
+            # For now, return a placeholder response
+            return ArtifactSyncResponse(
+                success=False,
+                message="Upstream sync not yet implemented. Use update endpoint or provide project_path for reverse sync.",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                conflicts=None,
+                updated_version=None,
+                synced_files_count=None,
             )
 
         # Validate project path
