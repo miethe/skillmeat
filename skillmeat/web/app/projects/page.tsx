@@ -1,32 +1,199 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GitBranch } from 'lucide-react';
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { GitBranch, FolderOpen, Clock, Package } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useProjects, useProject } from "@/hooks/useProjects";
+import type { ProjectSummary } from "@/types/project";
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const { data: projects, isLoading, error } = useProjects();
+  const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleProjectClick = (project: ProjectSummary) => {
+    setSelectedProject(project);
+    setIsDialogOpen(true);
+  };
+
+  const handleExpandProject = () => {
+    if (selectedProject) {
+      router.push(`/projects/${selectedProject.id}`);
+      setIsDialogOpen(false);
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Never";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-        <p className="text-muted-foreground">Manage your deployed projects and configurations</p>
+        <p className="text-muted-foreground">
+          Manage your deployed projects and configurations
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <GitBranch className="h-5 w-5" />
-            <CardTitle>Deployed Projects</CardTitle>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 bg-muted rounded w-3/4" />
+                <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-full" />
+                  <div className="h-4 bg-muted rounded w-2/3" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <p className="text-sm">
+                Failed to load projects. Please check if the API is running and try again.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && projects?.length === 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No projects found</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Deploy artifacts to projects to see them here
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Projects Grid */}
+      {!isLoading && !error && projects && projects.length > 0 && (
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">
+              {projects.length} {projects.length === 1 ? "Project" : "Projects"}
+            </h2>
           </div>
-          <CardDescription>View and manage artifacts deployed to projects</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            This page will display all projects with deployed artifacts and their deployment
-            status.
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Connect to the FastAPI backend to see your projects.
-          </p>
-        </CardContent>
-      </Card>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => (
+              <Card
+                key={project.id}
+                className="cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleProjectClick(project)}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                    </div>
+                    <Badge variant="secondary">{project.deployment_count}</Badge>
+                  </div>
+                  <CardDescription className="text-xs font-mono truncate">
+                    {project.path}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Package className="h-4 w-4" />
+                      <span>
+                        {project.deployment_count}{" "}
+                        {project.deployment_count === 1 ? "artifact" : "artifacts"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>Last deployed {formatDate(project.last_deployment)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Project Detail Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch className="h-5 w-5" />
+              {selectedProject?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedProject && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <div className="font-mono text-xs text-muted-foreground mb-4">
+                  {selectedProject.path}
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-muted-foreground">Deployments</p>
+                    <p className="text-2xl font-bold">{selectedProject.deployment_count}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Last Deployed</p>
+                    <p className="text-lg font-semibold">
+                      {formatDate(selectedProject.last_deployment)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleExpandProject} className="flex-1">
+                  View Full Details
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
