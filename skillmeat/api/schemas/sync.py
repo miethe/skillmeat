@@ -59,3 +59,37 @@ class SyncResponse(BaseModel):
         default_factory=list, description="Conflicts or failed artifacts"
     )
 
+
+class ResolveRequest(BaseModel):
+    """Request to resolve conflicts for an artifact."""
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    resolution: str = Field(
+        description="Resolution strategy (ours|theirs|manual)",
+        examples=["ours"],
+    )
+    project_path: Optional[str] = Field(
+        default=None, description="Project path if resolving a project artifact"
+    )
+    collection: Optional[str] = Field(
+        default=None, description="Collection name (defaults to active)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf",
+                "artifact_type": "skill",
+                "resolution": "ours",
+                "project_path": "/path/to/project",
+                "collection": "default",
+            }
+        }
+
+
+class ResolveResponse(BaseModel):
+    """Response for conflict resolution."""
+
+    status: str = Field(description="Resolution status")
+    message: Optional[str] = Field(default=None, description="Human-readable message")

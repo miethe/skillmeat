@@ -93,7 +93,7 @@
   - [x] Expose sync endpoints (upstream/push/pull) with DTOs and wiring (FR-15)
   - [x] Expose drift API with DTOs (FR-15)
   - [x] Expose version-history API with DTOs (FR-15)
-  - [ ] Expose resolve API with DTOs (FR-15, reasoning-heavy)
+  - [x] Expose resolve API placeholder with DTOs (FR-15) — implementation deferred
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
   - [ ] Performance benchmarks bulk drift check/update (NFR Performance)

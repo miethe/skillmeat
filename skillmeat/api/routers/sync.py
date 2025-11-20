@@ -10,7 +10,13 @@ from skillmeat.api.dependencies import CollectionManagerDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.drift import DriftArtifact, DriftResponse
-from skillmeat.api.schemas.sync import ConflictEntry, SyncRequest, SyncResponse
+from skillmeat.api.schemas.sync import (
+    ConflictEntry,
+    ResolveRequest,
+    ResolveResponse,
+    SyncRequest,
+    SyncResponse,
+)
 from skillmeat.api.schemas.version_history import VersionEntry, VersionHistoryResponse
 from skillmeat.core.sync import SyncManager
 
@@ -321,6 +327,29 @@ async def version_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         )
+
+
+@router.post(
+    "/resolve",
+    response_model=ResolveResponse,
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    summary="Resolve conflicts (placeholder)",
+    responses={
+        501: {"description": "Resolution not implemented yet"},
+    },
+)
+async def resolve_conflicts(
+    request: ResolveRequest,
+    token: TokenDep = None,
+) -> ResolveResponse:
+    """Placeholder endpoint for conflict resolution.
+
+    Currently not implemented; returns 501 to signal future support.
+    """
+    return ResolveResponse(
+        status="not_implemented",
+        message="Conflict resolution API not implemented yet.",
+    )
 
     try:
         project_path = Path(request.project_path)
