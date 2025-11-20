@@ -401,6 +401,7 @@ class MergeResult:
     stats: MergeStats = field(default_factory=MergeStats)
     output_path: Optional[Path] = None
     error: Optional[str] = None
+    conflict_info: List[ConflictInfo] = field(default_factory=list)
 
     @property
     def has_conflicts(self) -> bool:

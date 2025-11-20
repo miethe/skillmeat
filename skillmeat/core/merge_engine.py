@@ -5,12 +5,14 @@ of file changes, automatically resolving simple cases and generating Git-style
 conflict markers for complex conflicts.
 """
 
+import hashlib
 import shutil
 import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 from ..models import (
+    ConflictInfo,
     ConflictMetadata,
     MergeResult,
     MergeStats,
@@ -173,6 +175,14 @@ class MergeEngine:
             result.stats = stats
             return result
 
+        # Enrich conflicts with ConflictInfo payloads including content hashes
+        result.conflict_info = self._build_conflict_info(
+            conflicts=result.conflicts,
+            base_path=base_path,
+            local_path=local_path,
+            remote_path=remote_path,
+        )
+
         # Set success based on whether we have conflicts
         result.success = len(result.conflicts) == 0
         result.stats = stats
@@ -245,7 +255,38 @@ class MergeEngine:
                     shutil.copy2(merged_file, output_file)
                     result.output_path = output_file
 
-            return result
+        return result
+
+    def _build_conflict_info(
+        self,
+        conflicts: List[ConflictMetadata],
+        base_path: Path,
+        local_path: Path,
+        remote_path: Path,
+    ) -> List[ConflictInfo]:
+        """Generate ConflictInfo records for downstream sync/observability."""
+
+        def file_hash(root: Path, rel: str) -> Optional[str]:
+            candidate = root / rel
+            if not candidate.exists() or not candidate.is_file():
+                return None
+            sha = hashlib.sha256()
+            sha.update(candidate.read_bytes())
+            return sha.hexdigest()
+
+        conflict_info: List[ConflictInfo] = []
+        for metadata in conflicts:
+            conflict_info.append(
+                ConflictInfo(
+                    file_path=metadata.file_path,
+                    conflict_type=metadata.conflict_type,  # type: ignore[arg-type]
+                    base_hash=file_hash(base_path, metadata.file_path),
+                    ours_hash=file_hash(local_path, metadata.file_path),
+                    theirs_hash=file_hash(remote_path, metadata.file_path),
+                    resolution="pending",
+                )
+            )
+        return conflict_info
 
     def _auto_merge_file(
         self,
