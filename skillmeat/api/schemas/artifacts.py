@@ -73,6 +73,11 @@ class ArtifactUpstreamInfo(BaseModel):
         description="Whether local modifications exist",
         examples=[False],
     )
+    drift_status: Optional[str] = Field(
+        default=None,
+        description="Drift status (none, modified, deleted, added)",
+        examples=["modified"],
+    )
 
 
 class ArtifactResponse(BaseModel):
@@ -328,5 +333,69 @@ class ArtifactDeployResponse(BaseModel):
                 "artifact_type": "skill",
                 "deployed_path": "/Users/me/my-project/.claude/skills/pdf",
                 "error_message": None,
+            }
+        }
+
+
+class ArtifactSyncRequest(BaseModel):
+    """Request schema for syncing an artifact from project to collection."""
+
+    project_path: str = Field(
+        description="Path to project directory containing deployed artifact",
+        examples=["/Users/me/my-project"],
+    )
+    force: bool = Field(
+        default=False,
+        description="Force sync even if conflicts are detected",
+    )
+    strategy: str = Field(
+        default="theirs",
+        description="Conflict resolution strategy: 'theirs' (take upstream), 'ours' (keep local), 'manual' (preserve conflicts)",
+        pattern="^(theirs|ours|manual)$",
+    )
+
+
+class ConflictInfo(BaseModel):
+    """Information about a sync conflict."""
+
+    file_path: str = Field(description="Path to conflicted file relative to artifact root")
+    conflict_type: str = Field(
+        description="Type of conflict",
+        examples=["modified", "added", "removed"],
+    )
+
+
+class ArtifactSyncResponse(BaseModel):
+    """Response schema for artifact sync operation."""
+
+    success: bool = Field(description="Whether sync operation succeeded")
+    message: str = Field(description="Human-readable result message")
+    artifact_name: str = Field(description="Name of synced artifact")
+    artifact_type: str = Field(description="Type of artifact (skill/command/agent)")
+    conflicts: Optional[List[ConflictInfo]] = Field(
+        default=None,
+        description="List of conflicts detected during sync (if any)",
+    )
+    updated_version: Optional[str] = Field(
+        default=None,
+        description="New version after sync (if applicable)",
+    )
+    synced_files_count: Optional[int] = Field(
+        default=None,
+        description="Number of files synced",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Artifact 'pdf' synced successfully",
+                "artifact_name": "pdf",
+                "artifact_type": "skill",
+                "conflicts": None,
+                "updated_version": "1.2.0",
+                "synced_files_count": 5,
             }
         }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   GitBranch,
@@ -17,8 +18,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ArtifactDetail } from "@/components/collection/artifact-detail";
 import { useProject } from "@/hooks/useProjects";
+import { useArtifacts } from "@/hooks/useArtifacts";
 import type { DeployedArtifact } from "@/types/project";
+import type { Artifact } from "@/types/artifact";
 
 const artifactTypeIcons = {
   skill: Folder,
@@ -42,6 +46,14 @@ export default function ProjectDetailPage() {
   const projectId = params.id as string;
 
   const { data: project, isLoading, error } = useProject(projectId);
+
+  // Modal state for artifact detail
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFetchingArtifact, setIsFetchingArtifact] = useState(false);
+
+  // Fetch all artifacts to match by name
+  const { data: artifactsData } = useArtifacts();
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -72,9 +84,34 @@ export default function ProjectDetailPage() {
       if (!grouped[artifact.artifact_type]) {
         grouped[artifact.artifact_type] = [];
       }
-      grouped[artifact.artifact_type].push(artifact);
+      grouped[artifact.artifact_type]?.push(artifact);
     });
     return grouped;
+  };
+
+  const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
+    setIsFetchingArtifact(true);
+
+    // Try to find matching artifact from collection by name
+    const matchingArtifact = artifactsData?.artifacts.find(
+      (artifact) => artifact.name === deployedArtifact.artifact_name
+    );
+
+    if (matchingArtifact) {
+      setSelectedArtifact(matchingArtifact);
+      setIsDetailOpen(true);
+    } else {
+      // If not found in collection, show a notification or error
+      console.warn(`Artifact ${deployedArtifact.artifact_name} not found in collection`);
+    }
+
+    setIsFetchingArtifact(false);
+  };
+
+  const handleDetailClose = () => {
+    setIsDetailOpen(false);
+    // Keep selectedArtifact for a moment to avoid flickering
+    setTimeout(() => setSelectedArtifact(null), 300);
   };
 
   if (isLoading) {
@@ -116,7 +153,7 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const groupedArtifacts = groupArtifactsByType(project.deployments);
+  const groupedArtifacts = groupArtifactsByType(project.deployments || []);
 
   return (
     <div className="space-y-6">
@@ -253,7 +290,16 @@ export default function ProjectDetailPage() {
                     {artifacts.map((artifact) => (
                       <div
                         key={`${artifact.artifact_type}-${artifact.artifact_name}`}
-                        className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                        className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                        onClick={() => handleArtifactClick(artifact)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleArtifactClick(artifact);
+                          }
+                        }}
                       >
                         <div className="space-y-1 flex-1">
                           <div className="flex items-center gap-2">
@@ -290,6 +336,14 @@ export default function ProjectDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Artifact Detail Modal */}
+      <ArtifactDetail
+        artifact={selectedArtifact}
+        isOpen={isDetailOpen}
+        onClose={handleDetailClose}
+        isLoading={isFetchingArtifact}
+      />
     </div>
   );
 }
