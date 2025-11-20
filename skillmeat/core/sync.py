@@ -9,6 +9,7 @@ import logging
 import shutil
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -92,6 +93,7 @@ class SyncManager:
         drift_results = []
 
         # Check each deployed artifact for drift
+        start_time = time.perf_counter()
         for deployed in metadata.artifacts:
             # Find artifact in collection
             collection_artifact = self._find_artifact(
@@ -173,6 +175,11 @@ class SyncManager:
                     )
                 )
 
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.debug(
+            "Drift detection complete",
+            extra={"artifact_count": len(drift_results), "duration_ms": duration_ms},
+        )
         return drift_results
 
     def sync_project_from_collection(
@@ -194,6 +201,7 @@ class SyncManager:
             SyncResult summarizing applied or previewed changes
         """
         drift_results = self.check_drift(project_path, collection_name)
+        start_time = time.perf_counter()
         if artifact_names:
             drift_results = [
                 d for d in drift_results if d.artifact_name in artifact_names
@@ -235,6 +243,16 @@ class SyncManager:
                 )
 
         status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Sync project from collection completed",
+            extra={
+                "artifacts_synced": len(synced),
+                "conflicts": len(conflicts),
+                "status": status,
+                "duration_ms": duration_ms,
+            },
+        )
         return SyncResult(status=status, artifacts_synced=synced, conflicts=conflicts)
 
     def sync_collection_from_upstream(
@@ -257,6 +275,7 @@ class SyncManager:
 
         synced: List[str] = []
         conflicts: List[ArtifactSyncResult] = []
+        start_time = time.perf_counter()
 
         for artifact in candidates:
             try:
@@ -326,6 +345,16 @@ class SyncManager:
                 )
 
         status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Sync collection from upstream completed",
+            extra={
+                "artifacts_synced": len(synced),
+                "conflicts": len(conflicts),
+                "status": status,
+                "duration_ms": duration_ms,
+            },
+        )
         message = (
             f"{'Would sync' if dry_run else 'Synced'} {len(synced)} artifact(s) from upstream"
         )

@@ -96,7 +96,7 @@
   - [x] Expose resolve API placeholder with DTOs (FR-15) — implementation deferred
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
-  - [ ] Performance benchmarks bulk drift check/update (NFR Performance)
+  - [ ] Performance benchmarks bulk drift check/update (NFR Performance) — timers added; need formal benches
   - [ ] Troubleshooting/migration/user guides updates (Docs)
 
 ## Extension: Async Sync Execution & UX (to avoid UI hangs)
