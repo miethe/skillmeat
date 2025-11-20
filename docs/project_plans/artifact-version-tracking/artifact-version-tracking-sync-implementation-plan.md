@@ -92,7 +92,8 @@
   - [x] Wire CLI commands update/sync/resolve/rollback/bulk (FR-6/11/12/13) — upstream/collection→project/project→collection paths wired; bulk/resolve UX follow-ups pending
   - [x] Expose sync endpoints (upstream/push/pull) with DTOs and wiring (FR-15)
   - [x] Expose drift API with DTOs (FR-15)
-  - [ ] Expose resolve/version-history APIs with DTOs (FR-15, reasoning-heavy)
+  - [x] Expose version-history API with DTOs (FR-15)
+  - [ ] Expose resolve API with DTOs (FR-15, reasoning-heavy)
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
   - [ ] Performance benchmarks bulk drift check/update (NFR Performance)
