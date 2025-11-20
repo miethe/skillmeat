@@ -45,6 +45,33 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
   hook: "Hook",
 };
 
+// Icon colors for type differentiation (matches grid view badge colors)
+const artifactTypeIconColors: Record<ArtifactType, string> = {
+  skill: "text-blue-700 dark:text-blue-400",
+  command: "text-purple-700 dark:text-purple-400",
+  agent: "text-green-700 dark:text-green-400",
+  mcp: "text-orange-700 dark:text-orange-400",
+  hook: "text-pink-700 dark:text-pink-400",
+};
+
+// Subtle row background tints for visual differentiation
+const artifactTypeRowTints: Record<ArtifactType, string> = {
+  skill: "bg-blue-500/[0.02] dark:bg-blue-500/[0.03]",
+  command: "bg-purple-500/[0.02] dark:bg-purple-500/[0.03]",
+  agent: "bg-green-500/[0.02] dark:bg-green-500/[0.03]",
+  mcp: "bg-orange-500/[0.02] dark:bg-orange-500/[0.03]",
+  hook: "bg-pink-500/[0.02] dark:bg-pink-500/[0.03]",
+};
+
+// Left border accent colors for each artifact type
+const artifactTypeBorderAccents: Record<ArtifactType, string> = {
+  skill: "border-l-blue-500",
+  command: "border-l-purple-500",
+  agent: "border-l-green-500",
+  mcp: "border-l-orange-500",
+  hook: "border-l-pink-500",
+};
+
 const statusColors: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 border-green-500/20",
   outdated: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
@@ -156,7 +183,7 @@ export function ArtifactList({
             return (
               <TableRow
                 key={artifact.id}
-                className="cursor-pointer"
+                className={`cursor-pointer border-l-2 ${artifactTypeBorderAccents[artifact.type]} ${artifactTypeRowTints[artifact.type]}`}
                 onClick={() => onArtifactClick(artifact)}
                 role="button"
                 tabIndex={0}
@@ -184,7 +211,7 @@ export function ArtifactList({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2" data-testid="type-badge">
-                    <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <Icon className={`h-4 w-4 ${artifactTypeIconColors[artifact.type]}`} aria-hidden="true" />
                     <span className="text-sm">
                       {artifactTypeLabels[artifact.type]}
                     </span>
