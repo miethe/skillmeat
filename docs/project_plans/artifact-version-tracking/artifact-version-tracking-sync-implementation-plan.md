@@ -91,8 +91,16 @@
 - Phase 4 (CLI/API/UX)
   - [x] Wire CLI commands update/sync/resolve/rollback/bulk (FR-6/11/12/13) — upstream/collection→project/project→collection paths wired; bulk/resolve UX follow-ups pending
   - [x] Expose sync endpoints (upstream/push/pull) with DTOs and wiring (FR-15)
-  - [ ] Expose drift/resolve/version-history APIs with DTOs (FR-15, reasoning-heavy)
+  - [x] Expose drift API with DTOs (FR-15)
+  - [ ] Expose resolve/version-history APIs with DTOs (FR-15, reasoning-heavy)
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
   - [ ] Performance benchmarks bulk drift check/update (NFR Performance)
   - [ ] Troubleshooting/migration/user guides updates (Docs)
+
+## Extension: Async Sync Execution & UX (to avoid UI hangs)
+- Background job/promise-based sync execution with status polling (FR-6/15 UX) — enqueue sync, return job id immediately, allow navigation while processing.
+- Event/toast delivery hook for completion (success/failure) via websocket/SSE/poll (FR-6 UX).
+- API: `POST /api/v1/sync/jobs` (start), `GET /api/v1/sync/jobs/{id}` (status/results), optional cancel endpoint.
+- CLI: `--async` flag to start sync and print job id; `sync-status <job_id>` to poll.
+- Observability: job metrics (queued/running/duration), logs per job id.

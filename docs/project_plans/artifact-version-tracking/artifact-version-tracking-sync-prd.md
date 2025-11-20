@@ -924,3 +924,13 @@ See progress tracking at: `.claude/progress/artifact-version-tracking-sync/all-p
 ---
 
 *This PRD is designed for AI agent execution. It provides sufficient detail for parallel implementation without blocking dependencies.*
+
+---
+
+## Extension (Planned): Async Sync Execution to Prevent UI Hang
+
+- **Problem:** Current sync operations may block UI/navigation while awaiting responses.
+- **Approach:** Run sync as background job; API returns job id immediately; UI polls or listens for completion toasts via SSE/websocket; allows user navigation during processing.
+- **API Additions:** `POST /api/v1/sync/jobs` (enqueue), `GET /api/v1/sync/jobs/{id}` (status/result), optional `DELETE /api/v1/sync/jobs/{id}` (cancel).
+- **CLI Additions:** `skillmeat sync --async` returning job id; `skillmeat sync-status <job_id>` to poll.
+- **Telemetry:** Track queue time, execution time, success/conflict/error counts per job id; include trace_id.

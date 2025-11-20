@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from skillmeat.api.dependencies import CollectionManagerDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
+from skillmeat.api.schemas.drift import DriftArtifact, DriftResponse
 from skillmeat.api.schemas.sync import ConflictEntry, SyncRequest, SyncResponse
 from skillmeat.core.sync import SyncManager
 
@@ -37,6 +38,29 @@ def _result_to_response(result) -> SyncResponse:
         message=getattr(result, "message", None),
         artifacts_synced=result.artifacts_synced,
         conflicts=_build_conflicts(result.conflicts),
+    )
+
+
+def _drift_to_response(drift_results) -> DriftResponse:
+    items = []
+    for r in drift_results:
+        items.append(
+            DriftArtifact(
+                artifact_name=r.artifact_name,
+                artifact_type=r.artifact_type,
+                drift_type=r.drift_type,
+                collection_sha=r.collection_sha,
+                project_sha=r.project_sha,
+                collection_version=r.collection_version,
+                project_version=r.project_version,
+                recommendation=r.recommendation,
+                sync_status=r.sync_status.value if hasattr(r.sync_status, "value") else r.sync_status,
+            )
+        )
+    return DriftResponse(
+        drift_detected=len(items) > 0,
+        drift_count=len(items),
+        artifacts=items,
     )
 
 
@@ -157,6 +181,50 @@ async def sync_pull(
         raise
     except Exception as exc:  # noqa: BLE001
         logger.exception("Pull sync failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/drift",
+    response_model=DriftResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Detect drift between project and collection",
+    responses={
+        200: {"description": "Drift detection completed"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        500: {"model": ErrorResponse, "description": "Drift detection failed"},
+    },
+)
+async def sync_drift(
+    request: SyncRequest,
+    sync_mgr: SyncManager = Depends(get_sync_manager),
+    token: TokenDep = None,
+):
+    """Check drift for a project."""
+    if not request.project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required for drift detection",
+        )
+
+    try:
+        project_path = Path(request.project_path)
+        drift_results = sync_mgr.check_drift(
+            project_path=project_path,
+            collection_name=request.collection,
+        )
+        # Optional filter by artifacts
+        if request.artifacts:
+            allowed = set(request.artifacts)
+            drift_results = [d for d in drift_results if d.artifact_name in allowed]
+        return _drift_to_response(drift_results)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Drift detection failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
