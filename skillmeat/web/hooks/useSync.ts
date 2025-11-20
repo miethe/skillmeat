@@ -56,46 +56,21 @@ export function useSync(options: UseSyncOptions = {}) {
 
   return useMutation({
     mutationFn: async (request: SyncRequest): Promise<SyncResponse> => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await fetch(`/api/v1/artifacts/${request.artifactId}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          force: request.force,
+          strategy: request.mergeStrategy
+        })
+      });
 
-      const hasConflicts = !request.force && Math.random() < 0.2;
-
-      if (hasConflicts) {
-        const conflicts: ConflictInfo[] = [
-          {
-            filePath: "SKILL.md",
-            conflictType: "modified",
-            currentVersion: "v1.0.0",
-            upstreamVersion: "v1.1.0",
-            description: "Local modifications conflict with upstream changes",
-          },
-        ];
-
-        return {
-          success: false,
-          message: "Conflicts detected during sync",
-          hasConflicts: true,
-          conflicts,
-        };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Sync failed' }));
+        throw new Error(errorData.message || 'Sync failed');
       }
 
-      const syncId = "sync-" + Date.now().toString();
-      const streamUrl = "/api/v1/sync/" + request.artifactId + "/stream";
-      const message = "Successfully synced " + request.artifactName;
-
-      return {
-        success: true,
-        message,
-        syncId,
-        streamUrl,
-        hasConflicts: false,
-        updatedVersion: "v1.1.0",
-        changesSummary: {
-          filesAdded: 0,
-          filesModified: 2,
-          filesDeleted: 0,
-        },
-      };
+      return await response.json();
     },
 
     onSuccess: (data, variables) => {

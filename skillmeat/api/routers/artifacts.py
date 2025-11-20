@@ -14,6 +14,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
+    SyncManagerDep,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
@@ -23,9 +24,12 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactListResponse,
     ArtifactMetadataResponse,
     ArtifactResponse,
+    ArtifactSyncRequest,
+    ArtifactSyncResponse,
     ArtifactUpdateRequest,
     ArtifactUpstreamInfo,
     ArtifactUpstreamResponse,
+    ConflictInfo,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.core.artifact import ArtifactType
@@ -73,11 +77,17 @@ def decode_cursor(cursor: str) -> str:
         )
 
 
-def artifact_to_response(artifact) -> ArtifactResponse:
+def artifact_to_response(
+    artifact,
+    drift_status: Optional[str] = None,
+    has_local_modifications: Optional[bool] = None,
+) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
     Args:
         artifact: Artifact instance
+        drift_status: Optional drift status ("none", "modified", "deleted", "added")
+        has_local_modifications: Optional flag indicating local modifications
 
     Returns:
         ArtifactResponse schema
@@ -110,7 +120,8 @@ def artifact_to_response(artifact) -> ArtifactResponse:
             current_sha=artifact.resolved_sha,
             upstream_sha=None,  # Would need to fetch from upstream
             update_available=update_available,
-            has_local_modifications=False,  # Would need to check via diff
+            has_local_modifications=has_local_modifications or False,
+            drift_status=drift_status or "none",
         )
 
     # Determine version to display
@@ -144,6 +155,7 @@ def artifact_to_response(artifact) -> ArtifactResponse:
 async def list_artifacts(
     artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
+    sync_mgr: SyncManagerDep,
     token: TokenDep,
     limit: int = Query(
         default=20,
@@ -167,18 +179,29 @@ async def list_artifacts(
         default=None,
         description="Filter by tags (comma-separated)",
     ),
+    check_drift: bool = Query(
+        default=False,
+        description="Check for local modifications and drift status (may impact performance)",
+    ),
+    project_path: Optional[str] = Query(
+        default=None,
+        description="Project path for drift detection (required if check_drift=true)",
+    ),
 ) -> ArtifactListResponse:
     """List all artifacts with filters and pagination.
 
     Args:
         artifact_mgr: Artifact manager dependency
         collection_mgr: Collection manager dependency
+        sync_mgr: Sync manager dependency
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
         artifact_type: Optional type filter
         collection: Optional collection filter
         tags: Optional tag filter (comma-separated)
+        check_drift: Whether to check for drift and local modifications
+        project_path: Project path for drift detection
 
     Returns:
         Paginated list of artifacts
@@ -259,10 +282,58 @@ async def list_artifacts(
         end_idx = start_idx + limit
         page_artifacts = artifacts[start_idx:end_idx]
 
+        # Check drift if requested
+        drift_map = {}
+        if check_drift:
+            # Validate project_path is provided
+            if not project_path:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="project_path is required when check_drift=true",
+                )
+
+            project_path_obj = Path(project_path)
+            if not project_path_obj.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Project path does not exist: {project_path}",
+                )
+
+            try:
+                # Check drift for the project
+                drift_results = sync_mgr.check_drift(
+                    project_path=project_path_obj,
+                    collection_name=collection,
+                )
+
+                # Build drift map: artifact_key -> (drift_status, has_modifications)
+                for drift in drift_results:
+                    artifact_key = f"{drift.artifact_type}:{drift.artifact_name}"
+                    has_modifications = drift.drift_type in ("modified", "added")
+                    drift_map[artifact_key] = (drift.drift_type, has_modifications)
+
+                logger.debug(f"Detected drift for {len(drift_results)} artifacts")
+            except Exception as e:
+                logger.warning(f"Failed to check drift: {e}")
+                # Continue without drift info rather than failing the request
+
         # Convert to response format
-        items: List[ArtifactResponse] = [
-            artifact_to_response(artifact) for artifact in page_artifacts
-        ]
+        items: List[ArtifactResponse] = []
+        for artifact in page_artifacts:
+            artifact_key = f"{artifact.type.value}:{artifact.name}"
+            drift_status = None
+            has_modifications = None
+
+            if artifact_key in drift_map:
+                drift_status, has_modifications = drift_map[artifact_key]
+
+            items.append(
+                artifact_to_response(
+                    artifact,
+                    drift_status=drift_status,
+                    has_local_modifications=has_modifications,
+                )
+            )
 
         # Build pagination info
         has_next = end_idx < len(artifacts)
@@ -1000,6 +1071,208 @@ async def deploy_artifact(
 
 
 @router.post(
+    "/{artifact_id}/sync",
+    response_model=ArtifactSyncResponse,
+    summary="Sync artifact from project to collection",
+    description="Pull changes from project back to collection, with conflict resolution",
+    responses={
+        200: {"description": "Artifact synced successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def sync_artifact(
+    artifact_id: str,
+    request: ArtifactSyncRequest,
+    sync_mgr: SyncManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> ArtifactSyncResponse:
+    """Sync artifact from project to collection.
+
+    Pulls changes from a deployed artifact in a project back to the collection.
+    This is useful for capturing local modifications made to deployed artifacts.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        request: Sync request with project_path, force flag, and strategy
+        sync_mgr: Sync manager dependency
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection name
+
+    Returns:
+        Sync result with conflicts and updated version info
+
+    Raises:
+        HTTPException: If artifact not found, validation fails, or on error
+    """
+    try:
+        logger.info(
+            f"Syncing artifact: {artifact_id} from {request.project_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Validate project path
+        project_path = Path(request.project_path)
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project path does not exist: {request.project_path}",
+            )
+
+        # Validate strategy
+        valid_strategies = {"theirs", "ours", "manual"}
+        if request.strategy not in valid_strategies:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid strategy '{request.strategy}'. Must be one of: {', '.join(valid_strategies)}",
+            )
+
+        # Map request strategy to SyncManager strategy
+        # "theirs" = take upstream (collection) -> "overwrite"
+        # "ours" = keep local (project) -> this means pull from project, so "overwrite"
+        # "manual" = preserve conflicts -> "merge"
+        strategy_map = {
+            "theirs": "overwrite",  # Pull from project and overwrite collection
+            "ours": "overwrite",     # Same as theirs in pull context
+            "manual": "merge",       # Use merge with conflict markers
+        }
+        sync_strategy = strategy_map[request.strategy]
+
+        # Check for deployment metadata
+        deployment_metadata = sync_mgr._load_deployment_metadata(project_path)
+        if not deployment_metadata:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No deployment metadata found at {request.project_path}. Deploy artifacts first.",
+            )
+
+        # Get collection name from metadata if not provided
+        if not collection:
+            collection_name = deployment_metadata.collection
+        else:
+            collection_name = collection
+
+        # Verify collection exists
+        if collection_name not in collection_mgr.list_collections():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Load collection and verify artifact exists
+        coll = collection_mgr.load_collection(collection_name)
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+            )
+
+        # Check if artifact is deployed in project
+        deployed_artifact = None
+        for deployed in deployment_metadata.artifacts:
+            if deployed.name == artifact_name and deployed.artifact_type == artifact_type.value:
+                deployed_artifact = deployed
+                break
+
+        if not deployed_artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in project deployment metadata",
+            )
+
+        # Perform sync using sync_from_project
+        try:
+            sync_result = sync_mgr.sync_from_project(
+                project_path=project_path,
+                artifact_names=[artifact_name],
+                strategy=sync_strategy,
+                dry_run=False,
+                interactive=False,
+            )
+
+            # Extract conflicts if any
+            conflicts_list = None
+            if sync_result.conflicts:
+                conflicts_list = [
+                    ConflictInfo(
+                        file_path=conflict_file,
+                        conflict_type="modified"
+                    )
+                    for conflict_result in sync_result.conflicts
+                    for conflict_file in (conflict_result.conflict_files if hasattr(conflict_result, 'conflict_files') else [])
+                ]
+
+            # Determine success based on sync result status
+            success = sync_result.status in ("success", "partial")
+
+            # Get updated version from artifact if available
+            updated_version = None
+            if success:
+                # Reload artifact to get updated version
+                updated_coll = collection_mgr.load_collection(collection_name)
+                updated_artifact = updated_coll.find_artifact(artifact_name, artifact_type)
+                if updated_artifact and updated_artifact.metadata:
+                    updated_version = updated_artifact.metadata.version
+
+            # Count synced files (approximate based on artifact path)
+            synced_files_count = None
+            if success and artifact_name in sync_result.artifacts_synced:
+                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                artifact_path = collection_path / artifact.path
+                if artifact_path.exists():
+                    synced_files_count = len(list(artifact_path.rglob("*")))
+
+            logger.info(
+                f"Artifact '{artifact_name}' sync completed: status={sync_result.status}, "
+                f"conflicts={len(conflicts_list) if conflicts_list else 0}"
+            )
+
+            return ArtifactSyncResponse(
+                success=success,
+                message=sync_result.message,
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                conflicts=conflicts_list if conflicts_list else None,
+                updated_version=updated_version,
+                synced_files_count=synced_files_count,
+            )
+
+        except ValueError as e:
+            # Business logic error (e.g., sync preconditions not met)
+            logger.warning(f"Sync failed for '{artifact_name}': {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing artifact '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync artifact: {str(e)}",
+        )
+
+
+@router.post(
     "/{artifact_id}/undeploy",
     response_model=ArtifactDeployResponse,
     summary="Undeploy artifact from project",
@@ -1012,11 +1285,11 @@ async def deploy_artifact(
 )
 async def undeploy_artifact(
     artifact_id: str,
-    artifact_mgr: ArtifactManagerDep,
+    _artifact_mgr: ArtifactManagerDep,
     collection_mgr: CollectionManagerDep,
-    token: TokenDep,
+    _token: TokenDep,
     project_path: str = Body(..., embed=True, description="Project path"),
-    collection: Optional[str] = Query(
+    _collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
 ) -> ArtifactDeployResponse:
@@ -1024,11 +1297,11 @@ async def undeploy_artifact(
 
     Args:
         artifact_id: Artifact identifier (format: "type:name")
-        artifact_mgr: Artifact manager dependency
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
         collection_mgr: Collection manager dependency
-        token: Authentication token
+        _token: Authentication token (dependency injection)
         project_path: Project directory path
-        collection: Optional collection name
+        _collection: Optional collection name (unused, reserved for future use)
 
     Returns:
         Undeploy result

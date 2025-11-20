@@ -15,6 +15,7 @@ from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.sync import SyncManager
 
 from .config import APISettings, get_settings
 
@@ -38,6 +39,7 @@ class AppState:
         self.collection_manager: Optional[CollectionManager] = None
         self.artifact_manager: Optional[ArtifactManager] = None
         self.token_manager: Optional[TokenManager] = None
+        self.sync_manager: Optional[SyncManager] = None
         self.settings: Optional[APISettings] = None
 
     def initialize(self, settings: APISettings) -> None:
@@ -54,6 +56,10 @@ class AppState:
         self.collection_manager = CollectionManager(config=self.config_manager)
         self.artifact_manager = ArtifactManager(collection_mgr=self.collection_manager)
         self.token_manager = TokenManager()
+        self.sync_manager = SyncManager(
+            collection_manager=self.collection_manager,
+            artifact_manager=self.artifact_manager,
+        )
 
         logger.info("Application state initialized successfully")
 
@@ -65,6 +71,7 @@ class AppState:
         self.collection_manager = None
         self.artifact_manager = None
         self.token_manager = None
+        self.sync_manager = None
         logger.info("Application state shutdown complete")
 
 
@@ -177,6 +184,28 @@ def get_token_manager(
     return state.token_manager
 
 
+def get_sync_manager(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> SyncManager:
+    """Get SyncManager dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        SyncManager instance
+
+    Raises:
+        HTTPException: If SyncManager not available
+    """
+    if state.sync_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sync manager not available",
+        )
+    return state.sync_manager
+
+
 def verify_api_key(
     api_key: Annotated[Optional[str], Security(api_key_header)],
     settings: Annotated[APISettings, Depends(get_settings)],
@@ -215,5 +244,6 @@ ConfigManagerDep = Annotated[ConfigManager, Depends(get_config_manager)]
 CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manager)]
 ArtifactManagerDep = Annotated[ArtifactManager, Depends(get_artifact_manager)]
 TokenManagerDep = Annotated[TokenManager, Depends(get_token_manager)]
+SyncManagerDep = Annotated[SyncManager, Depends(get_sync_manager)]
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
