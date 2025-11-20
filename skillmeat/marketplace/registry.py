@@ -63,15 +63,23 @@ class BrokerRegistry:
 
     # Default broker configurations
     DEFAULT_BROKERS = {
-        "skillmeat": {
+        "mock-local": {
             "enabled": True,
+            "endpoint": "local://mock",
+            "description": "Local mock broker for development (no network required)",
+            "priority": 1,
+        },
+        "skillmeat": {
+            "enabled": False,
             "endpoint": "https://marketplace.skillmeat.dev/api",
             "description": "Official SkillMeat marketplace",
+            "priority": 2,
         },
         "claudehub": {
-            "enabled": True,
+            "enabled": False,
             "endpoint": "https://claude.ai/marketplace/api",
             "description": "Claude Hub public catalogs (read-only)",
+            "priority": 3,
         },
     }
 
@@ -157,11 +165,13 @@ class BrokerRegistry:
         from .brokers import (
             ClaudeHubBroker,
             CustomWebBroker,
+            MockLocalBroker,
             SkillMeatMarketplaceBroker,
         )
 
         # Map broker names to classes
         broker_classes = {
+            "mock-local": MockLocalBroker,
             "skillmeat": SkillMeatMarketplaceBroker,
             "claudehub": ClaudeHubBroker,
             "custom": CustomWebBroker,
@@ -245,6 +255,10 @@ class BrokerRegistry:
         # Basic URL validation
         if not endpoint:
             return False
+
+        # Allow local:// for mock broker
+        if endpoint.startswith("local://"):
+            return True
 
         if not endpoint.startswith(("http://", "https://")):
             logger.warning(f"Endpoint must use http or https: {endpoint}")
