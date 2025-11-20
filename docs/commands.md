@@ -4,55 +4,63 @@ Complete reference for all SkillMeat CLI commands.
 
 ## Table of Contents
 
-- [Core Commands](#core-commands)
-  - [init](#init)
-  - [list](#list)
-  - [show](#show)
-  - [remove](#remove)
-- [Adding Artifacts](#adding-artifacts)
-  - [add skill](#add-skill)
-  - [add command](#add-command)
-  - [add agent](#add-agent)
-- [Deployment](#deployment)
-  - [deploy](#deploy)
-  - [undeploy](#undeploy)
-- [Updates & Status](#updates--status)
-  - [status](#status)
-  - [update](#update)
-- [Versioning](#versioning)
-  - [snapshot](#snapshot)
-  - [history](#history)
-  - [rollback](#rollback)
-- [Collection Management](#collection-management)
-  - [collection create](#collection-create)
-  - [collection list](#collection-list)
-  - [collection use](#collection-use)
-- [Configuration](#configuration)
-  - [config list](#config-list)
-  - [config get](#config-get)
-  - [config set](#config-set)
-- [Phase 2: Diff Commands](#phase-2-diff-commands)
-  - [diff files](#diff-files)
-  - [diff dirs](#diff-dirs)
-  - [diff three-way](#diff-three-way)
-  - [diff artifact](#diff-artifact)
-- [Phase 2: Search Commands](#phase-2-search-commands)
-  - [search](#search)
-  - [find-duplicates](#find-duplicates)
-- [Phase 2: Sync Commands](#phase-2-sync-commands)
-  - [sync check](#sync-check)
-  - [sync pull](#sync-pull)
-  - [sync preview](#sync-preview)
-- [Phase 2: Analytics Commands](#phase-2-analytics-commands)
-  - [analytics usage](#analytics-usage)
-  - [analytics top](#analytics-top)
-  - [analytics cleanup](#analytics-cleanup)
-  - [analytics trends](#analytics-trends)
-  - [analytics export](#analytics-export)
-  - [analytics stats](#analytics-stats)
-  - [analytics clear](#analytics-clear)
-- [Utilities](#utilities)
-  - [verify](#verify)
+- [SkillMeat Command Reference](#skillmeat-command-reference)
+  - [Table of Contents](#table-of-contents)
+  - [Core Commands](#core-commands)
+    - [init](#init)
+    - [list](#list)
+    - [show](#show)
+    - [remove](#remove)
+  - [Adding Artifacts](#adding-artifacts)
+    - [add skill](#add-skill)
+    - [add command](#add-command)
+    - [add agent](#add-agent)
+  - [Deployment](#deployment)
+    - [deploy](#deploy)
+    - [undeploy](#undeploy)
+  - [Updates \& Status](#updates--status)
+    - [status](#status)
+    - [update](#update)
+  - [Versioning](#versioning)
+    - [snapshot](#snapshot)
+    - [history](#history)
+    - [rollback](#rollback)
+  - [Collection Management](#collection-management)
+    - [collection create](#collection-create)
+    - [collection list](#collection-list)
+    - [collection use](#collection-use)
+  - [Configuration](#configuration)
+    - [config list](#config-list)
+    - [config get](#config-get)
+    - [config set](#config-set)
+  - [Phase 2: Diff Commands](#phase-2-diff-commands)
+    - [diff files](#diff-files)
+    - [diff dirs](#diff-dirs)
+    - [diff three-way](#diff-three-way)
+    - [diff artifact](#diff-artifact)
+  - [Phase 2: Search Commands](#phase-2-search-commands)
+    - [search](#search)
+    - [find-duplicates](#find-duplicates)
+  - [Phase 2: Sync Commands](#phase-2-sync-commands)
+    - [sync check](#sync-check)
+    - [sync pull](#sync-pull)
+    - [sync preview](#sync-preview)
+  - [Phase 2: Analytics Commands](#phase-2-analytics-commands)
+    - [analytics usage](#analytics-usage)
+    - [analytics top](#analytics-top)
+    - [analytics cleanup](#analytics-cleanup)
+    - [analytics trends](#analytics-trends)
+    - [analytics export](#analytics-export)
+    - [analytics stats](#analytics-stats)
+    - [analytics clear](#analytics-clear)
+  - [Utilities](#utilities)
+    - [verify](#verify)
+  - [Exit Codes](#exit-codes)
+  - [Global Options](#global-options)
+  - [Environment Variables](#environment-variables)
+  - [File Locations](#file-locations)
+  - [Version Specifications](#version-specifications)
+  - [Security](#security)
 
 ---
 
@@ -63,14 +71,17 @@ Complete reference for all SkillMeat CLI commands.
 Initialize a new collection.
 
 **Syntax:**
+
 ```bash
 skillmeat init [--name NAME]
 ```
 
 **Options:**
+
 - `-n, --name TEXT` - Collection name (default: 'default')
 
 **Examples:**
+
 ```bash
 # Create default collection
 skillmeat init
@@ -80,6 +91,7 @@ skillmeat init --name work
 ```
 
 **Output:**
+
 ```
 Collection 'default' initialized
   Location: /home/user/.skillmeat/collections/default
@@ -87,6 +99,7 @@ Collection 'default' initialized
 ```
 
 **Notes:**
+
 - Creates collection directory structure
 - Initializes empty collection.toml manifest
 - Safe to run multiple times (won't overwrite existing)
@@ -98,16 +111,19 @@ Collection 'default' initialized
 List artifacts in collection.
 
 **Syntax:**
+
 ```bash
 skillmeat list [OPTIONS]
 ```
 
 **Options:**
+
 - `-t, --type [skill|command|agent]` - Filter by artifact type
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `--tags` - Show tags for each artifact
 
 **Examples:**
+
 ```bash
 # List all artifacts
 skillmeat list
@@ -123,6 +139,7 @@ skillmeat list --collection work
 ```
 
 **Output:**
+
 ```
 Artifacts (3)
 ┌─────────────┬─────────┬────────┐
@@ -141,18 +158,22 @@ Artifacts (3)
 Show detailed information about an artifact.
 
 **Syntax:**
+
 ```bash
 skillmeat show NAME [OPTIONS]
 ```
 
 **Arguments:**
+
 - `NAME` - Artifact name
 
 **Options:**
+
 - `-t, --type [skill|command|agent]` - Artifact type (required if name is ambiguous)
 - `-c, --collection TEXT` - Collection name (default: active collection)
 
 **Examples:**
+
 ```bash
 # Show artifact details
 skillmeat show canvas
@@ -162,6 +183,7 @@ skillmeat show review --type command
 ```
 
 **Output:**
+
 ```
 canvas
 ─────────────────────────────────────────
@@ -188,19 +210,23 @@ Tags: design, ui, prototyping
 Remove artifact from collection.
 
 **Syntax:**
+
 ```bash
 skillmeat remove NAME [OPTIONS]
 ```
 
 **Arguments:**
+
 - `NAME` - Artifact name
 
 **Options:**
+
 - `-t, --type [skill|command|agent]` - Artifact type (required if name is ambiguous)
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `--keep-files` - Remove from collection but keep files on disk
 
 **Examples:**
+
 ```bash
 # Remove artifact completely
 skillmeat remove canvas
@@ -213,6 +239,7 @@ skillmeat remove review --type command
 ```
 
 **Output:**
+
 ```
 Removed skill: canvas
   From collection: default
@@ -228,16 +255,19 @@ Removed skill: canvas
 Add a skill from GitHub or local path.
 
 **Syntax:**
+
 ```bash
 skillmeat add skill SPEC [OPTIONS]
 ```
 
 **Arguments:**
+
 - `SPEC` - GitHub path or local file path
   - GitHub: `user/repo/path/to/skill[@version]`
   - Local: `/path/to/skill` or `./relative/path`
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-n, --name TEXT` - Override artifact name
 - `--no-verify` - Skip validation
@@ -245,6 +275,7 @@ skillmeat add skill SPEC [OPTIONS]
 - `--dangerously-skip-permissions` - Skip security warning (not recommended)
 
 **Examples:**
+
 ```bash
 # Add from GitHub (latest version)
 skillmeat add skill anthropics/skills/canvas
@@ -263,6 +294,7 @@ skillmeat add skill anthropics/skills/canvas --force
 ```
 
 **Output:**
+
 ```
 Security warning: Artifacts can execute code and access system resources.
 ...
@@ -279,19 +311,23 @@ Added skill: canvas
 Add a command from GitHub or local path.
 
 **Syntax:**
+
 ```bash
 skillmeat add command SPEC [OPTIONS]
 ```
 
 **Arguments:**
+
 - `SPEC` - GitHub path or local file path
   - GitHub: `user/repo/path/to/command.md[@version]`
   - Local: `/path/to/command.md` or `./command.md`
 
 **Options:**
+
 - Same as `add skill`
 
 **Examples:**
+
 ```bash
 # Add command from GitHub
 skillmeat add command user/repo/commands/review.md
@@ -310,19 +346,23 @@ skillmeat add command user/repo/cmd.md --dangerously-skip-permissions
 Add an agent from GitHub or local path.
 
 **Syntax:**
+
 ```bash
 skillmeat add agent SPEC [OPTIONS]
 ```
 
 **Arguments:**
+
 - `SPEC` - GitHub path or local file path
   - GitHub: `user/repo/path/to/agent.md[@version]`
   - Local: `/path/to/agent.md` or `./agent.md`
 
 **Options:**
+
 - Same as `add skill`
 
 **Examples:**
+
 ```bash
 # Add agent from GitHub
 skillmeat add agent user/repo/agents/reviewer.md
@@ -340,19 +380,23 @@ skillmeat add agent ./my-agent.md
 Deploy artifacts to a project's .claude/ directory.
 
 **Syntax:**
+
 ```bash
 skillmeat deploy NAMES... [OPTIONS]
 ```
 
 **Arguments:**
+
 - `NAMES...` - One or more artifact names
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-p, --project PATH` - Project path (default: current directory)
 - `-t, --type [skill|command|agent]` - Artifact type (required if names are ambiguous)
 
 **Examples:**
+
 ```bash
 # Deploy single artifact to current directory
 skillmeat deploy canvas
@@ -368,6 +412,7 @@ skillmeat deploy review --type command
 ```
 
 **Output:**
+
 ```
 Deploying 3 artifact(s)...
 Deployed 3 artifact(s)
@@ -377,6 +422,7 @@ Deployed 3 artifact(s)
 ```
 
 **Notes:**
+
 - Creates `.claude/` directory if it doesn't exist
 - Creates deployment tracking file `.skillmeat-deployed.toml`
 - Preserves artifact structure (skills as directories, commands as files)
@@ -388,18 +434,22 @@ Deployed 3 artifact(s)
 Remove deployed artifact from project.
 
 **Syntax:**
+
 ```bash
 skillmeat undeploy NAME [OPTIONS]
 ```
 
 **Arguments:**
+
 - `NAME` - Artifact name
 
 **Options:**
+
 - `-p, --project PATH` - Project path (default: current directory)
 - `-t, --type [skill|command|agent]` - Artifact type (required if name is ambiguous)
 
 **Examples:**
+
 ```bash
 # Undeploy from current project
 skillmeat undeploy canvas
@@ -409,6 +459,7 @@ skillmeat undeploy canvas --project /path/to/project
 ```
 
 **Output:**
+
 ```
 Undeployed skill: canvas
   From project: /path/to/project
@@ -424,15 +475,18 @@ Undeployed skill: canvas
 Check update status for artifacts and deployments.
 
 **Syntax:**
+
 ```bash
 skillmeat status [OPTIONS]
 ```
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-p, --project PATH` - Project path for deployment status (default: current directory)
 
 **Examples:**
+
 ```bash
 # Check collection update status
 skillmeat status
@@ -445,6 +499,7 @@ skillmeat status --project /path/to/project
 ```
 
 **Output:**
+
 ```
 Checking for updates...
 
@@ -474,24 +529,29 @@ Synced (2):
 Update artifact(s) from upstream sources.
 
 **Syntax:**
+
 ```bash
 skillmeat update [NAME] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `NAME` - Artifact name (optional if using --all)
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-t, --type [skill|command|agent]` - Artifact type (required if name is ambiguous)
 - `--strategy [prompt|upstream|local]` - Update strategy (default: prompt)
 
 **Update Strategies:**
+
 - `prompt` - Ask user what to do if conflicts exist
 - `upstream` - Always take upstream version
 - `local` - Keep local modifications
 
 **Examples:**
+
 ```bash
 # Update single artifact (with prompt on conflicts)
 skillmeat update python
@@ -504,6 +564,7 @@ skillmeat update review --strategy local
 ```
 
 **Output:**
+
 ```
 Updating python...
 Fetching latest version from upstream...
@@ -519,17 +580,21 @@ Updated python: v2.0.0 -> v2.1.0
 Create a snapshot of the collection.
 
 **Syntax:**
+
 ```bash
 skillmeat snapshot [MESSAGE] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `MESSAGE` - Snapshot message (default: "Manual snapshot")
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 
 **Examples:**
+
 ```bash
 # Create snapshot with default message
 skillmeat snapshot
@@ -542,6 +607,7 @@ skillmeat snapshot "Backup" --collection work
 ```
 
 **Output:**
+
 ```
 Created snapshot: abc123d
   Collection: default
@@ -551,6 +617,7 @@ Created snapshot: abc123d
 ```
 
 **Notes:**
+
 - Snapshots are automatically created before destructive operations
 - Stored as compressed tarballs in `~/.skillmeat/snapshots/`
 - Include entire collection state (manifest + lock + all artifacts)
@@ -562,15 +629,18 @@ Created snapshot: abc123d
 List collection snapshots.
 
 **Syntax:**
+
 ```bash
 skillmeat history [OPTIONS]
 ```
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-n, --limit INTEGER` - Number of snapshots to show (default: 10)
 
 **Examples:**
+
 ```bash
 # Show recent snapshots
 skillmeat history
@@ -583,6 +653,7 @@ skillmeat history --collection work
 ```
 
 **Output:**
+
 ```
 Snapshots for 'default' (5)
 ┌──────────┬─────────────────────┬────────────────────────┬───────────┐
@@ -601,18 +672,22 @@ Snapshots for 'default' (5)
 Restore collection from a snapshot.
 
 **Syntax:**
+
 ```bash
 skillmeat rollback SNAPSHOT_ID [OPTIONS]
 ```
 
 **Arguments:**
+
 - `SNAPSHOT_ID` - Snapshot identifier from history
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active collection)
 - `-y, --yes` - Skip confirmation prompt
 
 **Examples:**
+
 ```bash
 # Rollback with confirmation
 skillmeat rollback abc123d
@@ -625,6 +700,7 @@ skillmeat rollback abc123d --collection work
 ```
 
 **Output:**
+
 ```
 Warning: This will replace collection 'default' with snapshot 'abc123d'
 Continue with rollback? [y/N]: y
@@ -637,6 +713,7 @@ Restored collection from snapshot
 ```
 
 **Notes:**
+
 - Creates a safety snapshot of current state before rollback
 - Replaces entire collection (manifest + lock + artifacts)
 - Cannot be undone (except by rolling back to the safety snapshot)
@@ -650,14 +727,17 @@ Restored collection from snapshot
 Create a new collection.
 
 **Syntax:**
+
 ```bash
 skillmeat collection create NAME
 ```
 
 **Arguments:**
+
 - `NAME` - Collection name
 
 **Examples:**
+
 ```bash
 # Create work collection
 skillmeat collection create work
@@ -667,6 +747,7 @@ skillmeat collection create experimental
 ```
 
 **Output:**
+
 ```
 Creating collection 'work'...
 Collection 'work' created
@@ -680,16 +761,19 @@ Collection 'work' created
 List all collections.
 
 **Syntax:**
+
 ```bash
 skillmeat collection list
 ```
 
 **Examples:**
+
 ```bash
 skillmeat collection list
 ```
 
 **Output:**
+
 ```
 Collections
 ┌──────────────┬────────┬───────────┐
@@ -702,6 +786,7 @@ Collections
 ```
 
 **Notes:**
+
 - Active collection is marked with ✓
 - Shows artifact count for each collection
 
@@ -712,14 +797,17 @@ Collections
 Switch to a different collection.
 
 **Syntax:**
+
 ```bash
 skillmeat collection use NAME
 ```
 
 **Arguments:**
+
 - `NAME` - Collection name
 
 **Examples:**
+
 ```bash
 # Switch to work collection
 skillmeat collection use work
@@ -729,11 +817,13 @@ skillmeat collection use default
 ```
 
 **Output:**
+
 ```
 Switched to collection 'work'
 ```
 
 **Notes:**
+
 - Makes the collection active for all subsequent commands
 - Setting persists across terminal sessions
 
@@ -746,16 +836,19 @@ Switched to collection 'work'
 List all configuration values.
 
 **Syntax:**
+
 ```bash
 skillmeat config list
 ```
 
 **Examples:**
+
 ```bash
 skillmeat config list
 ```
 
 **Output:**
+
 ```
 Configuration
 ┌──────────────────────┬─────────────────┐
@@ -768,6 +861,7 @@ Configuration
 ```
 
 **Notes:**
+
 - GitHub tokens are masked in output
 - Configuration stored in `~/.skillmeat/config.toml`
 
@@ -778,14 +872,17 @@ Configuration
 Get a configuration value.
 
 **Syntax:**
+
 ```bash
 skillmeat config get KEY
 ```
 
 **Arguments:**
+
 - `KEY` - Configuration key
 
 **Examples:**
+
 ```bash
 # Get GitHub token
 skillmeat config get github-token
@@ -795,6 +892,7 @@ skillmeat config get default-collection
 ```
 
 **Output:**
+
 ```
 github-token = ghp_xxxxx...
 ```
@@ -806,20 +904,24 @@ github-token = ghp_xxxxx...
 Set a configuration value.
 
 **Syntax:**
+
 ```bash
 skillmeat config set KEY VALUE
 ```
 
 **Arguments:**
+
 - `KEY` - Configuration key
 - `VALUE` - Configuration value
 
 **Common Keys:**
+
 - `github-token` - GitHub personal access token (for private repos and higher rate limits)
 - `default-collection` - Default collection name
 - `update-strategy` - Default update strategy (prompt/upstream/local)
 
 **Examples:**
+
 ```bash
 # Set GitHub token
 skillmeat config set github-token ghp_xxxxxxxxxxxxx
@@ -832,11 +934,13 @@ skillmeat config set update-strategy upstream
 ```
 
 **Output:**
+
 ```
 Set github-token
 ```
 
 **Notes:**
+
 - GitHub token format: `ghp_` followed by alphanumeric characters
 - [Create GitHub token](https://github.com/settings/tokens)
 
@@ -851,19 +955,23 @@ Diff commands compare files and directories to detect changes, with support for 
 Compare two individual files and show unified differences.
 
 **Syntax:**
+
 ```bash
 skillmeat diff files FILE1 FILE2 [OPTIONS]
 ```
 
 **Arguments:**
+
 - `FILE1` - Path to first file
 - `FILE2` - Path to second file
 
 **Options:**
+
 - `-c, --context INTEGER` - Context lines around changes (default: 3)
 - `--color/--no-color` - Enable/disable colored output (default: enabled)
 
 **Examples:**
+
 ```bash
 # Compare two files with default context
 skillmeat diff files ./old-skill.md ./new-skill.md
@@ -876,7 +984,8 @@ skillmeat diff files ./file1.txt ./file2.txt --no-color
 ```
 
 **Output:**
-```
+
+```diff
 --- ./old-skill.md
 +++ ./new-skill.md
 @@ -1,5 +1,6 @@
@@ -895,20 +1004,24 @@ skillmeat diff files ./file1.txt ./file2.txt --no-color
 Compare two directories recursively and show structure differences.
 
 **Syntax:**
+
 ```bash
 skillmeat diff dirs DIR1 DIR2 [OPTIONS]
 ```
 
 **Arguments:**
+
 - `DIR1` - Path to first directory
 - `DIR2` - Path to second directory
 
 **Options:**
+
 - `--ignore TEXT` - Patterns to ignore (can use multiple times)
 - `--limit INTEGER` - Max file diffs to show (default: 50)
 - `--stats-only` - Show only statistics
 
 **Examples:**
+
 ```bash
 # Compare artifact directories
 skillmeat diff dirs ./canvas-v1 ./canvas-v2
@@ -921,6 +1034,7 @@ skillmeat diff dirs ./project1 ./project2 --stats-only
 ```
 
 **Output:**
+
 ```
 Directory Comparison
   Files added:     5
@@ -939,20 +1053,24 @@ Modified Files:
 Perform three-way diff for detecting merge conflicts.
 
 **Syntax:**
+
 ```bash
 skillmeat diff three-way BASE LOCAL REMOTE [OPTIONS]
 ```
 
 **Arguments:**
+
 - `BASE` - Base/original version
 - `LOCAL` - Local version
 - `REMOTE` - Remote version
 
 **Options:**
+
 - `-o, --output PATH` - Write merged result to file
 - `--algorithm TEXT` - Merge algorithm (default: auto)
 
 **Examples:**
+
 ```bash
 # Detect merge conflicts
 skillmeat diff three-way ./base-skill ./local-skill ./upstream-skill
@@ -962,7 +1080,8 @@ skillmeat diff three-way ./base.md ./local.md ./upstream.md --output ./merged.md
 ```
 
 **Output (with conflicts):**
-```
+
+```diff
 <<<<<<< LOCAL
 Local changes here
 =======
@@ -977,14 +1096,17 @@ Remote changes here
 Compare artifact between versions or against upstream.
 
 **Syntax:**
+
 ```bash
 skillmeat diff artifact ARTIFACT [OPTIONS]
 ```
 
 **Arguments:**
+
 - `ARTIFACT` - Artifact name
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection name (default: active)
 - `-t, --type [skill|command|agent]` - Artifact type (if ambiguous)
 - `--upstream` - Compare against upstream
@@ -994,6 +1116,7 @@ skillmeat diff artifact ARTIFACT [OPTIONS]
 - `--stats-only` - Show only statistics
 
 **Examples:**
+
 ```bash
 # Check what changed in artifact
 skillmeat diff artifact canvas
@@ -1019,14 +1142,17 @@ Search commands help find and discover artifacts across collections and projects
 Search artifacts by metadata or content.
 
 **Syntax:**
+
 ```bash
 skillmeat search QUERY [OPTIONS]
 ```
 
 **Arguments:**
+
 - `QUERY` - Search query
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection to search (default: active)
 - `-t, --type [skill|command|agent]` - Filter by type
 - `--search-type [metadata|content|both]` - Search scope (default: both)
@@ -1038,6 +1164,7 @@ skillmeat search QUERY [OPTIONS]
 - `--json` - Output as JSON
 
 **Examples:**
+
 ```bash
 # Search in collection
 skillmeat search "authentication"
@@ -1062,6 +1189,7 @@ skillmeat search "auth" --type command --tags security --limit 20
 ```
 
 **Output:**
+
 ```
 Artifacts matching 'authentication'
 
@@ -1079,11 +1207,13 @@ oauth-integrator  skill    default      integration,security  0.82
 Detect duplicate or similar artifacts.
 
 **Syntax:**
+
 ```bash
 skillmeat find-duplicates [OPTIONS]
 ```
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection to check (default: active)
 - `-p, --projects PATH` - Project paths (multiple allowed)
 - `-t, --threshold FLOAT` - Similarity threshold 0.0-1.0 (default: 0.85)
@@ -1091,6 +1221,7 @@ skillmeat find-duplicates [OPTIONS]
 - `--json` - Output as JSON
 
 **Examples:**
+
 ```bash
 # Find duplicates in collection
 skillmeat find-duplicates
@@ -1109,6 +1240,7 @@ skillmeat find-duplicates --json
 ```
 
 **Output:**
+
 ```
 Duplicate Detection Results
 
@@ -1135,18 +1267,22 @@ Sync commands handle bidirectional synchronization between projects and collecti
 Check for drift between project and collection.
 
 **Syntax:**
+
 ```bash
 skillmeat sync check PROJECT_PATH [OPTIONS]
 ```
 
 **Arguments:**
+
 - `PROJECT_PATH` - Path to project root
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection (default: from deployment metadata)
 - `--json` - Output as JSON
 
 **Examples:**
+
 ```bash
 # Check project in current directory
 skillmeat sync check /path/to/project
@@ -1159,6 +1295,7 @@ skillmeat sync check /path/to/project --json
 ```
 
 **Output (No Drift):**
+
 ```
 No drift detected. Project is in sync.
 
@@ -1166,6 +1303,7 @@ Project: /path/to/project
 ```
 
 **Output (With Drift):**
+
 ```
 Drift Detection Results: 3 artifacts
 
@@ -1177,6 +1315,7 @@ code-reviewer  command  REMOVED_FROM_COLLECTION VERIFY_AND_REMOVE
 ```
 
 **Exit Codes:**
+
 - `0` - No drift detected
 - `1` - Drift detected
 - `2` - Error
@@ -1188,25 +1327,30 @@ code-reviewer  command  REMOVED_FROM_COLLECTION VERIFY_AND_REMOVE
 Sync changes from project to collection.
 
 **Syntax:**
+
 ```bash
 skillmeat sync pull PROJECT_PATH [ARTIFACTS...] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `PROJECT_PATH` - Path to project root
 - `ARTIFACTS...` - Specific artifact names (optional)
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection (default: from metadata)
 - `--strategy [overwrite|merge|fork]` - Sync strategy
 - `--force` - Skip confirmation
 
 **Sync Strategies:**
+
 - `overwrite` - Collection version takes precedence
 - `merge` - Auto-merge if possible
 - `fork` - Create new artifact for diverged version
 
 **Examples:**
+
 ```bash
 # Sync all drifted artifacts
 skillmeat sync pull /path/to/project
@@ -1222,6 +1366,7 @@ skillmeat sync pull /path/to/project --strategy merge
 ```
 
 **Output:**
+
 ```
 Syncing artifacts from project...
 
@@ -1241,19 +1386,23 @@ pdf-extractor (skill)
 Preview sync changes before applying.
 
 **Syntax:**
+
 ```bash
 skillmeat sync preview PROJECT_PATH [ARTIFACTS...] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `PROJECT_PATH` - Path to project root
 - `ARTIFACTS...` - Specific artifact names (optional)
 
 **Options:**
+
 - `-c, --collection TEXT` - Collection (default: from metadata)
 - `--json` - Output as JSON
 
 **Examples:**
+
 ```bash
 # Preview all changes
 skillmeat sync preview /path/to/project
@@ -1266,6 +1415,7 @@ skillmeat sync preview /path/to/project --json
 ```
 
 **Output:**
+
 ```
 Sync Preview: /path/to/project
 
@@ -1291,14 +1441,17 @@ Analytics commands track usage patterns and provide insights about artifact oper
 View artifact usage statistics.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics usage [ARTIFACT] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `ARTIFACT` - Artifact name (optional, shows all if omitted)
 
 **Options:**
+
 - `--days INTEGER` - Time window in days (default: 30)
 - `-t, --type [skill|command|agent]` - Filter by type
 - `-c, --collection TEXT` - Filter by collection
@@ -1306,6 +1459,7 @@ skillmeat analytics usage [ARTIFACT] [OPTIONS]
 - `--sort-by [total_events|deploy_count|update_count|last_used|artifact_name]` - Sort field
 
 **Examples:**
+
 ```bash
 # Show usage for all artifacts (30-day window)
 skillmeat analytics usage
@@ -1327,6 +1481,7 @@ skillmeat analytics usage --format json
 ```
 
 **Output:**
+
 ```
 Artifact Usage
 
@@ -1344,17 +1499,20 @@ code-reviewer     command  15             2        1        2024-01-05
 List top artifacts by metric.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics top [OPTIONS]
 ```
 
 **Options:**
+
 - `--limit INTEGER` - Number to show (default: 10)
 - `--metric [total_events|deploy_count|update_count|sync_count|search_count]` - Ranking metric (default: total_events)
 - `-t, --type [skill|command|agent]` - Filter by type
 - `--format [table|json]` - Output format (default: table)
 
 **Examples:**
+
 ```bash
 # Top 10 artifacts
 skillmeat analytics top
@@ -1370,6 +1528,7 @@ skillmeat analytics top --format json
 ```
 
 **Output:**
+
 ```
 Top 10 Artifacts by Total Events
 
@@ -1387,17 +1546,20 @@ Rank   Name              Type     Total Events   Deploy   Update
 Show cleanup suggestions for unused artifacts.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics cleanup [OPTIONS]
 ```
 
 **Options:**
+
 - `--inactivity-days INTEGER` - Inactivity threshold in days (default: 90)
 - `-c, --collection TEXT` - Filter by collection
 - `--format [table|json]` - Output format (default: table)
 - `--show-size` - Show disk space estimates
 
 **Examples:**
+
 ```bash
 # Get cleanup suggestions
 skillmeat analytics cleanup
@@ -1413,6 +1575,7 @@ skillmeat analytics cleanup --format json
 ```
 
 **Output:**
+
 ```
 Cleanup Suggestions
 
@@ -1433,18 +1596,22 @@ Estimated space savings: 1.2 MB
 Display usage trends over time.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics trends [ARTIFACT] [OPTIONS]
 ```
 
 **Arguments:**
+
 - `ARTIFACT` - Artifact name (optional)
 
 **Options:**
+
 - `--period [7d|30d|90d|all]` - Time period (default: 30d)
 - `--format [table|json]` - Output format (default: table)
 
 **Examples:**
+
 ```bash
 # Overall trends (30 days)
 skillmeat analytics trends
@@ -1460,6 +1627,7 @@ skillmeat analytics trends canvas --period all
 ```
 
 **Output:**
+
 ```
 Usage Trends: canvas (30-day period)
 
@@ -1480,18 +1648,22 @@ Event Breakdown:
 Export comprehensive analytics report to file.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics export OUTPUT_PATH [OPTIONS]
 ```
 
 **Arguments:**
+
 - `OUTPUT_PATH` - Path where report will be saved
 
 **Options:**
+
 - `--format [json|csv]` - Export format (default: json)
 - `-c, --collection TEXT` - Filter by collection
 
 **Examples:**
+
 ```bash
 # Export to JSON
 skillmeat analytics export report.json
@@ -1504,6 +1676,7 @@ skillmeat analytics export work-report.json --collection work
 ```
 
 **Output:**
+
 ```
 Exporting analytics report...
 Report exported successfully!
@@ -1519,16 +1692,19 @@ Report exported successfully!
 Show analytics database statistics.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics stats
 ```
 
 **Examples:**
+
 ```bash
 skillmeat analytics stats
 ```
 
 **Output:**
+
 ```
 Analytics Database Statistics
 
@@ -1552,15 +1728,18 @@ Database Size:     1.2 MB
 Clear old analytics data.
 
 **Syntax:**
+
 ```bash
 skillmeat analytics clear [OPTIONS]
 ```
 
 **Options:**
+
 - `--older-than-days INTEGER` - Delete events older than N days
 - `--confirm` - Skip confirmation
 
 **Examples:**
+
 ```bash
 # Clear events older than 180 days
 skillmeat analytics clear --older-than-days 180 --confirm
@@ -1570,6 +1749,7 @@ skillmeat analytics clear --older-than-days 90
 ```
 
 **Output:**
+
 ```
 This will delete analytics events older than 180 days.
 Continue? [y/N]: y
@@ -1588,15 +1768,18 @@ Remaining events: 2,156
 Verify an artifact has valid structure.
 
 **Syntax:**
+
 ```bash
 skillmeat verify SPEC --type TYPE
 ```
 
 **Arguments:**
+
 - `SPEC` - GitHub path or local file path
 - `--type [skill|command|agent]` - Artifact type (required)
 
 **Examples:**
+
 ```bash
 # Verify GitHub skill
 skillmeat verify anthropics/skills/canvas --type skill
@@ -1609,6 +1792,7 @@ skillmeat verify user/repo/cmd.md --type command
 ```
 
 **Output:**
+
 ```
 Verifying GitHub artifact: anthropics/skills/canvas...
 Valid artifact
@@ -1622,6 +1806,7 @@ Valid artifact
 ```
 
 **Notes:**
+
 - Checks artifact structure without adding to collection
 - Useful for testing before installation
 - Downloads GitHub artifacts to temporary directory (automatically cleaned up)
@@ -1637,6 +1822,7 @@ Valid artifact
 ## Global Options
 
 All commands support:
+
 - `--help` - Show command help
 - `--version` - Show SkillMeat version (root command only)
 
@@ -1664,6 +1850,7 @@ When adding artifacts from GitHub, you can specify versions:
 - Omit version - Same as `@latest`
 
 Examples:
+
 ```bash
 skillmeat add skill user/repo/skill@latest
 skillmeat add skill user/repo/skill@v1.0.0
@@ -1675,12 +1862,14 @@ skillmeat add skill user/repo/skill
 ## Security
 
 SkillMeat displays security warnings before installing artifacts from any source. Artifacts can:
+
 - Execute code
 - Access system resources
 - Read, create, and modify files
 - Execute system commands
 
 **Best Practices:**
+
 - Only install from trusted sources
 - Review artifacts before installation
 - Use `verify` command to inspect artifacts
