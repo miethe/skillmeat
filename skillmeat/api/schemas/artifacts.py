@@ -222,7 +222,6 @@ class ArtifactUpstreamResponse(BaseModel):
         }
 
 
-<<<<<<< HEAD
 class ArtifactUpdateMetadataRequest(BaseModel):
     """Request schema for updating artifact metadata fields."""
 
@@ -273,7 +272,22 @@ class ArtifactUpdateRequest(BaseModel):
     metadata: Optional[ArtifactUpdateMetadataRequest] = Field(
         default=None,
         description="Artifact metadata to update",
-=======
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "tags": ["document", "pdf", "productivity"],
+                "metadata": {
+                    "title": "Enhanced PDF Processor",
+                    "description": "Advanced PDF extraction and analysis",
+                    "tags": ["document", "pdf"],
+                },
+            }
+        }
+
 class ArtifactDeployRequest(BaseModel):
     """Request schema for deploying an artifact."""
 
@@ -301,7 +315,6 @@ class ArtifactDeployResponse(BaseModel):
     error_message: Optional[str] = Field(
         default=None,
         description="Error details if deployment failed",
->>>>>>> origin/main
     )
 
     class Config:
@@ -309,20 +322,11 @@ class ArtifactDeployResponse(BaseModel):
 
         json_schema_extra = {
             "example": {
-<<<<<<< HEAD
-                "tags": ["document", "pdf", "productivity"],
-                "metadata": {
-                    "title": "Enhanced PDF Processor",
-                    "description": "Advanced PDF extraction and analysis",
-                    "tags": ["document", "pdf"],
-                },
-=======
                 "success": True,
                 "message": "Artifact 'pdf' deployed successfully",
                 "artifact_name": "pdf",
                 "artifact_type": "skill",
                 "deployed_path": "/Users/me/my-project/.claude/skills/pdf",
                 "error_message": None,
->>>>>>> origin/main
             }
         }
