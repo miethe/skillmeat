@@ -35,6 +35,7 @@ class Deployment:
     parent_hash: Optional[str] = None  # Hash of parent version (if deployed from collection)
     version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
     last_modified_check: Optional[datetime] = None  # Last drift check timestamp
+    modification_detected_at: Optional[datetime] = None  # When modification was first detected
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -61,6 +62,9 @@ class Deployment:
         if self.last_modified_check:
             result["last_modified_check"] = self.last_modified_check.isoformat()
 
+        if self.modification_detected_at:
+            result["modification_detected_at"] = self.modification_detected_at.isoformat()
+
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
 
@@ -77,10 +81,14 @@ class Deployment:
         if not content_hash:
             raise ValueError("Deployment record missing content_hash or collection_sha")
 
-        # Parse optional datetime field
+        # Parse optional datetime fields
         last_modified_check = None
         if "last_modified_check" in data:
             last_modified_check = datetime.fromisoformat(data["last_modified_check"])
+
+        modification_detected_at = None
+        if "modification_detected_at" in data:
+            modification_detected_at = datetime.fromisoformat(data["modification_detected_at"])
 
         # Handle version_lineage: initialize with content_hash if not present
         version_lineage = data.get("version_lineage")
@@ -98,6 +106,7 @@ class Deployment:
             parent_hash=data.get("parent_hash"),
             version_lineage=version_lineage,
             last_modified_check=last_modified_check,
+            modification_detected_at=modification_detected_at,
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
