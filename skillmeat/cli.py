@@ -3705,14 +3705,132 @@ def sync_preview_cmd(project_path, artifacts, collection, output_json):
     )
 
 
-def _display_sync_pull_results(result) -> None:
+@main.command(name="sync-push")
+@click.argument("project_path", type=click.Path(exists=True))
+@click.option(
+    "--artifacts",
+    help="Specific artifacts to sync from collection to project (comma-separated)",
+)
+@click.option(
+    "-c",
+    "--collection",
+    help="Collection to sync from (default: active collection)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview what would be synced without making changes",
+)
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+def sync_push_cmd(project_path, artifacts, collection, dry_run, output_json):
+    """Sync collection artifacts down to a project (collection → project)."""
+    from pathlib import Path
+    from skillmeat.core.collection import CollectionManager
+    from skillmeat.core.sync import SyncManager
+
+    try:
+        project_path = Path(project_path)
+        artifact_list = None
+        if artifacts:
+            artifact_list = [a.strip() for a in artifacts.split(",") if a.strip()]
+
+        collection_mgr = CollectionManager()
+        sync_mgr = SyncManager(collection_manager=collection_mgr)
+
+        result = sync_mgr.sync_project_from_collection(
+            project_path=project_path,
+            collection_name=collection,
+            artifact_names=artifact_list,
+            dry_run=dry_run,
+        )
+
+        if output_json:
+            _display_sync_pull_json(result)
+        else:
+            _display_sync_pull_results(result, header="Sync Push Results")
+
+        # Exit codes: 0 success/no_changes/dry_run, 1 partial/conflict, 2 cancelled
+        if result.status in ["success", "no_changes", "dry_run"]:
+            sys.exit(0)
+        elif result.status == "partial":
+            sys.exit(1)
+        else:
+            sys.exit(2)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        logger.exception("Sync push failed")
+        sys.exit(1)
+
+
+@main.command(name="sync-upstream")
+@click.option(
+    "--artifacts",
+    help="Specific artifacts to sync from upstream (comma-separated)",
+)
+@click.option(
+    "-c",
+    "--collection",
+    help="Collection to sync (default: active collection)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview upstream updates without applying",
+)
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+def sync_upstream_cmd(artifacts, collection, dry_run, output_json):
+    """Sync collection artifacts from upstream (upstream → collection)."""
+    from skillmeat.core.collection import CollectionManager
+    from skillmeat.core.sync import SyncManager
+
+    try:
+        artifact_list = None
+        if artifacts:
+            artifact_list = [a.strip() for a in artifacts.split(",") if a.strip()]
+
+        collection_mgr = CollectionManager()
+        sync_mgr = SyncManager(collection_manager=collection_mgr)
+
+        result = sync_mgr.sync_collection_from_upstream(
+            collection_name=collection,
+            artifact_names=artifact_list,
+            dry_run=dry_run,
+        )
+
+        if output_json:
+            _display_sync_pull_json(result)
+        else:
+            _display_sync_pull_results(result, header="Sync Upstream Results")
+
+        if result.status in ["success", "no_changes", "dry_run"]:
+            sys.exit(0)
+        elif result.status == "partial":
+            sys.exit(1)
+        else:
+            sys.exit(2)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+    except Exception as e:  # noqa: BLE001
+        console.print(f"[red]Unexpected error:[/red] {e}")
+        logger.exception("Sync upstream failed")
+        sys.exit(1)
+
+
+def _display_sync_pull_results(result, header: str = "Sync Pull Results") -> None:
     """Display sync pull results with Rich formatting.
 
     Args:
         result: SyncResult object
+        header: Title to display
     """
     # Header
-    console.print(f"\n[bold]Sync Pull Results[/bold]")
+    console.print(f"\n[bold]{header}[/bold]")
     console.print(f"Status: [{_get_status_color(result.status)}]{result.status}[/]")
     console.print(f"Message: {result.message}\n")
 

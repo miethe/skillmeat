@@ -89,7 +89,7 @@
   - [x] Implement atomic apply with temp staging + rollback (FR-9)
   - [x] Directional sync flows upstream↔collection↔project w/ dry-run (FR-2/7/8) — upstream→collection + collection→project + project→collection overwrite/merge flows wired; upstream merge fidelity upgrades pending (reasoning-heavy)
 - Phase 4 (CLI/API/UX)
-  - [ ] Wire CLI commands update/sync/resolve/rollback/bulk (FR-6/11/12/13)
+  - [x] Wire CLI commands update/sync/resolve/rollback/bulk (FR-6/11/12/13) — upstream/collection→project/project→collection paths wired; bulk/resolve UX follow-ups pending
   - [ ] Expose sync+drift/resolve/version-history APIs with DTOs (FR-15)
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
