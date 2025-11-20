@@ -20,7 +20,7 @@ else:
 
 from skillmeat.utils.logging import redact_path
 from skillmeat.utils.filesystem import compute_content_hash
-from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.artifact import ArtifactType, ArtifactManager
 from skillmeat.models import (
     DeploymentRecord,
     DeploymentMetadata,
@@ -237,6 +237,102 @@ class SyncManager:
         status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
         return SyncResult(status=status, artifacts_synced=synced, conflicts=conflicts)
 
+    def sync_collection_from_upstream(
+        self,
+        collection_name: Optional[str] = None,
+        artifact_names: Optional[List[str]] = None,
+        dry_run: bool = True,
+    ) -> SyncResult:
+        """Fetch updates from upstream into collection (upstream -> collection)."""
+        artifact_mgr = self.artifact_mgr or ArtifactManager(self.collection_mgr)
+        collection = self.collection_mgr.load_collection(collection_name)
+        collection_path = self.collection_mgr.config.get_collection_path(collection.name)
+
+        candidates = [
+            a
+            for a in collection.artifacts
+            if a.origin == "github"
+            and (artifact_names is None or a.name in artifact_names)
+        ]
+
+        synced: List[str] = []
+        conflicts: List[ArtifactSyncResult] = []
+
+        for artifact in candidates:
+            try:
+                update_info = artifact_mgr.github_source.check_updates(artifact)
+            except Exception as exc:  # noqa: BLE001
+                conflicts.append(
+                    ArtifactSyncResult(
+                        artifact_name=artifact.name,
+                        success=False,
+                        error=f"Failed to check updates: {exc}",
+                    )
+                )
+                continue
+
+            if not update_info or not update_info.has_update:
+                continue
+
+            if dry_run:
+                synced.append(artifact.name)
+                continue
+
+            try:
+                override_version = update_info.latest_sha or artifact.version_spec
+                spec = artifact_mgr._build_spec_from_artifact(  # pylint: disable=protected-access
+                    artifact, version_override=override_version
+                )
+                fetch_result = artifact_mgr.github_source.fetch(
+                    spec, artifact.type
+                )
+
+                dest_path = collection_path / artifact.path
+                self._atomic_replace_artifact(
+                    source_path=fetch_result.artifact_path,
+                    dest_path=dest_path,
+                )
+
+                artifact.metadata = fetch_result.metadata
+                artifact.upstream = fetch_result.upstream_url or artifact.upstream
+                artifact.resolved_sha = fetch_result.resolved_sha or update_info.latest_sha
+                artifact.resolved_version = (
+                    fetch_result.resolved_version
+                    if fetch_result.resolved_version is not None
+                    else update_info.latest_version or artifact.resolved_version
+                )
+                artifact.last_updated = datetime.utcnow()
+
+                self.collection_mgr.save_collection(collection)
+
+                new_hash = compute_content_hash(dest_path)
+                self.collection_mgr.lock_mgr.update_entry(
+                    collection_path,
+                    artifact.name,
+                    artifact.type,
+                    artifact.upstream,
+                    artifact.resolved_sha,
+                    artifact.resolved_version,
+                    new_hash,
+                )
+                synced.append(artifact.name)
+            except Exception as exc:  # noqa: BLE001
+                conflicts.append(
+                    ArtifactSyncResult(
+                        artifact_name=artifact.name,
+                        success=False,
+                        error=str(exc),
+                    )
+                )
+
+        status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
+        message = (
+            f"{'Would sync' if dry_run else 'Synced'} {len(synced)} artifact(s) from upstream"
+        )
+        return SyncResult(
+            status=status, artifacts_synced=synced, conflicts=conflicts, message=message
+        )
+
     def _apply_collection_artifact_to_project(
         self,
         collection_path: Path,
@@ -287,13 +383,10 @@ class SyncManager:
             # Ensure destination base exists
             dest_base.mkdir(parents=True, exist_ok=True)
 
-            if dest_path.exists():
-                if dest_path.is_dir():
-                    shutil.rmtree(dest_path)
-                else:
-                    dest_path.unlink()
-
-            staged_dest.replace(dest_path)
+            self._atomic_replace_artifact(
+                source_path=staged_dest,
+                dest_path=dest_path,
+            )
 
         # Update deployment tracker with new content hash
         content_hash = compute_content_hash(dest_path)
@@ -303,6 +396,32 @@ class SyncManager:
             collection_name=collection_name,
             content_hash=content_hash,
         )
+
+    def _atomic_replace_artifact(self, source_path: Path, dest_path: Path) -> None:
+        """Replace dest_path contents with source_path using staging to avoid partial writes."""
+        dest_parent = dest_path.parent
+        dest_parent.mkdir(parents=True, exist_ok=True)
+
+        temp_target = dest_parent / f".{dest_path.name}.staging"
+        if temp_target.exists():
+            if temp_target.is_dir():
+                shutil.rmtree(temp_target)
+            else:
+                temp_target.unlink()
+
+        # Copy into temp_target
+        if source_path.is_file():
+            temp_target.write_bytes(source_path.read_bytes())
+        else:
+            shutil.copytree(source_path, temp_target, dirs_exist_ok=True)
+
+        # Replace destination
+        if dest_path.exists():
+            if dest_path.is_dir():
+                shutil.rmtree(dest_path)
+            else:
+                dest_path.unlink()
+        temp_target.replace(dest_path)
 
     def _compute_project_artifact_hash(
         self, project_path: Path, artifact_name: str, artifact_type: str
@@ -1376,14 +1495,11 @@ class SyncManager:
             project_artifact_path: Path to artifact in project
             collection_artifact_path: Path to artifact in collection
         """
-        import shutil
-
-        # Remove old collection artifact if it exists
-        if collection_artifact_path.exists():
-            shutil.rmtree(collection_artifact_path)
-
-        # Copy project artifact to collection
-        shutil.copytree(project_artifact_path, collection_artifact_path)
+        with tempfile.TemporaryDirectory(prefix="skillmeat_sync_overwrite_") as tmpdir:
+            staging_root = Path(tmpdir)
+            staged_dest = staging_root / collection_artifact_path.name
+            shutil.copytree(project_artifact_path, staged_dest, dirs_exist_ok=True)
+            self._atomic_replace_artifact(staged_dest, collection_artifact_path)
 
     def _sync_merge(
         self,
@@ -1407,15 +1523,20 @@ class SyncManager:
 
         merge_engine = MergeEngine()
 
-        # For now, use collection as base (no true three-way merge)
-        # P3-004 will add base version tracking
-        # Use project as "remote" and collection as "local"
-        merge_result = merge_engine.merge(
-            base_path=collection_artifact_path,  # Base = current collection
-            local_path=collection_artifact_path,  # Local = collection
-            remote_path=project_artifact_path,  # Remote = project
-            output_path=collection_artifact_path,  # Output = collection (in-place)
-        )
+        # Stage merge output to avoid corrupting collection on failure
+        with tempfile.TemporaryDirectory(prefix="skillmeat_sync_merge_") as tmpdir:
+            staging_root = Path(tmpdir)
+            staged_output = staging_root / "merged"
+
+            merge_result = merge_engine.merge(
+                base_path=collection_artifact_path,  # Base = current collection
+                local_path=collection_artifact_path,  # Local = collection
+                remote_path=project_artifact_path,  # Remote = project
+                output_path=staged_output,  # Output staged
+            )
+
+            if merge_result.success or not merge_result.has_conflicts:
+                self._atomic_replace_artifact(staged_output, collection_artifact_path)
 
         return ArtifactSyncResult(
             artifact_name=artifact_name,
