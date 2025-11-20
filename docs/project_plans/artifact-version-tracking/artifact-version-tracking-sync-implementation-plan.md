@@ -90,7 +90,8 @@
   - [x] Directional sync flows upstream↔collection↔project w/ dry-run (FR-2/7/8) — upstream→collection + collection→project + project→collection overwrite/merge flows wired; upstream merge fidelity upgrades pending (reasoning-heavy)
 - Phase 4 (CLI/API/UX)
   - [x] Wire CLI commands update/sync/resolve/rollback/bulk (FR-6/11/12/13) — upstream/collection→project/project→collection paths wired; bulk/resolve UX follow-ups pending
-  - [ ] Expose sync+drift/resolve/version-history APIs with DTOs (FR-15)
+  - [x] Expose sync endpoints (upstream/push/pull) with DTOs and wiring (FR-15)
+  - [ ] Expose drift/resolve/version-history APIs with DTOs (FR-15, reasoning-heavy)
 - Phase 5 (Testing/Docs/Perf)
   - [ ] Expand merge/sync integration regression suite >85% coverage (FR-17)
   - [ ] Performance benchmarks bulk drift check/update (NFR Performance)
