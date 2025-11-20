@@ -342,10 +342,15 @@ class ArtifactDeployResponse(BaseModel):
 
 
 class ArtifactSyncRequest(BaseModel):
-    """Request schema for syncing an artifact from project to collection."""
+    """Request schema for syncing an artifact.
 
-    project_path: str = Field(
-        description="Path to project directory containing deployed artifact",
+    If project_path is provided: Syncs FROM project TO collection (reverse sync).
+    If project_path is omitted: Syncs FROM upstream source TO collection (update).
+    """
+
+    project_path: Optional[str] = Field(
+        default=None,
+        description="Path to project directory containing deployed artifact. If omitted, syncs from upstream source.",
         examples=["/Users/me/my-project"],
     )
     force: bool = Field(
