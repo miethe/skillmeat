@@ -1,0 +1,185 @@
+/**
+ * React Query hooks for project data fetching
+ *
+ * These hooks provide data fetching, caching, and state management for projects.
+ * Uses live API data with mock fallbacks to keep the UI responsive offline.
+ */
+
+import { useQuery } from "@tanstack/react-query";
+import type {
+  ProjectSummary,
+  ProjectDetail,
+  ProjectsResponse,
+  ProjectDetailResponse,
+} from "@/types/project";
+import { ApiError, apiConfig, apiRequest } from "@/lib/api";
+
+const USE_MOCKS = apiConfig.useMocks;
+
+// Mock data generator for development
+const generateMockProjects = (): ProjectSummary[] => {
+  return [
+    {
+      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvd2ViLWFwcA==",
+      path: "/Users/john/projects/web-app",
+      name: "web-app",
+      deployment_count: 8,
+      last_deployment: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvYXBpLXNlcnZpY2U=",
+      path: "/Users/john/projects/api-service",
+      name: "api-service",
+      deployment_count: 5,
+      last_deployment: new Date(Date.now() - 2 * 86400000).toISOString(),
+    },
+    {
+      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvZGF0YS1waXBlbGluZQ==",
+      path: "/Users/john/projects/data-pipeline",
+      name: "data-pipeline",
+      deployment_count: 3,
+      last_deployment: new Date(Date.now() - 7 * 86400000).toISOString(),
+    },
+    {
+      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvbW9iaWxlLWFwcA==",
+      path: "/Users/john/projects/mobile-app",
+      name: "mobile-app",
+      deployment_count: 2,
+      last_deployment: new Date(Date.now() - 14 * 86400000).toISOString(),
+    },
+  ];
+};
+
+const generateMockProjectDetail = (projectId: string): ProjectDetail | null => {
+  const projects = generateMockProjects();
+  const project = projects.find((p) => p.id === projectId);
+
+  if (!project) {
+    return null;
+  }
+
+  return {
+    ...project,
+    deployments: [
+      {
+        artifact_name: "canvas-design",
+        artifact_type: "skill",
+        from_collection: "default",
+        deployed_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+        artifact_path: "skills/canvas-design",
+        version: "v2.1.0",
+        collection_sha: "abc123def456",
+        local_modifications: false,
+      },
+      {
+        artifact_name: "docx-processor",
+        artifact_type: "skill",
+        from_collection: "default",
+        deployed_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+        artifact_path: "skills/docx-processor",
+        version: "v1.5.0",
+        collection_sha: "def789ghi012",
+        local_modifications: true,
+      },
+      {
+        artifact_name: "review",
+        artifact_type: "command",
+        from_collection: "custom",
+        deployed_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+        artifact_path: "commands/review.md",
+        version: "v1.0.0",
+        collection_sha: "ghi345jkl678",
+        local_modifications: false,
+      },
+    ],
+    stats: {
+      by_type: {
+        skill: 5,
+        command: 2,
+        agent: 1,
+      },
+      by_collection: {
+        default: 6,
+        custom: 2,
+      },
+      modified_count: 1,
+    },
+  };
+};
+
+// Query keys
+const projectKeys = {
+  all: ["projects"] as const,
+  lists: () => [...projectKeys.all, "list"] as const,
+  list: () => [...projectKeys.lists()] as const,
+  details: () => [...projectKeys.all, "detail"] as const,
+  detail: (id: string) => [...projectKeys.details(), id] as const,
+};
+
+async function fetchProjectsFromApi(): Promise<ProjectSummary[]> {
+  const params = new URLSearchParams({
+    limit: "100", // Get all projects (they're typically not numerous)
+  });
+
+  try {
+    const response = await apiRequest<ProjectsResponse>(
+      `/projects?${params.toString()}`
+    );
+
+    return response.items;
+  } catch (error) {
+    if (USE_MOCKS) {
+      console.warn("[projects] API failed, falling back to mock data", error);
+      return generateMockProjects();
+    }
+    throw error;
+  }
+}
+
+async function fetchProjectFromApi(id: string): Promise<ProjectDetail | null> {
+  try {
+    const response = await apiRequest<ProjectDetailResponse>(`/projects/${id}`);
+
+    return {
+      id: response.id,
+      path: response.path,
+      name: response.name,
+      deployment_count: response.deployment_count,
+      last_deployment: response.last_deployment,
+      deployments: response.deployments,
+      stats: response.stats,
+    };
+  } catch (error) {
+    if (USE_MOCKS && error instanceof ApiError && error.status === 404) {
+      return generateMockProjectDetail(id);
+    }
+    console.error(`[projects] Failed to fetch project ${id} from API`, error);
+    throw error;
+  }
+}
+
+/**
+ * Hook to fetch all projects with deployments
+ */
+export function useProjects() {
+  return useQuery({
+    queryKey: projectKeys.list(),
+    queryFn: async (): Promise<ProjectSummary[]> => {
+      return await fetchProjectsFromApi();
+    },
+    staleTime: 30000, // Consider data fresh for 30 seconds
+  });
+}
+
+/**
+ * Hook to fetch a single project by ID
+ */
+export function useProject(id: string) {
+  return useQuery({
+    queryKey: projectKeys.detail(id),
+    queryFn: async (): Promise<ProjectDetail | null> => {
+      return await fetchProjectFromApi(id);
+    },
+    enabled: !!id,
+  });
+}

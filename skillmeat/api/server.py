@@ -27,6 +27,7 @@ from .routers import (
     health,
     marketplace,
     mcp,
+    projects,
 )
 from .middleware import ObservabilityMiddleware, RateLimitMiddleware, get_rate_limiter
 
@@ -214,6 +215,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
+    app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
 
     # Root endpoint
     @app.get(
