@@ -504,7 +504,7 @@ async def check_project_modifications(
                 modification_detected_at = None
 
             # Track last check time
-            deployment.last_modification_check = checked_at
+            deployment.last_modified_check = checked_at
 
             if is_modified:
                 modifications_count += 1
