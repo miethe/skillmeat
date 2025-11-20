@@ -22,15 +22,16 @@ import {
   Upload,
 } from "lucide-react";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeployDialog } from "./deploy-dialog";
 import { SyncDialog } from "./sync-dialog";
 import type { Artifact, ArtifactType } from "@/types/artifact";
@@ -78,7 +79,7 @@ const statusColors: Record<string, string> = {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6 pr-8">
+    <div className="space-y-6">
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-full" />
@@ -135,8 +136,6 @@ export function ArtifactDetail({
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
-  if (!isOpen) return null;
-
   const Icon = artifact ? artifactTypeIcons[artifact.type] : Package;
   const StatusIcon = (artifact
     ? statusIcons[artifact.status]
@@ -144,252 +143,267 @@ export function ArtifactDetail({
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="right" onClose={onClose}>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           {isLoading || !artifact ? (
-            <DetailSkeleton />
-          ) : (
-            <div className="space-y-6 pr-8">
-              {/* Header */}
-              <SheetHeader>
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 p-3 rounded-lg bg-primary/10">
-                    <Icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <SheetTitle className="text-xl">
-                      {artifact.metadata.title || artifact.name}
-                    </SheetTitle>
-                    <SheetDescription className="mt-1">
-                      {artifactTypeLabels[artifact.type]} · {artifact.name}
-                    </SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
-
-              {/* Status Badge */}
-              <div className="flex items-center gap-2">
-                <StatusIcon
-                  className={`h-4 w-4 ${statusColors[artifact.status]}`}
-                />
-                <Badge variant="outline" className="capitalize">
-                  {artifact.status}
-                </Badge>
-                <Badge variant="secondary" className="capitalize">
-                  {artifact.scope}
-                </Badge>
-              </div>
-
-              {/* Description */}
-              {artifact.metadata.description && (
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {artifact.metadata.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Metadata Grid */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Metadata</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <MetadataItem
-                    icon={<Package className="h-4 w-4" />}
-                    label="Version"
-                    value={artifact.version || "N/A"}
-                  />
-                  <MetadataItem
-                    icon={<User className="h-4 w-4" />}
-                    label="Author"
-                    value={artifact.metadata.author || "Unknown"}
-                  />
-                  <MetadataItem
-                    icon={<FileText className="h-4 w-4" />}
-                    label="License"
-                    value={artifact.metadata.license || "N/A"}
-                  />
-                  <MetadataItem
-                    icon={<Calendar className="h-4 w-4" />}
-                    label="Created"
-                    value={formatDate(artifact.createdAt)}
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              {artifact.metadata.tags && artifact.metadata.tags.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
-                    Tags
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {artifact.metadata.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Upstream Status */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Upstream Status</h3>
-                <div className="rounded-lg border p-4 space-y-2">
-                  {artifact.upstreamStatus.hasUpstream ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Source
-                        </span>
-                        {artifact.source && (
-                          <a
-                            href={artifact.upstreamStatus.upstreamUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            {artifact.source}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Current Version
-                        </span>
-                        <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {artifact.upstreamStatus.currentVersion || "N/A"}
-                        </code>
-                      </div>
-                      {artifact.upstreamStatus.isOutdated && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            Latest Version
-                          </span>
-                          <code className="text-xs bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded border border-yellow-500/20">
-                            {artifact.upstreamStatus.upstreamVersion}
-                          </code>
-                        </div>
-                      )}
-                      {artifact.upstreamStatus.lastChecked && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            Last Checked
-                          </span>
-                          <span className="text-sm">
-                            {formatRelativeTime(
-                              artifact.upstreamStatus.lastChecked
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No upstream source configured
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Usage Stats */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Usage Statistics
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard
-                    label="Total Deployments"
-                    value={artifact.usageStats.totalDeployments}
-                  />
-                  <StatCard
-                    label="Active Projects"
-                    value={artifact.usageStats.activeProjects}
-                  />
-                  <StatCard
-                    label="Usage Count"
-                    value={artifact.usageStats.usageCount}
-                  />
-                  <StatCard
-                    label="Last Used"
-                    value={
-                      artifact.usageStats.lastUsed
-                        ? formatRelativeTime(artifact.usageStats.lastUsed)
-                        : "Never"
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Aliases */}
-              {artifact.aliases && artifact.aliases.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-sm">Aliases</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {artifact.aliases.map((alias) => (
-                      <code
-                        key={alias}
-                        className="text-xs bg-muted px-2 py-1 rounded"
-                      >
-                        {alias}
-                      </code>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="space-y-3 pt-4 border-t">
-                <h3 className="font-semibold text-sm">Actions</h3>
-                <div className="flex flex-col gap-2">
-                  {/* Deploy Button */}
-                  <Button
-                    variant="default"
-                    className="w-full justify-start"
-                    onClick={() => setIsDeployDialogOpen(true)}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Deploy to Project
-                  </Button>
-
-                  {/* Sync Button */}
-                  {artifact.upstreamStatus.hasUpstream && (
-                    <Button
-                      variant={
-                        artifact.upstreamStatus.isOutdated
-                          ? "default"
-                          : "outline"
-                      }
-                      className="w-full justify-start"
-                      onClick={() => setIsSyncDialogOpen(true)}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      {artifact.upstreamStatus.isOutdated
-                        ? "Update to Latest Version"
-                        : "Sync with Upstream"}
-                    </Button>
-                  )}
-
-                  <Button variant="outline" className="w-full justify-start">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Duplicate Artifact
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Remove from Collection
-                  </Button>
-                </div>
-              </div>
+            <div className="p-6">
+              <DetailSkeleton />
             </div>
+          ) : (
+            <>
+              {/* Header Section - Fixed */}
+              <div className="px-6 pt-6 pb-4 border-b">
+                <DialogHeader>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 p-3 rounded-lg bg-primary/10">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <DialogTitle className="text-2xl">
+                        {artifact.metadata.title || artifact.name}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {artifactTypeLabels[artifact.type]} · {artifact.name}
+                      </DialogDescription>
+                      <div className="flex items-center gap-2 pt-1">
+                        <StatusIcon
+                          className={`h-4 w-4 ${statusColors[artifact.status]}`}
+                        />
+                        <Badge variant="outline" className="capitalize">
+                          {artifact.status}
+                        </Badge>
+                        <Badge variant="secondary" className="capitalize">
+                          {artifact.scope}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+              </div>
+
+              {/* Scrollable Content */}
+              <ScrollArea className="flex-1 px-6">
+                <div className="space-y-6 py-4">
+                  {/* Description */}
+                  {artifact.metadata.description && (
+                    <div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {artifact.metadata.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Metadata Grid */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-foreground">
+                      Metadata
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <MetadataItem
+                        icon={<Package className="h-4 w-4" />}
+                        label="Version"
+                        value={artifact.version || "N/A"}
+                      />
+                      <MetadataItem
+                        icon={<User className="h-4 w-4" />}
+                        label="Author"
+                        value={artifact.metadata.author || "Unknown"}
+                      />
+                      <MetadataItem
+                        icon={<FileText className="h-4 w-4" />}
+                        label="License"
+                        value={artifact.metadata.license || "N/A"}
+                      />
+                      <MetadataItem
+                        icon={<Calendar className="h-4 w-4" />}
+                        label="Created"
+                        value={formatDate(artifact.createdAt)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {artifact.metadata.tags && artifact.metadata.tags.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Tags
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {artifact.metadata.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upstream Status */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-foreground">
+                      Upstream Status
+                    </h3>
+                    <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                      {artifact.upstreamStatus.hasUpstream ? (
+                        <>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-sm text-muted-foreground">
+                              Source
+                            </span>
+                            {artifact.source && (
+                              <a
+                                href={artifact.upstreamStatus.upstreamUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:underline flex items-center gap-1 font-medium"
+                              >
+                                {artifact.source}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-sm text-muted-foreground">
+                              Current Version
+                            </span>
+                            <code className="text-xs bg-background px-2 py-1 rounded border">
+                              {artifact.upstreamStatus.currentVersion || "N/A"}
+                            </code>
+                          </div>
+                          {artifact.upstreamStatus.isOutdated && (
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-sm text-muted-foreground">
+                                Latest Version
+                              </span>
+                              <code className="text-xs bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded border border-yellow-500/20">
+                                {artifact.upstreamStatus.upstreamVersion}
+                              </code>
+                            </div>
+                          )}
+                          {artifact.upstreamStatus.lastChecked && (
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-sm text-muted-foreground">
+                                Last Checked
+                              </span>
+                              <span className="text-sm font-medium">
+                                {formatRelativeTime(
+                                  artifact.upstreamStatus.lastChecked
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No upstream source configured
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Usage Stats */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Usage Statistics
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <StatCard
+                        label="Total Deployments"
+                        value={artifact.usageStats.totalDeployments}
+                      />
+                      <StatCard
+                        label="Active Projects"
+                        value={artifact.usageStats.activeProjects}
+                      />
+                      <StatCard
+                        label="Usage Count"
+                        value={artifact.usageStats.usageCount}
+                      />
+                      <StatCard
+                        label="Last Used"
+                        value={
+                          artifact.usageStats.lastUsed
+                            ? formatRelativeTime(artifact.usageStats.lastUsed)
+                            : "Never"
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Aliases */}
+                  {artifact.aliases && artifact.aliases.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm text-foreground">
+                        Aliases
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {artifact.aliases.map((alias) => (
+                          <code
+                            key={alias}
+                            className="text-xs bg-muted px-3 py-1.5 rounded border"
+                          >
+                            {alias}
+                          </code>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {/* Actions Footer - Fixed */}
+              <div className="px-6 py-4 border-t bg-muted/30">
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-foreground">
+                    Actions
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Deploy Button */}
+                    <Button
+                      variant="default"
+                      className="justify-start"
+                      onClick={() => setIsDeployDialogOpen(true)}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Deploy
+                    </Button>
+
+                    {/* Sync Button */}
+                    {artifact.upstreamStatus.hasUpstream && (
+                      <Button
+                        variant={
+                          artifact.upstreamStatus.isOutdated
+                            ? "default"
+                            : "outline"
+                        }
+                        className="justify-start"
+                        onClick={() => setIsSyncDialogOpen(true)}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        {artifact.upstreamStatus.isOutdated ? "Update" : "Sync"}
+                      </Button>
+                    )}
+
+                    <Button variant="outline" className="justify-start">
+                      <Copy className="h-4 w-4 mr-2" />
+                      Duplicate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* Deploy Dialog */}
       <DeployDialog
@@ -397,7 +411,6 @@ export function ArtifactDetail({
         isOpen={isDeployDialogOpen}
         onClose={() => setIsDeployDialogOpen(false)}
         onSuccess={() => {
-          // Refresh artifact data or show success message
           setIsDeployDialogOpen(false);
         }}
       />
@@ -408,7 +421,6 @@ export function ArtifactDetail({
         isOpen={isSyncDialogOpen}
         onClose={() => setIsSyncDialogOpen(false)}
         onSuccess={() => {
-          // Refresh artifact data or show success message
           setIsSyncDialogOpen(false);
         }}
       />
