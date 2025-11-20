@@ -32,12 +32,31 @@ const artifactTypeIcons: Record<
   hook: Webhook,
 };
 
-const artifactTypeColors: Record<ArtifactType, string> = {
-  skill: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  command: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  agent: "bg-green-500/10 text-green-500 border-green-500/20",
-  mcp: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  hook: "bg-pink-500/10 text-pink-500 border-pink-500/20",
+// Enhanced type colors for better visual differentiation
+const artifactTypeBadgeColors: Record<ArtifactType, string> = {
+  skill: "bg-blue-500/20 text-blue-700 border-blue-500/30 dark:text-blue-300",
+  command: "bg-purple-500/20 text-purple-700 border-purple-500/30 dark:text-purple-300",
+  agent: "bg-green-500/20 text-green-700 border-green-500/30 dark:text-green-300",
+  mcp: "bg-orange-500/20 text-orange-700 border-orange-500/30 dark:text-orange-300",
+  hook: "bg-pink-500/20 text-pink-700 border-pink-500/30 dark:text-pink-300",
+};
+
+// Subtle background tints for entire card
+const artifactTypeCardTints: Record<ArtifactType, string> = {
+  skill: "bg-blue-500/[0.02] dark:bg-blue-500/[0.03]",
+  command: "bg-purple-500/[0.02] dark:bg-purple-500/[0.03]",
+  agent: "bg-green-500/[0.02] dark:bg-green-500/[0.03]",
+  mcp: "bg-orange-500/[0.02] dark:bg-orange-500/[0.03]",
+  hook: "bg-pink-500/[0.02] dark:bg-pink-500/[0.03]",
+};
+
+// Left border accent colors
+const artifactTypeBorderAccents: Record<ArtifactType, string> = {
+  skill: "border-l-blue-500",
+  command: "border-l-purple-500",
+  agent: "border-l-green-500",
+  mcp: "border-l-orange-500",
+  hook: "border-l-pink-500",
 };
 
 const statusColors: Record<string, string> = {
@@ -58,7 +77,7 @@ function ArtifactCard({
 
   return (
     <Card
-      className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+      className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 border-l-4 ${artifactTypeBorderAccents[artifact.type]} ${artifactTypeCardTints[artifact.type]}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -75,7 +94,7 @@ function ArtifactCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div
-              className={`flex-shrink-0 p-2 rounded-md border ${artifactTypeColors[artifact.type]}`}
+              className={`flex-shrink-0 p-2 rounded-md border ${artifactTypeBadgeColors[artifact.type]}`}
             >
               <Icon className="h-4 w-4" />
             </div>
