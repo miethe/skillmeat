@@ -152,7 +152,8 @@ Based on P1-003 acceptance criteria:
 - ⚠️ Add metadata to markers (branch/version info)
 
 **Git-Style Marker Format**:
-```
+
+```diff
 <<<<<<< LOCAL (or HEAD)
 local content here
 =======
@@ -161,7 +162,8 @@ remote content here
 ```
 
 **Enhanced Format** (recommended):
-```
+
+```diff
 <<<<<<< LOCAL (artifact_name v1.2.3)
 local content here
 ||||||| BASE (common ancestor v1.2.0)
