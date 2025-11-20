@@ -17,12 +17,14 @@ else:
     import tomli as tomllib
 
 from skillmeat.utils.logging import redact_path
+from skillmeat.utils.filesystem import compute_content_hash
 from skillmeat.models import (
     DeploymentRecord,
     DeploymentMetadata,
     DriftDetectionResult,
     SyncResult,
     ArtifactSyncResult,
+    SyncStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,6 +96,7 @@ class SyncManager:
 
             if not collection_artifact:
                 # Artifact removed from collection
+                status = SyncStatus.OUTDATED
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -105,15 +108,30 @@ class SyncManager:
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation="remove_from_project",
+                        sync_status=status,
                     )
                 )
                 continue
 
             # Compute current collection SHA
             collection_sha = self._compute_artifact_hash(collection_artifact["path"])
+            project_sha = self._compute_project_artifact_hash(
+                project_path, deployed.name, deployed.artifact_type
+            )
+
+            collection_changed = collection_sha != deployed.sha
+            project_changed = project_sha is not None and project_sha != deployed.sha
+
+            status = SyncStatus.SYNCED
+            if collection_changed and project_changed and project_sha != collection_sha:
+                status = SyncStatus.DIVERGED
+            elif project_changed:
+                status = SyncStatus.MODIFIED
+            elif collection_changed:
+                status = SyncStatus.OUTDATED
 
             # Compare SHAs
-            if collection_sha != deployed.sha:
+            if collection_changed or project_changed:
                 # Drift detected - artifact modified
                 drift_results.append(
                     DriftDetectionResult(
@@ -121,19 +139,21 @@ class SyncManager:
                         artifact_type=deployed.artifact_type,
                         drift_type="modified",
                         collection_sha=collection_sha,
-                        project_sha=deployed.sha,
+                        project_sha=project_sha or deployed.sha,
                         collection_version=collection_artifact.get("version"),
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation=self._recommend_sync_direction(
                             collection_artifact, deployed
                         ),
+                        sync_status=status,
                     )
                 )
 
         # Check for new artifacts in collection not yet deployed
         for artifact in collection_artifacts:
             if not self._is_deployed(artifact, metadata):
+                status = SyncStatus.OUTDATED
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=artifact["name"],
@@ -145,10 +165,36 @@ class SyncManager:
                         project_version=None,
                         last_deployed=None,
                         recommendation="deploy_to_project",
+                        sync_status=status,
                     )
                 )
 
         return drift_results
+
+    def _compute_project_artifact_hash(
+        self, project_path: Path, artifact_name: str, artifact_type: str
+    ) -> Optional[str]:
+        """Compute hash of deployed artifact in project (if present)."""
+        artifact_type_plural = self._get_artifact_type_plural(artifact_type)
+        base_path = project_path / ".claude" / artifact_type_plural
+
+        if artifact_type == "skill":
+            artifact_path = base_path / artifact_name
+        elif artifact_type in {"command", "agent"}:
+            artifact_path = base_path / f"{artifact_name}.md"
+        else:
+            artifact_path = base_path / artifact_name
+
+        if not artifact_path.exists():
+            return None
+
+        try:
+            return compute_content_hash(artifact_path)
+        except Exception as e:
+            logger.warning(
+                f"Failed to hash project artifact {redact_path(artifact_path)}: {e}"
+            )
+            return None
 
     def _compute_artifact_hash(self, artifact_path: Path) -> str:
         """Compute SHA-256 hash of artifact directory.

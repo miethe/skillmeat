@@ -85,7 +85,7 @@
   - [x] Add ConflictInfo + hashes to merge results for sync consumption (FR-3/4/5/17)
   - [ ] Validate merge perf benchmarks <1s for <10MB; add perf fixtures (FR-3/4, reasoning-heavy)
 - Phase 3 (Sync service)
-  - [ ] Implement drift detection using SyncStatus + lineage (FR-10/7)
+  - [x] Implement drift detection using SyncStatus + lineage (FR-10/7)
   - [ ] Implement atomic apply with temp staging + rollback (FR-9)
   - [ ] Directional sync flows upstream↔collection↔project w/ dry-run (FR-2/7/8)
 - Phase 4 (CLI/API/UX)

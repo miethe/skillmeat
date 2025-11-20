@@ -706,6 +706,7 @@ class DriftDetectionResult:
         project_version: Version in project (None if added)
         last_deployed: ISO 8601 timestamp of last deployment (None if never deployed)
         recommendation: Recommended sync action
+        sync_status: Optional SyncStatus representing consolidated state
     """
 
     artifact_name: str
@@ -722,6 +723,7 @@ class DriftDetectionResult:
     project_version: Optional[str] = None
     last_deployed: Optional[str] = None  # ISO 8601 timestamp
     recommendation: str = "review_manually"  # Default recommendation
+    sync_status: Optional[SyncStatus] = None
 
     def __post_init__(self):
         """Validate drift type."""
