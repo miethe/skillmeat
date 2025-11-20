@@ -1,6 +1,6 @@
 """Deployment tracking and management for SkillMeat."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -16,39 +16,89 @@ console = Console()
 
 @dataclass
 class Deployment:
-    """Tracks artifact deployment to a project."""
+    """Tracks artifact deployment to a project with version tracking."""
 
+    # Core identification
     artifact_name: str
     artifact_type: str  # Store as string for TOML serialization
     from_collection: str
+
+    # Deployment metadata
     deployed_at: datetime
     artifact_path: Path  # Relative path within .claude/ (e.g., "commands/review.md")
-    collection_sha: str  # SHA of artifact at deployment time
+
+    # Version tracking (ADR-004)
+    content_hash: str  # SHA-256 hash of artifact content at deployment time
     local_modifications: bool = False
+
+    # Optional version tracking fields
+    parent_hash: Optional[str] = None  # Hash of parent version (if deployed from collection)
+    version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
+    last_modified_check: Optional[datetime] = None  # Last drift check timestamp
+
+    # Deprecated field for backward compatibility
+    collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for TOML serialization."""
-        return {
+        result = {
             "artifact_name": self.artifact_name,
             "artifact_type": self.artifact_type,
             "from_collection": self.from_collection,
             "deployed_at": self.deployed_at.isoformat(),
             "artifact_path": str(self.artifact_path),
-            "collection_sha": self.collection_sha,
+            "content_hash": self.content_hash,
             "local_modifications": self.local_modifications,
         }
 
+        # Add optional fields if present
+        if self.parent_hash:
+            result["parent_hash"] = self.parent_hash
+
+        if self.version_lineage:
+            result["version_lineage"] = self.version_lineage
+
+        if self.last_modified_check:
+            result["last_modified_check"] = self.last_modified_check.isoformat()
+
+        # Keep collection_sha for backward compatibility (same as content_hash)
+        result["collection_sha"] = self.content_hash
+
+        return result
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Deployment":
-        """Create from dictionary (TOML deserialization)."""
+        """Create from dictionary (TOML deserialization).
+
+        Supports backward compatibility with old deployment records.
+        """
+        # Handle backward compatibility: use collection_sha if content_hash missing
+        content_hash = data.get("content_hash") or data.get("collection_sha")
+        if not content_hash:
+            raise ValueError("Deployment record missing content_hash or collection_sha")
+
+        # Parse optional datetime field
+        last_modified_check = None
+        if "last_modified_check" in data:
+            last_modified_check = datetime.fromisoformat(data["last_modified_check"])
+
+        # Handle version_lineage: initialize with content_hash if not present
+        version_lineage = data.get("version_lineage")
+        if version_lineage is None:
+            version_lineage = [content_hash]
+
         return cls(
             artifact_name=data["artifact_name"],
             artifact_type=data["artifact_type"],
             from_collection=data["from_collection"],
             deployed_at=datetime.fromisoformat(data["deployed_at"]),
             artifact_path=Path(data["artifact_path"]),
-            collection_sha=data["collection_sha"],
+            content_hash=content_hash,
             local_modifications=data.get("local_modifications", False),
+            parent_hash=data.get("parent_hash"),
+            version_lineage=version_lineage,
+            last_modified_check=last_modified_check,
+            collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
 

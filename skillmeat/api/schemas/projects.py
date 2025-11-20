@@ -1,7 +1,7 @@
 """Project API schemas for request and response models."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -160,3 +160,72 @@ class ProjectListResponse(PaginatedResponse[ProjectSummary]):
     """
 
     pass
+
+
+class ModifiedArtifactInfo(BaseModel):
+    """Information about a modified artifact in a project."""
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    deployed_sha: str = Field(description="SHA-256 hash at deployment time")
+    current_sha: str = Field(description="Current SHA-256 hash")
+    modification_detected_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when modification was first detected",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "deployed_sha": "abc123def456789abcdef123456789abcdef123456789abcdef123456789ab",
+                "current_sha": "def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh",
+                "modification_detected_at": "2025-11-20T15:45:00Z",
+            }
+        }
+
+
+class ModifiedArtifactsResponse(BaseModel):
+    """Response for modified artifacts in a project.
+
+    Lists all artifacts in a project that have been modified
+    since deployment.
+    """
+
+    project_id: str = Field(
+        description="Base64-encoded project path",
+        examples=["L1VzZXJzL21lL3Byb2plY3Qx"],
+    )
+    modified_artifacts: List[ModifiedArtifactInfo] = Field(
+        description="List of modified artifacts"
+    )
+    total_count: int = Field(
+        description="Total number of modified artifacts",
+        ge=0,
+    )
+    last_checked: datetime = Field(
+        description="Timestamp when modifications were last checked"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "project_id": "L1VzZXJzL21lL3Byb2plY3Qx",
+                "modified_artifacts": [
+                    {
+                        "artifact_name": "pdf-processor",
+                        "artifact_type": "skill",
+                        "deployed_sha": "abc123",
+                        "current_sha": "def456",
+                        "modification_detected_at": "2025-11-20T15:45:00Z",
+                    }
+                ],
+                "total_count": 2,
+                "last_checked": "2025-11-20T16:00:00Z",
+            }
+        }

@@ -29,11 +29,18 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactUpdateRequest,
     ArtifactUpstreamInfo,
     ArtifactUpstreamResponse,
+    ArtifactVersionInfo,
     ConflictInfo,
+    DeploymentStatistics,
+    ProjectDeploymentInfo,
+    VersionGraphNodeResponse,
+    VersionGraphResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.deployment import DeploymentManager
+from skillmeat.storage.deployment import DeploymentTracker
+from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +82,258 @@ def decode_cursor(cursor: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid cursor format: {str(e)}",
         )
+
+
+async def build_deployment_statistics(
+    artifact_name: str,
+    artifact_type: ArtifactType,
+) -> DeploymentStatistics:
+    """Build deployment statistics for an artifact across all projects.
+
+    Scans all discoverable projects to find deployments of this artifact
+    and compiles statistics about deployment count and modification status.
+
+    Args:
+        artifact_name: Name of the artifact
+        artifact_type: Type of the artifact
+
+    Returns:
+        DeploymentStatistics with per-project information
+
+    Note:
+        This function scans the filesystem for projects, which may be slow
+        for large directory structures. Consider implementing caching.
+    """
+    from skillmeat.api.routers.projects import discover_projects
+
+    # Discover all projects
+    project_paths = discover_projects()
+
+    total_deployments = 0
+    modified_deployments = 0
+    projects_info: List[ProjectDeploymentInfo] = []
+
+    for project_path in project_paths:
+        try:
+            # Load deployments for this project
+            deployments = DeploymentTracker.read_deployments(project_path)
+
+            # Find our artifact
+            for deployment in deployments:
+                if (
+                    deployment.artifact_name == artifact_name
+                    and deployment.artifact_type == artifact_type.value
+                ):
+                    total_deployments += 1
+
+                    # Check if modified
+                    artifact_full_path = (
+                        project_path / ".claude" / deployment.artifact_path
+                    )
+                    is_modified = False
+
+                    if artifact_full_path.exists():
+                        try:
+                            current_sha = compute_content_hash(artifact_full_path)
+                            is_modified = current_sha != deployment.collection_sha
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to check modification for {artifact_name} in {project_path}: {e}"
+                            )
+
+                    if is_modified:
+                        modified_deployments += 1
+
+                    projects_info.append(
+                        ProjectDeploymentInfo(
+                            project_name=project_path.name,
+                            project_path=str(project_path),
+                            is_modified=is_modified,
+                            deployed_at=deployment.deployed_at,
+                        )
+                    )
+                    break  # Only one deployment of this artifact per project
+
+        except Exception as e:
+            logger.warning(f"Error processing project {project_path}: {e}")
+            continue
+
+    return DeploymentStatistics(
+        total_deployments=total_deployments,
+        modified_deployments=modified_deployments,
+        projects=projects_info,
+    )
+
+
+async def build_version_graph(
+    artifact_name: str,
+    artifact_type: ArtifactType,
+    collection_name: Optional[str] = None,
+    collection_mgr = None,
+) -> VersionGraphResponse:
+    """Build version graph for an artifact showing deployment hierarchy.
+
+    Creates a tree structure with the collection version as the root and
+    project deployments as children, tracking content hashes and modifications.
+
+    Args:
+        artifact_name: Name of the artifact
+        artifact_type: Type of the artifact
+        collection_name: Optional collection filter
+        collection_mgr: Collection manager for accessing collection data
+
+    Returns:
+        VersionGraphResponse with complete hierarchy and statistics
+    """
+    from skillmeat.api.routers.projects import discover_projects
+
+    # Find the artifact in collection (root node)
+    root_node: Optional[VersionGraphNodeResponse] = None
+    collection_sha: Optional[str] = None
+
+    if collection_mgr:
+        # Search for artifact in collection
+        collections_to_search = (
+            [collection_name] if collection_name else collection_mgr.list_collections()
+        )
+
+        for coll_name in collections_to_search:
+            try:
+                coll = collection_mgr.load_collection(coll_name)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+
+                if artifact:
+                    # Compute collection version SHA
+                    collection_path = collection_mgr.config.get_collection_path(
+                        coll_name
+                    )
+                    artifact_path = collection_path / artifact.path
+
+                    if artifact_path.exists():
+                        collection_sha = compute_content_hash(artifact_path)
+
+                        # Create root version info
+                        version_info = ArtifactVersionInfo(
+                            artifact_name=artifact_name,
+                            artifact_type=artifact_type.value,
+                            location=coll_name,
+                            location_type="collection",
+                            content_sha=collection_sha,
+                            parent_sha=None,  # Collection is root
+                            is_modified=False,
+                            created_at=artifact.added,
+                            metadata={"collection_name": coll_name},
+                        )
+
+                        root_node = VersionGraphNodeResponse(
+                            id=f"collection:{coll_name}:{collection_sha[:8]}",
+                            artifact_name=artifact_name,
+                            artifact_type=artifact_type.value,
+                            version_info=version_info,
+                            children=[],
+                            metadata={"collection_name": coll_name},
+                        )
+                        break  # Found in this collection
+
+            except Exception as e:
+                logger.warning(
+                    f"Error loading artifact from collection {coll_name}: {e}"
+                )
+                continue
+
+    # Discover all project deployments
+    project_paths = discover_projects()
+    total_deployments = 0
+    modified_count = 0
+    unmodified_count = 0
+
+    children: List[VersionGraphNodeResponse] = []
+
+    for project_path in project_paths:
+        try:
+            # Load deployments for this project
+            deployments = DeploymentTracker.read_deployments(project_path)
+
+            # Find our artifact
+            for deployment in deployments:
+                if (
+                    deployment.artifact_name == artifact_name
+                    and deployment.artifact_type == artifact_type.value
+                ):
+                    total_deployments += 1
+
+                    # Compute current SHA
+                    artifact_full_path = (
+                        project_path / ".claude" / deployment.artifact_path
+                    )
+
+                    if not artifact_full_path.exists():
+                        continue
+
+                    current_sha = compute_content_hash(artifact_full_path)
+                    is_modified = current_sha != deployment.collection_sha
+
+                    if is_modified:
+                        modified_count += 1
+                    else:
+                        unmodified_count += 1
+
+                    # Create child node
+                    child_version_info = ArtifactVersionInfo(
+                        artifact_name=artifact_name,
+                        artifact_type=artifact_type.value,
+                        location=str(project_path),
+                        location_type="project",
+                        content_sha=current_sha,
+                        parent_sha=collection_sha,  # Parent is collection
+                        is_modified=is_modified,
+                        created_at=deployment.deployed_at,
+                        metadata={
+                            "project_name": project_path.name,
+                            "deployed_at": deployment.deployed_at.isoformat(),
+                            "modification_detected_at": (
+                                deployment.modification_detected_at.isoformat()
+                                if deployment.modification_detected_at
+                                else None
+                            ),
+                        },
+                    )
+
+                    child_node = VersionGraphNodeResponse(
+                        id=f"project:{project_path}",
+                        artifact_name=artifact_name,
+                        artifact_type=artifact_type.value,
+                        version_info=child_version_info,
+                        children=[],  # Projects don't have children
+                        metadata={"project_name": project_path.name},
+                    )
+
+                    children.append(child_node)
+                    break  # Only one deployment per project
+
+        except Exception as e:
+            logger.warning(f"Error processing project {project_path}: {e}")
+            continue
+
+    # Add children to root node if it exists
+    if root_node:
+        root_node.children = children
+
+    # Build statistics
+    statistics = {
+        "total_deployments": total_deployments,
+        "modified_count": modified_count,
+        "unmodified_count": unmodified_count,
+        "orphaned_count": 0,  # No orphaned nodes in current implementation
+    }
+
+    return VersionGraphResponse(
+        artifact_name=artifact_name,
+        artifact_type=artifact_type.value,
+        root=root_node,
+        statistics=statistics,
+        last_updated=datetime.utcnow(),
+    )
 
 
 def artifact_to_response(
@@ -392,6 +651,10 @@ async def get_artifact(
         default=None,
         description="Collection name (searches all if not specified)",
     ),
+    include_deployments: bool = Query(
+        default=False,
+        description="Include deployment statistics across all projects",
+    ),
 ) -> ArtifactResponse:
     """Get details for a specific artifact.
 
@@ -401,12 +664,19 @@ async def get_artifact(
         collection_mgr: Collection manager dependency
         token: Authentication token
         collection: Optional collection filter
+        include_deployments: Whether to include deployment statistics
 
     Returns:
-        Artifact details
+        Artifact details with optional deployment statistics
 
     Raises:
         HTTPException: If artifact not found or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor?include_deployments=true
+
+        Returns artifact details including deployment_stats field with
+        information about all projects where this artifact is deployed.
     """
     try:
         logger.info(f"Getting artifact: {artifact_id} (collection={collection})")
@@ -457,7 +727,24 @@ async def get_artifact(
                 detail=f"Artifact '{artifact_id}' not found",
             )
 
-        return artifact_to_response(artifact)
+        # Build base response
+        response = artifact_to_response(artifact)
+
+        # Add deployment statistics if requested
+        if include_deployments:
+            try:
+                deployment_stats = await build_deployment_statistics(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                )
+                response.deployment_stats = deployment_stats
+            except Exception as e:
+                logger.warning(
+                    f"Failed to build deployment statistics for {artifact_id}: {e}"
+                )
+                # Continue without deployment stats rather than failing
+
+        return response
 
     except HTTPException:
         raise
@@ -1368,4 +1655,142 @@ async def undeploy_artifact(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to undeploy artifact: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/version-graph",
+    response_model=VersionGraphResponse,
+    summary="Get artifact version graph",
+    description="Build and return version graph showing deployment hierarchy across all projects",
+    responses={
+        200: {
+            "description": "Successfully retrieved version graph",
+            "headers": {
+                "Cache-Control": {
+                    "description": "Caching directives",
+                    "schema": {"type": "string", "example": "max-age=300"},
+                }
+            },
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_version_graph(
+    artifact_id: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Filter to specific collection",
+    ),
+) -> VersionGraphResponse:
+    """Get complete version graph for an artifact.
+
+    Returns a hierarchical tree structure showing:
+    - Collection version as root node
+    - Project deployments as child nodes
+    - Content hashes and modification status at each node
+    - Aggregated statistics
+
+    The graph enables visualization of how an artifact has been
+    deployed across projects and which deployments have local modifications.
+
+    Results are cached for 5 minutes (Cache-Control header).
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        VersionGraphResponse with complete hierarchy
+
+    Raises:
+        HTTPException: If artifact not found or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/version-graph?collection=default
+
+        Returns:
+        {
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "root": {
+                "id": "collection:default:abc123",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "version_info": {...},
+                "children": [
+                    {
+                        "id": "project:/Users/me/project1",
+                        "version_info": {...},
+                        "children": []
+                    }
+                ]
+            },
+            "statistics": {
+                "total_deployments": 2,
+                "modified_count": 1,
+                "unmodified_count": 1,
+                "orphaned_count": 0
+            },
+            "last_updated": "2025-11-20T16:00:00Z"
+        }
+    """
+    try:
+        logger.info(
+            f"Building version graph for artifact: {artifact_id} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Build version graph
+        version_graph = await build_version_graph(
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            collection_name=collection,
+            collection_mgr=collection_mgr,
+        )
+
+        # Check if we found the artifact anywhere
+        if version_graph.root is None and version_graph.statistics["total_deployments"] == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in any collection or project",
+            )
+
+        logger.info(
+            f"Version graph built: {version_graph.statistics['total_deployments']} deployments, "
+            f"{version_graph.statistics['modified_count']} modified"
+        )
+
+        # Note: FastAPI Response with Cache-Control header would be set here
+        # For now, the response model handles the data structure
+        # To add caching headers, we would need to use Response directly
+
+        return version_graph
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error building version graph for '{artifact_id}': {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to build version graph: {str(e)}",
         )

@@ -1,7 +1,7 @@
 """Artifact API schemas for request and response models."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -119,6 +119,10 @@ class ArtifactResponse(BaseModel):
     upstream: Optional[ArtifactUpstreamInfo] = Field(
         default=None,
         description="Upstream tracking information",
+    )
+    deployment_stats: Optional["DeploymentStatistics"] = Field(
+        default=None,
+        description="Deployment statistics (included when include_deployments=true)",
     )
     added: datetime = Field(
         description="Timestamp when artifact was added to collection",
@@ -397,5 +401,320 @@ class ArtifactSyncResponse(BaseModel):
                 "conflicts": None,
                 "updated_version": "1.2.0",
                 "synced_files_count": 5,
+            }
+        }
+
+
+# ===========================
+# Version Tracking Schemas
+# ===========================
+
+
+class ArtifactVersionInfo(BaseModel):
+    """Version information for a single artifact instance.
+
+    Represents a specific version of an artifact at a point in time,
+    tracking content hash and parent lineage.
+    """
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type (skill/command/agent)")
+    location: str = Field(
+        description="Location (collection name or absolute project path)"
+    )
+    location_type: Literal["collection", "project"] = Field(
+        description="Type of location"
+    )
+    content_sha: str = Field(
+        description="SHA-256 content hash of artifact",
+        examples=["abc123def456789abcdef123456789abcdef123456789abcdef123456789ab"],
+    )
+    parent_sha: Optional[str] = Field(
+        default=None,
+        description="Parent version SHA (for tracking lineage)",
+        examples=["def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh"],
+    )
+    is_modified: bool = Field(
+        description="Whether content differs from parent version"
+    )
+    created_at: datetime = Field(description="Version creation timestamp")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional version metadata",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "location": "default",
+                "location_type": "collection",
+                "content_sha": "abc123def456789abcdef123456789abcdef123456789abcdef123456789ab",
+                "parent_sha": None,
+                "is_modified": False,
+                "created_at": "2025-11-15T10:00:00Z",
+                "metadata": {"collection_name": "default"},
+            }
+        }
+
+
+class VersionGraphNodeResponse(BaseModel):
+    """Node in version graph visualization.
+
+    Recursive structure representing the version tree,
+    where each node can have multiple children representing
+    deployments or forks.
+    """
+
+    id: str = Field(
+        description="Unique node identifier (e.g., 'collection:default:abc123' or 'project:/path/to/project')",
+        examples=["collection:default:abc123", "project:/Users/me/project1"],
+    )
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    version_info: ArtifactVersionInfo = Field(
+        description="Version information for this node"
+    )
+    children: List["VersionGraphNodeResponse"] = Field(
+        default_factory=list,
+        description="Child nodes (deployments/forks from this version)",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional node metadata",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "id": "collection:default:abc123",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "version_info": {
+                    "artifact_name": "pdf-processor",
+                    "artifact_type": "skill",
+                    "location": "default",
+                    "location_type": "collection",
+                    "content_sha": "abc123",
+                    "parent_sha": None,
+                    "is_modified": False,
+                    "created_at": "2025-11-15T10:00:00Z",
+                    "metadata": {},
+                },
+                "children": [],
+                "metadata": {},
+            }
+        }
+
+
+class VersionGraphResponse(BaseModel):
+    """Complete version graph for an artifact.
+
+    Provides hierarchical view of artifact versions across
+    collection and all project deployments, with aggregated
+    statistics.
+    """
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    root: Optional[VersionGraphNodeResponse] = Field(
+        default=None,
+        description="Root node (typically the collection version)",
+    )
+    statistics: Dict[str, Any] = Field(
+        description="Aggregated statistics about version graph",
+        examples=[
+            {
+                "total_deployments": 5,
+                "modified_count": 2,
+                "unmodified_count": 3,
+                "orphaned_count": 0,
+            }
+        ],
+    )
+    last_updated: datetime = Field(
+        description="Timestamp when graph was last computed"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "root": {
+                    "id": "collection:default:abc123",
+                    "artifact_name": "pdf-processor",
+                    "artifact_type": "skill",
+                    "version_info": {},
+                    "children": [],
+                    "metadata": {},
+                },
+                "statistics": {
+                    "total_deployments": 2,
+                    "modified_count": 1,
+                    "unmodified_count": 1,
+                    "orphaned_count": 0,
+                },
+                "last_updated": "2025-11-20T16:00:00Z",
+            }
+        }
+
+
+class DeploymentModificationStatus(BaseModel):
+    """Modification status for a single deployment.
+
+    Tracks whether a deployed artifact has been modified
+    since deployment by comparing content hashes.
+    """
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    deployed_sha: str = Field(
+        description="SHA-256 hash at deployment time",
+        examples=["abc123def456789abcdef123456789abcdef123456789abcdef123456789ab"],
+    )
+    current_sha: str = Field(
+        description="Current SHA-256 hash",
+        examples=["def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh"],
+    )
+    is_modified: bool = Field(
+        description="Whether artifact has been modified since deployment"
+    )
+    modification_detected_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when modification was first detected",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "deployed_sha": "abc123def456789abcdef123456789abcdef123456789abcdef123456789ab",
+                "current_sha": "def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh",
+                "is_modified": True,
+                "modification_detected_at": "2025-11-20T15:45:00Z",
+            }
+        }
+
+
+class ModificationCheckResponse(BaseModel):
+    """Response from modification check operation.
+
+    Provides comprehensive status of all deployments in a project,
+    identifying which artifacts have been modified.
+    """
+
+    project_id: str = Field(
+        description="Base64-encoded project path",
+        examples=["L1VzZXJzL21lL3Byb2plY3Qx"],
+    )
+    checked_at: datetime = Field(description="Timestamp when check was performed")
+    modifications_detected: int = Field(
+        description="Number of modified artifacts detected",
+        ge=0,
+    )
+    deployments: List[DeploymentModificationStatus] = Field(
+        description="Status of each deployment in the project"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "project_id": "L1VzZXJzL21lL3Byb2plY3Qx",
+                "checked_at": "2025-11-20T16:00:00Z",
+                "modifications_detected": 2,
+                "deployments": [
+                    {
+                        "artifact_name": "pdf-processor",
+                        "artifact_type": "skill",
+                        "deployed_sha": "abc123",
+                        "current_sha": "def456",
+                        "is_modified": True,
+                        "modification_detected_at": "2025-11-20T15:45:00Z",
+                    }
+                ],
+            }
+        }
+
+
+class ProjectDeploymentInfo(BaseModel):
+    """Deployment information for a single project.
+
+    Provides per-project deployment details including
+    modification status and deployment timestamp.
+    """
+
+    project_name: str = Field(description="Project name (derived from path)")
+    project_path: str = Field(description="Absolute project path")
+    is_modified: bool = Field(
+        description="Whether this deployment has local modifications"
+    )
+    deployed_at: datetime = Field(description="Deployment timestamp")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "project_name": "my-project",
+                "project_path": "/Users/me/my-project",
+                "is_modified": True,
+                "deployed_at": "2025-11-20T10:30:00Z",
+            }
+        }
+
+
+class DeploymentStatistics(BaseModel):
+    """Deployment statistics for an artifact.
+
+    Aggregates deployment information across all projects
+    where this artifact is deployed.
+    """
+
+    total_deployments: int = Field(
+        description="Total number of deployments across all projects",
+        ge=0,
+    )
+    modified_deployments: int = Field(
+        description="Number of deployments with local modifications",
+        ge=0,
+    )
+    projects: List[ProjectDeploymentInfo] = Field(
+        description="Per-project deployment information"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "total_deployments": 5,
+                "modified_deployments": 2,
+                "projects": [
+                    {
+                        "project_name": "project1",
+                        "project_path": "/Users/me/project1",
+                        "is_modified": True,
+                        "deployed_at": "2025-11-20T10:30:00Z",
+                    },
+                    {
+                        "project_name": "project2",
+                        "project_path": "/Users/me/project2",
+                        "is_modified": False,
+                        "deployed_at": "2025-11-19T14:20:00Z",
+                    },
+                ],
             }
         }

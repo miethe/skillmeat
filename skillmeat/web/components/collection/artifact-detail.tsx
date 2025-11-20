@@ -32,8 +32,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeployDialog } from "./deploy-dialog";
 import { SyncDialog } from "./sync-dialog";
+import { VersionTreeView } from "./version-tree";
+import { useVersionGraph } from "@/hooks/useVersionGraph";
 import type { Artifact, ArtifactType } from "@/types/artifact";
 
 interface ArtifactDetailProps {
@@ -136,6 +139,13 @@ export function ArtifactDetail({
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
+  // Fetch version graph when modal is open
+  const artifactId = artifact ? `${artifact.type}:${artifact.name}` : "";
+  const {
+    data: versionGraph,
+    isLoading: isVersionGraphLoading,
+  } = useVersionGraph(artifactId);
+
   const Icon = artifact ? artifactTypeIcons[artifact.type] : Package;
   const StatusIcon = (artifact
     ? statusIcons[artifact.status]
@@ -181,17 +191,34 @@ export function ArtifactDetail({
                 </DialogHeader>
               </div>
 
-              {/* Scrollable Content */}
-              <ScrollArea className="flex-1 px-6">
-                <div className="space-y-6 py-4">
-                  {/* Description */}
-                  {artifact.metadata.description && (
-                    <div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {artifact.metadata.description}
-                      </p>
-                    </div>
-                  )}
+              {/* Scrollable Content with Tabs */}
+              <Tabs defaultValue="overview" className="flex-1 flex flex-col px-6">
+                <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+                  <TabsTrigger
+                    value="overview"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="versions"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    Version History
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="flex-1 mt-0">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-6 py-4">
+                      {/* Description */}
+                      {artifact.metadata.description && (
+                        <div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {artifact.metadata.description}
+                          </p>
+                        </div>
+                      )}
 
                   {/* Metadata Grid */}
                   <div className="space-y-4">
@@ -350,8 +377,21 @@ export function ArtifactDetail({
                       </div>
                     </div>
                   )}
-                </div>
-              </ScrollArea>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="versions" className="flex-1 mt-0">
+                  <ScrollArea className="h-full">
+                    <div className="py-4">
+                      <VersionTreeView
+                        graph={versionGraph}
+                        isLoading={isVersionGraphLoading}
+                      />
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
 
               {/* Actions Footer - Fixed */}
               <div className="px-6 py-4 border-t bg-muted/30">

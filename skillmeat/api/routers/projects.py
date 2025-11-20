@@ -14,14 +14,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from skillmeat.api.dependencies import verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.artifacts import (
+    DeploymentModificationStatus,
+    ModificationCheckResponse,
+)
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.projects import (
     DeployedArtifact,
+    ModifiedArtifactsResponse,
     ProjectDetail,
     ProjectListResponse,
     ProjectSummary,
 )
 from skillmeat.storage.deployment import DeploymentTracker
+from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -373,4 +379,305 @@ async def get_project(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get project: {str(e)}",
+        )
+
+
+@router.post(
+    "/{project_id}/check-modifications",
+    response_model=ModificationCheckResponse,
+    summary="Check for artifact modifications",
+    description="Scan all deployments in a project and detect local modifications by comparing content hashes",
+    responses={
+        200: {"description": "Successfully checked for modifications"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def check_project_modifications(
+    project_id: str,
+    token: TokenDep,
+) -> ModificationCheckResponse:
+    """Check for modifications in all deployed artifacts.
+
+    Compares the current content hash of each deployed artifact with
+    the hash recorded at deployment time to detect local modifications.
+
+    This operation updates the deployment metadata with modification
+    timestamps when changes are first detected.
+
+    Args:
+        project_id: Base64-encoded project path
+        token: Authentication token
+
+    Returns:
+        Modification check results with status for each deployment
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        POST /api/v1/projects/L1VzZXJzL21lL3Byb2plY3Qx/check-modifications
+
+        Returns:
+        {
+            "project_id": "L1VzZXJzL21lL3Byb2plY3Qx",
+            "checked_at": "2025-11-20T16:00:00Z",
+            "modifications_detected": 2,
+            "deployments": [
+                {
+                    "artifact_name": "pdf-processor",
+                    "artifact_type": "skill",
+                    "deployed_sha": "abc123...",
+                    "current_sha": "def456...",
+                    "is_modified": true,
+                    "modification_detected_at": "2025-11-20T15:45:00Z"
+                }
+            ]
+        }
+    """
+    try:
+        logger.info(f"Checking modifications for project: {project_id}")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Validate project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Check if deployment file exists
+        deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
+        if not deployment_file.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No deployments found for project: {project_path.name}",
+            )
+
+        # Load current deployments
+        deployments = DeploymentTracker.read_deployments(project_path)
+
+        # Check each deployment for modifications
+        modification_statuses: List[DeploymentModificationStatus] = []
+        modifications_count = 0
+        checked_at = datetime.utcnow()
+
+        for deployment in deployments:
+            # Compute current content hash
+            artifact_full_path = project_path / ".claude" / deployment.artifact_path
+
+            if not artifact_full_path.exists():
+                # Artifact has been deleted
+                logger.warning(
+                    f"Deployed artifact not found: {deployment.artifact_name} at {artifact_full_path}"
+                )
+                # Skip deleted artifacts
+                continue
+
+            try:
+                current_sha = compute_content_hash(artifact_full_path)
+            except Exception as e:
+                logger.error(
+                    f"Failed to compute hash for {deployment.artifact_name}: {e}"
+                )
+                # Use a placeholder to indicate error
+                current_sha = "error"
+
+            # Compare with deployed SHA
+            is_modified = current_sha != deployment.collection_sha
+
+            # Update deployment metadata if modification detected
+            modification_detected_at = deployment.modification_detected_at
+            if is_modified and not deployment.local_modifications:
+                # First time detecting this modification
+                modification_detected_at = checked_at
+                deployment.local_modifications = True
+                deployment.modification_detected_at = modification_detected_at
+            elif not is_modified and deployment.local_modifications:
+                # Modification was reverted
+                deployment.local_modifications = False
+                deployment.modification_detected_at = None
+                modification_detected_at = None
+
+            # Track last check time
+            deployment.last_modification_check = checked_at
+
+            if is_modified:
+                modifications_count += 1
+
+            modification_statuses.append(
+                DeploymentModificationStatus(
+                    artifact_name=deployment.artifact_name,
+                    artifact_type=deployment.artifact_type,
+                    deployed_sha=deployment.collection_sha,
+                    current_sha=current_sha,
+                    is_modified=is_modified,
+                    modification_detected_at=modification_detected_at,
+                )
+            )
+
+        # Save updated deployment metadata
+        DeploymentTracker.write_deployments(project_path, deployments)
+
+        logger.info(
+            f"Modification check complete: {modifications_count} of {len(modification_statuses)} artifacts modified"
+        )
+
+        return ModificationCheckResponse(
+            project_id=project_id,
+            checked_at=checked_at,
+            modifications_detected=modifications_count,
+            deployments=modification_statuses,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error checking modifications for project '{project_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check modifications: {str(e)}",
+        )
+
+
+@router.get(
+    "/{project_id}/modified-artifacts",
+    response_model=ModifiedArtifactsResponse,
+    summary="Get modified artifacts",
+    description="List all artifacts in a project that have been modified since deployment",
+    responses={
+        200: {"description": "Successfully retrieved modified artifacts"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_modified_artifacts(
+    project_id: str,
+    token: TokenDep,
+) -> ModifiedArtifactsResponse:
+    """Get list of all modified artifacts in a project.
+
+    This is a convenience endpoint that filters the results from
+    check-modifications to return only modified artifacts.
+
+    Note: This performs a live check of all deployments. Results
+    are not cached between calls.
+
+    Args:
+        project_id: Base64-encoded project path
+        token: Authentication token
+
+    Returns:
+        List of modified artifacts with their current and deployed hashes
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        GET /api/v1/projects/L1VzZXJzL21lL3Byb2plY3Qx/modified-artifacts
+
+        Returns:
+        {
+            "project_id": "L1VzZXJzL21lL3Byb2plY3Qx",
+            "modified_artifacts": [
+                {
+                    "artifact_name": "pdf-processor",
+                    "artifact_type": "skill",
+                    "deployed_sha": "abc123...",
+                    "current_sha": "def456...",
+                    "modification_detected_at": "2025-11-20T15:45:00Z"
+                }
+            ],
+            "total_count": 2,
+            "last_checked": "2025-11-20T16:00:00Z"
+        }
+    """
+    try:
+        logger.info(f"Getting modified artifacts for project: {project_id}")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Validate project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Check if deployment file exists
+        deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
+        if not deployment_file.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No deployments found for project: {project_path.name}",
+            )
+
+        # Load current deployments
+        deployments = DeploymentTracker.read_deployments(project_path)
+
+        # Find modified artifacts
+        from skillmeat.api.schemas.projects import ModifiedArtifactInfo
+
+        modified_artifacts: List[ModifiedArtifactInfo] = []
+        checked_at = datetime.utcnow()
+
+        for deployment in deployments:
+            # Compute current content hash
+            artifact_full_path = project_path / ".claude" / deployment.artifact_path
+
+            if not artifact_full_path.exists():
+                # Skip deleted artifacts
+                continue
+
+            try:
+                current_sha = compute_content_hash(artifact_full_path)
+            except Exception as e:
+                logger.error(
+                    f"Failed to compute hash for {deployment.artifact_name}: {e}"
+                )
+                continue
+
+            # Check if modified
+            if current_sha != deployment.collection_sha:
+                modified_artifacts.append(
+                    ModifiedArtifactInfo(
+                        artifact_name=deployment.artifact_name,
+                        artifact_type=deployment.artifact_type,
+                        deployed_sha=deployment.collection_sha,
+                        current_sha=current_sha,
+                        modification_detected_at=deployment.modification_detected_at,
+                    )
+                )
+
+        logger.info(
+            f"Found {len(modified_artifacts)} modified artifacts in project '{project_path.name}'"
+        )
+
+        return ModifiedArtifactsResponse(
+            project_id=project_id,
+            modified_artifacts=modified_artifacts,
+            total_count=len(modified_artifacts),
+            last_checked=checked_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting modified artifacts for project '{project_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get modified artifacts: {str(e)}",
         )
