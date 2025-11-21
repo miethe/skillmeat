@@ -67,8 +67,8 @@ primary_model: GPT-5.1-Codex-Max
 
 | Done | Task | FR | SP | Domain | Risk | Reasoning | Target Model+Tools | Success Criteria | Ref |
 |------|------|----|----|--------|------|-----------|--------------------|------------------|-----|
-| [ ] | T1-QUEUE | FR1/2 | 3 | API/Infra | Medium | Medium | GPT-5.1-Codex-Max, local tools | enqueue + persisted jobs; restart resumes; lock per artifact; retry policy applied | BK-JOB-API, BK-JOB-RUN |
-| [ ] | T1-STATUS | FR2/9 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | GET status returns state/pct/duration/log excerpt/conflicts; latency <100ms | BK-JOB-API |
+| [X] | T1-QUEUE | FR1/2 | 3 | API/Infra | Medium | Medium | GPT-5.1-Codex-Max, local tools | enqueue + persisted jobs; restart resumes; lock per artifact; retry policy applied | BK-JOB-API, BK-JOB-RUN |
+| [X] | T1-STATUS | FR2/9 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | GET status returns state/pct/duration/log excerpt/conflicts; latency <100ms | BK-JOB-API |
 | [ ] | T1-OBS | NFR | 2 | Observability | Medium | Medium | GPT-5.1-Codex-Max | traces + metrics for queue depth/duration/outcomes; logs keyed by job_id | BK-OBS |
 
 ### Phase 2: Sync/Diff APIs
