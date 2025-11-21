@@ -744,7 +744,12 @@ async def generate_patch_bundle(
             detail=f"Artifact not found in collection at {coll_path}",
         )
 
-    project_path = Path(request.project_path)
+    project_path = Path(request.project_path).expanduser().resolve()
+    if not project_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"project_path not found: {project_path}",
+        )
     proj_base = project_path / ".claude" / plural
     proj_artifact = proj_base / (f"{artifact_name}.md" if artifact_type in {"command", "agent"} else artifact_name)
     if not proj_artifact.exists():

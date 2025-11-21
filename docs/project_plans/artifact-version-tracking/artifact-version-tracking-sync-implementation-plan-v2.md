@@ -96,8 +96,9 @@ primary_model: GPT-5.1-Codex-Max
 | Done | Task | FR | SP | Domain | Risk | Reasoning | Target Model+Tools | Success Criteria | Ref |
 |------|------|----|----|--------|------|-----------|--------------------|------------------|-----|
 | [ ] | T4-TESTS | FR1-9 | 3 | Test | Medium | Medium | GPT-5.1-Codex-Max (optionally Claude Code for test generation) | unit/integration coverage added for jobs/diff/resolve/patch; restart recovery tested | Testing Plan |
+| [X] | T4-TESTS | FR1-9 | 3 | Test | Medium | Medium | GPT-5.1-Codex-Max (optionally Claude Code for test generation) | unit/integration coverage added for jobs/diff/resolve/patch; restart recovery tested | Testing Plan |
 | [ ] | T4-PERF | NFR | 2 | Perf | Medium | Medium | GPT-5.1-Codex-Max | perf checks meet job creation/status targets; diff render fallback validated | Testing Plan |
-| [ ] | T4-SEC | NFR | 2 | Security | Medium | Medium | GPT-5.1-Codex-Max | auth/validation on new endpoints; path sanitization; rate limits on patch export | BK-SEC |
+| [X] | T4-SEC | NFR | 2 | Security | Medium | Medium | GPT-5.1-Codex-Max | auth/validation on new endpoints; path sanitization; rate limits on patch export | BK-SEC |
 
 ### Phase 5: Go-Live (no slow-roll)
 
