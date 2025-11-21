@@ -48,6 +48,12 @@ class ConfigManager:
                     "enabled": True,
                     "retention-days": 90,
                 },
+                "sync": {
+                    "async-enabled": True,
+                    "job-store": "sqlite",
+                    "job-dir": "sync_jobs",
+                    "kill-switch": False,
+                },
             }
             self.write(default_config)
 
@@ -232,3 +238,21 @@ class ConfigManager:
         if custom_path:
             return Path(custom_path)
         return self.config_dir / "analytics.db"
+
+    # Sync job configuration helpers
+    def is_sync_async_enabled(self) -> bool:
+        """Check whether async sync is enabled (kill-switch aware)."""
+        async_enabled = self.get("sync.async-enabled", True)
+        kill_switch = self.get("sync.kill-switch", False)
+        return bool(async_enabled) and not bool(kill_switch)
+
+    def get_sync_jobs_dir(self) -> Path:
+        """Return directory path for sync job persistence."""
+        dir_name = self.get("sync.job-dir", "sync_jobs")
+        jobs_dir = self.config_dir / dir_name
+        jobs_dir.mkdir(parents=True, exist_ok=True)
+        return jobs_dir
+
+    def get_sync_job_store_backend(self) -> str:
+        """Return preferred job store backend (sqlite|jsonl)."""
+        return self.get("sync.job-store", "sqlite")
