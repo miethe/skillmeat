@@ -88,7 +88,7 @@ primary_model: GPT-5.1-Codex-Max
 | [ ] | T3-JOBS | FR1/2/9 | 3 | Web | Medium | Medium | GPT-5.1-Codex-Max | async job kickoff non-blocking; toasts on completion via SSE/poll; status badge updates | UI-JOBS |
 | [X] | T3-VIEW | FR5 | 3 | Web | Medium | Medium | GPT-5.1-Codex-Max + GH Copilot for JSX | versions panel + diff selector render hashes/timestamps; truncation notices for large/binary; selectable pairs work | UI-VIEW |
 | [X] | T3-JOBS | FR1/2/9 | 3 | Web | Medium | Medium | GPT-5.1-Codex-Max | async job kickoff non-blocking; toasts on completion via SSE/poll; status badge updates | UI-JOBS |
-| [ ] | T3-RESOLVE | FR6/7 | 3 | Web | High | High | GPT-5.1-Codex-Max (consider Claude Code for UX polish) | conflict modal surfaces files; applies per-artifact strategy; shows unresolved list if markers remain | UI-RESOLVE |
+| [X] | T3-RESOLVE | FR6/7 | 3 | Web | High | High | GPT-5.1-Codex-Max (consider Claude Code for UX polish) | conflict modal surfaces files; applies per-artifact strategy; shows unresolved list if markers remain | UI-RESOLVE |
 | [X] | T3-PATCH | FR8 | 2 | Web | Medium | Medium | GPT-5.1-Codex-Max | push-upstream action downloads patch; exposes copyable URL/GitHub link; handles errors | UI-PATCH |
 
 ### Phase 4: Quality/Perf

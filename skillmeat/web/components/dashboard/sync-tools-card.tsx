@@ -18,6 +18,7 @@ export function SyncToolsCard() {
   const [diffPair, setDiffPair] = useState<"collection-project" | "project-collection">("collection-project");
   const [jobId, setJobId] = useState<string | null>(null);
   const [patchUrl, setPatchUrl] = useState<string | null>(null);
+  const [resolveStrategy, setResolveStrategy] = useState<"ours" | "theirs">("ours");
 
   const createJob = useCreateSyncJob();
   const jobStatus = useSyncJobStatus(jobId);
@@ -226,6 +227,60 @@ export function SyncToolsCard() {
                 Download: <span className="font-medium break-all">{patchUrl}</span>
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="font-medium">Resolve Conflicts</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={resolveStrategy === "ours" ? "default" : "outline"}
+                onClick={() => setResolveStrategy("ours")}
+              >
+                Use Ours (Collection)
+              </Button>
+              <Button
+                variant={resolveStrategy === "theirs" ? "default" : "outline"}
+                onClick={() => setResolveStrategy("theirs")}
+              >
+                Use Theirs (Project)
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              onClick={async () => {
+                if (!artifactId || !projectPath) {
+                  toast.error("Artifact ID and project path required");
+                  return;
+                }
+                const [artifactType, artifactName] = artifactId.split(":");
+                try {
+                  const res = await createJob.mutateAsync({
+                    direction: "resolve",
+                    artifacts: [artifactName],
+                    artifactType,
+                    projectPath,
+                    collection,
+                    resolution: resolveStrategy,
+                    strategy: resolveStrategy,
+                  });
+                  setJobId(res.job_id);
+                } catch (err: any) {
+                  toast.error("Failed to queue resolve", { description: err.message });
+                }
+              }}
+            >
+              Apply Resolution
+            </Button>
+            {jobStatus.data?.unresolved_files?.length ? (
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div className="font-semibold">Unresolved Files</div>
+                <ul className="list-disc list-inside space-y-1">
+                  {jobStatus.data.unresolved_files.map((f) => (
+                    <li key={f} className="break-all">{f}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </div>
       </CardContent>
