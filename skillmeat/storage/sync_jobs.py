@@ -71,9 +71,11 @@ class SyncJobStore:
                 id TEXT PRIMARY KEY,
                 direction TEXT NOT NULL,
                 artifacts TEXT,
+                artifact_type TEXT,
                 project_path TEXT,
                 collection TEXT,
                 strategy TEXT,
+                resolution TEXT,
                 dry_run INTEGER DEFAULT 0,
                 state TEXT NOT NULL,
                 pct_complete REAL DEFAULT 0,
@@ -83,13 +85,27 @@ class SyncJobStore:
                 trace_id TEXT,
                 log_excerpt TEXT,
                 conflicts TEXT,
+                unresolved_files TEXT,
                 attempts INTEGER DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_sync_jobs_state ON sync_jobs(state);
             CREATE INDEX IF NOT EXISTS idx_sync_jobs_trace ON sync_jobs(trace_id);
             """
         )
+        self._ensure_column("artifact_type", "TEXT")
+        self._ensure_column("resolution", "TEXT")
+        self._ensure_column("unresolved_files", "TEXT")
         self.connection.commit()
+
+    def _ensure_column(self, column: str, col_type: str) -> None:
+        """Ensure a column exists; add if missing."""
+        assert self.connection is not None
+        cursor = self.connection.execute("PRAGMA table_info(sync_jobs);")
+        cols = {row["name"] for row in cursor.fetchall()}
+        if column not in cols:
+            self.connection.execute(
+                f"ALTER TABLE sync_jobs ADD COLUMN {column} {col_type}"
+            )
 
     def _ensure_jsonl_file(self) -> None:
         """Ensure JSONL fallback file exists."""
@@ -101,6 +117,7 @@ class SyncJobStore:
         """Convert SQLite row to job record."""
         artifacts = json.loads(row["artifacts"]) if row["artifacts"] else []
         conflicts_raw = json.loads(row["conflicts"]) if row["conflicts"] else []
+        unresolved_raw = json.loads(row["unresolved_files"]) if row["unresolved_files"] else []
         conflicts: List[ConflictInfo] = [
             ConflictInfo.from_dict(c) if isinstance(c, dict) else c
             for c in conflicts_raw
@@ -109,9 +126,11 @@ class SyncJobStore:
             id=row["id"],
             direction=row["direction"],
             artifacts=artifacts or None,
+            artifact_type=row["artifact_type"],
             project_path=row["project_path"],
             collection=row["collection"],
             strategy=row["strategy"],
+            resolution=row["resolution"],
             dry_run=bool(row["dry_run"]),
             state=SyncJobState(row["state"]),
             pct_complete=float(row["pct_complete"] or 0.0),
@@ -125,6 +144,7 @@ class SyncJobStore:
             trace_id=row["trace_id"],
             log_excerpt=row["log_excerpt"],
             conflicts=conflicts,
+            unresolved_files=unresolved_raw,
             attempts=int(row["attempts"] or 0),
         )
 
@@ -135,6 +155,8 @@ class SyncJobStore:
         project_path: Optional[str] = None,
         collection: Optional[str] = None,
         strategy: Optional[str] = None,
+        resolution: Optional[str] = None,
+        artifact_type: Optional[str] = None,
         dry_run: bool = False,
         trace_id: Optional[str] = None,
     ) -> SyncJobRecord:
@@ -144,9 +166,11 @@ class SyncJobStore:
             id=uuid.uuid4().hex,
             direction=direction,
             artifacts=artifacts or [],
+            artifact_type=artifact_type,
             project_path=project_path,
             collection=collection,
             strategy=strategy,
+            resolution=resolution,
             dry_run=dry_run,
             trace_id=trace_id,
             created_at=now,
@@ -160,20 +184,21 @@ class SyncJobStore:
             self.connection.execute(
                 """
                 INSERT OR REPLACE INTO sync_jobs (
-                    id, direction, artifacts, project_path, collection, strategy,
-                    dry_run, state, pct_complete, started_at, ended_at, created_at,
-                    trace_id, log_excerpt, conflicts, attempts
+                    id, direction, artifacts, artifact_type, project_path, collection, strategy,
+                    resolution, dry_run, state, pct_complete, started_at, ended_at, created_at,
+                    trace_id, log_excerpt, conflicts, unresolved_files, attempts
                 )
                 VALUES (
-                    :id, :direction, :artifacts, :project_path, :collection, :strategy,
-                    :dry_run, :state, :pct_complete, :started_at, :ended_at,
-                    :created_at, :trace_id, :log_excerpt, :conflicts, :attempts
+                    :id, :direction, :artifacts, :artifact_type, :project_path, :collection, :strategy,
+                    :resolution, :dry_run, :state, :pct_complete, :started_at, :ended_at,
+                    :created_at, :trace_id, :log_excerpt, :conflicts, :unresolved_files, :attempts
                 )
                 """,
                 {
                     **payload,
                     "artifacts": json.dumps(payload["artifacts"]),
                     "conflicts": json.dumps(payload["conflicts"]),
+                    "unresolved_files": json.dumps(payload.get("unresolved_files", [])),
                 },
             )
             self.connection.commit()

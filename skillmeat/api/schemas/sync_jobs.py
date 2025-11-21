@@ -10,10 +10,13 @@ class SyncJobCreateRequest(BaseModel):
     """Create a new sync job."""
 
     direction: str = Field(
-        description="Direction of sync: upstream_to_collection|collection_to_project|project_to_collection"
+        description="Direction of sync: upstream_to_collection|collection_to_project|project_to_collection|resolve"
     )
     artifacts: Optional[List[str]] = Field(
         default=None, description="Artifacts to sync; syncs all if omitted"
+    )
+    artifact_type: Optional[str] = Field(
+        default=None, description="Artifact type (skill|command|agent|...) when needed"
     )
     project_path: Optional[str] = Field(
         default=None, description="Project path (required for project directions)"
@@ -24,6 +27,10 @@ class SyncJobCreateRequest(BaseModel):
     strategy: Optional[str] = Field(
         default=None,
         description="Strategy for project->collection pulls (overwrite|merge|fork|prompt|ours|theirs)",
+    )
+    resolution: Optional[str] = Field(
+        default=None,
+        description="Conflict resolution (ours|theirs) when direction=resolve",
     )
     dry_run: bool = Field(default=False, description="Preview without applying changes")
 
@@ -44,6 +51,11 @@ class SyncJobStatusResponse(BaseModel):
         default_factory=list, description="Conflicts encountered (if any)"
     )
     artifacts: List[str] = Field(default_factory=list, description="Artifacts requested")
+    artifact_type: Optional[str] = Field(default=None, description="Artifact type when applicable")
     project_path: Optional[str] = Field(default=None, description="Project path")
     collection: Optional[str] = Field(default=None, description="Collection name")
     strategy: Optional[str] = Field(default=None, description="Strategy used")
+    resolution: Optional[str] = Field(default=None, description="Resolution strategy used")
+    unresolved_files: List[str] = Field(
+        default_factory=list, description="Files still containing conflict markers"
+    )

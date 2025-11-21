@@ -85,6 +85,34 @@ def _drift_to_response(drift_results) -> DriftResponse:
     )
 
 
+def _detect_conflict_markers(project_path: Path, artifact_name: str, artifact_type: str = "skill") -> List[str]:
+    """Scan artifact files for merge conflict markers."""
+    plural_map = {
+        "skill": "skills",
+        "command": "commands",
+        "agent": "agents",
+        "hook": "hooks",
+        "mcp": "mcps",
+    }
+    plural = plural_map.get(artifact_type, f"{artifact_type}s")
+    base = project_path / ".claude" / plural
+    target = base / (f"{artifact_name}.md" if artifact_type in {"command", "agent"} else artifact_name)
+    paths: List[Path] = []
+    if target.is_file():
+        paths.append(target)
+    elif target.is_dir():
+        paths.extend(p for p in target.rglob("*") if p.is_file())
+    markers = []
+    for p in paths:
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        if "<<<<<<<" in text or ">>>>>>>" in text or "=======" in text:
+            markers.append(str(p))
+    return markers
+
+
 def _job_to_status(job: SyncJobRecord) -> SyncJobStatusResponse:
     """Convert job record to API status response."""
     duration_ms = None
@@ -110,9 +138,13 @@ def _job_to_status(job: SyncJobRecord) -> SyncJobStatusResponse:
         log_excerpt=job.log_excerpt,
         conflicts=conflicts_payload,
         artifacts=job.artifacts or [],
+        artifact_type=job.artifact_type,
         project_path=job.project_path,
         collection=job.collection,
         strategy=job.strategy,
+        resolution=job.resolution,
+        unresolved_files=job.unresolved_files or [],
+    )
     )
 
 
@@ -134,6 +166,7 @@ def get_job_service(sync_mgr: SyncManager = Depends(get_sync_manager)) -> InProc
             """Execute a job according to direction."""
             job.log_excerpt = None
             job.conflicts = []
+            job.unresolved_files = []
             started = datetime.now(timezone.utc)
             try:
                 if job.direction == "upstream_to_collection":
@@ -162,6 +195,33 @@ def get_job_service(sync_mgr: SyncManager = Depends(get_sync_manager)) -> InProc
                         dry_run=job.dry_run,
                         interactive=False,
                     )
+                elif job.direction in {"resolve", "resolve_conflicts"}:
+                    if not job.project_path:
+                        raise ValueError("project_path required for resolve")
+                    if not job.artifacts:
+                        raise ValueError("artifact name required for resolve")
+                    artifact_name = job.artifacts[0]
+                    artifact_type = job.artifact_type or "skill"
+                    resolution = (job.resolution or job.strategy or "ours").lower()
+                    if resolution not in {"ours", "theirs"}:
+                        raise ValueError("resolution must be ours|theirs")
+                    res = sync_mgr.resolve_conflicts(
+                        project_path=Path(job.project_path),
+                        artifact_name=artifact_name,
+                        artifact_type=artifact_type,
+                        resolution=resolution,
+                        collection_name=job.collection,
+                    )
+                    job.log_excerpt = getattr(res, "message", None)
+                    job.unresolved_files = _detect_conflict_markers(
+                        Path(job.project_path), artifact_name, artifact_type=artifact_type
+                    )
+                    if job.unresolved_files:
+                        job.state = SyncJobState.CONFLICT
+                    else:
+                        job.state = SyncJobState.SUCCESS
+                    job.conflicts = getattr(res, "conflicts", []) or []
+                    return job
                 else:
                     raise ValueError(f"Unsupported direction: {job.direction}")
 
@@ -456,40 +516,80 @@ async def version_history(
 @router.post(
     "/resolve",
     response_model=ResolveResponse,
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-    summary="Resolve conflicts (placeholder)",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Resolve conflicts (ours|theirs overwrite)",
     responses={
-        501: {"description": "Resolution not implemented yet"},
+        202: {"description": "Resolution queued or completed"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
     },
 )
 async def resolve_conflicts(
     request: ResolveRequest,
     sync_mgr: SyncManager = Depends(get_sync_manager),
+    job_service: InProcessJobService = Depends(get_job_service),
+    async_mode: bool = True,
     token: TokenDep = None,
 ) -> ResolveResponse:
-    """Placeholder endpoint for conflict resolution.
-
-    Currently supports coarse resolutions:
-    - ours: overwrite project with collection version
-    - theirs: overwrite collection with project version
-    """
+    """Resolve conflicts by selecting ours|theirs; can queue async job."""
     if not request.project_path:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="project_path is required for conflict resolution",
         )
 
+    resolution = request.resolution.lower()
+    if resolution not in {"ours", "theirs"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="resolution must be 'ours' or 'theirs'",
+        )
+
+    if async_mode:
+        try:
+            job = job_service.create_job(
+                direction="resolve",
+                artifacts=[request.artifact_name],
+                artifact_type=request.artifact_type,
+                project_path=request.project_path,
+                collection=request.collection,
+                resolution=resolution,
+                strategy=resolution,
+                dry_run=False,
+                trace_id=None,
+            )
+            return ResolveResponse(
+                status="queued",
+                message="Resolve job queued",
+                job_id=job.id,
+                unresolved_files=[],
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to queue resolve job")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(exc),
+            )
+
     try:
         result = sync_mgr.resolve_conflicts(
             project_path=Path(request.project_path),
             artifact_name=request.artifact_name,
             artifact_type=request.artifact_type,
-            resolution=request.resolution,
+            resolution=resolution,
             collection_name=request.collection,
         )
+        unresolved = _detect_conflict_markers(
+            Path(request.project_path), request.artifact_name, artifact_type=request.artifact_type
+        )
+        status_val = "conflict" if unresolved else result.status
+        message = result.message
+        if unresolved:
+            message = (message or "") + "; conflict markers remain"
         return ResolveResponse(
-            status=result.status,
-            message=result.message,
+            status=status_val,
+            message=message,
+            unresolved_files=unresolved,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -534,14 +634,32 @@ async def create_sync_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="project_path is required for project directions",
         )
+    if request.direction in {"resolve", "resolve_conflicts"}:
+        if not request.project_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="project_path is required for resolve",
+            )
+        if not request.artifacts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="artifact name required for resolve",
+            )
+        if request.resolution and request.resolution not in {"ours", "theirs"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="resolution must be ours|theirs",
+            )
 
     try:
         job = job_service.create_job(
             direction=request.direction,
             artifacts=request.artifacts,
+            artifact_type=request.artifact_type,
             project_path=request.project_path,
             collection=request.collection,
             strategy=request.strategy,
+            resolution=request.resolution,
             dry_run=request.dry_run,
             trace_id=None,
         )

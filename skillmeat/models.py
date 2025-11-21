@@ -351,9 +351,11 @@ class SyncJobRecord:
     id: str
     direction: str
     artifacts: Optional[List[str]] = None
+    artifact_type: Optional[str] = None
     project_path: Optional[str] = None
     collection: Optional[str] = None
     strategy: Optional[str] = None
+    resolution: Optional[str] = None
     dry_run: bool = False
     state: SyncJobState = SyncJobState.QUEUED
     pct_complete: float = 0.0
@@ -362,6 +364,7 @@ class SyncJobRecord:
     trace_id: Optional[str] = None
     log_excerpt: Optional[str] = None
     conflicts: List[ConflictInfo] = field(default_factory=list)
+    unresolved_files: List[str] = field(default_factory=list)
     attempts: int = 0
     created_at: Optional[datetime] = None
 
@@ -371,9 +374,11 @@ class SyncJobRecord:
             "id": self.id,
             "direction": self.direction,
             "artifacts": self.artifacts or [],
+            "artifact_type": self.artifact_type,
             "project_path": self.project_path,
             "collection": self.collection,
             "strategy": self.strategy,
+            "resolution": self.resolution,
             "dry_run": self.dry_run,
             "state": self.state.value,
             "pct_complete": self.pct_complete,
@@ -382,6 +387,7 @@ class SyncJobRecord:
             "trace_id": self.trace_id,
             "log_excerpt": self.log_excerpt,
             "conflicts": [c.to_dict() for c in self.conflicts],
+            "unresolved_files": self.unresolved_files,
             "attempts": self.attempts,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
@@ -393,9 +399,11 @@ class SyncJobRecord:
             id=data["id"],
             direction=data["direction"],
             artifacts=data.get("artifacts") or None,
+            artifact_type=data.get("artifact_type"),
             project_path=data.get("project_path"),
             collection=data.get("collection"),
             strategy=data.get("strategy"),
+            resolution=data.get("resolution"),
             dry_run=bool(data.get("dry_run", False)),
             state=SyncJobState(data.get("state", SyncJobState.QUEUED)),
             pct_complete=float(data.get("pct_complete") or 0.0),
@@ -411,6 +419,7 @@ class SyncJobRecord:
                 ConflictInfo.from_dict(c) if isinstance(c, dict) else c
                 for c in data.get("conflicts", [])
             ],
+            unresolved_files=list(data.get("unresolved_files", []) or []),
             attempts=int(data.get("attempts") or 0),
             created_at=datetime.fromisoformat(data["created_at"])
             if data.get("created_at")

@@ -93,6 +93,10 @@ class ResolveResponse(BaseModel):
 
     status: str = Field(description="Resolution status")
     message: Optional[str] = Field(default=None, description="Human-readable message")
+    job_id: Optional[str] = Field(default=None, description="Async job id when queued")
+    unresolved_files: List[str] = Field(
+        default_factory=list, description="Files still containing conflict markers"
+    )
 
 
 class PatchRequest(BaseModel):

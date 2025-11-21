@@ -11,6 +11,7 @@ from skillmeat.config import ConfigManager
 from skillmeat.models import SyncJobRecord, SyncJobState
 from skillmeat.storage import SyncJobStore
 from skillmeat.observability.tracing import trace_operation
+from skillmeat.core.sync import SyncManager
 
 try:  # Metrics are optional
     from skillmeat.observability.metrics import (
@@ -172,6 +173,7 @@ class InProcessJobService:
         project_path: Optional[str] = None,
         collection: Optional[str] = None,
         strategy: Optional[str] = None,
+        resolution: Optional[str] = None,
         dry_run: bool = False,
         trace_id: Optional[str] = None,
     ) -> SyncJobRecord:
@@ -186,6 +188,7 @@ class InProcessJobService:
             project_path=project_path,
             collection=collection,
             strategy=strategy,
+            resolution=resolution,
             dry_run=dry_run,
             trace_id=trace_id or uuid.uuid4().hex,
             created_at=datetime.now(timezone.utc),
