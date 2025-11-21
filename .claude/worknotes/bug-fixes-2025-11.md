@@ -59,3 +59,23 @@
   - `skillmeat/web/components/collection/deploy-dialog.tsx` (response handling)
   - `skillmeat/web/hooks/useMcpServers.ts` (refactored to use apiRequest)
 - **Note**: API server restart required to activate new endpoints
+
+### Sharing Page TypeError on Name Access
+
+**Issue**: `/sharing` page crashing with TypeError on render
+- **Location**: Multiple components - `bundle-list.tsx:109`, `bundle-preview.tsx:36,165`, `export-dialog.tsx:252,478`
+- **Error**: `Cannot read properties of undefined (reading 'name')`
+- **Root Cause**:
+  - Components accessing `bundle.metadata.name` and `artifact.name` without null checks
+  - `useExportBundle` mock generating artifacts with empty metadata objects
+  - No defensive coding for optional properties in TypeScript types
+- **Fix**:
+  - Added optional chaining (`?.`) and fallback values for all `.name` accesses
+  - Updated mock data generator to fetch real artifacts from React Query cache
+  - Fallback values: "Unnamed Bundle", "Unknown Artifact"
+- **Files Modified**:
+  - `skillmeat/web/components/sharing/bundle-list.tsx` (3 locations)
+  - `skillmeat/web/components/sharing/bundle-preview.tsx` (2 locations)
+  - `skillmeat/web/components/sharing/export-dialog.tsx` (2 locations)
+  - `skillmeat/web/hooks/useExportBundle.ts` (enhanced mock data)
+- **Validation**: Page now renders without crashes; verified with chrome-devtools MCP

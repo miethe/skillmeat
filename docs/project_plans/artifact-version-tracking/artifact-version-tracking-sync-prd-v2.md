@@ -1,6 +1,6 @@
 # PRD v2: Artifact Version Sync & Visualization
 
-**Date:** 2025-XX-XX  
+**Date:** 2025-XX-XX
 **Status:** Draft (targets web UI parity)
 
 ## 1) Context
