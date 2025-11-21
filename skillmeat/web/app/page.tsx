@@ -5,6 +5,7 @@
  */
 
 import { AnalyticsGrid } from '@/components/dashboard/analytics-grid';
+import { SyncToolsCard } from '@/components/dashboard/sync-tools-card';
 
 export default function Dashboard() {
   return (
@@ -17,6 +18,7 @@ export default function Dashboard() {
       </div>
 
       <AnalyticsGrid enableLiveUpdates={true} />
+      <SyncToolsCard />
     </div>
   );
 }
