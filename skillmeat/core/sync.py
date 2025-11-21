@@ -4,6 +4,7 @@ This module provides synchronization capabilities between collections and
 deployed projects, including drift detection and deployment tracking.
 """
 
+import contextlib
 import hashlib
 import logging
 import shutil
@@ -53,6 +54,13 @@ class SyncManager:
         self.collection_mgr = collection_manager
         self.artifact_mgr = artifact_manager
         self.snapshot_mgr = snapshot_manager
+        # Lazy import to avoid hard dependency when observability is disabled
+        try:
+            from skillmeat.observability.tracing import get_tracer
+        except Exception:  # pragma: no cover
+            self._tracer = None
+        else:
+            self._tracer = get_tracer(__name__)
 
     def check_drift(
         self,
@@ -94,7 +102,13 @@ class SyncManager:
 
         # Check each deployed artifact for drift
         start_time = time.perf_counter()
-        for deployed in metadata.artifacts:
+        span_ctx = (
+            self._tracer.start_as_current_span("sync.drift_check")
+            if self._tracer
+            else contextlib.nullcontext()
+        )
+        with span_ctx:
+            for deployed in metadata.artifacts:
             # Find artifact in collection
             collection_artifact = self._find_artifact(
                 collection_artifacts, deployed.name, deployed.artifact_type
@@ -178,7 +192,10 @@ class SyncManager:
         duration_ms = (time.perf_counter() - start_time) * 1000
         logger.debug(
             "Drift detection complete",
-            extra={"artifact_count": len(drift_results), "duration_ms": duration_ms},
+            extra={
+                "artifact_count": len(drift_results),
+                "duration_ms": duration_ms,
+            },
         )
         return drift_results
 
@@ -202,6 +219,11 @@ class SyncManager:
         """
         drift_results = self.check_drift(project_path, collection_name)
         start_time = time.perf_counter()
+        span_ctx = (
+            self._tracer.start_as_current_span("sync.push")
+            if self._tracer
+            else contextlib.nullcontext()
+        )
         if artifact_names:
             drift_results = [
                 d for d in drift_results if d.artifact_name in artifact_names
@@ -217,36 +239,38 @@ class SyncManager:
         coll = self.collection_mgr.load_collection(collection_name)
         collection_path = self.collection_mgr.config.get_collection_path(coll.name)
 
-        for drift in drift_results:
-            # Only handle collection->project pushes for added/modified/outdated
-            if drift.drift_type not in {"added", "modified"}:
-                continue
+        with span_ctx:
+            for drift in drift_results:
+                # Only handle collection->project pushes for added/modified/outdated
+                if drift.drift_type not in {"added", "modified"}:
+                    continue
 
-            try:
-                self._apply_collection_artifact_to_project(
-                    collection_path=collection_path,
-                    collection_name=coll.name,
-                    project_path=project_path,
-                    artifact_name=drift.artifact_name,
-                    artifact_type=drift.artifact_type,
-                    dry_run=dry_run,
-                )
-                synced.append(drift.artifact_name)
-            except Exception as exc:  # noqa: BLE001
-                conflicts.append(
-                    ArtifactSyncResult(
+                try:
+                    self._apply_collection_artifact_to_project(
+                        collection_path=collection_path,
+                        collection_name=coll.name,
+                        project_path=project_path,
                         artifact_name=drift.artifact_name,
-                        success=False,
-                        has_conflict=False,
-                        error=str(exc),
+                        artifact_type=drift.artifact_type,
+                        dry_run=dry_run,
                     )
-                )
+                    synced.append(drift.artifact_name)
+                except Exception as exc:  # noqa: BLE001
+                    conflicts.append(
+                        ArtifactSyncResult(
+                            artifact_name=drift.artifact_name,
+                            success=False,
+                            has_conflict=False,
+                            error=str(exc),
+                        )
+                    )
 
         status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
         duration_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
             "Sync project from collection completed",
             extra={
+                "artifact_count": len(drift_results),
                 "artifacts_synced": len(synced),
                 "conflicts": len(conflicts),
                 "status": status,
@@ -276,73 +300,79 @@ class SyncManager:
         synced: List[str] = []
         conflicts: List[ArtifactSyncResult] = []
         start_time = time.perf_counter()
+        span_ctx = (
+            self._tracer.start_as_current_span("sync.upstream")
+            if self._tracer
+            else contextlib.nullcontext()
+        )
 
-        for artifact in candidates:
-            try:
-                update_info = artifact_mgr.github_source.check_updates(artifact)
-            except Exception as exc:  # noqa: BLE001
-                conflicts.append(
-                    ArtifactSyncResult(
-                        artifact_name=artifact.name,
-                        success=False,
-                        error=f"Failed to check updates: {exc}",
+        with span_ctx:
+            for artifact in candidates:
+                try:
+                    update_info = artifact_mgr.github_source.check_updates(artifact)
+                except Exception as exc:  # noqa: BLE001
+                    conflicts.append(
+                        ArtifactSyncResult(
+                            artifact_name=artifact.name,
+                            success=False,
+                            error=f"Failed to check updates: {exc}",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if not update_info or not update_info.has_update:
-                continue
+                if not update_info or not update_info.has_update:
+                    continue
 
-            if dry_run:
-                synced.append(artifact.name)
-                continue
+                if dry_run:
+                    synced.append(artifact.name)
+                    continue
 
-            try:
-                override_version = update_info.latest_sha or artifact.version_spec
-                spec = artifact_mgr._build_spec_from_artifact(  # pylint: disable=protected-access
-                    artifact, version_override=override_version
-                )
-                fetch_result = artifact_mgr.github_source.fetch(
-                    spec, artifact.type
-                )
-
-                dest_path = collection_path / artifact.path
-                self._atomic_replace_artifact(
-                    source_path=fetch_result.artifact_path,
-                    dest_path=dest_path,
-                )
-
-                artifact.metadata = fetch_result.metadata
-                artifact.upstream = fetch_result.upstream_url or artifact.upstream
-                artifact.resolved_sha = fetch_result.resolved_sha or update_info.latest_sha
-                artifact.resolved_version = (
-                    fetch_result.resolved_version
-                    if fetch_result.resolved_version is not None
-                    else update_info.latest_version or artifact.resolved_version
-                )
-                artifact.last_updated = datetime.utcnow()
-
-                self.collection_mgr.save_collection(collection)
-
-                new_hash = compute_content_hash(dest_path)
-                self.collection_mgr.lock_mgr.update_entry(
-                    collection_path,
-                    artifact.name,
-                    artifact.type,
-                    artifact.upstream,
-                    artifact.resolved_sha,
-                    artifact.resolved_version,
-                    new_hash,
-                )
-                synced.append(artifact.name)
-            except Exception as exc:  # noqa: BLE001
-                conflicts.append(
-                    ArtifactSyncResult(
-                        artifact_name=artifact.name,
-                        success=False,
-                        error=str(exc),
+                try:
+                    override_version = update_info.latest_sha or artifact.version_spec
+                    spec = artifact_mgr._build_spec_from_artifact(  # pylint: disable=protected-access
+                        artifact, version_override=override_version
                     )
-                )
+                    fetch_result = artifact_mgr.github_source.fetch(
+                        spec, artifact.type
+                    )
+
+                    dest_path = collection_path / artifact.path
+                    self._atomic_replace_artifact(
+                        source_path=fetch_result.artifact_path,
+                        dest_path=dest_path,
+                    )
+
+                    artifact.metadata = fetch_result.metadata
+                    artifact.upstream = fetch_result.upstream_url or artifact.upstream
+                    artifact.resolved_sha = fetch_result.resolved_sha or update_info.latest_sha
+                    artifact.resolved_version = (
+                        fetch_result.resolved_version
+                        if fetch_result.resolved_version is not None
+                        else update_info.latest_version or artifact.resolved_version
+                    )
+                    artifact.last_updated = datetime.utcnow()
+
+                    self.collection_mgr.save_collection(collection)
+
+                    new_hash = compute_content_hash(dest_path)
+                    self.collection_mgr.lock_mgr.update_entry(
+                        collection_path,
+                        artifact.name,
+                        artifact.type,
+                        artifact.upstream,
+                        artifact.resolved_sha,
+                        artifact.resolved_version,
+                        new_hash,
+                    )
+                    synced.append(artifact.name)
+                except Exception as exc:  # noqa: BLE001
+                    conflicts.append(
+                        ArtifactSyncResult(
+                            artifact_name=artifact.name,
+                            success=False,
+                            error=str(exc),
+                        )
+                    )
 
         status = "dry_run" if dry_run else ("success" if not conflicts else "partial")
         duration_ms = (time.perf_counter() - start_time) * 1000
