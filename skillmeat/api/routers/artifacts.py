@@ -1868,13 +1868,13 @@ async def get_version_graph(
 )
 async def get_artifact_versions(
     artifact_id: str,
+    sync_mgr: SyncManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
     collection: Optional[str] = Query(default=None, description="Collection override"),
     project_path: Optional[str] = Query(
         default=None, description="Project path for project tier metadata"
     ),
-    sync_mgr: SyncManagerDep,
-    collection_mgr: CollectionManagerDep,
-    token: TokenDep = None,
 ) -> ArtifactVersionsResponse:
     """Return upstream/collection/project hashes and metadata for an artifact."""
     try:
@@ -1940,13 +1940,13 @@ async def get_artifact_versions(
 )
 async def diff_artifact_tiers(
     artifact_id: str,
+    sync_mgr: SyncManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
     lhs: str = Query(default="collection", description="Left tier (collection|project)"),
     rhs: str = Query(default="project", description="Right tier (collection|project)"),
     collection: Optional[str] = Query(default=None, description="Collection override"),
     project_path: Optional[str] = Query(default=None, description="Project path for project tier"),
-    sync_mgr: SyncManagerDep,
-    collection_mgr: CollectionManagerDep,
-    token: TokenDep = None,
 ) -> ArtifactDiffResponse:
     """Return diffs between two tiers for an artifact."""
     try:

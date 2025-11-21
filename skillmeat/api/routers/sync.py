@@ -145,7 +145,6 @@ def _job_to_status(job: SyncJobRecord) -> SyncJobStatusResponse:
         resolution=job.resolution,
         unresolved_files=job.unresolved_files or [],
     )
-    )
 
 
 def get_sync_manager(collection_mgr: CollectionManagerDep) -> SyncManager:
