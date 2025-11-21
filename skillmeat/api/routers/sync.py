@@ -1,8 +1,9 @@
 """Sync API endpoints for upstream/collection/project synchronization."""
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -10,6 +11,10 @@ from skillmeat.api.dependencies import CollectionManagerDep, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse
 from skillmeat.api.schemas.drift import DriftArtifact, DriftResponse
+from skillmeat.api.schemas.sync_jobs import (
+    SyncJobCreateRequest,
+    SyncJobStatusResponse,
+)
 from skillmeat.api.schemas.sync import (
     ConflictEntry,
     ResolveRequest,
@@ -18,7 +23,10 @@ from skillmeat.api.schemas.sync import (
     SyncResponse,
 )
 from skillmeat.api.schemas.version_history import VersionEntry, VersionHistoryResponse
+from skillmeat.config import ConfigManager
 from skillmeat.core.sync import SyncManager
+from skillmeat.core.sync_jobs import InProcessJobService
+from skillmeat.models import SyncJobRecord, SyncJobState
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +79,119 @@ def _drift_to_response(drift_results) -> DriftResponse:
     )
 
 
+def _job_to_status(job: SyncJobRecord) -> SyncJobStatusResponse:
+    """Convert job record to API status response."""
+    duration_ms = None
+    if job.started_at and job.ended_at:
+        duration_ms = int((job.ended_at - job.started_at).total_seconds() * 1000)
+    conflicts_payload = []
+    for c in job.conflicts or []:
+        if hasattr(c, "to_dict"):
+            conflicts_payload.append(c.to_dict())  # type: ignore[attr-defined]
+        elif isinstance(c, dict):
+            conflicts_payload.append(c)
+        else:
+            conflicts_payload.append(getattr(c, "__dict__", {}))
+    return SyncJobStatusResponse(
+        job_id=job.id,
+        direction=job.direction,
+        state=job.state.value if hasattr(job.state, "value") else str(job.state),
+        pct_complete=job.pct_complete,
+        duration_ms=duration_ms,
+        started_at=job.started_at,
+        ended_at=job.ended_at,
+        trace_id=job.trace_id,
+        log_excerpt=job.log_excerpt,
+        conflicts=conflicts_payload,
+        artifacts=job.artifacts or [],
+        project_path=job.project_path,
+        collection=job.collection,
+        strategy=job.strategy,
+    )
+
+
 def get_sync_manager(collection_mgr: CollectionManagerDep) -> SyncManager:
     """Provide SyncManager with injected CollectionManager."""
     return SyncManager(collection_manager=collection_mgr)
+
+
+# Job runner singleton (in-process)
+_job_service: Optional[InProcessJobService] = None
+
+
+def get_job_service(sync_mgr: SyncManager = Depends(get_sync_manager)) -> InProcessJobService:
+    """Initialize and return job service."""
+    global _job_service  # noqa: PLW0603
+    if _job_service is None:
+        # bind sync function that adapts SyncManager methods
+        def run_job(job: SyncJobRecord) -> SyncJobRecord:
+            """Execute a job according to direction."""
+            job.log_excerpt = None
+            job.conflicts = []
+            started = datetime.now(timezone.utc)
+            try:
+                if job.direction == "upstream_to_collection":
+                    result = sync_mgr.sync_collection_from_upstream(
+                        collection_name=job.collection,
+                        artifact_names=job.artifacts,
+                        dry_run=job.dry_run,
+                    )
+                elif job.direction == "collection_to_project":
+                    if not job.project_path:
+                        raise ValueError("project_path required for collection_to_project")
+                    result = sync_mgr.sync_project_from_collection(
+                        project_path=Path(job.project_path),
+                        collection_name=job.collection,
+                        artifact_names=job.artifacts,
+                        dry_run=job.dry_run,
+                    )
+                elif job.direction == "project_to_collection":
+                    if not job.project_path:
+                        raise ValueError("project_path required for project_to_collection")
+                    strategy = job.strategy or "overwrite"
+                    result = sync_mgr.sync_from_project(
+                        project_path=Path(job.project_path),
+                        artifact_names=job.artifacts,
+                        strategy=strategy,
+                        dry_run=job.dry_run,
+                        interactive=False,
+                    )
+                else:
+                    raise ValueError(f"Unsupported direction: {job.direction}")
+
+                job.pct_complete = 1.0
+                job.ended_at = datetime.now(timezone.utc)
+                job.log_excerpt = getattr(result, "message", None)
+                conflicts = getattr(result, "conflicts", []) or []
+                job.conflicts = [
+                    c if isinstance(c, dict) else getattr(c, "__dict__", {}) for c in conflicts
+                ]
+                if conflicts:
+                    job.state = SyncJobState.CONFLICT
+                else:
+                    job.state = SyncJobState.SUCCESS
+                return job
+            except Exception as exc:  # noqa: BLE001
+                job.state = SyncJobState.ERROR
+                job.log_excerpt = str(exc)
+                job.ended_at = datetime.now(timezone.utc)
+                return job
+            finally:
+                if not job.ended_at:
+                    job.ended_at = datetime.now(timezone.utc)
+                elapsed_ms = (job.ended_at - started).total_seconds() * 1000
+                logger.info(
+                    "Sync job completed",
+                    extra={
+                        "job_id": job.id,
+                        "state": job.state.value if hasattr(job.state, "value") else job.state,
+                        "elapsed_ms": elapsed_ms,
+                        "direction": job.direction,
+                    },
+                )
+
+        _job_service = InProcessJobService(sync_fn=run_job)
+    return _job_service
 
 
 @router.post(
@@ -389,7 +507,87 @@ async def resolve_conflicts(
         if request.artifacts:
             allowed = set(request.artifacts)
             drift_results = [d for d in drift_results if d.artifact_name in allowed]
-        return _drift_to_response(drift_results)
+    return _drift_to_response(drift_results)
+
+
+@router.post(
+    "/jobs",
+    response_model=SyncJobStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Create async sync job",
+    responses={
+        202: {"description": "Job created"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        503: {"model": ErrorResponse, "description": "Async sync disabled"},
+    },
+)
+async def create_sync_job(
+    request: SyncJobCreateRequest,
+    sync_mgr: SyncManager = Depends(get_sync_manager),
+    job_service: InProcessJobService = Depends(get_job_service),
+    token: TokenDep = None,
+) -> SyncJobStatusResponse:
+    """Create a new async sync job."""
+    config = ConfigManager()
+    if not config.is_sync_async_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Async sync disabled by configuration",
+        )
+
+    if request.direction in {"collection_to_project", "project_to_collection"} and not request.project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required for project directions",
+        )
+
+    try:
+        job = job_service.create_job(
+            direction=request.direction,
+            artifacts=request.artifacts,
+            project_path=request.project_path,
+            collection=request.collection,
+            strategy=request.strategy,
+            dry_run=request.dry_run,
+            trace_id=None,
+        )
+        return _job_to_status(job)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to create sync job")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
+
+
+@router.get(
+    "/jobs/{job_id}",
+    response_model=SyncJobStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get sync job status",
+    responses={
+        200: {"description": "Job status returned"},
+        404: {"model": ErrorResponse, "description": "Job not found"},
+    },
+)
+async def get_sync_job_status(
+    job_id: str,
+    job_service: InProcessJobService = Depends(get_job_service),
+    token: TokenDep = None,
+) -> SyncJobStatusResponse:
+    """Return job status."""
+    job = job_service.get_job(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+    return _job_to_status(job)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
