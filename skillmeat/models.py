@@ -333,6 +333,91 @@ class ArtifactVersion:
         return ", ".join(parts)
 
 
+class SyncJobState(str, Enum):
+    """State machine for sync jobs."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCESS = "success"
+    CONFLICT = "conflict"
+    ERROR = "error"
+    CANCELED = "canceled"
+
+
+@dataclass
+class SyncJobRecord:
+    """Persisted record for an async sync job."""
+
+    id: str
+    direction: str
+    artifacts: Optional[List[str]] = None
+    project_path: Optional[str] = None
+    collection: Optional[str] = None
+    strategy: Optional[str] = None
+    dry_run: bool = False
+    state: SyncJobState = SyncJobState.QUEUED
+    pct_complete: float = 0.0
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    trace_id: Optional[str] = None
+    log_excerpt: Optional[str] = None
+    conflicts: List[ConflictInfo] = field(default_factory=list)
+    attempts: int = 0
+    created_at: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dict for SQLite/JSONL persistence."""
+        return {
+            "id": self.id,
+            "direction": self.direction,
+            "artifacts": self.artifacts or [],
+            "project_path": self.project_path,
+            "collection": self.collection,
+            "strategy": self.strategy,
+            "dry_run": self.dry_run,
+            "state": self.state.value,
+            "pct_complete": self.pct_complete,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
+            "trace_id": self.trace_id,
+            "log_excerpt": self.log_excerpt,
+            "conflicts": [c.to_dict() for c in self.conflicts],
+            "attempts": self.attempts,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SyncJobRecord":
+        """Deserialize from stored representation."""
+        return cls(
+            id=data["id"],
+            direction=data["direction"],
+            artifacts=data.get("artifacts") or None,
+            project_path=data.get("project_path"),
+            collection=data.get("collection"),
+            strategy=data.get("strategy"),
+            dry_run=bool(data.get("dry_run", False)),
+            state=SyncJobState(data.get("state", SyncJobState.QUEUED)),
+            pct_complete=float(data.get("pct_complete") or 0.0),
+            started_at=datetime.fromisoformat(data["started_at"])
+            if data.get("started_at")
+            else None,
+            ended_at=datetime.fromisoformat(data["ended_at"])
+            if data.get("ended_at")
+            else None,
+            trace_id=data.get("trace_id"),
+            log_excerpt=data.get("log_excerpt"),
+            conflicts=[
+                ConflictInfo.from_dict(c) if isinstance(c, dict) else c
+                for c in data.get("conflicts", [])
+            ],
+            attempts=int(data.get("attempts") or 0),
+            created_at=datetime.fromisoformat(data["created_at"])
+            if data.get("created_at")
+            else None,
+        )
+
+
 @dataclass
 class MergeStats:
     """Statistics for a merge operation.
