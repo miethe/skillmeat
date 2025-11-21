@@ -50,31 +50,52 @@ export function useExportBundle({
           console.warn("[bundles] Export API failed, falling back to mock", error);
           await new Promise((resolve) => setTimeout(resolve, 1000));
 
-          // Mock response
+          // Fetch real artifact data from the cache
+          const cached = queryClient.getQueryData<any>(["artifacts", "list", {}, { field: "name", order: "asc" }]);
+
+          // Mock response with real artifact data when available
       const bundle: Bundle = {
         id: `bundle-${Date.now()}`,
         metadata: request.metadata,
-        artifacts: request.artifactIds.map((id) => ({
-          artifact: {
-            id,
-            name: `artifact-${id}`,
-            type: "skill",
-            scope: "user",
-            status: "active",
-            version: "1.0.0",
-            metadata: {},
-            upstreamStatus: { hasUpstream: false, isOutdated: false },
-            usageStats: {
-              totalDeployments: 0,
-              activeProjects: 0,
-              usageCount: 0,
+        artifacts: request.artifactIds.map((id) => {
+          // Try to find the real artifact from cache
+          const cachedArtifact = cached?.artifacts?.find((a: any) => a.id === id);
+
+          if (cachedArtifact) {
+            return {
+              artifact: cachedArtifact,
+              dependencies: [],
+              files: [],
+            };
+          }
+
+          // Fallback to mock artifact if not found in cache
+          return {
+            artifact: {
+              id,
+              name: `Artifact ${id}`,
+              type: "skill",
+              scope: "user",
+              status: "active",
+              version: "1.0.0",
+              metadata: {
+                title: `Artifact ${id}`,
+                description: "Mock artifact data",
+                tags: [],
+              },
+              upstreamStatus: { hasUpstream: false, isOutdated: false },
+              usageStats: {
+                totalDeployments: 0,
+                activeProjects: 0,
+                usageCount: 0,
+              },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          dependencies: [],
-          files: [],
-        })),
+            dependencies: [],
+            files: [],
+          };
+        }),
         exportedAt: new Date().toISOString(),
         exportedBy: "current-user",
         format: request.options.format,

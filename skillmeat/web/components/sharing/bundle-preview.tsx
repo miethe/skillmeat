@@ -33,7 +33,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            <CardTitle>{preview.bundle.metadata.name}</CardTitle>
+            <CardTitle>{preview.bundle.metadata?.name || "Unnamed Bundle"}</CardTitle>
           </div>
           {preview.bundle.metadata.description && (
             <p className="text-sm text-muted-foreground mt-2">
@@ -162,7 +162,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm">{item.artifact.name}</p>
+                            <p className="font-medium text-sm">{item.artifact?.name || "Unknown Artifact"}</p>
                             <Badge variant="outline" className="text-xs">
                               {item.artifact.type}
                             </Badge>

@@ -249,7 +249,7 @@ export function ExportDialog({
                             onClick={(e) => e.stopPropagation()}
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{artifact.name}</p>
+                            <p className="font-medium text-sm">{artifact?.name || "Unknown Artifact"}</p>
                             {artifact.metadata.description && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                 {artifact.metadata.description}
@@ -475,7 +475,7 @@ export function ExportDialog({
               <div className="rounded-lg border p-4 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Bundle Name</span>
-                  <span className="font-medium">{exportedBundle.metadata.name}</span>
+                  <span className="font-medium">{exportedBundle.metadata?.name || "Unnamed Bundle"}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Artifacts</span>

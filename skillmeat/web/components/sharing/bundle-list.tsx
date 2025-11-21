@@ -106,7 +106,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-base truncate">
-                          {bundle.metadata.name}
+                          {bundle.metadata?.name || "Unnamed Bundle"}
                         </h3>
                         {bundle.isImported && (
                           <Badge variant="secondary" className="text-xs flex-shrink-0">
@@ -204,7 +204,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
             <DialogHeader>
               <DialogTitle>Share Bundle</DialogTitle>
               <DialogDescription>
-                Share {selectedBundle.metadata.name} with others
+                Share {selectedBundle.metadata?.name || "this bundle"} with others
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -271,7 +271,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
           <DialogHeader>
             <DialogTitle>Delete Bundle?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedBundle?.metadata.name}"? This
+              Are you sure you want to delete "{selectedBundle?.metadata?.name || "this bundle"}"? This
               action cannot be undone.
             </DialogDescription>
           </DialogHeader>
