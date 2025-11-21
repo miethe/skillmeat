@@ -53,6 +53,7 @@ class ConfigManager:
                     "job-store": "sqlite",
                     "job-dir": "sync_jobs",
                     "kill-switch": False,
+                    "monitoring-enabled": True,
                 },
             }
             self.write(default_config)
@@ -256,3 +257,7 @@ class ConfigManager:
     def get_sync_job_store_backend(self) -> str:
         """Return preferred job store backend (sqlite|jsonl)."""
         return self.get("sync.job-store", "sqlite")
+
+    def is_sync_monitoring_enabled(self) -> bool:
+        """Return whether sync monitoring/metrics should be emitted."""
+        return bool(self.get("sync.monitoring-enabled", True))

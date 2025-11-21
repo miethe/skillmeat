@@ -104,4 +104,4 @@ primary_model: GPT-5.1-Codex-Max
 
 | Done | Task | FR | SP | Domain | Risk | Reasoning | Target Model+Tools | Success Criteria | Ref |
 |------|------|----|----|--------|------|-----------|--------------------|------------------|-----|
-| [ ] | T5-ENABLE | FR9 | 1 | Infra | Low | Low | GPT-5.1-Codex-Max | all features enabled in dev/prod parity; kill-switch documented and tested; monitoring dashboards live | Rollout Plan |
+| [X] | T5-ENABLE | FR9 | 1 | Infra | Low | Low | GPT-5.1-Codex-Max | all features enabled in dev/prod parity; kill-switch documented and tested; monitoring dashboards live | Rollout Plan |
