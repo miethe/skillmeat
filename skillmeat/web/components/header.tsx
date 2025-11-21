@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Package2 } from 'lucide-react';
+import Image from 'next/image';
 
 export function Header() {
   return (
@@ -7,7 +7,7 @@ export function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Package2 className="h-6 w-6" />
+            <Image src="/logo.png" alt="SkillMeat Logo" width={32} height={32} className="h-8 w-auto" />
             <span className="font-bold">SkillMeat</span>
           </Link>
         </div>

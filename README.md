@@ -1,7 +1,11 @@
 # SkillMeat: Personal Collection Manager for Claude Code Artifacts
 
-[![Tests and Build](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Tests%20and%20Build/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/tests.yml)
-[![Code Quality](https://github.com/chrisvoncsefalvay/skillmeat/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/chrisvoncsefalvay/skillmeat/actions/workflows/quality.yml)
+<p align="center">
+  <img src="skillmeat/web/public/logo.png" alt="SkillMeat Logo" width="400"/>
+</p>
+
+[![Tests and Build](https://github.com/miethe/skillmeat/workflows/Tests%20and%20Build/badge.svg)](https://github.com/miethe/skillmeat/actions/workflows/tests.yml)
+[![Code Quality](https://github.com/miethe/skillmeat/workflows/Code%20Quality%20Checks/badge.svg)](https://github.com/miethe/skillmeat/actions/workflows/quality.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -9,7 +13,7 @@
 
 ## What is SkillMeat?
 
-SkillMeat is the evolution of `skillman`, providing a unified system for managing all types of Claude Code artifacts:
+SkillMeat provides a unified system for managing all types of Claude Code artifacts:
 
 - **Skills** - Specialized capabilities for Claude
 - **Commands** - Custom slash commands
@@ -19,6 +23,7 @@ SkillMeat is the evolution of `skillman`, providing a unified system for managin
 ### Key Features
 
 #### Intelligence & Sync (v0.2.0-alpha)
+
 - **Smart Search** - Find artifacts across projects with metadata and content search using ripgrep
 - **Bidirectional Sync** - Keep projects and collection in sync with drift detection and safe merging
 - **Usage Analytics** - Track usage, identify cleanup candidates, analyze trends with detailed reports
@@ -26,6 +31,7 @@ SkillMeat is the evolution of `skillman`, providing a unified system for managin
 - **Duplicate Detection** - Find and manage duplicate artifacts intelligently with similarity scoring
 
 #### Collection Management (v0.1.0)
+
 - **Collection-First Architecture** - Organize artifacts into named collections (work, personal, experimental)
 - **GitHub Integration** - Add artifacts directly from GitHub repositories with version tracking
 - **Smart Deployment** - Deploy from collection to projects with automatic tracking
@@ -95,22 +101,26 @@ That's it! Your artifact is now available in your project's `.claude/` directory
 ### Intelligence Features
 
 **Smart Search & Discovery**
+
 - Search artifacts across all your projects using metadata and file content
 - Ripgrep integration for ultra-fast content search (fallback to Python grep)
 - Find duplicate artifacts with similarity scoring
 
 **Bidirectional Sync**
+
 - Detect drift between your projects and collection automatically
 - Safely merge changes from projects back to your collection
 - Multiple sync strategies (overwrite, merge, fork) for flexibility
 
 **Safe Updates**
+
 - Preview what will change before applying updates
 - Auto-merge non-conflicting changes safely
 - Automatic rollback if something goes wrong
 - Handle upstream changes intelligently
 
 **Usage Analytics**
+
 - Track when and where artifacts are used
 - Get cleanup suggestions for unused artifacts
 - Analyze usage trends over time
@@ -155,17 +165,19 @@ skillmeat update python
 ## Documentation
 
 ### Getting Started
+
 - **[Quickstart Guide](docs/quickstart.md)** - Get started in 5 minutes
 - **[Commands Reference](docs/commands.md)** - Complete CLI documentation
 
 ### Feature Guides
+
 - **[Smart Search Guide](docs/guides/searching.md)** - Find artifacts across projects
 - **[Safe Updates Guide](docs/guides/updating-safely.md)** - Preview and update artifacts
 - **[Syncing Changes Guide](docs/guides/syncing-changes.md)** - Sync projects with collection
 - **[Analytics Guide](docs/guides/using-analytics.md)** - Track usage and trends
 
 ### Resources
-- **[Migration Guide](docs/migration.md)** - Migrate from skillman
+
 - **[Examples](docs/examples.md)** - Real-world workflows and patterns
 - **[Security Guide](docs/SECURITY.md)** - Security best practices
 
@@ -273,22 +285,13 @@ SkillMeat takes security seriously. Artifacts can execute code and access system
 
 See [Using Skills in Claude - Security](https://support.claude.com/en/articles/12512180-using-skills-in-claude#h_2746475e70) for more information.
 
-## Migrating from skillman
-
-If you're using the original `skillman` tool, see our [Migration Guide](docs/migration.md) for step-by-step instructions.
-
-Key changes:
-- `skillman add <spec>` → `skillmeat add skill <spec>`
-- Project-level `skills.toml` → Collection-level `collection.toml`
-- Install to scope → Deploy from collection to projects
-
 ## Development
 
 ### Setup
 
 ```bash
 # Clone repository
-git clone https://github.com/chrisvoncsefalvay/skillmeat.git
+git clone https://github.com/miethe/skillmeat.git
 cd skillmeat
 
 # Install in development mode
@@ -406,14 +409,6 @@ Contributions are welcome! Please:
 
 ## FAQ
 
-**Q: What's the difference between skillman and skillmeat?**
-
-A: SkillMeat is the evolution of skillman with support for multiple artifact types (not just skills), collection-based organization, better versioning, and enhanced deployment tracking.
-
-**Q: Can I use both skillman and skillmeat?**
-
-A: Yes! They store data in different locations and won't conflict. See the [Migration Guide](docs/migration.md).
-
 **Q: Do artifacts get re-downloaded for each project?**
 
 A: No. Artifacts are stored once in your collection (`~/.skillmeat/`) and copied to projects when deployed.
@@ -441,8 +436,8 @@ A: Yes! Use `skillmeat update artifact-name --preview` to see changes first, the
 ## Support
 
 - **Documentation:** See [docs/](docs/) directory
-- **Issues:** [GitHub Issues](https://github.com/chrisvoncsefalvay/skillmeat/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/chrisvoncsefalvay/skillmeat/discussions)
+- **Issues:** [GitHub Issues](https://github.com/miethe/skillmeat/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/miethe/skillmeat/discussions)
 
 ## License
 
@@ -450,18 +445,15 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Built on the foundation of the original `skillman` tool
+- Built on the foundation of the `skillman` tool
 - Inspired by package managers like npm, pip, and brew
 - Powered by Claude Code and the Claude API
 
 ## AI Development Context
 
 For AI assistants working with this codebase, see [CLAUDE.md](CLAUDE.md) for:
+
 - Project architecture and design decisions
 - Development setup and testing procedures
 - Code style guidelines
 - Implementation patterns
-
----
-
-Made with ❤️ in the Mile High City 🏔️ by [Chris von Csefalvay](https://chrisvoncsefalvay.com)

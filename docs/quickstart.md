@@ -1,5 +1,9 @@
 # SkillMeat Quickstart Guide
 
+<p align="center">
+  <img src="../skillmeat/web/public/logo.png" alt="SkillMeat Logo" width="300"/>
+</p>
+
 Get started with SkillMeat in 5 minutes. This guide covers the essentials to create your first collection and deploy artifacts.
 
 ## Installation
@@ -25,7 +29,7 @@ pipx install skillmeat
 ### From Source (Development)
 
 ```bash
-git clone https://github.com/chrisvoncsefalvay/skillmeat.git
+git clone https://github.com/miethe/skillmeat.git
 cd skillmeat
 pip install -e ".[dev]"
 ```
