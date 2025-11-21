@@ -4,12 +4,24 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timezone
-from queue import Queue, Empty
+from queue import Empty, Queue
 from typing import Callable, Optional
 
 from skillmeat.config import ConfigManager
 from skillmeat.models import SyncJobRecord, SyncJobState
 from skillmeat.storage import SyncJobStore
+from skillmeat.observability.tracing import trace_operation
+
+try:  # Metrics are optional
+    from skillmeat.observability.metrics import (
+        sync_jobs_duration,
+        sync_jobs_queue_depth,
+        sync_jobs_total,
+    )
+except Exception:  # pragma: no cover
+    sync_jobs_duration = None
+    sync_jobs_queue_depth = None
+    sync_jobs_total = None
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +61,11 @@ class SyncJobRunner:
         """Add a job to the queue."""
         self.store.save_job(job)
         self._queue.put(job.id)
+        if sync_jobs_queue_depth:
+            try:
+                sync_jobs_queue_depth.set(self._queue.qsize())
+            except Exception:
+                pass
 
     def shutdown(self) -> None:
         """Signal shutdown (best-effort, in-process only)."""
@@ -82,8 +99,15 @@ class SyncJobRunner:
                 job.pct_complete = 0.05
                 self.store.save_job(job)
 
-                # Execute sync
-                job = self.sync_fn(job)
+                with trace_operation(
+                    "sync.job.run",
+                    job_id=job.id,
+                    direction=job.direction,
+                    dry_run=job.dry_run,
+                    collection=job.collection,
+                ):
+                    # Execute sync
+                    job = self.sync_fn(job)
 
                 if job.state not in {SyncJobState.SUCCESS, SyncJobState.CONFLICT}:
                     job.state = SyncJobState.SUCCESS
@@ -97,6 +121,38 @@ class SyncJobRunner:
                 job.ended_at = datetime.now(timezone.utc)
                 self.store.save_job(job)
             finally:
+                result = job.state.value if hasattr(job.state, "value") else str(job.state)
+                elapsed = None
+                if job.started_at and job.ended_at:
+                    elapsed = (job.ended_at - job.started_at).total_seconds()
+                if sync_jobs_total:
+                    try:
+                        sync_jobs_total.labels(
+                            direction=job.direction, result=result
+                        ).inc()
+                    except Exception:
+                        pass
+                if sync_jobs_duration and elapsed is not None:
+                    try:
+                        sync_jobs_duration.labels(
+                            direction=job.direction, result=result
+                        ).observe(elapsed)
+                    except Exception:
+                        pass
+                if sync_jobs_queue_depth:
+                    try:
+                        sync_jobs_queue_depth.set(self._queue.qsize())
+                    except Exception:
+                        pass
+                logger.info(
+                    "Sync job finished",
+                    extra={
+                        "job_id": job.id,
+                        "state": result,
+                        "direction": job.direction,
+                        "elapsed_s": elapsed,
+                    },
+                )
                 self._queue.task_done()
 
 

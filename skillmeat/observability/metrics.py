@@ -188,6 +188,28 @@ artifact_operation_duration = Histogram(
 )
 
 # =============================================================================
+# Sync Job Metrics
+# =============================================================================
+
+sync_jobs_total = Counter(
+    'skillmeat_sync_jobs_total',
+    'Total sync jobs processed',
+    ['direction', 'result'],
+)
+
+sync_jobs_duration = Histogram(
+    'skillmeat_sync_jobs_duration_seconds',
+    'Sync job duration in seconds',
+    ['direction', 'result'],
+    buckets=[.05, .1, .25, .5, 1.0, 2.5, 5.0, 10.0, 30.0],
+)
+
+sync_jobs_queue_depth = Gauge(
+    'skillmeat_sync_jobs_queue_depth',
+    'Current in-process sync job queue depth',
+)
+
+# =============================================================================
 # GitHub Source Metrics
 # =============================================================================
 
