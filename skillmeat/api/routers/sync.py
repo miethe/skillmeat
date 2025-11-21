@@ -497,18 +497,6 @@ async def resolve_conflicts(
             detail=str(exc),
         )
 
-    try:
-        project_path = Path(request.project_path)
-        drift_results = sync_mgr.check_drift(
-            project_path=project_path,
-            collection_name=request.collection,
-        )
-        # Optional filter by artifacts
-        if request.artifacts:
-            allowed = set(request.artifacts)
-            drift_results = [d for d in drift_results if d.artifact_name in allowed]
-    return _drift_to_response(drift_results)
-
 
 @router.post(
     "/jobs",
