@@ -1,6 +1,8 @@
 """Sync API endpoints for upstream/collection/project synchronization."""
 
 import logging
+import tarfile
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -17,6 +19,8 @@ from skillmeat.api.schemas.sync_jobs import (
 )
 from skillmeat.api.schemas.sync import (
     ConflictEntry,
+    PatchRequest,
+    PatchResponse,
     ResolveRequest,
     ResolveResponse,
     SyncRequest,
@@ -24,9 +28,11 @@ from skillmeat.api.schemas.sync import (
 )
 from skillmeat.api.schemas.version_history import VersionEntry, VersionHistoryResponse
 from skillmeat.config import ConfigManager
+from skillmeat.core.collection import CollectionManager
 from skillmeat.core.sync import SyncManager
 from skillmeat.core.sync_jobs import InProcessJobService
 from skillmeat.models import SyncJobRecord, SyncJobState
+from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -576,6 +582,80 @@ async def get_sync_job_status(
             detail="Job not found",
         )
     return _job_to_status(job)
+
+
+@router.post(
+    "/patch",
+    response_model=PatchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate project→collection patch bundle",
+    responses={
+        200: {"description": "Patch bundle created"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+    },
+)
+async def generate_patch_bundle(
+    request: PatchRequest,
+    sync_mgr: SyncManager = Depends(get_sync_manager),
+    token: TokenDep = None,
+) -> PatchResponse:
+    """Generate tar.gz patch bundle from project artifact compared to collection."""
+    if not request.project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required",
+        )
+
+    artifact_type_str = request.artifact_type
+    artifact_name = request.artifact_name
+    try:
+        artifact_type = artifact_type_str
+        collection_mgr = sync_mgr.collection_mgr or CollectionManager()
+        collection_obj = collection_mgr.get_collection(request.collection)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    plural = sync_mgr._get_artifact_type_plural(artifact_type)  # noqa: SLF001
+    coll_path = collection_obj.path / plural / artifact_name
+    if not coll_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact not found in collection at {coll_path}",
+        )
+
+    project_path = Path(request.project_path)
+    proj_base = project_path / ".claude" / plural
+    proj_artifact = proj_base / (f"{artifact_name}.md" if artifact_type in {"command", "agent"} else artifact_name)
+    if not proj_artifact.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact not found in project at {proj_artifact}",
+        )
+
+    tmp_dir = tempfile.mkdtemp(prefix="skillmeat-patch-")
+    tar_path = Path(tmp_dir) / f"{artifact_name}-patch.tar.gz"
+    try:
+        with tarfile.open(tar_path, "w:gz") as tar:
+            tar.add(proj_artifact, arcname=proj_artifact.name)
+        sha = compute_content_hash(tar_path)
+        size_bytes = tar_path.stat().st_size
+        return PatchResponse(
+            status="success",
+            download_path=str(tar_path),
+            sha256=sha,
+            size_bytes=size_bytes,
+            message="Patch bundle generated from project artifact",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to generate patch bundle")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        )
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001

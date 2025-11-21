@@ -93,3 +93,32 @@ class ResolveResponse(BaseModel):
 
     status: str = Field(description="Resolution status")
     message: Optional[str] = Field(default=None, description="Human-readable message")
+
+
+class PatchRequest(BaseModel):
+    """Request to generate patch bundle from project to upstream/collection."""
+
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    project_path: str = Field(description="Project path containing deployment")
+    collection: Optional[str] = Field(default=None, description="Collection name (defaults to active)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf",
+                "artifact_type": "skill",
+                "project_path": "/path/to/project",
+                "collection": "default",
+            }
+        }
+
+
+class PatchResponse(BaseModel):
+    """Response for patch bundle generation."""
+
+    status: str = Field(description="Result status (success|error)")
+    download_path: Optional[str] = Field(default=None, description="Path to generated patch bundle")
+    sha256: Optional[str] = Field(default=None, description="SHA256 of bundle")
+    size_bytes: Optional[int] = Field(default=None, description="Size of bundle in bytes")
+    message: Optional[str] = Field(default=None, description="Additional info or errors")

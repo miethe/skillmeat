@@ -5,6 +5,8 @@ Provides REST API for managing artifacts within collections.
 
 import base64
 import logging
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -36,11 +38,19 @@ from skillmeat.api.schemas.artifacts import (
     VersionGraphNodeResponse,
     VersionGraphResponse,
 )
+from skillmeat.api.schemas.artifact_diff import ArtifactDiffResponse, ArtifactFileDiff
+from skillmeat.api.schemas.artifact_versions import (
+    ArtifactTierVersion,
+    ArtifactVersionsResponse,
+)
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.collection import CollectionManager
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
+from skillmeat.core.diff_engine import DiffEngine
+from skillmeat.core.sync import SyncManager
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +92,41 @@ def decode_cursor(cursor: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid cursor format: {str(e)}",
         )
+
+
+def _get_artifact_paths(
+    artifact_type: ArtifactType,
+    artifact_name: str,
+    collection_mgr: CollectionManager,
+    collection: Optional[str],
+    project_path: Optional[str],
+    sync_mgr: SyncManager,
+) -> tuple[Path, Optional[Path]]:
+    """Return collection and project artifact paths."""
+    collection_obj = collection_mgr.get_collection(collection)
+    plural = sync_mgr._get_artifact_type_plural(artifact_type.value)  # noqa: SLF001
+    coll_base = collection_obj.path / plural
+    coll_path = coll_base / artifact_name
+    if artifact_type.value in {"command", "agent"} and coll_path.is_dir():
+        possible_file = coll_base / f"{artifact_name}.md"
+        if possible_file.exists():
+            coll_path = possible_file
+    if not coll_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact not found in collection at {coll_path}",
+        )
+
+    proj_path = None
+    if project_path:
+        base = Path(project_path) / ".claude" / plural
+        if artifact_type.value in {"command", "agent"}:
+            proj_candidate = base / f"{artifact_name}.md"
+        else:
+            proj_candidate = base / artifact_name
+        if proj_candidate.exists():
+            proj_path = proj_candidate
+    return coll_path, proj_path
 
 
 async def build_deployment_statistics(
@@ -1809,3 +1854,193 @@ async def get_version_graph(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to build version graph: {str(e)}",
         )
+
+
+@router.get(
+    "/{artifact_id}/versions",
+    response_model=ArtifactVersionsResponse,
+    summary="Get artifact versions across tiers",
+    responses={
+        200: {"description": "Versions returned"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+    },
+)
+async def get_artifact_versions(
+    artifact_id: str,
+    collection: Optional[str] = Query(default=None, description="Collection override"),
+    project_path: Optional[str] = Query(
+        default=None, description="Project path for project tier metadata"
+    ),
+    sync_mgr: SyncManagerDep = Depends(),
+    collection_mgr: CollectionManagerDep = Depends(),
+    token: TokenDep = None,
+) -> ArtifactVersionsResponse:
+    """Return upstream/collection/project hashes and metadata for an artifact."""
+    try:
+        artifact_type_str, artifact_name = artifact_id.split(":", 1)
+        artifact_type = ArtifactType(artifact_type_str)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid artifact ID format. Expected 'type:name'",
+        )
+
+    coll_path, proj_path = _get_artifact_paths(
+        artifact_type, artifact_name, collection_mgr, collection, project_path, sync_mgr
+    )
+    collection_hash = compute_content_hash(coll_path)
+    coll_ts = datetime.fromtimestamp(coll_path.stat().st_mtime, tz=datetime.now().astimezone().tzinfo)
+
+    project_hash = None
+    project_ts = None
+    sync_status = None
+    if project_path and proj_path:
+        project_hash = compute_content_hash(proj_path)
+        project_ts = datetime.fromtimestamp(proj_path.stat().st_mtime, tz=datetime.now().astimezone().tzinfo)
+        # derive sync status from drift detection if available
+        try:
+            drift_results = sync_mgr.check_drift(Path(project_path), collection_name=collection)
+            match = next((d for d in drift_results if d.artifact_name == artifact_name), None)
+            if match and hasattr(match, "sync_status"):
+                sync_status = match.sync_status.value if hasattr(match.sync_status, "value") else match.sync_status
+        except Exception:
+            sync_status = None
+
+    return ArtifactVersionsResponse(
+        artifact_name=artifact_name,
+        artifact_type=artifact_type.value,
+        upstream=ArtifactTierVersion(tier="upstream", hash=None, timestamp=None, source=None, sync_status=None),
+        collection=ArtifactTierVersion(
+            tier="collection",
+            hash=collection_hash,
+            timestamp=coll_ts,
+            source=str(coll_path),
+            sync_status="synced" if sync_status is None else sync_status,
+        ),
+        project=ArtifactTierVersion(
+            tier="project",
+            hash=project_hash,
+            timestamp=project_ts,
+            source=str(proj_path) if proj_path else None,
+            sync_status=sync_status,
+        ),
+    )
+
+
+@router.get(
+    "/{artifact_id}/diff",
+    response_model=ArtifactDiffResponse,
+    summary="Get diff between tiers for an artifact",
+    responses={
+        200: {"description": "Diff returned"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+    },
+)
+async def diff_artifact_tiers(
+    artifact_id: str,
+    lhs: str = Query(default="collection", description="Left tier (collection|project)"),
+    rhs: str = Query(default="project", description="Right tier (collection|project)"),
+    collection: Optional[str] = Query(default=None, description="Collection override"),
+    project_path: Optional[str] = Query(default=None, description="Project path for project tier"),
+    sync_mgr: SyncManagerDep = Depends(),
+    collection_mgr: CollectionManagerDep = Depends(),
+    token: TokenDep = None,
+) -> ArtifactDiffResponse:
+    """Return diffs between two tiers for an artifact."""
+    try:
+        artifact_type_str, artifact_name = artifact_id.split(":", 1)
+        artifact_type = ArtifactType(artifact_type_str)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid artifact ID format. Expected 'type:name'",
+        )
+
+    if "project" in {lhs, rhs} and not project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required when comparing with project",
+        )
+
+    coll_path, proj_path = _get_artifact_paths(
+        artifact_type, artifact_name, collection_mgr, collection, project_path, sync_mgr
+    )
+
+    lhs_path = coll_path if lhs == "collection" else proj_path
+    rhs_path = proj_path if rhs == "project" else coll_path
+    if lhs_path is None or rhs_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested tier path not found",
+        )
+
+    engine = DiffEngine()
+    files: List[ArtifactFileDiff] = []
+    truncated = False
+    download_path = None
+
+    if lhs_path.is_dir() and rhs_path.is_dir():
+        diff_result = engine.diff_directories(lhs_path, rhs_path)
+        for path in diff_result.files_added:
+            files.append(ArtifactFileDiff(path=path, status="added", lines_added=0, lines_removed=0))
+        for path in diff_result.files_removed:
+            files.append(ArtifactFileDiff(path=path, status="removed", lines_added=0, lines_removed=0))
+        for fd in diff_result.files_modified:
+            files.append(
+                ArtifactFileDiff(
+                    path=fd.path,
+                    status=fd.status,
+                    lines_added=fd.lines_added,
+                    lines_removed=fd.lines_removed,
+                    unified_diff=fd.unified_diff,
+                )
+            )
+        files_added = len(diff_result.files_added)
+        files_removed = len(diff_result.files_removed)
+        files_modified = len(diff_result.files_modified)
+        total_lines_added = diff_result.total_lines_added
+        total_lines_removed = diff_result.total_lines_removed
+    else:
+        fd = engine.diff_files(lhs_path, rhs_path)
+        files.append(
+            ArtifactFileDiff(
+                path=fd.path,
+                status=fd.status,
+                lines_added=fd.lines_added,
+                lines_removed=fd.lines_removed,
+                unified_diff=fd.unified_diff,
+            )
+        )
+        files_added = 0
+        files_removed = 0
+        files_modified = 1 if fd.status != "unchanged" else 0
+        total_lines_added = fd.lines_added
+        total_lines_removed = fd.lines_removed
+
+    diff_size = sum(len(f.unified_diff or "") for f in files)
+    if diff_size > 1_000_000:
+        truncated = True
+        combined = "\n\n".join([f.unified_diff for f in files if f.unified_diff])
+        tmp_dir = tempfile.mkdtemp(prefix="skillmeat-diff-")
+        diff_file = Path(tmp_dir) / f"{artifact_name}-{lhs}-vs-{rhs}.diff"
+        diff_file.write_text(combined or "", encoding="utf-8")
+        download_path = str(diff_file)
+        for f in files:
+            f.unified_diff = None
+
+    return ArtifactDiffResponse(
+        artifact_name=artifact_name,
+        artifact_type=artifact_type.value,
+        lhs=lhs,
+        rhs=rhs,
+        files_added=files_added,
+        files_removed=files_removed,
+        files_modified=files_modified,
+        total_lines_added=total_lines_added,
+        total_lines_removed=total_lines_removed,
+        truncated=truncated,
+        download_path=download_path,
+        files=files,
+    )

@@ -75,10 +75,10 @@ primary_model: GPT-5.1-Codex-Max
 
 | Done | Task | FR | SP | Domain | Risk | Reasoning | Target Model+Tools | Success Criteria | Ref |
 |------|------|----|----|--------|------|-----------|--------------------|------------------|-----|
-| [ ] | T2-VERSIONS | FR3 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | versions endpoint returns metadata + sync status; validated against sample artifacts | BK-VERSIONS |
-| [ ] | T2-DIFF | FR4/5 | 3 | API | Medium | Medium | GPT-5.1-Codex-Max | diff endpoint supports U↔C,C↔P,U↔P; size guard + download fallback; summary stats present | BK-DIFF |
+| [X] | T2-VERSIONS | FR3 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | versions endpoint returns metadata + sync status; validated against sample artifacts | BK-VERSIONS |
+| [X] | T2-DIFF | FR4/5 | 3 | API | Medium | Medium | GPT-5.1-Codex-Max | diff endpoint supports U↔C,C↔P,U↔P; size guard + download fallback; summary stats present | BK-DIFF |
 | [ ] | T2-RESOLVE | FR6/7 | 3 | API | High | High | GPT-5.1-Codex-Max (optionally Claude Code for merge edge cases) | resolve request overwrites according to strategy; reports unresolved markers; reuses job runner | BK-RESOLVE |
-| [ ] | T2-PATCH | FR8 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | patch export returns tar.gz + hash/size; validated contents vs upstream diff | BK-PATCH |
+| [X] | T2-PATCH | FR8 | 2 | API | Medium | Medium | GPT-5.1-Codex-Max | patch export returns tar.gz + hash/size; validated contents vs upstream diff | BK-PATCH |
 
 ### Phase 3: UI Enablement
 
