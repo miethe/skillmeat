@@ -109,35 +109,35 @@ class SyncManager:
         )
         with span_ctx:
             for deployed in metadata.artifacts:
-            # Find artifact in collection
-            collection_artifact = self._find_artifact(
-                collection_artifacts, deployed.name, deployed.artifact_type
-            )
-
-            if not collection_artifact:
-                # Artifact removed from collection
-                status = SyncStatus.OUTDATED
-                drift_results.append(
-                    DriftDetectionResult(
-                        artifact_name=deployed.name,
-                        artifact_type=deployed.artifact_type,
-                        drift_type="removed",
-                        collection_sha=None,
-                        project_sha=deployed.sha,
-                        collection_version=None,
-                        project_version=deployed.version,
-                        last_deployed=deployed.deployed_at,
-                        recommendation="remove_from_project",
-                        sync_status=status,
-                    )
+                # Find artifact in collection
+                collection_artifact = self._find_artifact(
+                    collection_artifacts, deployed.name, deployed.artifact_type
                 )
-                continue
 
-            # Compute current collection SHA
-            collection_sha = self._compute_artifact_hash(collection_artifact["path"])
-            project_sha = self._compute_project_artifact_hash(
-                project_path, deployed.name, deployed.artifact_type
-            )
+                if not collection_artifact:
+                    # Artifact removed from collection
+                    status = SyncStatus.OUTDATED
+                    drift_results.append(
+                        DriftDetectionResult(
+                            artifact_name=deployed.name,
+                            artifact_type=deployed.artifact_type,
+                            drift_type="removed",
+                            collection_sha=None,
+                            project_sha=deployed.sha,
+                            collection_version=None,
+                            project_version=deployed.version,
+                            last_deployed=deployed.deployed_at,
+                            recommendation="remove_from_project",
+                            sync_status=status,
+                        )
+                    )
+                    continue
+
+                # Compute current collection SHA
+                collection_sha = self._compute_artifact_hash(collection_artifact["path"])
+                project_sha = self._compute_project_artifact_hash(
+                    project_path, deployed.name, deployed.artifact_type
+                )
 
             collection_changed = collection_sha != deployed.sha
             project_changed = project_sha is not None and project_sha != deployed.sha
