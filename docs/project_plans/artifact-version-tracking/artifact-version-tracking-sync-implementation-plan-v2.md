@@ -36,6 +36,7 @@ primary_model: GPT-5.1-Codex-Max
 - Reuse existing sync service/merge engine; add async wrappers and event hooks for progress/conflict lists.
 - SSE endpoint optional; if infra absent, UI polls `GET /sync/jobs/{id}` every 2s with backoff.
 - No feature flags/slow-roll during active dev; single config kill-switch only.
+- Config keys (default-on): `sync.async-enabled`, `sync.kill-switch`, `sync.job-store` (sqlite|jsonl), `sync.job-dir` (relative to config dir).
 
 ## Testing Plan
 - Unit: job enqueue/dequeue/state transitions; status serialization; diff size guards; resolve overwrite logic; patch bundle contents.
@@ -59,8 +60,8 @@ primary_model: GPT-5.1-Codex-Max
 
 | Done | Task | FR | SP | Domain | Risk | Reasoning | Target Model+Tools | Success Criteria | Ref |
 |------|------|----|----|--------|------|-----------|--------------------|------------------|-----|
-| [ ] | T0-SCHEMA | FR2 | 1 | API/Infra | Low | Low | GPT-5.1-Codex-Max (default tools) | job table/jsonl schema defined/migrated; replay on boot works | BK-JOB-API |
-| [ ] | T0-CONFIG | FR9 | 1 | Infra | Low | Low | GPT-4o or GH Copilot for config touch-up | defaults loaded with no gating; kill-switch config documented | Integration/Interop |
+| [X] | T0-SCHEMA | FR2 | 1 | API/Infra | Low | Low | GPT-5.1-Codex-Max (default tools) | job table/jsonl schema defined/migrated; replay on boot works | BK-JOB-API |
+| [X] | T0-CONFIG | FR9 | 1 | Infra | Low | Low | GPT-4o or GH Copilot for config touch-up | defaults loaded with no gating; kill-switch config documented | Integration/Interop |
 
 ### Phase 1: Backend Job System
 
