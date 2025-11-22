@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { useCreateSyncJob, useSyncJobStatus } from "@/hooks/useSyncJobs";
 import { useArtifactVersions } from "@/hooks/useArtifactVersions";
 import { useArtifactDiff } from "@/hooks/useArtifactDiff";
+import { useCollections } from "@/hooks/useCollections";
+import { useCollectionArtifacts } from "@/hooks/useCollectionArtifacts";
 import { toast } from "sonner";
 
 export function SyncToolsCard() {
@@ -27,6 +29,8 @@ export function SyncToolsCard() {
     projectPath: projectPath || undefined,
   });
   const diffMutation = useArtifactDiff();
+  const collections = useCollections();
+  const artifacts = useCollectionArtifacts(collection || undefined);
 
   const lhs = diffPair === "collection-project" ? "collection" : "project";
   const rhs = diffPair === "collection-project" ? "project" : "collection";
@@ -40,16 +44,44 @@ export function SyncToolsCard() {
       <CardContent className="space-y-4">
         <div className="grid gap-2 md:grid-cols-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Artifact ID (type:name)</label>
-            <Input
-              placeholder="skill:pdf-processor"
-              value={artifactId}
-              onChange={(e) => setArtifactId(e.target.value)}
-            />
+            <label className="text-sm font-medium">Collection</label>
+            <Select
+              value={collection}
+              onValueChange={(val) => {
+                setCollection(val);
+                setArtifactId("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select collection" />
+              </SelectTrigger>
+              <SelectContent>
+                {(collections.data || [{ name: "default", id: "default" }]).map((c) => (
+                  <SelectItem key={c.id || c.name} value={c.name || c.id}>
+                    {c.name || c.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Collection</label>
-            <Input value={collection} onChange={(e) => setCollection(e.target.value)} />
+            <label className="text-sm font-medium">Artifact</label>
+            <Select
+              value={artifactId}
+              onValueChange={(val) => setArtifactId(val)}
+              disabled={!collection}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={collection ? "Select artifact" : "Choose collection first"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(artifacts.data || []).map((a) => (
+                  <SelectItem key={a.id} value={`${a.type}:${a.name}`}>
+                    {a.type}:{a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Project Path</label>
@@ -71,13 +103,15 @@ export function SyncToolsCard() {
             <Select
               defaultValue="collection_to_project"
               onValueChange={(v) =>
-                createJob.mutateAsync({
-                  direction: v as any,
-                  artifacts: artifactId ? [artifactId.split(":")[1]] : undefined,
-                  artifactType: artifactId.includes(":") ? artifactId.split(":")[0] : undefined,
-                  projectPath: projectPath || undefined,
-                  collection: collection || undefined,
-                }).then((res) => setJobId(res.job_id))
+                createJob
+                  .mutateAsync({
+                    direction: v as any,
+                    artifacts: artifactId ? [artifactId.split(":")[1]] : undefined,
+                    artifactType: artifactId.includes(":") ? artifactId.split(":")[0] : undefined,
+                    projectPath: projectPath || undefined,
+                    collection: collection || undefined,
+                  })
+                  .then((res) => setJobId(res.job_id))
               }
             >
               <SelectTrigger>

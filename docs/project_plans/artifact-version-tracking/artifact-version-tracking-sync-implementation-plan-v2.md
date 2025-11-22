@@ -47,6 +47,10 @@ primary_model: GPT-5.1-Codex-Max
 - Build/enable order: backend job APIs → UI version/diff → UI job flows → resolve → patch export. Enable immediately in dev; kill-switch only if rollback needed; SSE enabled once backend ready.
 - Backward compatibility: keep existing CLI sync paths; new async API additive.
 - Observability watch: queue depth, conflict/error rates; rollback only via kill-switch config.
+- UX extension (dropdown-driven selection):
+  - Collection-first selection feeds artifact dropdown; artifact choices restricted to selected collection and show `type:name`.
+  - Selecting artifact auto-populates related fields (artifact id/type) for job/diff/resolve controls.
+  - Avoid free-text for collection/artifact where possible; surface fallback only when no data.
 
 ## Risks/Mitigations
 - Job loss/corruption: persisted store + recovery on boot + idempotent status; alert on failed reload.
