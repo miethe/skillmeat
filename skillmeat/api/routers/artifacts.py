@@ -105,7 +105,8 @@ def _get_artifact_paths(
     """Return collection and project artifact paths."""
     collection_obj = collection_mgr.load_collection(collection)
     plural = sync_mgr._get_artifact_type_plural(artifact_type.value)  # noqa: SLF001
-    coll_base = collection_obj.path / plural
+    collection_path = collection_mgr.config.get_collection_path(collection_obj.name)
+    coll_base = collection_path / plural
     coll_path = coll_base / artifact_name
     if artifact_type.value in {"command", "agent"} and coll_path.is_dir():
         possible_file = coll_base / f"{artifact_name}.md"

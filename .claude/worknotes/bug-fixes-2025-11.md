@@ -1,5 +1,31 @@
 # Bug Fixes - November 2025
 
+## 2025-11-21
+
+### Collection Artifacts API AttributeError
+
+**Issue**: Sync Ops page failing to populate artifacts from collection
+- **Location**: `skillmeat/api/routers/collections.py:341-342,352,355`
+- **Error**: Multiple AttributeErrors - `'Artifact' object has no attribute 'version'`, `'source'`, `'tuple' object has no attribute 'encode'`
+- **Root Cause**:
+  - Direct access to non-existent `artifact.version` (should use `resolved_version` or `version_spec`)
+  - Direct access to non-existent `artifact.source` (should use `upstream` for GitHub, "local" otherwise)
+  - `composite_key()` returns tuple but `encode_cursor()` expects string
+- **Fix**:
+  - Version: Use `artifact.resolved_version or artifact.version_spec`
+  - Source: Use `artifact.upstream if artifact.origin == "github" else "local"`
+  - Cursor: Convert tuple to string with `":".join(composite_key())`
+- **Validation**: API endpoint tested, returns artifacts successfully
+
+### CollectionManager Method Name Error
+
+**Issue**: Version refresh in Sync Ops failing with AttributeError
+- **Location**: `skillmeat/api/routers/artifacts.py:106`, `skillmeat/api/routers/sync.py:732`, `skillmeat/core/sync.py:803,1012,1152,1488,1820`
+- **Error**: `'CollectionManager' object has no attribute 'get_collection'. Did you mean: 'delete_collection'?`
+- **Root Cause**: Code calling non-existent `get_collection()` method instead of `load_collection()`
+- **Fix**: Replace all 7 occurrences of `collection_mgr.get_collection()` with `collection_mgr.load_collection()`
+- **Validation**: API endpoint tested successfully
+
 ## 2025-11-18
 
 ### API Import Errors
