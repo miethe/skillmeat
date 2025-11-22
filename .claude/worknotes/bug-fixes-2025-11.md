@@ -26,6 +26,15 @@
 - **Fix**: Replace all 7 occurrences of `collection_mgr.get_collection()` with `collection_mgr.load_collection()`
 - **Validation**: API endpoint tested successfully
 
+### Collection Path AttributeError
+
+**Issue**: Version refresh failing with Collection path access error
+- **Location**: `skillmeat/api/routers/artifacts.py:108` (_get_artifact_paths)
+- **Error**: `AttributeError: 'Collection' object has no attribute 'path'`
+- **Root Cause**: Code accessed `collection_obj.path`, but Collection dataclass has no `path` attribute
+- **Fix**: Changed to `collection_mgr.config.get_collection_path(collection_obj.name)` to get filesystem path
+- **Validation**: API endpoint tested successfully with curl - returns version hashes for collection/project tiers
+
 ## 2025-11-18
 
 ### API Import Errors
