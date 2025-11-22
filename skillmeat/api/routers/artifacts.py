@@ -103,7 +103,7 @@ def _get_artifact_paths(
     sync_mgr: SyncManager,
 ) -> tuple[Path, Optional[Path]]:
     """Return collection and project artifact paths."""
-    collection_obj = collection_mgr.get_collection(collection)
+    collection_obj = collection_mgr.load_collection(collection)
     plural = sync_mgr._get_artifact_type_plural(artifact_type.value)  # noqa: SLF001
     coll_base = collection_obj.path / plural
     coll_path = coll_base / artifact_name
