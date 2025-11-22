@@ -338,8 +338,8 @@ async def list_collection_artifacts(
             ArtifactSummary(
                 name=artifact.name,
                 type=artifact.type.value,
-                version=artifact.version,
-                source=artifact.source,
+                version=artifact.resolved_version or artifact.version_spec,
+                source=artifact.upstream if artifact.origin == "github" else "local",
             )
             for artifact in page_artifacts
         ]
@@ -349,10 +349,10 @@ async def list_collection_artifacts(
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(page_artifacts[0].composite_key()) if page_artifacts else None
+            encode_cursor(":".join(page_artifacts[0].composite_key())) if page_artifacts else None
         )
         end_cursor = (
-            encode_cursor(page_artifacts[-1].composite_key())
+            encode_cursor(":".join(page_artifacts[-1].composite_key()))
             if page_artifacts
             else None
         )
