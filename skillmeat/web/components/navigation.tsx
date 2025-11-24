@@ -3,13 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Home, Package, GitBranch, Users, Database, Settings, ShoppingBag } from 'lucide-react';
+import { Home, Package, GitBranch, Users, Database, Settings, ShoppingBag, FolderCog } from 'lucide-react';
 
 const navItems = [
   {
     title: 'Dashboard',
     href: '/',
     icon: Home,
+  },
+  {
+    title: 'Manage',
+    href: '/manage',
+    icon: FolderCog,
   },
   {
     title: 'Collection',
