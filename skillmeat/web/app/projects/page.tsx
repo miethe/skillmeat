@@ -2,19 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitBranch, FolderOpen, Clock, Package } from "lucide-react";
+import { GitBranch, FolderOpen, Clock, Package, Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProjects, useProject } from "@/hooks/useProjects";
+import { CreateProjectDialog } from "./components/create-project-dialog";
+import { ProjectActions } from "./components/project-actions";
 import type { ProjectSummary } from "@/types/project";
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { data: projects, isLoading, error } = useProjects();
+  const { data: projects, isLoading, error, refetch } = useProjects();
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const handleProjectClick = (project: ProjectSummary) => {
     setSelectedProject(project);
@@ -26,6 +29,14 @@ export default function ProjectsPage() {
       router.push(`/projects/${selectedProject.id}`);
       setIsDialogOpen(false);
     }
+  };
+
+  const handleCreateSuccess = () => {
+    refetch();
+  };
+
+  const handleActionSuccess = () => {
+    refetch();
   };
 
   const formatDate = (dateString?: string) => {
@@ -46,11 +57,17 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-        <p className="text-muted-foreground">
-          Manage your deployed projects and configurations
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <p className="text-muted-foreground">
+            Manage your deployed projects and configurations
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Project
+        </Button>
       </div>
 
       {/* Loading State */}
@@ -94,8 +111,12 @@ export default function ProjectsPage() {
               <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No projects found</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Deploy artifacts to projects to see them here
+                Create a new project to start deploying artifacts
               </p>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Project
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -119,11 +140,17 @@ export default function ProjectsPage() {
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <GitBranch className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <CardTitle className="text-lg truncate">{project.name}</CardTitle>
                     </div>
-                    <Badge variant="secondary">{project.deployment_count}</Badge>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge variant="secondary">{project.deployment_count}</Badge>
+                      <ProjectActions
+                        project={project}
+                        onSuccess={handleActionSuccess}
+                      />
+                    </div>
                   </div>
                   <CardDescription className="text-xs font-mono truncate">
                     {project.path}
@@ -194,6 +221,13 @@ export default function ProjectsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Create Project Dialog */}
+      <CreateProjectDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   );
 }
