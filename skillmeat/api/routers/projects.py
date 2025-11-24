@@ -22,11 +22,16 @@ from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.projects import (
     DeployedArtifact,
     ModifiedArtifactsResponse,
+    ProjectCreateRequest,
+    ProjectCreateResponse,
+    ProjectDeleteResponse,
     ProjectDetail,
     ProjectListResponse,
     ProjectSummary,
+    ProjectUpdateRequest,
 )
 from skillmeat.storage.deployment import DeploymentTracker
+from skillmeat.storage.project import ProjectMetadataStorage
 from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
@@ -132,10 +137,14 @@ def build_project_summary(project_path: Path) -> ProjectSummary:
     if deployments:
         last_deployment = max(d.deployed_at for d in deployments)
 
+    # Try to get project name from metadata, fallback to directory name
+    metadata = ProjectMetadataStorage.read_metadata(project_path)
+    project_name = metadata.name if metadata else project_path.name
+
     return ProjectSummary(
         id=encode_project_id(str(project_path)),
         path=str(project_path),
-        name=project_path.name,
+        name=project_name,
         deployment_count=len(deployments),
         last_deployment=last_deployment,
     )
@@ -189,10 +198,14 @@ def build_project_detail(project_path: Path) -> ProjectDetail:
     if deployments:
         last_deployment = max(d.deployed_at for d in deployments)
 
+    # Try to get project name from metadata, fallback to directory name
+    metadata = ProjectMetadataStorage.read_metadata(project_path)
+    project_name = metadata.name if metadata else project_path.name
+
     return ProjectDetail(
         id=encode_project_id(str(project_path)),
         path=str(project_path),
-        name=project_path.name,
+        name=project_name,
         deployment_count=len(deployments),
         last_deployment=last_deployment,
         deployments=deployed_artifacts,
@@ -311,6 +324,118 @@ async def list_projects(
         )
 
 
+@router.post(
+    "",
+    response_model=ProjectCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create new project",
+    description="Create a new project by initializing the directory structure and metadata",
+    responses={
+        201: {"description": "Project created successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request or project already exists"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def create_project(
+    request: ProjectCreateRequest,
+    token: TokenDep,
+) -> ProjectCreateResponse:
+    """Create a new project.
+
+    Initializes a new project by:
+    1. Creating the project directory if it doesn't exist
+    2. Creating the .claude subdirectory
+    3. Storing project metadata
+
+    Args:
+        request: Project creation request with name, path, and optional description
+        token: Authentication token
+
+    Returns:
+        Created project information
+
+    Raises:
+        HTTPException: If project already exists or on error
+
+    Example:
+        POST /api/v1/projects
+        {
+            "name": "my-project",
+            "path": "/Users/john/projects/my-project",
+            "description": "My awesome project"
+        }
+
+        Returns:
+        {
+            "id": "L1VzZXJzL2pvaG4vcHJvamVjdHMvbXktcHJvamVjdA==",
+            "path": "/Users/john/projects/my-project",
+            "name": "my-project",
+            "description": "My awesome project",
+            "created_at": "2025-11-24T12:00:00Z"
+        }
+    """
+    try:
+        logger.info(f"Creating project: {request.name} at {request.path}")
+
+        # Convert path to Path object
+        project_path = Path(request.path).resolve()
+
+        # Check if project metadata already exists
+        if ProjectMetadataStorage.exists(project_path):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project already exists at path: {request.path}",
+            )
+
+        # Create project directory if it doesn't exist
+        try:
+            project_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created project directory: {project_path}")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to create project directory: {str(e)}",
+            )
+
+        # Create .claude subdirectory
+        claude_dir = project_path / ".claude"
+        try:
+            claude_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created .claude directory: {claude_dir}")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to create .claude directory: {str(e)}",
+            )
+
+        # Create project metadata
+        metadata = ProjectMetadataStorage.create_metadata(
+            project_path=project_path,
+            name=request.name,
+            description=request.description,
+        )
+
+        logger.info(f"Project created successfully: {request.name}")
+
+        return ProjectCreateResponse(
+            id=encode_project_id(str(project_path)),
+            path=str(project_path),
+            name=metadata.name,
+            description=metadata.description,
+            created_at=metadata.created_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating project: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create project: {str(e)}",
+        )
+
+
 @router.get(
     "/{project_id}",
     response_model=ProjectDetail,
@@ -379,6 +504,214 @@ async def get_project(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get project: {str(e)}",
+        )
+
+
+@router.put(
+    "/{project_id}",
+    response_model=ProjectDetail,
+    summary="Update project metadata",
+    description="Update project name and/or description",
+    responses={
+        200: {"description": "Project updated successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def update_project(
+    project_id: str,
+    request: ProjectUpdateRequest,
+    token: TokenDep,
+) -> ProjectDetail:
+    """Update project metadata.
+
+    Updates the project's name and/or description. Only provided fields
+    are updated; omitted fields remain unchanged.
+
+    Args:
+        project_id: Base64-encoded project path
+        request: Project update request with optional name and description
+        token: Authentication token
+
+    Returns:
+        Updated project details
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        PUT /api/v1/projects/L1VzZXJzL2pvaG4vcHJvamVjdHMvbXktcHJvamVjdA==
+        {
+            "name": "renamed-project",
+            "description": "Updated description"
+        }
+
+        Returns: ProjectDetail with updated metadata
+    """
+    try:
+        logger.info(f"Updating project: {project_id}")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Check if project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Check if metadata exists
+        if not ProjectMetadataStorage.exists(project_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project metadata not found for: {project_path.name}",
+            )
+
+        # Validate that at least one field is being updated
+        if request.name is None and request.description is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one field (name or description) must be provided",
+            )
+
+        # Update metadata
+        updated_metadata = ProjectMetadataStorage.update_metadata(
+            project_path=project_path,
+            name=request.name,
+            description=request.description,
+        )
+
+        if updated_metadata is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Failed to update project metadata",
+            )
+
+        logger.info(f"Project updated successfully: {updated_metadata.name}")
+
+        # Build and return updated project detail
+        project_detail = build_project_detail(project_path)
+        return project_detail
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating project '{project_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update project: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{project_id}",
+    response_model=ProjectDeleteResponse,
+    summary="Delete project",
+    description="Remove project from tracking and optionally delete files from disk",
+    responses={
+        200: {"description": "Project deleted successfully"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def delete_project(
+    project_id: str,
+    token: TokenDep,
+    delete_files: bool = Query(
+        default=False,
+        description="If true, delete project files from disk (WARNING: destructive operation)",
+    ),
+) -> ProjectDeleteResponse:
+    """Delete a project.
+
+    Removes project metadata from tracking. By default, this only removes
+    the tracking metadata and leaves the project files intact. Set
+    delete_files=true to also delete the project directory from disk.
+
+    Args:
+        project_id: Base64-encoded project path
+        token: Authentication token
+        delete_files: Whether to delete project files from disk (default: False)
+
+    Returns:
+        Deletion status and message
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        DELETE /api/v1/projects/L1VzZXJzL2pvaG4vcHJvamVjdHMvbXktcHJvamVjdA==?delete_files=false
+
+        Returns:
+        {
+            "success": true,
+            "message": "Project removed from tracking successfully",
+            "deleted_files": false
+        }
+    """
+    try:
+        logger.info(f"Deleting project: {project_id} (delete_files={delete_files})")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Check if project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Check if metadata exists
+        if not ProjectMetadataStorage.exists(project_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project metadata not found for: {project_path.name}",
+            )
+
+        # Delete metadata file
+        metadata_deleted = ProjectMetadataStorage.delete_metadata(project_path)
+
+        message = "Project removed from tracking successfully"
+        files_deleted = False
+
+        # Optionally delete project files
+        if delete_files:
+            try:
+                import shutil
+
+                shutil.rmtree(project_path)
+                message = "Project and all files deleted successfully"
+                files_deleted = True
+                logger.warning(f"Deleted project directory: {project_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete project files: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to delete project files: {str(e)}",
+                )
+
+        logger.info(f"Project deleted successfully: {project_path.name}")
+
+        return ProjectDeleteResponse(
+            success=True,
+            message=message,
+            deleted_files=files_deleted,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting project '{project_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete project: {str(e)}",
         )
 
 
