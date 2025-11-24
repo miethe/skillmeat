@@ -144,12 +144,34 @@ def create_app(settings: APISettings = None) -> FastAPI:
             JSON response with error details
         """
         logger.warning(f"Validation error for {request.url}: {exc.errors()}")
+
+        # Serialize error details, removing non-JSON-serializable objects
+        def serialize_errors(errors):
+            """Convert validation errors to JSON-serializable format."""
+            serialized = []
+            for error in errors:
+                error_dict = {
+                    "type": error.get("type"),
+                    "loc": error.get("loc"),
+                    "msg": error.get("msg"),
+                }
+                # Include input if available and serializable
+                if "input" in error:
+                    try:
+                        import json
+
+                        json.dumps(error["input"])
+                        error_dict["input"] = error["input"]
+                    except (TypeError, ValueError):
+                        error_dict["input"] = str(error["input"])
+
+                # Skip ctx as it often contains non-serializable exceptions
+                serialized.append(error_dict)
+            return serialized
+
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "detail": exc.errors(),
-                "body": exc.body if hasattr(exc, "body") else None,
-            },
+            content={"detail": serialize_errors(exc.errors())},
         )
 
     @app.exception_handler(Exception)

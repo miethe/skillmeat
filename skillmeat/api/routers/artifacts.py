@@ -19,11 +19,15 @@ from skillmeat.api.dependencies import (
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
+    ArtifactCreateRequest,
+    ArtifactCreateResponse,
     ArtifactDeployRequest,
     ArtifactDeployResponse,
+    ArtifactDiffResponse,
     ArtifactListResponse,
     ArtifactMetadataResponse,
     ArtifactResponse,
+    ArtifactSourceType,
     ArtifactSyncRequest,
     ArtifactSyncResponse,
     ArtifactUpdateRequest,
@@ -32,6 +36,7 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactVersionInfo,
     ConflictInfo,
     DeploymentStatistics,
+    FileDiff,
     ProjectDeploymentInfo,
     VersionGraphNodeResponse,
     VersionGraphResponse,
@@ -398,6 +403,258 @@ def artifact_to_response(
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
     )
+
+
+@router.post(
+    "",
+    response_model=ArtifactCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create new artifact",
+    description="Create a new artifact from GitHub URL or local path",
+    responses={
+        201: {"description": "Artifact created successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Source not found"},
+        409: {"model": ErrorResponse, "description": "Artifact already exists"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def create_artifact(
+    request: ArtifactCreateRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+) -> ArtifactCreateResponse:
+    """Create a new artifact from GitHub or local source.
+
+    This endpoint allows you to add artifacts to your collection from:
+    - GitHub repositories (supports specs like username/repo/path@version)
+    - Local filesystem paths
+
+    Args:
+        request: Artifact creation request with source and metadata
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+
+    Returns:
+        ArtifactCreateResponse with created artifact details
+
+    Raises:
+        HTTPException: If validation fails, source not found, or artifact exists
+
+    Examples:
+        GitHub source:
+        ```json
+        {
+            "source_type": "github",
+            "source": "anthropics/skills/canvas-design",
+            "artifact_type": "skill",
+            "name": "canvas",
+            "tags": ["design", "ui"]
+        }
+        ```
+
+        Local source:
+        ```json
+        {
+            "source_type": "local",
+            "source": "/path/to/my-skill",
+            "artifact_type": "skill"
+        }
+        ```
+    """
+    try:
+        logger.info(
+            f"Creating artifact from {request.source_type.value} source: {request.source}"
+        )
+
+        # Validate artifact type
+        try:
+            artifact_type = ArtifactType(request.artifact_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid artifact type: {request.artifact_type}. "
+                f"Must be one of: {', '.join([t.value for t in ArtifactType])}",
+            )
+
+        # Determine collection
+        collection_name = request.collection
+        if not collection_name:
+            # Use first available collection as default
+            collections = collection_mgr.list_collections()
+            if not collections:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No collections found. Create a collection first.",
+                )
+            collection_name = collections[0]
+        else:
+            # Verify collection exists
+            if collection_name not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection_name}' not found",
+                )
+
+        # Create artifact based on source type
+        artifact = None
+
+        if request.source_type == ArtifactSourceType.GITHUB:
+            # Handle GitHub source
+            try:
+                # Parse GitHub spec (can be URL or short spec)
+                # If it looks like a URL, extract the spec
+                source = request.source
+                if source.startswith("http://") or source.startswith("https://"):
+                    # Parse GitHub URL to extract spec
+                    # Format: https://github.com/username/repo/tree/branch/path
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(source)
+                    if "github.com" not in parsed.netloc:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid GitHub URL: {source}",
+                        )
+
+                    # Extract path components
+                    path_parts = parsed.path.strip("/").split("/")
+                    if len(path_parts) < 2:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Invalid GitHub URL format",
+                        )
+
+                    username = path_parts[0]
+                    repo = path_parts[1]
+
+                    # Check if path contains tree/branch/path structure
+                    if len(path_parts) > 3 and path_parts[2] == "tree":
+                        # Extract artifact path (skip username/repo/tree/branch)
+                        artifact_path = "/".join(path_parts[4:]) if len(path_parts) > 4 else ""
+                        if artifact_path:
+                            source = f"{username}/{repo}/{artifact_path}"
+                        else:
+                            source = f"{username}/{repo}"
+                    else:
+                        # Just username/repo
+                        source = f"{username}/{repo}"
+
+                # Add from GitHub
+                artifact = artifact_mgr.add_from_github(
+                    spec=source,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    custom_name=request.name,
+                    tags=request.tags,
+                    force=False,  # Don't overwrite by default
+                )
+
+            except ValueError as e:
+                # Check if it's a duplicate error
+                if "already exists" in str(e):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=str(e),
+                    )
+                # Other validation errors
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e),
+                )
+            except RuntimeError as e:
+                # Fetch or network errors
+                if "not found" in str(e).lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"GitHub source not found: {str(e)}",
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to fetch from GitHub: {str(e)}",
+                )
+
+        elif request.source_type == ArtifactSourceType.LOCAL:
+            # Handle local source
+            try:
+                # Validate path exists
+                from pathlib import Path
+
+                source_path = Path(request.source)
+                if not source_path.exists():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Local path does not exist: {request.source}",
+                    )
+
+                if not source_path.is_dir() and not source_path.is_file():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid path: {request.source}",
+                    )
+
+                # Add from local
+                artifact = artifact_mgr.add_from_local(
+                    path=request.source,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    custom_name=request.name,
+                    tags=request.tags,
+                    force=False,
+                )
+
+            except ValueError as e:
+                # Check if it's a duplicate error
+                if "already exists" in str(e):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=str(e),
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e),
+                )
+            except RuntimeError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to add local artifact: {str(e)}",
+                )
+
+        # Build response
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Artifact creation failed unexpectedly",
+            )
+
+        logger.info(
+            f"Successfully created artifact: {artifact.type.value}:{artifact.name} "
+            f"in collection '{collection_name}'"
+        )
+
+        return ArtifactCreateResponse(
+            success=True,
+            artifact_id=f"{artifact.type.value}:{artifact.name}",
+            artifact_name=artifact.name,
+            artifact_type=artifact.type.value,
+            collection=collection_name,
+            source=request.source,
+            source_type=request.source_type.value,
+            path=artifact.path,
+            message=f"Artifact '{artifact.name}' created successfully from {request.source_type.value} source",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating artifact: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create artifact: {str(e)}",
+        )
 
 
 @router.get(
@@ -1808,4 +2065,345 @@ async def get_version_graph(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to build version graph: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/diff",
+    response_model=ArtifactDiffResponse,
+    summary="Get artifact diff",
+    description="Compare artifact versions between collection and deployed project",
+    responses={
+        200: {"description": "Successfully retrieved diff"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_diff(
+    artifact_id: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    project_path: str = Query(
+        ...,
+        description="Path to project for comparison",
+    ),
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> ArtifactDiffResponse:
+    """Get diff between collection version and deployed project version.
+
+    Compares the artifact in the collection with the deployed version in a project,
+    showing file-level differences with unified diff format for modified files.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        project_path: Path to project directory containing deployed artifact
+        collection: Optional collection filter
+
+    Returns:
+        ArtifactDiffResponse with file-level diffs and summary
+
+    Raises:
+        HTTPException: If artifact not found, project not found, or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/diff?project_path=/Users/me/project1
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "project_path": "/Users/me/project1",
+            "has_changes": true,
+            "files": [
+                {
+                    "file_path": "SKILL.md",
+                    "status": "modified",
+                    "collection_hash": "abc123",
+                    "project_hash": "def456",
+                    "unified_diff": "--- a/SKILL.md\\n+++ b/SKILL.md\\n..."
+                }
+            ],
+            "summary": {
+                "added": 0,
+                "modified": 1,
+                "deleted": 0,
+                "unchanged": 3
+            }
+        }
+    """
+    import difflib
+    import hashlib
+
+    try:
+        logger.info(
+            f"Getting diff for artifact: {artifact_id} (project={project_path}, collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Validate project path
+        proj_path = Path(project_path)
+        if not proj_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project path does not exist: {project_path}",
+            )
+
+        # Find deployment in project
+        deployment = DeploymentTracker.get_deployment(
+            proj_path, artifact_name, artifact_type.value
+        )
+
+        if not deployment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not deployed in project {project_path}",
+            )
+
+        # Determine collection name from deployment if not specified
+        collection_name = collection or deployment.from_collection
+
+        # Verify collection exists
+        if collection_name not in collection_mgr.list_collections():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Load collection and find artifact
+        coll = collection_mgr.load_collection(collection_name)
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+            )
+
+        # Get paths
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        collection_artifact_path = collection_path / artifact.path
+        project_artifact_path = proj_path / ".claude" / deployment.artifact_path
+
+        if not collection_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
+            )
+
+        if not project_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project artifact path does not exist: {project_artifact_path}",
+            )
+
+        # Collect all files from both locations
+        collection_files = set()
+        project_files = set()
+
+        if collection_artifact_path.is_dir():
+            collection_files = {
+                str(f.relative_to(collection_artifact_path))
+                for f in collection_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            collection_files = {collection_artifact_path.name}
+
+        if project_artifact_path.is_dir():
+            project_files = {
+                str(f.relative_to(project_artifact_path))
+                for f in project_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            project_files = {project_artifact_path.name}
+
+        # Get all unique files
+        all_files = sorted(collection_files | project_files)
+
+        # Helper function to compute file hash
+        def compute_file_hash(file_path: Path) -> str:
+            """Compute SHA256 hash of a single file."""
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+
+        # Helper function to check if file is binary
+        def is_binary_file(file_path: Path) -> bool:
+            """Check if file is binary by reading first 8KB."""
+            try:
+                with open(file_path, "rb") as f:
+                    chunk = f.read(8192)
+                    # Check for null bytes
+                    return b"\x00" in chunk
+            except Exception:
+                return True  # Treat as binary if can't read
+
+        # Build file diffs
+        file_diffs: List[FileDiff] = []
+        summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
+
+        for file_rel_path in all_files:
+            in_collection = file_rel_path in collection_files
+            in_project = file_rel_path in project_files
+
+            # Determine status
+            if in_collection and in_project:
+                # File exists in both - check if modified
+                if collection_artifact_path.is_dir():
+                    coll_file_path = collection_artifact_path / file_rel_path
+                else:
+                    coll_file_path = collection_artifact_path
+
+                if project_artifact_path.is_dir():
+                    proj_file_path = project_artifact_path / file_rel_path
+                else:
+                    proj_file_path = project_artifact_path
+
+                coll_hash = compute_file_hash(coll_file_path)
+                proj_hash = compute_file_hash(proj_file_path)
+
+                if coll_hash == proj_hash:
+                    # Unchanged
+                    file_status = "unchanged"
+                    unified_diff = None
+                    summary["unchanged"] += 1
+                else:
+                    # Modified
+                    file_status = "modified"
+                    summary["modified"] += 1
+
+                    # Generate unified diff if text file
+                    unified_diff = None
+                    if (
+                        not is_binary_file(coll_file_path)
+                        and not is_binary_file(proj_file_path)
+                    ):
+                        try:
+                            with open(coll_file_path, "r", encoding="utf-8") as f:
+                                coll_lines = f.readlines()
+                            with open(proj_file_path, "r", encoding="utf-8") as f:
+                                proj_lines = f.readlines()
+
+                            diff_lines = difflib.unified_diff(
+                                coll_lines,
+                                proj_lines,
+                                fromfile=f"collection/{file_rel_path}",
+                                tofile=f"project/{file_rel_path}",
+                                lineterm="",
+                            )
+                            unified_diff = "\n".join(diff_lines)
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to generate diff for {file_rel_path}: {e}"
+                            )
+                            unified_diff = f"[Error generating diff: {str(e)}]"
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=coll_hash,
+                        project_hash=proj_hash,
+                        unified_diff=unified_diff,
+                    )
+                )
+
+            elif in_collection and not in_project:
+                # File deleted in project (only in collection)
+                file_status = "deleted"
+                summary["deleted"] += 1
+
+                if collection_artifact_path.is_dir():
+                    coll_file_path = collection_artifact_path / file_rel_path
+                else:
+                    coll_file_path = collection_artifact_path
+
+                coll_hash = compute_file_hash(coll_file_path)
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=coll_hash,
+                        project_hash=None,
+                        unified_diff=None,
+                    )
+                )
+
+            elif not in_collection and in_project:
+                # File added in project (only in project)
+                file_status = "added"
+                summary["added"] += 1
+
+                if project_artifact_path.is_dir():
+                    proj_file_path = project_artifact_path / file_rel_path
+                else:
+                    proj_file_path = project_artifact_path
+
+                proj_hash = compute_file_hash(proj_file_path)
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=None,
+                        project_hash=proj_hash,
+                        unified_diff=None,
+                    )
+                )
+
+        # Determine if there are changes
+        has_changes = (
+            summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+        )
+
+        logger.info(
+            f"Diff computed for {artifact_id}: {len(file_diffs)} files, "
+            f"has_changes={has_changes}, summary={summary}"
+        )
+
+        return ArtifactDiffResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            project_path=str(proj_path),
+            has_changes=has_changes,
+            files=file_diffs,
+            summary=summary,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting diff for '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get artifact diff: {str(e)}",
         )
