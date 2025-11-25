@@ -2,14 +2,15 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Grid3x3, List, Loader2 } from 'lucide-react';
+import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { EntityLifecycleProvider, useEntityLifecycle } from '@/components/entity/EntityLifecycleProvider';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
-import { EntityDetailPanel } from './components/entity-detail-panel';
+import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import { Entity, EntityType, EntityStatus } from '@/types/entity';
 import {
@@ -27,6 +28,8 @@ function ManagePageContent() {
   const {
     entities,
     isLoading,
+    isRefetching,
+    refetch,
     setTypeFilter,
     setStatusFilter,
     setSearchQuery,
@@ -78,24 +81,27 @@ function ManagePageContent() {
   }, [deleteEntity]);
 
   const handleDeploy = useCallback((entity: Entity) => {
-    // Navigate to deploy page or open deploy dialog
-    console.log('Deploy entity:', entity);
+    // Open entity modal to sync tab for deployment
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   const handleSync = useCallback((entity: Entity) => {
-    // Handle sync
-    console.log('Sync entity:', entity);
+    // Open entity modal to sync tab for sync operations
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   const handleViewDiff = useCallback((entity: Entity) => {
-    // Open diff viewer
-    console.log('View diff:', entity);
+    // Open entity modal to sync tab which shows diff viewer
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
-  const handleRollback = useCallback(async (entity: Entity) => {
-    // Rollback will be handled by entity-actions component via RollbackDialog
-    // This is just a placeholder in case we need to do something after rollback
-    console.log('Rollback entity:', entity);
+  const handleRollback = useCallback((entity: Entity) => {
+    // Open entity modal to history tab for rollback
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   return (
@@ -110,6 +116,17 @@ function ManagePageContent() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Refresh button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh entities"
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
+            </Button>
+
             {/* View mode toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -184,8 +201,8 @@ function ManagePageContent() {
         </EntityTabs>
       </div>
 
-      {/* Detail Panel */}
-      <EntityDetailPanel
+      {/* Entity Detail Modal */}
+      <UnifiedEntityModal
         entity={selectedEntity}
         open={detailPanelOpen}
         onClose={() => {

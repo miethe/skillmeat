@@ -11,7 +11,7 @@ import * as React from "react";
 import { FileQuestion } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Entity } from "@/types/entity";
-import { EntityCard } from "./entity-card";
+import { EntityCard, EntityCardSkeleton } from "./entity-card";
 import { EntityRow } from "./entity-row";
 import { useEntityLifecycle } from "@/hooks/useEntityLifecycle";
 
@@ -83,7 +83,7 @@ export function EntityList({
   const context = useEntityLifecycle();
   const entities = entitiesProp ?? context.entities;
   const selectedEntities = context.selectedEntities;
-  const { selectEntity, deselectEntity } = context;
+  const { selectEntity, deselectEntity, isLoading } = context;
 
   // Memoize handlers to prevent EntityCard/EntityRow re-renders
   const handleEntityClick = useCallback((entity: Entity) => {
@@ -159,6 +159,40 @@ export function EntityList({
     onViewDiff,
     onRollback,
   ]);
+
+  // Loading state - show skeletons
+  if (isLoading) {
+    if (viewMode === "grid") {
+      return (
+        <ScrollArea className="h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <EntityCardSkeleton key={i} />
+            ))}
+          </div>
+        </ScrollArea>
+      );
+    } else {
+      return (
+        <ScrollArea className="h-full">
+          <div className="border-t">
+            <div className="flex items-center gap-4 px-4 py-2 border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+              {selectable && <div className="flex-shrink-0 w-4" />}
+              <div className="w-48">Name</div>
+              <div className="w-24">Type</div>
+              <div className="flex-1">Description</div>
+              <div className="w-40">Tags</div>
+              <div className="w-24">Status</div>
+              <div className="flex-shrink-0 w-8">Actions</div>
+            </div>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <EntityCardSkeleton key={i} />
+            ))}
+          </div>
+        </ScrollArea>
+      );
+    }
+  }
 
   // Empty state - safe to return early now that all hooks are defined
   if (!entities || entities.length === 0) {

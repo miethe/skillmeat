@@ -19,16 +19,12 @@ class ArtifactSourceType(str, Enum):
 class ArtifactCreateRequest(BaseModel):
     """Request schema for creating an artifact."""
 
-    source_type: ArtifactSourceType = Field(
-        description="Source type: github or local"
-    )
+    source_type: ArtifactSourceType = Field(description="Source type: github or local")
     source: str = Field(description="GitHub URL/spec or local path")
     artifact_type: str = Field(
         description="Type of artifact (skill, command, agent, mcp, hook)"
     )
-    name: Optional[str] = Field(
-        default=None, description="Override artifact name"
-    )
+    name: Optional[str] = Field(default=None, description="Override artifact name")
     collection: Optional[str] = Field(
         default=None, description="Target collection (uses default if not specified)"
     )
@@ -371,6 +367,7 @@ class ArtifactUpdateRequest(BaseModel):
             }
         }
 
+
 class ArtifactDeployRequest(BaseModel):
     """Request schema for deploying an artifact."""
 
@@ -441,7 +438,9 @@ class ArtifactSyncRequest(BaseModel):
 class ConflictInfo(BaseModel):
     """Information about a sync conflict."""
 
-    file_path: str = Field(description="Path to conflicted file relative to artifact root")
+    file_path: str = Field(
+        description="Path to conflicted file relative to artifact root"
+    )
     conflict_type: str = Field(
         description="Type of conflict",
         examples=["modified", "added", "removed"],
@@ -513,9 +512,7 @@ class ArtifactVersionInfo(BaseModel):
         description="Parent version SHA (for tracking lineage)",
         examples=["def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh"],
     )
-    is_modified: bool = Field(
-        description="Whether content differs from parent version"
-    )
+    is_modified: bool = Field(description="Whether content differs from parent version")
     created_at: datetime = Field(description="Version creation timestamp")
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
@@ -616,9 +613,7 @@ class VersionGraphResponse(BaseModel):
             }
         ],
     )
-    last_updated: datetime = Field(
-        description="Timestamp when graph was last computed"
-    )
+    last_updated: datetime = Field(description="Timestamp when graph was last computed")
 
     class Config:
         """Pydantic model configuration."""
@@ -875,5 +870,132 @@ class ArtifactDiffResponse(BaseModel):
                     "deleted": 0,
                     "unchanged": 3,
                 },
+            }
+        }
+
+
+# ===========================
+# File Content Schemas
+# ===========================
+
+
+class FileNode(BaseModel):
+    """File or directory node in artifact file tree."""
+
+    name: str = Field(description="File or directory name")
+    path: str = Field(description="Relative path from artifact root")
+    type: Literal["file", "directory"] = Field(description="Node type")
+    size: Optional[int] = Field(
+        default=None,
+        description="File size in bytes (only for files)",
+    )
+    children: Optional[List["FileNode"]] = Field(
+        default=None,
+        description="Child nodes (only for directories)",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "name": "src",
+                "path": "src",
+                "type": "directory",
+                "size": None,
+                "children": [
+                    {
+                        "name": "main.py",
+                        "path": "src/main.py",
+                        "type": "file",
+                        "size": 1234,
+                        "children": None,
+                    }
+                ],
+            }
+        }
+
+
+class FileListResponse(BaseModel):
+    """Response for artifact file listing."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    files: List[FileNode] = Field(description="File tree structure")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "files": [
+                    {
+                        "name": "SKILL.md",
+                        "path": "SKILL.md",
+                        "type": "file",
+                        "size": 2048,
+                        "children": None,
+                    },
+                    {
+                        "name": "src",
+                        "path": "src",
+                        "type": "directory",
+                        "size": None,
+                        "children": [],
+                    },
+                ],
+            }
+        }
+
+
+class FileContentResponse(BaseModel):
+    """Response for artifact file content."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    path: str = Field(description="Relative file path within artifact")
+    content: str = Field(description="File content (UTF-8 encoded)")
+    size: int = Field(description="File size in bytes")
+    mime_type: Optional[str] = Field(
+        default=None,
+        description="MIME type of the file",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "path": "SKILL.md",
+                "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
+                "size": 2048,
+                "mime_type": "text/markdown",
+            }
+        }
+
+
+class FileUpdateRequest(BaseModel):
+    """Request body for updating file content."""
+
+    content: str = Field(..., description="New file content")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "content": "# Updated PDF Processor Skill\n\nThis skill processes PDF files with enhanced features...",
             }
         }

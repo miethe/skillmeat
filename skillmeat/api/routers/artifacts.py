@@ -37,6 +37,10 @@ from skillmeat.api.schemas.artifacts import (
     ConflictInfo,
     DeploymentStatistics,
     FileDiff,
+    FileContentResponse,
+    FileListResponse,
+    FileNode,
+    FileUpdateRequest,
     ProjectDeploymentInfo,
     VersionGraphNodeResponse,
     VersionGraphResponse,
@@ -174,7 +178,7 @@ async def build_version_graph(
     artifact_name: str,
     artifact_type: ArtifactType,
     collection_name: Optional[str] = None,
-    collection_mgr = None,
+    collection_mgr=None,
 ) -> VersionGraphResponse:
     """Build version graph for an artifact showing deployment hierarchy.
 
@@ -534,7 +538,9 @@ async def create_artifact(
                     # Check if path contains tree/branch/path structure
                     if len(path_parts) > 3 and path_parts[2] == "tree":
                         # Extract artifact path (skip username/repo/tree/branch)
-                        artifact_path = "/".join(path_parts[4:]) if len(path_parts) > 4 else ""
+                        artifact_path = (
+                            "/".join(path_parts[4:]) if len(path_parts) > 4 else ""
+                        )
                         if artifact_path:
                             source = f"{username}/{repo}/{artifact_path}"
                         else:
@@ -1282,6 +1288,7 @@ async def update_artifact(
             # Ensure artifact has metadata object
             if artifact.metadata is None:
                 from skillmeat.core.artifact import ArtifactMetadata
+
                 artifact.metadata = ArtifactMetadata()
 
             metadata_updates = update_request.metadata
@@ -1707,13 +1714,14 @@ async def sync_artifact(
         # "manual" = preserve conflicts -> "merge"
         strategy_map = {
             "theirs": "overwrite",  # Pull from project and overwrite collection
-            "ours": "overwrite",     # Same as theirs in pull context
-            "manual": "merge",       # Use merge with conflict markers
+            "ours": "overwrite",  # Same as theirs in pull context
+            "manual": "merge",  # Use merge with conflict markers
         }
         sync_strategy = strategy_map[request.strategy]
 
         # Check for deployment metadata using DeploymentTracker (public API)
         from skillmeat.storage.deployment import DeploymentTracker
+
         deployments = DeploymentTracker.read_deployments(project_path)
         if not deployments:
             raise HTTPException(
@@ -1724,7 +1732,10 @@ async def sync_artifact(
         # Find the deployment for this artifact
         target_deployment = None
         for deployment in deployments:
-            if deployment.artifact_name == artifact_name and deployment.artifact_type == artifact_type.value:
+            if (
+                deployment.artifact_name == artifact_name
+                and deployment.artifact_type == artifact_type.value
+            ):
                 target_deployment = deployment
                 break
 
@@ -1771,12 +1782,13 @@ async def sync_artifact(
             conflicts_list = None
             if sync_result.conflicts:
                 conflicts_list = [
-                    ConflictInfo(
-                        file_path=conflict_file,
-                        conflict_type="modified"
-                    )
+                    ConflictInfo(file_path=conflict_file, conflict_type="modified")
                     for conflict_result in sync_result.conflicts
-                    for conflict_file in (conflict_result.conflict_files if hasattr(conflict_result, 'conflict_files') else [])
+                    for conflict_file in (
+                        conflict_result.conflict_files
+                        if hasattr(conflict_result, "conflict_files")
+                        else []
+                    )
                 ]
 
             # Determine success based on sync result status
@@ -1787,14 +1799,18 @@ async def sync_artifact(
             if success:
                 # Reload artifact to get updated version
                 updated_coll = collection_mgr.load_collection(collection_name)
-                updated_artifact = updated_coll.find_artifact(artifact_name, artifact_type)
+                updated_artifact = updated_coll.find_artifact(
+                    artifact_name, artifact_type
+                )
                 if updated_artifact and updated_artifact.metadata:
                     updated_version = updated_artifact.metadata.version
 
             # Count synced files (approximate based on artifact path)
             synced_files_count = None
             if success and artifact_name in sync_result.artifacts_synced:
-                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                collection_path = collection_mgr.config.get_collection_path(
+                    collection_name
+                )
                 artifact_path = collection_path / artifact.path
                 if artifact_path.exists():
                     synced_files_count = len(list(artifact_path.rglob("*")))
@@ -2040,7 +2056,10 @@ async def get_version_graph(
         )
 
         # Check if we found the artifact anywhere
-        if version_graph.root is None and version_graph.statistics["total_deployments"] == 0:
+        if (
+            version_graph.root is None
+            and version_graph.statistics["total_deployments"] == 0
+        ):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{artifact_id}' not found in any collection or project",
@@ -2301,9 +2320,8 @@ async def get_artifact_diff(
 
                     # Generate unified diff if text file
                     unified_diff = None
-                    if (
-                        not is_binary_file(coll_file_path)
-                        and not is_binary_file(proj_file_path)
+                    if not is_binary_file(coll_file_path) and not is_binary_file(
+                        proj_file_path
                     ):
                         try:
                             with open(coll_file_path, "r", encoding="utf-8") as f:
@@ -2407,4 +2425,735 @@ async def get_artifact_diff(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get artifact diff: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/files",
+    response_model=FileListResponse,
+    summary="List artifact files",
+    description="List all files and directories in an artifact",
+    responses={
+        200: {"description": "Successfully retrieved file list"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_artifact_files(
+    artifact_id: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileListResponse:
+    """List all files in an artifact.
+
+    Returns a nested tree structure showing all files and directories
+    within the artifact. Hidden files and directories are excluded
+    (.git, __pycache__, node_modules, etc.).
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileListResponse with nested file tree
+
+    Raises:
+        HTTPException: If artifact not found or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/files
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "files": [
+                {
+                    "name": "SKILL.md",
+                    "path": "SKILL.md",
+                    "type": "file",
+                    "size": 2048,
+                    "children": null
+                },
+                {
+                    "name": "src",
+                    "path": "src",
+                    "type": "directory",
+                    "size": null,
+                    "children": [...]
+                }
+            ]
+        }
+    """
+    try:
+        logger.info(
+            f"Listing files for artifact: {artifact_id} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_path = collection_path / artifact.path
+
+        if not artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_path}",
+            )
+
+        # Define hidden/excluded patterns
+        EXCLUDED_PATTERNS = {
+            ".git",
+            ".gitignore",
+            "__pycache__",
+            "node_modules",
+            ".DS_Store",
+            "*.pyc",
+            "*.pyo",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+            "venv",
+        }
+
+        def should_exclude(name: str) -> bool:
+            """Check if file/directory should be excluded."""
+            # Exclude hidden files (starting with .)
+            if name.startswith("."):
+                return True
+            # Exclude common artifacts
+            if name in EXCLUDED_PATTERNS:
+                return True
+            return False
+
+        def build_file_tree(path: Path, relative_root: Path) -> List[FileNode]:
+            """Recursively build file tree structure."""
+            nodes: List[FileNode] = []
+
+            try:
+                entries = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+            except PermissionError:
+                logger.warning(f"Permission denied accessing {path}")
+                return nodes
+
+            for entry in entries:
+                # Skip excluded files/directories
+                if should_exclude(entry.name):
+                    continue
+
+                rel_path = str(entry.relative_to(relative_root))
+
+                if entry.is_dir():
+                    # Recursively process directory
+                    children = build_file_tree(entry, relative_root)
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            type="directory",
+                            size=None,
+                            children=children,
+                        )
+                    )
+                elif entry.is_file():
+                    # Add file node
+                    try:
+                        file_size = entry.stat().st_size
+                    except Exception:
+                        file_size = 0
+
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            type="file",
+                            size=file_size,
+                            children=None,
+                        )
+                    )
+
+            return nodes
+
+        # Build file tree
+        if artifact_path.is_dir():
+            files = build_file_tree(artifact_path, artifact_path)
+        else:
+            # Single file artifact
+            files = [
+                FileNode(
+                    name=artifact_path.name,
+                    path=artifact_path.name,
+                    type="file",
+                    size=artifact_path.stat().st_size,
+                    children=None,
+                )
+            ]
+
+        logger.info(f"Listed {len(files)} files for artifact: {artifact_id}")
+
+        return FileListResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            files=files,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing files for '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list artifact files: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Get artifact file content",
+    description="Get the content of a specific file within an artifact",
+    responses={
+        200: {"description": "Successfully retrieved file content"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or path traversal attempt",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact or file not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_file_content(
+    artifact_id: str,
+    file_path: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileContentResponse:
+    """Get content of a specific file within an artifact.
+
+    **SECURITY: Path Traversal Protection**
+    This endpoint implements strict path validation to prevent directory
+    traversal attacks. The file_path must:
+    - Be within the artifact directory
+    - Not contain ".." (parent directory references)
+    - Resolve to a path inside the artifact root
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        file_path: Relative path to file within artifact (e.g., "SKILL.md" or "src/main.py")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileContentResponse with file content and metadata
+
+    Raises:
+        HTTPException: If artifact not found, file not found, path traversal attempt, or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/files/SKILL.md
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "path": "SKILL.md",
+            "content": "# PDF Processor Skill...",
+            "size": 2048,
+            "mime_type": "text/markdown"
+        }
+    """
+    import mimetypes
+    import os
+
+    try:
+        logger.info(
+            f"Getting file content for artifact: {artifact_id}, file: {file_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_root = collection_path / artifact.path
+
+        if not artifact_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_root}",
+            )
+
+        # CRITICAL SECURITY: Validate and normalize the file path to prevent path traversal
+        # This prevents attacks like: ../../etc/passwd
+        try:
+            # Normalize the requested path to remove any .., ., etc.
+            normalized_file_path = os.path.normpath(file_path)
+
+            # Check for path traversal indicators
+            if (
+                normalized_file_path.startswith("..")
+                or "/.." in normalized_file_path
+                or "\\.." in normalized_file_path
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path traversal attempt detected",
+                )
+
+            # Construct the full path
+            full_path = (artifact_root / normalized_file_path).resolve()
+
+            # Ensure the resolved path is still within the artifact directory
+            artifact_root_resolved = artifact_root.resolve()
+            if not str(full_path).startswith(str(artifact_root_resolved)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path escapes artifact directory",
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Path validation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {str(e)}",
+            )
+
+        # Check if file exists
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {file_path}",
+            )
+
+        # Check if it's a file (not a directory)
+        if not full_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path is not a file: {file_path}",
+            )
+
+        # Get file size
+        file_size = full_path.stat().st_size
+
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(str(full_path))
+
+        # Check if file is binary
+        def is_binary_file(path: Path) -> bool:
+            """Check if file is binary by reading first 8KB."""
+            try:
+                with open(path, "rb") as f:
+                    chunk = f.read(8192)
+                    return b"\x00" in chunk
+            except Exception:
+                return True
+
+        # Read file content
+        try:
+            if is_binary_file(full_path):
+                # For binary files, return a placeholder
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot display binary file: {file_path}. Binary files are not supported.",
+                )
+
+            # Read text file
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File encoding error: {file_path} is not valid UTF-8",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error reading file {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {str(e)}",
+            )
+
+        logger.info(f"Successfully retrieved file content: {artifact_id}/{file_path}")
+
+        return FileContentResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            path=file_path,
+            content=content,
+            size=file_size,
+            mime_type=mime_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting file content for '{artifact_id}/{file_path}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get file content: {str(e)}",
+        )
+
+
+@router.put(
+    "/{artifact_id}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Update artifact file content",
+    description="Update the content of a specific file within an artifact",
+    responses={
+        200: {"description": "Successfully updated file content"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request, path traversal attempt, or directory path",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact or file not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def update_artifact_file_content(
+    artifact_id: str,
+    file_path: str,
+    request: FileUpdateRequest,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileContentResponse:
+    """Update a file's content within an artifact.
+
+    **SECURITY: Path Traversal Protection**
+    This endpoint implements strict path validation to prevent directory
+    traversal attacks. The file_path must:
+    - Be within the artifact directory
+    - Not contain ".." (parent directory references)
+    - Resolve to a path inside the artifact root
+
+    **Atomic Write**
+    File updates are performed atomically using a temporary file and rename
+    operation to ensure consistency.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        file_path: Relative path to file within artifact (e.g., "SKILL.md" or "src/main.py")
+        request: File update request containing new content
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileContentResponse with updated file content and metadata
+
+    Raises:
+        HTTPException: If artifact not found, file not found, path traversal attempt,
+                      directory path, validation error, or write failure
+
+    Example:
+        PUT /api/v1/artifacts/skill:pdf-processor/files/SKILL.md
+        Body: {"content": "# Updated PDF Processor Skill..."}
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "path": "SKILL.md",
+            "content": "# Updated PDF Processor Skill...",
+            "size": 2048,
+            "mime_type": "text/markdown"
+        }
+    """
+    import mimetypes
+    import os
+    import tempfile
+
+    try:
+        logger.info(
+            f"Updating file content for artifact: {artifact_id}, file: {file_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_root = Path(collection_path) / artifact_type.value / artifact_name
+
+        # Validate file path (path traversal protection)
+        try:
+            # Normalize the requested path to remove any .., ., etc.
+            normalized_file_path = os.path.normpath(file_path)
+
+            # Check for path traversal indicators
+            if (
+                normalized_file_path.startswith("..")
+                or "/.." in normalized_file_path
+                or "\\.." in normalized_file_path
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path traversal attempt detected",
+                )
+
+            # Construct the full path
+            full_path = (artifact_root / normalized_file_path).resolve()
+
+            # Ensure the resolved path is still within the artifact directory
+            artifact_root_resolved = artifact_root.resolve()
+            if not str(full_path).startswith(str(artifact_root_resolved)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path escapes artifact directory",
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Path validation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {str(e)}",
+            )
+
+        # Check if file exists
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {file_path}",
+            )
+
+        # Check if it's a file (not a directory)
+        if not full_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path is not a file: {file_path}",
+            )
+
+        # Validate content is valid UTF-8 (will raise UnicodeEncodeError if not)
+        try:
+            request.content.encode("utf-8")
+        except UnicodeEncodeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid content encoding: {str(e)}. Content must be valid UTF-8.",
+            )
+
+        # Write file atomically
+        try:
+            dir_path = full_path.parent
+
+            # Create temporary file in the same directory for atomic rename
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=dir_path,
+                delete=False,
+                encoding="utf-8",
+                prefix=".tmp_",
+                suffix=f"_{full_path.name}",
+            ) as tmp:
+                tmp.write(request.content)
+                tmp_path = Path(tmp.name)
+
+            # Atomic rename (same filesystem)
+            tmp_path.replace(full_path)
+
+            logger.info(f"Successfully wrote file atomically: {full_path}")
+
+        except Exception as e:
+            # Clean up temp file if it still exists
+            if "tmp_path" in locals() and tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
+            logger.error(f"Error writing file {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to write file: {str(e)}",
+            )
+
+        # Get updated file info
+        file_size = full_path.stat().st_size
+        mime_type, _ = mimetypes.guess_type(str(full_path))
+
+        logger.info(f"Successfully updated file content: {artifact_id}/{file_path}")
+
+        return FileContentResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            path=file_path,
+            content=request.content,
+            size=file_size,
+            mime_type=mime_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error updating file content for '{artifact_id}/{file_path}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update file content: {str(e)}",
         )

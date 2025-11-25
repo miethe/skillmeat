@@ -76,6 +76,8 @@ export interface EntityLifecycleContextValue {
   selectedEntities: string[];
   /** Whether entity data is being loaded */
   isLoading: boolean;
+  /** Whether entity data is being refetched */
+  isRefetching: boolean;
   /** Any error that occurred during loading or operations */
   error: Error | null;
 
@@ -294,6 +296,7 @@ export function EntityLifecycleProvider({
     isLoading,
     error,
     refetch,
+    isRefetching,
   } = useQuery({
     queryKey,
     queryFn: async (): Promise<Entity[]> => {
@@ -306,7 +309,8 @@ export function EntityLifecycleProvider({
         return fetchProjectEntities(projectPath, typeFilter, searchQuery);
       }
     },
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - don't refetch if data is fresh
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
   });
 
   // Apply status filter client-side
@@ -494,6 +498,7 @@ export function EntityLifecycleProvider({
     entities: filteredEntities,
     selectedEntities,
     isLoading,
+    isRefetching,
     error: error as Error | null,
 
     // Filters
