@@ -27,6 +27,36 @@ import type {
 const USE_MOCKS = apiConfig.useMocks;
 
 // ============================================================================
+// Mock Fallback Utility
+// ============================================================================
+
+/**
+ * Wraps an async API call with mock fallback behavior.
+ * If the API call fails and mocks are enabled in non-production, logs a warning and returns the mock result.
+ * Otherwise, re-throws the error.
+ *
+ * @param apiCall - The async function that performs the API request
+ * @param mockFallback - The value to return (or function to call) when using mock fallback
+ * @param context - A string describing the operation for logging purposes
+ * @returns The result of the API call or mock fallback
+ */
+async function withMockFallback<T>(
+  apiCall: () => Promise<T>,
+  mockFallback: T | (() => T),
+  context: string
+): Promise<T> {
+  try {
+    return await apiCall();
+  } catch (error) {
+    if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+      console.warn(`[entities] ${context} API failed, using mock fallback`, error);
+      return typeof mockFallback === 'function' ? (mockFallback as () => T)() : mockFallback;
+    }
+    throw error;
+  }
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -319,20 +349,15 @@ export function EntityLifecycleProvider({
         tags: data.tags,
       };
 
-      try {
-        await apiRequest<ArtifactCreateResponse>('/artifacts', {
+      await withMockFallback(
+        () => apiRequest<ArtifactCreateResponse>('/artifacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request),
-        });
-      } catch (error) {
-        // Only use mocks in development/testing, not production
-        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-          console.warn('[entities] Create API failed, using mock fallback', error);
-          return;
-        }
-        throw error;
-      }
+        }),
+        undefined,
+        'Create'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
@@ -346,20 +371,15 @@ export function EntityLifecycleProvider({
         aliases: data.aliases,
       };
 
-      try {
-        await apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
+      await withMockFallback(
+        () => apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request),
-        });
-      } catch (error) {
-        // Only use mocks in development/testing, not production
-        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-          console.warn('[entities] Update API failed, using mock fallback', error);
-          return;
-        }
-        throw error;
-      }
+        }),
+        undefined,
+        'Update'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
@@ -368,18 +388,13 @@ export function EntityLifecycleProvider({
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await apiRequest<void>(`/artifacts/${id}`, {
+      await withMockFallback(
+        () => apiRequest<void>(`/artifacts/${id}`, {
           method: 'DELETE',
-        });
-      } catch (error) {
-        // Only use mocks in development/testing, not production
-        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-          console.warn('[entities] Delete API failed, using mock fallback', error);
-          return;
-        }
-        throw error;
-      }
+        }),
+        undefined,
+        'Delete'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
@@ -392,20 +407,15 @@ export function EntityLifecycleProvider({
         project_path: projectPath,
       };
 
-      try {
-        await apiRequest(`/artifacts/${id}/deploy`, {
+      await withMockFallback(
+        () => apiRequest(`/artifacts/${id}/deploy`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request),
-        });
-      } catch (error) {
-        // Only use mocks in development/testing, not production
-        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-          console.warn('[entities] Deploy API failed, using mock fallback', error);
-          return;
-        }
-        throw error;
-      }
+        }),
+        undefined,
+        'Deploy'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
@@ -420,20 +430,15 @@ export function EntityLifecycleProvider({
         strategy: 'ours',
       };
 
-      try {
-        await apiRequest(`/artifacts/${id}/sync`, {
+      await withMockFallback(
+        () => apiRequest(`/artifacts/${id}/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request),
-        });
-      } catch (error) {
-        // Only use mocks in development/testing, not production
-        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-          console.warn('[entities] Sync API failed, using mock fallback', error);
-          return;
-        }
-        throw error;
-      }
+        }),
+        undefined,
+        'Sync'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entities'] });
@@ -589,8 +594,7 @@ async function fetchCollectionEntities(
     params.set('artifact_type', typeFilter);
   }
 
-  try {
-    const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
+  const processResponse = (response: ArtifactListResponse): Entity[] => {
     const entities = response.items.map(item => mapApiArtifactToEntity(item, 'collection'));
 
     // Apply search filter client-side
@@ -605,14 +609,16 @@ async function fetchCollectionEntities(
     }
 
     return entities;
-  } catch (error) {
-    // Only use mocks in development/testing, not production
-    if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-      console.warn('[entities] Collection API failed, using mock data', error);
-      return generateMockCollectionEntities(typeFilter, searchQuery);
-    }
-    throw error;
-  }
+  };
+
+  return withMockFallback(
+    async () => {
+      const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
+      return processResponse(response);
+    },
+    () => generateMockCollectionEntities(typeFilter, searchQuery),
+    'Collection'
+  );
 }
 
 async function fetchProjectEntities(
@@ -620,11 +626,7 @@ async function fetchProjectEntities(
   typeFilter: EntityType | null,
   searchQuery: string
 ): Promise<Entity[]> {
-  try {
-    // Encode project path as base64 for use as ID
-    const projectId = btoa(projectPath);
-    const response = await apiRequest<ProjectDetail>(`/projects/${projectId}`);
-
+  const processResponse = (response: ProjectDetail): Entity[] => {
     // Map deployments to entities
     const deployments = response.deployments || [];
     const entities: Entity[] = deployments.map(deployment => ({
@@ -649,14 +651,19 @@ async function fetchProjectEntities(
     }
 
     return filtered;
-  } catch (error) {
-    // Only use mocks in development/testing, not production
-    if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
-      console.warn('[entities] Project API failed, using mock data', error);
-      return generateMockProjectEntities(projectPath, typeFilter, searchQuery);
-    }
-    throw error;
-  }
+  };
+
+  // Encode project path as base64 for use as ID
+  const projectId = btoa(projectPath);
+
+  return withMockFallback(
+    async () => {
+      const response = await apiRequest<ProjectDetail>(`/projects/${projectId}`);
+      return processResponse(response);
+    },
+    () => generateMockProjectEntities(projectPath, typeFilter, searchQuery),
+    'Project'
+  );
 }
 
 // ============================================================================
