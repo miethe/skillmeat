@@ -72,3 +72,21 @@
   - `renderEntityRow` useCallback defined at line 158 (after grid view return at line 148)
 - **Fix**: Moved all `useCallback` hooks before any conditional returns
 - **Validation**: Chrome DevTools confirmed no React errors on /manage and /manage?type=command
+
+### atob InvalidCharacterError on /projects/{id}/manage
+
+**Issue**: Navigating to project manage page crashes with InvalidCharacterError
+- **Location**: `skillmeat/web/app/projects/[id]/manage/page.tsx:261`
+- **Error**: `Uncaught InvalidCharacterError: Failed to execute 'atob' on 'Window'`
+- **Root Cause**: Base64 project IDs contain `+`, `/`, `=` chars that get URL-encoded, corrupting the string for `atob()`
+- **Fix**: Get `projectPath` from API response (`project.path`) instead of client-side decoding
+- **Validation**: Chrome DevTools confirmed no atob errors on /projects/{id}/manage
+
+### Deployment TypeError missing content_hash
+
+**Issue**: Deploying artifact from project manage page throws TypeError
+- **Location**: `skillmeat/storage/deployment.py:110`
+- **Error**: `TypeError: Deployment.__init__() missing 1 required positional argument: 'content_hash'`
+- **Root Cause**: `Deployment` dataclass requires `content_hash` but `record_deployment()` passed deprecated `collection_sha` parameter
+- **Fix**: Changed `collection_sha=collection_sha` to `content_hash=collection_sha` in line 116
+- **Validation**: API server reloaded successfully; dataclass constructor now receives correct parameter
