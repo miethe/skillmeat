@@ -9,7 +9,7 @@ import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
-import { EntityDetailPanel } from './components/entity-detail-panel';
+import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
 import { Entity, EntityType, EntityStatus } from '@/types/entity';
 import {
@@ -78,24 +78,27 @@ function ManagePageContent() {
   }, [deleteEntity]);
 
   const handleDeploy = useCallback((entity: Entity) => {
-    // Navigate to deploy page or open deploy dialog
-    console.log('Deploy entity:', entity);
+    // Open entity modal to sync tab for deployment
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   const handleSync = useCallback((entity: Entity) => {
-    // Handle sync
-    console.log('Sync entity:', entity);
+    // Open entity modal to sync tab for sync operations
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   const handleViewDiff = useCallback((entity: Entity) => {
-    // Open diff viewer
-    console.log('View diff:', entity);
+    // Open entity modal to sync tab which shows diff viewer
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
-  const handleRollback = useCallback(async (entity: Entity) => {
-    // Rollback will be handled by entity-actions component via RollbackDialog
-    // This is just a placeholder in case we need to do something after rollback
-    console.log('Rollback entity:', entity);
+  const handleRollback = useCallback((entity: Entity) => {
+    // Open entity modal to history tab for rollback
+    setSelectedEntity(entity);
+    setDetailPanelOpen(true);
   }, []);
 
   return (
@@ -184,8 +187,8 @@ function ManagePageContent() {
         </EntityTabs>
       </div>
 
-      {/* Detail Panel */}
-      <EntityDetailPanel
+      {/* Entity Detail Modal */}
+      <UnifiedEntityModal
         entity={selectedEntity}
         open={detailPanelOpen}
         onClose={() => {
