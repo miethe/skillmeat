@@ -22,7 +22,6 @@ function ArtifactCard({
   return (
     <UnifiedCard
       item={artifact}
-      mode="browse"
       onClick={onClick}
     />
   );
@@ -32,7 +31,7 @@ function ArtifactGridSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="artifact-grid-skeleton">
       {[...Array(6)].map((_, i) => (
-        <UnifiedCardSkeleton key={i} mode="browse" />
+        <UnifiedCardSkeleton key={i} />
       ))}
     </div>
   );

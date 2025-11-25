@@ -2,13 +2,14 @@
  * Unified Card Component
  *
  * A flexible card component that works with both Entity and Artifact types.
- * Supports selection mode (for /manage) and browse mode (for /collection).
+ * Uses the ArtifactCard visual style (colored borders, metadata-rich layout) everywhere.
  *
  * Design decisions:
  * - Type guards detect Entity vs Artifact at runtime
  * - Normalizes flat (Entity) and nested (Artifact) property access
- * - Maintains visual consistency with colored borders
- * - Conditionally renders features based on mode and type
+ * - Unified ArtifactCard-style appearance on all pages
+ * - Conditionally renders selection features (checkboxes) when enabled
+ * - Conditionally renders entity actions (edit, delete, etc.) for Entity types
  */
 
 "use client";
@@ -107,7 +108,7 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
 export interface UnifiedCardProps {
   /** The item to display (Entity or Artifact) */
   item: Entity | Artifact;
-  /** Whether the card is currently selected (selection mode only) */
+  /** Whether the card is currently selected (when selectable is true) */
   selected?: boolean;
   /** Whether the item can be selected (shows checkbox) */
   selectable?: boolean;
@@ -115,19 +116,19 @@ export interface UnifiedCardProps {
   onSelect?: (selected: boolean) => void;
   /** Callback when card is clicked */
   onClick?: () => void;
-  /** Callback for edit action (Entity mode only) */
+  /** Callback for edit action (Entity types only, shows in actions menu) */
   onEdit?: () => void;
-  /** Callback for delete action (Entity mode only) */
+  /** Callback for delete action (Entity types only, shows in actions menu) */
   onDelete?: () => void;
-  /** Callback for deploy action (Entity mode only) */
+  /** Callback for deploy action (Entity types only, shows in actions menu) */
   onDeploy?: () => void;
-  /** Callback for sync action (Entity mode only) */
+  /** Callback for sync action (Entity types only, shows in actions menu) */
   onSync?: () => void;
-  /** Callback to view diff (Entity mode only) */
+  /** Callback to view diff (Entity types only, shows in actions menu) */
   onViewDiff?: () => void;
-  /** Callback to rollback (Entity mode only) */
+  /** Callback to rollback (Entity types only, shows in actions menu) */
   onRollback?: () => void;
-  /** Display mode: selection for /manage, browse for /collection */
+  /** @deprecated mode prop is no longer used - visual style is now unified */
   mode?: "selection" | "browse";
 }
 
@@ -170,14 +171,13 @@ const statusLabels: Record<string, string> = {
  * UnifiedCard - Universal card component for Entity and Artifact types
  *
  * Automatically detects the type of item and renders appropriately.
- * Supports both selection mode (with checkboxes and actions) and browse mode
- * (with colored borders and metadata).
+ * Uses the ArtifactCard visual style (colored borders, metadata display) everywhere.
+ * Conditionally shows checkboxes and actions based on props.
  *
- * @example Selection mode (for /manage)
+ * @example With selection (for /manage)
  * ```tsx
  * <UnifiedCard
  *   item={entity}
- *   mode="selection"
  *   selected={true}
  *   selectable={true}
  *   onSelect={(checked) => updateSelection(checked)}
@@ -186,11 +186,10 @@ const statusLabels: Record<string, string> = {
  * />
  * ```
  *
- * @example Browse mode (for /collection)
+ * @example Without selection (for /collection)
  * ```tsx
  * <UnifiedCard
  *   item={artifact}
- *   mode="browse"
  *   onClick={() => openDetail(artifact)}
  * />
  * ```
@@ -207,13 +206,11 @@ export const UnifiedCard = React.memo(function UnifiedCard({
   onSync,
   onViewDiff,
   onRollback,
-  mode = "selection",
+  mode, // Deprecated but kept for backward compatibility
 }: UnifiedCardProps) {
   const queryClient = useQueryClient();
   const data = normalizeCardData(item);
   const config = getEntityTypeConfig(data.type as EntityType);
-  const isBrowseMode = mode === "browse";
-  const isSelectionMode = mode === "selection";
 
   // Type-safe icon lookup with fallback
   const IconComponent = (LucideIcons as any)[config.icon] as
@@ -290,50 +287,66 @@ export const UnifiedCard = React.memo(function UnifiedCard({
     return date.toLocaleDateString();
   };
 
-  // Browse mode rendering (for /collection)
-  if (isBrowseMode) {
-    return (
-      <Card
-        className={cn(
-          "cursor-pointer transition-all hover:shadow-md hover:border-primary/50 border-l-4",
-          artifactTypeBorderAccents[data.type],
-          artifactTypeCardTints[data.type]
-        )}
-        onClick={handleCardClick}
-        onMouseEnter={handleMouseEnter}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClick?.();
-          }
-        }}
-        aria-label={`View details for ${data.name}`}
-      >
-        {/* Header with icon and status badge */}
-        <div className="p-4 pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div
-                className={cn(
-                  "flex-shrink-0 p-2 rounded-md border",
-                  data.status && statusColors[data.status]
-                )}
-              >
-                <Icon className={cn("h-4 w-4", config.color)} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold truncate" title={data.name}>
-                  {data.title || data.name}
-                </h3>
-                {data.title && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {data.name}
-                  </p>
-                )}
-              </div>
+  // Unified ArtifactCard-style rendering for both modes
+  return (
+    <Card
+      className={cn(
+        "cursor-pointer transition-all hover:shadow-md hover:border-primary/50 border-l-4",
+        artifactTypeBorderAccents[data.type],
+        artifactTypeCardTints[data.type],
+        selected && "ring-2 ring-primary"
+      )}
+      onClick={handleCardClick}
+      onMouseEnter={handleMouseEnter}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      aria-label={`View details for ${data.name}`}
+    >
+      {/* Header with icon and status badge */}
+      <div className="p-4 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {/* Checkbox (selection mode only) */}
+            {selectable && (
+              <Checkbox
+                checked={selected}
+                onCheckedChange={handleCheckboxChange}
+                className="flex-shrink-0"
+                aria-label={`Select ${data.name}`}
+              />
+            )}
+
+            {/* Icon with status border */}
+            <div
+              className={cn(
+                "flex-shrink-0 p-2 rounded-md border",
+                data.status && statusColors[data.status]
+              )}
+            >
+              <Icon className={cn("h-4 w-4", config.color)} />
             </div>
+
+            {/* Name and title */}
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold truncate" title={data.name}>
+                {data.title || data.name}
+              </h3>
+              {data.title && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {data.name}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Status badge and actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             {data.status && (
               <Badge
                 className={cn("flex-shrink-0", statusColors[data.status])}
@@ -342,154 +355,76 @@ export const UnifiedCard = React.memo(function UnifiedCard({
                 {statusLabels[data.status] || data.status}
               </Badge>
             )}
+            {isEntity(item) && (
+              <EntityActions
+                entity={item}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onDeploy={onDeploy}
+                onSync={onSync}
+                onViewDiff={onViewDiff}
+                onRollback={onRollback}
+              />
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="px-4 pb-4 space-y-3">
-          {/* Description */}
-          {truncatedDescription && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {truncatedDescription}
-            </p>
-          )}
+      {/* Content */}
+      <div className="px-4 pb-4 space-y-3">
+        {/* Description */}
+        {truncatedDescription && (
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {truncatedDescription}
+          </p>
+        )}
 
-          {/* Metadata row */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            {data.version && (
-              <div className="flex items-center gap-1" title="Version">
-                <LucideIcons.Package className="h-3 w-3" />
-                <span>{data.version}</span>
-              </div>
-            )}
-            {data.updatedAt && (
-              <div className="flex items-center gap-1" title="Last updated">
-                <LucideIcons.Clock className="h-3 w-3" />
-                <span>{formatRelativeTime(data.updatedAt)}</span>
-              </div>
-            )}
-            {data.usageCount !== undefined && (
-              <div className="flex items-center gap-1" title="Usage count">
-                <LucideIcons.TrendingUp className="h-3 w-3" />
-                <span>{data.usageCount}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          {displayTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {displayTags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {remainingTagsCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{remainingTagsCount}
-                </Badge>
-              )}
+        {/* Metadata row */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {data.version && (
+            <div className="flex items-center gap-1" title="Version">
+              <LucideIcons.Package className="h-3 w-3" />
+              <span>{data.version}</span>
             </div>
           )}
-
-          {/* Warnings */}
-          {data.isOutdated && (
-            <div className="flex items-center gap-1 text-xs text-yellow-600">
-              <LucideIcons.AlertCircle className="h-3 w-3" />
-              <span>Update available</span>
+          {data.updatedAt && (
+            <div className="flex items-center gap-1" title="Last updated">
+              <LucideIcons.Clock className="h-3 w-3" />
+              <span>{formatRelativeTime(data.updatedAt)}</span>
+            </div>
+          )}
+          {data.usageCount !== undefined && (
+            <div className="flex items-center gap-1" title="Usage count">
+              <LucideIcons.TrendingUp className="h-3 w-3" />
+              <span>{data.usageCount}</span>
             </div>
           )}
         </div>
-      </Card>
-    );
-  }
 
-  // Selection mode rendering (for /manage)
-  return (
-    <Card
-      className={cn(
-        "p-4 transition-colors cursor-pointer hover:bg-accent/50",
-        selected && "ring-2 ring-primary"
-      )}
-      onClick={handleCardClick}
-      onMouseEnter={handleMouseEnter}
-    >
-      {/* Header: Checkbox, Icon, Name, Actions */}
-      <div className="flex items-start gap-3 mb-3">
-        {selectable && (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={handleCheckboxChange}
-            className="mt-1"
-            aria-label={`Select ${data.name}`}
-          />
-        )}
-
-        <Icon className={cn("h-5 w-5 mt-0.5", config.color)} />
-
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm truncate">
-            {data.title || data.name}
-          </h3>
-        </div>
-
-        {isEntity(item) && (
-          <EntityActions
-            entity={item}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onDeploy={onDeploy}
-            onSync={onSync}
-            onViewDiff={onViewDiff}
-            onRollback={onRollback}
-          />
-        )}
-      </div>
-
-      {/* Type Badge */}
-      <div className="mb-2">
-        <Badge variant="secondary" className="text-xs">
-          {config.label}
-        </Badge>
-      </div>
-
-      {/* Description */}
-      {truncatedDescription && (
-        <p className="text-sm text-muted-foreground mb-3">
-          {truncatedDescription}
-        </p>
-      )}
-
-      {/* Tags */}
-      {displayTags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {displayTags.map((tag) => (
-            <Badge key={tag} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-          {remainingTagsCount > 0 && (
-            <Badge variant="outline" className="text-xs">
-              +{remainingTagsCount} more
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Status Indicator */}
-      {data.status && (
-        <div className="flex items-center gap-2 text-sm">
-          <span
-            className={cn(
-              "inline-block w-2 h-2 rounded-full",
-              statusColors[data.status]
+        {/* Tags */}
+        {displayTags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {displayTags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+            {remainingTagsCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                +{remainingTagsCount}
+              </Badge>
             )}
-          />
-          <span className="text-muted-foreground">
-            {statusLabels[data.status] || data.status}
-          </span>
-        </div>
-      )}
+          </div>
+        )}
+
+        {/* Warnings */}
+        {data.isOutdated && (
+          <div className="flex items-center gap-1 text-xs text-yellow-600">
+            <LucideIcons.AlertCircle className="h-3 w-3" />
+            <span>Update available</span>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }, (prevProps, nextProps) => {
@@ -504,8 +439,7 @@ export const UnifiedCard = React.memo(function UnifiedCard({
     prevData.description === nextData.description &&
     prevData.tags?.join(",") === nextData.tags?.join(",") &&
     prevProps.selected === nextProps.selected &&
-    prevProps.selectable === nextProps.selectable &&
-    prevProps.mode === nextProps.mode
+    prevProps.selectable === nextProps.selectable
   );
 });
 
@@ -513,65 +447,53 @@ export const UnifiedCard = React.memo(function UnifiedCard({
  * UnifiedCardSkeleton - Loading skeleton for unified card
  *
  * Displays a placeholder while data is being fetched.
+ * Uses the same ArtifactCard-style layout for both modes.
  *
- * @param mode - Display mode (selection or browse)
+ * @param selectable - Whether to show checkbox skeleton (selection mode)
  */
-export function UnifiedCardSkeleton({ mode = "selection" }: { mode?: "selection" | "browse" }) {
-  if (mode === "browse") {
-    return (
-      <Card className="border-l-4">
-        <div className="p-4 pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-1">
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            </div>
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
-        </div>
-        <div className="px-4 pb-4 space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <div className="flex gap-4">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-          <div className="flex gap-1">
-            <Skeleton className="h-5 w-12 rounded-full" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-5 w-14 rounded-full" />
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
+export function UnifiedCardSkeleton({ selectable = false }: { selectable?: boolean }) {
   return (
-    <Card className="p-4">
-      <div className="flex items-start gap-3 mb-3">
-        <Skeleton className="h-5 w-5 rounded" />
-        <Skeleton className="h-5 flex-1" />
-        <Skeleton className="h-8 w-8 rounded" />
+    <Card className="border-l-4">
+      <div className="p-4 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1">
+            {/* Checkbox skeleton (selection mode only) */}
+            {selectable && <Skeleton className="h-4 w-4 flex-shrink-0 rounded" />}
+
+            {/* Icon skeleton */}
+            <Skeleton className="h-8 w-8 rounded-md flex-shrink-0" />
+
+            {/* Name skeleton */}
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+
+          {/* Status badge and actions skeleton */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded" />
+          </div>
+        </div>
       </div>
+      <div className="px-4 pb-4 space-y-3">
+        {/* Description skeleton */}
+        <Skeleton className="h-10 w-full" />
 
-      <div className="mb-2">
-        <Skeleton className="h-5 w-20" />
-      </div>
+        {/* Metadata skeleton */}
+        <div className="flex gap-4">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-16" />
+        </div>
 
-      <Skeleton className="h-4 w-full mb-2" />
-      <Skeleton className="h-4 w-3/4 mb-3" />
-
-      <div className="flex gap-2 mb-3">
-        <Skeleton className="h-5 w-16" />
-        <Skeleton className="h-5 w-20" />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-2 w-2 rounded-full" />
-        <Skeleton className="h-4 w-16" />
+        {/* Tags skeleton */}
+        <div className="flex gap-1">
+          <Skeleton className="h-5 w-12 rounded-full" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-14 rounded-full" />
+        </div>
       </div>
     </Card>
   );

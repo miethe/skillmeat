@@ -48,7 +48,7 @@ export interface EntityCardProps {
  * EntityCard - Grid view card for displaying a single entity
  *
  * Renders entity information in card format with icon, name, type badge, description,
- * tags, status indicator, and action menu. Used in grid view mode.
+ * tags, status indicator, and action menu. Uses the unified ArtifactCard visual style.
  *
  * @example
  * ```tsx
@@ -64,10 +64,10 @@ export interface EntityCardProps {
  * ```
  *
  * @param props - EntityCardProps configuration
- * @returns Unified card component in selection mode
+ * @returns Unified card component with consistent ArtifactCard styling
  */
 export function EntityCard(props: EntityCardProps) {
-  return <UnifiedCard {...props} item={props.entity} mode="selection" />;
+  return <UnifiedCard {...props} item={props.entity} />;
 }
 
 /**
@@ -75,6 +75,7 @@ export function EntityCard(props: EntityCardProps) {
  *
  * Displays a placeholder while entity data is being fetched to prevent
  * layout shift and provide visual feedback to the user.
+ * Uses the same unified ArtifactCard-style layout.
  *
  * @example
  * ```tsx
@@ -87,8 +88,8 @@ export function EntityCard(props: EntityCardProps) {
  * )}
  * ```
  *
- * @returns Skeleton component matching EntityCard layout
+ * @returns Skeleton component matching EntityCard layout with selection checkbox
  */
 export function EntityCardSkeleton() {
-  return <UnifiedCardSkeleton mode="selection" />;
+  return <UnifiedCardSkeleton selectable={true} />;
 }
