@@ -14,6 +14,7 @@ import {
   Bot,
   Plug,
   Code,
+  Settings,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -172,17 +173,23 @@ export default function ProjectDetailPage() {
             </div>
             <p className="text-sm font-mono text-muted-foreground">{project.path}</p>
           </div>
-          <Button variant="outline" asChild>
-            <a
-              href={`file://${project.path}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2"
-            >
-              Open in Finder
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => router.push(`/projects/${projectId}/manage`)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Entities
+            </Button>
+            <Button variant="outline" asChild>
+              <a
+                href={`file://${project.path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                Open in Finder
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
         </div>
       </div>
 

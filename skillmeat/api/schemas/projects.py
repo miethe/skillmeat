@@ -1,9 +1,12 @@
 """Project API schemas for request and response models."""
 
+import os
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .common import PageInfo, PaginatedResponse
 
@@ -227,5 +230,230 @@ class ModifiedArtifactsResponse(BaseModel):
                 ],
                 "total_count": 2,
                 "last_checked": "2025-11-20T16:00:00Z",
+            }
+        }
+
+
+class ProjectCreateRequest(BaseModel):
+    """Request schema for creating a project."""
+
+    name: str = Field(
+        description="Project name (1-100 characters, letters, numbers, hyphens, underscores only)",
+        examples=["my-awesome-project"],
+        min_length=1,
+        max_length=100,
+    )
+    path: str = Field(
+        description="Absolute path to project directory",
+        examples=["/Users/john/projects/my-awesome-project"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Project description",
+        examples=["A project for managing Claude configurations"],
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate project name format.
+
+        Requirements:
+        - 1-100 characters (handled by Field constraints)
+        - Only letters, numbers, hyphens, underscores
+        - Cannot start or end with hyphen or underscore
+
+        Args:
+            v: The project name to validate
+
+        Returns:
+            The validated name
+
+        Raises:
+            ValueError: If name format is invalid
+        """
+        # Check for valid characters: alphanumeric, hyphen, underscore
+        if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$", v):
+            raise ValueError(
+                "Project name must start and end with alphanumeric characters "
+                "and can only contain letters, numbers, hyphens, and underscores"
+            )
+        return v
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        """Validate project path format.
+
+        Requirements:
+        - Must be an absolute path
+        - Must have valid filesystem path characters
+        - Platform-specific invalid character detection
+
+        Args:
+            v: The project path to validate
+
+        Returns:
+            The validated path
+
+        Raises:
+            ValueError: If path is invalid
+        """
+        # Must be absolute path
+        if not os.path.isabs(v):
+            raise ValueError("Project path must be an absolute path (e.g., /home/user/project or C:\\Users\\project)")
+
+        # Check for invalid characters (platform-specific)
+        # Windows reserved characters
+        if os.name == "nt":
+            invalid_chars = '<>"|?*'
+            if any(c in v for c in invalid_chars):
+                raise ValueError(
+                    f"Project path contains invalid Windows characters: {invalid_chars}"
+                )
+        # Unix null character
+        else:
+            if "\0" in v:
+                raise ValueError("Project path contains null character")
+
+        # Validate path doesn't have consecutive separators or other obvious issues
+        try:
+            Path(v)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid path format: {str(e)}")
+
+        return v
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "name": "my-awesome-project",
+                "path": "/Users/john/projects/my-awesome-project",
+                "description": "A project for managing Claude configurations",
+            }
+        }
+
+
+class ProjectUpdateRequest(BaseModel):
+    """Request schema for updating a project."""
+
+    name: Optional[str] = Field(
+        default=None,
+        description="New project name (1-100 characters, letters, numbers, hyphens, underscores only)",
+        examples=["renamed-project"],
+        min_length=1,
+        max_length=100,
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="New project description",
+        examples=["Updated project description"],
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        """Validate project name format if provided.
+
+        Requirements:
+        - 1-100 characters (handled by Field constraints)
+        - Only letters, numbers, hyphens, underscores
+        - Cannot start or end with hyphen or underscore
+
+        Args:
+            v: The project name to validate (or None)
+
+        Returns:
+            The validated name or None
+
+        Raises:
+            ValueError: If name format is invalid
+        """
+        # Skip validation if name is not provided
+        if v is None:
+            return v
+
+        # Check for valid characters: alphanumeric, hyphen, underscore
+        if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$", v):
+            raise ValueError(
+                "Project name must start and end with alphanumeric characters "
+                "and can only contain letters, numbers, hyphens, and underscores"
+            )
+        return v
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "name": "renamed-project",
+                "description": "Updated project description",
+            }
+        }
+
+
+class ProjectCreateResponse(BaseModel):
+    """Response for project creation."""
+
+    id: str = Field(
+        description="Base64-encoded project path (unique identifier)",
+        examples=["L1VzZXJzL2pvaG4vcHJvamVjdHMvbXktcHJvamVjdA=="],
+    )
+    path: str = Field(
+        description="Absolute filesystem path to project",
+        examples=["/Users/john/projects/my-project"],
+    )
+    name: str = Field(
+        description="Project name",
+        examples=["my-project"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Project description",
+    )
+    created_at: datetime = Field(
+        description="Project creation timestamp",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "id": "L1VzZXJzL2pvaG4vcHJvamVjdHMvbXktcHJvamVjdA==",
+                "path": "/Users/john/projects/my-project",
+                "name": "my-project",
+                "description": "A sample project",
+                "created_at": "2025-11-24T12:00:00Z",
+            }
+        }
+
+
+class ProjectDeleteResponse(BaseModel):
+    """Response for project deletion."""
+
+    success: bool = Field(
+        description="Whether the deletion was successful",
+        examples=[True],
+    )
+    message: str = Field(
+        description="Human-readable status message",
+        examples=["Project removed from tracking successfully"],
+    )
+    deleted_files: bool = Field(
+        default=False,
+        description="Whether project files were deleted from disk",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Project removed from tracking successfully",
+                "deleted_files": False,
             }
         }
