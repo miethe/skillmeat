@@ -624,7 +624,9 @@ class DriftDetectionResult:
     artifact_name: str
     artifact_type: str  # ArtifactType.value
     drift_type: Literal[
-        "modified",  # Artifact modified in collection
+        "modified",  # Artifact modified in project only (local changes)
+        "outdated",  # Artifact modified in collection only (upstream changes)
+        "conflict",  # Both project and collection modified (three-way conflict)
         "added",  # Artifact added to collection (not in project)
         "removed",  # Artifact removed from collection
         "version_mismatch",  # Version changed but content may be same
@@ -638,7 +640,7 @@ class DriftDetectionResult:
 
     def __post_init__(self):
         """Validate drift type."""
-        valid_types = {"modified", "added", "removed", "version_mismatch"}
+        valid_types = {"modified", "outdated", "conflict", "added", "removed", "version_mismatch"}
         if self.drift_type not in valid_types:
             raise ValueError(
                 f"Invalid drift_type '{self.drift_type}'. Must be one of {valid_types}"

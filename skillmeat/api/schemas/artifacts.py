@@ -145,8 +145,8 @@ class ArtifactUpstreamInfo(BaseModel):
     )
     drift_status: Optional[str] = Field(
         default=None,
-        description="Drift status (none, modified, deleted, added)",
-        examples=["modified"],
+        description="Drift status: none (no changes), modified (local changes only), outdated (upstream changes only), conflict (both changed), added (new in collection), removed (deleted from collection)",
+        examples=["conflict"],
     )
 
 

@@ -200,10 +200,21 @@ function mapApiArtifactToEntity(artifact: ArtifactResponse, mode: 'collection' |
   const upstream = artifact.upstream;
   const isOutdated = upstream?.update_available ?? false;
   const hasLocalMods = upstream?.has_local_modifications ?? false;
+  const driftStatus = upstream?.drift_status;
 
+  // Determine entity status based on drift detection
+  // Priority: conflict > modified > outdated > synced
   let status: EntityStatus = 'synced';
-  if (hasLocalMods) status = 'modified';
-  else if (isOutdated) status = 'outdated';
+  if (driftStatus === 'conflict') {
+    // Three-way conflict: both collection and project changed
+    status = 'conflict';
+  } else if (hasLocalMods || driftStatus === 'modified') {
+    // Local modifications only (project changed, collection unchanged)
+    status = 'modified';
+  } else if (isOutdated || driftStatus === 'outdated') {
+    // Upstream changes only (collection changed, project unchanged)
+    status = 'outdated';
+  }
 
   return {
     id: artifact.id,
