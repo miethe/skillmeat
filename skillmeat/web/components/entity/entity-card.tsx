@@ -9,13 +9,17 @@
 
 import * as React from "react";
 import * as LucideIcons from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/api";
 import type { Entity } from "@/types/entity";
 import { getEntityTypeConfig } from "@/types/entity";
 import { EntityActions } from "./entity-actions";
+import type { ArtifactDiffResponse } from "@/sdk";
 
 /**
  * Props for EntityCard component
@@ -83,6 +87,7 @@ export const EntityCard = React.memo(function EntityCard({
   onViewDiff,
   onRollback,
 }: EntityCardProps) {
+  const queryClient = useQueryClient();
   const config = getEntityTypeConfig(entity.type);
   // Type-safe icon lookup with fallback
   const IconComponent = (LucideIcons as any)[config.icon] as React.ComponentType<{ className?: string }> | undefined;
@@ -117,6 +122,30 @@ export const EntityCard = React.memo(function EntityCard({
     onSelect?.(checked);
   };
 
+  // Prefetch entity data on hover for faster modal opening
+  const handleMouseEnter = () => {
+    // Prefetch diff data if entity is modified or outdated
+    if ((entity.status === 'modified' || entity.status === 'outdated') && entity.projectPath) {
+      queryClient.prefetchQuery({
+        queryKey: ['artifact-diff', entity.id, entity.projectPath],
+        queryFn: async () => {
+          const params = new URLSearchParams({
+            project_path: entity.projectPath!,
+          });
+
+          if (entity.collection) {
+            params.set('collection', entity.collection);
+          }
+
+          return await apiRequest<ArtifactDiffResponse>(
+            `/artifacts/${entity.id}/diff?${params.toString()}`
+          );
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+    }
+  };
+
   // Truncate description
   const truncatedDescription =
     entity.description && entity.description.length > 100
@@ -134,6 +163,7 @@ export const EntityCard = React.memo(function EntityCard({
         selected && "ring-2 ring-primary"
       )}
       onClick={handleCardClick}
+      onMouseEnter={handleMouseEnter}
     >
       {/* Header: Checkbox, Icon, Name, Actions */}
       <div className="flex items-start gap-3 mb-3">
@@ -213,3 +243,51 @@ export const EntityCard = React.memo(function EntityCard({
     prevProps.selectable === nextProps.selectable
   );
 });
+
+/**
+ * EntityCardSkeleton - Loading skeleton for entity card
+ *
+ * Displays a placeholder while entity data is being fetched to prevent
+ * layout shift and provide visual feedback to the user.
+ *
+ * @example
+ * ```tsx
+ * {isLoading && (
+ *   <div className="grid gap-4">
+ *     {Array.from({ length: 6 }).map((_, i) => (
+ *       <EntityCardSkeleton key={i} />
+ *     ))}
+ *   </div>
+ * )}
+ * ```
+ *
+ * @returns Skeleton component matching EntityCard layout
+ */
+export function EntityCardSkeleton() {
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3 mb-3">
+        <Skeleton className="h-5 w-5 rounded" />
+        <Skeleton className="h-5 flex-1" />
+        <Skeleton className="h-8 w-8 rounded" />
+      </div>
+
+      <div className="mb-2">
+        <Skeleton className="h-5 w-20" />
+      </div>
+
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-4 w-3/4 mb-3" />
+
+      <div className="flex gap-2 mb-3">
+        <Skeleton className="h-5 w-16" />
+        <Skeleton className="h-5 w-20" />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-2 w-2 rounded-full" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+    </Card>
+  );
+}
