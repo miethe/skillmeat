@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,8 @@ import { RollbackDialog } from '@/components/entity/rollback-dialog';
 import { MergeWorkflow } from '@/components/entity/merge-workflow';
 import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
+import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
+import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
@@ -178,6 +180,7 @@ function EntityModalSkeleton() {
  *
  * Features:
  * - Overview tab with metadata, status, version, tags, timestamps, location
+ * - Contents tab with file tree, file creation, and file deletion
  * - Sync Status tab with deploy/sync buttons, diff viewer, status alerts
  * - History tab with timeline of deploy/sync/rollback events
  * - Skeleton loading state
@@ -202,7 +205,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [showFileCreationDialog, setShowFileCreationDialog] = useState(false);
+  const [showFileDeletionDialog, setShowFileDeletionDialog] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Generate mock history entries
   const historyEntries = useMemo(() => {
@@ -215,6 +222,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     data: filesData,
     isLoading: isFilesLoading,
     error: filesError,
+    refetch: refetchFiles,
   } = useQuery<FileListResponse>({
     queryKey: ['artifact-files', entity?.id],
     queryFn: async () => {
@@ -500,6 +508,91 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     }
   };
 
+  const handleCreateFile = async (fileName: string) => {
+    if (!entity?.id) {
+      throw new Error('No entity selected');
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      const requestBody: FileUpdateRequest = { content: '' };
+
+      await apiRequest<FileContentResponse>(
+        `/artifacts/${entity.id}/files/${encodeURIComponent(fileName)}?${params.toString()}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      toast({
+        title: 'File Created',
+        description: `${fileName} has been created successfully.`,
+      });
+
+      // Refresh file list
+      await refetchFiles();
+
+      // Invalidate and refetch file list query
+      queryClient.invalidateQueries({ queryKey: ['artifact-files', entity.id] });
+
+      // Auto-select the newly created file
+      setSelectedPath(fileName);
+    } catch (error) {
+      console.error('Create file failed:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteFile = async (filePath: string) => {
+    setFileToDelete(filePath);
+    setShowFileDeletionDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!entity?.id || !fileToDelete) {
+      throw new Error('No file selected for deletion');
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      await apiRequest(
+        `/artifacts/${entity.id}/files/${encodeURIComponent(fileToDelete)}?${params.toString()}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      toast({
+        title: 'File Deleted',
+        description: `${fileToDelete} has been deleted successfully.`,
+      });
+
+      // Clear selection if deleted file was selected
+      if (selectedPath === fileToDelete) {
+        setSelectedPath(null);
+      }
+
+      // Refresh file list
+      await refetchFiles();
+
+      // Invalidate and refetch file list query
+      queryClient.invalidateQueries({ queryKey: ['artifact-files', entity.id] });
+    } catch (error) {
+      console.error('Delete file failed:', error);
+      throw error;
+    }
+  };
+
   const handleRetryDiff = async () => {
     try {
       await refetchDiff();
@@ -644,7 +737,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           <>
             {/* Has changes - show diff viewer */}
             {diffData.has_changes && diffData.files && diffData.files.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden bg-background h-[500px]">
+              <div className="border rounded-lg overflow-hidden bg-background">
                 <DiffViewer
                   files={diffData.files}
                   leftLabel={entity.collection ? 'Collection' : 'Current'}
@@ -698,9 +791,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-x-hidden overflow-y-hidden flex flex-col p-0">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           {/* Header Section - Fixed */}
-          <div className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+          <div className="px-6 pt-6 pb-4 border-b">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 {IconComponent && <IconComponent className={`h-5 w-5 ${config.color}`} />}
@@ -870,21 +963,23 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="flex-1 mt-0 min-h-0 overflow-hidden">
-              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6 overflow-hidden">
+            <TabsContent value="contents" className="flex-1 mt-0">
+              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6">
                 {/* File Tree - Left Panel */}
-                <div className="w-1/3 border-r overflow-hidden flex-shrink-0">
+                <div className="w-1/3 border-r">
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
                     selectedPath={selectedPath}
                     onSelect={setSelectedPath}
+                    onAddFile={() => setShowFileCreationDialog(true)}
+                    onDeleteFile={handleDeleteFile}
                     isLoading={isFilesLoading}
                   />
                 </div>
 
                 {/* Content Pane - Right Panel */}
-                <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="flex-1">
                   <ContentPane
                     path={selectedPath}
                     content={contentData?.content || null}
@@ -1119,6 +1214,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           </DialogContent>
         </Dialog>
       )}
+
+      {/* File Creation Dialog */}
+      <FileCreationDialog
+        open={showFileCreationDialog}
+        onOpenChange={setShowFileCreationDialog}
+        onConfirm={handleCreateFile}
+      />
+
+      {/* File Deletion Dialog */}
+      <FileDeletionDialog
+        open={showFileDeletionDialog}
+        onOpenChange={setShowFileDeletionDialog}
+        onConfirm={handleConfirmDelete}
+        fileName={fileToDelete}
+      />
     </>
   );
 }
