@@ -112,22 +112,48 @@ class SyncManager:
             # Compute current collection SHA
             collection_sha = self._compute_artifact_hash(collection_artifact["path"])
 
-            # Compare SHAs
-            if collection_sha != deployed.sha:
-                # Drift detected - artifact modified
+            # Compute current project SHA (check if project has local modifications)
+            project_artifact_path = self._get_project_artifact_path(
+                project_path, deployed.name, deployed.artifact_type
+            )
+            current_project_sha = deployed.sha  # Default to deployed SHA
+            if project_artifact_path and project_artifact_path.exists():
+                current_project_sha = self._compute_artifact_hash(project_artifact_path)
+
+            # Three-way conflict detection:
+            # - deployed.sha is the "base" (what was deployed)
+            # - collection_sha is "upstream" (current collection state)
+            # - current_project_sha is "local" (current project state)
+
+            collection_changed = collection_sha != deployed.sha
+            project_changed = current_project_sha != deployed.sha
+
+            if collection_changed or project_changed:
+                # Determine drift type
+                if collection_changed and project_changed:
+                    # CONFLICT: Both collection and project changed since deployment
+                    drift_type = "conflict"
+                    recommendation = "review_manually"
+                elif collection_changed:
+                    # Collection changed, project unchanged (simple update available)
+                    drift_type = "outdated"
+                    recommendation = "pull_from_collection"
+                else:
+                    # Project changed, collection unchanged (local modifications only)
+                    drift_type = "modified"
+                    recommendation = "push_to_collection"
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
                         artifact_type=deployed.artifact_type,
-                        drift_type="modified",
+                        drift_type=drift_type,
                         collection_sha=collection_sha,
-                        project_sha=deployed.sha,
+                        project_sha=current_project_sha,
                         collection_version=collection_artifact.get("version"),
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
-                        recommendation=self._recommend_sync_direction(
-                            collection_artifact, deployed
-                        ),
+                        recommendation=recommendation,
                     )
                 )
 
