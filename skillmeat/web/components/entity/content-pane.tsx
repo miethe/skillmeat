@@ -316,39 +316,48 @@ export function ContentPane({
     );
   }
 
-  // Edit mode with markdown editor
-  if (isEditing && isMarkdown) {
+  // Markdown file - always use split preview (shows rendered markdown)
+  if (isMarkdown) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="h-full flex flex-col overflow-hidden">
         {/* Header with breadcrumb and actions */}
-        <div className="border-b p-4 flex items-center justify-between bg-muted/20">
+        <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
           <Breadcrumb path={path} />
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCancelClick}
-              disabled={isSaving}
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleSaveClick}
-              disabled={isSaving}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-          </div>
+          {isEditing ? (
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelClick}
+                disabled={isSaving}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSaveClick}
+                disabled={isSaving}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          ) : (
+            canEdit && (
+              <Button variant="ghost" size="sm" onClick={handleEditClick}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )
+          )}
         </div>
 
-        {/* Split-view editor and preview */}
-        <div className="flex-1 p-4 overflow-hidden">
+        {/* Split-view editor and preview - preview always shown for markdown */}
+        <div className="flex-1 p-4 overflow-hidden min-h-0">
           <SplitPreview
-            content={editedContent}
+            content={isEditing ? editedContent : content}
             onChange={setEditedContent}
             isEditing={isEditing}
           />
@@ -357,11 +366,11 @@ export function ContentPane({
     );
   }
 
-  // Content display (read-only mode)
+  // Content display (read-only mode for non-markdown files)
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Header with breadcrumb and actions */}
-      <div className="border-b p-4 flex items-center justify-between bg-muted/20">
+      <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
         <Breadcrumb path={path} />
         {canEdit && !isEditing && (
           <Button variant="ghost" size="sm" onClick={handleEditClick}>
@@ -371,9 +380,9 @@ export function ContentPane({
         )}
       </div>
 
-      {/* Scrollable content area */}
-      <ScrollArea className="flex-1">
-        <div className="p-4">
+      {/* Scrollable content area with horizontal scroll when needed */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-4 overflow-x-auto">
           <ContentDisplay content={content} showLineNumbers={false} />
         </div>
       </ScrollArea>
