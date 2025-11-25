@@ -9,7 +9,8 @@
 
 **Branch:** claude/web-ui-consolidation-01ScmCA55uej61fk5y4VJpwU
 **Started:** 2025-11-25
-**Current Phase:** Phase 1 - Unified Modal & Sync Fix
+**Completed:** 2025-11-25
+**Status:** ALL PHASES COMPLETE (22/22 tasks, 35 pts)
 
 ---
 
@@ -55,8 +56,40 @@
 
 ## Session Log
 
-### 2025-11-25 - Session 1
-- Completed WUI-001 audit
-- Documented differences between two modal implementations
-- Decision: Use Dialog container with Entity types
-- Starting WUI-002: Create UnifiedEntityModal
+### 2025-11-25 - Session 1 (COMPLETE)
+
+**Phase 1: Unified Modal & Sync Fix (10 pts)** ✅
+- Audited entity-detail-panel.tsx vs artifact-detail.tsx
+- Created UnifiedEntityModal with Dialog container
+- Added Overview, Sync Status, and History tabs
+- Fixed handleSync/handleDeploy (no more console.log)
+- Updated both /manage pages to use new modal
+
+**Phase 2: Contents Tab & File Browser (10 pts)** ✅
+- Created FileTree component with recursive rendering
+- Created ContentPane component with scrollable content
+- Added Contents tab with 33/67 split layout
+- Added GET /artifacts/{id}/files API endpoint
+- Added GET /artifacts/{id}/files/{path} API endpoint
+- Implemented path traversal protection
+
+**Phase 3: Content Editing & CodeMirror (8 pts)** ✅
+- Installed CodeMirror 6 packages
+- Created MarkdownEditor with syntax highlighting
+- Created SplitPreview with live preview
+- Wired Edit/Save/Cancel buttons in ContentPane
+- Added PUT /artifacts/{id}/files/{path} API endpoint
+
+**Phase 4: Performance & Merge Integration (7 pts)** ✅
+- Added hover prefetching for diff data
+- Created EntityCardSkeleton for loading states
+- Added refresh button to both manage pages
+- Verified DiffViewer integration
+- Added merge workflow trigger for conflicts
+- Wired all Sync Status buttons with refetch()
+
+**Commits:**
+- `63f931a` feat(web): implement UnifiedEntityModal (Phase 1)
+- `2fd050b` feat(web,api): implement Contents tab with file browser (Phase 2)
+- `734b198` feat(web,api): implement markdown editing with CodeMirror 6 (Phase 3)
+- `2adbf23` feat(web): implement performance optimizations and merge integration (Phase 4)
