@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User } from 'lucide-react';
+import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import { Entity, ENTITY_TYPES } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
+import { MergeWorkflow } from '@/components/entity/merge-workflow';
 import { FileTree, FileNode } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { useToast } from '@/hooks/use-toast';
@@ -333,6 +334,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [isDeploying, setIsDeploying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const { toast } = useToast();
@@ -419,6 +421,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         title: 'Deploy Successful',
         description: `${entity.name} has been deployed to the project.`,
       });
+      // Refresh entity data after successful deployment
+      refetch();
     } catch (error) {
       console.error('Deploy failed:', error);
       toast({
@@ -448,6 +452,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         title: 'Sync Successful',
         description: `${entity.name} has been synced with upstream.`,
       });
+      // Refresh entity data after successful sync
+      refetch();
     } catch (error) {
       console.error('Sync failed:', error);
       toast({
@@ -861,9 +867,22 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {entity.status === 'conflict' && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
-                      <AlertDescription className="text-sm">
-                        There are conflicting changes between local and upstream versions.
-                        Manual resolution may be required.
+                      <AlertDescription className="space-y-3">
+                        <p className="text-sm">
+                          There are conflicting changes between local and upstream versions.
+                          Use the merge workflow to resolve conflicts interactively.
+                        </p>
+                        {entity.projectPath && (
+                          <Button
+                            onClick={() => setShowMergeWorkflow(true)}
+                            variant="outline"
+                            size="sm"
+                            className="bg-background hover:bg-muted"
+                          >
+                            <GitMerge className="h-4 w-4 mr-2" />
+                            Resolve Conflicts
+                          </Button>
+                        )}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -985,6 +1004,31 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         onOpenChange={setShowRollbackDialog}
         onConfirm={handleRollback}
       />
+
+      {/* Merge Workflow Dialog */}
+      {showMergeWorkflow && entity.projectPath && (
+        <Dialog open={showMergeWorkflow} onOpenChange={setShowMergeWorkflow}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Resolve Conflicts - {entity.name}</DialogTitle>
+            </DialogHeader>
+            <MergeWorkflow
+              entityId={entity.id}
+              projectPath={entity.projectPath}
+              direction="upstream"
+              onComplete={() => {
+                setShowMergeWorkflow(false);
+                refetch();
+                toast({
+                  title: 'Merge Complete',
+                  description: 'Conflicts have been resolved successfully.',
+                });
+              }}
+              onCancel={() => setShowMergeWorkflow(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

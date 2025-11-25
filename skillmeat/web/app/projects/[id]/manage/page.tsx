@@ -2,8 +2,9 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package } from 'lucide-react';
+import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { EntityLifecycleProvider, useEntityLifecycle } from '@/components/entity/EntityLifecycleProvider';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
@@ -35,6 +36,8 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
   const {
     entities,
     isLoading,
+    isRefetching,
+    refetch,
     setTypeFilter,
     setStatusFilter,
     setSearchQuery,
@@ -124,6 +127,17 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Refresh button */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh entities"
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
+            </Button>
+
             {/* View mode toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
