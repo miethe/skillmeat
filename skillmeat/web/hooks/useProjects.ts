@@ -1,11 +1,11 @@
 /**
- * React Query hooks for project data fetching
+ * React Query hooks for project data fetching and mutations
  *
  * These hooks provide data fetching, caching, and state management for projects.
  * Uses live API data with mock fallbacks to keep the UI responsive offline.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ProjectSummary,
   ProjectDetail,
@@ -13,6 +13,7 @@ import type {
   ProjectDetailResponse,
 } from "@/types/project";
 import { ApiError, apiConfig, apiRequest } from "@/lib/api";
+import type { ProjectCreateRequest, ProjectUpdateRequest } from "@/sdk";
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -158,6 +159,44 @@ async function fetchProjectFromApi(id: string): Promise<ProjectDetail | null> {
   }
 }
 
+async function createProjectApi(
+  data: ProjectCreateRequest
+): Promise<ProjectDetail> {
+  const response = await apiRequest<ProjectDetail>("/projects", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  return response;
+}
+
+async function updateProjectApi(
+  id: string,
+  data: ProjectUpdateRequest
+): Promise<ProjectDetail> {
+  const response = await apiRequest<ProjectDetail>(`/projects/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  return response;
+}
+
+async function deleteProjectApi(
+  id: string,
+  deleteFiles: boolean = false
+): Promise<void> {
+  await apiRequest(`/projects/${id}?delete_files=${deleteFiles}`, {
+    method: "DELETE",
+  });
+}
+
 /**
  * Hook to fetch all projects with deployments
  */
@@ -181,5 +220,58 @@ export function useProject(id: string) {
       return await fetchProjectFromApi(id);
     },
     enabled: !!id,
+  });
+}
+
+/**
+ * Hook to create a new project
+ */
+export function useCreateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createProjectApi,
+    onSuccess: () => {
+      // Invalidate projects list to refetch
+      queryClient.invalidateQueries({ queryKey: projectKeys.list() });
+    },
+  });
+}
+
+/**
+ * Hook to update an existing project
+ */
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ProjectUpdateRequest }) =>
+      updateProjectApi(id, data),
+    onSuccess: (data) => {
+      // Invalidate both list and detail queries
+      queryClient.invalidateQueries({ queryKey: projectKeys.list() });
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.id) });
+    },
+  });
+}
+
+/**
+ * Hook to delete a project
+ */
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      deleteFiles = false,
+    }: {
+      id: string;
+      deleteFiles?: boolean;
+    }) => deleteProjectApi(id, deleteFiles),
+    onSuccess: () => {
+      // Invalidate projects list to refetch
+      queryClient.invalidateQueries({ queryKey: projectKeys.list() });
+    },
   });
 }

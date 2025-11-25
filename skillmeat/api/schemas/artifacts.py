@@ -1,11 +1,85 @@
 """Artifact API schemas for request and response models."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from .common import PaginatedResponse
+
+
+class ArtifactSourceType(str, Enum):
+    """Source type for artifact creation."""
+
+    GITHUB = "github"
+    LOCAL = "local"
+
+
+class ArtifactCreateRequest(BaseModel):
+    """Request schema for creating an artifact."""
+
+    source_type: ArtifactSourceType = Field(
+        description="Source type: github or local"
+    )
+    source: str = Field(description="GitHub URL/spec or local path")
+    artifact_type: str = Field(
+        description="Type of artifact (skill, command, agent, mcp, hook)"
+    )
+    name: Optional[str] = Field(
+        default=None, description="Override artifact name"
+    )
+    collection: Optional[str] = Field(
+        default=None, description="Target collection (uses default if not specified)"
+    )
+    tags: Optional[List[str]] = Field(default=None, description="Tags to apply")
+    description: Optional[str] = Field(default=None, description="Override description")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_type": "github",
+                "source": "anthropics/skills/canvas-design",
+                "artifact_type": "skill",
+                "name": "canvas",
+                "collection": "default",
+                "tags": ["design", "canvas"],
+                "description": "Canvas design skill",
+            }
+        }
+
+
+class ArtifactCreateResponse(BaseModel):
+    """Response for artifact creation."""
+
+    success: bool = Field(description="Whether creation succeeded")
+    artifact_id: str = Field(description="Artifact ID (format: type:name)")
+    artifact_name: str = Field(description="Name of created artifact")
+    artifact_type: str = Field(description="Type of artifact")
+    collection: str = Field(description="Collection name")
+    source: str = Field(description="Source specification or path")
+    source_type: str = Field(description="Source type (github or local)")
+    path: str = Field(description="Path to artifact in collection")
+    message: str = Field(description="Human-readable result message")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "artifact_id": "skill:canvas",
+                "artifact_name": "canvas",
+                "artifact_type": "skill",
+                "collection": "default",
+                "source": "anthropics/skills/canvas-design",
+                "source_type": "github",
+                "path": "skills/canvas",
+                "message": "Artifact 'canvas' created successfully",
+            }
+        }
 
 
 class ArtifactMetadataResponse(BaseModel):
@@ -721,5 +795,85 @@ class DeploymentStatistics(BaseModel):
                         "deployed_at": "2025-11-19T14:20:00Z",
                     },
                 ],
+            }
+        }
+
+
+# ===========================
+# Diff Schemas
+# ===========================
+
+
+class FileDiff(BaseModel):
+    """Diff information for a single file."""
+
+    file_path: str = Field(description="Relative path to file within artifact")
+    status: Literal["added", "modified", "deleted", "unchanged"] = Field(
+        description="Change status of file"
+    )
+    collection_hash: Optional[str] = Field(
+        default=None, description="SHA-256 hash in collection"
+    )
+    project_hash: Optional[str] = Field(
+        default=None, description="SHA-256 hash in project"
+    )
+    unified_diff: Optional[str] = Field(
+        default=None, description="Unified diff content (for modified files)"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "file_path": "SKILL.md",
+                "status": "modified",
+                "collection_hash": "abc123def456",
+                "project_hash": "def789ghi012",
+                "unified_diff": "--- a/SKILL.md\n+++ b/SKILL.md\n@@ -1,3 +1,3 @@\n-Old line\n+New line\n",
+            }
+        }
+
+
+class ArtifactDiffResponse(BaseModel):
+    """Response for artifact diff."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    project_path: str = Field(description="Project path")
+    has_changes: bool = Field(description="Whether any changes detected")
+    files: List[FileDiff] = Field(description="List of file diffs")
+    summary: Dict[str, int] = Field(
+        description="Summary counts: added, modified, deleted, unchanged"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "project_path": "/Users/me/my-project",
+                "has_changes": True,
+                "files": [
+                    {
+                        "file_path": "SKILL.md",
+                        "status": "modified",
+                        "collection_hash": "abc123",
+                        "project_hash": "def456",
+                        "unified_diff": "--- a/SKILL.md\n+++ b/SKILL.md\n...",
+                    }
+                ],
+                "summary": {
+                    "added": 0,
+                    "modified": 1,
+                    "deleted": 0,
+                    "unchanged": 3,
+                },
             }
         }
