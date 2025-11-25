@@ -25,6 +25,7 @@ export interface EntityListProps {
   onDeploy?: (entity: Entity) => void;
   onSync?: (entity: Entity) => void;
   onViewDiff?: (entity: Entity) => void;
+  onRollback?: (entity: Entity) => void;
 }
 
 export function EntityList({
@@ -37,6 +38,7 @@ export function EntityList({
   onDeploy,
   onSync,
   onViewDiff,
+  onRollback,
 }: EntityListProps) {
   // Use entities from context if not provided
   const context = useEntityLifecycle();
@@ -89,6 +91,7 @@ export function EntityList({
               onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
               onSync={onSync ? () => onSync(entity) : undefined}
               onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
+              onRollback={onRollback ? () => onRollback(entity) : undefined}
             />
           ))}
         </div>
@@ -125,6 +128,7 @@ export function EntityList({
             onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
             onSync={onSync ? () => onSync(entity) : undefined}
             onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
+            onRollback={onRollback ? () => onRollback(entity) : undefined}
           />
         ))}
       </div>

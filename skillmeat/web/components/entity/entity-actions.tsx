@@ -8,7 +8,7 @@
 "use client";
 
 import * as React from "react";
-import { MoreVertical, Pencil, Trash2, Rocket, RefreshCw, FileText } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { RollbackDialog } from "./rollback-dialog";
 import type { Entity } from "@/types/entity";
 
 export interface EntityActionsProps {
@@ -34,6 +35,7 @@ export interface EntityActionsProps {
   onDeploy?: () => void;
   onSync?: () => void;
   onViewDiff?: () => void;
+  onRollback?: () => void;
 }
 
 export function EntityActions({
@@ -43,8 +45,10 @@ export function EntityActions({
   onDeploy,
   onSync,
   onViewDiff,
+  onRollback,
 }: EntityActionsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [showRollbackDialog, setShowRollbackDialog] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   const handleDelete = async () => {
@@ -61,7 +65,15 @@ export function EntityActions({
     }
   };
 
+  const handleRollback = async () => {
+    if (!onRollback) return;
+    await onRollback();
+  };
+
   const showViewDiff = entity.status === "modified" && onViewDiff;
+  const showRollback =
+    (entity.status === "modified" || entity.status === "conflict") &&
+    onRollback;
 
   return (
     <>
@@ -98,6 +110,13 @@ export function EntityActions({
             <DropdownMenuItem onClick={onViewDiff}>
               <FileText className="mr-2 h-4 w-4" />
               View Diff
+            </DropdownMenuItem>
+          )}
+
+          {showRollback && (
+            <DropdownMenuItem onClick={() => setShowRollbackDialog(true)}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Rollback to Collection
             </DropdownMenuItem>
           )}
 
@@ -140,6 +159,14 @@ export function EntityActions({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rollback Confirmation Dialog */}
+      <RollbackDialog
+        entity={entity}
+        open={showRollbackDialog}
+        onOpenChange={setShowRollbackDialog}
+        onConfirm={handleRollback}
+      />
     </>
   );
 }

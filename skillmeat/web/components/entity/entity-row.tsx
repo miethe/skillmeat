@@ -27,6 +27,7 @@ export interface EntityRowProps {
   onDeploy?: () => void;
   onSync?: () => void;
   onViewDiff?: () => void;
+  onRollback?: () => void;
 }
 
 export function EntityRow({
@@ -40,6 +41,7 @@ export function EntityRow({
   onDeploy,
   onSync,
   onViewDiff,
+  onRollback,
 }: EntityRowProps) {
   const config = getEntityTypeConfig(entity.type);
   const Icon = (LucideIcons as any)[config.icon] || LucideIcons.FileText;
@@ -160,6 +162,7 @@ export function EntityRow({
           onDeploy={onDeploy}
           onSync={onSync}
           onViewDiff={onViewDiff}
+          onRollback={onRollback}
         />
       </div>
     </div>
