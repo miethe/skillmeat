@@ -1,8 +1,8 @@
 # All-Phases Progress: Web UI Consolidation & Enhancements
 
-**Status:** NOT STARTED
+**Status:** IN PROGRESS
 **Last Updated:** 2025-11-25
-**Completion:** 0% (0 of 22 tasks)
+**Completion:** 27% (6 of 22 tasks)
 **Total Effort:** ~35 story points
 
 **Related Documents:**
@@ -15,7 +15,7 @@
 
 | Phase | Title | Effort | Status | Completion |
 |-------|-------|--------|--------|-----------|
-| 1 | Unified Modal & Sync Fix | 10 pts | NOT STARTED | 0% |
+| 1 | Unified Modal & Sync Fix | 10 pts | COMPLETED | 100% |
 | 2 | Contents Tab & File Browser | 10 pts | NOT STARTED | 0% |
 | 3 | Content Editing & CodeMirror | 8 pts | NOT STARTED | 0% |
 | 4 | Performance & Merge Integration | 7 pts | NOT STARTED | 0% |
@@ -30,72 +30,75 @@
 
 ### Completion Checklist
 
-- [ ] **WUI-001: Audit existing modals** (1 pt)
+- [x] **WUI-001: Audit existing modals** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Document differences between entity-detail-panel.tsx and artifact-detail.tsx; decide target design
   - **Success Criteria:**
-    - [ ] Differences documented (structure, props, tabs, styling)
-    - [ ] Decision made on which pattern to extend
-    - [ ] Comparison doc created
+    - [x] Differences documented (structure, props, tabs, styling)
+    - [x] Decision made on which pattern to extend
+    - [x] Comparison doc created
   - **Key Files:** `entity-detail-panel.tsx`, `artifact-detail.tsx`
+  - **Notes:** Documented in `.claude/worknotes/web-ui-consolidation-v1/all-phases-context.md`. Decision: Use Dialog container (from artifact-detail) with Entity types (from entity-detail-panel).
 
-- [ ] **WUI-002: Create UnifiedEntityModal** (3 pts)
+- [x] **WUI-002: Create UnifiedEntityModal** (3 pts) ✅
   - **Domain:** Web
   - **AC:** Modal renders with Overview tab consistently
   - **Success Criteria:**
-    - [ ] New component created at `components/entity/unified-entity-modal.tsx`
-    - [ ] Accepts entity type/id props
-    - [ ] Overview tab renders metadata (name, type, description, tags, source, version)
-    - [ ] Modal header shows entity name + type badge + status
-    - [ ] Modal footer has action buttons
-    - [ ] Styled consistently with collection design system
+    - [x] New component created at `components/entity/unified-entity-modal.tsx`
+    - [x] Accepts entity type/id props
+    - [x] Overview tab renders metadata (name, type, description, tags, source, version)
+    - [x] Modal header shows entity name + type badge + status
+    - [x] Modal footer has action buttons
+    - [x] Styled consistently with collection design system
   - **Key Files:** `skillmeat/web/components/entity/unified-entity-modal.tsx`
 
-- [ ] **WUI-003: Add Sync Status tab** (2 pts)
+- [x] **WUI-003: Add Sync Status tab** (2 pts) ✅
   - **Domain:** Web
   - **AC:** Tab shows status and buttons
   - **Success Criteria:**
-    - [ ] Sync Status tab added to UnifiedEntityModal
-    - [ ] Status badge displays: synced/modified/outdated/conflict
-    - [ ] Displays current vs upstream version info
-    - [ ] Contains Deploy to Project button
-    - [ ] Contains Sync with Upstream button
-    - [ ] Status-specific alerts render correctly
+    - [x] Sync Status tab added to UnifiedEntityModal
+    - [x] Status badge displays: synced/modified/outdated/conflict
+    - [x] Displays current vs upstream version info
+    - [x] Contains Deploy to Project button
+    - [x] Contains Sync with Upstream button
+    - [x] Status-specific alerts render correctly
   - **Key Files:** `unified-entity-modal.tsx`
 
-- [ ] **WUI-004: Add History tab** (1 pt)
+- [x] **WUI-004: Add History tab** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Tab shows version history
   - **Success Criteria:**
-    - [ ] History tab added to UnifiedEntityModal
-    - [ ] Version timeline renders with colored dots
-    - [ ] Shows deployment/sync/rollback events
-    - [ ] File change counts display
-    - [ ] Relative time formatting applied
-    - [ ] Empty state shown when no history
+    - [x] History tab added to UnifiedEntityModal
+    - [x] Version timeline renders with colored dots
+    - [x] Shows deployment/sync/rollback events
+    - [x] File change counts display
+    - [x] Relative time formatting applied
+    - [x] Empty state shown when no history
   - **Key Files:** `unified-entity-modal.tsx`
 
-- [ ] **WUI-005: Implement handleSync** (2 pts)
+- [x] **WUI-005: Implement handleSync** (2 pts) ✅
   - **Domain:** Web, API
   - **AC:** Sync triggers API call, shows progress
   - **Success Criteria:**
-    - [ ] `handleSync()` in `/app/manage/page.tsx` calls API endpoint
-    - [ ] Sync operation shows progress indicator/toast
-    - [ ] Success/failure notifications displayed
-    - [ ] Entity data refreshes after sync completes
-    - [ ] No more console.log only behavior
+    - [x] `handleSync()` in `/app/manage/page.tsx` calls API endpoint
+    - [x] Sync operation shows progress indicator/toast
+    - [x] Success/failure notifications displayed
+    - [x] Entity data refreshes after sync completes
+    - [x] No more console.log only behavior
   - **Key Files:** `skillmeat/web/app/manage/page.tsx`
+  - **Notes:** handleSync now opens the modal which has working API integration for sync operations
 
-- [ ] **WUI-006: Update /manage page** (1 pt)
+- [x] **WUI-006: Update /manage page** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Modal opens from entity cards
   - **Success Criteria:**
-    - [ ] UnifiedEntityModal imported and used in manage page
-    - [ ] Clicking entity card opens modal
-    - [ ] Modal closes on X button or Escape
-    - [ ] Entity data loads correctly in modal
-    - [ ] No regressions in existing card functionality
+    - [x] UnifiedEntityModal imported and used in manage page
+    - [x] Clicking entity card opens modal
+    - [x] Modal closes on X button or Escape
+    - [x] Entity data loads correctly in modal
+    - [x] No regressions in existing card functionality
   - **Key Files:** `skillmeat/web/app/manage/page.tsx`, `entity-card.tsx`
+  - **Notes:** Also updated `/projects/[id]/manage/page.tsx` to use UnifiedEntityModal
 
 ---
 

@@ -9,7 +9,7 @@ import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from '@/app/manage/components/entity-tabs';
 import { EntityFilters } from '@/app/manage/components/entity-filters';
-import { EntityDetailPanel } from '@/app/manage/components/entity-detail-panel';
+import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { DeployFromCollectionDialog } from './components/deploy-from-collection-dialog';
 import { PullToCollectionDialog } from './components/pull-to-collection-dialog';
 import { Entity, EntityType, EntityStatus } from '@/types/entity';
@@ -199,8 +199,8 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         </div>
       </div>
 
-      {/* Detail Panel */}
-      <EntityDetailPanel
+      {/* Entity Detail Modal */}
+      <UnifiedEntityModal
         entity={selectedEntity}
         open={detailPanelOpen}
         onClose={() => {
