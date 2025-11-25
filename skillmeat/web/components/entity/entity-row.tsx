@@ -16,21 +16,60 @@ import type { Entity } from "@/types/entity";
 import { getEntityTypeConfig } from "@/types/entity";
 import { EntityActions } from "./entity-actions";
 
+/**
+ * Props for EntityRow component
+ *
+ * Controls the row display, selection state, and action callbacks.
+ */
 export interface EntityRowProps {
+  /** The entity to display in the row */
   entity: Entity;
+  /** Whether the row is currently selected */
   selected?: boolean;
+  /** Whether the entity can be selected (shows checkbox) */
   selectable?: boolean;
+  /** Callback when selection state changes */
   onSelect?: (selected: boolean) => void;
+  /** Callback when row is clicked */
   onClick?: () => void;
+  /** Callback for edit action */
   onEdit?: () => void;
+  /** Callback for delete action */
   onDelete?: () => void;
+  /** Callback for deploy action */
   onDeploy?: () => void;
+  /** Callback for sync action */
   onSync?: () => void;
+  /** Callback to view diff (enabled when status is "modified") */
   onViewDiff?: () => void;
+  /** Callback to rollback (enabled for "modified" or "conflict" status) */
   onRollback?: () => void;
 }
 
-export function EntityRow({
+/**
+ * EntityRow - Table row view for displaying a single entity
+ *
+ * Renders entity information in a horizontal row format with columns for name,
+ * type, description, tags, status, and actions. Used in list view mode. All columns
+ * are displayed with fixed widths for consistent alignment.
+ *
+ * @example
+ * ```tsx
+ * <EntityRow
+ *   entity={artifact}
+ *   selected={false}
+ *   selectable={true}
+ *   onSelect={(checked) => handleSelect(artifact.id, checked)}
+ *   onClick={() => showDetails(artifact)}
+ *   onEdit={() => openForm(artifact)}
+ * />
+ * ```
+ *
+ * @param props - EntityRowProps configuration
+ * @returns Memoized row component with custom render comparison
+ */
+// Memoized component with custom comparison to prevent unnecessary re-renders
+export const EntityRow = React.memo(function EntityRow({
   entity,
   selected = false,
   selectable = false,
@@ -44,7 +83,9 @@ export function EntityRow({
   onRollback,
 }: EntityRowProps) {
   const config = getEntityTypeConfig(entity.type);
-  const Icon = (LucideIcons as any)[config.icon] || LucideIcons.FileText;
+  // Type-safe icon lookup with fallback
+  const IconComponent = (LucideIcons as any)[config.icon] as React.ComponentType<{ className?: string }> | undefined;
+  const Icon = IconComponent || LucideIcons.FileText;
 
   const statusColors = {
     synced: "text-green-500",
@@ -96,7 +137,11 @@ export function EntityRow({
       {/* Checkbox */}
       {selectable && (
         <div className="flex-shrink-0">
-          <Checkbox checked={selected} onCheckedChange={handleCheckboxChange} />
+          <Checkbox
+            checked={selected}
+            onCheckedChange={handleCheckboxChange}
+            aria-label={`Select ${entity.name}`}
+          />
         </div>
       )}
 
@@ -167,4 +212,16 @@ export function EntityRow({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only re-render if entity data, selected state, or selectable prop changes
+  return (
+    prevProps.entity.id === nextProps.entity.id &&
+    prevProps.entity.name === nextProps.entity.name &&
+    prevProps.entity.status === nextProps.entity.status &&
+    prevProps.entity.description === nextProps.entity.description &&
+    prevProps.entity.tags?.join(',') === nextProps.entity.tags?.join(',') &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.selectable === nextProps.selectable
+  );
+});

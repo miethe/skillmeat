@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import { FileDiff } from '../../sdk/models/FileDiff';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
+/**
+ * Props for DiffViewer component
+ *
+ * Configuration for displaying unified diffs with side-by-side view.
+ */
 interface DiffViewerProps {
+  /** Array of file diffs to display */
   files: FileDiff[];
+  /** Label for left (before) panel */
   leftLabel?: string;
+  /** Label for right (after) panel */
   rightLabel?: string;
+  /** Callback when user closes the diff viewer */
   onClose?: () => void;
 }
 
@@ -29,7 +37,7 @@ interface ParsedDiffLine {
   content: string;
 }
 
-function DiffLine({ content, type, lineNumber, side }: DiffLineProps) {
+function DiffLine({ content, type, lineNumber }: DiffLineProps) {
   const lineClasses = cn(
     'flex font-mono text-sm border-b border-border/50',
     type === 'addition' && 'bg-green-500/10 text-green-700 dark:text-green-400',
@@ -65,7 +73,7 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
     // Parse hunk header: @@ -1,5 +1,6 @@
     if (line.startsWith('@@')) {
       const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
-      if (match) {
+      if (match && match[1] && match[2]) {
         leftLineNum = parseInt(match[1], 10);
         rightLineNum = parseInt(match[2], 10);
       }
@@ -121,6 +129,29 @@ function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
   );
 }
 
+/**
+ * DiffViewer - Side-by-side diff viewer with file browser
+ *
+ * Displays unified diffs in a professional side-by-side format. Features include:
+ * - File list sidebar with expandable items showing change statistics
+ * - Side-by-side diff panels with synchronized scrolling
+ * - Color-coded additions (green), deletions (red), and context lines
+ * - File status badges (added, modified, deleted, unchanged)
+ * - Change summary (total files added, modified, deleted)
+ *
+ * @example
+ * ```tsx
+ * <DiffViewer
+ *   files={diffData.files}
+ *   leftLabel="Collection"
+ *   rightLabel="Project"
+ *   onClose={() => closeDiff()}
+ * />
+ * ```
+ *
+ * @param props - DiffViewerProps configuration
+ * @returns Full-height diff viewer component
+ */
 export function DiffViewer({
   files,
   leftLabel = 'Before',
@@ -133,21 +164,36 @@ export function DiffViewer({
   const rightScrollRef = useRef<HTMLDivElement>(null);
 
   const selectedFile = files[selectedFileIndex];
-  const parsedDiff = selectedFile?.unified_diff
-    ? parseDiff(selectedFile.unified_diff)
-    : [];
 
-  // Calculate summary
-  const summary = files.reduce(
-    (acc, file) => {
-      if (file.status === 'added') acc.added++;
-      else if (file.status === 'modified') acc.modified++;
-      else if (file.status === 'deleted') acc.deleted++;
-      else acc.unchanged++;
-      return acc;
-    },
-    { added: 0, modified: 0, deleted: 0, unchanged: 0 }
-  );
+  // Memoize parsed diff to avoid re-parsing on every render
+  const parsedDiff = useMemo(() => {
+    return selectedFile?.unified_diff ? parseDiff(selectedFile.unified_diff) : [];
+  }, [selectedFile?.unified_diff]);
+
+  // Memoize summary calculation
+  const summary = useMemo(() => {
+    return files.reduce(
+      (acc, file) => {
+        if (file.status === 'added') acc.added++;
+        else if (file.status === 'modified') acc.modified++;
+        else if (file.status === 'deleted') acc.deleted++;
+        else acc.unchanged++;
+        return acc;
+      },
+      { added: 0, modified: 0, deleted: 0, unchanged: 0 }
+    );
+  }, [files]);
+
+  // Memoize parsed diffs for all files (for stats in sidebar)
+  const parsedDiffs = useMemo(() => {
+    const cache = new Map<string, ParsedDiffLine[]>();
+    files.forEach(file => {
+      if (file.unified_diff) {
+        cache.set(file.file_path, parseDiff(file.unified_diff));
+      }
+    });
+    return cache;
+  }, [files]);
 
   // Synchronized scrolling
   useEffect(() => {
@@ -264,12 +310,19 @@ export function DiffViewer({
 
                   {isExpanded && (
                     <div className="ml-6 mt-1 text-xs text-muted-foreground space-y-0.5">
-                      {file.status === 'modified' && file.unified_diff && (
-                        <div className="font-mono">
-                          {parseDiff(file.unified_diff).filter(l => l.type === 'addition').length} additions,{' '}
-                          {parseDiff(file.unified_diff).filter(l => l.type === 'deletion').length} deletions
-                        </div>
-                      )}
+                      {file.status === 'modified' && file.unified_diff && (() => {
+                        const cached = parsedDiffs.get(file.file_path);
+                        if (cached) {
+                          const additions = cached.filter(l => l.type === 'addition').length;
+                          const deletions = cached.filter(l => l.type === 'deletion').length;
+                          return (
+                            <div className="font-mono">
+                              {additions} additions, {deletions} deletions
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   )}
                 </div>

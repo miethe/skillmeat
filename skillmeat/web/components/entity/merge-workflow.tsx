@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Check, Loader2, AlertCircle, ChevronRight, AlertTriangle } from 'lucide-react';
 import { DiffViewer } from './diff-viewer';
 import { ConflictResolver } from './conflict-resolver';
@@ -13,11 +13,21 @@ import { cn } from '@/lib/utils';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncResponse, FileDiff } from '@/sdk';
 
+/**
+ * Props for MergeWorkflow component
+ *
+ * Configuration for multi-step merge and conflict resolution workflow.
+ */
 interface MergeWorkflowProps {
+  /** ID of the entity to sync */
   entityId: string;
+  /** Path to the target project for deployment/sync */
   projectPath: string;
-  direction: 'upstream' | 'downstream'; // upstream = project→collection, downstream = collection→project
+  /** Direction of sync: 'upstream' (project→collection) or 'downstream' (collection→project) */
+  direction: 'upstream' | 'downstream';
+  /** Callback when workflow completes successfully */
   onComplete: () => void;
+  /** Callback when user cancels the workflow */
   onCancel: () => void;
 }
 
@@ -88,11 +98,12 @@ function analyzeConflicts(unifiedDiff: string | null | undefined): ConflictAnaly
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (!line) continue;
 
     // Parse hunk header to get line numbers
     if (line.startsWith('@@')) {
       const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
-      if (match) {
+      if (match && match[1]) {
         currentLineNum = parseInt(match[1], 10);
         consecutiveDeletions = 0;
         consecutiveAdditions = 0;
@@ -189,6 +200,41 @@ function analyzeAllConflicts(files: FileDiff[]): FileConflictInfo[] {
     }));
 }
 
+/**
+ * MergeWorkflow - Multi-step workflow for syncing entities and resolving conflicts
+ *
+ * Orchestrates a three-step process for syncing entities between collection and projects:
+ *
+ * 1. **Preview Step**: Shows diff summary with conflict detection and analysis
+ *    - Displays all changed files (added, modified, deleted)
+ *    - Detects and highlights conflicts (hard/soft)
+ *    - Allows user to review changes before proceeding
+ *
+ * 2. **Resolve Step**: Interactive conflict resolution for each modified file
+ *    - Shows side-by-side diff for conflicting files
+ *    - Provides three resolution options: keep collection, keep project, manual merge
+ *    - Displays conflict severity and change statistics
+ *    - Only shown if conflicts are detected
+ *
+ * 3. **Apply Step**: Final review and merge execution
+ *    - Shows summary of changes and selected resolutions
+ *    - Displays progress during merge operation
+ *    - Confirms success with final results
+ *
+ * @example
+ * ```tsx
+ * <MergeWorkflow
+ *   entityId="skill:canvas-design"
+ *   projectPath="/home/user/my-project"
+ *   direction="downstream"
+ *   onComplete={() => refreshUI()}
+ *   onCancel={() => closeDialog()}
+ * />
+ * ```
+ *
+ * @param props - MergeWorkflowProps configuration
+ * @returns Multi-step workflow component with progress stepper
+ */
 export function MergeWorkflow({
   entityId,
   projectPath,
@@ -458,9 +504,11 @@ interface PreviewStepProps {
 function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepProps) {
   const summary = diffData.summary || { added: 0, modified: 0, deleted: 0, unchanged: 0 };
   const hasChanges = diffData.has_changes;
-  const conflictAnalysis = analyzeAllConflicts(diffData.files);
-  const hasConflicts = conflictAnalysis.some((c) => c.conflictCount > 0);
-  const conflictCount = conflictAnalysis.reduce((sum, c) => sum + c.conflictCount, 0);
+
+  // Memoize expensive conflict analysis
+  const conflictAnalysis = useMemo(() => analyzeAllConflicts(diffData.files), [diffData.files]);
+  const hasConflicts = useMemo(() => conflictAnalysis.some((c) => c.conflictCount > 0), [conflictAnalysis]);
+  const conflictCount = useMemo(() => conflictAnalysis.reduce((sum, c) => sum + c.conflictCount, 0), [conflictAnalysis]);
 
   return (
     <Card className="w-full">
@@ -492,17 +540,17 @@ function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepP
           <div className="flex-1">
             <h4 className="text-sm font-semibold mb-2">Summary of Changes</h4>
             <div className="flex items-center gap-4 text-sm">
-              {summary.added > 0 && (
+              {(summary.added ?? 0) > 0 && (
                 <span className="text-green-600 dark:text-green-400">
                   +{summary.added} added
                 </span>
               )}
-              {summary.modified > 0 && (
+              {(summary.modified ?? 0) > 0 && (
                 <span className="text-blue-600 dark:text-blue-400">
                   ~{summary.modified} modified
                 </span>
               )}
-              {summary.deleted > 0 && (
+              {(summary.deleted ?? 0) > 0 && (
                 <span className="text-red-600 dark:text-red-400">
                   -{summary.deleted} deleted
                 </span>
@@ -619,8 +667,11 @@ function ResolveStep({
   onBack,
   canContinue,
 }: ResolveStepProps) {
-  const modifiedFiles = diffData.files.filter((file) => file.status === 'modified');
-  const conflictAnalysis = analyzeAllConflicts(diffData.files);
+  // Memoize modified files list
+  const modifiedFiles = useMemo(() => diffData.files.filter((file) => file.status === 'modified'), [diffData.files]);
+
+  // Memoize expensive conflict analysis
+  const conflictAnalysis = useMemo(() => analyzeAllConflicts(diffData.files), [diffData.files]);
 
   // Map resolution strategies: 'collection'/'project'/'merge' -> 'theirs'/'ours'/'manual'
   const mapResolutionToStrategy = (resolution: ConflictResolution | undefined): 'theirs' | 'ours' | 'manual' | null => {
@@ -734,7 +785,7 @@ function ApplyStep({
     }
 
     // Calculate total files to process
-    const totalFiles = summary.added + summary.modified + summary.deleted;
+    const totalFiles = (summary.added ?? 0) + (summary.modified ?? 0) + (summary.deleted ?? 0);
 
     // Define progressive stages with timing
     const stages: Array<{
@@ -758,6 +809,8 @@ function ApplyStep({
       }
 
       const stage = stages[currentStageIndex];
+      if (!stage) return;
+
       const range = stage.endPercent - stage.startPercent;
       const steps = 10; // Number of incremental updates per stage
       const stepSize = range / steps;

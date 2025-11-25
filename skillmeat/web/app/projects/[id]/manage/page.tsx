@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -66,16 +66,17 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       )
     : entities;
 
-  const handleEntityClick = (entity: Entity) => {
+  // Memoize event handlers to prevent EntityList re-renders
+  const handleEntityClick = useCallback((entity: Entity) => {
     setSelectedEntity(entity);
     setDetailPanelOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (entity: Entity) => {
+  const handleEdit = useCallback((entity: Entity) => {
     setEditingEntity(entity);
-  };
+  }, []);
 
-  const handleDelete = async (entity: Entity) => {
+  const handleDelete = useCallback(async (entity: Entity) => {
     if (confirm(`Are you sure you want to remove ${entity.name} from this project?`)) {
       try {
         await deleteEntity(entity.id);
@@ -84,22 +85,22 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         alert('Failed to remove entity from project');
       }
     }
-  };
+  }, [deleteEntity]);
 
-  const handleSync = async (entity: Entity) => {
+  const handleSync = useCallback(async (entity: Entity) => {
     setPullDialogEntity(entity);
-  };
+  }, []);
 
-  const handleViewDiff = (entity: Entity) => {
+  const handleViewDiff = useCallback((entity: Entity) => {
     // Open pull dialog in diff mode
     setPullDialogEntity(entity);
-  };
+  }, []);
 
-  const handleRollback = async (entity: Entity) => {
+  const handleRollback = useCallback(async (entity: Entity) => {
     // Rollback will be handled by entity-actions component via RollbackDialog
     // This is just a placeholder in case we need to do something after rollback
     console.log('Rollback entity:', entity);
-  };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen">

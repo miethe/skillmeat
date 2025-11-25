@@ -5,7 +5,7 @@ Provides REST API for managing artifacts within collections.
 
 import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -337,7 +337,7 @@ async def build_version_graph(
         artifact_type=artifact_type.value,
         root=root_node,
         statistics=statistics,
-        last_updated=datetime.utcnow(),
+        last_updated=datetime.now(timezone.utc),
     )
 
 
@@ -812,11 +812,11 @@ async def list_artifacts(
             if not project_path_obj.exists():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Project path does not exist: {project_path}",
+                    detail="Project path does not exist",
                 )
 
             try:
-                # Check drift for the project
+                # Check drift for the project using public API
                 drift_results = sync_mgr.check_drift(
                     project_path=project_path_obj,
                     collection_name=collection,
@@ -1135,7 +1135,7 @@ async def check_artifact_upstream(
                 upstream_sha=None,
                 update_available=False,
                 has_local_modifications=False,
-                last_checked=datetime.utcnow(),
+                last_checked=datetime.now(timezone.utc),
             )
 
         # Extract update information
@@ -1163,7 +1163,7 @@ async def check_artifact_upstream(
                 if update_info
                 else False
             ),
-            last_checked=datetime.utcnow(),
+            last_checked=datetime.now(timezone.utc),
         )
 
     except HTTPException:
@@ -1712,17 +1712,31 @@ async def sync_artifact(
         }
         sync_strategy = strategy_map[request.strategy]
 
-        # Check for deployment metadata
-        deployment_metadata = sync_mgr._load_deployment_metadata(project_path)
-        if not deployment_metadata:
+        # Check for deployment metadata using DeploymentTracker (public API)
+        from skillmeat.storage.deployment import DeploymentTracker
+        deployments = DeploymentTracker.read_deployments(project_path)
+        if not deployments:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No deployment metadata found at {request.project_path}. Deploy artifacts first.",
             )
 
-        # Get collection name from metadata if not provided
+        # Find the deployment for this artifact
+        target_deployment = None
+        for deployment in deployments:
+            if deployment.artifact_name == artifact_name and deployment.artifact_type == artifact_type.value:
+                target_deployment = deployment
+                break
+
+        if not target_deployment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not deployed in project",
+            )
+
+        # Get collection name from deployment if not provided
         if not collection:
-            collection_name = deployment_metadata.collection
+            collection_name = target_deployment.from_collection
         else:
             collection_name = collection
 
@@ -1738,19 +1752,6 @@ async def sync_artifact(
         artifact = coll.find_artifact(artifact_name, artifact_type)
 
         if not artifact:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
-            )
-
-        # Check if artifact is deployed in project
-        deployed_artifact = None
-        for deployed in deployment_metadata.artifacts:
-            if deployed.name == artifact_name and deployed.artifact_type == artifact_type.value:
-                deployed_artifact = deployed
-                break
-
-        if not deployed_artifact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{artifact_id}' not found in project deployment metadata",

@@ -8,6 +8,10 @@
 // Import testing library matchers
 import '@testing-library/jest-dom'
 
+// Import jest-axe matchers for accessibility testing
+import { toHaveNoViolations } from 'jest-axe'
+expect.extend(toHaveNoViolations)
+
 // Import TextEncoder/TextDecoder for Node.js environment
 import { TextEncoder, TextDecoder } from 'util'
 

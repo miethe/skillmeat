@@ -41,7 +41,6 @@ export function EntityFilters({
   onStatusFilterChange,
   tagFilter,
   onTagFilterChange,
-  availableTags = [],
 }: EntityFiltersProps) {
   const [tagInputValue, setTagInputValue] = useState('');
 

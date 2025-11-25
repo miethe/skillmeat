@@ -6,7 +6,7 @@ Provides REST API for browsing and managing projects with deployed artifacts.
 import base64
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -101,17 +101,38 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
         ]
 
     discovered = []
+    MAX_DEPTH = 3  # Limit search depth to prevent performance issues
 
     for search_path in search_paths:
         if not search_path.exists() or not search_path.is_dir():
             continue
 
-        # Search for .skillmeat-deployed.toml files up to 3 levels deep
-        # This prevents excessive filesystem scanning
+        # Validate search path to prevent directory traversal
+        try:
+            search_path = search_path.resolve()
+        except (RuntimeError, OSError) as e:
+            logger.warning(f"Invalid search path {search_path}: {e}")
+            continue
+
+        # Search for .skillmeat-deployed.toml files with depth limit
         try:
             for deployment_file in search_path.rglob(".claude/.skillmeat-deployed.toml"):
                 # Get project root (parent of .claude)
                 project_path = deployment_file.parent.parent
+
+                # Validate path is within search_path (security check)
+                try:
+                    project_path = project_path.resolve()
+                    project_path.relative_to(search_path)
+                except (ValueError, RuntimeError, OSError):
+                    logger.warning(f"Skipping invalid project path: {project_path}")
+                    continue
+
+                # Check depth limit
+                depth = len(project_path.relative_to(search_path).parts)
+                if depth > MAX_DEPTH:
+                    continue
+
                 if project_path not in discovered:
                     discovered.append(project_path)
         except (PermissionError, OSError) as e:
@@ -797,7 +818,7 @@ async def check_project_modifications(
         # Check each deployment for modifications
         modification_statuses: List[DeploymentModificationStatus] = []
         modifications_count = 0
-        checked_at = datetime.utcnow()
+        checked_at = datetime.now(timezone.utc)
 
         for deployment in deployments:
             # Compute current content hash
@@ -962,7 +983,7 @@ async def get_modified_artifacts(
         from skillmeat.api.schemas.projects import ModifiedArtifactInfo
 
         modified_artifacts: List[ModifiedArtifactInfo] = []
-        checked_at = datetime.utcnow()
+        checked_at = datetime.now(timezone.utc)
 
         for deployment in deployments:
             # Compute current content hash
