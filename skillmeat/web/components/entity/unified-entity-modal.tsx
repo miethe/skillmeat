@@ -27,6 +27,7 @@ import { ContentPane } from '@/components/entity/content-pane';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
+import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
 
 interface UnifiedEntityModalProps {
   entity: Entity | null;
@@ -132,143 +133,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
   return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
-/**
- * Generate mock file structure for testing
- * TODO: Replace with real API call in Phase 3
- */
-function generateMockFiles(entity: Entity): FileNode[] {
-  const entityType = entity.type;
-
-  // Base files common to all entities
-  const baseFiles: FileNode[] = [
-    {
-      name: 'README.md',
-      path: 'README.md',
-      type: 'file',
-    },
-  ];
-
-  // Entity-specific files
-  if (entityType === 'skill') {
-    return [
-      {
-        name: 'SKILL.md',
-        path: 'SKILL.md',
-        type: 'file',
-      },
-      ...baseFiles,
-      {
-        name: 'examples',
-        path: 'examples',
-        type: 'directory',
-        children: [
-          {
-            name: 'basic.md',
-            path: 'examples/basic.md',
-            type: 'file',
-          },
-          {
-            name: 'advanced.md',
-            path: 'examples/advanced.md',
-            type: 'file',
-          },
-        ],
-      },
-    ];
-  } else if (entityType === 'command') {
-    return [
-      {
-        name: 'COMMAND.md',
-        path: 'COMMAND.md',
-        type: 'file',
-      },
-      ...baseFiles,
-      {
-        name: 'src',
-        path: 'src',
-        type: 'directory',
-        children: [
-          {
-            name: 'index.ts',
-            path: 'src/index.ts',
-            type: 'file',
-          },
-          {
-            name: 'utils.ts',
-            path: 'src/utils.ts',
-            type: 'file',
-          },
-        ],
-      },
-      {
-        name: 'package.json',
-        path: 'package.json',
-        type: 'file',
-      },
-    ];
-  } else if (entityType === 'agent') {
-    return [
-      {
-        name: 'AGENT.md',
-        path: 'AGENT.md',
-        type: 'file',
-      },
-      ...baseFiles,
-      {
-        name: 'prompts',
-        path: 'prompts',
-        type: 'directory',
-        children: [
-          {
-            name: 'system.md',
-            path: 'prompts/system.md',
-            type: 'file',
-          },
-          {
-            name: 'examples.md',
-            path: 'prompts/examples.md',
-            type: 'file',
-          },
-        ],
-      },
-      {
-        name: 'config.json',
-        path: 'config.json',
-        type: 'file',
-      },
-    ];
-  }
-
-  // Default structure for other entity types
-  return baseFiles;
-}
-
-/**
- * Generate mock file content for testing
- * TODO: Replace with real API call in Phase 3
- */
-function generateMockContent(path: string, entity: Entity): string {
-  const fileName = path.split('/').pop() || '';
-
-  if (fileName === 'SKILL.md' || fileName === 'COMMAND.md' || fileName === 'AGENT.md') {
-    return `# ${entity.name}\n\n${entity.description || 'No description available.'}\n\n## Usage\n\nThis is a placeholder content for ${fileName}.\n\n## Examples\n\n\`\`\`bash\n# Example command\necho "Hello, World!"\n\`\`\`\n\n## Notes\n\n- This is mock content for demonstration\n- Real content will be fetched from the API\n- Support for syntax highlighting coming soon`;
-  }
-
-  if (fileName === 'README.md') {
-    return `# ${entity.name}\n\n${entity.description || ''}\n\n## Overview\n\nThis README provides information about the ${entity.type}.\n\n## Installation\n\nFollow the installation instructions here.\n\n## Contributing\n\nContributions are welcome!`;
-  }
-
-  if (fileName.endsWith('.json')) {
-    return `{\n  "name": "${entity.name}",\n  "version": "${entity.version || '1.0.0'}",\n  "type": "${entity.type}",\n  "description": "${entity.description || ''}"\n}`;
-  }
-
-  if (fileName.endsWith('.ts') || fileName.endsWith('.tsx')) {
-    return `// ${fileName}\n\nexport function example() {\n  console.log('This is a placeholder TypeScript file');\n  return 'Hello from ${entity.name}';\n}\n\nexport default example;`;
-  }
-
-  // Default content
-  return `This is placeholder content for ${path}.\n\nReal file contents will be loaded from the API in Phase 3.`;
-}
+// Mock data generator functions removed - using real API calls now
 
 // ============================================================================
 // Loading Skeleton
@@ -345,17 +210,58 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     return generateMockHistory(entity);
   }, [entity]);
 
-  // Generate mock file structure
-  const mockFiles = useMemo(() => {
-    if (!entity) return [];
-    return generateMockFiles(entity);
-  }, [entity]);
+  // Fetch file list from API
+  const {
+    data: filesData,
+    isLoading: isFilesLoading,
+    error: filesError,
+  } = useQuery<FileListResponse>({
+    queryKey: ['artifact-files', entity?.id],
+    queryFn: async () => {
+      if (!entity?.id) {
+        throw new Error('Missing entity ID');
+      }
 
-  // Generate mock file content based on selected path
-  const fileContent = useMemo(() => {
-    if (!entity || !selectedPath) return null;
-    return generateMockContent(selectedPath, entity);
-  }, [entity, selectedPath]);
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      return await apiRequest<FileListResponse>(
+        `/artifacts/${entity.id}/files?${params.toString()}`
+      );
+    },
+    enabled: !!entity?.id && activeTab === 'contents',
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+  });
+
+  // Fetch file content when a file is selected
+  const {
+    data: contentData,
+    isLoading: isContentLoading,
+    error: contentError,
+    refetch: refetchContent,
+  } = useQuery<FileContentResponse>({
+    queryKey: ['artifact-file-content', entity?.id, selectedPath],
+    queryFn: async () => {
+      if (!entity?.id || !selectedPath) {
+        throw new Error('Missing entity ID or file path');
+      }
+
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      return await apiRequest<FileContentResponse>(
+        `/artifacts/${entity.id}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`
+      );
+    },
+    enabled: !!entity?.id && !!selectedPath,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+  });
 
   // Fetch diff data when sync tab is active and entity has changes
   const shouldFetchDiff = !!(
@@ -508,6 +414,51 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       throw error; // Re-throw to let dialog handle it
     } finally {
       setIsRollingBack(false);
+    }
+  };
+
+  const handleSaveFile = async (content: string) => {
+    if (!entity?.id || !selectedPath) {
+      toast({
+        title: 'Save Failed',
+        description: 'No file selected',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      const requestBody: FileUpdateRequest = { content };
+
+      await apiRequest<FileContentResponse>(
+        `/artifacts/${entity.id}/files/${encodeURIComponent(selectedPath)}?${params.toString()}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      toast({
+        title: 'File Saved',
+        description: `${selectedPath} has been updated successfully.`,
+      });
+
+      // Refresh file content
+      await refetchContent();
+    } catch (error) {
+      console.error('Save file failed:', error);
+      toast({
+        title: 'Save Failed',
+        description: error instanceof Error ? error.message : 'Failed to save file',
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
@@ -756,9 +707,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 <div className="w-1/3 border-r">
                   <FileTree
                     entityId={entity.id}
-                    files={mockFiles}
+                    files={filesData?.files || []}
                     selectedPath={selectedPath}
                     onSelect={setSelectedPath}
+                    isLoading={isFilesLoading}
                   />
                 </div>
 
@@ -766,9 +718,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 <div className="flex-1">
                   <ContentPane
                     path={selectedPath}
-                    content={fileContent}
-                    isLoading={false}
-                    error={null}
+                    content={contentData?.content || null}
+                    isLoading={isContentLoading}
+                    error={contentError?.message || filesError?.message || null}
+                    onSave={handleSaveFile}
                   />
                 </div>
               </div>
