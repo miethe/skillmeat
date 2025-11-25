@@ -113,7 +113,7 @@ class DeploymentTracker:
             from_collection=collection_name,
             deployed_at=datetime.now(),
             artifact_path=artifact_path,
-            collection_sha=collection_sha,
+            content_hash=collection_sha,
             local_modifications=False,
         )
 
