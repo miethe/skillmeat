@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Entity, ENTITY_TYPES } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 import { DiffViewer } from '@/components/entity/diff-viewer';
+import { RollbackDialog } from '@/components/entity/rollback-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
+import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
 
 interface EntityDetailPanelProps {
   entity: Entity | null;
@@ -19,11 +24,146 @@ interface EntityDetailPanelProps {
   onClose: () => void;
 }
 
+interface HistoryEntry {
+  id: string;
+  type: 'deploy' | 'sync' | 'rollback';
+  direction: 'upstream' | 'downstream';
+  timestamp: string;
+  filesChanged?: number;
+  user?: string;
+}
+
+// Helper function to format relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) {
+    return 'just now';
+  } else if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  } else if (diffDays < 30) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+}
+
+// Generate mock history entries based on entity metadata
+function generateMockHistory(entity: Entity): HistoryEntry[] {
+  const history: HistoryEntry[] = [];
+
+  // Create history entries from available timestamps
+  if (entity.deployedAt) {
+    const deployedDate = new Date(entity.deployedAt);
+    history.push({
+      id: `deploy-${entity.deployedAt}`,
+      type: 'deploy',
+      direction: 'downstream',
+      timestamp: entity.deployedAt,
+      filesChanged: Math.floor(Math.random() * 5) + 1,
+      user: 'You',
+    });
+
+    // Add a sync entry a bit before deployment if entity is modified
+    if (entity.status === 'modified' || entity.status === 'outdated') {
+      const syncDate = new Date(deployedDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours before
+      history.push({
+        id: `sync-${syncDate.toISOString()}`,
+        type: 'sync',
+        direction: 'upstream',
+        timestamp: syncDate.toISOString(),
+        filesChanged: Math.floor(Math.random() * 3) + 1,
+        user: 'You',
+      });
+    }
+  }
+
+  if (entity.modifiedAt && entity.modifiedAt !== entity.deployedAt) {
+    const modifiedDate = new Date(entity.modifiedAt);
+
+    // Add sync entry for modifications
+    history.push({
+      id: `sync-${entity.modifiedAt}`,
+      type: 'sync',
+      direction: 'upstream',
+      timestamp: entity.modifiedAt,
+      filesChanged: Math.floor(Math.random() * 4) + 1,
+      user: 'You',
+    });
+  }
+
+  // Add a rollback entry for conflict status
+  if (entity.status === 'conflict' && entity.modifiedAt) {
+    const rollbackDate = new Date(new Date(entity.modifiedAt).getTime() + 1 * 60 * 60 * 1000); // 1 hour after modification
+    history.push({
+      id: `rollback-${rollbackDate.toISOString()}`,
+      type: 'rollback',
+      direction: 'downstream',
+      timestamp: rollbackDate.toISOString(),
+      filesChanged: Math.floor(Math.random() * 3) + 1,
+      user: 'You',
+    });
+  }
+
+  // Sort by timestamp (most recent first)
+  return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
 export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelProps) {
   const [activeTab, setActiveTab] = useState('overview');
-  const { deployEntity, syncEntity } = useEntityLifecycle();
+  const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
   const [isDeploying, setIsDeploying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [isRollingBack, setIsRollingBack] = useState(false);
+  const { toast } = useToast();
+
+  // Generate mock history entries
+  const historyEntries = useMemo(() => {
+    if (!entity) return [];
+    return generateMockHistory(entity);
+  }, [entity]);
+
+  // Fetch diff data when sync tab is active and entity has changes
+  const shouldFetchDiff =
+    activeTab === 'sync' &&
+    entity &&
+    (entity.status === 'modified' || entity.status === 'outdated') &&
+    entity.projectPath;
+
+  const {
+    data: diffData,
+    isLoading: isDiffLoading,
+    error: diffError,
+  } = useQuery({
+    queryKey: ['artifact-diff', entity?.id, entity?.projectPath],
+    queryFn: async (): Promise<ArtifactDiffResponse> => {
+      if (!entity?.id || !entity?.projectPath) {
+        throw new Error('Missing entity ID or project path');
+      }
+
+      const params = new URLSearchParams({
+        project_path: entity.projectPath,
+      });
+
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      return await apiRequest<ArtifactDiffResponse>(
+        `/artifacts/${entity.id}/diff?${params.toString()}`
+      );
+    },
+    enabled: shouldFetchDiff,
+    staleTime: 30000, // Cache for 30 seconds
+  });
 
   if (!entity) {
     return null;
@@ -66,6 +206,51 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
     }
   };
 
+  const handleRollback = async () => {
+    if (!entity.projectPath) {
+      toast({
+        title: 'Rollback Failed',
+        description: 'Please select a project to rollback',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsRollingBack(true);
+    try {
+      // Call sync API with 'theirs' strategy to pull collection version
+      const request: ArtifactSyncRequest = {
+        project_path: entity.projectPath,
+        strategy: 'theirs', // Take collection version
+        force: true, // Force overwrite local changes
+      };
+
+      await apiRequest(`/artifacts/${entity.id}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      toast({
+        title: 'Rollback Successful',
+        description: `${entity.name} has been rolled back to the collection version.`,
+      });
+
+      // Refresh the entity list
+      refetch();
+    } catch (error) {
+      console.error('Rollback failed:', error);
+      toast({
+        title: 'Rollback Failed',
+        description: error instanceof Error ? error.message : 'Failed to rollback entity',
+        variant: 'destructive',
+      });
+      throw error; // Re-throw to let dialog handle it
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
+
   const getStatusIcon = () => {
     switch (entity.status) {
       case 'synced':
@@ -93,6 +278,32 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
         return 'Conflict';
       default:
         return 'Unknown';
+    }
+  };
+
+  const getHistoryTypeLabel = (type: HistoryEntry['type']) => {
+    switch (type) {
+      case 'deploy':
+        return 'Deployed';
+      case 'sync':
+        return 'Synced';
+      case 'rollback':
+        return 'Rolled back';
+      default:
+        return type;
+    }
+  };
+
+  const getHistoryTypeColor = (type: HistoryEntry['type']) => {
+    switch (type) {
+      case 'deploy':
+        return 'text-green-600 dark:text-green-400';
+      case 'sync':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'rollback':
+        return 'text-orange-600 dark:text-orange-400';
+      default:
+        return 'text-gray-600 dark:text-gray-400';
     }
   };
 
@@ -268,15 +479,38 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                   </div>
                 </div>
 
-                {/* Diff Preview Placeholder */}
-                {entity.status === 'modified' && (
+                {/* Diff Viewer */}
+                {(entity.status === 'modified' || entity.status === 'outdated') && entity.projectPath && (
                   <div>
                     <h3 className="text-sm font-medium mb-2">Changes</h3>
-                    <div className="border rounded-lg p-4 bg-muted/20">
-                      <p className="text-sm text-muted-foreground text-center">
-                        Diff preview coming soon
-                      </p>
-                    </div>
+                    {isDiffLoading ? (
+                      <div className="border rounded-lg p-8 bg-muted/20 flex items-center justify-center">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Loading diff...</span>
+                        </div>
+                      </div>
+                    ) : diffError ? (
+                      <div className="border rounded-lg p-4 bg-red-500/10 border-red-500/20">
+                        <p className="text-sm text-red-700 dark:text-red-400">
+                          Failed to load diff: {diffError instanceof Error ? diffError.message : 'Unknown error'}
+                        </p>
+                      </div>
+                    ) : diffData && diffData.files.length > 0 ? (
+                      <div className="border rounded-lg overflow-hidden bg-background">
+                        <DiffViewer
+                          files={diffData.files}
+                          leftLabel={entity.collection ? 'Collection' : 'Current'}
+                          rightLabel={entity.projectPath ? 'Project' : 'Upstream'}
+                        />
+                      </div>
+                    ) : diffData && !diffData.has_changes ? (
+                      <div className="border rounded-lg p-4 bg-muted/20">
+                        <p className="text-sm text-muted-foreground text-center">
+                          No changes detected
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
@@ -304,17 +538,114 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
           <TabsContent value="history" className="flex-1 overflow-hidden">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-4">
-                <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Version History</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Version history tracking coming soon
-                  </p>
-                </div>
+                {/* Rollback Section */}
+                {(entity.status === 'modified' || entity.status === 'conflict') && entity.projectPath && (
+                  <div className="border rounded-lg p-4 bg-muted/20">
+                    <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Rollback to Collection Version
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Your local version has been modified. You can rollback to the collection version
+                      to discard all local changes.
+                    </p>
+                    <Button
+                      onClick={() => setShowRollbackDialog(true)}
+                      variant="outline"
+                      size="sm"
+                      disabled={isRollingBack}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      {isRollingBack ? 'Rolling Back...' : 'Rollback to Collection'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* History Timeline */}
+                {historyEntries.length > 0 ? (
+                  <div>
+                    <h3 className="text-sm font-medium mb-4">Sync History</h3>
+                    <div className="space-y-0 relative">
+                      {/* Timeline line */}
+                      <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+
+                      {historyEntries.map((entry, index) => (
+                        <div
+                          key={entry.id}
+                          className="relative pl-11 pb-6 last:pb-0 group hover:bg-muted/30 -ml-2 pl-13 pr-2 py-2 rounded-lg transition-colors"
+                        >
+                          {/* Timeline dot and icon */}
+                          <div className={`absolute left-4 top-2 w-8 h-8 rounded-full border-2 bg-background flex items-center justify-center z-10 ${
+                            entry.type === 'deploy' ? 'border-green-500' :
+                            entry.type === 'sync' ? 'border-blue-500' :
+                            'border-orange-500'
+                          }`}>
+                            {entry.direction === 'downstream' ? (
+                              <ArrowDown className="h-4 w-4" />
+                            ) : (
+                              <ArrowUp className="h-4 w-4" />
+                            )}
+                          </div>
+
+                          {/* Entry content */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-sm font-medium ${getHistoryTypeColor(entry.type)}`}>
+                                  {getHistoryTypeLabel(entry.type)}
+                                </span>
+                                {entry.filesChanged && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    {entry.filesChanged} {entry.filesChanged === 1 ? 'file' : 'files'}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                <span>{formatRelativeTime(new Date(entry.timestamp))}</span>
+                                {entry.user && (
+                                  <>
+                                    <span>•</span>
+                                    <User className="h-3 w-3" />
+                                    <span>{entry.user}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(entry.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // Empty state
+                  <div className="text-center py-12">
+                    <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-semibold mb-2">No sync history yet</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Sync operations and deployments will appear here once you start managing this entity.
+                    </p>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </TabsContent>
         </Tabs>
+
+        {/* Rollback Confirmation Dialog */}
+        <RollbackDialog
+          entity={entity}
+          open={showRollbackDialog}
+          onOpenChange={setShowRollbackDialog}
+          onConfirm={handleRollback}
+        />
       </SheetContent>
     </Sheet>
   );

@@ -91,6 +91,12 @@ function ManagePageContent() {
     console.log('View diff:', entity);
   };
 
+  const handleRollback = async (entity: Entity) => {
+    // Rollback will be handled by entity-actions component via RollbackDialog
+    // This is just a placeholder in case we need to do something after rollback
+    console.log('Rollback entity:', entity);
+  };
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
@@ -169,6 +175,7 @@ function ManagePageContent() {
                   onDeploy={handleDeploy}
                   onSync={handleSync}
                   onViewDiff={handleViewDiff}
+                  onRollback={handleRollback}
                 />
               </div>
             </div>

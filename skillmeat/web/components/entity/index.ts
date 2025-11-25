@@ -10,3 +10,6 @@ export { EntityRow } from './entity-row';
 export type { EntityRowProps } from './entity-row';
 export { EntityList } from './entity-list';
 export type { EntityListProps } from './entity-list';
+export { ConflictResolver } from './conflict-resolver';
+export type { ConflictResolverProps } from './conflict-resolver';
+export { MergeWorkflow } from './merge-workflow';

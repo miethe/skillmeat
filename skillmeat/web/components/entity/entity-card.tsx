@@ -28,6 +28,7 @@ export interface EntityCardProps {
   onDeploy?: () => void;
   onSync?: () => void;
   onViewDiff?: () => void;
+  onRollback?: () => void;
 }
 
 export function EntityCard({
@@ -41,6 +42,7 @@ export function EntityCard({
   onDeploy,
   onSync,
   onViewDiff,
+  onRollback,
 }: EntityCardProps) {
   const config = getEntityTypeConfig(entity.type);
   const Icon = (LucideIcons as any)[config.icon] || LucideIcons.FileText;
@@ -115,6 +117,7 @@ export function EntityCard({
           onDeploy={onDeploy}
           onSync={onSync}
           onViewDiff={onViewDiff}
+          onRollback={onRollback}
         />
       </div>
 
