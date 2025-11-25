@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge } from 'lucide-react';
+import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -275,13 +275,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     data: diffData,
     isLoading: isDiffLoading,
     error: diffError,
+    refetch: refetchDiff,
   } = useQuery<ArtifactDiffResponse>({
     queryKey: ['artifact-diff', entity?.id, entity?.projectPath],
     queryFn: async () => {
-      if (!entity?.id || !entity?.projectPath) {
-        throw new Error('Missing entity ID or project path');
+      if (!entity?.id) {
+        throw new Error('Missing entity ID for diff');
       }
 
+      if (!entity?.projectPath) {
+        throw new Error('Missing project path for diff');
+      }
+
+      // Ensure projectPath is properly encoded
       const params = new URLSearchParams({
         project_path: entity.projectPath,
       });
@@ -290,14 +296,46 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         params.set('collection', entity.collection);
       }
 
-      return await apiRequest<ArtifactDiffResponse>(
-        `/artifacts/${entity.id}/diff?${params.toString()}`
-      );
+      try {
+        const response = await apiRequest<ArtifactDiffResponse>(
+          `/artifacts/${entity.id}/diff?${params.toString()}`
+        );
+
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid diff response format');
+        }
+
+        return response;
+      } catch (error) {
+        // Log error for debugging
+        console.error('Diff fetch error:', error);
+        throw error;
+      }
     },
     enabled: shouldFetchDiff,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    retry: 2, // Retry failed requests up to 2 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
+
+  // Show toast notification when diff fetch fails
+  if (diffError && shouldFetchDiff) {
+    // Only show toast once per error by checking if it's a new error
+    const errorMessage = diffError instanceof Error ? diffError.message : 'Failed to load diff';
+
+    // Use a ref or state to track if we've shown this error
+    // For simplicity, we'll show it on every render when error exists
+    // In production, you might want to debounce this or use a ref
+    if (activeTab === 'sync') {
+      toast({
+        title: 'Diff Load Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  }
 
   if (!entity) {
     return null;
@@ -462,6 +500,23 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     }
   };
 
+  const handleRetryDiff = async () => {
+    try {
+      await refetchDiff();
+      toast({
+        title: 'Diff Reloaded',
+        description: 'Successfully reloaded the diff data.',
+      });
+    } catch (error) {
+      console.error('Retry diff failed:', error);
+      toast({
+        title: 'Retry Failed',
+        description: error instanceof Error ? error.message : 'Failed to retry diff',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // ============================================================================
   // Status Helpers
   // ============================================================================
@@ -520,6 +575,120 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       default:
         return 'text-gray-600 dark:text-gray-400';
     }
+  };
+
+  // ============================================================================
+  // Render Diff Section
+  // ============================================================================
+
+  const renderDiffSection = () => {
+    // Only show diff section for modified or outdated entities with a project path
+    if (!(entity.status === 'modified' || entity.status === 'outdated') || !entity.projectPath) {
+      return null;
+    }
+
+    return (
+      <div>
+        <h3 className="text-sm font-medium mb-2">Changes</h3>
+
+        {/* Loading State */}
+        {isDiffLoading && (
+          <div className="border rounded-lg p-8 bg-muted/20 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground">Loading diff...</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Comparing collection and project versions
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {!isDiffLoading && diffError && (
+          <div className="border rounded-lg overflow-hidden bg-red-500/10 border-red-500/20">
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-700 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-1">
+                    Failed to load diff
+                  </p>
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80 break-words">
+                    {diffError instanceof Error ? diffError.message : 'An unknown error occurred'}
+                  </p>
+                  {!entity.projectPath && (
+                    <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
+                      Project path is missing. Please ensure the entity is properly configured.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  onClick={handleRetryDiff}
+                  variant="outline"
+                  size="sm"
+                  className="text-red-700 dark:text-red-400 border-red-500/20 hover:bg-red-500/10"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success State with Data */}
+        {!isDiffLoading && !diffError && diffData && (
+          <>
+            {/* Has changes - show diff viewer */}
+            {diffData.has_changes && diffData.files && diffData.files.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden bg-background">
+                <DiffViewer
+                  files={diffData.files}
+                  leftLabel={entity.collection ? 'Collection' : 'Current'}
+                  rightLabel={entity.projectPath ? 'Project' : 'Upstream'}
+                />
+              </div>
+            ) : (
+              /* No changes detected */
+              <div className="border rounded-lg p-6 bg-muted/20">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                  <p className="text-sm font-medium text-foreground">No changes detected</p>
+                  <p className="text-xs text-muted-foreground text-center max-w-sm">
+                    The collection and project versions are identical
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Edge case: No diff data and no error (shouldn't happen) */}
+        {!isDiffLoading && !diffError && !diffData && (
+          <div className="border rounded-lg p-6 bg-muted/20">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">No diff data available</p>
+              <p className="text-xs text-muted-foreground text-center max-w-sm">
+                Unable to retrieve diff information
+              </p>
+              <Button
+                onClick={handleRetryDiff}
+                variant="outline"
+                size="sm"
+                className="mt-2"
+              >
+                <RefreshCw className="h-3 w-3 mr-1.5" />
+                Try Again
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // ============================================================================
@@ -772,40 +941,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   </div>
 
-                  {/* Diff Viewer */}
-                  {(entity.status === 'modified' || entity.status === 'outdated') && entity.projectPath && (
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Changes</h3>
-                      {isDiffLoading ? (
-                        <div className="border rounded-lg p-8 bg-muted/20 flex items-center justify-center">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Loading diff...</span>
-                          </div>
-                        </div>
-                      ) : diffError ? (
-                        <div className="border rounded-lg p-4 bg-red-500/10 border-red-500/20">
-                          <p className="text-sm text-red-700 dark:text-red-400">
-                            Failed to load diff: {diffError instanceof Error ? diffError.message : 'Unknown error'}
-                          </p>
-                        </div>
-                      ) : diffData && (diffData as unknown as ArtifactDiffResponse).files && Array.isArray((diffData as unknown as ArtifactDiffResponse).files) && (diffData as unknown as ArtifactDiffResponse).files.length > 0 ? (
-                        <div className="border rounded-lg overflow-hidden bg-background">
-                          <DiffViewer
-                            files={(diffData as unknown as ArtifactDiffResponse).files}
-                            leftLabel={entity.collection ? 'Collection' : 'Current'}
-                            rightLabel={entity.projectPath ? 'Project' : 'Upstream'}
-                          />
-                        </div>
-                      ) : diffData && !(diffData as unknown as ArtifactDiffResponse).has_changes ? (
-                        <div className="border rounded-lg p-4 bg-muted/20">
-                          <p className="text-sm text-muted-foreground text-center">
-                            No changes detected
-                          </p>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
+                  {/* Diff Viewer Section */}
+                  {renderDiffSection()}
 
                   {/* Status Alerts */}
                   {entity.status === 'outdated' && (
