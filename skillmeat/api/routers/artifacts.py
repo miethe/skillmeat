@@ -37,6 +37,9 @@ from skillmeat.api.schemas.artifacts import (
     ConflictInfo,
     DeploymentStatistics,
     FileDiff,
+    FileContentResponse,
+    FileListResponse,
+    FileNode,
     ProjectDeploymentInfo,
     VersionGraphNodeResponse,
     VersionGraphResponse,
@@ -2407,4 +2410,475 @@ async def get_artifact_diff(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get artifact diff: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/files",
+    response_model=FileListResponse,
+    summary="List artifact files",
+    description="List all files and directories in an artifact",
+    responses={
+        200: {"description": "Successfully retrieved file list"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_artifact_files(
+    artifact_id: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileListResponse:
+    """List all files in an artifact.
+
+    Returns a nested tree structure showing all files and directories
+    within the artifact. Hidden files and directories are excluded
+    (.git, __pycache__, node_modules, etc.).
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileListResponse with nested file tree
+
+    Raises:
+        HTTPException: If artifact not found or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/files
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "files": [
+                {
+                    "name": "SKILL.md",
+                    "path": "SKILL.md",
+                    "type": "file",
+                    "size": 2048,
+                    "children": null
+                },
+                {
+                    "name": "src",
+                    "path": "src",
+                    "type": "directory",
+                    "size": null,
+                    "children": [...]
+                }
+            ]
+        }
+    """
+    try:
+        logger.info(f"Listing files for artifact: {artifact_id} (collection={collection})")
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_path = collection_path / artifact.path
+
+        if not artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_path}",
+            )
+
+        # Define hidden/excluded patterns
+        EXCLUDED_PATTERNS = {
+            ".git",
+            ".gitignore",
+            "__pycache__",
+            "node_modules",
+            ".DS_Store",
+            "*.pyc",
+            "*.pyo",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".venv",
+            "venv",
+        }
+
+        def should_exclude(name: str) -> bool:
+            """Check if file/directory should be excluded."""
+            # Exclude hidden files (starting with .)
+            if name.startswith("."):
+                return True
+            # Exclude common artifacts
+            if name in EXCLUDED_PATTERNS:
+                return True
+            return False
+
+        def build_file_tree(path: Path, relative_root: Path) -> List[FileNode]:
+            """Recursively build file tree structure."""
+            nodes: List[FileNode] = []
+
+            try:
+                entries = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+            except PermissionError:
+                logger.warning(f"Permission denied accessing {path}")
+                return nodes
+
+            for entry in entries:
+                # Skip excluded files/directories
+                if should_exclude(entry.name):
+                    continue
+
+                rel_path = str(entry.relative_to(relative_root))
+
+                if entry.is_dir():
+                    # Recursively process directory
+                    children = build_file_tree(entry, relative_root)
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            type="directory",
+                            size=None,
+                            children=children,
+                        )
+                    )
+                elif entry.is_file():
+                    # Add file node
+                    try:
+                        file_size = entry.stat().st_size
+                    except Exception:
+                        file_size = 0
+
+                    nodes.append(
+                        FileNode(
+                            name=entry.name,
+                            path=rel_path,
+                            type="file",
+                            size=file_size,
+                            children=None,
+                        )
+                    )
+
+            return nodes
+
+        # Build file tree
+        if artifact_path.is_dir():
+            files = build_file_tree(artifact_path, artifact_path)
+        else:
+            # Single file artifact
+            files = [
+                FileNode(
+                    name=artifact_path.name,
+                    path=artifact_path.name,
+                    type="file",
+                    size=artifact_path.stat().st_size,
+                    children=None,
+                )
+            ]
+
+        logger.info(f"Listed {len(files)} files for artifact: {artifact_id}")
+
+        return FileListResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            files=files,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing files for '{artifact_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list artifact files: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Get artifact file content",
+    description="Get the content of a specific file within an artifact",
+    responses={
+        200: {"description": "Successfully retrieved file content"},
+        400: {"model": ErrorResponse, "description": "Invalid request or path traversal attempt"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact or file not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_file_content(
+    artifact_id: str,
+    file_path: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileContentResponse:
+    """Get content of a specific file within an artifact.
+
+    **SECURITY: Path Traversal Protection**
+    This endpoint implements strict path validation to prevent directory
+    traversal attacks. The file_path must:
+    - Be within the artifact directory
+    - Not contain ".." (parent directory references)
+    - Resolve to a path inside the artifact root
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        file_path: Relative path to file within artifact (e.g., "SKILL.md" or "src/main.py")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileContentResponse with file content and metadata
+
+    Raises:
+        HTTPException: If artifact not found, file not found, path traversal attempt, or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/files/SKILL.md
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "path": "SKILL.md",
+            "content": "# PDF Processor Skill...",
+            "size": 2048,
+            "mime_type": "text/markdown"
+        }
+    """
+    import mimetypes
+    import os
+
+    try:
+        logger.info(
+            f"Getting file content for artifact: {artifact_id}, file: {file_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_root = collection_path / artifact.path
+
+        if not artifact_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_root}",
+            )
+
+        # CRITICAL SECURITY: Validate and normalize the file path to prevent path traversal
+        # This prevents attacks like: ../../etc/passwd
+        try:
+            # Normalize the requested path to remove any .., ., etc.
+            normalized_file_path = os.path.normpath(file_path)
+
+            # Check for path traversal indicators
+            if normalized_file_path.startswith("..") or "/.." in normalized_file_path or "\\.." in normalized_file_path:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path traversal attempt detected",
+                )
+
+            # Construct the full path
+            full_path = (artifact_root / normalized_file_path).resolve()
+
+            # Ensure the resolved path is still within the artifact directory
+            artifact_root_resolved = artifact_root.resolve()
+            if not str(full_path).startswith(str(artifact_root_resolved)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path escapes artifact directory",
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Path validation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {str(e)}",
+            )
+
+        # Check if file exists
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {file_path}",
+            )
+
+        # Check if it's a file (not a directory)
+        if not full_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path is not a file: {file_path}",
+            )
+
+        # Get file size
+        file_size = full_path.stat().st_size
+
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(str(full_path))
+
+        # Check if file is binary
+        def is_binary_file(path: Path) -> bool:
+            """Check if file is binary by reading first 8KB."""
+            try:
+                with open(path, "rb") as f:
+                    chunk = f.read(8192)
+                    return b"\x00" in chunk
+            except Exception:
+                return True
+
+        # Read file content
+        try:
+            if is_binary_file(full_path):
+                # For binary files, return a placeholder
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot display binary file: {file_path}. Binary files are not supported.",
+                )
+
+            # Read text file
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File encoding error: {file_path} is not valid UTF-8",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error reading file {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {str(e)}",
+            )
+
+        logger.info(f"Successfully retrieved file content: {artifact_id}/{file_path}")
+
+        return FileContentResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            path=file_path,
+            content=content,
+            size=file_size,
+            mime_type=mime_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting file content for '{artifact_id}/{file_path}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get file content: {str(e)}",
         )

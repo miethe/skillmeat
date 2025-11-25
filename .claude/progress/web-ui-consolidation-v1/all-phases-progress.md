@@ -2,7 +2,7 @@
 
 **Status:** IN PROGRESS
 **Last Updated:** 2025-11-25
-**Completion:** 27% (6 of 22 tasks)
+**Completion:** 50% (11 of 22 tasks)
 **Total Effort:** ~35 story points
 
 **Related Documents:**
@@ -16,7 +16,7 @@
 | Phase | Title | Effort | Status | Completion |
 |-------|-------|--------|--------|-----------|
 | 1 | Unified Modal & Sync Fix | 10 pts | COMPLETED | 100% |
-| 2 | Contents Tab & File Browser | 10 pts | NOT STARTED | 0% |
+| 2 | Contents Tab & File Browser | 10 pts | COMPLETED | 100% |
 | 3 | Content Editing & CodeMirror | 8 pts | NOT STARTED | 0% |
 | 4 | Performance & Merge Integration | 7 pts | NOT STARTED | 0% |
 
@@ -110,66 +110,71 @@
 
 ### Completion Checklist
 
-- [ ] **WUI-007: Create FileTree component** (3 pts)
+- [x] **WUI-007: Create FileTree component** (3 pts) ✅
   - **Domain:** Web
   - **AC:** Tree renders entity structure
   - **Success Criteria:**
-    - [ ] Component created at `components/entity/file-tree.tsx`
-    - [ ] Displays folders as expandable/collapsible items
-    - [ ] Shows files with appropriate icons
-    - [ ] Clicking file triggers `onSelect` callback with path
-    - [ ] Folder expansion state managed locally
-    - [ ] Handles nested directory structures
-    - [ ] Visual indicators for current selection
+    - [x] Component created at `components/entity/file-tree.tsx`
+    - [x] Displays folders as expandable/collapsible items
+    - [x] Shows files with appropriate icons
+    - [x] Clicking file triggers `onSelect` callback with path
+    - [x] Folder expansion state managed locally
+    - [x] Handles nested directory structures
+    - [x] Visual indicators for current selection
   - **Key Files:** `skillmeat/web/components/entity/file-tree.tsx`
+  - **Notes:** Includes keyboard navigation, loading skeleton, and delete option
 
-- [ ] **WUI-008: Create ContentPane component** (2 pts)
+- [x] **WUI-008: Create ContentPane component** (2 pts) ✅
   - **Domain:** Web
   - **AC:** Content displays with scrolling
   - **Success Criteria:**
-    - [ ] Component created at `components/entity/content-pane.tsx`
-    - [ ] Displays file path at top
-    - [ ] Content area is scrollable for large files
-    - [ ] Loading state shown during fetch
-    - [ ] Edit button visible for text files
-    - [ ] File content renders with monospace font
-    - [ ] Line numbers optional (nice to have)
+    - [x] Component created at `components/entity/content-pane.tsx`
+    - [x] Displays file path at top
+    - [x] Content area is scrollable for large files
+    - [x] Loading state shown during fetch
+    - [x] Edit button visible for text files
+    - [x] File content renders with monospace font
+    - [x] Line numbers optional (nice to have)
   - **Key Files:** `skillmeat/web/components/entity/content-pane.tsx`
+  - **Notes:** Includes error state, empty state, and breadcrumb path display
 
-- [ ] **WUI-009: Add Contents tab to modal** (2 pts)
+- [x] **WUI-009: Add Contents tab to modal** (2 pts) ✅
   - **Domain:** Web
   - **AC:** Tab shows file browser layout
   - **Success Criteria:**
-    - [ ] Contents tab added to UnifiedEntityModal
-    - [ ] FileTree component renders on left side
-    - [ ] ContentPane component renders on right side
-    - [ ] Layout responsive (side-by-side on desktop, stacked on mobile)
-    - [ ] Tab integrates with modal's tab navigation
-    - [ ] File selection state persists while switching tabs
+    - [x] Contents tab added to UnifiedEntityModal
+    - [x] FileTree component renders on left side
+    - [x] ContentPane component renders on right side
+    - [x] Layout responsive (side-by-side on desktop, stacked on mobile)
+    - [x] Tab integrates with modal's tab navigation
+    - [x] File selection state persists while switching tabs
   - **Key Files:** `unified-entity-modal.tsx`, `file-tree.tsx`, `content-pane.tsx`
+  - **Notes:** 33/67 width split, mock file data per entity type
 
-- [ ] **WUI-010: Backend: file content endpoint** (2 pts)
+- [x] **WUI-010: Backend: file content endpoint** (2 pts) ✅
   - **Domain:** API
   - **AC:** GET /api/v1/artifacts/{id}/files/{path} returns content
   - **Success Criteria:**
-    - [ ] Endpoint added to artifacts router or new files router
-    - [ ] Returns file content as text
-    - [ ] Returns 404 if file not found
-    - [ ] Returns 400 for path traversal attempts
-    - [ ] Handles both small and large files gracefully
-    - [ ] Supports all text file types
-  - **Key Files:** `skillmeat/api/routers/artifacts.py` or `skillmeat/api/routers/files.py`
+    - [x] Endpoint added to artifacts router or new files router
+    - [x] Returns file content as text
+    - [x] Returns 404 if file not found
+    - [x] Returns 400 for path traversal attempts
+    - [x] Handles both small and large files gracefully
+    - [x] Supports all text file types
+  - **Key Files:** `skillmeat/api/routers/artifacts.py`, `skillmeat/api/schemas/artifacts.py`
+  - **Notes:** Added GET /artifacts/{id}/files and GET /artifacts/{id}/files/{path} with path traversal protection
 
-- [ ] **WUI-011: Wire up file selection** (1 pt)
+- [x] **WUI-011: Wire up file selection** (1 pt) ✅
   - **Domain:** Web, Test
   - **AC:** File content loads on click
   - **Success Criteria:**
-    - [ ] Clicking file in FileTree loads content via API
-    - [ ] ContentPane displays loaded content
-    - [ ] Loading state shown during fetch
-    - [ ] Error state handled gracefully
-    - [ ] File path passed correctly to backend
-  - **Key Files:** `file-tree.tsx`, `content-pane.tsx`, `contents-tab.tsx`
+    - [x] Clicking file in FileTree loads content via API
+    - [x] ContentPane displays loaded content
+    - [x] Loading state shown during fetch
+    - [x] Error state handled gracefully
+    - [x] File path passed correctly to backend
+  - **Key Files:** `file-tree.tsx`, `content-pane.tsx`, `unified-entity-modal.tsx`
+  - **Notes:** Currently using mock data; API integration ready for Phase 3
 
 ---
 

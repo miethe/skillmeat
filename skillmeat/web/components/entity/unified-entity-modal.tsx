@@ -21,6 +21,8 @@ import { Entity, ENTITY_TYPES } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
+import { FileTree, FileNode } from '@/components/entity/file-tree';
+import { ContentPane } from '@/components/entity/content-pane';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
@@ -129,6 +131,144 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
   return history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
+/**
+ * Generate mock file structure for testing
+ * TODO: Replace with real API call in Phase 3
+ */
+function generateMockFiles(entity: Entity): FileNode[] {
+  const entityType = entity.type;
+
+  // Base files common to all entities
+  const baseFiles: FileNode[] = [
+    {
+      name: 'README.md',
+      path: 'README.md',
+      type: 'file',
+    },
+  ];
+
+  // Entity-specific files
+  if (entityType === 'skill') {
+    return [
+      {
+        name: 'SKILL.md',
+        path: 'SKILL.md',
+        type: 'file',
+      },
+      ...baseFiles,
+      {
+        name: 'examples',
+        path: 'examples',
+        type: 'directory',
+        children: [
+          {
+            name: 'basic.md',
+            path: 'examples/basic.md',
+            type: 'file',
+          },
+          {
+            name: 'advanced.md',
+            path: 'examples/advanced.md',
+            type: 'file',
+          },
+        ],
+      },
+    ];
+  } else if (entityType === 'command') {
+    return [
+      {
+        name: 'COMMAND.md',
+        path: 'COMMAND.md',
+        type: 'file',
+      },
+      ...baseFiles,
+      {
+        name: 'src',
+        path: 'src',
+        type: 'directory',
+        children: [
+          {
+            name: 'index.ts',
+            path: 'src/index.ts',
+            type: 'file',
+          },
+          {
+            name: 'utils.ts',
+            path: 'src/utils.ts',
+            type: 'file',
+          },
+        ],
+      },
+      {
+        name: 'package.json',
+        path: 'package.json',
+        type: 'file',
+      },
+    ];
+  } else if (entityType === 'agent') {
+    return [
+      {
+        name: 'AGENT.md',
+        path: 'AGENT.md',
+        type: 'file',
+      },
+      ...baseFiles,
+      {
+        name: 'prompts',
+        path: 'prompts',
+        type: 'directory',
+        children: [
+          {
+            name: 'system.md',
+            path: 'prompts/system.md',
+            type: 'file',
+          },
+          {
+            name: 'examples.md',
+            path: 'prompts/examples.md',
+            type: 'file',
+          },
+        ],
+      },
+      {
+        name: 'config.json',
+        path: 'config.json',
+        type: 'file',
+      },
+    ];
+  }
+
+  // Default structure for other entity types
+  return baseFiles;
+}
+
+/**
+ * Generate mock file content for testing
+ * TODO: Replace with real API call in Phase 3
+ */
+function generateMockContent(path: string, entity: Entity): string {
+  const fileName = path.split('/').pop() || '';
+
+  if (fileName === 'SKILL.md' || fileName === 'COMMAND.md' || fileName === 'AGENT.md') {
+    return `# ${entity.name}\n\n${entity.description || 'No description available.'}\n\n## Usage\n\nThis is a placeholder content for ${fileName}.\n\n## Examples\n\n\`\`\`bash\n# Example command\necho "Hello, World!"\n\`\`\`\n\n## Notes\n\n- This is mock content for demonstration\n- Real content will be fetched from the API\n- Support for syntax highlighting coming soon`;
+  }
+
+  if (fileName === 'README.md') {
+    return `# ${entity.name}\n\n${entity.description || ''}\n\n## Overview\n\nThis README provides information about the ${entity.type}.\n\n## Installation\n\nFollow the installation instructions here.\n\n## Contributing\n\nContributions are welcome!`;
+  }
+
+  if (fileName.endsWith('.json')) {
+    return `{\n  "name": "${entity.name}",\n  "version": "${entity.version || '1.0.0'}",\n  "type": "${entity.type}",\n  "description": "${entity.description || ''}"\n}`;
+  }
+
+  if (fileName.endsWith('.ts') || fileName.endsWith('.tsx')) {
+    return `// ${fileName}\n\nexport function example() {\n  console.log('This is a placeholder TypeScript file');\n  return 'Hello from ${entity.name}';\n}\n\nexport default example;`;
+  }
+
+  // Default content
+  return `This is placeholder content for ${path}.\n\nReal file contents will be loaded from the API in Phase 3.`;
+}
+
 // ============================================================================
 // Loading Skeleton
 // ============================================================================
@@ -194,6 +334,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [isSyncing, setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Generate mock history entries
@@ -201,6 +342,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     if (!entity) return [];
     return generateMockHistory(entity);
   }, [entity]);
+
+  // Generate mock file structure
+  const mockFiles = useMemo(() => {
+    if (!entity) return [];
+    return generateMockFiles(entity);
+  }, [entity]);
+
+  // Generate mock file content based on selected path
+  const fileContent = useMemo(() => {
+    if (!entity || !selectedPath) return null;
+    return generateMockContent(selectedPath, entity);
+  }, [entity, selectedPath]);
 
   // Fetch diff data when sync tab is active and entity has changes
   const shouldFetchDiff = !!(
@@ -448,6 +601,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 Overview
               </TabsTrigger>
               <TabsTrigger
+                value="contents"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                Contents
+              </TabsTrigger>
+              <TabsTrigger
                 value="sync"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
               >
@@ -582,6 +741,31 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   </div>
                 </div>
               </ScrollArea>
+            </TabsContent>
+
+            {/* Contents Tab */}
+            <TabsContent value="contents" className="flex-1 mt-0">
+              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6">
+                {/* File Tree - Left Panel */}
+                <div className="w-1/3 border-r">
+                  <FileTree
+                    entityId={entity.id}
+                    files={mockFiles}
+                    selectedPath={selectedPath}
+                    onSelect={setSelectedPath}
+                  />
+                </div>
+
+                {/* Content Pane - Right Panel */}
+                <div className="flex-1">
+                  <ContentPane
+                    path={selectedPath}
+                    content={fileContent}
+                    isLoading={false}
+                    error={null}
+                  />
+                </div>
+              </div>
             </TabsContent>
 
             {/* Sync Status Tab */}

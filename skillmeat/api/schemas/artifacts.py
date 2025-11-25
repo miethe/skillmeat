@@ -877,3 +877,115 @@ class ArtifactDiffResponse(BaseModel):
                 },
             }
         }
+
+
+# ===========================
+# File Content Schemas
+# ===========================
+
+
+class FileNode(BaseModel):
+    """File or directory node in artifact file tree."""
+
+    name: str = Field(description="File or directory name")
+    path: str = Field(description="Relative path from artifact root")
+    type: Literal["file", "directory"] = Field(description="Node type")
+    size: Optional[int] = Field(
+        default=None,
+        description="File size in bytes (only for files)",
+    )
+    children: Optional[List["FileNode"]] = Field(
+        default=None,
+        description="Child nodes (only for directories)",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "name": "src",
+                "path": "src",
+                "type": "directory",
+                "size": None,
+                "children": [
+                    {
+                        "name": "main.py",
+                        "path": "src/main.py",
+                        "type": "file",
+                        "size": 1234,
+                        "children": None,
+                    }
+                ],
+            }
+        }
+
+
+class FileListResponse(BaseModel):
+    """Response for artifact file listing."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    files: List[FileNode] = Field(description="File tree structure")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "files": [
+                    {
+                        "name": "SKILL.md",
+                        "path": "SKILL.md",
+                        "type": "file",
+                        "size": 2048,
+                        "children": None,
+                    },
+                    {
+                        "name": "src",
+                        "path": "src",
+                        "type": "directory",
+                        "size": None,
+                        "children": [],
+                    },
+                ],
+            }
+        }
+
+
+class FileContentResponse(BaseModel):
+    """Response for artifact file content."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    path: str = Field(description="Relative file path within artifact")
+    content: str = Field(description="File content (UTF-8 encoded)")
+    size: int = Field(description="File size in bytes")
+    mime_type: Optional[str] = Field(
+        default=None,
+        description="MIME type of the file",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "path": "SKILL.md",
+                "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
+                "size": 2048,
+                "mime_type": "text/markdown",
+            }
+        }
