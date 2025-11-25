@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
-import { FileText, AlertCircle, Edit, ChevronRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileText, AlertCircle, Edit, ChevronRight, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SplitPreview } from '@/components/editor/split-preview';
 
 // ============================================================================
 // Types
@@ -18,6 +19,7 @@ export interface ContentPaneProps {
   isLoading?: boolean;
   error?: string | null;
   onEdit?: () => void;
+  onSave?: (content: string) => void | Promise<void>;
 }
 
 // ============================================================================
@@ -30,6 +32,13 @@ export interface ContentPaneProps {
 function isEditableFile(path: string): boolean {
   const editableExtensions = ['.md', '.txt', '.json', '.ts', '.tsx', '.js', '.jsx', '.py', '.yml', '.yaml', '.toml'];
   return editableExtensions.some((ext) => path.toLowerCase().endsWith(ext));
+}
+
+/**
+ * Check if a file should use markdown editor (for .md files)
+ */
+function isMarkdownFile(path: string): boolean {
+  return path.toLowerCase().endsWith('.md');
 }
 
 /**
@@ -171,7 +180,7 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
 // ============================================================================
 
 /**
- * ContentPane - File content viewer component
+ * ContentPane - File content viewer and editor component
  *
  * Displays the contents of a selected file with features like breadcrumb navigation,
  * optional line numbers, and edit functionality for supported file types.
@@ -184,6 +193,8 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
  * - Error state display with alert
  * - Empty state when no file selected
  * - Edit button for editable files (.md, .txt, .json, etc.)
+ * - Split-view markdown editor with live preview for .md files
+ * - Save and Cancel buttons in edit mode
  * - Optional line numbers (nice to have)
  *
  * @example
@@ -194,6 +205,7 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
  *   isLoading={isLoading}
  *   error={error}
  *   onEdit={() => handleEdit()}
+ *   onSave={(content) => handleSave(content)}
  * />
  * ```
  */
@@ -203,8 +215,43 @@ export function ContentPane({
   isLoading = false,
   error = null,
   onEdit,
+  onSave,
 }: ContentPaneProps) {
-  const canEdit = path && onEdit && isEditableFile(path);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const canEdit = path && (onEdit || onSave) && isEditableFile(path);
+  const isMarkdown = path && isMarkdownFile(path);
+
+  // Handle edit button click
+  const handleEditClick = () => {
+    setEditedContent(content || '');
+    setIsEditing(true);
+    onEdit?.();
+  };
+
+  // Handle save button click
+  const handleSaveClick = async () => {
+    if (!onSave) return;
+
+    setIsSaving(true);
+    try {
+      await onSave(editedContent);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save:', error);
+      // Error handling can be expanded here
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle cancel button click
+  const handleCancelClick = () => {
+    setEditedContent('');
+    setIsEditing(false);
+  };
 
   // Loading state
   if (isLoading) {
@@ -228,11 +275,33 @@ export function ContentPane({
         {/* Header with breadcrumb */}
         <div className="border-b p-4 flex items-center justify-between bg-muted/20">
           <Breadcrumb path={path} />
-          {canEdit && (
-            <Button variant="ghost" size="sm" onClick={onEdit}>
+          {canEdit && !isEditing && (
+            <Button variant="ghost" size="sm" onClick={handleEditClick}>
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Button>
+          )}
+          {isEditing && (
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelClick}
+                disabled={isSaving}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSaveClick}
+                disabled={isSaving}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -247,14 +316,55 @@ export function ContentPane({
     );
   }
 
-  // Content display
+  // Edit mode with markdown editor
+  if (isEditing && isMarkdown) {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Header with breadcrumb and actions */}
+        <div className="border-b p-4 flex items-center justify-between bg-muted/20">
+          <Breadcrumb path={path} />
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelClick}
+              disabled={isSaving}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSaveClick}
+              disabled={isSaving}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Split-view editor and preview */}
+        <div className="flex-1 p-4 overflow-hidden">
+          <SplitPreview
+            content={editedContent}
+            onChange={setEditedContent}
+            isEditing={isEditing}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Content display (read-only mode)
   return (
     <div className="h-full flex flex-col">
       {/* Header with breadcrumb and actions */}
       <div className="border-b p-4 flex items-center justify-between bg-muted/20">
         <Breadcrumb path={path} />
-        {canEdit && (
-          <Button variant="ghost" size="sm" onClick={onEdit}>
+        {canEdit && !isEditing && (
+          <Button variant="ghost" size="sm" onClick={handleEditClick}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
