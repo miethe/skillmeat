@@ -257,10 +257,7 @@ export default function ProjectManagePage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  // Decode project ID to get path
-  const projectPath = typeof window !== 'undefined' ? atob(projectId) : '';
-
-  // Fetch project details to ensure it exists
+  // Fetch project details to get the path (avoid client-side atob which fails on URL-encoded base64)
   const { data: project, isLoading, error } = useProject(projectId);
 
   if (isLoading) {
@@ -283,6 +280,9 @@ export default function ProjectManagePage() {
       </div>
     );
   }
+
+  // Get project path from API response (safe approach)
+  const projectPath = project.path;
 
   return (
     <EntityLifecycleProvider mode="project" projectPath={projectPath}>
