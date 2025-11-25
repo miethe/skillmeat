@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ENTITY_TYPES, EntityType, getAllEntityTypes } from '@/types/entity';
 import * as LucideIcons from 'lucide-react';
@@ -12,13 +12,15 @@ interface EntityTabsProps {
 
 export function EntityTabs({ children }: EntityTabsProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTab = (searchParams.get('type') as EntityType) || 'skill';
 
   const handleTabChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('type', value);
-    router.push(`/manage?${params.toString()}`);
+    // Use current pathname instead of hardcoded /manage
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const entityTypes = getAllEntityTypes();
