@@ -49,7 +49,7 @@ export function SplitPreview({
 }: SplitPreviewProps) {
   return (
     <div className={cn('flex flex-col lg:flex-row h-full gap-4', className)}>
-      {/* Editor Panel */}
+      {/* Editor Panel - Only shown in edit mode */}
       {isEditing && (
         <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0">
           <MarkdownEditor
@@ -60,11 +60,11 @@ export function SplitPreview({
         </div>
       )}
 
-      {/* Preview Panel */}
+      {/* Preview Panel - Always shown for markdown */}
       <div className={cn('flex-1 min-w-0 min-h-[300px] lg:min-h-0', !isEditing && 'w-full')}>
-        <div className="h-full border rounded-md bg-card">
+        <div className="h-full border rounded-md bg-card overflow-hidden">
           <ScrollArea className="h-full">
-            <div className="p-6 prose prose-sm dark:prose-invert max-w-none">
+            <div className="p-6 prose prose-sm dark:prose-invert max-w-none break-words overflow-wrap-anywhere">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {content || '*No content to preview*'}
               </ReactMarkdown>
