@@ -98,22 +98,8 @@ export function EntityList({
     }
   }, [selectEntity, deselectEntity]);
 
-  // Empty state
-  if (!entities || entities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No entities found</h3>
-        <p className="text-sm text-muted-foreground max-w-md">
-          {selectable
-            ? "No entities match your current filters. Try adjusting your search or filters."
-            : "Get started by adding your first entity to your collection."}
-        </p>
-      </div>
-    );
-  }
-
-  // Memoized render functions to prevent unnecessary re-renders
+  // ALL useCallback hooks must be defined BEFORE any early returns
+  // to comply with React's Rules of Hooks (same order on every render)
   const renderEntityCard = useCallback((entity: Entity) => {
     return (
       <EntityCard
@@ -144,17 +130,6 @@ export function EntityList({
     onRollback,
   ]);
 
-  // Grid view
-  if (viewMode === "grid") {
-    return (
-      <ScrollArea className="h-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-          {entities.map(renderEntityCard)}
-        </div>
-      </ScrollArea>
-    );
-  }
-
   const renderEntityRow = useCallback((entity: Entity) => {
     return (
       <EntityRow
@@ -184,6 +159,32 @@ export function EntityList({
     onViewDiff,
     onRollback,
   ]);
+
+  // Empty state - safe to return early now that all hooks are defined
+  if (!entities || entities.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No entities found</h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          {selectable
+            ? "No entities match your current filters. Try adjusting your search or filters."
+            : "Get started by adding your first entity to your collection."}
+        </p>
+      </div>
+    );
+  }
+
+  // Grid view
+  if (viewMode === "grid") {
+    return (
+      <ScrollArea className="h-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+          {entities.map(renderEntityCard)}
+        </div>
+      </ScrollArea>
+    );
+  }
 
   // List view
   return (
