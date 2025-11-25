@@ -19,16 +19,12 @@ class ArtifactSourceType(str, Enum):
 class ArtifactCreateRequest(BaseModel):
     """Request schema for creating an artifact."""
 
-    source_type: ArtifactSourceType = Field(
-        description="Source type: github or local"
-    )
+    source_type: ArtifactSourceType = Field(description="Source type: github or local")
     source: str = Field(description="GitHub URL/spec or local path")
     artifact_type: str = Field(
         description="Type of artifact (skill, command, agent, mcp, hook)"
     )
-    name: Optional[str] = Field(
-        default=None, description="Override artifact name"
-    )
+    name: Optional[str] = Field(default=None, description="Override artifact name")
     collection: Optional[str] = Field(
         default=None, description="Target collection (uses default if not specified)"
     )
@@ -371,6 +367,7 @@ class ArtifactUpdateRequest(BaseModel):
             }
         }
 
+
 class ArtifactDeployRequest(BaseModel):
     """Request schema for deploying an artifact."""
 
@@ -441,7 +438,9 @@ class ArtifactSyncRequest(BaseModel):
 class ConflictInfo(BaseModel):
     """Information about a sync conflict."""
 
-    file_path: str = Field(description="Path to conflicted file relative to artifact root")
+    file_path: str = Field(
+        description="Path to conflicted file relative to artifact root"
+    )
     conflict_type: str = Field(
         description="Type of conflict",
         examples=["modified", "added", "removed"],
@@ -513,9 +512,7 @@ class ArtifactVersionInfo(BaseModel):
         description="Parent version SHA (for tracking lineage)",
         examples=["def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh"],
     )
-    is_modified: bool = Field(
-        description="Whether content differs from parent version"
-    )
+    is_modified: bool = Field(description="Whether content differs from parent version")
     created_at: datetime = Field(description="Version creation timestamp")
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
@@ -616,9 +613,7 @@ class VersionGraphResponse(BaseModel):
             }
         ],
     )
-    last_updated: datetime = Field(
-        description="Timestamp when graph was last computed"
-    )
+    last_updated: datetime = Field(description="Timestamp when graph was last computed")
 
     class Config:
         """Pydantic model configuration."""
@@ -987,5 +982,20 @@ class FileContentResponse(BaseModel):
                 "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
                 "size": 2048,
                 "mime_type": "text/markdown",
+            }
+        }
+
+
+class FileUpdateRequest(BaseModel):
+    """Request body for updating file content."""
+
+    content: str = Field(..., description="New file content")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "content": "# Updated PDF Processor Skill\n\nThis skill processes PDF files with enhanced features...",
             }
         }

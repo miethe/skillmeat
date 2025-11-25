@@ -2,7 +2,7 @@
 
 **Status:** IN PROGRESS
 **Last Updated:** 2025-11-25
-**Completion:** 50% (11 of 22 tasks)
+**Completion:** 73% (16 of 22 tasks)
 **Total Effort:** ~35 story points
 
 **Related Documents:**
@@ -17,7 +17,7 @@
 |-------|-------|--------|--------|-----------|
 | 1 | Unified Modal & Sync Fix | 10 pts | COMPLETED | 100% |
 | 2 | Contents Tab & File Browser | 10 pts | COMPLETED | 100% |
-| 3 | Content Editing & CodeMirror | 8 pts | NOT STARTED | 0% |
+| 3 | Content Editing & CodeMirror | 8 pts | COMPLETED | 100% |
 | 4 | Performance & Merge Integration | 7 pts | NOT STARTED | 0% |
 
 ---
@@ -186,66 +186,71 @@
 
 ### Completion Checklist
 
-- [ ] **WUI-012: Install CodeMirror 6** (1 pt)
+- [x] **WUI-012: Install CodeMirror 6** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Packages installed, no build errors
   - **Success Criteria:**
-    - [ ] All CodeMirror 6 packages added to package.json
-    - [ ] Build succeeds without errors
-    - [ ] No version conflicts with existing dependencies
-    - [ ] Packages: @codemirror/state, @codemirror/view, @codemirror/lang-markdown
+    - [x] All CodeMirror 6 packages added to package.json
+    - [x] Build succeeds without errors
+    - [x] No version conflicts with existing dependencies
+    - [x] Packages: @codemirror/state, @codemirror/view, @codemirror/lang-markdown
   - **Key Files:** `package.json`
+  - **Notes:** Also added @tailwindcss/typography for prose styling
 
-- [ ] **WUI-013: Create MarkdownEditor** (3 pts)
+- [x] **WUI-013: Create MarkdownEditor** (3 pts) ✅
   - **Domain:** Web
   - **AC:** Editor renders with highlighting
   - **Success Criteria:**
-    - [ ] Component created at `components/editor/markdown-editor.tsx`
-    - [ ] CodeMirror instance initializes correctly
-    - [ ] Markdown syntax highlighting applied
-    - [ ] Content can be typed and edited
-    - [ ] onChange callback fires on changes
-    - [ ] Initial content loads from props
-    - [ ] Editor is keyboard accessible
+    - [x] Component created at `components/editor/markdown-editor.tsx`
+    - [x] CodeMirror instance initializes correctly
+    - [x] Markdown syntax highlighting applied
+    - [x] Content can be typed and edited
+    - [x] onChange callback fires on changes
+    - [x] Initial content loads from props
+    - [x] Editor is keyboard accessible
   - **Key Files:** `skillmeat/web/components/editor/markdown-editor.tsx`
+  - **Notes:** Includes history support, dark/light themes
 
-- [ ] **WUI-014: Add split-view preview** (2 pts)
+- [x] **WUI-014: Add split-view preview** (2 pts) ✅
   - **Domain:** Web
   - **AC:** Preview updates as you type
   - **Success Criteria:**
-    - [ ] Component created at `components/editor/split-preview.tsx`
-    - [ ] Left side shows CodeMirror editor
-    - [ ] Right side shows rendered markdown preview
-    - [ ] Preview updates in real-time as user types
-    - [ ] GFM features supported (tables, strikethrough, etc.)
-    - [ ] Layout responsive with scrollable panes
-    - [ ] Syntax highlighting in both editor and preview
+    - [x] Component created at `components/editor/split-preview.tsx`
+    - [x] Left side shows CodeMirror editor
+    - [x] Right side shows rendered markdown preview
+    - [x] Preview updates in real-time as user types
+    - [x] GFM features supported (tables, strikethrough, etc.)
+    - [x] Layout responsive with scrollable panes
+    - [x] Syntax highlighting in both editor and preview
   - **Key Files:** `skillmeat/web/components/editor/split-preview.tsx`
+  - **Notes:** Uses react-markdown with remark-gfm
 
-- [ ] **WUI-015: Wire Edit button** (1 pt)
+- [x] **WUI-015: Wire Edit button** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Button switches modes
   - **Success Criteria:**
-    - [ ] Edit button added to ContentPane header
-    - [ ] Clicking toggles between view and edit mode
-    - [ ] View mode shows read-only content
-    - [ ] Edit mode shows CodeMirror + preview
-    - [ ] Save button appears in edit mode
-    - [ ] Cancel button reverts unsaved changes
+    - [x] Edit button added to ContentPane header
+    - [x] Clicking toggles between view and edit mode
+    - [x] View mode shows read-only content
+    - [x] Edit mode shows CodeMirror + preview
+    - [x] Save button appears in edit mode
+    - [x] Cancel button reverts unsaved changes
   - **Key Files:** `content-pane.tsx`
+  - **Notes:** Includes loading state during save
 
-- [ ] **WUI-016: Backend: file update endpoint** (1 pt)
+- [x] **WUI-016: Backend: file update endpoint** (1 pt) ✅
   - **Domain:** API
   - **AC:** PUT /api/v1/artifacts/{id}/files/{path} saves
   - **Success Criteria:**
-    - [ ] Endpoint added for file updates
-    - [ ] Accepts file path and content in request body
-    - [ ] Validates path for traversal attacks
-    - [ ] Returns 201/200 on success
-    - [ ] Returns 404 if file not found
-    - [ ] Returns 400 for invalid inputs
-    - [ ] Creates backup of original file (nice to have)
-  - **Key Files:** `skillmeat/api/routers/files.py`
+    - [x] Endpoint added for file updates
+    - [x] Accepts file path and content in request body
+    - [x] Validates path for traversal attacks
+    - [x] Returns 201/200 on success
+    - [x] Returns 404 if file not found
+    - [x] Returns 400 for invalid inputs
+    - [x] Creates backup of original file (nice to have)
+  - **Key Files:** `skillmeat/api/routers/artifacts.py`, `skillmeat/api/schemas/artifacts.py`
+  - **Notes:** Atomic write with tempfile, path traversal protection
 
 ---
 
