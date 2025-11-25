@@ -1,8 +1,8 @@
 # All-Phases Progress: Web UI Consolidation & Enhancements
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Last Updated:** 2025-11-25
-**Completion:** 73% (16 of 22 tasks)
+**Completion:** 100% (22 of 22 tasks)
 **Total Effort:** ~35 story points
 
 **Related Documents:**
@@ -18,7 +18,7 @@
 | 1 | Unified Modal & Sync Fix | 10 pts | COMPLETED | 100% |
 | 2 | Contents Tab & File Browser | 10 pts | COMPLETED | 100% |
 | 3 | Content Editing & CodeMirror | 8 pts | COMPLETED | 100% |
-| 4 | Performance & Merge Integration | 7 pts | NOT STARTED | 0% |
+| 4 | Performance & Merge Integration | 7 pts | COMPLETED | 100% |
 
 ---
 
@@ -262,77 +262,83 @@
 
 ### Completion Checklist
 
-- [ ] **WUI-017: Add prefetching on hover** (2 pts)
+- [x] **WUI-017: Add prefetching on hover** (2 pts) ✅
   - **Domain:** Web
   - **AC:** Data ready when modal opens
   - **Success Criteria:**
-    - [ ] Prefetch query implemented using React Query
-    - [ ] onMouseEnter on EntityCard triggers prefetch
-    - [ ] Data cached before modal opens
-    - [ ] Modal opens instantly with cached data
-    - [ ] No unnecessary network requests
-    - [ ] Works on both collection and project pages
+    - [x] Prefetch query implemented using React Query
+    - [x] onMouseEnter on EntityCard triggers prefetch
+    - [x] Data cached before modal opens
+    - [x] Modal opens instantly with cached data
+    - [x] No unnecessary network requests
+    - [x] Works on both collection and project pages
   - **Key Files:** `entity-card.tsx`, `useEntityLifecycle.tsx`
+  - **Notes:** Prefetches diff data for modified/outdated entities
 
-- [ ] **WUI-018: Implement skeleton loading** (1 pt)
+- [x] **WUI-018: Implement skeleton loading** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Skeletons display during load
   - **Success Criteria:**
-    - [ ] Skeleton component created or imported
-    - [ ] Shows skeleton in entity list during initial load
-    - [ ] Shows skeleton in modal tabs during load
-    - [ ] Smooth transition from skeleton to content
-    - [ ] Improves perceived performance
-  - **Key Files:** `entity-card.tsx`, `unified-entity-modal.tsx`
+    - [x] Skeleton component created or imported
+    - [x] Shows skeleton in entity list during initial load
+    - [x] Shows skeleton in modal tabs during load
+    - [x] Smooth transition from skeleton to content
+    - [x] Improves perceived performance
+  - **Key Files:** `entity-card.tsx`, `entity-list.tsx`
+  - **Notes:** EntityCardSkeleton component supports both grid and list views
 
-- [ ] **WUI-019: Add refresh button** (1 pt)
+- [x] **WUI-019: Add refresh button** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Button triggers data refetch
   - **Success Criteria:**
-    - [ ] Refresh button added to page header
-    - [ ] Clicking triggers `refetch()` on entity query
-    - [ ] Shows loading state during refetch
-    - [ ] Success/error feedback shown
-    - [ ] Manual refresh available in entity detail
-    - [ ] Works on both /manage and /projects/[id]/manage
+    - [x] Refresh button added to page header
+    - [x] Clicking triggers `refetch()` on entity query
+    - [x] Shows loading state during refetch
+    - [x] Success/error feedback shown
+    - [x] Manual refresh available in entity detail
+    - [x] Works on both /manage and /projects/[id]/manage
   - **Key Files:** `skillmeat/web/app/manage/page.tsx`, `skillmeat/web/app/projects/[id]/manage/page.tsx`
+  - **Notes:** Spinning refresh icon with disabled state during refetch
 
-- [ ] **WUI-020: Integrate DiffViewer in Sync Status** (1 pt)
+- [x] **WUI-020: Integrate DiffViewer in Sync Status** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Diff viewer renders in tab
   - **Success Criteria:**
-    - [ ] DiffViewer component imported into Sync Status tab
-    - [ ] Shows diff when changes available
-    - [ ] Left side shows local version
-    - [ ] Right side shows upstream version
-    - [ ] Color coding: green (additions), red (deletions)
-    - [ ] File list sidebar shows all changed files
+    - [x] DiffViewer component imported into Sync Status tab
+    - [x] Shows diff when changes available
+    - [x] Left side shows local version
+    - [x] Right side shows upstream version
+    - [x] Color coding: green (additions), red (deletions)
+    - [x] File list sidebar shows all changed files
   - **Key Files:** `unified-entity-modal.tsx`, `diff-viewer.tsx`
+  - **Notes:** Already implemented in Phase 1, verified working
 
-- [ ] **WUI-021: Add merge workflow trigger** (1 pt)
+- [x] **WUI-021: Add merge workflow trigger** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Merge dialog opens from tab
   - **Success Criteria:**
-    - [ ] Merge button added to Sync Status tab
-    - [ ] Clicking opens MergeWorkflow component
-    - [ ] Merge workflow shows in modal or overlay
-    - [ ] Conflict detection works
-    - [ ] Progress stages display correctly
-    - [ ] Completion status shown
+    - [x] Merge button added to Sync Status tab
+    - [x] Clicking opens MergeWorkflow component
+    - [x] Merge workflow shows in modal or overlay
+    - [x] Conflict detection works
+    - [x] Progress stages display correctly
+    - [x] Completion status shown
   - **Key Files:** `unified-entity-modal.tsx`, `merge-workflow.tsx`
+  - **Notes:** 3-step workflow: Preview → Resolve → Apply
 
-- [ ] **WUI-022: Wire Sync Status buttons** (1 pt)
+- [x] **WUI-022: Wire Sync Status buttons** (1 pt) ✅
   - **Domain:** Web
   - **AC:** Buttons trigger operations
   - **Success Criteria:**
-    - [ ] Deploy to Project button calls deploy API
-    - [ ] Sync with Upstream button calls sync API
-    - [ ] Rollback button calls rollback API (if present)
-    - [ ] All buttons show loading state during operation
-    - [ ] Success/error notifications displayed
-    - [ ] Entity data refreshes after operation
-    - [ ] No console.log only behavior
+    - [x] Deploy to Project button calls deploy API
+    - [x] Sync with Upstream button calls sync API
+    - [x] Rollback button calls rollback API (if present)
+    - [x] All buttons show loading state during operation
+    - [x] Success/error notifications displayed
+    - [x] Entity data refreshes after operation
+    - [x] No console.log only behavior
   - **Key Files:** `unified-entity-modal.tsx`
+  - **Notes:** All buttons trigger refetch() after completion
 
 ---
 
