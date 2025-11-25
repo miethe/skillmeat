@@ -28,16 +28,56 @@ import { Button } from "@/components/ui/button";
 import { RollbackDialog } from "./rollback-dialog";
 import type { Entity } from "@/types/entity";
 
+/**
+ * Props for EntityActions component
+ *
+ * Controls which actions are available and callbacks for each action.
+ */
 export interface EntityActionsProps {
+  /** The entity this action menu is for */
   entity: Entity;
+  /** Callback for edit action */
   onEdit?: () => void;
+  /** Callback for delete action - shows confirmation dialog */
   onDelete?: () => void;
+  /** Callback for deploy action */
   onDeploy?: () => void;
+  /** Callback for sync action */
   onSync?: () => void;
+  /** Callback for view diff action - only shown when status is "modified" */
   onViewDiff?: () => void;
+  /** Callback for rollback action - only shown when status is "modified" or "conflict" */
   onRollback?: () => void;
 }
 
+/**
+ * EntityActions - Dropdown menu for entity lifecycle actions
+ *
+ * Renders a dropdown menu with context-aware actions for managing entities.
+ * Actions shown depend on entity status and available callbacks:
+ * - Edit: Always shown if onEdit provided
+ * - Deploy: Shown if onDeploy provided
+ * - Sync: Shown if onSync provided
+ * - View Diff: Only shown if status is "modified" and onViewDiff provided
+ * - Rollback: Only shown if status is "modified" or "conflict" and onRollback provided
+ * - Delete: Always shown if onDelete provided (with warning icon)
+ *
+ * Includes confirmation dialogs for destructive operations (delete, rollback).
+ *
+ * @example
+ * ```tsx
+ * <EntityActions
+ *   entity={skill}
+ *   onEdit={() => openEditDialog(skill)}
+ *   onDelete={() => deleteEntity(skill.id)}
+ *   onDeploy={() => deployTo(skill)}
+ *   onViewDiff={() => showDiff(skill)}
+ * />
+ * ```
+ *
+ * @param props - EntityActionsProps configuration
+ * @returns Dropdown menu component with entity action options
+ */
 export function EntityActions({
   entity,
   onEdit,

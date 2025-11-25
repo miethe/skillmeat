@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,16 +56,17 @@ function ManagePageContent() {
       )
     : entities;
 
-  const handleEntityClick = (entity: Entity) => {
+  // Memoize event handlers to prevent EntityList re-renders
+  const handleEntityClick = useCallback((entity: Entity) => {
     setSelectedEntity(entity);
     setDetailPanelOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (entity: Entity) => {
+  const handleEdit = useCallback((entity: Entity) => {
     setEditingEntity(entity);
-  };
+  }, []);
 
-  const handleDelete = async (entity: Entity) => {
+  const handleDelete = useCallback(async (entity: Entity) => {
     if (confirm(`Are you sure you want to delete ${entity.name}?`)) {
       try {
         await deleteEntity(entity.id);
@@ -74,28 +75,28 @@ function ManagePageContent() {
         alert('Failed to delete entity');
       }
     }
-  };
+  }, [deleteEntity]);
 
-  const handleDeploy = (entity: Entity) => {
+  const handleDeploy = useCallback((entity: Entity) => {
     // Navigate to deploy page or open deploy dialog
     console.log('Deploy entity:', entity);
-  };
+  }, []);
 
-  const handleSync = (entity: Entity) => {
+  const handleSync = useCallback((entity: Entity) => {
     // Handle sync
     console.log('Sync entity:', entity);
-  };
+  }, []);
 
-  const handleViewDiff = (entity: Entity) => {
+  const handleViewDiff = useCallback((entity: Entity) => {
     // Open diff viewer
     console.log('View diff:', entity);
-  };
+  }, []);
 
-  const handleRollback = async (entity: Entity) => {
+  const handleRollback = useCallback(async (entity: Entity) => {
     // Rollback will be handled by entity-actions component via RollbackDialog
     // This is just a placeholder in case we need to do something after rollback
     console.log('Rollback entity:', entity);
-  };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen">

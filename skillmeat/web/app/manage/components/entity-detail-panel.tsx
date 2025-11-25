@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User } from 'lucide-react';
+import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -86,8 +86,6 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
   }
 
   if (entity.modifiedAt && entity.modifiedAt !== entity.deployedAt) {
-    const modifiedDate = new Date(entity.modifiedAt);
-
     // Add sync entry for modifications
     history.push({
       id: `sync-${entity.modifiedAt}`,
@@ -132,19 +130,20 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
   }, [entity]);
 
   // Fetch diff data when sync tab is active and entity has changes
-  const shouldFetchDiff =
+  const shouldFetchDiff = !!(
     activeTab === 'sync' &&
     entity &&
     (entity.status === 'modified' || entity.status === 'outdated') &&
-    entity.projectPath;
+    entity.projectPath
+  );
 
   const {
     data: diffData,
     isLoading: isDiffLoading,
     error: diffError,
-  } = useQuery({
+  } = useQuery<ArtifactDiffResponse>({
     queryKey: ['artifact-diff', entity?.id, entity?.projectPath],
-    queryFn: async (): Promise<ArtifactDiffResponse> => {
+    queryFn: async () => {
       if (!entity?.id || !entity?.projectPath) {
         throw new Error('Missing entity ID or project path');
       }
@@ -162,7 +161,8 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
       );
     },
     enabled: shouldFetchDiff,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (improved from 30s)
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
 
   if (!entity) {
@@ -496,15 +496,15 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                           Failed to load diff: {diffError instanceof Error ? diffError.message : 'Unknown error'}
                         </p>
                       </div>
-                    ) : diffData && diffData.files.length > 0 ? (
+                    ) : diffData && (diffData as unknown as ArtifactDiffResponse).files && Array.isArray((diffData as unknown as ArtifactDiffResponse).files) && (diffData as unknown as ArtifactDiffResponse).files.length > 0 ? (
                       <div className="border rounded-lg overflow-hidden bg-background">
                         <DiffViewer
-                          files={diffData.files}
+                          files={(diffData as unknown as ArtifactDiffResponse).files}
                           leftLabel={entity.collection ? 'Collection' : 'Current'}
                           rightLabel={entity.projectPath ? 'Project' : 'Upstream'}
                         />
                       </div>
-                    ) : diffData && !diffData.has_changes ? (
+                    ) : diffData && !(diffData as unknown as ArtifactDiffResponse).has_changes ? (
                       <div className="border rounded-lg p-4 bg-muted/20">
                         <p className="text-sm text-muted-foreground text-center">
                           No changes detected
@@ -569,7 +569,7 @@ export function EntityDetailPanel({ entity, open, onClose }: EntityDetailPanelPr
                       {/* Timeline line */}
                       <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
 
-                      {historyEntries.map((entry, index) => (
+                      {historyEntries.map((entry) => (
                         <div
                           key={entry.id}
                           className="relative pl-11 pb-6 last:pb-0 group hover:bg-muted/30 -ml-2 pl-13 pr-2 py-2 rounded-lg transition-colors"

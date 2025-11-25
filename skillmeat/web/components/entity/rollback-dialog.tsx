@@ -21,13 +21,45 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Entity } from "@/types/entity";
 
+/**
+ * Props for RollbackDialog component
+ *
+ * Controls dialog state and rollback confirmation behavior.
+ */
 export interface RollbackDialogProps {
+  /** The entity to rollback */
   entity: Entity;
+  /** Whether the dialog is open */
   open: boolean;
+  /** Callback to change dialog open state */
   onOpenChange: (open: boolean) => void;
+  /** Async callback to execute the rollback operation */
   onConfirm: () => Promise<void>;
 }
 
+/**
+ * RollbackDialog - Confirmation dialog for rolling back entity changes
+ *
+ * Multi-section confirmation dialog that warns users about destructive rollback operation.
+ * Shows:
+ * - Current version vs target (collection) version
+ * - Entity details (name, type, project path if applicable)
+ * - Warning alert about permanent data loss
+ * - Loading state during rollback operation
+ *
+ * @example
+ * ```tsx
+ * <RollbackDialog
+ *   entity={modifiedSkill}
+ *   open={showDialog}
+ *   onOpenChange={setShowDialog}
+ *   onConfirm={async () => await rollbackEntity(skill.id)}
+ * />
+ * ```
+ *
+ * @param props - RollbackDialogProps configuration
+ * @returns Dialog component with rollback confirmation UI
+ */
 export function RollbackDialog({
   entity,
   open,

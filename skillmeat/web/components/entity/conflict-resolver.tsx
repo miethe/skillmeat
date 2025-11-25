@@ -7,17 +7,32 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { FileDiff } from '@/sdk/models/FileDiff';
 
+/**
+ * Props for ConflictResolver component
+ *
+ * Controls file display, conflict information, and resolution callback.
+ */
 export interface ConflictResolverProps {
+  /** The file diff containing the conflict */
   file: FileDiff;
+  /** Currently selected resolution strategy */
   resolution: 'theirs' | 'ours' | 'manual' | null;
+  /** Callback when user selects a resolution strategy */
   onResolve: (resolution: 'theirs' | 'ours' | 'manual') => void;
+  /** Optional conflict analysis information for display */
   conflictInfo?: {
+    /** Conflict severity: 'hard' (overlapping) or 'soft' (adjacent) */
     severity: 'hard' | 'soft' | 'none';
+    /** Number of conflicts detected */
     conflictCount: number;
+    /** Number of lines added */
     additions: number;
+    /** Number of lines deleted */
     deletions: number;
   };
+  /** Label for collection version (left panel) */
   collectionLabel?: string;
+  /** Label for project version (right panel) */
   projectLabel?: string;
 }
 
@@ -68,7 +83,7 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
 
     if (line.startsWith('@@')) {
       const match = line.match(/@@ -(\d+),?\d* \+(\d+),?\d* @@/);
-      if (match) {
+      if (match && match[1] && match[2]) {
         leftLineNum = parseInt(match[1], 10);
         rightLineNum = parseInt(match[2], 10);
       }
@@ -105,6 +120,35 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
   return parsed;
 }
 
+/**
+ * ConflictResolver - Interactive conflict resolution card
+ *
+ * Displays a single file with conflicts and provides resolution options.
+ * Features include:
+ * - Visual conflict severity indicators (hard/soft) with color coding
+ * - Side-by-side diff preview with synchronized scrolling
+ * - Three resolution strategies: keep collection, keep project, manual merge
+ * - Conflict statistics (additions/deletions, conflict count)
+ * - Selected resolution confirmation summary
+ *
+ * @example
+ * ```tsx
+ * <ConflictResolver
+ *   file={fileDiff}
+ *   resolution="collection"
+ *   onResolve={(strategy) => updateResolution(filePath, strategy)}
+ *   conflictInfo={{
+ *     severity: 'hard',
+ *     conflictCount: 3,
+ *     additions: 12,
+ *     deletions: 8
+ *   }}
+ * />
+ * ```
+ *
+ * @param props - ConflictResolverProps configuration
+ * @returns Card component with conflict resolution options
+ */
 export function ConflictResolver({
   file,
   resolution,
@@ -324,7 +368,6 @@ function ResolutionOption({
   description,
   selected,
   onClick,
-  variant,
   disabled = false,
 }: ResolutionOptionProps) {
   return (

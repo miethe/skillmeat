@@ -17,21 +17,60 @@ import type { Entity } from "@/types/entity";
 import { getEntityTypeConfig } from "@/types/entity";
 import { EntityActions } from "./entity-actions";
 
+/**
+ * Props for EntityCard component
+ *
+ * Controls the card display, selection state, and action callbacks.
+ */
 export interface EntityCardProps {
+  /** The entity to display in the card */
   entity: Entity;
+  /** Whether the card is currently selected */
   selected?: boolean;
+  /** Whether the entity can be selected (shows checkbox) */
   selectable?: boolean;
+  /** Callback when selection state changes */
   onSelect?: (selected: boolean) => void;
+  /** Callback when card is clicked */
   onClick?: () => void;
+  /** Callback for edit action */
   onEdit?: () => void;
+  /** Callback for delete action */
   onDelete?: () => void;
+  /** Callback for deploy action */
   onDeploy?: () => void;
+  /** Callback for sync action */
   onSync?: () => void;
+  /** Callback to view diff (enabled when status is "modified") */
   onViewDiff?: () => void;
+  /** Callback to rollback (enabled for "modified" or "conflict" status) */
   onRollback?: () => void;
 }
 
-export function EntityCard({
+/**
+ * EntityCard - Grid view card for displaying a single entity
+ *
+ * Renders entity information in card format with icon, name, type badge, description,
+ * tags, status indicator, and action menu. Used in grid view mode.
+ *
+ * @example
+ * ```tsx
+ * <EntityCard
+ *   entity={skill}
+ *   selected={true}
+ *   selectable={true}
+ *   onSelect={(checked) => updateSelection(checked)}
+ *   onClick={() => openDetail(skill)}
+ *   onEdit={() => startEdit(skill)}
+ *   onDelete={() => deleteEntity(skill)}
+ * />
+ * ```
+ *
+ * @param props - EntityCardProps configuration
+ * @returns Memoized card component with custom render comparison
+ */
+// Memoized component with custom comparison to prevent unnecessary re-renders
+export const EntityCard = React.memo(function EntityCard({
   entity,
   selected = false,
   selectable = false,
@@ -45,7 +84,9 @@ export function EntityCard({
   onRollback,
 }: EntityCardProps) {
   const config = getEntityTypeConfig(entity.type);
-  const Icon = (LucideIcons as any)[config.icon] || LucideIcons.FileText;
+  // Type-safe icon lookup with fallback
+  const IconComponent = (LucideIcons as any)[config.icon] as React.ComponentType<{ className?: string }> | undefined;
+  const Icon = IconComponent || LucideIcons.FileText;
 
   const statusColors = {
     synced: "text-green-500",
@@ -101,6 +142,7 @@ export function EntityCard({
             checked={selected}
             onCheckedChange={handleCheckboxChange}
             className="mt-1"
+            aria-label={`Select ${entity.name}`}
           />
         )}
 
@@ -158,4 +200,16 @@ export function EntityCard({
       )}
     </Card>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only re-render if entity data, selected state, or selectable prop changes
+  return (
+    prevProps.entity.id === nextProps.entity.id &&
+    prevProps.entity.name === nextProps.entity.name &&
+    prevProps.entity.status === nextProps.entity.status &&
+    prevProps.entity.description === nextProps.entity.description &&
+    prevProps.entity.tags?.join(',') === nextProps.entity.tags?.join(',') &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.selectable === nextProps.selectable
+  );
+});

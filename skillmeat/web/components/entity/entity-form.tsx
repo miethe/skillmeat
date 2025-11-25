@@ -11,18 +11,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
 
+/**
+ * Props for EntityForm component
+ *
+ * Controls form mode (create vs edit), entity data, and submission callbacks.
+ */
 interface EntityFormProps {
-  /** Mode: 'create' for new entities, 'edit' for existing */
+  /** Mode: 'create' for new entities, 'edit' for existing entities */
   mode: 'create' | 'edit';
-  /** Entity type - required for create mode */
+  /** Entity type configuration - required for create mode, determines available form fields */
   entityType?: EntityType;
-  /** Existing entity data - required for edit mode */
+  /** Existing entity data - required for edit mode to populate form values */
   entity?: Entity;
-  /** Called on successful submit */
+  /** Callback function called after successful form submission */
   onSuccess?: () => void;
-  /** Called on cancel */
+  /** Callback function called when user clicks cancel */
   onCancel?: () => void;
 }
 
@@ -35,6 +39,36 @@ interface FormData {
   [key: string]: any;
 }
 
+/**
+ * EntityForm - Create or edit entity form
+ *
+ * Renders a dynamic form for creating new entities or editing existing ones.
+ * In create mode, shows all fields from the entity type schema plus source type selection (GitHub/Local).
+ * In edit mode, only shows editable fields (tags and description).
+ * Supports dynamic field rendering based on entity type (text, textarea, select, tags, boolean).
+ *
+ * @example
+ * ```tsx
+ * // Create mode
+ * <EntityForm
+ *   mode="create"
+ *   entityType="skill"
+ *   onSuccess={() => closeDialog()}
+ *   onCancel={() => closeDialog()}
+ * />
+ *
+ * // Edit mode
+ * <EntityForm
+ *   mode="edit"
+ *   entity={existingSkill}
+ *   onSuccess={() => refetchData()}
+ *   onCancel={() => closeDialog()}
+ * />
+ * ```
+ *
+ * @param props - EntityFormProps configuration
+ * @returns Form component for creating or editing entities
+ */
 export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: EntityFormProps) {
   const { createEntity, updateEntity } = useEntityLifecycle();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +85,6 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     handleSubmit,
     formState: { errors },
     setValue,
-    watch,
   } = useForm<FormData>({
     defaultValues: {
       name: entity?.name || '',
@@ -305,10 +338,6 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     );
   }
 
-  const title = mode === 'create'
-    ? `Add New ${typeConfig.label}`
-    : `Edit ${typeConfig.label}`;
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Error message */}
@@ -330,7 +359,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                   name="sourceType"
                   value="github"
                   checked={sourceType === 'github'}
-                  onChange={(e) => setSourceType('github')}
+                  onChange={() => setSourceType('github')}
                   className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 <span className="text-sm">GitHub</span>
@@ -341,7 +370,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                   name="sourceType"
                   value="local"
                   checked={sourceType === 'local'}
-                  onChange={(e) => setSourceType('local')}
+                  onChange={() => setSourceType('local')}
                   className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 <span className="text-sm">Local</span>

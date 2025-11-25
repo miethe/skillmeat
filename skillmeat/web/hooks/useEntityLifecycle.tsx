@@ -30,56 +30,126 @@ const USE_MOCKS = apiConfig.useMocks;
 // Types
 // ============================================================================
 
+/**
+ * Entity Lifecycle Context Value
+ *
+ * Provides centralized state and operations for entity management across collection and project modes.
+ */
 export interface EntityLifecycleContextValue {
+  // ============================================================================
   // State
+  // ============================================================================
+
+  /** Current array of entities (filtered by typeFilter and statusFilter) */
   entities: Entity[];
+  /** IDs of currently selected entities */
   selectedEntities: string[];
+  /** Whether entity data is being loaded */
   isLoading: boolean;
+  /** Any error that occurred during loading or operations */
   error: Error | null;
 
+  // ============================================================================
   // Filters
+  // ============================================================================
+
+  /** Filter by entity type (skill, command, agent, mcp, hook) */
   typeFilter: EntityType | null;
+  /** Filter by entity status (synced, modified, outdated, conflict) */
   statusFilter: EntityStatus | null;
+  /** Full-text search query applied to entity names and descriptions */
   searchQuery: string;
 
-  // Context mode
+  // ============================================================================
+  // Context Mode
+  // ============================================================================
+
+  /** Operating mode: 'collection' for global collection view or 'project' for specific project */
   mode: 'collection' | 'project';
+  /** Path to project when mode is 'project', undefined for collection mode */
   projectPath?: string;
 
-  // Actions
+  // ============================================================================
+  // Filter Actions
+  // ============================================================================
+
+  /** Update type filter */
   setTypeFilter: (type: EntityType | null) => void;
+  /** Update status filter */
   setStatusFilter: (status: EntityStatus | null) => void;
+  /** Update search query */
   setSearchQuery: (query: string) => void;
+
+  // ============================================================================
+  // Selection Actions
+  // ============================================================================
+
+  /** Select a single entity by ID */
   selectEntity: (id: string) => void;
+  /** Deselect a single entity by ID */
   deselectEntity: (id: string) => void;
+  /** Clear all selected entities */
   clearSelection: () => void;
+  /** Select all currently filtered entities */
   selectAll: () => void;
 
-  // CRUD operations
+  // ============================================================================
+  // CRUD Operations
+  // ============================================================================
+
+  /** Create new entity */
   createEntity: (data: CreateEntityInput) => Promise<void>;
+  /** Update existing entity (tags, description, aliases) */
   updateEntity: (id: string, data: UpdateEntityInput) => Promise<void>;
+  /** Delete entity */
   deleteEntity: (id: string) => Promise<void>;
 
-  // Lifecycle operations
+  // ============================================================================
+  // Lifecycle Operations
+  // ============================================================================
+
+  /** Deploy entity to specified project */
   deployEntity: (id: string, projectPath: string) => Promise<void>;
+  /** Sync entity changes between collection and project */
   syncEntity: (id: string, projectPath: string) => Promise<void>;
 
-  // Refetch
+  // ============================================================================
+  // Utilities
+  // ============================================================================
+
+  /** Manually refetch entity list */
   refetch: () => void;
 }
 
+/**
+ * Input data for creating a new entity
+ */
 export interface CreateEntityInput {
+  /** Entity name (alphanumeric, hyphens, underscores) */
   name: string;
+  /** Entity type (skill, command, agent, mcp, hook) */
   type: EntityType;
+  /** Source location: GitHub (owner/repo/path[@version]) or local file path */
   source: string;
+  /** Source type: GitHub repository or local file system */
   sourceType: 'github' | 'local';
+  /** Optional tags for categorization and discovery */
   tags?: string[];
+  /** Optional description of the entity */
   description?: string;
 }
 
+/**
+ * Input data for updating an existing entity
+ *
+ * Only editable fields are included. Most metadata like name and source are immutable.
+ */
 export interface UpdateEntityInput {
+  /** Updated tags for the entity */
   tags?: string[];
+  /** Updated description */
   description?: string;
+  /** Updated aliases for quick access */
   aliases?: string[];
 }
 
@@ -124,12 +194,46 @@ function mapApiArtifactToEntity(artifact: ArtifactResponse, mode: 'collection' |
 // Provider Component
 // ============================================================================
 
+/**
+ * Props for EntityLifecycleProvider component
+ */
 export interface EntityLifecycleProviderProps {
+  /** Child components that will have access to the entity lifecycle context */
   children: ReactNode;
+  /** Operating mode: 'collection' (default) or 'project' */
   mode?: 'collection' | 'project';
+  /** Required when mode is 'project' - path to the target project directory */
   projectPath?: string;
 }
 
+/**
+ * EntityLifecycleProvider - Context provider for entity management
+ *
+ * Provides centralized state and operations for managing entities in both collection
+ * and project modes. Handles:
+ * - Entity data fetching and caching (via React Query)
+ * - Multi-selection with batch operations
+ * - Filtering (type, status, search) with client-side refinement
+ * - CRUD operations (create, read, update, delete)
+ * - Lifecycle operations (deploy, sync)
+ * - Error handling and loading states
+ *
+ * @example
+ * ```tsx
+ * // Collection view
+ * <EntityLifecycleProvider mode="collection">
+ *   <EntityManagementPage />
+ * </EntityLifecycleProvider>
+ *
+ * // Project view
+ * <EntityLifecycleProvider mode="project" projectPath="/home/user/my-project">
+ *   <ProjectManagementPage />
+ * </EntityLifecycleProvider>
+ * ```
+ *
+ * @param props - EntityLifecycleProviderProps configuration
+ * @returns Context provider wrapping children
+ */
 export function EntityLifecycleProvider({
   children,
   mode = 'collection',
@@ -222,8 +326,9 @@ export function EntityLifecycleProvider({
           body: JSON.stringify(request),
         });
       } catch (error) {
-        if (USE_MOCKS) {
-          console.warn('[entities] Create API failed, using mock', error);
+        // Only use mocks in development/testing, not production
+        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+          console.warn('[entities] Create API failed, using mock fallback', error);
           return;
         }
         throw error;
@@ -248,8 +353,9 @@ export function EntityLifecycleProvider({
           body: JSON.stringify(request),
         });
       } catch (error) {
-        if (USE_MOCKS) {
-          console.warn('[entities] Update API failed, using mock', error);
+        // Only use mocks in development/testing, not production
+        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+          console.warn('[entities] Update API failed, using mock fallback', error);
           return;
         }
         throw error;
@@ -267,8 +373,9 @@ export function EntityLifecycleProvider({
           method: 'DELETE',
         });
       } catch (error) {
-        if (USE_MOCKS) {
-          console.warn('[entities] Delete API failed, using mock', error);
+        // Only use mocks in development/testing, not production
+        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+          console.warn('[entities] Delete API failed, using mock fallback', error);
           return;
         }
         throw error;
@@ -292,8 +399,9 @@ export function EntityLifecycleProvider({
           body: JSON.stringify(request),
         });
       } catch (error) {
-        if (USE_MOCKS) {
-          console.warn('[entities] Deploy API failed, using mock', error);
+        // Only use mocks in development/testing, not production
+        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+          console.warn('[entities] Deploy API failed, using mock fallback', error);
           return;
         }
         throw error;
@@ -319,8 +427,9 @@ export function EntityLifecycleProvider({
           body: JSON.stringify(request),
         });
       } catch (error) {
-        if (USE_MOCKS) {
-          console.warn('[entities] Sync API failed, using mock', error);
+        // Only use mocks in development/testing, not production
+        if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
+          console.warn('[entities] Sync API failed, using mock fallback', error);
           return;
         }
         throw error;
@@ -424,6 +533,38 @@ export function EntityLifecycleProvider({
 // Hook
 // ============================================================================
 
+/**
+ * useEntityLifecycle - Hook to access entity management context
+ *
+ * Provides full access to entity state, filters, selections, and operations.
+ * Must be used within EntityLifecycleProvider.
+ *
+ * @throws {Error} If used outside of EntityLifecycleProvider
+ *
+ * @example
+ * ```tsx
+ * function EntityManager() {
+ *   const {
+ *     entities,
+ *     selectedEntities,
+ *     createEntity,
+ *     deleteEntity,
+ *     deployEntity,
+ *   } = useEntityLifecycle();
+ *
+ *   return (
+ *     <div>
+ *       <EntityList entities={entities} />
+ *       <Button onClick={() => createEntity({...})}>
+ *         Create Entity
+ *       </Button>
+ *     </div>
+ *   );
+ * }
+ * ```
+ *
+ * @returns EntityLifecycleContextValue with all state and operations
+ */
 export function useEntityLifecycle(): EntityLifecycleContextValue {
   const context = useContext(EntityLifecycleContext);
   if (!context) {
@@ -465,7 +606,8 @@ async function fetchCollectionEntities(
 
     return entities;
   } catch (error) {
-    if (USE_MOCKS) {
+    // Only use mocks in development/testing, not production
+    if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
       console.warn('[entities] Collection API failed, using mock data', error);
       return generateMockCollectionEntities(typeFilter, searchQuery);
     }
@@ -508,7 +650,8 @@ async function fetchProjectEntities(
 
     return filtered;
   } catch (error) {
-    if (USE_MOCKS) {
+    // Only use mocks in development/testing, not production
+    if (USE_MOCKS && process.env.NODE_ENV !== 'production') {
       console.warn('[entities] Project API failed, using mock data', error);
       return generateMockProjectEntities(projectPath, typeFilter, searchQuery);
     }
