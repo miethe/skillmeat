@@ -3157,3 +3157,471 @@ async def update_artifact_file_content(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update file content: {str(e)}",
         )
+@router.post(
+    "/{artifact_id}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Create new artifact file",
+    description="Create a new file within an artifact",
+    responses={
+        201: {"description": "Successfully created file"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request, path traversal attempt, or file already exists",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_artifact_file(
+    artifact_id: str,
+    file_path: str,
+    request: FileUpdateRequest,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> FileContentResponse:
+    """Create a new file within an artifact.
+
+    **SECURITY: Path Traversal Protection**
+    This endpoint implements strict path validation to prevent directory
+    traversal attacks. The file_path must:
+    - Be within the artifact directory
+    - Not contain ".." (parent directory references)
+    - Resolve to a path inside the artifact root
+
+    **Atomic Write**
+    File creation is performed atomically using a temporary file and rename
+    operation to ensure consistency.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        file_path: Relative path to new file within artifact (e.g., "README.md" or "docs/guide.md")
+        request: File content request
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        FileContentResponse with created file content and metadata
+
+    Raises:
+        HTTPException: If artifact not found, file already exists, path traversal attempt,
+                      validation error, or write failure
+
+    Example:
+        POST /api/v1/artifacts/skill:pdf-processor/files/docs/guide.md
+        Body: {"content": "# User Guide..."}
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "path": "docs/guide.md",
+            "content": "# User Guide...",
+            "size": 256,
+            "mime_type": "text/markdown"
+        }
+    """
+    import mimetypes
+    import os
+    import tempfile
+
+    try:
+        logger.info(
+            f"Creating file for artifact: {artifact_id}, file: {file_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_root = collection_path / artifact.path
+
+        if not artifact_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_root}",
+            )
+
+        # Validate file path (path traversal protection)
+        try:
+            # Normalize the requested path to remove any .., ., etc.
+            normalized_file_path = os.path.normpath(file_path)
+
+            # Check for path traversal indicators
+            if (
+                normalized_file_path.startswith("..")
+                or "/.." in normalized_file_path
+                or "\\.." in normalized_file_path
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path traversal attempt detected",
+                )
+
+            # Construct the full path
+            full_path = (artifact_root / normalized_file_path).resolve()
+
+            # Ensure the resolved path is still within the artifact directory
+            artifact_root_resolved = artifact_root.resolve()
+            if not str(full_path).startswith(str(artifact_root_resolved)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path escapes artifact directory",
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Path validation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {str(e)}",
+            )
+
+        # Check if file already exists
+        if full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File already exists: {file_path}",
+            )
+
+        # Validate content is valid UTF-8
+        try:
+            request.content.encode("utf-8")
+        except UnicodeEncodeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid content encoding: {str(e)}. Content must be valid UTF-8.",
+            )
+
+        # Create parent directories if they don't exist
+        try:
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Error creating parent directories for {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create parent directories: {str(e)}",
+            )
+
+        # Write file atomically
+        try:
+            dir_path = full_path.parent
+
+            # Create temporary file in the same directory for atomic rename
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=dir_path,
+                delete=False,
+                encoding="utf-8",
+                prefix=".tmp_",
+                suffix=f"_{full_path.name}",
+            ) as tmp:
+                tmp.write(request.content)
+                tmp_path = Path(tmp.name)
+
+            # Atomic rename (same filesystem)
+            tmp_path.replace(full_path)
+
+            logger.info(f"Successfully created file atomically: {full_path}")
+
+        except Exception as e:
+            # Clean up temp file if it still exists
+            if "tmp_path" in locals() and tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
+            logger.error(f"Error creating file {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create file: {str(e)}",
+            )
+
+        # Get file info
+        file_size = full_path.stat().st_size
+        mime_type, _ = mimetypes.guess_type(str(full_path))
+
+        logger.info(f"Successfully created file: {artifact_id}/{file_path}")
+
+        return FileContentResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            path=file_path,
+            content=request.content,
+            size=file_size,
+            mime_type=mime_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error creating file for '{artifact_id}/{file_path}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create file: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{artifact_id}/files/{file_path:path}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete artifact file",
+    description="Delete a specific file within an artifact",
+    responses={
+        204: {"description": "Successfully deleted file"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request, path traversal attempt, or directory path",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact or file not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def delete_artifact_file(
+    artifact_id: str,
+    file_path: str,
+    _artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> None:
+    """Delete a file within an artifact.
+
+    **SECURITY: Path Traversal Protection**
+    This endpoint implements strict path validation to prevent directory
+    traversal attacks. The file_path must:
+    - Be within the artifact directory
+    - Not contain ".." (parent directory references)
+    - Resolve to a path inside the artifact root
+
+    **Safety**
+    - Only files can be deleted, not directories
+    - Protected files (SKILL.md, COMMAND.md, etc.) should be validated before deletion
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        file_path: Relative path to file within artifact (e.g., "README.md" or "docs/guide.md")
+        _artifact_mgr: Artifact manager dependency (unused, reserved for future use)
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        HTTPException: If artifact not found, file not found, path traversal attempt,
+                      directory path, or deletion failure
+
+    Example:
+        DELETE /api/v1/artifacts/skill:pdf-processor/files/docs/guide.md
+
+        Returns: 204 No Content
+    """
+    import os
+
+    try:
+        logger.info(
+            f"Deleting file for artifact: {artifact_id}, file: {file_path} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact
+        artifact = None
+        collection_name = collection
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get artifact path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        artifact_root = collection_path / artifact.path
+
+        if not artifact_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_root}",
+            )
+
+        # Validate file path (path traversal protection)
+        try:
+            # Normalize the requested path to remove any .., ., etc.
+            normalized_file_path = os.path.normpath(file_path)
+
+            # Check for path traversal indicators
+            if (
+                normalized_file_path.startswith("..")
+                or "/.." in normalized_file_path
+                or "\\.." in normalized_file_path
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path traversal attempt detected",
+                )
+
+            # Construct the full path
+            full_path = (artifact_root / normalized_file_path).resolve()
+
+            # Ensure the resolved path is still within the artifact directory
+            artifact_root_resolved = artifact_root.resolve()
+            if not str(full_path).startswith(str(artifact_root_resolved)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid file path: path escapes artifact directory",
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Path validation error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file path: {str(e)}",
+            )
+
+        # Check if file exists
+        if not full_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {file_path}",
+            )
+
+        # Check if it's a file (not a directory)
+        if not full_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Path is not a file (directories cannot be deleted): {file_path}",
+            )
+
+        # Prevent deletion of critical files
+        critical_files = {
+            "SKILL.md",
+            "COMMAND.md",
+            "AGENT.md",
+            "HOOK.md",
+            "MCP.md",
+        }
+        if full_path.name in critical_files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete critical file: {full_path.name}",
+            )
+
+        # Delete the file
+        try:
+            full_path.unlink()
+            logger.info(f"Successfully deleted file: {full_path}")
+        except Exception as e:
+            logger.error(f"Error deleting file {full_path}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete file: {str(e)}",
+            )
+
+        logger.info(f"Successfully deleted file: {artifact_id}/{file_path}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error deleting file for '{artifact_id}/{file_path}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete file: {str(e)}",
+        )
