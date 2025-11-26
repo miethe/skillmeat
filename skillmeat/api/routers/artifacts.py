@@ -1638,6 +1638,7 @@ async def sync_artifact(
     request: ArtifactSyncRequest,
     sync_mgr: SyncManagerDep,
     collection_mgr: CollectionManagerDep,
+    artifact_mgr: ArtifactManagerDep,
     _token: TokenDep,
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
@@ -1680,16 +1681,135 @@ async def sync_artifact(
         # Handle upstream sync (no project_path provided)
         if not request.project_path:
             logger.info(f"Syncing {artifact_id} from upstream source")
-            # TODO: Implement upstream sync - fetch from GitHub and update collection
-            # For now, return a placeholder response
+
+            # Get collection name (use provided or default)
+            collection_name = collection or collection_mgr.get_active_collection_name()
+
+            # Load collection and verify artifact exists
+            coll = collection_mgr.load_collection(collection_name)
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+
+            if not artifact:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact '{artifact_id}' not found in collection '{collection_name}'",
+                )
+
+            # Check if artifact has GitHub origin
+            if artifact.origin != "github":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Artifact '{artifact_id}' does not have a GitHub origin. Upstream sync only supported for GitHub artifacts.",
+                )
+
+            # Fetch update from upstream
+            try:
+                fetch_result = artifact_mgr.fetch_update(
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                )
+            except Exception as e:
+                logger.error(f"Failed to fetch update for '{artifact_id}': {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to fetch update from upstream: {str(e)}",
+                )
+
+            # Check if fetch was successful
+            if fetch_result.error:
+                return ArtifactSyncResponse(
+                    success=False,
+                    message=f"Failed to fetch update: {fetch_result.error}",
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type.value,
+                    conflicts=None,
+                    updated_version=None,
+                    synced_files_count=None,
+                )
+
+            # If no update available, return success with message
+            if not fetch_result.has_update:
+                return ArtifactSyncResponse(
+                    success=True,
+                    message=f"Artifact '{artifact_name}' is already up to date",
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type.value,
+                    conflicts=None,
+                    updated_version=artifact.metadata.version if artifact.metadata else None,
+                    synced_files_count=0,
+                )
+
+            # Map request strategy to ArtifactManager strategy
+            # "theirs" = take upstream -> "overwrite"
+            # "ours" = keep local -> skip update (handled by returning early)
+            # "manual" = preserve conflicts -> "merge"
+            strategy_map = {
+                "theirs": "overwrite",
+                "ours": "skip",  # We'll handle this by returning early
+                "manual": "merge",
+            }
+
+            apply_strategy = strategy_map.get(request.strategy, "overwrite")
+
+            # If strategy is "ours", skip the update
+            if apply_strategy == "skip":
+                logger.info(f"Strategy 'ours' selected - keeping local version of '{artifact_id}'")
+                return ArtifactSyncResponse(
+                    success=True,
+                    message=f"Local version of '{artifact_name}' preserved (strategy: ours)",
+                    artifact_name=artifact_name,
+                    artifact_type=artifact_type.value,
+                    conflicts=None,
+                    updated_version=artifact.metadata.version if artifact.metadata else None,
+                    synced_files_count=0,
+                )
+
+            # Apply the update strategy
+            try:
+                update_result = artifact_mgr.apply_update_strategy(
+                    fetch_result=fetch_result,
+                    strategy=apply_strategy,
+                    interactive=False,  # Non-interactive mode for API
+                    auto_resolve="theirs" if apply_strategy == "overwrite" else "abort",
+                    collection_name=collection_name,
+                )
+            except Exception as e:
+                logger.error(f"Failed to apply update for '{artifact_id}': {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to apply update: {str(e)}",
+                )
+
+            # Extract conflicts if any (for merge strategy)
+            conflicts_list = None
+            if apply_strategy == "merge" and not update_result.updated:
+                # Merge may have failed due to conflicts
+                # This is a simplified approach - proper conflict tracking would require
+                # modifying UpdateResult to include conflict information
+                logger.warning(f"Merge strategy may have encountered conflicts for '{artifact_id}'")
+
+            # Count synced files
+            synced_files_count = None
+            if update_result.updated:
+                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                artifact_path = collection_path / artifact.path
+                if artifact_path.exists():
+                    synced_files_count = len(list(artifact_path.rglob("*")))
+
+            logger.info(
+                f"Upstream sync for '{artifact_name}' completed: "
+                f"updated={update_result.updated}, status={update_result.status}"
+            )
+
             return ArtifactSyncResponse(
-                success=False,
-                message="Upstream sync not yet implemented. Use update endpoint or provide project_path for reverse sync.",
+                success=update_result.updated,
+                message=f"Artifact '{artifact_name}' synced from upstream: {update_result.status}",
                 artifact_name=artifact_name,
                 artifact_type=artifact_type.value,
-                conflicts=None,
-                updated_version=None,
-                synced_files_count=None,
+                conflicts=conflicts_list,
+                updated_version=update_result.new_version,
+                synced_files_count=synced_files_count,
             )
 
         # Validate project path
