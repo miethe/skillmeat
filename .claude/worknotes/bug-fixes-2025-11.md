@@ -113,10 +113,12 @@
 ### Next.js Build Cache Corruption (MODULE_NOT_FOUND)
 
 **Issue**: App fails to start with MODULE_NOT_FOUND for vendor chunks
-- **Error**: `Cannot find module './vendor-chunks/@tanstack+query-core@5.90.10.js'`
+- **Errors**:
+  - `Cannot find module './vendor-chunks/@tanstack+query-core@5.90.10.js'`
+  - `Cannot find module './vendor-chunks/next@15.5.6_@babel+core@7.28.5_...js'`
 - **Root Cause**: Corrupted `.next` build cache with missing webpack vendor chunks
-- **Fix**: Clean `.next` directory and restart dev server
-- **Validation**: Screenshot confirmed dashboard renders correctly after restart
+- **Fix**: Clean `.next` directory (`rm -rf .next`) and restart dev server
+- **Validation**: Chrome DevTools confirmed collection page loads successfully
 
 ### Horizontal Overflow in Entity Modal Content Panes
 
