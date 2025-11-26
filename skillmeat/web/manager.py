@@ -476,15 +476,19 @@ class WebManager:
     def build_web(self) -> int:
         """Build Next.js for production.
 
+        Uses 'pnpm build:fresh' which cleans the .next cache before building
+        to prevent MODULE_NOT_FOUND errors from corrupted webpack caches.
+
         Returns:
             Exit code (0 for success)
         """
-        self.console.print("[cyan]Building Next.js application for production...[/cyan]\n")
+        self.console.print("[cyan]Building Next.js application for production...[/cyan]")
+        self.console.print("[dim]Cleaning cache and building fresh to prevent cache corruption[/dim]\n")
 
         try:
-            # Run pnpm build
+            # Run pnpm build:fresh (cleans cache then builds)
             result = subprocess.run(
-                ["pnpm", "build"],
+                ["pnpm", "build:fresh"],
                 cwd=self.web_dir,
                 check=True,
             )

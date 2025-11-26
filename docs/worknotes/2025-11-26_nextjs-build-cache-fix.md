@@ -97,7 +97,13 @@ pnpm start            # Start production server
 1. `skillmeat/web/package.json` - Added cleanup scripts
 2. `skillmeat/web/scripts/validate-build.sh` - Created validation script
 3. `skillmeat/web/docs/BUILD_TROUBLESHOOTING.md` - Created troubleshooting guide
-4. `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` - This file
+4. `skillmeat/web/manager.py` - Updated `build_web()` to use `pnpm build:fresh`
+5. `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` - This file
+
+## CLI Integration
+The `skillmeat web build` command now uses `pnpm build:fresh` automatically,
+ensuring the cache is cleaned before every production build. This prevents
+the MODULE_NOT_FOUND errors without requiring manual intervention.
 
 ## Next Steps
 1. Test the fix thoroughly
