@@ -316,7 +316,7 @@ class ArtifactManager:
             # Extract name from spec (last path component)
             parsed_spec = ArtifactSpec.parse(spec)
             if parsed_spec.path:
-                artifact_name = Path(parsed_spec.path).name
+                artifact_name = Path(parsed_spec.path).stem
             else:
                 # If no path, use repo name
                 artifact_name = parsed_spec.repo

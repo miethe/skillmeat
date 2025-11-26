@@ -208,7 +208,7 @@ def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
 
         # Show artifact
         artifact_mgr.show(
-            name=name,
+            artifact_name=name,
             artifact_type=type_filter,
             collection_name=collection,
         )
