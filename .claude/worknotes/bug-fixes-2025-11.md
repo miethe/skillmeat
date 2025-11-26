@@ -107,3 +107,13 @@
   - `unified-entity-modal.tsx` (modal width, Contents tab layout)
   - `content-pane.tsx` (overflow handling)
   - `split-preview.tsx` (markdown preview overflow)
+
+## 2025-11-26
+
+### Next.js Build Cache Corruption (MODULE_NOT_FOUND)
+
+**Issue**: App fails to start with MODULE_NOT_FOUND for vendor chunks
+- **Error**: `Cannot find module './vendor-chunks/@tanstack+query-core@5.90.10.js'`
+- **Root Cause**: Corrupted `.next` build cache with missing webpack vendor chunks
+- **Fix**: Clean `.next` directory and restart dev server
+- **Validation**: Screenshot confirmed dashboard renders correctly after restart
