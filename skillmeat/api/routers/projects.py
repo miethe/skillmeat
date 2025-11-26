@@ -437,6 +437,10 @@ async def create_project(
             description=request.description,
         )
 
+        # Initialize empty deployment tracking file so project is discoverable
+        from skillmeat.storage.deployment import DeploymentTracker
+        DeploymentTracker.write_deployments(project_path, [])
+
         logger.info(f"Project created successfully: {request.name}")
 
         return ProjectCreateResponse(

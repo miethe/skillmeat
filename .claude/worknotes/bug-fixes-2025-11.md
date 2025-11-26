@@ -155,3 +155,24 @@
 - **Files Modified**:
   - `unified-entity-modal.tsx` (lift state, add guards, render dialog)
   - `content-pane.tsx` (accept lifted state as props)
+
+### File Save 404 Error (PUT /artifacts/{id}/files/{path})
+
+**Issue**: Saving file changes returns 404 "File not found"
+- **Location**: `skillmeat/api/routers/artifacts.py:3037`
+- **Error**: `PUT /api/v1/artifacts/skill:notebooklm-skill/files/SKILL.md` returns 404
+- **Root Cause**: PUT endpoint manually constructed path using `artifact_type.value` ("skill" singular) instead of `artifact.path` ("skills" plural)
+- **Fix**: Changed `artifact_root = Path(collection_path) / artifact_type.value / artifact_name` to `artifact_root = collection_path / artifact.path`
+
+### New Project Not Appearing in /projects
+
+**Issue**: Adding a new project via web UI doesn't show in project list
+- **Location**: `skillmeat/api/routers/projects.py:434-438`
+- **Root Cause**: `discover_projects()` searches for `.skillmeat-deployed.toml` but new projects only create `.skillmeat-metadata.toml`
+- **Fix**: Initialize empty deployment file after creating metadata: `DeploymentTracker.write_deployments(project_path, [])`
+
+### Markdown Preview Code Block Overflow
+
+**Issue**: Code blocks in markdown preview extend beyond modal width
+- **Location**: `skillmeat/web/components/editor/split-preview.tsx:67`
+- **Fix**: Added `prose-pre:overflow-x-auto prose-code:break-all` to prose container classes
