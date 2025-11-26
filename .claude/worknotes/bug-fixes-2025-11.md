@@ -117,3 +117,39 @@
 - **Root Cause**: Corrupted `.next` build cache with missing webpack vendor chunks
 - **Fix**: Clean `.next` directory and restart dev server
 - **Validation**: Screenshot confirmed dashboard renders correctly after restart
+
+### Horizontal Overflow in Entity Modal Content Panes
+
+**Issue**: Content in entity modal extends beyond modal width
+- **Locations**:
+  - `unified-entity-modal.tsx:967` - Contents tab container
+  - `content-pane.tsx:358` - Markdown content wrapper
+  - `split-preview.tsx:51` - Split view container
+- **Root Cause**: Missing `min-w-0` flex constraints and improper overflow handling
+- **Fix**:
+  - Added `min-w-0` to Contents tab container for proper flex constraints
+  - Changed `overflow-hidden` to `overflow-x-auto overflow-y-hidden` on markdown wrapper
+  - Added `min-w-0 overflow-hidden` to split-preview container
+  - Added `w-full prose-headings:break-words prose-p:break-words` to preview prose
+- **Files Modified**:
+  - `unified-entity-modal.tsx`
+  - `content-pane.tsx`
+  - `split-preview.tsx`
+
+### Edit Mode Navigation Without Warning
+
+**Issue**: Clicking another file while in Edit mode navigates without warning about unsaved changes
+- **Location**: `unified-entity-modal.tsx` and `content-pane.tsx`
+- **Root Cause**: Edit state was local to ContentPane, parent had no awareness to guard navigation
+- **Fix**:
+  - Created `UnsavedChangesDialog` component for confirmation prompts
+  - Lifted edit state (`isEditing`, `editedContent`) to unified-entity-modal
+  - Added navigation guards for file selection (`handleFileSelect`)
+  - Added navigation guards for tab switching (`handleTabChange`)
+  - Guards check `hasUnsavedChanges` before allowing navigation
+  - Dialog offers: Save & Continue, Discard, or Cancel options
+- **Files Created**:
+  - `unsaved-changes-dialog.tsx`
+- **Files Modified**:
+  - `unified-entity-modal.tsx` (lift state, add guards, render dialog)
+  - `content-pane.tsx` (accept lifted state as props)
