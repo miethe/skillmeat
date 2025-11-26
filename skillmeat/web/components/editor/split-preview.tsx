@@ -61,10 +61,10 @@ export function SplitPreview({
       )}
 
       {/* Preview Panel - Always shown for markdown */}
-      <div className={cn('flex-1 min-w-0 min-h-[300px] lg:min-h-0', !isEditing && 'w-full')}>
+      <div className={cn('flex-1 min-w-0 min-h-[300px] lg:min-h-0 overflow-hidden', !isEditing && 'w-full')}>
         <div className="h-full border rounded-md bg-card overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="p-6 prose prose-sm dark:prose-invert max-w-none break-words overflow-wrap-anywhere">
+          <ScrollArea className="h-full w-full">
+            <div className="p-6 prose prose-sm dark:prose-invert max-w-none break-words [overflow-wrap:anywhere] [word-break:break-word]">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {content || '*No content to preview*'}
               </ReactMarkdown>

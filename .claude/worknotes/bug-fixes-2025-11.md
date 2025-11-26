@@ -90,3 +90,20 @@
 - **Root Cause**: `Deployment` dataclass requires `content_hash` but `record_deployment()` passed deprecated `collection_sha` parameter
 - **Fix**: Changed `collection_sha=collection_sha` to `content_hash=collection_sha` in line 116
 - **Validation**: API server reloaded successfully; dataclass constructor now receives correct parameter
+
+### Contents Tab Width Overflow in Entity Modal
+
+**Issue**: Content tab in UnifiedEntityModal extends beyond modal width
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx:794`
+- **Error**: Content pane overflows modal container on large content
+- **Root Cause**: Modal width fixed at `max-w-2xl`, Contents tab using percentage-based file tree width (`w-1/3`), missing `min-w-0` on flex children
+- **Fix**:
+  - Modal: `max-w-2xl` → `max-w-2xl lg:max-w-5xl xl:max-w-6xl` (responsive width)
+  - Contents tab: Added `min-h-0 overflow-hidden` to flex container
+  - File tree: Changed `w-1/3` to `w-64 lg:w-72 flex-shrink-0` (fixed width)
+  - Content pane: Added `min-w-0 overflow-hidden` for flex constraint
+  - Split-preview: Added `overflow-hidden` and proper word-break properties
+- **Files Modified**:
+  - `unified-entity-modal.tsx` (modal width, Contents tab layout)
+  - `content-pane.tsx` (overflow handling)
+  - `split-preview.tsx` (markdown preview overflow)
