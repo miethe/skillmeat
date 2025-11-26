@@ -2,21 +2,37 @@
 
 Analyze the attached list of bugs. Create a remediation plan with designs, then implement it. You must use subagents to perform all tasks, only delegating tasks. You are Opus, so tokens are expensive; use them wisely to optimize for reasoning, with all token-heavy work being delegated. Commit often.
 
-- Validate every fix where applicable with both unit tests (if available) and E2E tests. All web app fixes should be validated via chrome-devtools.
-- If new issues appear during testing of your fix, then proceed to analyze and remediate them as well. If builds fail, and you've been so instructed with ITERATE=TRUE, then continue to iterate by analyzing and remediating the build failures as well until it passes with recursive instructions from here.
-- You should add a very brief note per bug fix in the monthly bug fixes doc, creating if it doesn't exist yet per the format below:
-`bug-fixes-{current_month}-{current_year}.md` - validating current date via tool call, ie `bash: `date +%Y-%m-%d``.
+- **Validation Strategy**: Validate code changes via direct code review (Read/Grep tools). DO NOT create test scripts, automation, or browser screenshots. For web app fixes, inspect the code changes directly to verify correct implementation.
 
-  ```markdown
-    ### {BUG DESCRIPTIVE TITLE}
+- **NO test automation or validation scripts**: Do not create `.js`, `.py`, or any scripts for validation in the codebase. Do not use chrome-devtools to automate browser tests. Do not generate screenshots or test reports.
+- **NO validation reports**: Do not create VALIDATION_SUMMARY.txt, CODE_VERIFICATION_REPORT.md, or any other reports/summaries outside the bug-fixes doc.
+- If new issues appear during implementation, continue to analyze and remediate them. If builds fail with ITERATE=TRUE, continue iterating until resolved.
 
-    **Issue**: {Explanation of the bug.}
-    - **Date**: {Must validate current date per above.}
-    - **Location**: `{filepath:line number or component name}`
-    - **Root Cause**: {Brief explanation of the root cause.}
-    - **Fix**: {Brief explanation of the fix.}
-    - **Tests**: {Brief explanation of tests added or updated to validate the fix.}
-    - **Commit**: {Commit id}
-    ```
+## Documentation Requirements
 
-- NO other docs should be created (or must be removed before commit) except the update to the above-noted monthly bug fixes doc, unless explicitly called for in the bug fix itself. You may update existing user/developer docs when relevant from the fix.
+**Update the monthly bug-fixes document ONLY** (create if doesn't exist):
+- File: `docs/project_plans/bugs/bug-fixes-{YYYY}-{MM}.md`
+- Example: `bug-fixes-2025-11.md`
+
+Add one section per bug using this template:
+
+```markdown
+### {BUG DESCRIPTIVE TITLE}
+
+**Issue**: {Explanation of the bug}
+- **Location**: `filepath:line-number` or component name
+- **Root Cause**: {Brief explanation}
+- **Fix**: {Brief explanation of changes}
+- **Commit(s)**: {Commit hash(es)}
+- **Status**: RESOLVED
+```
+
+## Strict Rules
+
+- ❌ Do NOT create validation scripts or test automation
+- ❌ Do NOT create screenshots, reports, or summaries outside bug-fixes doc
+- ❌ Do NOT create any files in `docs/screenshots/` unless explicitly required by the bug itself
+- ❌ Do NOT add markdown files, PNG files, or JSON reports unless they are part of the actual bug fix
+- ✅ DO delete all untracked artifacts (screenshots, reports, scripts) before final commit
+- ✅ DO update only the monthly bug-fixes document for all validation notes
+- ✅ DO commit frequently with clear, focused commit messages
