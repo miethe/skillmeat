@@ -220,12 +220,19 @@ export const UnifiedCard = React.memo(function UnifiedCard({
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger onClick if clicking on checkbox or actions menu
-    if (
-      (e.target as HTMLElement).closest('[role="checkbox"]') ||
-      (e.target as HTMLElement).closest('[role="button"]')
-    ) {
+    const target = e.target as HTMLElement;
+
+    // Ignore clicks on checkboxes
+    if (target.closest('[role="checkbox"]')) {
       return;
     }
+
+    // Ignore clicks on buttons (action menu, etc.)
+    // This includes any button element within the card
+    if (target.closest('button')) {
+      return;
+    }
+
     onClick?.();
   };
 
