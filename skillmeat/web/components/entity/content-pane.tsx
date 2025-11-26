@@ -18,8 +18,13 @@ export interface ContentPaneProps {
   content: string | null;
   isLoading?: boolean;
   error?: string | null;
-  onEdit?: () => void;
+  // Lifted edit state from parent
+  isEditing?: boolean;
+  editedContent?: string;
+  onEditStart?: () => void;
+  onEditChange?: (content: string) => void;
   onSave?: (content: string) => void | Promise<void>;
+  onCancel?: () => void;
 }
 
 // ============================================================================
@@ -214,21 +219,22 @@ export function ContentPane({
   content,
   isLoading = false,
   error = null,
-  onEdit,
+  isEditing = false,
+  editedContent = '',
+  onEditStart,
+  onEditChange,
   onSave,
+  onCancel,
 }: ContentPaneProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedContent, setEditedContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const canEdit = path && (onEdit || onSave) && isEditableFile(path);
+  const canEdit = path && (onEditStart || onSave) && isEditableFile(path);
   const isMarkdown = path && isMarkdownFile(path);
 
   // Handle edit button click
   const handleEditClick = () => {
-    setEditedContent(content || '');
-    setIsEditing(true);
-    onEdit?.();
+    onEditChange?.(content || '');
+    onEditStart?.();
   };
 
   // Handle save button click
@@ -238,7 +244,7 @@ export function ContentPane({
     setIsSaving(true);
     try {
       await onSave(editedContent);
-      setIsEditing(false);
+      onCancel?.();
     } catch (error) {
       console.error('Failed to save:', error);
       // Error handling can be expanded here
@@ -249,8 +255,7 @@ export function ContentPane({
 
   // Handle cancel button click
   const handleCancelClick = () => {
-    setEditedContent('');
-    setIsEditing(false);
+    onCancel?.();
   };
 
   // Loading state
@@ -358,7 +363,7 @@ export function ContentPane({
         <div className="flex-1 p-4 overflow-x-auto overflow-y-hidden min-h-0 min-w-0">
           <SplitPreview
             content={isEditing ? editedContent : content}
-            onChange={setEditedContent}
+            onChange={(newContent) => onEditChange?.(newContent)}
             isEditing={isEditing}
           />
         </div>
