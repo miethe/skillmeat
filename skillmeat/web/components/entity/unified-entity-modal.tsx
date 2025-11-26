@@ -26,6 +26,7 @@ import { FileTree } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
 import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
+import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
@@ -208,6 +209,14 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showFileCreationDialog, setShowFileCreationDialog] = useState(false);
   const [showFileDeletionDialog, setShowFileDeletionDialog] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  // Edit mode state (lifted from ContentPane)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    type: 'file' | 'tab';
+    target: string;
+  } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -270,6 +279,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
   });
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = isEditing && editedContent !== (contentData?.content || '');
 
   // Fetch diff data when sync tab is active and entity has changes
   const shouldFetchDiff = !!(
@@ -610,6 +622,62 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     }
   };
 
+  // Handle file selection with unsaved changes guard
+  const handleFileSelect = (path: string) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation({ type: 'file', target: path });
+      setShowUnsavedChangesDialog(true);
+    } else {
+      setSelectedPath(path);
+      setIsEditing(false);
+      setEditedContent('');
+    }
+  };
+
+  // Handle tab change with unsaved changes guard
+  const handleTabChange = (tab: string) => {
+    if (hasUnsavedChanges && activeTab === 'contents') {
+      setPendingNavigation({ type: 'tab', target: tab });
+      setShowUnsavedChangesDialog(true);
+    } else {
+      setActiveTab(tab);
+      if (tab !== 'contents') {
+        setIsEditing(false);
+        setEditedContent('');
+      }
+    }
+  };
+
+  // Handle discard from unsaved changes dialog
+  const handleDiscardChanges = () => {
+    if (pendingNavigation) {
+      if (pendingNavigation.type === 'file') {
+        setSelectedPath(pendingNavigation.target);
+      } else {
+        setActiveTab(pendingNavigation.target);
+      }
+      setIsEditing(false);
+      setEditedContent('');
+      setPendingNavigation(null);
+    }
+  };
+
+  // Handle save from unsaved changes dialog
+  const handleSaveAndNavigate = async () => {
+    if (pendingNavigation && selectedPath) {
+      await handleSaveFile(editedContent);
+      if (pendingNavigation.type === 'file') {
+        setSelectedPath(pendingNavigation.target);
+      } else {
+        setActiveTab(pendingNavigation.target);
+      }
+      setIsEditing(false);
+      setEditedContent('');
+      setPendingNavigation(null);
+      setShowUnsavedChangesDialog(false);
+    }
+  };
+
   // ============================================================================
   // Status Helpers
   // ============================================================================
@@ -811,7 +879,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           </div>
 
           {/* Tabs Section */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col px-6">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col px-6">
             <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
               <TabsTrigger
                 value="overview"
@@ -971,7 +1039,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     entityId={entity.id}
                     files={filesData?.files || []}
                     selectedPath={selectedPath}
-                    onSelect={setSelectedPath}
+                    onSelect={handleFileSelect}
                     onAddFile={() => setShowFileCreationDialog(true)}
                     onDeleteFile={handleDeleteFile}
                     isLoading={isFilesLoading}
@@ -985,7 +1053,15 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     content={contentData?.content || null}
                     isLoading={isContentLoading}
                     error={contentError?.message || filesError?.message || null}
+                    isEditing={isEditing}
+                    editedContent={editedContent}
+                    onEditStart={() => setIsEditing(true)}
+                    onEditChange={setEditedContent}
                     onSave={handleSaveFile}
+                    onCancel={() => {
+                      setIsEditing(false);
+                      setEditedContent('');
+                    }}
                   />
                 </div>
               </div>
@@ -1228,6 +1304,20 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         onOpenChange={setShowFileDeletionDialog}
         onConfirm={handleConfirmDelete}
         fileName={fileToDelete}
+      />
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        open={showUnsavedChangesDialog}
+        onOpenChange={setShowUnsavedChangesDialog}
+        currentFile={selectedPath || undefined}
+        targetFile={pendingNavigation?.type === 'file' ? pendingNavigation.target : undefined}
+        onSave={handleSaveAndNavigate}
+        onDiscard={handleDiscardChanges}
+        onCancel={() => {
+          setPendingNavigation(null);
+          setShowUnsavedChangesDialog(false);
+        }}
       />
     </>
   );
