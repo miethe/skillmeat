@@ -176,3 +176,10 @@
 **Issue**: Code blocks in markdown preview extend beyond modal width
 - **Location**: `skillmeat/web/components/editor/split-preview.tsx:67`
 - **Fix**: Added `prose-pre:overflow-x-auto prose-code:break-all` to prose container classes
+
+### Deployment content_hash Missing (CLI and Web)
+
+**Issue**: Adding artifact via CLI/web causes `Deployment.__init__() missing 1 required positional argument: 'content_hash'`
+- **Location**: `skillmeat/core/deployment.py:220`
+- **Root Cause**: `DeploymentManager.deploy_artifacts()` used deprecated `collection_sha` parameter instead of required `content_hash`
+- **Fix**: Changed `collection_sha=content_hash` to `content_hash=content_hash`

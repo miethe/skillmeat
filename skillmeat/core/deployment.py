@@ -217,7 +217,7 @@ class DeploymentManager:
                 from_collection=collection.name,
                 deployed_at=datetime.now(),
                 artifact_path=dest_path.relative_to(dest_base),
-                collection_sha=content_hash,
+                content_hash=content_hash,
                 local_modifications=False,
             )
             deployments.append(deployment)
