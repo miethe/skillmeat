@@ -964,7 +964,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
             {/* Contents Tab */}
             <TabsContent value="contents" className="flex-1 mt-0 min-h-0 overflow-hidden">
-              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6 overflow-hidden">
+              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6 min-w-0 overflow-hidden">
                 {/* File Tree - Left Panel */}
                 <div className="w-64 lg:w-72 flex-shrink-0 border-r overflow-hidden">
                   <FileTree

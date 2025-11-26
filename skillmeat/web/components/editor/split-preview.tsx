@@ -48,7 +48,7 @@ export function SplitPreview({
   className,
 }: SplitPreviewProps) {
   return (
-    <div className={cn('flex flex-col lg:flex-row h-full gap-4', className)}>
+    <div className={cn('flex flex-col lg:flex-row h-full gap-4 min-w-0 overflow-hidden', className)}>
       {/* Editor Panel - Only shown in edit mode */}
       {isEditing && (
         <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0">
