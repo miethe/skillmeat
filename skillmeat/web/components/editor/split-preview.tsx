@@ -64,7 +64,7 @@ export function SplitPreview({
       <div className={cn('flex-1 min-w-0 min-h-[300px] lg:min-h-0 overflow-hidden', !isEditing && 'w-full')}>
         <div className="h-full border rounded-md bg-card overflow-hidden">
           <ScrollArea className="h-full w-full">
-            <div className="p-6 prose prose-sm dark:prose-invert max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] prose-headings:break-words prose-p:break-words">
+            <div className="p-6 prose prose-sm dark:prose-invert max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] prose-headings:break-words prose-p:break-words prose-pre:overflow-x-auto prose-code:break-all">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {content || '*No content to preview*'}
               </ReactMarkdown>

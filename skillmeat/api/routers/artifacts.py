@@ -3032,9 +3032,9 @@ async def update_artifact_file_content(
                 detail=f"Artifact '{artifact_id}' not found",
             )
 
-        # Get artifact path
+        # Get artifact path - use artifact.path to get correct pluralized directory
         collection_path = collection_mgr.config.get_collection_path(collection_name)
-        artifact_root = Path(collection_path) / artifact_type.value / artifact_name
+        artifact_root = collection_path / artifact.path
 
         # Validate file path (path traversal protection)
         try:
