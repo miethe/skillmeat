@@ -2,22 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitBranch, FolderOpen, Clock, Package, Plus } from "lucide-react";
+import { GitBranch, FolderOpen, Clock, Package, Plus, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useProjects, useProject } from "@/hooks/useProjects";
+import { useProjects } from "@/hooks/useProjects";
 import { CreateProjectDialog } from "./components/create-project-dialog";
 import { ProjectActions } from "./components/project-actions";
 import type { ProjectSummary } from "@/types/project";
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { data: projects, isLoading, error, refetch } = useProjects();
+  const { data: projects, isLoading, error, refetch, forceRefresh } = useProjects();
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleProjectClick = (project: ProjectSummary) => {
     setSelectedProject(project);
@@ -37,6 +38,15 @@ export default function ProjectsPage() {
 
   const handleActionSuccess = () => {
     refetch();
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await forceRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const formatDate = (dateString?: string) => {
@@ -64,10 +74,21 @@ export default function ProjectsPage() {
             Manage your deployed projects and configurations
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            title="Refresh projects (rescan filesystem)"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Loading State */}

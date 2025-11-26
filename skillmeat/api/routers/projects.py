@@ -30,11 +30,16 @@ from skillmeat.api.schemas.projects import (
     ProjectSummary,
     ProjectUpdateRequest,
 )
+from skillmeat.api.project_registry import ProjectRegistry, get_project_registry
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
 from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
+
+
+# Type alias for registry dependency
+RegistryDep = ProjectRegistry
 
 router = APIRouter(
     prefix="/projects",
@@ -257,17 +262,22 @@ async def list_projects(
         default=None,
         description="Cursor for pagination (next page)",
     ),
+    refresh: bool = Query(
+        default=False,
+        description="Force cache refresh (bypass cached results)",
+    ),
 ) -> ProjectListResponse:
     """List all projects with deployed artifacts.
 
-    This endpoint discovers projects by scanning configured paths for
-    .claude/.skillmeat-deployed.toml files and returns summary information
-    about each project.
+    This endpoint returns cached project discovery results for fast responses.
+    The cache is automatically refreshed every 5 minutes, or can be forced
+    with the refresh=true query parameter.
 
     Args:
         token: Authentication token
         limit: Number of items per page
         after: Cursor for next page
+        refresh: Force cache refresh
 
     Returns:
         Paginated list of projects
@@ -276,20 +286,27 @@ async def list_projects(
         HTTPException: On error
     """
     try:
-        logger.info(f"Listing projects (limit={limit}, after={after})")
+        logger.info(f"Listing projects (limit={limit}, after={after}, refresh={refresh})")
 
-        # Discover all projects
-        project_paths = discover_projects()
-        logger.info(f"Discovered {len(project_paths)} projects")
+        # Use ProjectRegistry for cached results
+        registry = await get_project_registry()
+        cache_entries = await registry.get_projects(force_refresh=refresh)
+        logger.info(f"Got {len(cache_entries)} projects from registry (cached)")
 
-        # Build project summaries
+        # Convert cache entries to ProjectSummary
         all_projects = []
-        for project_path in project_paths:
+        for entry in cache_entries:
             try:
-                summary = build_project_summary(project_path)
+                summary = ProjectSummary(
+                    id=encode_project_id(str(entry.path)),
+                    path=str(entry.path),
+                    name=entry.name,
+                    deployment_count=entry.deployment_count,
+                    last_deployment=entry.last_deployment,
+                )
                 all_projects.append(summary)
             except Exception as e:
-                logger.error(f"Error processing project {project_path}: {e}")
+                logger.error(f"Error processing project {entry.path}: {e}")
                 continue
 
         # Sort by last deployment (most recent first)
@@ -442,6 +459,10 @@ async def create_project(
         DeploymentTracker.write_deployments(project_path, [])
 
         logger.info(f"Project created successfully: {request.name}")
+
+        # Invalidate cache so new project appears in list
+        registry = await get_project_registry()
+        await registry.refresh_entry(project_path)
 
         return ProjectCreateResponse(
             id=encode_project_id(str(project_path)),
@@ -618,6 +639,10 @@ async def update_project(
 
         logger.info(f"Project updated successfully: {updated_metadata.name}")
 
+        # Refresh cache entry
+        registry = await get_project_registry()
+        await registry.refresh_entry(project_path)
+
         # Build and return updated project detail
         project_detail = build_project_detail(project_path)
         return project_detail
@@ -723,6 +748,10 @@ async def delete_project(
                 )
 
         logger.info(f"Project deleted successfully: {project_path.name}")
+
+        # Invalidate cache entry
+        registry = await get_project_registry()
+        await registry.invalidate(project_path)
 
         return ProjectDeleteResponse(
             success=True,
@@ -1039,3 +1068,75 @@ async def get_modified_artifacts(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get modified artifacts: {str(e)}",
         )
+
+
+# =============================================================================
+# Cache Management Endpoints
+# =============================================================================
+
+
+@router.post(
+    "/cache/refresh",
+    summary="Refresh project cache",
+    description="Force a full refresh of the project discovery cache",
+    responses={
+        200: {"description": "Cache refreshed successfully"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def refresh_cache(token: TokenDep) -> dict:
+    """Force refresh the project discovery cache.
+
+    Triggers a full filesystem scan to update the cached project list.
+    This is useful after making changes outside the API or if the cache
+    seems stale.
+
+    Args:
+        token: Authentication token
+
+    Returns:
+        Cache status after refresh
+    """
+    try:
+        logger.info("Forcing project cache refresh")
+        registry = await get_project_registry()
+        await registry.get_projects(force_refresh=True)
+        stats = registry.get_cache_stats()
+        logger.info(f"Cache refreshed: {stats['entries']} projects")
+        return {
+            "success": True,
+            "message": "Cache refreshed successfully",
+            "stats": stats,
+        }
+    except Exception as e:
+        logger.error(f"Error refreshing cache: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to refresh cache: {str(e)}",
+        )
+
+
+@router.get(
+    "/cache/stats",
+    summary="Get cache statistics",
+    description="Get statistics about the project discovery cache",
+    responses={
+        200: {"description": "Cache statistics"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def get_cache_stats(token: TokenDep) -> dict:
+    """Get cache statistics for monitoring.
+
+    Returns information about the cache state including number of entries,
+    age, and validity status.
+
+    Args:
+        token: Authentication token
+
+    Returns:
+        Cache statistics
+    """
+    registry = await get_project_registry()
+    return registry.get_cache_stats()

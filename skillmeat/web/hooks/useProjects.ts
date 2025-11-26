@@ -117,10 +117,17 @@ const projectKeys = {
   detail: (id: string) => [...projectKeys.details(), id] as const,
 };
 
-async function fetchProjectsFromApi(): Promise<ProjectSummary[]> {
+async function fetchProjectsFromApi(
+  forceRefresh: boolean = false
+): Promise<ProjectSummary[]> {
   const params = new URLSearchParams({
     limit: "100", // Get all projects (they're typically not numerous)
   });
+
+  // Add refresh parameter to bypass backend cache
+  if (forceRefresh) {
+    params.set("refresh", "true");
+  }
 
   try {
     const response = await apiRequest<ProjectsResponse>(
@@ -197,17 +204,46 @@ async function deleteProjectApi(
   });
 }
 
+// Cache configuration
+const PROJECTS_STALE_TIME = 5 * 60 * 1000; // 5 minutes - backend caches for this long
+const PROJECTS_GC_TIME = 10 * 60 * 1000; // 10 minutes - keep in memory longer
+
 /**
  * Hook to fetch all projects with deployments
+ *
+ * The backend now caches project discovery results for 5 minutes,
+ * so we match that with our frontend stale time.
+ *
+ * @returns Query result with projects list and refresh function
  */
 export function useProjects() {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: projectKeys.list(),
     queryFn: async (): Promise<ProjectSummary[]> => {
       return await fetchProjectsFromApi();
     },
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: PROJECTS_STALE_TIME,
+    gcTime: PROJECTS_GC_TIME,
   });
+
+  /**
+   * Force refresh the projects list, bypassing both frontend and backend cache.
+   * Use this after making changes outside the app or when data seems stale.
+   */
+  const forceRefresh = async () => {
+    // Fetch with forceRefresh to bypass backend cache
+    const freshData = await fetchProjectsFromApi(true);
+    // Update the cache with fresh data
+    queryClient.setQueryData(projectKeys.list(), freshData);
+    return freshData;
+  };
+
+  return {
+    ...query,
+    forceRefresh,
+  };
 }
 
 /**
