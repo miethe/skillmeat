@@ -7,22 +7,48 @@ import { Badge } from "@/components/ui/badge";
 import { Filters } from "@/components/collection/filters";
 import { ArtifactGrid } from "@/components/collection/artifact-grid";
 import { ArtifactList } from "@/components/collection/artifact-list";
-import { ArtifactDetail } from "@/components/collection/artifact-detail";
+import { UnifiedEntityModal } from "@/components/entity/unified-entity-modal";
+import { EntityLifecycleProvider } from "@/hooks/useEntityLifecycle";
 import { useArtifacts } from "@/hooks/useArtifacts";
 import type {
   Artifact,
   ArtifactFilters,
   ArtifactSort,
 } from "@/types/artifact";
+import type { Entity } from "@/types/entity";
 
 type ViewMode = "grid" | "list";
 
-export default function CollectionPage() {
+// Helper function to convert Artifact to Entity for the modal
+function artifactToEntity(artifact: Artifact): Entity {
+  // Map ArtifactStatus to EntityStatus
+  const statusMap: Record<string, Entity["status"]> = {
+    active: "synced",
+    outdated: "outdated",
+    conflict: "conflict",
+    error: "conflict",
+  };
+
+  return {
+    id: artifact.id,
+    name: artifact.name,
+    type: artifact.type,
+    collection: "default",
+    status: statusMap[artifact.status] || "synced",
+    tags: artifact.metadata.tags || [],
+    description: artifact.metadata.description,
+    version: artifact.version || artifact.metadata.version,
+    source: artifact.source || "unknown",
+    deployedAt: artifact.createdAt,
+    modifiedAt: artifact.updatedAt,
+    aliases: artifact.aliases || [],
+  };
+}
+
+function CollectionPageContent() {
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(
-    null
-  );
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Filter and sort state
@@ -36,14 +62,14 @@ export default function CollectionPage() {
   const { data, isLoading, error } = useArtifacts(filters, sort);
 
   const handleArtifactClick = (artifact: Artifact) => {
-    setSelectedArtifact(artifact);
+    setSelectedEntity(artifactToEntity(artifact));
     setIsDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
-    // Keep selectedArtifact for a moment to avoid flickering
-    setTimeout(() => setSelectedArtifact(null), 300);
+    // Keep selectedEntity for a moment to avoid flickering
+    setTimeout(() => setSelectedEntity(null), 300);
   };
 
   // Calculate active filter count
@@ -161,12 +187,20 @@ export default function CollectionPage() {
         </>
       )}
 
-      {/* Artifact Detail Drawer */}
-      <ArtifactDetail
-        artifact={selectedArtifact}
-        isOpen={isDetailOpen}
+      {/* Entity Detail Modal */}
+      <UnifiedEntityModal
+        entity={selectedEntity}
+        open={isDetailOpen}
         onClose={handleDetailClose}
       />
     </div>
+  );
+}
+
+export default function CollectionPage() {
+  return (
+    <EntityLifecycleProvider mode="collection">
+      <CollectionPageContent />
+    </EntityLifecycleProvider>
   );
 }

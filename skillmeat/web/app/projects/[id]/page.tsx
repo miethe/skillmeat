@@ -19,11 +19,12 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArtifactDetail } from "@/components/collection/artifact-detail";
+import { UnifiedEntityModal } from "@/components/entity/unified-entity-modal";
 import { useProject } from "@/hooks/useProjects";
 import { useArtifacts } from "@/hooks/useArtifacts";
 import type { DeployedArtifact } from "@/types/project";
 import type { Artifact } from "@/types/artifact";
+import type { Entity } from "@/types/entity";
 
 const artifactTypeIcons = {
   skill: Folder,
@@ -48,10 +49,10 @@ export default function ProjectDetailPage() {
 
   const { data: project, isLoading, error } = useProject(projectId);
 
-  // Modal state for artifact detail
-  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
+  // Modal state for entity detail
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isFetchingArtifact, setIsFetchingArtifact] = useState(false);
+  const [isFetchingEntity, setIsFetchingEntity] = useState(false);
 
   // Fetch all artifacts to match by name
   const { data: artifactsData } = useArtifacts();
@@ -91,7 +92,7 @@ export default function ProjectDetailPage() {
   };
 
   const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
-    setIsFetchingArtifact(true);
+    setIsFetchingEntity(true);
 
     // Try to find matching artifact from collection by name
     const matchingArtifact = artifactsData?.artifacts.find(
@@ -99,20 +100,37 @@ export default function ProjectDetailPage() {
     );
 
     if (matchingArtifact) {
-      setSelectedArtifact(matchingArtifact);
+      // Convert Artifact to Entity with project context
+      const entity: Entity = {
+        id: matchingArtifact.name,
+        name: matchingArtifact.name,
+        type: matchingArtifact.type,
+        description: matchingArtifact.metadata?.description,
+        source: matchingArtifact.source,
+        version: matchingArtifact.version,
+        tags: matchingArtifact.metadata?.tags,
+        aliases: matchingArtifact.aliases,
+        status: deployedArtifact.local_modifications ? 'modified' : 'synced',
+        collection: deployedArtifact.from_collection,
+        projectPath: project?.path, // Set project path for project-level operations
+        deployedAt: deployedArtifact.deployed_at,
+        modifiedAt: deployedArtifact.local_modifications ? new Date().toISOString() : undefined,
+      };
+
+      setSelectedEntity(entity);
       setIsDetailOpen(true);
     } else {
       // If not found in collection, show a notification or error
       console.warn(`Artifact ${deployedArtifact.artifact_name} not found in collection`);
     }
 
-    setIsFetchingArtifact(false);
+    setIsFetchingEntity(false);
   };
 
   const handleDetailClose = () => {
     setIsDetailOpen(false);
-    // Keep selectedArtifact for a moment to avoid flickering
-    setTimeout(() => setSelectedArtifact(null), 300);
+    // Keep selectedEntity for a moment to avoid flickering
+    setTimeout(() => setSelectedEntity(null), 300);
   };
 
   if (isLoading) {
@@ -344,12 +362,11 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Artifact Detail Modal */}
-      <ArtifactDetail
-        artifact={selectedArtifact}
-        isOpen={isDetailOpen}
+      {/* Entity Detail Modal - Project Mode */}
+      <UnifiedEntityModal
+        entity={selectedEntity}
+        open={isDetailOpen}
         onClose={handleDetailClose}
-        isLoading={isFetchingArtifact}
       />
     </div>
   );
