@@ -791,7 +791,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-2xl lg:max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0">
           {/* Header Section - Fixed */}
           <div className="px-6 pt-6 pb-4 border-b">
             <DialogHeader>
@@ -963,10 +963,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="flex-1 mt-0">
-              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6">
+            <TabsContent value="contents" className="flex-1 mt-0 min-h-0 overflow-hidden">
+              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6 overflow-hidden">
                 {/* File Tree - Left Panel */}
-                <div className="w-1/3 border-r">
+                <div className="w-64 lg:w-72 flex-shrink-0 border-r overflow-hidden">
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
@@ -979,7 +979,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 </div>
 
                 {/* Content Pane - Right Panel */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <ContentPane
                     path={selectedPath}
                     content={contentData?.content || null}

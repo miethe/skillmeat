@@ -319,7 +319,7 @@ export function ContentPane({
   // Markdown file - always use split preview (shows rendered markdown)
   if (isMarkdown) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="h-full w-full flex flex-col overflow-hidden">
         {/* Header with breadcrumb and actions */}
         <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
           <Breadcrumb path={path} />
@@ -355,7 +355,7 @@ export function ContentPane({
         </div>
 
         {/* Split-view editor and preview - preview always shown for markdown */}
-        <div className="flex-1 p-4 overflow-hidden min-h-0">
+        <div className="flex-1 p-4 overflow-hidden min-h-0 min-w-0">
           <SplitPreview
             content={isEditing ? editedContent : content}
             onChange={setEditedContent}
@@ -368,7 +368,7 @@ export function ContentPane({
 
   // Content display (read-only mode for non-markdown files)
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Header with breadcrumb and actions */}
       <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
         <Breadcrumb path={path} />
@@ -381,9 +381,11 @@ export function ContentPane({
       </div>
 
       {/* Scrollable content area with horizontal scroll when needed */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4 overflow-x-auto">
-          <ContentDisplay content={content} showLineNumbers={false} />
+      <ScrollArea className="flex-1 min-h-0 min-w-0">
+        <div className="p-4">
+          <div className="overflow-x-auto max-w-full">
+            <ContentDisplay content={content} showLineNumbers={false} />
+          </div>
         </div>
       </ScrollArea>
     </div>
