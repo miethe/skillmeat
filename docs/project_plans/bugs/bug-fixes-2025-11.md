@@ -31,5 +31,5 @@ Bug fixes resolved during November 2025.
   1. Added `NEXT_PUBLIC_API_URL` environment variable in `manager.py` using the configured `api_host` and `api_port`
   2. Unified the environment variable name from `NEXT_PUBLIC_API_BASE_URL` to `NEXT_PUBLIC_API_URL` in `sdk/core/OpenAPI.ts`
   3. Standardized fallback port to 8080 in `app/settings/page.tsx` for consistency with `lib/api.ts`
-- **Commit(s)**: `06a0180`
+- **Commit(s)**: `b10af74`
 - **Status**: RESOLVED
