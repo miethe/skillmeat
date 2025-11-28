@@ -16,5 +16,5 @@ Bug fixes resolved during November 2025.
   - `clean`: Attempts `rm -rf`, falls back to `chmod -R u+w` then retry, always succeeds
   - `clean:cache`: Same pattern for cache-only cleanup
   - `clean:all`: Same pattern for full cleanup including node_modules
-- **Commit(s)**: `8c13d96`
+- **Commit(s)**: `cb8e14c`
 - **Status**: RESOLVED
