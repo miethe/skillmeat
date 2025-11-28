@@ -2,11 +2,10 @@
 
 Analyze the attached list of bugs. Create a remediation plan with designs, then implement it. You must use subagents to perform all tasks, only delegating tasks. You are Opus, so tokens are expensive; use them wisely to optimize for reasoning, with all token-heavy work being delegated. Commit often.
 
-- **Validation Strategy**: Validate code changes via direct code review (Read/Grep tools). DO NOT create test scripts, automation, or browser screenshots. For web app fixes, inspect the code changes directly to verify correct implementation.
+- **Validation Strategy**: Validate code changes via direct code review (Read/Grep tools). You MAY create test scripts, automation, or similar if absolutely necessary, but only if there isn't a more appropriate, reusable method that wouldn't be significant extra effort or complexity; ie unit tests or mock API calls for backend, or chrome-devtools for frontend, etc. However, if one-time scripts are created, or screenshots saved, or otherwise, and they have no further value in the future after immediate verification, then they must be deleted before commit.
 
-- **NO test automation or validation scripts**: Do not create `.js`, `.py`, or any scripts for validation in the codebase. Do not use chrome-devtools to automate browser tests. Do not generate screenshots or test reports.
-- **NO validation reports**: Do not create VALIDATION_SUMMARY.txt, CODE_VERIFICATION_REPORT.md, or any other reports/summaries outside the bug-fixes doc.
-- If new issues appear during implementation, continue to analyze and remediate them. If builds fail with ITERATE=TRUE, continue iterating until resolved.
+- **NO validation reports**: Do not create VALIDATION_SUMMARY.txt, CODE_VERIFICATION_REPORT.md, or any other reports/summaries outside the bug-fixes doc. If an artifact is created by a necessary validation method per above for the agent's immediate review, then it must be deleted before commit.
+- If new issues appear during implementation, continue to analyze and remediate them.
 
 ## Documentation Requirements
 
@@ -29,10 +28,9 @@ Add one section per bug using this template:
 
 ## Strict Rules
 
-- ❌ Do NOT create validation scripts or test automation
-- ❌ Do NOT create screenshots, reports, or summaries outside bug-fixes doc
-- ❌ Do NOT create any files in `docs/screenshots/` unless explicitly required by the bug itself
-- ❌ Do NOT add markdown files, PNG files, or JSON reports unless they are part of the actual bug fix
+- ❌ Do NOT commit validation scripts or test automation if they are one-time use only
+- ❌ Do NOT commit screenshots, reports, or summaries outside bug-fixes doc
+- ❌ Do NOT add markdown files, PNG files, or JSON reports unless they are part of the actual bug fix, or add significant value to the codebase long-term
 - ✅ DO delete all untracked artifacts (screenshots, reports, scripts) before final commit
 - ✅ DO update only the monthly bug-fixes document for all validation notes
 - ✅ DO commit frequently with clear, focused commit messages
