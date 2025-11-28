@@ -60,62 +60,48 @@
     }
   },
   "hooks": {
-    "_comment": "Pre/post tool-use hooks for automated checks. Customize commands based on your project's linters, formatters, and build tools.",
     "PreToolUse": [
       {
+        "_comment": "Pre-tool validation hook - runs before Write or Edit operations",
         "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Checking file changes...'"
+            "command": "echo 'Validating file operation...'"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "_comment": "Python linting hook - customize path and linter command",
-        "matcher": "Write.*\\.py$",
+        "_comment": "Python linting hook - runs after Write/Edit on .py files. Customize path and linter command. Matcher matches tool names (Write|Edit), command filters by file extension using $TOOL_ARGS.",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "cd {{API_PATH}} && {{PYTHON_TOOL}} run {{LINTER_COMMAND}} --select E,W,F --quiet || echo 'Python linting issues detected'"
+            "command": "FILE_PATH=$(echo \"$TOOL_ARGS\" | jq -r '.file_path // empty' 2>/dev/null) && if [[ -n \"$FILE_PATH\" && \"$FILE_PATH\" =~ \\.py$ ]]; then echo \"Checking Python file: $FILE_PATH\" && flake8 \"$FILE_PATH\" --select=E9,F63,F7,F82 --show-source 2>/dev/null || echo 'Python syntax check complete'; fi"
           }
         ],
         "_examples": {
-          "ruff": "cd services/api && uv run ruff check --select E,W,F --quiet",
-          "flake8": "cd src/server && poetry run flake8 --select E,W,F",
-          "pylint": "cd backend && pip run pylint --disable=all --enable=E,W,F"
-        }
-      },
-      {
-        "_comment": "TypeScript/JavaScript type checking - customize package manager and command",
-        "matcher": "Write.*\\.(ts|tsx|js|jsx)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "{{PACKAGE_MANAGER}} typecheck --skipLibCheck || echo 'TypeScript issues detected'"
-          }
-        ],
-        "_examples": {
-          "pnpm": "pnpm typecheck --skipLibCheck",
-          "npm": "npm run typecheck",
-          "yarn": "yarn typecheck"
+          "black": "FILE_PATH=$(echo \"$TOOL_ARGS\" | jq -r '.file_path') && [[ \"$FILE_PATH\" =~ \\.py$ ]] && black --check \"$FILE_PATH\"",
+          "ruff": "FILE_PATH=$(echo \"$TOOL_ARGS\" | jq -r '.file_path') && [[ \"$FILE_PATH\" =~ \\.py$ ]] && ruff check \"$FILE_PATH\"",
+          "mypy": "FILE_PATH=$(echo \"$TOOL_ARGS\" | jq -r '.file_path') && [[ \"$FILE_PATH\" =~ \\.py$ ]] && mypy \"$FILE_PATH\""
         }
       }
     ],
     "SessionStart": [
       {
+        "_comment": "Session initialization hook - runs when Claude Code session starts. No matcher needed for SessionStart events.",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{{PROJECT_NAME}} session started — {{PROJECT_STANDARDS}}'"
+            "command": "echo 'SkillMeat development session started — follow Python best practices and run tests before commits'"
           }
         ],
         "_examples": {
-          "meaty_prompts": "echo 'MeatyPrompts session started — follow layering principles and test changes'",
-          "generic": "echo 'ProjectName session started — follow coding standards'",
-          "strict": "echo 'ProjectName session started — all code must pass linting and tests'"
+          "with_git_status": "echo 'Session started' && git status --short",
+          "with_environment_check": "echo 'Session started' && python --version && which pytest",
+          "minimal": "echo 'Ready to code'"
         }
       }
     ]
