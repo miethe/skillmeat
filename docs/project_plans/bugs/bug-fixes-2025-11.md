@@ -18,3 +18,18 @@ Bug fixes resolved during November 2025.
   - `clean:all`: Same pattern for full cleanup including node_modules
 - **Commit(s)**: `cb8e14c`
 - **Status**: RESOLVED
+
+---
+
+### Custom API Port Not Applied to Frontend
+
+**Issue**: Running `skillmeat web dev --api-port 8080 --web-port 3001` starts the API on port 8080, but the frontend continues making requests to port 8000.
+
+- **Location**: `skillmeat/web/manager.py:151-155`
+- **Root Cause**: The WebManager's `_get_web_config()` method only set the `PORT` environment variable for Next.js but never set `NEXT_PUBLIC_API_URL`. Without this variable, the frontend fell back to hardcoded defaults (inconsistently 8000 or 8080 across different modules).
+- **Fix**:
+  1. Added `NEXT_PUBLIC_API_URL` environment variable in `manager.py` using the configured `api_host` and `api_port`
+  2. Unified the environment variable name from `NEXT_PUBLIC_API_BASE_URL` to `NEXT_PUBLIC_API_URL` in `sdk/core/OpenAPI.ts`
+  3. Standardized fallback port to 8080 in `app/settings/page.tsx` for consistency with `lib/api.ts`
+- **Commit(s)**: `06a0180`
+- **Status**: RESOLVED

@@ -148,9 +148,11 @@ class WebManager:
             startup_msg = f"Starting Next.js server (dev) on :{self.web_port}..."
             ready_msg = f"Next.js ready at http://localhost:{self.web_port} (dev)"
 
-        # Set PORT environment variable for Next.js
+        # Set environment variables for Next.js
         env = os.environ.copy()
         env["PORT"] = str(self.web_port)
+        # Set API URL so frontend knows where to send requests
+        env["NEXT_PUBLIC_API_URL"] = f"http://{self.api_host}:{self.api_port}"
 
         return ServerConfig(
             name="Web",
