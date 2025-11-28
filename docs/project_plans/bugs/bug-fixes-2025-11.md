@@ -46,5 +46,5 @@ Bug fixes resolved during November 2025.
   1. Added import for EntityLifecycleProvider from '@/components/entity/EntityLifecycleProvider' (line 22)
   2. Wrapped entire page return JSX with `<EntityLifecycleProvider mode="project" projectPath={project?.path}>` (lines 179-374)
   3. Pattern matches other project pages like `/projects/[id]/manage/page.tsx`
-- **Commit(s)**: `TBD`
+- **Commit(s)**: `3164567`
 - **Status**: RESOLVED
