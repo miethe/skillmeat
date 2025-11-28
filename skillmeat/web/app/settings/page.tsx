@@ -35,7 +35,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">API URL</span>
                 <span className="text-sm text-muted-foreground">
-                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
+                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}
                 </span>
               </div>
               <div className="flex items-center justify-between">

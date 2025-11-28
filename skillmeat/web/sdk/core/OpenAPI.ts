@@ -21,7 +21,7 @@ export type OpenAPIConfig = {
 
 export const OpenAPI: OpenAPIConfig = {
     // Use environment variable for API base URL, fallback to empty string for relative URLs.
-    BASE: typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_BASE_URL ? process.env.NEXT_PUBLIC_API_BASE_URL : '',
+    BASE: typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL : '',
     VERSION: '0.1.0-alpha',
     WITH_CREDENTIALS: false,
     CREDENTIALS: 'include',
