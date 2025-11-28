@@ -33,3 +33,18 @@ Bug fixes resolved during November 2025.
   3. Standardized fallback port to 8080 in `app/settings/page.tsx` for consistency with `lib/api.ts`
 - **Commit(s)**: `b10af74`
 - **Status**: RESOLVED
+
+---
+
+### Missing EntityLifecycleProvider in Project Detail Page
+
+**Issue**: Clicking into a project from the projects list causes React error: "useEntityLifecycle must be used within EntityLifecycleProvider"
+
+- **Location**: `skillmeat/web/app/projects/[id]/page.tsx:366-370`
+- **Root Cause**: The ProjectDetailPage component renders UnifiedEntityModal which internally calls useEntityLifecycle hook, but the page did not wrap its content in EntityLifecycleProvider. When users clicked on a deployed artifact to view details, the modal attempted to access the context and threw an error.
+- **Fix**:
+  1. Added import for EntityLifecycleProvider from '@/components/entity/EntityLifecycleProvider' (line 22)
+  2. Wrapped entire page return JSX with `<EntityLifecycleProvider mode="project" projectPath={project?.path}>` (lines 179-374)
+  3. Pattern matches other project pages like `/projects/[id]/manage/page.tsx`
+- **Commit(s)**: `TBD`
+- **Status**: RESOLVED
