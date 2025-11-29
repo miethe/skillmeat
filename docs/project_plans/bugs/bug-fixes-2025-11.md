@@ -48,3 +48,35 @@ Bug fixes resolved during November 2025.
   3. Pattern matches other project pages like `/projects/[id]/manage/page.tsx`
 - **Commit(s)**: `3164567`
 - **Status**: RESOLVED
+
+---
+
+### React Warning: asChild Prop on DOM Element
+
+**Issue**: React console warning when using Button component with asChild prop: "React does not recognize the `asChild` prop on a DOM element"
+
+- **Location**: `skillmeat/web/components/ui/button.tsx:44-48`
+- **Root Cause**: The Button component declared `asChild?: boolean` in its TypeScript interface but didn't implement the prop handling logic. The prop was being spread directly to the native `<button>` DOM element via `{...props}`, causing React to warn about an unrecognized prop.
+- **Fix**:
+  1. Imported `Slot` from `@radix-ui/react-slot` (line 2)
+  2. Destructured `asChild = false` from props to prevent it from spreading to DOM (line 43)
+  3. Created polymorphic component selector: `const Comp = asChild ? Slot : "button"` (line 44)
+  4. Replaced hardcoded `<button>` with dynamic `<Comp>` element (lines 46-50)
+  5. Installed `@radix-ui/react-slot` dependency
+- **Commit(s)**: `TBD`
+- **Status**: RESOLVED
+
+---
+
+### Sync with Upstream Fails with 400 Bad Request
+
+**Issue**: Attempting "Sync with Upstream" on a skill within a project fails with HTTP 400 error: `POST /api/v1/artifacts/notebooklm-skill/sync - 400`
+
+- **Location**: `skillmeat/web/app/projects/[id]/page.tsx:106`
+- **Root Cause**: The Entity object created when clicking on a deployed artifact used only the artifact name for the `id` field (`id: matchingArtifact.name`). However, the backend API expects entity IDs in `type:name` format (e.g., `skill:notebooklm-skill`) for proper routing. The sync endpoint validates this format and returns 400 when receiving just the name.
+- **Fix**:
+  1. Changed Entity `id` from `matchingArtifact.name` to `${matchingArtifact.type}:${matchingArtifact.name}` (line 106)
+  2. Ensures consistency with Entity interface spec: `id` should be "Unique identifier in format 'type:name'"
+  3. Enables proper API routing for sync, deploy, and other entity operations
+- **Commit(s)**: `TBD`
+- **Status**: RESOLVED
