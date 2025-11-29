@@ -80,3 +80,15 @@ Bug fixes resolved during November 2025.
   3. Enables proper API routing for sync, deploy, and other entity operations
 - **Commit(s)**: `ee7c59d`
 - **Status**: RESOLVED
+
+---
+
+### Upstream Diff Endpoint AttributeError on artifact.upstream.spec
+
+**Issue**: Navigating to Sync Status tab on an artifact fails with: `AttributeError: 'str' object has no attribute 'spec'`
+
+- **Location**: `skillmeat/api/routers/artifacts.py:2922`
+- **Root Cause**: The `get_artifact_upstream_diff` endpoint incorrectly accessed `artifact.upstream.spec`, but `artifact.upstream` is already a string containing the source spec (e.g., "anthropics/skills/pdf"), not an object with a `.spec` attribute.
+- **Fix**: Changed `artifact.upstream.spec` to `artifact.upstream` to correctly use the string value directly.
+- **Commit(s)**: `46a6fd6`
+- **Status**: RESOLVED
