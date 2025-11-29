@@ -26,9 +26,10 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 ```text
 1. Analyze task → identify what needs to change
 2. Delegate exploration → codebase-explorer finds files/patterns
-3. Delegate implementation → specialist agent writes code
-4. Review results → verify correctness via agent reports
-5. Commit → only direct action Opus takes
+3. Read progress YAML → get assigned_to and batch strategy
+4. Delegate implementation → use Task() from Orchestration Quick Reference
+5. Update progress → artifact-tracker marks tasks complete
+6. Commit → only direct action Opus takes
 ```
 
 **When you catch yourself about to edit a file**: STOP. Delegate instead.
@@ -40,7 +41,8 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 **Allowed**:
 
 - `/docs/` → User/dev/architecture docs (with frontmatter)
-- `.claude/progress/[prd]/` → ONE per phase
+- `.claude/progress/[prd]/` → ONE per phase (YAML+Markdown hybrid)
+- `.claude/worknotes/[prd]/` → ONE context.md per PRD (agent worknotes)
 - `.claude/worknotes/fixes/` → ONE per month
 - `.claude/worknotes/observations/` → ONE per month
 
@@ -64,6 +66,8 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 | Find files/patterns | codebase-explorer | Haiku | Quick discovery |
 | Deep analysis | explore | Haiku | Full context needed |
 | Debug investigation | ultrathink-debugger | Sonnet | Complex bugs |
+| Progress tracking | artifact-tracker | Haiku | Create/update progress |
+| Query status | artifact-query | Haiku | Find blockers, pending tasks |
 
 ### Implementation
 
@@ -99,6 +103,72 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 3. COMMIT (Opus does this directly):
    git add ... && git commit
 ```
+
+---
+
+## Orchestration-Driven Development
+
+**Reference**: Use `artifact-tracking` skill for progress tracking of implementation plans.
+
+### Progress & Context Files
+
+| File Type | Location | Purpose |
+|-----------|----------|---------|
+| Progress | `.claude/progress/[prd]/phase-N-progress.md` | ONE per phase, tracks tasks |
+| Context | `.claude/worknotes/[prd]/context.md` | ONE per PRD, agent worknotes |
+
+### Progress File Orchestration
+
+Progress files include YAML frontmatter optimized for Opus-level orchestration:
+
+```yaml
+tasks:
+  - id: "TASK-1.1"
+    status: "pending"
+    assigned_to: ["ui-engineer-enhanced"]  # REQUIRED
+    dependencies: []                        # REQUIRED
+
+parallelization:
+  batch_1: ["TASK-1.1", "TASK-1.2"]  # Run in parallel
+  batch_2: ["TASK-2.1"]              # Sequential after batch_1
+```
+
+**Key Fields** (REQUIRED for every task):
+- `assigned_to`: Array of agents to delegate to
+- `dependencies`: Array of task IDs that must complete first
+
+### Orchestration Quick Reference
+
+Every progress file includes a markdown section with ready-to-copy Task() commands:
+
+```markdown
+## Orchestration Quick Reference
+
+**Batch 1** (Parallel):
+- TASK-1.1 → `ui-engineer-enhanced` (2h)
+- TASK-1.2 → `python-pro` (1h)
+
+### Task Delegation Commands
+Task("ui-engineer-enhanced", "TASK-1.1: Create component...")
+Task("python-pro", "TASK-1.2: Add API endpoint...")
+```
+
+**Execute batches**: Parallel tasks in one message, sequential batches wait for completion.
+
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/dev:execute-phase N` | Execute phase N with orchestration |
+| `skill: artifact-tracking` | Create/update/query progress files |
+
+### Token Efficiency
+
+| Operation | Traditional | With Orchestration | Savings |
+|-----------|-------------|-------------------|---------|
+| Read task list | 25KB | 2KB (YAML only) | 92% |
+| Query blockers | 75KB | 3KB | 96% |
+| Session handoff | 150KB | 5KB | 97% |
 
 ---
 
