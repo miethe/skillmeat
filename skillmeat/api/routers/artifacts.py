@@ -2919,7 +2919,7 @@ async def get_artifact_upstream_diff(
             artifact_name=artifact_name,
             artifact_type=artifact_type.value,
             collection_name=collection_name,
-            upstream_source=artifact.upstream.spec if artifact.upstream else "unknown",
+            upstream_source=artifact.upstream if artifact.upstream else "unknown",
             upstream_version=upstream_version,
             has_changes=has_changes,
             files=file_diffs,
