@@ -1,13 +1,15 @@
 $schema: "http://json-schema.org/draft-07/schema#"
-title: "Context Notes Artifact Schema"
+title: "Context Worknotes Artifact Schema"
 type: object
-description: "JSON Schema for context notes artifacts (YAML frontmatter validation)"
+description: "JSON Schema for PRD-level context worknotes (YAML frontmatter validation). One file per PRD for agent observations and notes during development."
 
 required:
   - type
   - prd
   - title
   - status
+  - created
+  - updated
 
 properties:
   type:
@@ -20,27 +22,82 @@ properties:
     minLength: 3
     maxLength: 64
     pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
-    description: "PRD identifier in kebab-case (e.g., 'blocks-v2')"
-
-  phase:
-    oneOf:
-      - type: "null"
-      - type: integer
-        minimum: 1
-        maximum: 99
-    default: null
-    description: "Phase number if context is for single phase (null for all-phases context)"
+    description: "PRD identifier in kebab-case (e.g., 'artifact-flow-modal-redesign')"
 
   title:
     type: string
     minLength: 5
     maxLength: 256
-    description: "Context document title"
+    description: "Context document title (e.g., 'Artifact Flow Modal - Development Context')"
 
   status:
     type: string
-    enum: ["complete", "blocked", "in-progress"]
-    description: "Overall implementation status"
+    enum: ["active", "archived", "abandoned"]
+    description: "Context file status (active during development, archived when complete)"
+
+  created:
+    type: string
+    format: "date"
+    description: "Creation date in YYYY-MM-DD format"
+
+  updated:
+    type: string
+    format: "date"
+    description: "Last update date in YYYY-MM-DD format"
+
+  # Quick reference metrics for token-efficient queries
+  critical_notes_count:
+    type: integer
+    minimum: 0
+    default: 0
+    description: "Number of critical observations documented"
+
+  implementation_decisions_count:
+    type: integer
+    minimum: 0
+    default: 0
+    description: "Number of key decisions documented"
+
+  active_gotchas_count:
+    type: integer
+    minimum: 0
+    default: 0
+    description: "Number of unresolved gotchas"
+
+  agent_contributors:
+    type: array
+    maxItems: 50
+    items:
+      type: string
+      pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+    default: []
+    description: "List of agents who have contributed notes"
+
+  # Agent communication index for efficient lookups
+  agents:
+    type: array
+    maxItems: 50
+    items:
+      type: object
+      required: ["agent", "note_count"]
+      properties:
+        agent:
+          type: string
+          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+          description: "Agent identifier"
+
+        note_count:
+          type: integer
+          minimum: 1
+          description: "Number of notes from this agent"
+
+        last_contribution:
+          type: string
+          format: "date"
+          description: "Date of last contribution (YYYY-MM-DD)"
+
+    default: []
+    description: "Index of agent contributions for efficient queries"
 
   phase_status:
     type: array
