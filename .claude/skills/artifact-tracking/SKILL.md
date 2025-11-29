@@ -106,14 +106,17 @@ Automated quality checks before phase completion.
 **When**: Starting implementation of a new phase from PRD
 
 **Steps**:
-1. Delegate to `artifact-tracker` agent
-2. Provide: PRD name, phase number, phase title, initial task list from implementation plan
-3. Agent creates file at `.claude/progress/[prd-name]/phase-[N]-progress.md`
-4. File includes YAML frontmatter (metadata) + markdown body (narrative + task tables)
+1. Delegate to `artifact-tracker` agent with task list from implementation plan
+2. Agent creates file at `.claude/progress/[prd-name]/phase-[N]-progress.md`
+3. File includes YAML frontmatter + markdown body with task tables
+4. **CRITICAL**: Delegate to `lead-architect` agent to analyze plan and annotate:
+   - `assigned_to`: Which subagent(s) should handle each task
+   - `dependencies`: Which prior tasks must complete first
+   - `parallelization`: Batch groupings (parallel vs sequential)
 5. Progress defaults to 0%, all tasks pending
-6. Ready for task updates as work progresses
+6. Ready for orchestration agent to delegate tasks with minimal token usage
 
-**Result**: Structured file that can be queried and updated efficiently across sessions
+**Result**: Structured file optimized for minimal-understanding delegation by orchestration agents
 
 ### Workflow: Update Task Status
 
@@ -203,6 +206,53 @@ Validates and maintains artifact quality. Specializes in:
 
 Use when: Validating files, checking quality, finding/fixing issues
 
+## Orchestration Requirements (Critical)
+
+**For Opus-Level Orchestration Agents**: Progress files are optimized to minimize your token usage.
+
+### Required Fields (Every Task)
+
+All progress files MUST include these fields in YAML frontmatter for each task:
+
+```yaml
+tasks:
+  - id: "TASK-1.1"
+    description: "Brief task description"
+    status: "pending"
+    assigned_to: ["ui-engineer-enhanced"]  # REQUIRED
+    dependencies: []                       # REQUIRED (empty array if none)
+    estimated_effort: "2h"                 # Optional
+    priority: "high"                       # Optional
+```
+
+### Orchestration Quick Reference Section
+
+Every progress file includes an "Orchestration Quick Reference" markdown section with:
+- **Parallelization Strategy**: Which tasks can run simultaneously vs sequentially
+- **Critical Path**: Longest dependency chain
+- **Task Delegation Commands**: Ready-to-use Task() calls
+
+**Example**:
+```markdown
+## Orchestration Quick Reference
+
+**Batch 1** (Parallel - No Dependencies):
+- TASK-1.1 → `ui-engineer-enhanced` (2h)
+- TASK-1.2 → `ui-engineer-enhanced` (1.5h)
+
+**Batch 2** (Sequential - Depends on Batch 1):
+- TASK-2.1 → `ui-engineer-enhanced` (3h) - **Blocked by**: TASK-1.1, TASK-1.2
+
+### Task Delegation Commands
+\```
+# Batch 1 (Launch in parallel)
+Task("ui-engineer-enhanced", "TASK-1.1: [description]")
+Task("ui-engineer-enhanced", "TASK-1.2: [description]")
+\```
+```
+
+This enables you to delegate all tasks in a phase with minimal token usage and zero deep understanding.
+
 ## Format Reference
 
 Tracking artifacts use **hybrid YAML+Markdown format**:
@@ -211,49 +261,51 @@ Tracking artifacts use **hybrid YAML+Markdown format**:
 ---
 # Machine-readable metadata (YAML frontmatter)
 type: progress
-prd: "listings-enhancements-v3"
-phase: 2
-title: "Search and Filtering Implementation"
+prd: "artifact-flow-modal-redesign"
+phase: 1
+title: "3-Panel Sync Status Redesign"
 status: in_progress
-progress: 45
-total_tasks: 8
-completed_tasks: 3
+progress: 40
+total_tasks: 10
+completed_tasks: 4
 in_progress_tasks: 2
-blocked_tasks: 1
-created: 2025-11-15
-updated: 2025-11-17
+blocked_tasks: 0
 owners: ["ui-engineer-enhanced"]
-contributors: ["backend-engineer"]
-blockers:
-  - id: "BLOCKER-001"
-    title: "Missing API endpoint"
-    severity: "critical"
-    blocking: ["TASK-2.3", "TASK-2.4"]
-    resolution: "Awaiting backend-engineer implementation"
+
+# === ORCHESTRATION QUICK REFERENCE (NEW) ===
+tasks:
+  - id: "TASK-1.1"
+    description: "Create ArtifactFlowBanner component"
+    status: "complete"
+    assigned_to: ["ui-engineer-enhanced"]
+    dependencies: []
+    estimated_effort: "2h"
+  - id: "TASK-2.1"
+    description: "Create SyncStatusTab composite"
+    status: "in_progress"
+    assigned_to: ["ui-engineer-enhanced"]
+    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
+    estimated_effort: "3h"
+
+parallelization:
+  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
+  batch_2: ["TASK-2.1"]
+  critical_path: ["TASK-1.1", "TASK-2.1"]
 ---
 
-# Listings Enhancements V3 - Phase 2: Search and Filtering
+# Artifact Flow Modal - Phase 1
 
-**Phase**: 2 of 4
-**Status**: In Progress (45% complete)
-**Owner**: ui-engineer-enhanced
+## Orchestration Quick Reference
+
+**Batch 1** (Parallel): TASK-1.1, TASK-1.2, TASK-1.3
+**Batch 2** (Sequential): TASK-2.1 (blocked by Batch 1)
 
 ## Tasks
 
-| ID | Task | Status | Agent | Notes |
-|----|------|--------|-------|-------|
-| TASK-2.1 | API search endpoint | ✓ | backend-engineer | Complete |
-| TASK-2.2 | Search UI component | 🔄 | ui-engineer-enhanced | In review |
-| TASK-2.3 | Filter dropdown | 🚫 | ui-engineer-enhanced | Blocked by BLOCKER-001 |
-| ... | ... | ... | ... | ... |
-
-## Architecture Context
-
-[Narrative markdown content about implementation decisions, patterns, gotchas]
-
----
-
-**Key**: YAML frontmatter is machine-readable metadata. Markdown body is human-readable narrative.
+| ID | Task | Status | Agent | Dependencies | Est |
+|----|------|--------|-------|--------------|-----|
+| TASK-1.1 | ArtifactFlowBanner | ✓ | ui-engineer-enhanced | None | 2h |
+| TASK-2.1 | SyncStatusTab | 🔄 | ui-engineer-enhanced | TASK-1.1, TASK-1.2 | 3h |
 ```
 
 See `./format-specification.md` for complete format documentation with all YAML fields, value types, and validation rules.
