@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw } from 'lucide-react';
+import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw, Github, ChevronDown, ChevronRight } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Entity, ENTITY_TYPES } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 import { DiffViewer } from '@/components/entity/diff-viewer';
@@ -51,6 +52,14 @@ interface HistoryEntry {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Truncate SHA or version string for display
+ */
+function truncateSha(sha: string | undefined, length: number = 7): string {
+  if (!sha) return 'unknown';
+  return sha.substring(0, length);
+}
 
 /**
  * Format relative time for display
@@ -212,6 +221,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   // Selected project for diff comparison (when viewing collection-mode entities)
   const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
+  // Upstream diff section collapsed/expanded state
+  const [isUpstreamExpanded, setIsUpstreamExpanded] = useState(false);
   // Edit mode state (lifted from ContentPane)
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
@@ -345,6 +356,49 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     enabled: shouldFetchDiff,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    retry: 2, // Retry failed requests up to 2 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+  });
+
+  // Fetch upstream diff data when sync tab is active
+  // This compares the collection version against the GitHub upstream source
+  const {
+    data: upstreamDiff,
+    isLoading: upstreamLoading,
+    error: upstreamError,
+    refetch: refetchUpstream,
+  } = useQuery<ArtifactDiffResponse>({
+    queryKey: ['upstream-diff', entity?.id, entity?.collection],
+    queryFn: async () => {
+      if (!entity?.id) {
+        throw new Error('Missing entity ID for upstream diff');
+      }
+
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      try {
+        const response = await apiRequest<ArtifactDiffResponse>(
+          `/artifacts/${entity.id}/upstream-diff?${params.toString()}`
+        );
+
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid upstream diff response format');
+        }
+
+        return response;
+      } catch (error) {
+        // Log error for debugging
+        console.error('Upstream diff fetch error:', error);
+        throw error;
+      }
+    },
+    enabled: activeTab === 'sync' && !!entity?.id,
+    staleTime: 60 * 1000, // Cache for 1 minute (upstream changes less frequently)
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     retry: 2, // Retry failed requests up to 2 times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
@@ -637,6 +691,23 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     }
   };
 
+  const handleRefreshUpstream = async () => {
+    try {
+      await refetchUpstream();
+      toast({
+        title: 'Upstream Check Complete',
+        description: 'Successfully checked for upstream updates.',
+      });
+    } catch (error) {
+      console.error('Refresh upstream failed:', error);
+      toast({
+        title: 'Refresh Failed',
+        description: error instanceof Error ? error.message : 'Failed to check upstream',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Handle file selection with unsaved changes guard
   const handleFileSelect = (path: string) => {
     if (hasUnsavedChanges) {
@@ -751,6 +822,148 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       default:
         return 'text-gray-600 dark:text-gray-400';
     }
+  };
+
+  // ============================================================================
+  // Render Upstream Status Section
+  // ============================================================================
+
+  const renderUpstreamSection = () => {
+    // Check if artifact has a GitHub source (not local-only)
+    const hasUpstreamSource = entity?.source && !entity.source.startsWith('local:');
+
+    // Don't show upstream section for local-only artifacts
+    if (!hasUpstreamSource) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-3">
+        <Card>
+          <CardHeader
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => setIsUpstreamExpanded(!isUpstreamExpanded)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Github className="h-4 w-4" />
+                <CardTitle className="text-sm font-medium">Upstream Status</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRefreshUpstream();
+                  }}
+                  disabled={upstreamLoading}
+                  className="h-8 px-2"
+                >
+                  <RefreshCw className={`h-3 w-3 ${upstreamLoading ? 'animate-spin' : ''}`} />
+                </Button>
+                {isUpstreamExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-0">
+            {/* Loading State */}
+            {upstreamLoading && (
+              <div className="py-4 flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Checking upstream...</p>
+              </div>
+            )}
+
+            {/* Error State - Local-only or fetch failed */}
+            {!upstreamLoading && upstreamError && (
+              <div className="py-2">
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {upstreamError instanceof Error && upstreamError.message.includes('no upstream')
+                      ? 'This artifact has no upstream source (local-only).'
+                      : upstreamError instanceof Error
+                        ? upstreamError.message
+                        : 'Failed to check upstream status'}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {/* Success State */}
+            {!upstreamLoading && !upstreamError && upstreamDiff && (
+              <div className="space-y-3">
+                {/* Status Badge and Version Info */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    {upstreamDiff.has_changes ? (
+                      <>
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          Update Available
+                        </Badge>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="default" className="gap-1 bg-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Up to Date
+                        </Badge>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Version SHA Info */}
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex justify-between">
+                    <span>Current Collection:</span>
+                    <code className="font-mono">{truncateSha(entity?.version)}</code>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Upstream Version:</span>
+                    <code className="font-mono">{truncateSha(upstreamDiff.project_path || 'latest')}</code>
+                  </div>
+                </div>
+
+                {/* Expandable Diff Viewer */}
+                {isUpstreamExpanded && upstreamDiff.has_changes && upstreamDiff.files && upstreamDiff.files.length > 0 && (
+                  <div className="mt-4 border rounded-lg overflow-hidden">
+                    <div className="bg-muted/30 px-3 py-2 border-b">
+                      <p className="text-xs font-medium">Changes from Upstream</p>
+                    </div>
+                    <div className="max-h-[400px] overflow-hidden">
+                      <DiffViewer
+                        files={upstreamDiff.files}
+                        leftLabel="Collection"
+                        rightLabel="Upstream"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* No changes message when expanded */}
+                {isUpstreamExpanded && !upstreamDiff.has_changes && (
+                  <div className="py-4 text-center">
+                    <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm font-medium">No upstream changes</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your collection is up to date with the upstream source
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
   };
 
   // ============================================================================
@@ -1149,8 +1362,14 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   </div>
 
-                  {/* Diff Viewer Section */}
-                  {renderDiffSection()}
+                  {/* Upstream Status Section */}
+                  {renderUpstreamSection()}
+
+                  {/* Project Comparison Section */}
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Project Comparison</h3>
+                    {renderDiffSection()}
+                  </div>
 
                   {/* Status Alerts */}
                   {entity.status === 'outdated' && (
