@@ -1,131 +1,232 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 
-## Project Overview
+## Prime Directives
 
-**SkillMeat** is a personal collection manager for Claude Code configurations. It enables developers to maintain, version, and deploy Claude artifacts (Skills, Commands, Agents, MCP servers, Hooks) across multiple projects.
+| Directive | Implementation |
+|-----------|---------------|
+| **Delegate everything** | Opus reasons & orchestrates; subagents implement |
+| Token efficient | Symbol system, codebase-explorer |
+| Rapid iteration | PRD → code → deploy fast |
+| No over-architecture | YAGNI until proven |
 
-**Current Status**: Transitioning from skillman (skill-only tool) to SkillMeat (unified artifact manager)
-- Currently supports: Skills only
-- Future: Commands, Agents, MCP servers, Hooks
+### Opus Delegation Principle
 
-## Essential Commands
+**You are Opus. Tokens are expensive. You orchestrate; subagents execute.**
 
-### Development Setup
-```bash
-# Install in development mode with dependencies
-pip install -e ".[dev]"
+- ✗ **Never** write code directly (Read/Edit/Write for implementation)
+- ✗ **Never** do token-heavy exploration yourself
+- ✓ **Always** delegate implementation to specialized subagents
+- ✓ **Always** use codebase-explorer for pattern discovery
+- ✓ **Focus** on reasoning, analysis, planning, and orchestration
 
-# Or with uv (recommended)
-uv tool install --editable .
+**Delegation Pattern**:
+
+```text
+1. Analyze task → identify what needs to change
+2. Delegate exploration → codebase-explorer finds files/patterns
+3. Delegate implementation → specialist agent writes code
+4. Review results → verify correctness via agent reports
+5. Commit → only direct action Opus takes
 ```
+
+**When you catch yourself about to edit a file**: STOP. Delegate instead.
+
+## Documentation Policy
+
+**Reference**: `.claude/specs/doc-policy-spec.md`
+
+**Allowed**:
+
+- `/docs/` → User/dev/architecture docs (with frontmatter)
+- `.claude/progress/[prd]/` → ONE per phase
+- `.claude/worknotes/fixes/` → ONE per month
+- `.claude/worknotes/observations/` → ONE per month
+
+**Prohibited**:
+
+- Debugging summaries → git commit
+- Multiple progress per phase
+- Daily/weekly reports
+- Session notes as docs
+
+---
+
+## Agent Delegation
+
+**Mandatory**: All implementation work MUST be delegated. Opus orchestrates only.
+
+### Exploration & Analysis
+
+| Task | Agent | Model | Use When |
+|------|-------|-------|----------|
+| Find files/patterns | codebase-explorer | Haiku | Quick discovery |
+| Deep analysis | explore | Haiku | Full context needed |
+| Debug investigation | ultrathink-debugger | Sonnet | Complex bugs |
+
+### Implementation
+
+| Task | Agent | Model | Use When |
+|------|-------|-------|----------|
+| Backend Python | python-backend-engineer | Sonnet | FastAPI, SQLAlchemy, Alembic |
+| Frontend React | ui-engineer | Sonnet | Components, hooks, pages |
+| Full-stack TS | backend-typescript-architect | Sonnet | Node/TS backend |
+| UI components | ui-engineer-enhanced | Sonnet | Design system, Radix |
+
+### Documentation
+
+| Task | Agent | Model | Use When |
+|------|-------|-------|----------|
+| Most docs (90%) | documentation-writer | Haiku | READMEs, API docs, guides |
+| Complex docs | documentation-complex | Sonnet | Multi-system integration |
+| AI artifacts | ai-artifacts-engineer | Sonnet | Skills, agents, commands |
+
+### Example Delegation
+
+```text
+# Bug: API returns 422 error
+
+1. DELEGATE exploration:
+   Task("codebase-explorer", "Find ListItemCreate schema and where it's used")
+
+2. DELEGATE fix:
+   Task("python-backend-engineer", "Fix ListItemCreate schema - make list_id optional.
+        File: services/api/app/schemas/list_item.py
+        Change: list_id from required to optional (int | None = None)
+        Reason: list_id comes from URL path, not request body")
+
+3. COMMIT (Opus does this directly):
+   git add ... && git commit
+```
+
+---
+
+## Architecture Overview
+
+**Full-Stack Web Application** (v0.3.0-beta)
+
+```
+skillmeat/
+├── cli.py              # Click-based CLI (collection, web commands)
+├── core/               # Business logic (artifact, deployment, sync, analytics)
+├── api/                # FastAPI backend → See skillmeat/api/CLAUDE.md
+├── web/                # Next.js 15 frontend → See skillmeat/web/CLAUDE.md
+├── sources/            # GitHub, local artifact sources
+├── storage/            # Manifest, lockfile, snapshot managers
+├── marketplace/        # Claude marketplace integration
+└── observability/      # Logging, monitoring
+```
+
+**Collection-Based Architecture** (Active):
+
+```
+~/.skillmeat/collection/    # User's personal collection
+  ├── artifacts/            # All artifact types
+  ├── manifest.toml         # Collection metadata
+  └── snapshots/            # Version history
+
+Projects (.claude/ directories)
+  └── deployed artifacts
+```
+
+**Artifact Types Supported**:
+- Skills (full support)
+- Commands, Agents, MCP servers, Hooks (planned)
+
+---
+
+## Development Commands
+
+### Setup
+
+| Command | Purpose |
+|---------|---------|
+| `pip install -e ".[dev]"` | Install in dev mode |
+| `uv tool install --editable .` | Install with uv (recommended) |
+
+### CLI (Collection Management)
+
+| Command | Purpose |
+|---------|---------|
+| `skillmeat init` | Initialize collection/project |
+| `skillmeat add <source>` | Add artifact from GitHub/local |
+| `skillmeat deploy <artifact>` | Deploy to project |
+| `skillmeat sync` | Sync collection with upstream |
+| `skillmeat list` | List artifacts |
+| `skillmeat search <query>` | Search artifacts |
+
+### Web Interface
+
+| Command | Purpose |
+|---------|---------|
+| `skillmeat web dev` | Start dev servers (API + Next.js) |
+| `skillmeat web dev --api-only` | Start only API server |
+| `skillmeat web dev --web-only` | Start only Next.js |
+| `skillmeat web build` | Build for production |
+| `skillmeat web start` | Start production servers |
+| `skillmeat web doctor` | Diagnose environment issues |
 
 ### Testing
-```bash
-# Run all tests with coverage
-pytest -v --cov=skillman --cov-report=xml
 
-# Run specific test file
-pytest tests/test_cli_core.py -v
-
-# Run single test
-pytest tests/test_cli_core.py::test_specific_function -v
-```
+| Command | Purpose |
+|---------|---------|
+| `pytest -v --cov=skillmeat` | Run all tests with coverage |
+| `pytest tests/test_cli_core.py` | Run specific test file |
+| `pytest -k test_name` | Run specific test |
 
 ### Code Quality
-```bash
-# Format code (must pass before commit)
-black skillman
 
-# Lint (errors only)
-flake8 skillman --count --select=E9,F63,F7,F82 --show-source --statistics
+| Command | Purpose |
+|---------|---------|
+| `black skillmeat` | Format code (required) |
+| `flake8 skillmeat --select=E9,F63,F7,F82` | Lint errors only |
+| `mypy skillmeat --ignore-missing-imports` | Type checking |
 
-# Type checking
-mypy skillman --ignore-missing-imports
+---
 
-# Run all quality checks (mimics CI)
-black skillman && \
-  flake8 skillman --count --select=E9,F63,F7,F82 --show-source --statistics && \
-  mypy skillman --ignore-missing-imports
+## Key Cross-Cutting Patterns
+
+### Version Compatibility (Python)
+
+```python
+# Required: Python 3.9+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 ```
 
-### Build and Release
-```bash
-# Build distribution packages
-python -m build
+### Artifact Source Format
 
-# Check package integrity
-twine check dist/*
+```
+username/repo/path/to/artifact[@version]
 
-# Publish to PyPI (requires credentials)
-twine upload dist/*
+# Examples:
+anthropics/skills/canvas-design@latest
+anthropics/skills/document-skills/docx@v1.2.0
+user/repo/nested/path/skill@abc1234
 ```
 
-## Architecture
+**Version Options**: `@latest`, `@1.2.0` (tag), `@abc1234` (SHA), or omitted (defaults to latest)
 
-### Three-Tier System (Future MVP)
-```
-Collection (Personal Library)
-  ~/.skillmeat/collection/
-  ↓ deploy
-Projects (.claude/ directories)
-```
+### Manifest Structure (TOML)
 
-**Current Implementation**: Operates on project-level manifests (skills.toml) without global collection
-
-### Core Components
-
-**Data Models** (`models.py`):
-- `Skill`: Represents a skill with name, source, version, scope, aliases
-- `Manifest`: Manages skills.toml with CRUD operations for skills
-- `LockFile`: Tracks resolved versions (skills.lock) for reproducibility
-- `SkillMetadata`: Extracted from SKILL.md YAML front matter
-- `SkillValidationResult`: Validation status and metadata
-
-**GitHub Integration** (`github.py`):
-- `SkillSpec`: Parses `username/repo/path/to/skill[@version]` format
-  - Supports arbitrary nesting levels: `anthropics/skills/document-skills/docx`
-  - Version can be: `@latest`, `@1.2.3` (tag), `@abc1234` (SHA), or omitted
-- `GitHubClient`: Clones repos, resolves versions, handles authentication
-- `SkillValidator`: Validates SKILL.md presence and structure, extracts YAML metadata
-
-**Installation** (`installer.py`):
-- `SkillInstaller`: Manages installation to user scope (`~/.claude/skills/user/`) or local scope (`./.claude/skills/`)
-- Excludes unnecessary files: `.git`, `__pycache__`, `node_modules`, etc.
-- Atomic operations using temp directories
-- Handle read-only files on Windows
-
-**CLI** (`cli.py`):
-- Click-based command structure
-- Commands: `init`, `add`, `remove`, `verify`, `list`, `show`, `update`, `fetch`, `sync`, `clean`, `config`
-- Rich library for formatted output (ASCII-compatible, no Unicode box-drawing)
-- Security warnings before installation (skippable with `--dangerously-skip-permissions`)
-
-**Configuration** (`config.py`):
-- `ConfigManager`: Manages `~/.skillman/config.toml`
-- Stores: `default-scope`, `github-token`
-
-**Claude Marketplace** (`claude_marketplace.py`):
-- `ClaudeMarketplaceManager`: Registers skills with Claude marketplace after installation
-- Uses headless Claude commands (experimental integration)
-
-## Key Patterns
-
-### Manifest Structure
 ```toml
-[tool.skillman]
+[tool.skillmeat]
 version = "1.0.0"
 
-[[skills]]
+[[artifacts]]
 name = "canvas"
+type = "skill"
 source = "anthropics/skills/canvas-design"
 version = "latest"
-scope = "user"
+scope = "user"  # "user" (global) or "local" (project)
 aliases = ["design"]
 ```
 
-### Lock File Structure
+### Lock File Structure (TOML)
+
 ```toml
 [lock]
 version = "1.0.0"
@@ -135,77 +236,48 @@ source = "anthropics/skills/canvas-design"
 version_spec = "latest"
 resolved_sha = "abc123def456..."
 resolved_version = "v2.1.0"
+locked_at = "2024-11-29T10:00:00Z"
 ```
 
-### Skill Validation
-All skills must:
-1. Be a directory
-2. Contain `SKILL.md` in root
-3. Have non-empty content in SKILL.md
+### Security Patterns
 
-Optional YAML front matter in SKILL.md:
-```yaml
----
-title: My Skill
-description: What this skill does
-license: MIT
-author: Author Name
-version: 1.0.0
-tags:
-  - documentation
-  - productivity
----
-```
+- **Atomic Operations**: Use temp directories → atomic move
+- **Validation**: All artifacts validated before installation
+- **Permissions**: Warning before installation (skip with `--dangerously-skip-permissions`)
+- **Rate Limiting**: GitHub token recommended for private repos
 
-## Development Workflow
+### Error Handling
 
-### Adding New Commands
-1. Add command function to `cli.py` using `@main.command()` decorator
-2. Use Click options for flags: `@click.option(...)`
-3. Use Rich console for output: `console.print("[green]Success[/green]")`
-4. Handle errors with try/except and exit with `sys.exit(1)` on failure
-5. Add tests in `tests/test_cli_core.py`
-
-### Testing Strategy
-- Use pytest fixtures for temp directories and isolated file operations
-- Mock GitHub operations in tests (avoid network calls)
-- Test both success and error paths
-- CI runs tests on Python 3.9, 3.10, 3.11, 3.12 on Ubuntu, Windows, macOS
-
-### Version Compatibility
-- Python 3.9+ required (specified in pyproject.toml)
-- Use conditional imports for `tomllib` (3.11+) vs `tomli` (<3.11)
-- Pattern used throughout codebase:
 ```python
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
+# CLI: Exit with sys.exit(1) on failure
+# API: Raise HTTPException with status code
+# Core: Raise domain-specific exceptions
 ```
 
-## Migration to SkillMeat (Future)
+---
 
-Per PRD, the project will evolve to:
-1. **Phase 1 (MVP)**: Collection management, artifact addition (GitHub + local), deployment, upstream tracking, versioning
-2. **Phase 2**: Cross-project search, usage analytics, smart updates, collection sync
-3. **Phase 3**: Web interface, team sharing, MCP server management, marketplace integration
+## Domain-Specific Documentation
 
-**Current Task**: The existing skillman codebase is the foundation. New modules will be added:
-- `skillmeat/core/` - Collection, artifact, deployment, sync, version managers
-- `skillmeat/sources/` - GitHub, local sources
-- `skillmeat/storage/` - Manifest, lockfile, snapshot managers
+**Backend/API**: `skillmeat/api/CLAUDE.md`
+- FastAPI server setup
+- SQLAlchemy models
+- Alembic migrations
+- API routers and schemas
+- Middleware patterns
 
-### Breaking Changes to Expect
-- Rename package from `skillman` to `skillmeat`
-- Shift from project-manifest to collection-first architecture
-- Support multiple artifact types (not just skills)
-- New command structure aligned with Git-like patterns
+**Frontend/Web**: `skillmeat/web/CLAUDE.md`
+- Next.js 15 app structure
+- React component patterns
+- Radix UI + shadcn
+- API client usage
+- Testing strategies
+
+---
 
 ## Important Notes
 
-- **Security**: Skills execute code and access system resources. Always validate before installation
-- **Atomic Operations**: Installation uses temp directories and moves atomically to prevent partial installs
-- **Lock Files**: Always update skills.lock when modifying skills.toml to maintain reproducibility
-- **Scopes**: User scope (`~/.claude/skills/user/`) is global; local scope (`./.claude/skills/`) is per-project
-- **GitHub Rate Limits**: Use GitHub token (`skillman config set github-token <token>`) for private repos and higher rate limits
-- **Rich Output**: Use Rich library styling but avoid Unicode box-drawing characters (ASCII-compatible)
+- **Scopes**: `user` scope (~/.claude/skills/user/) is global; `local` scope (./.claude/skills/) is per-project
+- **Lock Files**: Always update when modifying manifests for reproducibility
+- **GitHub Rate Limits**: Use token: `skillmeat config set github-token <token>`
+- **Rich Output**: Use Rich library (ASCII-compatible, no Unicode box-drawing)
+- **CI/CD**: Tests run on Python 3.9-3.12, Ubuntu/Windows/macOS
