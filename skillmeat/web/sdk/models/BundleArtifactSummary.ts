@@ -6,21 +6,20 @@
  * Summary of an artifact within a bundle.
  */
 export type BundleArtifactSummary = {
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Artifact type (skill, command, agent)
-     */
-    type: string;
-    /**
-     * Artifact version
-     */
-    version: string;
-    /**
-     * Artifact scope (user, local)
-     */
-    scope: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Artifact type (skill, command, agent)
+   */
+  type: string;
+  /**
+   * Artifact version
+   */
+  version: string;
+  /**
+   * Artifact scope (user, local)
+   */
+  scope: string;
 };
-

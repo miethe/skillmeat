@@ -6,17 +6,16 @@
  * Response for share link deletion/revocation.
  */
 export type ShareLinkDeleteResponse = {
-    /**
-     * Whether deletion succeeded
-     */
-    success: boolean;
-    /**
-     * Bundle unique identifier
-     */
-    bundle_id: string;
-    /**
-     * Status message
-     */
-    message: string;
+  /**
+   * Whether deletion succeeded
+   */
+  success: boolean;
+  /**
+   * Bundle unique identifier
+   */
+  bundle_id: string;
+  /**
+   * Status message
+   */
+  message: string;
 };
-

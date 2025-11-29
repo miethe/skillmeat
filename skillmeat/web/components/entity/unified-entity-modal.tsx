@@ -1,16 +1,29 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw, Github, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  Calendar,
+  Tag,
+  GitBranch,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  RotateCcw,
+  ArrowUp,
+  ArrowDown,
+  FileText,
+  User,
+  GitMerge,
+  RefreshCw,
+  Github,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +44,7 @@ import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
-import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
+import type { ArtifactDiffResponse, ArtifactUpstreamDiffResponse, ArtifactSyncRequest } from '@/sdk';
 import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
 
 interface UnifiedEntityModalProps {
@@ -305,11 +318,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Fetch diff data when sync tab is active and we have a project path to compare against
   // Allow diff fetching for ALL statuses (synced, modified, outdated, conflict)
   // Key requirement: must have a valid entity ID and effectiveProjectPath
-  const shouldFetchDiff = !!(
-    activeTab === 'sync' &&
-    entity?.id &&
-    effectiveProjectPath
-  );
+  const shouldFetchDiff = !!(activeTab === 'sync' && entity?.id && effectiveProjectPath);
 
   const {
     data: diffData,
@@ -367,7 +376,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     isLoading: upstreamLoading,
     error: upstreamError,
     refetch: refetchUpstream,
-  } = useQuery<ArtifactDiffResponse>({
+  } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity?.id, entity?.collection],
     queryFn: async () => {
       if (!entity?.id) {
@@ -380,7 +389,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       }
 
       try {
-        const response = await apiRequest<ArtifactDiffResponse>(
+        const response = await apiRequest<ArtifactUpstreamDiffResponse>(
           `/artifacts/${entity.id}/upstream-diff?${params.toString()}`
         );
 
@@ -841,7 +850,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       <div className="space-y-3">
         <Card>
           <CardHeader
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer transition-colors hover:bg-muted/50"
             onClick={() => setIsUpstreamExpanded(!isUpstreamExpanded)}
           >
             <div className="flex items-center justify-between">
@@ -874,7 +883,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           <CardContent className="pt-0">
             {/* Loading State */}
             {upstreamLoading && (
-              <div className="py-4 flex items-center gap-3">
+              <div className="flex items-center gap-3 py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">Checking upstream...</p>
               </div>
@@ -921,39 +930,44 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 </div>
 
                 {/* Version SHA Info */}
-                <div className="text-xs text-muted-foreground space-y-1">
+                <div className="space-y-1 text-xs text-muted-foreground">
                   <div className="flex justify-between">
                     <span>Current Collection:</span>
                     <code className="font-mono">{truncateSha(entity?.version)}</code>
                   </div>
                   <div className="flex justify-between">
                     <span>Upstream Version:</span>
-                    <code className="font-mono">{truncateSha(upstreamDiff.project_path || 'latest')}</code>
+                    <code className="font-mono">
+                      {truncateSha(upstreamDiff.upstream_version || 'latest')}
+                    </code>
                   </div>
                 </div>
 
                 {/* Expandable Diff Viewer */}
-                {isUpstreamExpanded && upstreamDiff.has_changes && upstreamDiff.files && upstreamDiff.files.length > 0 && (
-                  <div className="mt-4 border rounded-lg overflow-hidden">
-                    <div className="bg-muted/30 px-3 py-2 border-b">
-                      <p className="text-xs font-medium">Changes from Upstream</p>
+                {isUpstreamExpanded &&
+                  upstreamDiff.has_changes &&
+                  upstreamDiff.files &&
+                  upstreamDiff.files.length > 0 && (
+                    <div className="mt-4 overflow-hidden rounded-lg border">
+                      <div className="border-b bg-muted/30 px-3 py-2">
+                        <p className="text-xs font-medium">Changes from Upstream</p>
+                      </div>
+                      <div className="max-h-[400px] overflow-hidden">
+                        <DiffViewer
+                          files={upstreamDiff.files}
+                          leftLabel="Collection"
+                          rightLabel="Upstream"
+                        />
+                      </div>
                     </div>
-                    <div className="max-h-[400px] overflow-hidden">
-                      <DiffViewer
-                        files={upstreamDiff.files}
-                        leftLabel="Collection"
-                        rightLabel="Upstream"
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
 
                 {/* No changes message when expanded */}
                 {isUpstreamExpanded && !upstreamDiff.has_changes && (
                   <div className="py-4 text-center">
-                    <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-500" />
                     <p className="text-sm font-medium">No upstream changes</p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Your collection is up to date with the upstream source
                     </p>
                   </div>
@@ -1000,15 +1014,15 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
     return (
       <div>
-        <h3 className="text-sm font-medium mb-2">Changes</h3>
+        <h3 className="mb-2 text-sm font-medium">Changes</h3>
 
         {/* Loading State */}
         {isDiffLoading && (
-          <div className="border rounded-lg p-8 bg-muted/20 flex flex-col items-center justify-center gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border bg-muted/20 p-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">Loading diff...</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Comparing collection and project versions
               </p>
             </div>
@@ -1017,19 +1031,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
         {/* Error State */}
         {!isDiffLoading && diffError && (
-          <div className="border rounded-lg overflow-hidden bg-red-500/10 border-red-500/20">
+          <div className="overflow-hidden rounded-lg border border-red-500/20 bg-red-500/10">
             <div className="p-4">
               <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-red-700 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-1">
+                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-700 dark:text-red-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-sm font-medium text-red-700 dark:text-red-400">
                     Failed to load diff
                   </p>
-                  <p className="text-xs text-red-600/80 dark:text-red-400/80 break-words">
+                  <p className="break-words text-xs text-red-600/80 dark:text-red-400/80">
                     {diffError instanceof Error ? diffError.message : 'An unknown error occurred'}
                   </p>
                   {!entity.projectPath && (
-                    <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
+                    <p className="mt-2 text-xs text-red-600/80 dark:text-red-400/80">
                       Project path is missing. Please ensure the entity is properly configured.
                     </p>
                   )}
@@ -1040,9 +1054,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   onClick={handleRetryDiff}
                   variant="outline"
                   size="sm"
-                  className="text-red-700 dark:text-red-400 border-red-500/20 hover:bg-red-500/10"
+                  className="border-red-500/20 text-red-700 hover:bg-red-500/10 dark:text-red-400"
                 >
-                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  <RefreshCw className="mr-1.5 h-3 w-3" />
                   Retry
                 </Button>
               </div>
@@ -1055,7 +1069,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           <>
             {/* Has changes - show diff viewer */}
             {diffData.has_changes && diffData.files && diffData.files.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden bg-background">
+              <div className="overflow-hidden rounded-lg border bg-background">
                 <DiffViewer
                   files={diffData.files}
                   leftLabel={entity.collection ? 'Collection' : 'Current'}
@@ -1064,11 +1078,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               </div>
             ) : (
               /* No changes detected */
-              <div className="border rounded-lg p-6 bg-muted/20">
+              <div className="rounded-lg border bg-muted/20 p-6">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <CheckCircle2 className="h-8 w-8 text-green-500" />
                   <p className="text-sm font-medium text-foreground">No changes detected</p>
-                  <p className="text-xs text-muted-foreground text-center max-w-sm">
+                  <p className="max-w-sm text-center text-xs text-muted-foreground">
                     The collection and project versions are identical
                   </p>
                 </div>
@@ -1079,20 +1093,15 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
         {/* Edge case: No diff data and no error (shouldn't happen) */}
         {!isDiffLoading && !diffError && !diffData && (
-          <div className="border rounded-lg p-6 bg-muted/20">
+          <div className="rounded-lg border bg-muted/20 p-6">
             <div className="flex flex-col items-center justify-center gap-2">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">No diff data available</p>
-              <p className="text-xs text-muted-foreground text-center max-w-sm">
+              <p className="max-w-sm text-center text-xs text-muted-foreground">
                 Unable to retrieve diff information
               </p>
-              <Button
-                onClick={handleRetryDiff}
-                variant="outline"
-                size="sm"
-                className="mt-2"
-              >
-                <RefreshCw className="h-3 w-3 mr-1.5" />
+              <Button onClick={handleRetryDiff} variant="outline" size="sm" className="mt-2">
+                <RefreshCw className="mr-1.5 h-3 w-3" />
                 Try Again
               </Button>
             </div>
@@ -1109,9 +1118,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-2xl lg:max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden p-0 lg:max-w-5xl xl:max-w-6xl">
           {/* Header Section - Fixed */}
-          <div className="px-6 pt-6 pb-4 border-b">
+          <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 {IconComponent && <IconComponent className={`h-5 w-5 ${config.color}`} />}
@@ -1129,8 +1138,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           </div>
 
           {/* Tabs Section */}
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col px-6">
-            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+          <Tabs
+            value={activeTab}
+            onValueChange={handleTabChange}
+            className="flex flex-1 flex-col px-6"
+          >
+            <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
               <TabsTrigger
                 value="overview"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
@@ -1158,13 +1171,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsList>
 
             {/* Overview Tab */}
-            <TabsContent value="overview" className="flex-1 mt-0">
+            <TabsContent value="overview" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-6 py-4">
                   {/* Status */}
                   {entity.status && (
                     <div>
-                      <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                         {getStatusIcon()}
                         Status
                       </h3>
@@ -1179,18 +1192,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {/* Description */}
                   {entity.description && (
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Description</h3>
+                      <h3 className="mb-2 text-sm font-medium">Description</h3>
                       <p className="text-sm text-muted-foreground">{entity.description}</p>
                     </div>
                   )}
 
                   {/* Source */}
                   <div>
-                    <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                       <GitBranch className="h-4 w-4" />
                       Source
                     </h3>
-                    <p className="text-sm font-mono bg-muted px-3 py-2 rounded">
+                    <p className="rounded bg-muted px-3 py-2 font-mono text-sm">
                       {entity.source || 'Unknown'}
                     </p>
                   </div>
@@ -1198,7 +1211,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {/* Version */}
                   {entity.version && (
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Version</h3>
+                      <h3 className="mb-2 text-sm font-medium">Version</h3>
                       <p className="text-sm text-muted-foreground">{entity.version}</p>
                     </div>
                   )}
@@ -1206,7 +1219,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {/* Tags */}
                   {entity.tags && entity.tags.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                         <Tag className="h-4 w-4" />
                         Tags
                       </h3>
@@ -1223,7 +1236,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   {/* Aliases */}
                   {entity.aliases && entity.aliases.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Aliases</h3>
+                      <h3 className="mb-2 text-sm font-medium">Aliases</h3>
                       <div className="flex flex-wrap gap-2">
                         {entity.aliases.map((alias) => (
                           <Badge key={alias} variant="secondary">
@@ -1236,7 +1249,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
                   {/* Timestamps */}
                   <div>
-                    <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                       <Calendar className="h-4 w-4" />
                       Timestamps
                     </h3>
@@ -1258,7 +1271,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
                   {/* Location */}
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Location</h3>
+                    <h3 className="mb-2 text-sm font-medium">Location</h3>
                     <div className="space-y-2 text-sm text-muted-foreground">
                       {entity.collection && (
                         <div className="flex justify-between">
@@ -1269,7 +1282,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       {entity.projectPath && (
                         <div className="flex flex-col gap-1">
                           <span>Project Path:</span>
-                          <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                          <code className="break-all rounded bg-muted px-2 py-1 text-xs">
                             {entity.projectPath}
                           </code>
                         </div>
@@ -1281,10 +1294,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="flex-1 mt-0 min-h-0 overflow-hidden">
-              <div className="h-[calc(90vh-12rem)] flex gap-0 -mx-6 min-w-0 overflow-hidden">
+            <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
+              <div className="-mx-6 flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel */}
-                <div className="w-64 lg:w-72 flex-shrink-0 border-r overflow-hidden">
+                <div className="w-64 flex-shrink-0 overflow-hidden border-r lg:w-72">
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
@@ -1297,7 +1310,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 </div>
 
                 {/* Content Pane - Right Panel */}
-                <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="min-w-0 flex-1 overflow-hidden">
                   <ContentPane
                     path={selectedPath}
                     content={contentData?.content || null}
@@ -1318,12 +1331,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Sync Status Tab */}
-            <TabsContent value="sync" className="flex-1 mt-0">
+            <TabsContent value="sync" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-6 py-4">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Sync Status</h3>
-                    <div className="flex items-center gap-2 mb-4">
+                    <h3 className="mb-2 text-sm font-medium">Sync Status</h3>
+                    <div className="mb-4 flex items-center gap-2">
                       {getStatusIcon()}
                       <span className="text-sm">{getStatusLabel()}</span>
                     </div>
@@ -1367,7 +1380,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
                   {/* Project Comparison Section */}
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Project Comparison</h3>
+                    <h3 className="mb-2 text-sm font-medium">Project Comparison</h3>
                     {renderDiffSection()}
                   </div>
 
@@ -1386,8 +1399,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription className="space-y-3">
                         <p className="text-sm">
-                          There are conflicting changes between local and upstream versions.
-                          Use the merge workflow to resolve conflicts interactively.
+                          There are conflicting changes between local and upstream versions. Use the
+                          merge workflow to resolve conflicts interactively.
                         </p>
                         {entity.projectPath && (
                           <Button
@@ -1396,7 +1409,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                             size="sm"
                             className="bg-background hover:bg-muted"
                           >
-                            <GitMerge className="h-4 w-4 mr-2" />
+                            <GitMerge className="mr-2 h-4 w-4" />
                             Resolve Conflicts
                           </Button>
                         )}
@@ -1408,51 +1421,56 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* History Tab */}
-            <TabsContent value="history" className="flex-1 mt-0">
+            <TabsContent value="history" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-4 py-4">
                   {/* Rollback Section */}
-                  {(entity.status === 'modified' || entity.status === 'conflict') && entity.projectPath && (
-                    <div className="border rounded-lg p-4 bg-muted/20">
-                      <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <RotateCcw className="h-4 w-4" />
-                        Rollback to Collection Version
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Your local version has been modified. You can rollback to the collection version
-                        to discard all local changes.
-                      </p>
-                      <Button
-                        onClick={() => setShowRollbackDialog(true)}
-                        variant="outline"
-                        size="sm"
-                        disabled={isRollingBack}
-                      >
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        {isRollingBack ? 'Rolling Back...' : 'Rollback to Collection'}
-                      </Button>
-                    </div>
-                  )}
+                  {(entity.status === 'modified' || entity.status === 'conflict') &&
+                    entity.projectPath && (
+                      <div className="rounded-lg border bg-muted/20 p-4">
+                        <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                          <RotateCcw className="h-4 w-4" />
+                          Rollback to Collection Version
+                        </h3>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                          Your local version has been modified. You can rollback to the collection
+                          version to discard all local changes.
+                        </p>
+                        <Button
+                          onClick={() => setShowRollbackDialog(true)}
+                          variant="outline"
+                          size="sm"
+                          disabled={isRollingBack}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          {isRollingBack ? 'Rolling Back...' : 'Rollback to Collection'}
+                        </Button>
+                      </div>
+                    )}
 
                   {/* History Timeline */}
                   {historyEntries.length > 0 ? (
                     <div>
-                      <h3 className="text-sm font-medium mb-4">Sync History</h3>
-                      <div className="space-y-0 relative">
+                      <h3 className="mb-4 text-sm font-medium">Sync History</h3>
+                      <div className="relative space-y-0">
                         {/* Timeline line */}
-                        <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+                        <div className="absolute bottom-0 left-4 top-0 w-px bg-border" />
 
                         {historyEntries.map((entry) => (
                           <div
                             key={entry.id}
-                            className="relative pl-11 pb-6 last:pb-0 group hover:bg-muted/30 -ml-2 pl-13 pr-2 py-2 rounded-lg transition-colors"
+                            className="pl-13 group relative -ml-2 rounded-lg py-2 pb-6 pl-11 pr-2 transition-colors last:pb-0 hover:bg-muted/30"
                           >
                             {/* Timeline dot and icon */}
-                            <div className={`absolute left-4 top-2 w-8 h-8 rounded-full border-2 bg-background flex items-center justify-center z-10 ${
-                              entry.type === 'deploy' ? 'border-green-500' :
-                              entry.type === 'sync' ? 'border-blue-500' :
-                              'border-orange-500'
-                            }`}>
+                            <div
+                              className={`absolute left-4 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-background ${
+                                entry.type === 'deploy'
+                                  ? 'border-green-500'
+                                  : entry.type === 'sync'
+                                    ? 'border-blue-500'
+                                    : 'border-orange-500'
+                              }`}
+                            >
                               {entry.direction === 'downstream' ? (
                                 <ArrowDown className="h-4 w-4" />
                               ) : (
@@ -1462,15 +1480,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
                             {/* Entry content */}
                             <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className={`text-sm font-medium ${getHistoryTypeColor(entry.type)}`}>
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1 flex items-center gap-2">
+                                  <span
+                                    className={`text-sm font-medium ${getHistoryTypeColor(entry.type)}`}
+                                  >
                                     {getHistoryTypeLabel(entry.type)}
                                   </span>
                                   {entry.filesChanged && (
                                     <Badge variant="secondary" className="text-xs">
-                                      <FileText className="h-3 w-3 mr-1" />
-                                      {entry.filesChanged} {entry.filesChanged === 1 ? 'file' : 'files'}
+                                      <FileText className="mr-1 h-3 w-3" />
+                                      {entry.filesChanged}{' '}
+                                      {entry.filesChanged === 1 ? 'file' : 'files'}
                                     </Badge>
                                   )}
                                 </div>
@@ -1489,7 +1510,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                               <div className="text-xs text-muted-foreground">
                                 {new Date(entry.timestamp).toLocaleTimeString([], {
                                   hour: '2-digit',
-                                  minute: '2-digit'
+                                  minute: '2-digit',
                                 })}
                               </div>
                             </div>
@@ -1499,11 +1520,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   ) : (
                     // Empty state
-                    <div className="text-center py-12">
-                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                      <h3 className="text-lg font-semibold mb-2">No sync history yet</h3>
-                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                        Sync operations and deployments will appear here once you start managing this entity.
+                    <div className="py-12 text-center">
+                      <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+                      <h3 className="mb-2 text-lg font-semibold">No sync history yet</h3>
+                      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                        Sync operations and deployments will appear here once you start managing
+                        this entity.
                       </p>
                     </div>
                   )}
@@ -1525,7 +1547,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       {/* Merge Workflow Dialog */}
       {showMergeWorkflow && entity.projectPath && (
         <Dialog open={showMergeWorkflow} onOpenChange={setShowMergeWorkflow}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Resolve Conflicts - {entity.name}</DialogTitle>
             </DialogHeader>

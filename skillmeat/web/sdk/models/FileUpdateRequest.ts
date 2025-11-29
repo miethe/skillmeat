@@ -2,9 +2,12 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type Body_undeploy_artifact_api_v1_artifacts__artifact_id__undeploy_post = {
+/**
+ * Request body for updating file content.
+ */
+export type FileUpdateRequest = {
   /**
-   * Project path
+   * New file content
    */
-  project_path: string;
+  content: string;
 };

@@ -9,17 +9,16 @@
  * If project_path is omitted: Syncs FROM upstream source TO collection (update).
  */
 export type ArtifactSyncRequest = {
-    /**
-     * Path to project directory containing deployed artifact. If omitted, syncs from upstream source.
-     */
-    project_path?: (string | null);
-    /**
-     * Force sync even if conflicts are detected
-     */
-    force?: boolean;
-    /**
-     * Conflict resolution strategy: 'theirs' (take upstream), 'ours' (keep local), 'manual' (preserve conflicts)
-     */
-    strategy?: string;
+  /**
+   * Path to project directory containing deployed artifact. If omitted, syncs from upstream source.
+   */
+  project_path?: string | null;
+  /**
+   * Force sync even if conflicts are detected
+   */
+  force?: boolean;
+  /**
+   * Conflict resolution strategy: 'theirs' (take upstream), 'ours' (keep local), 'manual' (preserve conflicts)
+   */
+  strategy?: string;
 };
-

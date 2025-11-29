@@ -3,7 +3,9 @@
   "info": {
     "title": "SkillMeat API",
     "description": "REST API for SkillMeat collection manager",
-    "version": "0.1.0-alpha"
+    "version": "0.1.0-alpha",
+    "x-api-version": "v1",
+    "x-package-version": "0.1.0-alpha"
   },
   "paths": {
     "/health": {
@@ -1639,6 +1641,709 @@
           },
           "404": {
             "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/upstream-diff": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get artifact upstream diff",
+        "description": "Compare collection artifact with its GitHub upstream source",
+        "operationId": "get_artifact_upstream_diff_api_v1_artifacts__artifact_id__upstream_diff_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved upstream diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactUpstreamDiffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or no upstream source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/files": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "List artifact files",
+        "description": "List all files and directories in an artifact",
+        "operationId": "list_artifact_files_api_v1_artifacts__artifact_id__files_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved file list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/files/{file_path}": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get artifact file content",
+        "description": "Get the content of a specific file within an artifact",
+        "operationId": "get_artifact_file_content_api_v1_artifacts__artifact_id__files__file_path__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved file content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or path traversal attempt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact or file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Update artifact file content",
+        "description": "Update the content of a specific file within an artifact",
+        "operationId": "update_artifact_file_content_api_v1_artifacts__artifact_id__files__file_path__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully updated file content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, path traversal attempt, or directory path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact or file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Create new artifact file",
+        "description": "Create a new file within an artifact",
+        "operationId": "create_artifact_file_api_v1_artifacts__artifact_id__files__file_path__post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successfully created file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileContentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, path traversal attempt, or file already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Delete artifact file",
+        "description": "Delete a specific file within an artifact",
+        "operationId": "delete_artifact_file_api_v1_artifacts__artifact_id__files__file_path__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (searches all if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (searches all if not specified)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successfully deleted file"
+          },
+          "400": {
+            "description": "Invalid request, path traversal attempt, or directory path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact or file not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4861,6 +5566,18 @@
               "title": "After"
             },
             "description": "Cursor for pagination (next page)"
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Force cache refresh (bypass cached results)",
+              "default": false,
+              "title": "Refresh"
+            },
+            "description": "Force cache refresh (bypass cached results)"
           }
         ],
         "responses": {
@@ -5422,6 +6139,102 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/projects/cache/refresh": {
+      "post": {
+        "tags": [
+          "projects",
+          "projects"
+        ],
+        "summary": "Refresh project cache",
+        "description": "Force a full refresh of the project discovery cache",
+        "operationId": "refresh_cache_api_v1_projects_cache_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Cache refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Refresh Cache Api V1 Projects Cache Refresh Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/cache/stats": {
+      "get": {
+        "tags": [
+          "projects",
+          "projects"
+        ],
+        "summary": "Get cache statistics",
+        "description": "Get statistics about the project discovery cache",
+        "operationId": "get_cache_stats_api_v1_projects_cache_stats_get",
+        "responses": {
+          "200": {
+            "description": "Cache statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Cache Stats Api V1 Projects Cache Stats Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/": {
@@ -6630,6 +7443,99 @@
           ]
         }
       },
+      "ArtifactUpstreamDiffResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact identifier"
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Artifact name"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Artifact type"
+          },
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name",
+            "description": "Collection name"
+          },
+          "upstream_source": {
+            "type": "string",
+            "title": "Upstream Source",
+            "description": "GitHub upstream source specification"
+          },
+          "upstream_version": {
+            "type": "string",
+            "title": "Upstream Version",
+            "description": "Upstream version (SHA or tag)"
+          },
+          "has_changes": {
+            "type": "boolean",
+            "title": "Has Changes",
+            "description": "Whether any changes detected"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileDiff"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "List of file diffs"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Summary",
+            "description": "Summary counts: added, modified, deleted, unchanged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "artifact_name",
+          "artifact_type",
+          "collection_name",
+          "upstream_source",
+          "upstream_version",
+          "has_changes",
+          "files",
+          "summary"
+        ],
+        "title": "ArtifactUpstreamDiffResponse",
+        "description": "Response for upstream diff comparing collection with GitHub source.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "artifact_name": "pdf-processor",
+          "artifact_type": "skill",
+          "collection_name": "default",
+          "files": [
+            {
+              "collection_hash": "abc123",
+              "file_path": "SKILL.md",
+              "project_hash": "def456",
+              "status": "modified",
+              "unified_diff": "--- a/SKILL.md\n+++ b/SKILL.md\n..."
+            }
+          ],
+          "has_changes": true,
+          "summary": {
+            "added": 0,
+            "deleted": 0,
+            "modified": 1,
+            "unchanged": 3
+          },
+          "upstream_source": "anthropics/skills/pdf",
+          "upstream_version": "abc123def456"
+        }
+      },
       "ArtifactUpstreamInfo": {
         "properties": {
           "tracking_enabled": {
@@ -6696,9 +7602,9 @@
               }
             ],
             "title": "Drift Status",
-            "description": "Drift status (none, modified, deleted, added)",
+            "description": "Drift status: none (no changes), modified (local changes only), outdated (upstream changes only), conflict (both changed), added (new in collection), removed (deleted from collection)",
             "examples": [
-              "modified"
+              "conflict"
             ]
           }
         },
@@ -9051,74 +9957,93 @@
         "description": "Detailed health check response with component status."
       },
       "ErrorResponse": {
+        "title": "ErrorResponse",
+        "type": "object",
         "properties": {
-          "error": {
-            "type": "string",
-            "title": "Error",
-            "description": "Error type or code",
-            "examples": [
-              "NOT_FOUND"
-            ]
+          "detail": {
+            "title": "Detail",
+            "type": "string"
           },
-          "message": {
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "detail"
+        ]
+      },
+      "FileContentResponse": {
+        "properties": {
+          "artifact_id": {
             "type": "string",
-            "title": "Message",
-            "description": "Human-readable error message",
-            "examples": [
-              "Collection not found"
-            ]
+            "title": "Artifact Id",
+            "description": "Artifact identifier"
           },
-          "details": {
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Artifact name"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Artifact type"
+          },
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name",
+            "description": "Collection name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative file path within artifact"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "File content (UTF-8 encoded)"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "File size in bytes"
+          },
+          "mime_type": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Details",
-            "description": "Additional error details (optional)",
-            "examples": [
-              {
-                "collection_id": "abc123"
-              }
-            ]
-          },
-          "validation_errors": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ValidationErrorDetail"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Validation Errors",
-            "description": "Validation errors for invalid requests"
+            "title": "Mime Type",
+            "description": "MIME type of the file"
           }
         },
         "type": "object",
         "required": [
-          "error",
-          "message"
+          "artifact_id",
+          "artifact_name",
+          "artifact_type",
+          "collection_name",
+          "path",
+          "content",
+          "size"
         ],
-        "title": "ErrorResponse",
-        "description": "Standard error response envelope.\n\nAll API errors return this structure for consistent error handling\non the client side.",
+        "title": "FileContentResponse",
+        "description": "Response for artifact file content.",
         "example": {
-          "error": "VALIDATION_ERROR",
-          "message": "Invalid request parameters",
-          "validation_errors": [
-            {
-              "field": "name",
-              "message": "Field is required",
-              "type": "value_error.missing"
-            }
-          ]
+          "artifact_id": "skill:pdf-processor",
+          "artifact_name": "pdf-processor",
+          "artifact_type": "skill",
+          "collection_name": "default",
+          "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
+          "mime_type": "text/markdown",
+          "path": "SKILL.md",
+          "size": 2048
         }
       },
       "FileDiff": {
@@ -9191,18 +10116,169 @@
           "unified_diff": "--- a/SKILL.md\n+++ b/SKILL.md\n@@ -1,3 +1,3 @@\n-Old line\n+New line\n"
         }
       },
-      "HTTPValidationError": {
+      "FileListResponse": {
         "properties": {
-          "detail": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact identifier"
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Artifact name"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Artifact type"
+          },
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name",
+            "description": "Collection name"
+          },
+          "files": {
             "items": {
-              "$ref": "#/components/schemas/ValidationError"
+              "$ref": "#/components/schemas/FileNode"
             },
             "type": "array",
-            "title": "Detail"
+            "title": "Files",
+            "description": "File tree structure"
           }
         },
         "type": "object",
-        "title": "HTTPValidationError"
+        "required": [
+          "artifact_id",
+          "artifact_name",
+          "artifact_type",
+          "collection_name",
+          "files"
+        ],
+        "title": "FileListResponse",
+        "description": "Response for artifact file listing.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "artifact_name": "pdf-processor",
+          "artifact_type": "skill",
+          "collection_name": "default",
+          "files": [
+            {
+              "name": "SKILL.md",
+              "path": "SKILL.md",
+              "size": 2048,
+              "type": "file"
+            },
+            {
+              "children": [],
+              "name": "src",
+              "path": "src",
+              "type": "directory"
+            }
+          ]
+        }
+      },
+      "FileNode": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "File or directory name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative path from artifact root"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "directory"
+            ],
+            "title": "Type",
+            "description": "Node type"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "File size in bytes (only for files)"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FileNode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children",
+            "description": "Child nodes (only for directories)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "type"
+        ],
+        "title": "FileNode",
+        "description": "File or directory node in artifact file tree.",
+        "example": {
+          "children": [
+            {
+              "name": "main.py",
+              "path": "src/main.py",
+              "size": 1234,
+              "type": "file"
+            }
+          ],
+          "name": "src",
+          "path": "src",
+          "type": "directory"
+        }
+      },
+      "FileUpdateRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "New file content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "FileUpdateRequest",
+        "description": "Request body for updating file content.",
+        "example": {
+          "content": "# Updated PDF Processor Skill\n\nThis skill processes PDF files with enhanced features..."
+        }
+      },
+      "HTTPValidationError": {
+        "title": "HTTPValidationError",
+        "type": "object",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
       },
       "HealthCheckResponse": {
         "properties": {
@@ -11569,8 +12645,17 @@
         }
       },
       "ValidationError": {
+        "title": "ValidationError",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "type": "object",
         "properties": {
           "loc": {
+            "title": "Location",
+            "type": "array",
             "items": {
               "anyOf": [
                 {
@@ -11580,26 +12665,17 @@
                   "type": "integer"
                 }
               ]
-            },
-            "type": "array",
-            "title": "Location"
+            }
           },
           "msg": {
-            "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "type": "string"
           },
           "type": {
-            "type": "string",
-            "title": "Error Type"
+            "title": "Error Type",
+            "type": "string"
           }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
+        }
       },
       "ValidationErrorDetail": {
         "properties": {
@@ -12027,5 +13103,15 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server"
+    },
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Local development API"
+    }
+  ]
 }

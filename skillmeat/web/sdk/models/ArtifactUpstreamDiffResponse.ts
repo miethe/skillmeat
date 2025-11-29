@@ -4,9 +4,9 @@
 /* eslint-disable */
 import type { FileDiff } from './FileDiff';
 /**
- * Response for artifact diff.
+ * Response for upstream diff comparing collection with GitHub source.
  */
-export type ArtifactDiffResponse = {
+export type ArtifactUpstreamDiffResponse = {
   /**
    * Artifact identifier
    */
@@ -24,9 +24,13 @@ export type ArtifactDiffResponse = {
    */
   collection_name: string;
   /**
-   * Project path
+   * GitHub upstream source specification
    */
-  project_path: string;
+  upstream_source: string;
+  /**
+   * Upstream version (SHA or tag)
+   */
+  upstream_version: string;
   /**
    * Whether any changes detected
    */
