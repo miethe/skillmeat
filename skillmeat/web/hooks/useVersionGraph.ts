@@ -4,14 +4,14 @@
  * Provides data fetching, caching, and state management for version tracking.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import type { VersionGraph } from "@/types/version";
-import { apiRequest } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import type { VersionGraph } from '@/types/version';
+import { apiRequest } from '@/lib/api';
 
 // Query keys
 export const versionKeys = {
-  all: ["versions"] as const,
-  graphs: () => [...versionKeys.all, "graphs"] as const,
+  all: ['versions'] as const,
+  graphs: () => [...versionKeys.all, 'graphs'] as const,
   graph: (artifactId: string, collection?: string) =>
     [...versionKeys.graphs(), artifactId, collection] as const,
 };
@@ -19,17 +19,14 @@ export const versionKeys = {
 /**
  * Fetch version graph from API
  */
-async function fetchVersionGraph(
-  artifactId: string,
-  collection?: string
-): Promise<VersionGraph> {
+async function fetchVersionGraph(artifactId: string, collection?: string): Promise<VersionGraph> {
   const params = new URLSearchParams();
   if (collection) {
-    params.set("collection", collection);
+    params.set('collection', collection);
   }
 
   const queryString = params.toString();
-  const path = `/artifacts/${artifactId}/version-graph${queryString ? `?${queryString}` : ""}`;
+  const path = `/artifacts/${artifactId}/version-graph${queryString ? `?${queryString}` : ''}`;
 
   return apiRequest<VersionGraph>(path);
 }

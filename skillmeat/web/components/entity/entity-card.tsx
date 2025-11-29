@@ -8,11 +8,11 @@
  * rendering across the application.
  */
 
-"use client";
+'use client';
 
-import * as React from "react";
-import type { Entity } from "@/types/entity";
-import { UnifiedCard, UnifiedCardSkeleton } from "@/components/shared/unified-card";
+import * as React from 'react';
+import type { Entity } from '@/types/entity';
+import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 
 /**
  * Props for EntityCard component

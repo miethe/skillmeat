@@ -9,7 +9,7 @@ import {
   Clock,
   Loader2,
   ChevronRight,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,9 @@ function formatRelativeTime(date: Date): string {
 /**
  * Get status badge variant based on entity status
  */
-function getStatusVariant(status: EntityStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+function getStatusVariant(
+  status: EntityStatus
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'synced':
       return 'default';
@@ -187,13 +189,11 @@ export function ProjectSelectorForDiff({
   // Loading state
   if (isLoading) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-3 p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">Loading projects...</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Finding deployments of {entityName}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Finding deployments of {entityName}</p>
         </div>
       </div>
     );
@@ -205,7 +205,7 @@ export function ProjectSelectorForDiff({
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          <p className="font-medium mb-1">Failed to load project deployments</p>
+          <p className="mb-1 font-medium">Failed to load project deployments</p>
           <p className="text-xs">
             {error instanceof Error ? error.message : 'An unknown error occurred'}
           </p>
@@ -217,14 +217,14 @@ export function ProjectSelectorForDiff({
   // Empty state - no deployments
   if (deployments.length === 0) {
     return (
-      <div className="border rounded-lg p-8 bg-muted/20">
+      <div className="rounded-lg border bg-muted/20 p-8">
         <div className="flex flex-col items-center justify-center gap-3 text-center">
           <Folder className="h-12 w-12 text-muted-foreground opacity-50" />
           <div>
-            <h3 className="text-lg font-semibold mb-2">No deployments found</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              This artifact has not been deployed to any projects yet. Deploy it to a project
-              to view diffs and sync status.
+            <h3 className="mb-2 text-lg font-semibold">No deployments found</h3>
+            <p className="max-w-md text-sm text-muted-foreground">
+              This artifact has not been deployed to any projects yet. Deploy it to a project to
+              view diffs and sync status.
             </p>
           </div>
         </div>
@@ -236,7 +236,7 @@ export function ProjectSelectorForDiff({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-medium mb-1">Select Project for Comparison</h3>
+        <h3 className="mb-1 text-sm font-medium">Select Project for Comparison</h3>
         <p className="text-xs text-muted-foreground">
           Choose a project to compare the collection version of {entityName} against
         </p>
@@ -249,26 +249,26 @@ export function ProjectSelectorForDiff({
               key={deployment.projectPath}
               className={`cursor-pointer transition-all hover:shadow-md ${
                 selectedProject === deployment.projectPath
-                  ? 'ring-2 ring-primary bg-primary/5'
+                  ? 'bg-primary/5 ring-2 ring-primary'
                   : 'hover:bg-muted/50'
               }`}
               onClick={() => handleProjectClick(deployment.projectPath)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <Folder className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-medium break-words">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <Folder className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="break-words text-base font-medium">
                         {deployment.projectName}
                       </CardTitle>
-                      <CardDescription className="text-xs mt-1 break-all">
+                      <CardDescription className="mt-1 break-all text-xs">
                         {deployment.projectPath}
                       </CardDescription>
                     </div>
                   </div>
                   <ChevronRight
-                    className={`h-5 w-5 text-muted-foreground flex-shrink-0 transition-transform ${
+                    className={`h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform ${
                       selectedProject === deployment.projectPath ? 'rotate-90' : ''
                     }`}
                   />
@@ -276,7 +276,7 @@ export function ProjectSelectorForDiff({
               </CardHeader>
 
               <CardContent className="pt-0">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   {/* Status badge */}
                   <div className="flex items-center gap-2">
                     {getStatusIcon(deployment.status)}
@@ -300,15 +300,13 @@ export function ProjectSelectorForDiff({
       </ScrollArea>
 
       {/* Summary info */}
-      <div className="pt-2 border-t">
+      <div className="border-t pt-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {deployments.length} {deployments.length === 1 ? 'project' : 'projects'} found
           </span>
           {artifactData?.deployment_stats && (
-            <span>
-              {artifactData.deployment_stats.modified_deployments} modified
-            </span>
+            <span>{artifactData.deployment_stats.modified_deployments} modified</span>
           )}
         </div>
       </div>

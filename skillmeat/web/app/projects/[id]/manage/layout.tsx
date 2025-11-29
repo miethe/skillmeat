@@ -5,10 +5,6 @@ export const metadata: Metadata = {
   description: 'Manage entities deployed to your project',
 };
 
-export default function ProjectManageLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ProjectManageLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

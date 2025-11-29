@@ -30,12 +30,12 @@ try {
 
 // SLA targets
 const SLA_TARGETS = {
-  performance: 90,      // Lighthouse performance score ≥90
-  accessibility: 90,    // Accessibility score ≥90
-  fcp: 1500,           // First Contentful Paint <1.5s
-  lcp: 2500,           // Largest Contentful Paint <2.5s
-  tti: 3500,           // Time to Interactive <3.5s
-  cls: 0.1,            // Cumulative Layout Shift <0.1
+  performance: 90, // Lighthouse performance score ≥90
+  accessibility: 90, // Accessibility score ≥90
+  fcp: 1500, // First Contentful Paint <1.5s
+  lcp: 2500, // Largest Contentful Paint <2.5s
+  tti: 3500, // Time to Interactive <3.5s
+  cls: 0.1, // Cumulative Layout Shift <0.1
 };
 
 /**
@@ -170,8 +170,12 @@ function printResults(url, scores, slaCheck) {
 
   // Core Web Vitals
   console.log('\nCore Web Vitals:');
-  console.log(`  Performance Score:  ${scores.performance.toFixed(0)}/100 (target: ≥${SLA_TARGETS.performance})`);
-  console.log(`  Accessibility:      ${scores.accessibility.toFixed(0)}/100 (target: ≥${SLA_TARGETS.accessibility})`);
+  console.log(
+    `  Performance Score:  ${scores.performance.toFixed(0)}/100 (target: ≥${SLA_TARGETS.performance})`
+  );
+  console.log(
+    `  Accessibility:      ${scores.accessibility.toFixed(0)}/100 (target: ≥${SLA_TARGETS.accessibility})`
+  );
 
   // Detailed metrics
   console.log('\nDetailed Metrics:');
@@ -226,7 +230,8 @@ function saveReports(reports, outputDir) {
 async function main() {
   const args = process.argv.slice(2);
   const urlIndex = args.indexOf('--url');
-  const baseUrl = urlIndex >= 0 && args[urlIndex + 1] ? args[urlIndex + 1] : 'http://localhost:3000';
+  const baseUrl =
+    urlIndex >= 0 && args[urlIndex + 1] ? args[urlIndex + 1] : 'http://localhost:3000';
 
   // Pages to test
   const pages = [

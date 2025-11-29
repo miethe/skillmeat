@@ -5,17 +5,17 @@
  * Handles confirmation dialogs for destructive operations.
  */
 
-"use client";
+'use client';
 
-import * as React from "react";
-import { MoreVertical, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from "lucide-react";
+import * as React from 'react';
+import { MoreVertical, Pencil, Trash2, Rocket, RefreshCw, FileText, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -23,10 +23,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RollbackDialog } from "./rollback-dialog";
-import type { Entity } from "@/types/entity";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { RollbackDialog } from './rollback-dialog';
+import type { Entity } from '@/types/entity';
 
 /**
  * Props for EntityActions component
@@ -99,7 +99,7 @@ export function EntityActions({
       await onDelete();
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error("Failed to delete entity:", error);
+      console.error('Failed to delete entity:', error);
     } finally {
       setIsDeleting(false);
     }
@@ -110,10 +110,8 @@ export function EntityActions({
     await onRollback();
   };
 
-  const showViewDiff = entity.status === "modified" && onViewDiff;
-  const showRollback =
-    (entity.status === "modified" || entity.status === "conflict") &&
-    onRollback;
+  const showViewDiff = entity.status === 'modified' && onViewDiff;
+  const showRollback = (entity.status === 'modified' || entity.status === 'conflict') && onRollback;
 
   return (
     <>
@@ -181,8 +179,8 @@ export function EntityActions({
           <DialogHeader>
             <DialogTitle>Delete {entity.name}?</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete the {entity.type}{" "}
-              "{entity.name}".
+              This action cannot be undone. This will permanently delete the {entity.type} "
+              {entity.name}".
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -194,7 +192,7 @@ export function EntityActions({
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

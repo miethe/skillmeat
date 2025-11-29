@@ -1,44 +1,40 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { LayoutGrid, List } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Filters } from "@/components/collection/filters";
-import { ArtifactGrid } from "@/components/collection/artifact-grid";
-import { ArtifactList } from "@/components/collection/artifact-list";
-import { UnifiedEntityModal } from "@/components/entity/unified-entity-modal";
-import { EntityLifecycleProvider } from "@/hooks/useEntityLifecycle";
-import { useArtifacts } from "@/hooks/useArtifacts";
-import type {
-  Artifact,
-  ArtifactFilters,
-  ArtifactSort,
-} from "@/types/artifact";
-import type { Entity } from "@/types/entity";
+import { useState } from 'react';
+import { LayoutGrid, List } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Filters } from '@/components/collection/filters';
+import { ArtifactGrid } from '@/components/collection/artifact-grid';
+import { ArtifactList } from '@/components/collection/artifact-list';
+import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
+import { useArtifacts } from '@/hooks/useArtifacts';
+import type { Artifact, ArtifactFilters, ArtifactSort } from '@/types/artifact';
+import type { Entity } from '@/types/entity';
 
-type ViewMode = "grid" | "list";
+type ViewMode = 'grid' | 'list';
 
 // Helper function to convert Artifact to Entity for the modal
 function artifactToEntity(artifact: Artifact): Entity {
   // Map ArtifactStatus to EntityStatus
-  const statusMap: Record<string, Entity["status"]> = {
-    active: "synced",
-    outdated: "outdated",
-    conflict: "conflict",
-    error: "conflict",
+  const statusMap: Record<string, Entity['status']> = {
+    active: 'synced',
+    outdated: 'outdated',
+    conflict: 'conflict',
+    error: 'conflict',
   };
 
   return {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type,
-    collection: "default",
-    status: statusMap[artifact.status] || "synced",
+    collection: 'default',
+    status: statusMap[artifact.status] || 'synced',
     tags: artifact.metadata.tags || [],
     description: artifact.metadata.description,
     version: artifact.version || artifact.metadata.version,
-    source: artifact.source || "unknown",
+    source: artifact.source || 'unknown',
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
     aliases: artifact.aliases || [],
@@ -47,15 +43,15 @@ function artifactToEntity(artifact: Artifact): Entity {
 
 function CollectionPageContent() {
   // View state
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Filter and sort state
   const [filters, setFilters] = useState<ArtifactFilters>({});
   const [sort, setSort] = useState<ArtifactSort>({
-    field: "name",
-    order: "asc",
+    field: 'name',
+    order: 'asc',
   });
 
   // Fetch artifacts with React Query
@@ -74,7 +70,7 @@ function CollectionPageContent() {
 
   // Calculate active filter count
   const activeFilterCount = Object.values(filters).filter(
-    (value) => value !== undefined && value !== "all" && value !== ""
+    (value) => value !== undefined && value !== 'all' && value !== ''
   ).length;
 
   return (
@@ -82,9 +78,7 @@ function CollectionPageContent() {
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Collection</h1>
-        <p className="text-muted-foreground">
-          Browse and manage your artifact collection
-        </p>
+        <p className="text-muted-foreground">Browse and manage your artifact collection</p>
       </div>
 
       {/* Filters */}
@@ -92,9 +86,7 @@ function CollectionPageContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="font-semibold">Filters</h2>
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary">{activeFilterCount} active</Badge>
-            )}
+            {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount} active</Badge>}
           </div>
           {activeFilterCount > 0 && (
             <Button
@@ -120,13 +112,12 @@ function CollectionPageContent() {
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">
             {isLoading ? (
-              "Loading..."
+              'Loading...'
             ) : error ? (
-              "Error loading artifacts"
+              'Error loading artifacts'
             ) : (
               <>
-                {data?.total || 0}{" "}
-                {data?.total === 1 ? "Artifact" : "Artifacts"}
+                {data?.total || 0} {data?.total === 1 ? 'Artifact' : 'Artifacts'}
               </>
             )}
           </h2>
@@ -134,25 +125,25 @@ function CollectionPageContent() {
 
         {/* View Toggle */}
         <div
-          className="flex items-center gap-1 border rounded-md p-1"
+          className="flex items-center gap-1 rounded-md border p-1"
           role="group"
           aria-label="View mode"
         >
           <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={() => setViewMode("grid")}
+            onClick={() => setViewMode('grid')}
             aria-label="Grid view"
-            aria-pressed={viewMode === "grid"}
+            aria-pressed={viewMode === 'grid'}
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
           <Button
-            variant={viewMode === "list" ? "secondary" : "ghost"}
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
             size="sm"
-            onClick={() => setViewMode("list")}
+            onClick={() => setViewMode('list')}
             aria-label="List view"
-            aria-pressed={viewMode === "list"}
+            aria-pressed={viewMode === 'list'}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -171,7 +162,7 @@ function CollectionPageContent() {
       {/* Artifacts View */}
       {!error && (
         <>
-          {viewMode === "grid" ? (
+          {viewMode === 'grid' ? (
             <ArtifactGrid
               artifacts={data?.artifacts || []}
               isLoading={isLoading}
@@ -188,11 +179,7 @@ function CollectionPageContent() {
       )}
 
       {/* Entity Detail Modal */}
-      <UnifiedEntityModal
-        entity={selectedEntity}
-        open={isDetailOpen}
-        onClose={handleDetailClose}
-      />
+      <UnifiedEntityModal entity={selectedEntity} open={isDetailOpen} onClose={handleDetailClose} />
     </div>
   );
 }

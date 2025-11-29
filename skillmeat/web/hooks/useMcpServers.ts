@@ -5,8 +5,8 @@
  * automatic caching, refetching, and error handling.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/api';
 import type {
   DeploymentRequest,
   DeploymentResponse,
@@ -15,18 +15,17 @@ import type {
   MCPServerCreateRequest,
   MCPServerListResponse,
   MCPServerUpdateRequest,
-} from "@/types/mcp";
+} from '@/types/mcp';
 
 // Query keys
 export const mcpQueryKeys = {
-  all: ["mcp"] as const,
-  lists: () => [...mcpQueryKeys.all, "list"] as const,
-  list: (collection?: string) =>
-    [...mcpQueryKeys.lists(), collection] as const,
-  details: () => [...mcpQueryKeys.all, "detail"] as const,
+  all: ['mcp'] as const,
+  lists: () => [...mcpQueryKeys.all, 'list'] as const,
+  list: (collection?: string) => [...mcpQueryKeys.lists(), collection] as const,
+  details: () => [...mcpQueryKeys.all, 'detail'] as const,
   detail: (name: string, collection?: string) =>
     [...mcpQueryKeys.details(), name, collection] as const,
-  status: (name: string) => [...mcpQueryKeys.all, "status", name] as const,
+  status: (name: string) => [...mcpQueryKeys.all, 'status', name] as const,
 };
 
 // Query hooks
@@ -38,7 +37,7 @@ export function useMcpServers(collection?: string) {
   return useQuery({
     queryKey: mcpQueryKeys.list(collection),
     queryFn: async (): Promise<MCPServerListResponse> => {
-      const params = collection ? `?collection=${collection}` : "";
+      const params = collection ? `?collection=${collection}` : '';
       return apiRequest<MCPServerListResponse>(`/mcp/servers${params}`);
     },
     staleTime: 30000, // Cache for 30 seconds
@@ -52,7 +51,7 @@ export function useMcpServer(name: string, collection?: string) {
   return useQuery({
     queryKey: mcpQueryKeys.detail(name, collection),
     queryFn: async (): Promise<MCPServer> => {
-      const params = collection ? `?collection=${collection}` : "";
+      const params = collection ? `?collection=${collection}` : '';
       return apiRequest<MCPServer>(`/mcp/servers/${name}${params}`);
     },
     enabled: !!name,
@@ -84,12 +83,10 @@ export function useCreateMcpServer(collection?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      data: MCPServerCreateRequest
-    ): Promise<MCPServer> => {
-      const params = collection ? `?collection=${collection}` : "";
+    mutationFn: async (data: MCPServerCreateRequest): Promise<MCPServer> => {
+      const params = collection ? `?collection=${collection}` : '';
       return apiRequest<MCPServer>(`/mcp/servers${params}`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(data),
       });
     },
@@ -107,12 +104,10 @@ export function useUpdateMcpServer(name: string, collection?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      data: MCPServerUpdateRequest
-    ): Promise<MCPServer> => {
-      const params = collection ? `?collection=${collection}` : "";
+    mutationFn: async (data: MCPServerUpdateRequest): Promise<MCPServer> => {
+      const params = collection ? `?collection=${collection}` : '';
       return apiRequest<MCPServer>(`/mcp/servers/${name}${params}`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify(data),
       });
     },
@@ -134,9 +129,9 @@ export function useDeleteMcpServer(collection?: string) {
 
   return useMutation({
     mutationFn: async (name: string): Promise<void> => {
-      const params = collection ? `?collection=${collection}` : "";
+      const params = collection ? `?collection=${collection}` : '';
       await apiRequest<void>(`/mcp/servers/${name}${params}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
     },
     onSuccess: () => {
@@ -153,17 +148,12 @@ export function useDeployMcpServer(name: string, collection?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      request: DeploymentRequest = {}
-    ): Promise<DeploymentResponse> => {
-      const params = collection ? `?collection=${collection}` : "";
-      return apiRequest<DeploymentResponse>(
-        `/mcp/servers/${name}/deploy${params}`,
-        {
-          method: "POST",
-          body: JSON.stringify(request),
-        }
-      );
+    mutationFn: async (request: DeploymentRequest = {}): Promise<DeploymentResponse> => {
+      const params = collection ? `?collection=${collection}` : '';
+      return apiRequest<DeploymentResponse>(`/mcp/servers/${name}/deploy${params}`, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
     },
     onSuccess: () => {
       // Invalidate server detail and deployment status
@@ -184,13 +174,10 @@ export function useUndeployMcpServer(name: string, collection?: string) {
 
   return useMutation({
     mutationFn: async (): Promise<DeploymentResponse> => {
-      const params = collection ? `?collection=${collection}` : "";
-      return apiRequest<DeploymentResponse>(
-        `/mcp/servers/${name}/undeploy${params}`,
-        {
-          method: "POST",
-        }
-      );
+      const params = collection ? `?collection=${collection}` : '';
+      return apiRequest<DeploymentResponse>(`/mcp/servers/${name}/undeploy${params}`, {
+        method: 'POST',
+      });
     },
     onSuccess: () => {
       // Invalidate server detail and deployment status
@@ -210,12 +197,10 @@ export function useMcpBatchOperations(collection?: string) {
   const deleteMutation = useDeleteMcpServer(collection);
 
   const deleteMultiple = async (names: string[]) => {
-    const results = await Promise.allSettled(
-      names.map((name) => deleteMutation.mutateAsync(name))
-    );
+    const results = await Promise.allSettled(names.map((name) => deleteMutation.mutateAsync(name)));
 
-    const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.filter((r) => r.status === "rejected").length;
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
 
     return { succeeded, failed, total: names.length };
   };

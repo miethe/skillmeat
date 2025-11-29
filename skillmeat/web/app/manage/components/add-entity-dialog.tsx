@@ -21,7 +21,7 @@ export function AddEntityDialog({ entityType, open, onOpenChange }: AddEntityDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New {config.label}</DialogTitle>
           <DialogDescription>

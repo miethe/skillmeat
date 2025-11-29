@@ -74,12 +74,12 @@ export function EntityFilters({
   };
 
   return (
-    <div className="flex flex-col gap-3 p-4 border-b bg-muted/20">
+    <div className="flex flex-col gap-3 border-b bg-muted/20 p-4">
       {/* Search and Status Filter */}
       <div className="flex gap-3">
         {/* Search */}
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
           <Input
             placeholder="Search entities..."
             value={searchQuery}
@@ -93,7 +93,9 @@ export function EntityFilters({
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2">
               <Filter className="h-4 w-4" />
-              {statusFilter ? STATUS_OPTIONS.find(o => o.value === statusFilter)?.label : 'All Status'}
+              {statusFilter
+                ? STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label
+                : 'All Status'}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
@@ -115,17 +117,14 @@ export function EntityFilters({
 
       {/* Tag Filter */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 flex items-center gap-2 flex-wrap">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Tags:</span>
 
           {/* Selected tags */}
           {tagFilter.map((tag) => (
             <Badge key={tag} variant="secondary" className="gap-1">
               {tag}
-              <button
-                onClick={() => handleRemoveTag(tag)}
-                className="hover:text-destructive"
-              >
+              <button onClick={() => handleRemoveTag(tag)} className="hover:text-destructive">
                 <X className="h-3 w-3" />
               </button>
             </Badge>

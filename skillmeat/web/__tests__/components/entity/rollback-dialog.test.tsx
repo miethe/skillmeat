@@ -1,22 +1,22 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { RollbackDialog } from "@/components/entity/rollback-dialog";
-import type { Entity } from "@/types/entity";
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { RollbackDialog } from '@/components/entity/rollback-dialog';
+import type { Entity } from '@/types/entity';
 
 const mockEntity: Entity = {
-  id: "skill:test",
-  name: "test-skill",
-  type: "skill",
-  source: "github:user/repo/skill",
-  status: "modified",
-  version: "v1.2.3",
-  projectPath: "/home/user/projects/my-project",
+  id: 'skill:test',
+  name: 'test-skill',
+  type: 'skill',
+  source: 'github:user/repo/skill',
+  status: 'modified',
+  version: 'v1.2.3',
+  projectPath: '/home/user/projects/my-project',
 };
 
-describe("RollbackDialog", () => {
-  it("renders dialog when open", () => {
+describe('RollbackDialog', () => {
+  it('renders dialog when open', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -26,12 +26,10 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(
-      screen.getByText(/Rollback to Collection Version\?/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Rollback to Collection Version\?/)).toBeInTheDocument();
   });
 
-  it("does not render when closed", () => {
+  it('does not render when closed', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -41,12 +39,10 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(
-      screen.queryByText(/Rollback to Collection Version\?/)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rollback to Collection Version\?/)).not.toBeInTheDocument();
   });
 
-  it("displays entity name in dialog", () => {
+  it('displays entity name in dialog', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -59,7 +55,7 @@ describe("RollbackDialog", () => {
     expect(screen.getByText(/test-skill/)).toBeInTheDocument();
   });
 
-  it("displays entity type", () => {
+  it('displays entity type', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -73,7 +69,7 @@ describe("RollbackDialog", () => {
     expect(screen.getByText(/skill/)).toBeInTheDocument();
   });
 
-  it("shows current and target versions", () => {
+  it('shows current and target versions', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -83,12 +79,12 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(screen.getByText("Current (Local)")).toBeInTheDocument();
-    expect(screen.getByText("Target (Collection)")).toBeInTheDocument();
-    expect(screen.getAllByText("v1.2.3")).toHaveLength(2);
+    expect(screen.getByText('Current (Local)')).toBeInTheDocument();
+    expect(screen.getByText('Target (Collection)')).toBeInTheDocument();
+    expect(screen.getAllByText('v1.2.3')).toHaveLength(2);
   });
 
-  it("displays project path when available", () => {
+  it('displays project path when available', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -99,12 +95,10 @@ describe("RollbackDialog", () => {
     );
 
     expect(screen.getByText(/Project:/)).toBeInTheDocument();
-    expect(
-      screen.getByText("/home/user/projects/my-project")
-    ).toBeInTheDocument();
+    expect(screen.getByText('/home/user/projects/my-project')).toBeInTheDocument();
   });
 
-  it("shows warning about data loss", () => {
+  it('shows warning about data loss', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -114,15 +108,11 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(
-      screen.getByText(/Warning: This action cannot be undone/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/All local modifications will be lost/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Warning: This action cannot be undone/)).toBeInTheDocument();
+    expect(screen.getByText(/All local modifications will be lost/)).toBeInTheDocument();
   });
 
-  it("renders Cancel button", () => {
+  it('renders Cancel button', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -132,10 +122,10 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /Cancel/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cancel/ })).toBeInTheDocument();
   });
 
-  it("renders Rollback button", () => {
+  it('renders Rollback button', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -145,12 +135,10 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(
-      screen.getByRole("button", { name: /^Rollback$/ })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Rollback$/ })).toBeInTheDocument();
   });
 
-  it("calls onOpenChange when Cancel is clicked", () => {
+  it('calls onOpenChange when Cancel is clicked', () => {
     const handleOpenChange = jest.fn();
     render(
       <RollbackDialog
@@ -161,13 +149,13 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const cancelButton = screen.getByRole("button", { name: /Cancel/ });
+    const cancelButton = screen.getByRole('button', { name: /Cancel/ });
     fireEvent.click(cancelButton);
 
     expect(handleOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("calls onConfirm when Rollback is clicked", async () => {
+  it('calls onConfirm when Rollback is clicked', async () => {
     const handleConfirm = jest.fn().mockResolvedValue(undefined);
     render(
       <RollbackDialog
@@ -178,7 +166,7 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
@@ -186,7 +174,7 @@ describe("RollbackDialog", () => {
     });
   });
 
-  it("closes dialog after successful rollback", async () => {
+  it('closes dialog after successful rollback', async () => {
     const handleOpenChange = jest.fn();
     const handleConfirm = jest.fn().mockResolvedValue(undefined);
 
@@ -199,7 +187,7 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
@@ -207,12 +195,10 @@ describe("RollbackDialog", () => {
     });
   });
 
-  it("shows loading state during rollback", async () => {
+  it('shows loading state during rollback', async () => {
     const handleConfirm = jest
       .fn()
-      .mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     render(
       <RollbackDialog
@@ -223,7 +209,7 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
@@ -231,12 +217,10 @@ describe("RollbackDialog", () => {
     });
   });
 
-  it("disables buttons during rollback", async () => {
+  it('disables buttons during rollback', async () => {
     const handleConfirm = jest
       .fn()
-      .mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     render(
       <RollbackDialog
@@ -247,22 +231,18 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Rolling Back.../ })
-      ).toBeDisabled();
-      expect(screen.getByRole("button", { name: /Cancel/ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Rolling Back.../ })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Cancel/ })).toBeDisabled();
     });
   });
 
-  it("handles rollback error gracefully", async () => {
-    const consoleError = jest.spyOn(console, "error").mockImplementation();
-    const handleConfirm = jest
-      .fn()
-      .mockRejectedValue(new Error("Rollback failed"));
+  it('handles rollback error gracefully', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation();
+    const handleConfirm = jest.fn().mockRejectedValue(new Error('Rollback failed'));
 
     render(
       <RollbackDialog
@@ -273,20 +253,17 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
-      expect(consoleError).toHaveBeenCalledWith(
-        "Failed to rollback entity:",
-        expect.any(Error)
-      );
+      expect(consoleError).toHaveBeenCalledWith('Failed to rollback entity:', expect.any(Error));
     });
 
     consoleError.mockRestore();
   });
 
-  it("renders RotateCcw icon in title", () => {
+  it('renders RotateCcw icon in title', () => {
     const { container } = render(
       <RollbackDialog
         entity={mockEntity}
@@ -296,11 +273,11 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const icons = container.querySelectorAll("svg");
+    const icons = container.querySelectorAll('svg');
     expect(icons.length).toBeGreaterThan(0);
   });
 
-  it("renders AlertTriangle icon in warning", () => {
+  it('renders AlertTriangle icon in warning', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -315,7 +292,7 @@ describe("RollbackDialog", () => {
     expect(warning).toBeInTheDocument();
   });
 
-  it("applies destructive variant to Rollback button", () => {
+  it('applies destructive variant to Rollback button', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -325,11 +302,11 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
-    expect(rollbackButton).toHaveClass("bg-destructive");
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
+    expect(rollbackButton).toHaveClass('bg-destructive');
   });
 
-  it("shows Unknown when version is missing", () => {
+  it('shows Unknown when version is missing', () => {
     const entityWithoutVersion = { ...mockEntity, version: undefined };
     render(
       <RollbackDialog
@@ -340,11 +317,11 @@ describe("RollbackDialog", () => {
       />
     );
 
-    expect(screen.getAllByText("Unknown")).toHaveLength(1);
-    expect(screen.getAllByText("Collection version")).toHaveLength(1);
+    expect(screen.getAllByText('Unknown')).toHaveLength(1);
+    expect(screen.getAllByText('Collection version')).toHaveLength(1);
   });
 
-  it("does not show project path when not available", () => {
+  it('does not show project path when not available', () => {
     const entityWithoutPath = { ...mockEntity, projectPath: undefined };
     render(
       <RollbackDialog
@@ -358,7 +335,7 @@ describe("RollbackDialog", () => {
     expect(screen.queryByText(/Project:/)).not.toBeInTheDocument();
   });
 
-  it("displays descriptive warning text", () => {
+  it('displays descriptive warning text', () => {
     render(
       <RollbackDialog
         entity={mockEntity}
@@ -369,23 +346,17 @@ describe("RollbackDialog", () => {
     );
 
     expect(
-      screen.getByText(
-        /The collection version will overwrite your current local version/
-      )
+      screen.getByText(/The collection version will overwrite your current local version/)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Make sure you have backed up any important changes before proceeding/
-      )
+      screen.getByText(/Make sure you have backed up any important changes before proceeding/)
     ).toBeInTheDocument();
   });
 
-  it("shows spinning icon during rollback", async () => {
+  it('shows spinning icon during rollback', async () => {
     const handleConfirm = jest
       .fn()
-      .mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     render(
       <RollbackDialog
@@ -396,15 +367,15 @@ describe("RollbackDialog", () => {
       />
     );
 
-    const rollbackButton = screen.getByRole("button", { name: /^Rollback$/ });
+    const rollbackButton = screen.getByRole('button', { name: /^Rollback$/ });
     fireEvent.click(rollbackButton);
 
     await waitFor(() => {
-      const loadingButton = screen.getByRole("button", {
+      const loadingButton = screen.getByRole('button', {
         name: /Rolling Back.../,
       });
-      const icon = loadingButton.querySelector("svg");
-      expect(icon).toHaveClass("animate-spin");
+      const icon = loadingButton.querySelector('svg');
+      expect(icon).toHaveClass('animate-spin');
     });
   });
 });

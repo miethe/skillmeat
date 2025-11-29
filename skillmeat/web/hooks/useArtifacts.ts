@@ -5,7 +5,7 @@
  * Uses live API data with mock fallbacks to keep the UI responsive offline.
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   Artifact,
   ArtifactFilters,
@@ -13,8 +13,8 @@ import type {
   ArtifactsResponse,
   ArtifactScope,
   ArtifactType,
-} from "@/types/artifact";
-import { ApiError, apiConfig, apiRequest } from "@/lib/api";
+} from '@/types/artifact';
+import { ApiError, apiConfig, apiRequest } from '@/lib/api';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -63,29 +63,28 @@ interface ApiArtifactListResponse {
 
 // Mock data generator for development
 const generateMockArtifacts = (): Artifact[] => {
-
   return [
     {
-      id: "1",
-      name: "canvas-design",
-      type: "skill",
-      scope: "user",
-      status: "active",
-      version: "v2.1.0",
-      source: "anthropics/skills/canvas-design",
+      id: '1',
+      name: 'canvas-design',
+      type: 'skill',
+      scope: 'user',
+      status: 'active',
+      version: 'v2.1.0',
+      source: 'anthropics/skills/canvas-design',
       metadata: {
-        title: "Canvas Design",
-        description: "Create and edit visual designs with an interactive canvas",
-        license: "MIT",
-        author: "Anthropic",
-        version: "2.1.0",
-        tags: ["design", "visual", "canvas"],
+        title: 'Canvas Design',
+        description: 'Create and edit visual designs with an interactive canvas',
+        license: 'MIT',
+        author: 'Anthropic',
+        version: '2.1.0',
+        tags: ['design', 'visual', 'canvas'],
       },
       upstreamStatus: {
         hasUpstream: true,
-        upstreamUrl: "https://github.com/anthropics/skills/canvas-design",
-        upstreamVersion: "v2.1.0",
-        currentVersion: "v2.1.0",
+        upstreamUrl: 'https://github.com/anthropics/skills/canvas-design',
+        upstreamVersion: 'v2.1.0',
+        currentVersion: 'v2.1.0',
         isOutdated: false,
         lastChecked: new Date().toISOString(),
       },
@@ -97,29 +96,29 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-      aliases: ["design", "canvas"],
+      aliases: ['design', 'canvas'],
     },
     {
-      id: "2",
-      name: "docx-processor",
-      type: "skill",
-      scope: "user",
-      status: "outdated",
-      version: "v1.5.0",
-      source: "anthropics/skills/document-skills/docx",
+      id: '2',
+      name: 'docx-processor',
+      type: 'skill',
+      scope: 'user',
+      status: 'outdated',
+      version: 'v1.5.0',
+      source: 'anthropics/skills/document-skills/docx',
       metadata: {
-        title: "DOCX Processor",
-        description: "Read and process Microsoft Word documents",
-        license: "Apache-2.0",
-        author: "Anthropic",
-        version: "1.5.0",
-        tags: ["document", "docx", "word"],
+        title: 'DOCX Processor',
+        description: 'Read and process Microsoft Word documents',
+        license: 'Apache-2.0',
+        author: 'Anthropic',
+        version: '1.5.0',
+        tags: ['document', 'docx', 'word'],
       },
       upstreamStatus: {
         hasUpstream: true,
-        upstreamUrl: "https://github.com/anthropics/skills/document-skills/docx",
-        upstreamVersion: "v1.8.0",
-        currentVersion: "v1.5.0",
+        upstreamUrl: 'https://github.com/anthropics/skills/document-skills/docx',
+        upstreamVersion: 'v1.8.0',
+        currentVersion: 'v1.5.0',
         isOutdated: true,
         lastChecked: new Date().toISOString(),
       },
@@ -133,19 +132,19 @@ const generateMockArtifacts = (): Artifact[] => {
       updatedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
     },
     {
-      id: "3",
-      name: "git-helper",
-      type: "command",
-      scope: "user",
-      status: "active",
-      version: "v1.0.0",
-      source: "local",
+      id: '3',
+      name: 'git-helper',
+      type: 'command',
+      scope: 'user',
+      status: 'active',
+      version: 'v1.0.0',
+      source: 'local',
       metadata: {
-        title: "Git Helper",
-        description: "Custom git workflow commands",
-        author: "Local User",
-        version: "1.0.0",
-        tags: ["git", "vcs", "workflow"],
+        title: 'Git Helper',
+        description: 'Custom git workflow commands',
+        author: 'Local User',
+        version: '1.0.0',
+        tags: ['git', 'vcs', 'workflow'],
       },
       upstreamStatus: {
         hasUpstream: false,
@@ -159,29 +158,29 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-      aliases: ["git"],
+      aliases: ['git'],
     },
     {
-      id: "4",
-      name: "code-reviewer",
-      type: "agent",
-      scope: "local",
-      status: "active",
-      version: "v0.5.0",
-      source: "github.com/example/code-reviewer",
+      id: '4',
+      name: 'code-reviewer',
+      type: 'agent',
+      scope: 'local',
+      status: 'active',
+      version: 'v0.5.0',
+      source: 'github.com/example/code-reviewer',
       metadata: {
-        title: "Code Reviewer Agent",
-        description: "Automated code review assistant",
-        license: "MIT",
-        author: "Example User",
-        version: "0.5.0",
-        tags: ["code-review", "agent", "quality"],
+        title: 'Code Reviewer Agent',
+        description: 'Automated code review assistant',
+        license: 'MIT',
+        author: 'Example User',
+        version: '0.5.0',
+        tags: ['code-review', 'agent', 'quality'],
       },
       upstreamStatus: {
         hasUpstream: true,
-        upstreamUrl: "https://github.com/example/code-reviewer",
-        upstreamVersion: "v0.5.0",
-        currentVersion: "v0.5.0",
+        upstreamUrl: 'https://github.com/example/code-reviewer',
+        upstreamVersion: 'v0.5.0',
+        currentVersion: 'v0.5.0',
         isOutdated: false,
         lastChecked: new Date().toISOString(),
       },
@@ -195,26 +194,26 @@ const generateMockArtifacts = (): Artifact[] => {
       updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
     },
     {
-      id: "5",
-      name: "database-mcp",
-      type: "mcp",
-      scope: "user",
-      status: "active",
-      version: "v2.0.1",
-      source: "anthropics/mcp-servers/database",
+      id: '5',
+      name: 'database-mcp',
+      type: 'mcp',
+      scope: 'user',
+      status: 'active',
+      version: 'v2.0.1',
+      source: 'anthropics/mcp-servers/database',
       metadata: {
-        title: "Database MCP Server",
-        description: "MCP server for database operations",
-        license: "MIT",
-        author: "Anthropic",
-        version: "2.0.1",
-        tags: ["mcp", "database", "sql"],
+        title: 'Database MCP Server',
+        description: 'MCP server for database operations',
+        license: 'MIT',
+        author: 'Anthropic',
+        version: '2.0.1',
+        tags: ['mcp', 'database', 'sql'],
       },
       upstreamStatus: {
         hasUpstream: true,
-        upstreamUrl: "https://github.com/anthropics/mcp-servers/database",
-        upstreamVersion: "v2.0.1",
-        currentVersion: "v2.0.1",
+        upstreamUrl: 'https://github.com/anthropics/mcp-servers/database',
+        upstreamVersion: 'v2.0.1',
+        currentVersion: 'v2.0.1',
         isOutdated: false,
         lastChecked: new Date().toISOString(),
       },
@@ -237,19 +236,19 @@ const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
   const upstream = artifact.upstream;
   const updatedAt = artifact.updated || artifact.added;
   const isOutdated = upstream?.update_available ?? false;
-  const scope: ArtifactScope = artifact.source === "local" ? "local" : "user";
+  const scope: ArtifactScope = artifact.source === 'local' ? 'local' : 'user';
 
   return {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type,
     scope,
-    status: isOutdated ? "outdated" : "active",
+    status: isOutdated ? 'outdated' : 'active',
     version: artifact.version || metadata.version,
     source: artifact.source,
     metadata: {
       title: metadata.title || artifact.name,
-      description: metadata.description || "",
+      description: metadata.description || '',
       license: metadata.license,
       author: metadata.author,
       version: metadata.version || artifact.version,
@@ -258,7 +257,7 @@ const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
     upstreamStatus: {
       hasUpstream: Boolean(upstream?.tracking_enabled),
       upstreamUrl:
-        artifact.source?.startsWith("http") || artifact.source?.includes("github.com")
+        artifact.source?.startsWith('http') || artifact.source?.includes('github.com')
           ? artifact.source
           : undefined,
       upstreamVersion: upstream?.upstream_sha,
@@ -287,17 +286,17 @@ const filterAndSortArtifacts = (
   let filtered = [...artifacts];
 
   // Apply type filter
-  if (filters.type && filters.type !== "all") {
+  if (filters.type && filters.type !== 'all') {
     filtered = filtered.filter((a) => a.type === filters.type);
   }
 
   // Apply status filter
-  if (filters.status && filters.status !== "all") {
+  if (filters.status && filters.status !== 'all') {
     filtered = filtered.filter((a) => a.status === filters.status);
   }
 
   // Apply scope filter
-  if (filters.scope && filters.scope !== "all") {
+  if (filters.scope && filters.scope !== 'all') {
     filtered = filtered.filter((a) => a.scope === filters.scope);
   }
 
@@ -319,15 +318,15 @@ const filterAndSortArtifacts = (
     let bValue: any;
 
     switch (sort.field) {
-      case "name":
+      case 'name':
         aValue = a.name;
         bValue = b.name;
         break;
-      case "updatedAt":
+      case 'updatedAt':
         aValue = new Date(a.updatedAt).getTime();
         bValue = new Date(b.updatedAt).getTime();
         break;
-      case "usageCount":
+      case 'usageCount':
         aValue = a.usageStats.usageCount;
         bValue = b.usageStats.usageCount;
         break;
@@ -335,8 +334,8 @@ const filterAndSortArtifacts = (
         return 0;
     }
 
-    if (aValue < bValue) return sort.order === "asc" ? -1 : 1;
-    if (aValue > bValue) return sort.order === "asc" ? 1 : -1;
+    if (aValue < bValue) return sort.order === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sort.order === 'asc' ? 1 : -1;
     return 0;
   });
 
@@ -345,11 +344,11 @@ const filterAndSortArtifacts = (
 
 // Query keys
 const artifactKeys = {
-  all: ["artifacts"] as const,
-  lists: () => [...artifactKeys.all, "list"] as const,
+  all: ['artifacts'] as const,
+  lists: () => [...artifactKeys.all, 'list'] as const,
   list: (filters: ArtifactFilters, sort: ArtifactSort) =>
     [...artifactKeys.lists(), filters, sort] as const,
-  details: () => [...artifactKeys.all, "detail"] as const,
+  details: () => [...artifactKeys.all, 'detail'] as const,
   detail: (id: string) => [...artifactKeys.details(), id] as const,
 };
 
@@ -361,14 +360,12 @@ async function fetchArtifactsFromApi(
     limit: DEFAULT_ARTIFACT_LIMIT.toString(),
   });
 
-  if (filters.type && filters.type !== "all") {
-    params.set("artifact_type", filters.type);
+  if (filters.type && filters.type !== 'all') {
+    params.set('artifact_type', filters.type);
   }
 
   try {
-    const response = await apiRequest<ApiArtifactListResponse>(
-      `/artifacts?${params.toString()}`
-    );
+    const response = await apiRequest<ApiArtifactListResponse>(`/artifacts?${params.toString()}`);
 
     const mappedArtifacts = response.items.map(mapApiArtifact);
     const filtered = filterAndSortArtifacts(mappedArtifacts, filters, sort);
@@ -381,7 +378,7 @@ async function fetchArtifactsFromApi(
     };
   } catch (error) {
     if (USE_MOCKS) {
-      console.warn("[artifacts] API failed, falling back to mock data", error);
+      console.warn('[artifacts] API failed, falling back to mock data', error);
       const mockArtifacts = generateMockArtifacts();
       const filtered = filterAndSortArtifacts(mockArtifacts, filters, sort);
       return {
@@ -413,7 +410,7 @@ async function fetchArtifactFromApi(id: string): Promise<Artifact | null> {
  */
 export function useArtifacts(
   filters: ArtifactFilters = {},
-  sort: ArtifactSort = { field: "name", order: "asc" }
+  sort: ArtifactSort = { field: 'name', order: 'asc' }
 ) {
   return useQuery({
     queryKey: artifactKeys.list(filters, sort),
@@ -421,7 +418,7 @@ export function useArtifacts(
       return await fetchArtifactsFromApi(filters, sort);
     },
     staleTime: 30000, // Consider data fresh for 30 seconds
-    });
+  });
 }
 
 /**
@@ -447,14 +444,14 @@ export function useUpdateArtifact() {
     mutationFn: async (artifact: Partial<Artifact> & { id: string }) => {
       try {
         const response = await apiRequest<ApiArtifact>(`/artifacts/${artifact.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(artifact),
         });
         return mapApiArtifact(response);
       } catch (error) {
         if (USE_MOCKS) {
-          console.warn("[artifacts] Update API failed, falling back to mock", error);
+          console.warn('[artifacts] Update API failed, falling back to mock', error);
           return artifact as Artifact;
         }
         throw error;
@@ -477,12 +474,12 @@ export function useDeleteArtifact() {
     mutationFn: async (id: string) => {
       try {
         await apiRequest<void>(`/artifacts/${id}`, {
-          method: "DELETE",
+          method: 'DELETE',
         });
         return id;
       } catch (error) {
         if (USE_MOCKS) {
-          console.warn("[artifacts] Delete API failed, falling back to mock", error);
+          console.warn('[artifacts] Delete API failed, falling back to mock', error);
           return id;
         }
         throw error;

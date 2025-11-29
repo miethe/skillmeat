@@ -14,6 +14,7 @@ pnpm install
 ```
 
 This will install:
+
 - `@playwright/test` - Playwright test framework
 - `@axe-core/playwright` - Accessibility testing with axe-core
 
@@ -85,6 +86,7 @@ tests/
 ## Test Coverage
 
 ### 1. Collections Dashboard (`collections.spec.ts`)
+
 - View switching (grid/list)
 - Filtering by type, status, scope
 - Search functionality
@@ -95,6 +97,7 @@ tests/
 - Responsive design
 
 ### 2. Deploy & Sync (`deploy-sync.spec.ts`)
+
 - Deploy workflow
 - Sync workflow
 - Project selection
@@ -103,6 +106,7 @@ tests/
 - Batch operations
 
 ### 3. Analytics (`analytics.spec.ts`)
+
 - Stats cards
 - Top artifacts widget
 - Usage trends widget
@@ -111,6 +115,7 @@ tests/
 - Loading/error states
 
 ### 4. Accessibility (`accessibility.spec.ts`)
+
 - WCAG 2.1 AA compliance
 - Zero critical violations
 - Zero serious violations
@@ -121,6 +126,7 @@ tests/
 - Screen reader support
 
 ### 5. Keyboard Navigation (`keyboard-navigation.spec.ts`)
+
 - Tab order
 - All elements reachable
 - Escape closes modals
@@ -133,6 +139,7 @@ tests/
 ## Accessibility Standards
 
 All tests must pass:
+
 - **WCAG 2.1 Level AA** compliance
 - **No critical violations** from axe-core
 - **No serious violations** from axe-core
@@ -145,10 +152,12 @@ All tests must pass:
 ## CI Integration
 
 Tests run automatically on:
+
 - Push to `main` or `develop`
 - Pull requests to `main` or `develop`
 
 Tests run in three browsers:
+
 - Chromium
 - Firefox
 - WebKit (Safari)
@@ -164,6 +173,7 @@ pnpm run test:e2e:ui
 ```
 
 Features:
+
 - Time travel through test execution
 - Watch mode
 - Pick locators
@@ -193,6 +203,7 @@ pnpm run test:report
 ```
 
 Opens interactive HTML report with:
+
 - Test results
 - Screenshots
 - Videos

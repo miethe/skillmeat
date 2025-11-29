@@ -4,11 +4,11 @@
  * These types represent artifacts in the collection (Skills, Commands, Agents, MCP servers, Hooks)
  */
 
-export type ArtifactType = "skill" | "command" | "agent" | "mcp" | "hook";
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
 
-export type ArtifactScope = "user" | "local";
+export type ArtifactScope = 'user' | 'local';
 
-export type ArtifactStatus = "active" | "outdated" | "conflict" | "error";
+export type ArtifactStatus = 'active' | 'outdated' | 'conflict' | 'error';
 
 export interface ArtifactMetadata {
   title?: string;
@@ -52,14 +52,14 @@ export interface Artifact {
 }
 
 export interface ArtifactFilters {
-  type?: ArtifactType | "all";
-  status?: ArtifactStatus | "all";
-  scope?: ArtifactScope | "all";
+  type?: ArtifactType | 'all';
+  status?: ArtifactStatus | 'all';
+  scope?: ArtifactScope | 'all';
   search?: string;
 }
 
-export type SortField = "name" | "updatedAt" | "usageCount";
-export type SortOrder = "asc" | "desc";
+export type SortField = 'name' | 'updatedAt' | 'usageCount';
+export type SortOrder = 'asc' | 'desc';
 
 export interface ArtifactSort {
   field: SortField;

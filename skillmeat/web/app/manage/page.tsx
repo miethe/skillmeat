@@ -5,7 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { EntityLifecycleProvider, useEntityLifecycle } from '@/components/entity/EntityLifecycleProvider';
+import {
+  EntityLifecycleProvider,
+  useEntityLifecycle,
+} from '@/components/entity/EntityLifecycleProvider';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from './components/entity-tabs';
@@ -53,11 +56,10 @@ function ManagePageContent() {
   }, [activeEntityType, setTypeFilter]);
 
   // Filter entities by tags client-side
-  const filteredEntities = tagFilter.length > 0
-    ? entities.filter((entity) =>
-        tagFilter.some((tag) => entity.tags?.includes(tag))
-      )
-    : entities;
+  const filteredEntities =
+    tagFilter.length > 0
+      ? entities.filter((entity) => tagFilter.some((tag) => entity.tags?.includes(tag)))
+      : entities;
 
   // Memoize event handlers to prevent EntityList re-renders
   const handleEntityClick = useCallback((entity: Entity) => {
@@ -69,16 +71,19 @@ function ManagePageContent() {
     setEditingEntity(entity);
   }, []);
 
-  const handleDelete = useCallback(async (entity: Entity) => {
-    if (confirm(`Are you sure you want to delete ${entity.name}?`)) {
-      try {
-        await deleteEntity(entity.id);
-      } catch (error) {
-        console.error('Delete failed:', error);
-        alert('Failed to delete entity');
+  const handleDelete = useCallback(
+    async (entity: Entity) => {
+      if (confirm(`Are you sure you want to delete ${entity.name}?`)) {
+        try {
+          await deleteEntity(entity.id);
+        } catch (error) {
+          console.error('Delete failed:', error);
+          alert('Failed to delete entity');
+        }
       }
-    }
-  }, [deleteEntity]);
+    },
+    [deleteEntity]
+  );
 
   const handleDeploy = useCallback((entity: Entity) => {
     // Open entity modal to sync tab for deployment
@@ -105,13 +110,13 @@ function ManagePageContent() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-screen flex-col">
       {/* Header */}
       <div className="border-b p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Entity Management</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1 text-muted-foreground">
               Manage your skills, commands, agents, MCP servers, and hooks
             </p>
           </div>
@@ -124,24 +129,31 @@ function ManagePageContent() {
               disabled={isRefetching}
               title="Refresh entities"
             >
-              <RefreshCw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
 
             {/* View mode toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  {viewMode === 'grid' ? <Grid3x3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                  {viewMode === 'grid' ? (
+                    <Grid3x3 className="h-4 w-4" />
+                  ) : (
+                    <List className="h-4 w-4" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'list')}>
+                <DropdownMenuRadioGroup
+                  value={viewMode}
+                  onValueChange={(v) => setViewMode(v as 'grid' | 'list')}
+                >
                   <DropdownMenuRadioItem value="grid">
-                    <Grid3x3 className="h-4 w-4 mr-2" />
+                    <Grid3x3 className="mr-2 h-4 w-4" />
                     Grid
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="list">
-                    <List className="h-4 w-4 mr-2" />
+                    <List className="mr-2 h-4 w-4" />
                     List
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -150,7 +162,7 @@ function ManagePageContent() {
 
             {/* Add button */}
             <Button onClick={() => setAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Add New
             </Button>
           </div>
@@ -159,7 +171,7 @@ function ManagePageContent() {
         {/* Tabs */}
         <EntityTabs>
           {(entityType) => (
-            <div className="flex flex-col h-full">
+            <div className="flex h-full flex-col">
               {/* Filters */}
               <EntityFilters
                 searchQuery={searchQuery}
@@ -171,7 +183,7 @@ function ManagePageContent() {
               />
 
               {/* Entity count */}
-              <div className="px-4 py-2 text-sm text-muted-foreground border-b">
+              <div className="border-b px-4 py-2 text-sm text-muted-foreground">
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -221,7 +233,7 @@ function ManagePageContent() {
       {/* Edit Dialog */}
       {editingEntity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-6 shadow-lg">
             <EntityForm
               mode="edit"
               entity={editingEntity}
@@ -238,11 +250,13 @@ function ManagePageContent() {
 export default function ManagePage() {
   return (
     <EntityLifecycleProvider mode="collection">
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-screen">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        }
+      >
         <ManagePageContent />
       </Suspense>
     </EntityLifecycleProvider>

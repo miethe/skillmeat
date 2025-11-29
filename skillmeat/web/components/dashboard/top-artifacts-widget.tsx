@@ -10,16 +10,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useTopArtifacts } from '@/hooks/useAnalytics';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { calculatePercentage } from '@/lib/utils';
 import type { TopArtifact } from '@/types/analytics';
 
 const COLORS = {
-  skill: '#3b82f6',    // blue
-  command: '#10b981',  // green
-  agent: '#8b5cf6',    // purple
-  mcp: '#f59e0b',      // amber
-  hook: '#ec4899',     // pink
+  skill: '#3b82f6', // blue
+  command: '#10b981', // green
+  agent: '#8b5cf6', // purple
+  mcp: '#f59e0b', // amber
+  hook: '#ec4899', // pink
 };
 
 interface TopArtifactsWidgetProps {
@@ -38,7 +47,7 @@ export function TopArtifactsWidget({ limit = 10, showChart = true }: TopArtifact
           <CardDescription>Most used artifacts by deployment count</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
+          <div className="flex h-64 items-center justify-center text-muted-foreground">
             <p>Failed to load top artifacts data</p>
           </div>
         </CardContent>
@@ -70,9 +79,9 @@ export function TopArtifactsWidget({ limit = 10, showChart = true }: TopArtifact
           <CardDescription>Most used artifacts by deployment count</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+          <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
             <p className="text-sm">No artifacts found</p>
-            <p className="text-xs mt-2">Add artifacts to your collection to see usage statistics</p>
+            <p className="mt-2 text-xs">Add artifacts to your collection to see usage statistics</p>
           </div>
         </CardContent>
       </Card>
@@ -87,7 +96,7 @@ export function TopArtifactsWidget({ limit = 10, showChart = true }: TopArtifact
       </CardHeader>
       <CardContent>
         {showChart && chartData.length > 0 && (
-          <div className="h-64 mb-6">
+          <div className="mb-6 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
@@ -107,10 +116,7 @@ export function TopArtifactsWidget({ limit = 10, showChart = true }: TopArtifact
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
-                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
                 <Bar dataKey="usage" radius={[0, 4, 4, 0]} label={{ position: 'right' }}>
                   {chartData.map((entry, index) => (
                     <Cell
@@ -161,13 +167,13 @@ function ArtifactRow({
   percentage: number;
 }) {
   return (
-    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex-shrink-0 w-6 text-center font-semibold text-muted-foreground text-sm">
+    <div className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+      <div className="w-6 flex-shrink-0 text-center text-sm font-semibold text-muted-foreground">
         {rank}
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="font-medium text-sm truncate">{artifact.artifact_name}</p>
+          <p className="truncate text-sm font-medium">{artifact.artifact_name}</p>
           <Badge variant="outline" className="flex-shrink-0 text-xs">
             {artifact.artifact_type}
           </Badge>
@@ -177,7 +183,7 @@ function ArtifactRow({
         </p>
       </div>
       <div className="flex-shrink-0 text-right">
-        <p className="font-semibold text-sm">{artifact.usage_count}</p>
+        <p className="text-sm font-semibold">{artifact.usage_count}</p>
         <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</p>
       </div>
     </div>
@@ -195,16 +201,16 @@ function CustomTooltip({ active, payload }: any) {
   const data = payload[0].payload;
 
   return (
-    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+    <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
       <div className="space-y-1">
-        <p className="font-semibold text-sm">{data.name}</p>
+        <p className="text-sm font-semibold">{data.name}</p>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs">
             {data.type}
           </Badge>
           <span className="text-xs text-muted-foreground">{data.percentage.toFixed(1)}%</span>
         </div>
-        <div className="pt-2 space-y-1">
+        <div className="space-y-1 pt-2">
           <p className="text-xs">
             <span className="text-muted-foreground">Usage:</span>{' '}
             <span className="font-medium">{data.usage}</span>
@@ -230,7 +236,7 @@ export function TopArtifactsWidgetSkeleton() {
         <CardDescription>Most used artifacts by deployment count</CardDescription>
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-64 w-full mb-6" />
+        <Skeleton className="mb-6 h-64 w-full" />
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center gap-3">

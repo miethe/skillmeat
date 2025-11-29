@@ -13,12 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import {
-  mockApiRoute,
-  navigateToPage,
-  waitForElement,
-  pressKey,
-} from './helpers/test-utils';
+import { mockApiRoute, navigateToPage, waitForElement, pressKey } from './helpers/test-utils';
 import { buildApiResponse, mockArtifacts } from './helpers/fixtures';
 
 /**
@@ -31,9 +26,7 @@ async function runAxeScan(page: any, context?: string) {
 
   // Log violations for debugging
   if (results.violations.length > 0) {
-    console.log(
-      `\n${context || 'Page'} - Accessibility Violations:`
-    );
+    console.log(`\n${context || 'Page'} - Accessibility Violations:`);
     results.violations.forEach((violation) => {
       console.log(`\n${violation.impact?.toUpperCase()}: ${violation.description}`);
       console.log(`Rule: ${violation.id}`);
@@ -57,17 +50,13 @@ test.describe('Accessibility Tests', () => {
   });
 
   test.describe('Page-Level Accessibility', () => {
-    test('Dashboard page should have no critical accessibility violations', async ({
-      page,
-    }) => {
+    test('Dashboard page should have no critical accessibility violations', async ({ page }) => {
       await navigateToPage(page, '/');
 
       const results = await runAxeScan(page, 'Dashboard');
 
       // No critical violations
-      const critical = results.violations.filter(
-        (v) => v.impact === 'critical'
-      );
+      const critical = results.violations.filter((v) => v.impact === 'critical');
       expect(critical).toHaveLength(0);
 
       // No serious violations
@@ -75,32 +64,24 @@ test.describe('Accessibility Tests', () => {
       expect(serious).toHaveLength(0);
     });
 
-    test('Collection page should have no critical accessibility violations', async ({
-      page,
-    }) => {
+    test('Collection page should have no critical accessibility violations', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       const results = await runAxeScan(page, 'Collection');
 
-      const critical = results.violations.filter(
-        (v) => v.impact === 'critical'
-      );
+      const critical = results.violations.filter((v) => v.impact === 'critical');
       expect(critical).toHaveLength(0);
 
       const serious = results.violations.filter((v) => v.impact === 'serious');
       expect(serious).toHaveLength(0);
     });
 
-    test('Projects page should have no critical accessibility violations', async ({
-      page,
-    }) => {
+    test('Projects page should have no critical accessibility violations', async ({ page }) => {
       await navigateToPage(page, '/projects');
 
       const results = await runAxeScan(page, 'Projects');
 
-      const critical = results.violations.filter(
-        (v) => v.impact === 'critical'
-      );
+      const critical = results.violations.filter((v) => v.impact === 'critical');
       expect(critical).toHaveLength(0);
 
       const serious = results.violations.filter((v) => v.impact === 'serious');
@@ -117,9 +98,7 @@ test.describe('Accessibility Tests', () => {
       await expect(h1).toBeVisible();
 
       // Should not skip heading levels
-      const results = await new AxeBuilder({ page })
-        .withRules(['heading-order'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['heading-order']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -205,9 +184,7 @@ test.describe('Accessibility Tests', () => {
       }
     });
 
-    test('should use proper ARIA roles for custom components', async ({
-      page,
-    }) => {
+    test('should use proper ARIA roles for custom components', async ({ page }) => {
       await navigateToPage(page, '/');
 
       const results = await new AxeBuilder({ page })
@@ -217,40 +194,28 @@ test.describe('Accessibility Tests', () => {
       expect(results.violations).toHaveLength(0);
     });
 
-    test('should have proper ARIA live regions for dynamic content', async ({
-      page,
-    }) => {
+    test('should have proper ARIA live regions for dynamic content', async ({ page }) => {
       await navigateToPage(page, '/');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['aria-valid-attr-value'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['aria-valid-attr-value']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
   });
 
   test.describe('Color Contrast', () => {
-    test('should meet WCAG AA color contrast ratios for text', async ({
-      page,
-    }) => {
+    test('should meet WCAG AA color contrast ratios for text', async ({ page }) => {
       await navigateToPage(page, '/');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['color-contrast'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
 
       // Filter for text contrast violations
-      const contrastViolations = results.violations.filter(
-        (v) => v.id === 'color-contrast'
-      );
+      const contrastViolations = results.violations.filter((v) => v.id === 'color-contrast');
 
       expect(contrastViolations).toHaveLength(0);
     });
 
-    test('should have sufficient contrast for interactive elements', async ({
-      page,
-    }) => {
+    test('should have sufficient contrast for interactive elements', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       // Check buttons
@@ -262,9 +227,7 @@ test.describe('Accessibility Tests', () => {
       expect(results.violations).toHaveLength(0);
     });
 
-    test('should have sufficient contrast for form controls', async ({
-      page,
-    }) => {
+    test('should have sufficient contrast for form controls', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       const results = await new AxeBuilder({ page })
@@ -295,16 +258,12 @@ test.describe('Accessibility Tests', () => {
       await pressKey(page, 'Tab');
 
       // Should have visible focus
-      const focusedElement = await page.evaluateHandle(() =>
-        document.activeElement
-      );
+      const focusedElement = await page.evaluateHandle(() => document.activeElement);
 
       expect(focusedElement).toBeTruthy();
 
       // Check for focus-visible styles
-      const results = await new AxeBuilder({ page })
-        .withRules(['focus-order-semantics'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['focus-order-semantics']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -312,9 +271,7 @@ test.describe('Accessibility Tests', () => {
     test('should maintain logical focus order', async ({ page }) => {
       await navigateToPage(page, '/');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['tabindex'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['tabindex']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -373,9 +330,7 @@ test.describe('Accessibility Tests', () => {
     test('should have labels for all form inputs', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['label'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['label']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -394,9 +349,7 @@ test.describe('Accessibility Tests', () => {
       await navigateToPage(page, '/collection');
 
       // Required fields should have aria-required or required attribute
-      const requiredInputs = page.locator(
-        'input[required], input[aria-required="true"]'
-      );
+      const requiredInputs = page.locator('input[required], input[aria-required="true"]');
 
       const count = await requiredInputs.count();
       if (count > 0) {
@@ -414,9 +367,7 @@ test.describe('Accessibility Tests', () => {
     test('should provide error messages for validation', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['aria-valid-attr-value'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['aria-valid-attr-value']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -526,16 +477,12 @@ test.describe('Accessibility Tests', () => {
     test('should have alt text for images', async ({ page }) => {
       await navigateToPage(page, '/');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['image-alt'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['image-alt']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
 
-    test('should hide decorative icons from screen readers', async ({
-      page,
-    }) => {
+    test('should hide decorative icons from screen readers', async ({ page }) => {
       await navigateToPage(page, '/');
 
       // Decorative icons should have aria-hidden="true"
@@ -570,14 +517,10 @@ test.describe('Accessibility Tests', () => {
       expect(newTitle).not.toBe(title);
     });
 
-    test('should have proper live regions for dynamic updates', async ({
-      page,
-    }) => {
+    test('should have proper live regions for dynamic updates', async ({ page }) => {
       await navigateToPage(page, '/');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['aria-allowed-attr'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['aria-allowed-attr']).analyze();
 
       expect(results.violations).toHaveLength(0);
     });
@@ -590,9 +533,7 @@ test.describe('Accessibility Tests', () => {
 
       const results = await runAxeScan(page, 'Mobile Dashboard');
 
-      const critical = results.violations.filter(
-        (v) => v.impact === 'critical'
-      );
+      const critical = results.violations.filter((v) => v.impact === 'critical');
       expect(critical).toHaveLength(0);
     });
 
@@ -602,9 +543,7 @@ test.describe('Accessibility Tests', () => {
 
       const results = await runAxeScan(page, 'Tablet Dashboard');
 
-      const critical = results.violations.filter(
-        (v) => v.impact === 'critical'
-      );
+      const critical = results.violations.filter((v) => v.impact === 'critical');
       expect(critical).toHaveLength(0);
     });
 
@@ -612,9 +551,7 @@ test.describe('Accessibility Tests', () => {
       await page.setViewportSize({ width: 375, height: 667 });
       await navigateToPage(page, '/collection');
 
-      const results = await new AxeBuilder({ page })
-        .withRules(['target-size'])
-        .analyze();
+      const results = await new AxeBuilder({ page }).withRules(['target-size']).analyze();
 
       // WCAG 2.1 AA requires 44x44px touch targets
       expect(results.violations).toHaveLength(0);

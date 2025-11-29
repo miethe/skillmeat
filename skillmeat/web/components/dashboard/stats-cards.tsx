@@ -18,7 +18,9 @@ export function StatsCards() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-destructive">Error Loading Stats</CardTitle>
+            <CardTitle className="text-sm font-medium text-destructive">
+              Error Loading Stats
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Failed to fetch analytics data</p>
@@ -78,7 +80,7 @@ export function StatsCards() {
               <div className={`font-bold ${stat.valueClass || 'text-2xl'}`}>
                 {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{stat.description}</p>
             </CardContent>
           </Card>
         );
@@ -100,7 +102,7 @@ export function StatsCardsSkeleton() {
             <Skeleton className="h-4 w-4 rounded" />
           </CardHeader>
           <CardContent>
-            <Skeleton className="h-8 w-16 mb-2" />
+            <Skeleton className="mb-2 h-8 w-16" />
             <Skeleton className="h-3 w-32" />
           </CardContent>
         </Card>

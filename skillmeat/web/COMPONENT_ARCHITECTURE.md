@@ -116,6 +116,7 @@ app/collection/page.tsx (Main Dashboard)
 ## State Management Strategy
 
 ### Server State (React Query)
+
 - Artifact data fetching
 - Caching with 30s stale time
 - Automatic refetching
@@ -123,6 +124,7 @@ app/collection/page.tsx (Main Dashboard)
 - Cache invalidation on mutations
 
 ### Local UI State (React useState)
+
 - View mode toggle (grid/list)
 - Filter values
 - Sort configuration
@@ -195,11 +197,13 @@ Desktop (> 1024px):
 ## Error Boundaries
 
 Currently handled at component level:
+
 - Error state in useArtifacts hook
 - Error display in page component
 - Graceful degradation
 
 Future enhancement:
+
 - React Error Boundary wrapper
 - Global error reporting
 - Retry mechanisms
@@ -207,41 +211,44 @@ Future enhancement:
 ## Testing Strategy
 
 ### Unit Tests (Future)
+
 ```typescript
 // Component tests
 describe('ArtifactGrid', () => {
-  it('renders artifacts in grid layout')
-  it('shows loading skeletons when loading')
-  it('shows empty state when no artifacts')
-  it('calls onClick when artifact clicked')
-})
+  it('renders artifacts in grid layout');
+  it('shows loading skeletons when loading');
+  it('shows empty state when no artifacts');
+  it('calls onClick when artifact clicked');
+});
 
 // Hook tests
 describe('useArtifacts', () => {
-  it('fetches artifacts with filters')
-  it('sorts artifacts correctly')
-  it('handles errors gracefully')
-})
+  it('fetches artifacts with filters');
+  it('sorts artifacts correctly');
+  it('handles errors gracefully');
+});
 ```
 
 ### Integration Tests (Future)
+
 ```typescript
 describe('Collection Dashboard', () => {
-  it('filters artifacts by type')
-  it('switches between grid and list view')
-  it('opens detail drawer on artifact click')
-  it('clears all filters')
-})
+  it('filters artifacts by type');
+  it('switches between grid and list view');
+  it('opens detail drawer on artifact click');
+  it('clears all filters');
+});
 ```
 
 ### E2E Tests (Future)
+
 ```typescript
 test('user can browse and filter artifacts', async ({ page }) => {
-  await page.goto('/collection')
-  await page.click('[data-testid="filter-type"]')
-  await page.click('[data-testid="type-skill"]')
+  await page.goto('/collection');
+  await page.click('[data-testid="filter-type"]');
+  await page.click('[data-testid="type-skill"]');
   // ...
-})
+});
 ```
 
 ## API Integration Plan
@@ -249,6 +256,7 @@ test('user can browse and filter artifacts', async ({ page }) => {
 When P1-004 (API endpoints) is ready:
 
 1. **Update `useArtifacts` hook:**
+
    ```typescript
    queryFn: async () => {
      const response = await apiClient.artifacts.listArtifacts({
@@ -260,7 +268,7 @@ When P1-004 (API endpoints) is ready:
        sortOrder: sort.order,
      });
      return response;
-   }
+   };
    ```
 
 2. **Update types if needed:**
@@ -280,18 +288,21 @@ When P1-004 (API endpoints) is ready:
 ## Future Enhancements
 
 ### Phase 2 Features
+
 - Advanced filtering (date ranges, regex)
 - Saved filter presets
 - Bulk actions (select multiple)
 - Export/import functionality
 
 ### Phase 3 Features
+
 - Real-time updates (WebSocket)
 - Analytics dashboard
 - Usage trends charts
 - Collaborative features
 
 ### Performance
+
 - Virtual scrolling for 1000+ items
 - Infinite scroll option
 - Image lazy loading

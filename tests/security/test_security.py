@@ -27,10 +27,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
-from skillmeat.core.sharing.bundle import Bundle, BundleManifest, BundleMetadata
-from skillmeat.core.sharing.exporter import BundleExporter
+from skillmeat.core.sharing.bundle import Bundle, BundleArtifact, BundleMetadata
+from skillmeat.core.sharing.builder import BundleBuilder
 from skillmeat.core.sharing.importer import BundleImporter
-from skillmeat.core.sharing.signer import BundleSigner, KeyStorage
+from skillmeat.core.signing.signer import BundleSigner
+from skillmeat.core.signing.storage import KeyStorage
 from skillmeat.marketplace.security_scanner import SecurityScanner, ScanResult
 
 
@@ -69,29 +70,31 @@ class TestBundleSecurity:
         artifact_dir.mkdir()
         (artifact_dir / "SKILL.md").write_text("# Test Skill")
 
-        # Create bundle
-        manifest = BundleManifest(
-            metadata=BundleMetadata(
-                name="test-bundle",
-                version="1.0.0",
-                description="Test bundle",
-                author="Test Author",
-                license="MIT",
-            ),
-            artifacts=[
-                {
-                    "name": "test-skill",
-                    "type": "skill",
-                    "path": "test-skill",
-                }
-            ],
+        # Create bundle metadata
+        metadata = BundleMetadata(
+            name="test-bundle",
+            description="Test bundle",
+            author="Test Author",
+            created_at="2025-01-01T00:00:00",
+            version="1.0.0",
+            license="MIT",
         )
 
+        # Create artifact
+        artifact = BundleArtifact(
+            type="skill",
+            name="test-skill",
+            version="1.0.0",
+            scope="user",
+            path="artifacts/test-skill/",
+            files=["SKILL.md"],
+            hash="sha256:" + "a" * 64,
+        )
+
+        # Create bundle
         return Bundle(
-            manifest=manifest,
-            artifact_paths={
-                "test-skill": artifact_dir,
-            },
+            metadata=metadata,
+            artifacts=[artifact],
         )
 
     def test_signature_verification_required(self, temp_dir: Path, sample_bundle: Bundle, bundle_signer: BundleSigner):
@@ -174,17 +177,15 @@ class TestBundleSecurity:
             }))
 
         # Create a mock bundle for scanning
-        manifest = BundleManifest(
-            metadata=BundleMetadata(
-                name="test",
-                version="1.0.0",
-                description="Test",
-                author="Test",
-                license="MIT",
-            ),
-            artifacts=[],
+        metadata = BundleMetadata(
+            name="test",
+            description="Test",
+            author="Test",
+            created_at="2025-01-01T00:00:00",
+            version="1.0.0",
+            license="MIT",
         )
-        bundle = Bundle(manifest=manifest, artifact_paths={})
+        bundle = Bundle(metadata=metadata, artifacts=[])
 
         # Scan should detect executable
         scanner = SecurityScanner()
@@ -220,17 +221,15 @@ class TestBundleSecurity:
             }))
 
         # Create a mock bundle for scanning
-        manifest = BundleManifest(
-            metadata=BundleMetadata(
-                name="test",
-                version="1.0.0",
-                description="Test",
-                author="Test",
-                license="MIT",
-            ),
-            artifacts=[],
+        metadata = BundleMetadata(
+            name="test",
+            description="Test",
+            author="Test",
+            created_at="2025-01-01T00:00:00",
+            version="1.0.0",
+            license="MIT",
         )
-        bundle = Bundle(manifest=manifest, artifact_paths={})
+        bundle = Bundle(metadata=metadata, artifacts=[])
 
         # Scan should detect secrets
         scanner = SecurityScanner()
@@ -249,17 +248,15 @@ class TestBundleSecurity:
 
         # Create a file larger than MAX_BUNDLE_SIZE (100MB)
         # For testing, we'll just check the logic without creating a huge file
-        manifest = BundleManifest(
-            metadata=BundleMetadata(
-                name="large-bundle",
-                version="1.0.0",
-                description="Large bundle",
-                author="Test",
-                license="MIT",
-            ),
-            artifacts=[],
+        metadata = BundleMetadata(
+            name="large-bundle",
+            description="Large bundle",
+            author="Test",
+            created_at="2025-01-01T00:00:00",
+            version="1.0.0",
+            license="MIT",
         )
-        bundle = Bundle(manifest=manifest, artifact_paths={})
+        bundle = Bundle(metadata=metadata, artifacts=[])
 
         # Create a small file for testing (we'll mock the size check)
         with zipfile.ZipFile(bundle_path, "w") as zf:

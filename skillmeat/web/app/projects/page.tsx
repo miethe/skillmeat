@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { GitBranch, FolderOpen, Clock, Package, Plus, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useProjects } from "@/hooks/useProjects";
-import { CreateProjectDialog } from "./components/create-project-dialog";
-import { ProjectActions } from "./components/project-actions";
-import type { ProjectSummary } from "@/types/project";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { GitBranch, FolderOpen, Clock, Package, Plus, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useProjects } from '@/hooks/useProjects';
+import { CreateProjectDialog } from './components/create-project-dialog';
+import { ProjectActions } from './components/project-actions';
+import type { ProjectSummary } from '@/types/project';
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -50,14 +50,14 @@ export default function ProjectsPage() {
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "Never";
+    if (!dateString) return 'Never';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
@@ -70,9 +70,7 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">
-            Manage your deployed projects and configurations
-          </p>
+          <p className="text-muted-foreground">Manage your deployed projects and configurations</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -82,7 +80,7 @@ export default function ProjectsPage() {
             disabled={isRefreshing || isLoading}
             title="Refresh projects (rescan filesystem)"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -97,13 +95,13 @@ export default function ProjectsPage() {
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
-                <div className="h-6 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+                <div className="h-6 w-3/4 rounded bg-muted" />
+                <div className="mt-2 h-4 w-1/2 rounded bg-muted" />
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="h-4 bg-muted rounded w-full" />
-                  <div className="h-4 bg-muted rounded w-2/3" />
+                  <div className="h-4 w-full rounded bg-muted" />
+                  <div className="h-4 w-2/3 rounded bg-muted" />
                 </div>
               </CardContent>
             </Card>
@@ -128,10 +126,10 @@ export default function ProjectsPage() {
       {!isLoading && !error && projects?.length === 0 && (
         <Card>
           <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No projects found</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+            <div className="py-8 text-center">
+              <FolderOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold">No projects found</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
                 Create a new project to start deploying artifacts
               </p>
               <Button onClick={() => setIsCreateOpen(true)}>
@@ -148,7 +146,7 @@ export default function ProjectsPage() {
         <>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">
-              {projects.length} {projects.length === 1 ? "Project" : "Projects"}
+              {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
             </h2>
           </div>
 
@@ -156,24 +154,21 @@ export default function ProjectsPage() {
             {projects.map((project) => (
               <Card
                 key={project.id}
-                className="cursor-pointer hover:border-primary transition-colors"
+                className="cursor-pointer transition-colors hover:border-primary"
                 onClick={() => handleProjectClick(project)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <GitBranch className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      <CardTitle className="text-lg truncate">{project.name}</CardTitle>
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <GitBranch className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                      <CardTitle className="truncate text-lg">{project.name}</CardTitle>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-shrink-0 items-center gap-2">
                       <Badge variant="secondary">{project.deployment_count}</Badge>
-                      <ProjectActions
-                        project={project}
-                        onSuccess={handleActionSuccess}
-                      />
+                      <ProjectActions project={project} onSuccess={handleActionSuccess} />
                     </div>
                   </div>
-                  <CardDescription className="text-xs font-mono truncate">
+                  <CardDescription className="truncate font-mono text-xs">
                     {project.path}
                   </CardDescription>
                 </CardHeader>
@@ -182,8 +177,8 @@ export default function ProjectsPage() {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Package className="h-4 w-4" />
                       <span>
-                        {project.deployment_count}{" "}
-                        {project.deployment_count === 1 ? "artifact" : "artifacts"}
+                        {project.deployment_count}{' '}
+                        {project.deployment_count === 1 ? 'artifact' : 'artifacts'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -210,10 +205,10 @@ export default function ProjectsPage() {
           {selectedProject && (
             <div className="space-y-4">
               <div className="text-sm">
-                <div className="font-mono text-xs text-muted-foreground mb-4">
+                <div className="mb-4 font-mono text-xs text-muted-foreground">
                   {selectedProject.path}
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="mb-4 grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-muted-foreground">Deployments</p>
                     <p className="text-2xl font-bold">{selectedProject.deployment_count}</p>
@@ -230,11 +225,7 @@ export default function ProjectsPage() {
                 <Button onClick={handleExpandProject} className="flex-1">
                   View Full Details
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
                   Close
                 </Button>
               </div>

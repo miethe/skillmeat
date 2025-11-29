@@ -198,7 +198,7 @@ export function MarkdownEditor({
   return (
     <div
       ref={containerRef}
-      className={cn('h-full w-full overflow-auto border rounded-md', className)}
+      className={cn('h-full w-full overflow-auto rounded-md border', className)}
     />
   );
 }

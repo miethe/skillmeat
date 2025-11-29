@@ -216,11 +216,10 @@ const artifacts = await apiClient.artifacts.listArtifacts({
 });
 
 // Build paginated response
-const response = apiUtils.buildPaginatedResponse(
-  artifacts.items,
-  artifacts.total,
-  { page: 1, pageSize: 20 },
-);
+const response = apiUtils.buildPaginatedResponse(artifacts.items, artifacts.total, {
+  page: 1,
+  pageSize: 20,
+});
 
 console.log('Has more pages:', response.hasMore);
 console.log('Total items:', response.total);

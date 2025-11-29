@@ -4,9 +4,9 @@
  * These hooks provide data fetching, caching, and state management for marketplace operations.
  */
 
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import { useToast } from "./use-toast";
-import { ApiError, apiRequest } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useToast } from './use-toast';
+import { ApiError, apiRequest } from '@/lib/api';
 import type {
   MarketplaceListingDetail,
   MarketplaceFilters,
@@ -16,17 +16,17 @@ import type {
   InstallResponse,
   PublishRequest,
   PublishResponse,
-} from "@/types/marketplace";
+} from '@/types/marketplace';
 
 // Query keys
 const marketplaceKeys = {
-  all: ["marketplace"] as const,
-  listings: () => [...marketplaceKeys.all, "listings"] as const,
+  all: ['marketplace'] as const,
+  listings: () => [...marketplaceKeys.all, 'listings'] as const,
   listing: (filters: MarketplaceFilters, cursor?: string) =>
     [...marketplaceKeys.listings(), filters, cursor] as const,
-  details: () => [...marketplaceKeys.all, "detail"] as const,
+  details: () => [...marketplaceKeys.all, 'detail'] as const,
   detail: (id: string) => [...marketplaceKeys.details(), id] as const,
-  brokers: () => [...marketplaceKeys.all, "brokers"] as const,
+  brokers: () => [...marketplaceKeys.all, 'brokers'] as const,
 };
 
 /**
@@ -39,15 +39,15 @@ async function fetchListings(
 ): Promise<ListingsPageResponse> {
   const params = new URLSearchParams();
 
-  if (filters.broker) params.append("broker", filters.broker);
-  if (filters.query) params.append("query", filters.query);
+  if (filters.broker) params.append('broker', filters.broker);
+  if (filters.query) params.append('query', filters.query);
   if (filters.tags && filters.tags.length > 0) {
-    params.append("tags", filters.tags.join(","));
+    params.append('tags', filters.tags.join(','));
   }
-  if (filters.license) params.append("license", filters.license);
-  if (filters.publisher) params.append("publisher", filters.publisher);
-  if (cursor) params.append("cursor", cursor);
-  params.append("limit", limit.toString());
+  if (filters.license) params.append('license', filters.license);
+  if (filters.publisher) params.append('publisher', filters.publisher);
+  if (cursor) params.append('cursor', cursor);
+  params.append('limit', limit.toString());
 
   return apiRequest<ListingsPageResponse>(`/marketplace/listings?${params}`);
 }
@@ -80,7 +80,7 @@ async function fetchBrokers(): Promise<BrokerInfo[]> {
 async function installListing(request: InstallRequest): Promise<InstallResponse> {
   try {
     return await apiRequest<InstallResponse>(`/marketplace/install`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(request),
     });
   } catch (error) {
@@ -97,7 +97,7 @@ async function installListing(request: InstallRequest): Promise<InstallResponse>
 async function publishBundle(request: PublishRequest): Promise<PublishResponse> {
   try {
     return await apiRequest<PublishResponse>(`/marketplace/publish`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(request),
     });
   } catch (error) {
@@ -113,7 +113,7 @@ async function publishBundle(request: PublishRequest): Promise<PublishResponse> 
  */
 export function useListings(filters: MarketplaceFilters = {}, limit: number = 50) {
   return useInfiniteQuery({
-    queryKey: marketplaceKeys.listing(filters, "infinite"),
+    queryKey: marketplaceKeys.listing(filters, 'infinite'),
     queryFn: ({ pageParam }) => fetchListings(filters, pageParam, limit),
     getNextPageParam: (lastPage) =>
       lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor : undefined,
@@ -162,16 +162,16 @@ export function useInstallListing() {
 
       // Show success toast
       toast({
-        title: "Installation successful",
+        title: 'Installation successful',
         description: `Installed ${data.artifacts_imported.length} artifacts from ${data.listing_id}`,
       });
     },
     onError: (error: Error) => {
       // Show error toast
       toast({
-        title: "Installation failed",
+        title: 'Installation failed',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     },
   });
@@ -191,14 +191,14 @@ export function usePublishBundle() {
       queryClient.invalidateQueries({ queryKey: marketplaceKeys.listings() });
 
       // Show success toast based on status
-      if (data.status === "approved") {
+      if (data.status === 'approved') {
         toast({
-          title: "Bundle published",
+          title: 'Bundle published',
           description: `Your bundle has been approved and is now live!`,
         });
-      } else if (data.status === "pending") {
+      } else if (data.status === 'pending') {
         toast({
-          title: "Bundle submitted",
+          title: 'Bundle submitted',
           description: `Your bundle is pending review. Submission ID: ${data.submission_id}`,
         });
       }
@@ -206,9 +206,9 @@ export function usePublishBundle() {
     onError: (error: Error) => {
       // Show error toast
       toast({
-        title: "Publish failed",
+        title: 'Publish failed',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     },
   });

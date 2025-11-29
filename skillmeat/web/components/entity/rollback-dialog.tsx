@@ -5,10 +5,10 @@
  * Shows what will be rolled back and warns about losing local changes.
  */
 
-"use client";
+'use client';
 
-import * as React from "react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import * as React from 'react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { Entity } from "@/types/entity";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { Entity } from '@/types/entity';
 
 /**
  * Props for RollbackDialog component
@@ -60,12 +60,7 @@ export interface RollbackDialogProps {
  * @param props - RollbackDialogProps configuration
  * @returns Dialog component with rollback confirmation UI
  */
-export function RollbackDialog({
-  entity,
-  open,
-  onOpenChange,
-  onConfirm,
-}: RollbackDialogProps) {
+export function RollbackDialog({ entity, open, onOpenChange, onConfirm }: RollbackDialogProps) {
   const [isRollingBack, setIsRollingBack] = React.useState(false);
 
   const handleConfirm = async () => {
@@ -74,14 +69,14 @@ export function RollbackDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to rollback entity:", error);
+      console.error('Failed to rollback entity:', error);
     } finally {
       setIsRollingBack(false);
     }
   };
 
-  const currentVersion = entity.version || "Unknown";
-  const targetVersion = entity.version || "Collection version";
+  const currentVersion = entity.version || 'Unknown';
+  const targetVersion = entity.version || 'Collection version';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,24 +96,28 @@ export function RollbackDialog({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground mb-1">Current (Local)</p>
-                <p className="font-mono text-xs bg-muted px-2 py-1.5 rounded border">
+                <p className="mb-1 text-muted-foreground">Current (Local)</p>
+                <p className="rounded border bg-muted px-2 py-1.5 font-mono text-xs">
                   {currentVersion}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground mb-1">Target (Collection)</p>
-                <p className="font-mono text-xs bg-muted px-2 py-1.5 rounded border">
+                <p className="mb-1 text-muted-foreground">Target (Collection)</p>
+                <p className="rounded border bg-muted px-2 py-1.5 font-mono text-xs">
                   {targetVersion}
                 </p>
               </div>
             </div>
 
             <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-1">Entity Details:</p>
+              <p className="mb-1 font-medium">Entity Details:</p>
               <ul className="space-y-1 pl-4">
-                <li>Name: <span className="font-mono">{entity.name}</span></li>
-                <li>Type: <span className="capitalize">{entity.type}</span></li>
+                <li>
+                  Name: <span className="font-mono">{entity.name}</span>
+                </li>
+                <li>
+                  Type: <span className="capitalize">{entity.type}</span>
+                </li>
                 {entity.projectPath && (
                   <li className="break-all">
                     Project: <span className="font-mono text-xs">{entity.projectPath}</span>
@@ -133,26 +132,18 @@ export function RollbackDialog({
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Warning: This action cannot be undone</AlertTitle>
             <AlertDescription>
-              All local modifications will be lost. The collection version will overwrite
-              your current local version. Make sure you have backed up any important changes
-              before proceeding.
+              All local modifications will be lost. The collection version will overwrite your
+              current local version. Make sure you have backed up any important changes before
+              proceeding.
             </AlertDescription>
           </Alert>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isRollingBack}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRollingBack}>
             Cancel
           </Button>
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={isRollingBack}
-          >
+          <Button variant="destructive" onClick={handleConfirm} disabled={isRollingBack}>
             {isRollingBack ? (
               <>
                 <RotateCcw className="mr-2 h-4 w-4 animate-spin" />

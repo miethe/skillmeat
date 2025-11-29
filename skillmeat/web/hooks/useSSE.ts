@@ -2,7 +2,7 @@
  * Server-Sent Events (SSE) hook for real-time progress updates
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from 'react';
 
 export interface SSEMessage<T = any> {
   event: string;
@@ -25,10 +25,7 @@ export interface UseSSEOptions {
   onClose?: () => void;
 }
 
-export function useSSE<T = any>(
-  url: string | null,
-  options: UseSSEOptions = {}
-) {
+export function useSSE<T = any>(url: string | null, options: UseSSEOptions = {}) {
   const [state, setState] = useState<SSEState<T>>({
     isConnected: false,
     isConnecting: false,

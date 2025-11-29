@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Bundle List Component
@@ -6,18 +6,11 @@
  * Display list of created and imported bundles with analytics
  */
 
-import { useState } from "react";
-import {
-  Package,
-  Download,
-  Trash2,
-  Share2,
-  Calendar,
-  FileArchive,
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Package, Download, Trash2, Share2, Calendar, FileArchive } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -25,16 +18,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { ShareLink } from "./share-link";
-import { useBundles, useDeleteBundle, useBundleAnalytics } from "@/hooks/useBundles";
-import type { BundleListItem } from "@/types/bundle";
+} from '@/components/ui/dialog';
+import { ShareLink } from './share-link';
+import { useBundles, useDeleteBundle, useBundleAnalytics } from '@/hooks/useBundles';
+import type { BundleListItem } from '@/types/bundle';
 
 export interface BundleListProps {
-  filter?: "created" | "imported" | "all";
+  filter?: 'created' | 'imported' | 'all';
 }
 
-export function BundleList({ filter = "all" }: BundleListProps) {
+export function BundleList({ filter = 'all' }: BundleListProps) {
   const { data: bundles, isLoading } = useBundles(filter);
   const [selectedBundle, setSelectedBundle] = useState<BundleListItem | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -51,7 +44,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
       setShowDeleteDialog(false);
       setSelectedBundle(null);
     } catch (error) {
-      console.error("Failed to delete bundle:", error);
+      console.error('Failed to delete bundle:', error);
     }
   };
 
@@ -61,8 +54,8 @@ export function BundleList({ filter = "all" }: BundleListProps) {
         {[1, 2, 3].map((i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
-              <div className="h-4 bg-muted rounded w-1/3 mb-2" />
-              <div className="h-3 bg-muted rounded w-2/3" />
+              <div className="mb-2 h-4 w-1/3 rounded bg-muted" />
+              <div className="h-3 w-2/3 rounded bg-muted" />
             </CardContent>
           </Card>
         ))}
@@ -74,14 +67,14 @@ export function BundleList({ filter = "all" }: BundleListProps) {
     return (
       <Card>
         <CardContent className="p-12 text-center">
-          <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">No bundles yet</h3>
+          <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold">No bundles yet</h3>
           <p className="text-sm text-muted-foreground">
-            {filter === "created"
-              ? "Create your first bundle to share artifacts with others"
-              : filter === "imported"
-              ? "Import bundles shared by others to get started"
-              : "No bundles available"}
+            {filter === 'created'
+              ? 'Create your first bundle to share artifacts with others'
+              : filter === 'imported'
+                ? 'Import bundles shared by others to get started'
+                : 'No bundles available'}
           </p>
         </CardContent>
       </Card>
@@ -92,37 +85,32 @@ export function BundleList({ filter = "all" }: BundleListProps) {
     <>
       <div className="space-y-3">
         {bundles.map((bundle) => (
-          <Card
-            key={bundle.id}
-            className="hover:shadow-md transition-shadow cursor-pointer group"
-          >
+          <Card key={bundle.id} className="group cursor-pointer transition-shadow hover:shadow-md">
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+                    <div className="flex-shrink-0 rounded-lg bg-primary/10 p-2">
                       <Package className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-base truncate">
-                          {bundle.metadata.name}
-                        </h3>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <h3 className="truncate text-base font-semibold">{bundle.metadata.name}</h3>
                         {bundle.isImported && (
-                          <Badge variant="secondary" className="text-xs flex-shrink-0">
+                          <Badge variant="secondary" className="flex-shrink-0 text-xs">
                             Imported
                           </Badge>
                         )}
                       </div>
 
                       {bundle.metadata.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                           {bundle.metadata.description}
                         </p>
                       )}
 
                       {bundle.metadata.tags && bundle.metadata.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
+                        <div className="mb-3 flex flex-wrap gap-1">
                           {bundle.metadata.tags.slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
@@ -147,9 +135,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          <span>
-                            {new Date(bundle.exportedAt).toLocaleDateString()}
-                          </span>
+                          <span>{new Date(bundle.exportedAt).toLocaleDateString()}</span>
                         </div>
                         {bundle.shareLink && (
                           <div className="flex items-center gap-1">
@@ -162,7 +148,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                   {bundle.shareLink && (
                     <Button
                       variant="outline"
@@ -173,7 +159,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
                         setShowShareDialog(true);
                       }}
                     >
-                      <Share2 className="h-4 w-4 mr-1" />
+                      <Share2 className="mr-1 h-4 w-4" />
                       Share
                     </Button>
                   )}
@@ -208,48 +194,38 @@ export function BundleList({ filter = "all" }: BundleListProps) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <ShareLink
-                shareLink={selectedBundle.shareLink}
-                showAnalytics={true}
-              />
+              <ShareLink shareLink={selectedBundle.shareLink} showAnalytics={true} />
 
               {analytics && (
-                <div className="rounded-lg border p-4 space-y-3">
+                <div className="space-y-3 rounded-lg border p-4">
                   <h4 className="text-sm font-medium">Analytics</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Total Downloads</p>
-                      <p className="font-medium text-lg">{analytics.downloads}</p>
+                      <p className="text-lg font-medium">{analytics.downloads}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Unique Users</p>
-                      <p className="font-medium text-lg">
-                        {analytics.uniqueDownloaders}
-                      </p>
+                      <p className="text-lg font-medium">{analytics.uniqueDownloaders}</p>
                     </div>
                   </div>
                   {analytics.lastDownloaded && (
-                    <div className="pt-2 border-t text-xs text-muted-foreground">
-                      Last downloaded:{" "}
-                      {new Date(analytics.lastDownloaded).toLocaleString()}
+                    <div className="border-t pt-2 text-xs text-muted-foreground">
+                      Last downloaded: {new Date(analytics.lastDownloaded).toLocaleString()}
                     </div>
                   )}
 
                   {analytics.popularArtifacts.length > 0 && (
-                    <div className="pt-2 border-t">
-                      <p className="text-xs font-medium mb-2">Popular Artifacts</p>
+                    <div className="border-t pt-2">
+                      <p className="mb-2 text-xs font-medium">Popular Artifacts</p>
                       <div className="space-y-1">
                         {analytics.popularArtifacts.map((artifact) => (
                           <div
                             key={artifact.artifactId}
                             className="flex items-center justify-between text-xs"
                           >
-                            <span className="text-muted-foreground">
-                              {artifact.artifactName}
-                            </span>
-                            <span className="font-medium">
-                              {artifact.downloads} downloads
-                            </span>
+                            <span className="text-muted-foreground">{artifact.artifactName}</span>
+                            <span className="font-medium">{artifact.downloads} downloads</span>
                           </div>
                         ))}
                       </div>
@@ -271,15 +247,12 @@ export function BundleList({ filter = "all" }: BundleListProps) {
           <DialogHeader>
             <DialogTitle>Delete Bundle?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedBundle?.metadata.name}"? This
-              action cannot be undone.
+              Are you sure you want to delete "{selectedBundle?.metadata.name}"? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
             <Button
@@ -287,7 +260,7 @@ export function BundleList({ filter = "all" }: BundleListProps) {
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

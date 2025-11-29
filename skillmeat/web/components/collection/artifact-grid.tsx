@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { Package } from "lucide-react";
-import type { Artifact } from "@/types/artifact";
-import { UnifiedCard, UnifiedCardSkeleton } from "@/components/shared/unified-card";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Package } from 'lucide-react';
+import type { Artifact } from '@/types/artifact';
+import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ArtifactGridProps {
   artifacts: Artifact[];
@@ -12,24 +12,16 @@ interface ArtifactGridProps {
   onArtifactClick: (artifact: Artifact) => void;
 }
 
-function ArtifactCard({
-  artifact,
-  onClick,
-}: {
-  artifact: Artifact;
-  onClick: () => void;
-}) {
-  return (
-    <UnifiedCard
-      item={artifact}
-      onClick={onClick}
-    />
-  );
+function ArtifactCard({ artifact, onClick }: { artifact: Artifact; onClick: () => void }) {
+  return <UnifiedCard item={artifact} onClick={onClick} />;
 }
 
 function ArtifactGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="artifact-grid-skeleton">
+    <div
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+      data-testid="artifact-grid-skeleton"
+    >
       {[...Array(6)].map((_, i) => (
         <UnifiedCardSkeleton key={i} />
       ))}
@@ -37,18 +29,14 @@ function ArtifactGridSkeleton() {
   );
 }
 
-export function ArtifactGrid({
-  artifacts,
-  isLoading,
-  onArtifactClick,
-}: ArtifactGridProps) {
+export function ArtifactGrid({ artifacts, isLoading, onArtifactClick }: ArtifactGridProps) {
   if (isLoading) {
     return <ArtifactGridSkeleton />;
   }
 
   if (artifacts.length === 0) {
     return (
-      <div className="text-center py-12" data-testid="artifact-grid-empty">
+      <div className="py-12 text-center" data-testid="artifact-grid-empty">
         <Package className="mx-auto h-12 w-12 text-muted-foreground/50" />
         <h3 className="mt-4 text-lg font-semibold">No artifacts found</h3>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -60,7 +48,7 @@ export function ArtifactGrid({
 
   return (
     <div
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
       role="grid"
       aria-label="Artifact grid"
       data-testid="artifact-grid"

@@ -48,12 +48,10 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
 
   return (
     <div className={lineClasses}>
-      <span className="text-gray-400 select-none w-12 text-right pr-2 flex-shrink-0 border-r border-border/50">
+      <span className="w-12 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-gray-400">
         {lineNumber !== undefined ? lineNumber : ''}
       </span>
-      <span className="px-2 flex-1 whitespace-pre-wrap break-all">
-        {content}
-      </span>
+      <span className="flex-1 whitespace-pre-wrap break-all px-2">{content}</span>
     </div>
   );
 }
@@ -113,7 +111,10 @@ function parseDiff(unifiedDiff: string): ParsedDiffLine[] {
 }
 
 function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
-  const variants: Record<FileDiff['status'], { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+  const variants: Record<
+    FileDiff['status'],
+    { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }
+  > = {
     added: { variant: 'default', label: 'Added' },
     modified: { variant: 'secondary', label: 'Modified' },
     deleted: { variant: 'destructive', label: 'Deleted' },
@@ -156,7 +157,7 @@ export function DiffViewer({
   files,
   leftLabel = 'Before',
   rightLabel = 'After',
-  onClose
+  onClose,
 }: DiffViewerProps) {
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
@@ -187,7 +188,7 @@ export function DiffViewer({
   // Memoize parsed diffs for all files (for stats in sidebar)
   const parsedDiffs = useMemo(() => {
     const cache = new Map<string, ParsedDiffLine[]>();
-    files.forEach(file => {
+    files.forEach((file) => {
       if (file.unified_diff) {
         cache.set(file.file_path, parseDiff(file.unified_diff));
       }
@@ -230,33 +231,27 @@ export function DiffViewer({
 
   if (files.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
         <p>No changes to display</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header with summary */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between border-b p-4">
         <div className="flex items-center gap-4">
-          <h3 className="font-semibold text-lg">Diff Viewer</h3>
+          <h3 className="text-lg font-semibold">Diff Viewer</h3>
           <div className="flex items-center gap-2 text-sm">
             {summary.added > 0 && (
-              <span className="text-green-600 dark:text-green-400">
-                +{summary.added}
-              </span>
+              <span className="text-green-600 dark:text-green-400">+{summary.added}</span>
             )}
             {summary.modified > 0 && (
-              <span className="text-blue-600 dark:text-blue-400">
-                ~{summary.modified}
-              </span>
+              <span className="text-blue-600 dark:text-blue-400">~{summary.modified}</span>
             )}
             {summary.deleted > 0 && (
-              <span className="text-red-600 dark:text-red-400">
-                -{summary.deleted}
-              </span>
+              <span className="text-red-600 dark:text-red-400">-{summary.deleted}</span>
             )}
           </div>
         </div>
@@ -269,8 +264,8 @@ export function DiffViewer({
 
       <div className="flex flex-1 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-64 border-r overflow-y-auto bg-muted/20">
-          <div className="p-2 space-y-1">
+        <div className="w-64 overflow-y-auto border-r bg-muted/20">
+          <div className="space-y-1 p-2">
             {files.map((file, index) => {
               const isExpanded = expandedFiles.has(index);
               const isSelected = index === selectedFileIndex;
@@ -285,7 +280,7 @@ export function DiffViewer({
                       }
                     }}
                     className={cn(
-                      'w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-left',
+                      'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
                       isSelected && 'bg-accent'
                     )}
                   >
@@ -302,27 +297,27 @@ export function DiffViewer({
                         <ChevronRight className="h-3 w-3" />
                       )}
                     </button>
-                    <span className="flex-1 truncate font-mono text-xs">
-                      {file.file_path}
-                    </span>
+                    <span className="flex-1 truncate font-mono text-xs">{file.file_path}</span>
                     <FileStatusBadge status={file.status} />
                   </button>
 
                   {isExpanded && (
-                    <div className="ml-6 mt-1 text-xs text-muted-foreground space-y-0.5">
-                      {file.status === 'modified' && file.unified_diff && (() => {
-                        const cached = parsedDiffs.get(file.file_path);
-                        if (cached) {
-                          const additions = cached.filter(l => l.type === 'addition').length;
-                          const deletions = cached.filter(l => l.type === 'deletion').length;
-                          return (
-                            <div className="font-mono">
-                              {additions} additions, {deletions} deletions
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                    <div className="ml-6 mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      {file.status === 'modified' &&
+                        file.unified_diff &&
+                        (() => {
+                          const cached = parsedDiffs.get(file.file_path);
+                          if (cached) {
+                            const additions = cached.filter((l) => l.type === 'addition').length;
+                            const deletions = cached.filter((l) => l.type === 'deletion').length;
+                            return (
+                              <div className="font-mono">
+                                {additions} additions, {deletions} deletions
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                     </div>
                   )}
                 </div>
@@ -332,13 +327,11 @@ export function DiffViewer({
         </div>
 
         {/* Diff viewer */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
           {/* File header */}
-          <div className="px-4 py-2 border-b bg-muted/30">
+          <div className="border-b bg-muted/30 px-4 py-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-sm font-semibold">
-                {selectedFile?.file_path}
-              </span>
+              <span className="font-mono text-sm font-semibold">{selectedFile?.file_path}</span>
               <FileStatusBadge status={selectedFile?.status || 'unchanged'} />
             </div>
           </div>
@@ -347,24 +340,16 @@ export function DiffViewer({
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
             <div className="flex flex-1 overflow-hidden">
               {/* Left panel */}
-              <div className="flex-1 flex flex-col border-r">
-                <div className="px-4 py-2 bg-muted/50 border-b text-sm font-medium">
+              <div className="flex flex-1 flex-col border-r">
+                <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div
-                  ref={leftScrollRef}
-                  className="flex-1 overflow-y-auto"
-                >
+                <div ref={leftScrollRef} className="flex-1 overflow-y-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'addition') return null;
                     if (line.type === 'header') {
                       return (
-                        <DiffLine
-                          key={idx}
-                          content={line.content}
-                          type="header"
-                          side="left"
-                        />
+                        <DiffLine key={idx} content={line.content} type="header" side="left" />
                       );
                     }
                     return (
@@ -381,24 +366,16 @@ export function DiffViewer({
               </div>
 
               {/* Right panel */}
-              <div className="flex-1 flex flex-col">
-                <div className="px-4 py-2 bg-muted/50 border-b text-sm font-medium">
+              <div className="flex flex-1 flex-col">
+                <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div
-                  ref={rightScrollRef}
-                  className="flex-1 overflow-y-auto"
-                >
+                <div ref={rightScrollRef} className="flex-1 overflow-y-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'deletion') return null;
                     if (line.type === 'header') {
                       return (
-                        <DiffLine
-                          key={idx}
-                          content={line.content}
-                          type="header"
-                          side="right"
-                        />
+                        <DiffLine key={idx} content={line.content} type="header" side="right" />
                       );
                     }
                     return (
@@ -415,8 +392,8 @@ export function DiffViewer({
               </div>
             </div>
           ) : selectedFile?.status === 'added' ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 bg-green-500/10 text-green-700 dark:text-green-400 text-sm">
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">
                 This file was added in {rightLabel}
               </div>
               <div className="flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
@@ -424,8 +401,8 @@ export function DiffViewer({
               </div>
             </div>
           ) : selectedFile?.status === 'deleted' ? (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
                 This file was deleted from {leftLabel}
               </div>
               <div className="flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
@@ -433,7 +410,7 @@ export function DiffViewer({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center text-muted-foreground">
               <p>No changes in this file</p>
             </div>
           )}

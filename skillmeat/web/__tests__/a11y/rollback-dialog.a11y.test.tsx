@@ -29,7 +29,7 @@ describe('RollbackDialog Accessibility', () => {
     );
 
     // Wait for dialog to be fully rendered
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const results = await axe(container);
     expect(results).toHaveNoViolations();
@@ -51,9 +51,9 @@ describe('RollbackDialog Accessibility', () => {
   });
 
   it('should have no violations with loading state', async () => {
-    const onConfirm = jest.fn().mockImplementation(
-      () => new Promise(resolve => setTimeout(resolve, 100))
-    );
+    const onConfirm = jest
+      .fn()
+      .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
     const { container } = render(
       <RollbackDialog
@@ -64,7 +64,7 @@ describe('RollbackDialog Accessibility', () => {
       />
     );
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const results = await axe(container);
     expect(results).toHaveNoViolations();
@@ -80,7 +80,7 @@ describe('RollbackDialog Accessibility', () => {
       />
     );
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Verify focus trap accessibility
     const results = await axe(container, {
@@ -101,7 +101,7 @@ describe('RollbackDialog Accessibility', () => {
       />
     );
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Verify alert role is accessible
     const results = await axe(container, {

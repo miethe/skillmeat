@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Bundle Preview Component
@@ -14,10 +14,10 @@ import {
   GitMerge,
   GitBranch,
   FileWarning,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { BundlePreview as BundlePreviewType } from "@/types/bundle";
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { BundlePreview as BundlePreviewType } from '@/types/bundle';
 
 export interface BundlePreviewProps {
   preview: BundlePreviewType;
@@ -36,7 +36,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
             <CardTitle>{preview.bundle.metadata.name}</CardTitle>
           </div>
           {preview.bundle.metadata.description && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="mt-2 text-sm text-muted-foreground">
               {preview.bundle.metadata.description}
             </p>
           )}
@@ -50,9 +50,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
             </div>
             <div>
               <p className="text-muted-foreground">Size</p>
-              <p className="font-medium">
-                {(preview.bundle.size / 1024 / 1024).toFixed(2)} MB
-              </p>
+              <p className="font-medium">{(preview.bundle.size / 1024 / 1024).toFixed(2)} MB</p>
             </div>
             <div>
               <p className="text-muted-foreground">Format</p>
@@ -81,40 +79,33 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
           )}
 
           {/* Import Summary */}
-          <div className="space-y-2 pt-2 border-t">
+          <div className="space-y-2 border-t pt-2">
             <p className="text-sm font-medium">Import Summary</p>
             <div className="grid grid-cols-2 gap-2 text-sm">
               {preview.willImport > 0 && (
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-4 w-4" />
                   <span>
-                    {preview.willImport} new{" "}
-                    {preview.willImport === 1 ? "artifact" : "artifacts"}
+                    {preview.willImport} new {preview.willImport === 1 ? 'artifact' : 'artifacts'}
                   </span>
                 </div>
               )}
               {preview.willMerge > 0 && (
                 <div className="flex items-center gap-2 text-blue-600">
                   <GitMerge className="h-4 w-4" />
-                  <span>
-                    {preview.willMerge} to merge
-                  </span>
+                  <span>{preview.willMerge} to merge</span>
                 </div>
               )}
               {preview.willFork > 0 && (
                 <div className="flex items-center gap-2 text-purple-600">
                   <GitBranch className="h-4 w-4" />
-                  <span>
-                    {preview.willFork} to fork
-                  </span>
+                  <span>{preview.willFork} to fork</span>
                 </div>
               )}
               {preview.willSkip > 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <XCircle className="h-4 w-4" />
-                  <span>
-                    {preview.willSkip} to skip
-                  </span>
+                  <span>{preview.willSkip} to skip</span>
                 </div>
               )}
             </div>
@@ -124,17 +115,18 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
           {hasConflicts && (
             <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                    {preview.conflicts.length} Conflict{preview.conflicts.length > 1 ? "s" : ""} Detected
+                    {preview.conflicts.length} Conflict{preview.conflicts.length > 1 ? 's' : ''}{' '}
+                    Detected
                   </p>
-                  <ul className="text-xs text-yellow-800 dark:text-yellow-200 mt-2 space-y-1">
+                  <ul className="mt-2 space-y-1 text-xs text-yellow-800 dark:text-yellow-200">
                     {preview.conflicts.map((conflict) => (
                       <li key={conflict.artifactId} className="flex items-start gap-1">
-                        <FileWarning className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                        <FileWarning className="mt-0.5 h-3 w-3 flex-shrink-0" />
                         <span>
-                          <strong>{conflict.artifactName}</strong>: {conflict.existingVersion} →{" "}
+                          <strong>{conflict.artifactName}</strong>: {conflict.existingVersion} →{' '}
                           {conflict.incomingVersion} ({conflict.conflictType})
                         </span>
                       </li>
@@ -149,26 +141,23 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
           <div className="space-y-2">
             <p className="text-sm font-medium">Included Artifacts</p>
             <div className="rounded-lg border">
-              <div className="divide-y max-h-48 overflow-y-auto">
+              <div className="max-h-48 divide-y overflow-y-auto">
                 {preview.bundle.artifacts.map((item) => {
                   const isNew = preview.newArtifacts.includes(item.artifact.id);
                   const isExisting = preview.existingArtifacts.includes(item.artifact.id);
 
                   return (
-                    <div
-                      key={item.artifact.id}
-                      className="p-3 hover:bg-muted/50 transition-colors"
-                    >
+                    <div key={item.artifact.id} className="p-3 transition-colors hover:bg-muted/50">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm">{item.artifact.name}</p>
+                            <p className="text-sm font-medium">{item.artifact.name}</p>
                             <Badge variant="outline" className="text-xs">
                               {item.artifact.type}
                             </Badge>
                           </div>
                           {item.artifact.metadata.description && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                               {item.artifact.metadata.description}
                             </p>
                           )}
@@ -185,7 +174,7 @@ export function BundlePreview({ preview, className }: BundlePreviewProps) {
                             </Badge>
                           )}
                           {item.artifact.version && (
-                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                            <code className="rounded bg-muted px-2 py-1 text-xs">
                               {item.artifact.version}
                             </code>
                           )}

@@ -6,7 +6,7 @@
 
 export interface DeployedArtifact {
   artifact_name: string;
-  artifact_type: "skill" | "command" | "agent" | "mcp" | "hook";
+  artifact_type: 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
   from_collection: string;
   deployed_at: string;
   artifact_path: string;

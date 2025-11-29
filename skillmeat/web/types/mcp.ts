@@ -4,9 +4,9 @@
  * These types represent MCP servers and deployment configurations
  */
 
-export type MCPServerStatus = "installed" | "not_installed" | "updating" | "error";
+export type MCPServerStatus = 'installed' | 'not_installed' | 'updating' | 'error';
 
-export type DeploymentHealth = "healthy" | "unhealthy" | "unknown";
+export type DeploymentHealth = 'healthy' | 'unhealthy' | 'unknown';
 
 export interface MCPServer {
   name: string;
@@ -67,12 +67,12 @@ export interface MCPServerUpdateRequest {
 }
 
 export interface MCPServerFilters {
-  status?: MCPServerStatus | "all";
+  status?: MCPServerStatus | 'all';
   search?: string;
 }
 
-export type MCPSortField = "name" | "status" | "last_updated";
-export type MCPSortOrder = "asc" | "desc";
+export type MCPSortField = 'name' | 'status' | 'last_updated';
+export type MCPSortOrder = 'asc' | 'desc';
 
 export interface MCPServerSort {
   field: MCPSortField;

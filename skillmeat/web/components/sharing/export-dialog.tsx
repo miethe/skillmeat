@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Export Dialog Component
@@ -6,8 +6,8 @@
  * Multi-step wizard for exporting artifact bundles
  */
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import {
   Package,
   ChevronRight,
@@ -16,7 +16,7 @@ import {
   Share2,
   CheckCircle,
   Download,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,16 +24,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ProgressIndicator, ProgressStep } from "../collection/progress-indicator";
-import { ShareLink } from "./share-link";
-import { useArtifacts } from "@/hooks/useArtifacts";
-import { useExportBundle } from "@/hooks/useExportBundle";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ProgressIndicator, ProgressStep } from '../collection/progress-indicator';
+import { ShareLink } from './share-link';
+import { useArtifacts } from '@/hooks/useArtifacts';
+import { useExportBundle } from '@/hooks/useExportBundle';
 import type {
   ExportRequest,
   BundleMetadata,
@@ -41,8 +41,8 @@ import type {
   PermissionLevel,
   CompressionLevel,
   BundleFormat,
-} from "@/types/bundle";
-import type { Artifact } from "@/types/artifact";
+} from '@/types/bundle';
+import type { Artifact } from '@/types/artifact';
 
 export interface ExportDialogProps {
   isOpen: boolean;
@@ -66,11 +66,7 @@ type ExportFormData = {
   permissionLevel: PermissionLevel;
 };
 
-export function ExportDialog({
-  isOpen,
-  onClose,
-  preselectedArtifacts = [],
-}: ExportDialogProps) {
+export function ExportDialog({ isOpen, onClose, preselectedArtifacts = [] }: ExportDialogProps) {
   const [step, setStep] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
@@ -88,18 +84,18 @@ export function ExportDialog({
   } = useForm<ExportFormData>({
     defaultValues: {
       artifactIds: preselectedArtifacts,
-      name: "",
-      description: "",
-      tags: "",
-      license: "MIT",
-      author: "",
-      version: "1.0.0",
+      name: '',
+      description: '',
+      tags: '',
+      license: 'MIT',
+      author: '',
+      version: '1.0.0',
       includeDependencies: true,
-      compressionLevel: "balanced",
-      format: "zip",
+      compressionLevel: 'balanced',
+      format: 'zip',
       generateShareLink: true,
       linkExpiration: 0,
-      permissionLevel: "importer",
+      permissionLevel: 'importer',
     },
   });
 
@@ -112,14 +108,14 @@ export function ExportDialog({
     },
   });
 
-  const selectedArtifacts = watch("artifactIds");
-  const generateShareLink = watch("generateShareLink");
+  const selectedArtifacts = watch('artifactIds');
+  const generateShareLink = watch('generateShareLink');
 
   const [initialSteps] = useState<ProgressStep[]>([
-    { step: "Collecting artifacts", status: "pending" },
-    { step: "Resolving dependencies", status: "pending" },
-    { step: "Compressing bundle", status: "pending" },
-    { step: "Generating share link", status: "pending" },
+    { step: 'Collecting artifacts', status: 'pending' },
+    { step: 'Resolving dependencies', status: 'pending' },
+    { step: 'Compressing bundle', status: 'pending' },
+    { step: 'Generating share link', status: 'pending' },
   ]);
 
   const handleNext = () => {
@@ -137,11 +133,11 @@ export function ExportDialog({
     const current = selectedArtifacts || [];
     if (current.includes(artifactId)) {
       setValue(
-        "artifactIds",
+        'artifactIds',
         current.filter((id) => id !== artifactId)
       );
     } else {
-      setValue("artifactIds", [...current, artifactId]);
+      setValue('artifactIds', [...current, artifactId]);
     }
   };
 
@@ -151,7 +147,7 @@ export function ExportDialog({
     const metadata: BundleMetadata = {
       name: data.name,
       description: data.description || undefined,
-      tags: data.tags ? data.tags.split(",").map((t) => t.trim()) : undefined,
+      tags: data.tags ? data.tags.split(',').map((t) => t.trim()) : undefined,
       license: data.license || undefined,
       author: data.author || undefined,
       version: data.version || undefined,
@@ -176,7 +172,7 @@ export function ExportDialog({
     try {
       await exportMutation.mutateAsync(request);
     } catch (error) {
-      console.error("Export failed:", error);
+      console.error('Export failed:', error);
       setIsExporting(false);
     }
   };
@@ -201,19 +197,19 @@ export function ExportDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg bg-primary/10 p-2">
               <Package className="h-5 w-5 text-primary" />
             </div>
             <div>
               <DialogTitle>Export Bundle</DialogTitle>
               <DialogDescription>
-                {step === 1 && "Select artifacts to include"}
-                {step === 2 && "Configure bundle metadata"}
-                {step === 3 && "Set export options"}
-                {step === 4 && "Export complete"}
+                {step === 1 && 'Select artifacts to include'}
+                {step === 2 && 'Configure bundle metadata'}
+                {step === 3 && 'Set export options'}
+                {step === 4 && 'Export complete'}
               </DialogDescription>
             </div>
           </div>
@@ -229,7 +225,7 @@ export function ExportDialog({
                   {selectedArtifacts.length} selected
                 </span>
               </div>
-              <div className="rounded-lg border max-h-96 overflow-y-auto">
+              <div className="max-h-96 overflow-y-auto rounded-lg border">
                 {artifacts.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     No artifacts available
@@ -239,7 +235,7 @@ export function ExportDialog({
                     {artifacts.map((artifact: Artifact) => (
                       <div
                         key={artifact.id}
-                        className="p-3 hover:bg-muted/50 cursor-pointer"
+                        className="cursor-pointer p-3 hover:bg-muted/50"
                         onClick={() => toggleArtifact(artifact.id)}
                       >
                         <div className="flex items-start gap-3">
@@ -248,19 +244,19 @@ export function ExportDialog({
                             onCheckedChange={() => toggleArtifact(artifact.id)}
                             onClick={(e) => e.stopPropagation()}
                           />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{artifact.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{artifact.name}</p>
                             {artifact.metadata.description && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                 {artifact.metadata.description}
                               </p>
                             )}
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs px-2 py-0.5 rounded bg-muted capitalize">
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="rounded bg-muted px-2 py-0.5 text-xs capitalize">
                                 {artifact.type}
                               </span>
                               {artifact.version && (
-                                <code className="text-xs bg-muted px-2 py-0.5 rounded">
+                                <code className="rounded bg-muted px-2 py-0.5 text-xs">
                                   {artifact.version}
                                 </code>
                               )}
@@ -283,11 +279,9 @@ export function ExportDialog({
                 <Input
                   id="name"
                   placeholder="My Artifact Bundle"
-                  {...register("name", { required: true })}
+                  {...register('name', { required: true })}
                 />
-                {errors.name && (
-                  <p className="text-sm text-destructive">Name is required</p>
-                )}
+                {errors.name && <p className="text-sm text-destructive">Name is required</p>}
               </div>
 
               <div className="space-y-2">
@@ -296,27 +290,19 @@ export function ExportDialog({
                   id="description"
                   placeholder="Describe what this bundle contains..."
                   rows={3}
-                  {...register("description")}
+                  {...register('description')}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="version">Version</Label>
-                  <Input
-                    id="version"
-                    placeholder="1.0.0"
-                    {...register("version")}
-                  />
+                  <Input id="version" placeholder="1.0.0" {...register('version')} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="license">License</Label>
-                  <Input
-                    id="license"
-                    placeholder="MIT"
-                    {...register("license")}
-                  />
+                  <Input id="license" placeholder="MIT" {...register('license')} />
                 </div>
               </div>
 
@@ -325,7 +311,7 @@ export function ExportDialog({
                 <Input
                   id="author"
                   placeholder="Your name or organization"
-                  {...register("author")}
+                  {...register('author')}
                 />
               </div>
 
@@ -334,11 +320,9 @@ export function ExportDialog({
                 <Input
                   id="tags"
                   placeholder="web, frontend, development (comma-separated)"
-                  {...register("tags")}
+                  {...register('tags')}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Separate multiple tags with commas
-                </p>
+                <p className="text-xs text-muted-foreground">Separate multiple tags with commas</p>
               </div>
             </div>
           )}
@@ -347,16 +331,13 @@ export function ExportDialog({
           {step === 3 && !isExporting && (
             <div className="space-y-4">
               <div className="space-y-3">
-                <h4 className="text-sm font-medium flex items-center gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-medium">
                   <Settings className="h-4 w-4" />
                   Export Options
                 </h4>
 
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="includeDependencies"
-                    {...register("includeDependencies")}
-                  />
+                  <Checkbox id="includeDependencies" {...register('includeDependencies')} />
                   <Label htmlFor="includeDependencies" className="cursor-pointer">
                     Include dependencies
                   </Label>
@@ -368,7 +349,7 @@ export function ExportDialog({
                     <select
                       id="format"
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      {...register("format")}
+                      {...register('format')}
                     >
                       <option value="zip">ZIP</option>
                       <option value="tar.gz">TAR.GZ</option>
@@ -380,7 +361,7 @@ export function ExportDialog({
                     <select
                       id="compressionLevel"
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      {...register("compressionLevel")}
+                      {...register('compressionLevel')}
                     >
                       <option value="none">None</option>
                       <option value="fast">Fast</option>
@@ -391,8 +372,8 @@ export function ExportDialog({
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4 border-t">
-                <h4 className="text-sm font-medium flex items-center gap-2">
+              <div className="space-y-3 border-t pt-4">
+                <h4 className="flex items-center gap-2 text-sm font-medium">
                   <Share2 className="h-4 w-4" />
                   Share Settings
                 </h4>
@@ -401,9 +382,7 @@ export function ExportDialog({
                   <Checkbox
                     id="generateShareLink"
                     checked={generateShareLink}
-                    onCheckedChange={(checked) =>
-                      setValue("generateShareLink", checked as boolean)
-                    }
+                    onCheckedChange={(checked) => setValue('generateShareLink', checked as boolean)}
                   />
                   <Label htmlFor="generateShareLink" className="cursor-pointer">
                     Generate shareable link
@@ -417,7 +396,7 @@ export function ExportDialog({
                       <select
                         id="permissionLevel"
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                        {...register("permissionLevel")}
+                        {...register('permissionLevel')}
                       >
                         <option value="viewer">Viewer (view only)</option>
                         <option value="importer">Importer (can import)</option>
@@ -431,7 +410,7 @@ export function ExportDialog({
                       <select
                         id="linkExpiration"
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                        {...register("linkExpiration", { valueAsNumber: true })}
+                        {...register('linkExpiration', { valueAsNumber: true })}
                       >
                         <option value="0">Never</option>
                         <option value="24">24 hours</option>
@@ -453,7 +432,7 @@ export function ExportDialog({
               initialSteps={initialSteps}
               onComplete={handleComplete}
               onError={(error) => {
-                console.error("Export error:", error);
+                console.error('Export error:', error);
                 setIsExporting(false);
               }}
             />
@@ -463,16 +442,16 @@ export function ExportDialog({
           {step === 4 && exportedBundle && (
             <div className="space-y-4">
               <div className="flex flex-col items-center justify-center py-6 text-center">
-                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20 mb-4">
+                <div className="mb-4 rounded-full bg-green-100 p-3 dark:bg-green-900/20">
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Export Complete!</h3>
+                <h3 className="mb-2 text-lg font-semibold">Export Complete!</h3>
                 <p className="text-sm text-muted-foreground">
                   Your bundle has been created successfully
                 </p>
               </div>
 
-              <div className="rounded-lg border p-4 space-y-2">
+              <div className="space-y-2 rounded-lg border p-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Bundle Name</span>
                   <span className="font-medium">{exportedBundle.metadata.name}</span>
@@ -494,7 +473,7 @@ export function ExportDialog({
               )}
 
               <Button className="w-full" variant="outline">
-                <Download className="h-4 w-4 mr-2" />
+                <Download className="mr-2 h-4 w-4" />
                 Download Bundle
               </Button>
             </div>
@@ -504,30 +483,23 @@ export function ExportDialog({
         <DialogFooter>
           {step > 1 && step < 4 && !isExporting && (
             <Button variant="outline" onClick={handleBack}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
+              <ChevronLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
           )}
           {step < 3 && (
-            <Button
-              onClick={handleNext}
-              disabled={step === 1 && selectedArtifacts.length === 0}
-            >
+            <Button onClick={handleNext} disabled={step === 1 && selectedArtifacts.length === 0}>
               Next
-              <ChevronRight className="h-4 w-4 ml-2" />
+              <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
           {step === 3 && !isExporting && (
             <Button type="submit" onClick={handleSubmit(onSubmit)}>
-              <Package className="h-4 w-4 mr-2" />
+              <Package className="mr-2 h-4 w-4" />
               Export Bundle
             </Button>
           )}
-          {step === 4 && (
-            <Button onClick={handleClose}>
-              Done
-            </Button>
-          )}
+          {step === 4 && <Button onClick={handleClose}>Done</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -2,19 +2,14 @@
  * React Query hook for bundle import operations
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  ImportRequest,
-  ImportResult,
-  BundlePreview,
-  BundleSource,
-} from "@/types/bundle";
-import { apiConfig, apiRequest } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ImportRequest, ImportResult, BundlePreview, BundleSource } from '@/types/bundle';
+import { apiConfig, apiRequest } from '@/lib/api';
 
 const USE_MOCKS = apiConfig.useMocks;
 
 export interface ImportProgress {
-  step: "uploading" | "validating" | "resolving" | "installing" | "complete";
+  step: 'uploading' | 'validating' | 'resolving' | 'installing' | 'complete';
   progress: number; // 0-100
   message: string;
   currentArtifact?: string;
@@ -30,7 +25,7 @@ export interface ImportBundleResult {
  */
 export function usePreviewBundle(source: BundleSource | null, enabled: boolean = true) {
   return useQuery({
-    queryKey: ["bundle-preview", source],
+    queryKey: ['bundle-preview', source],
     queryFn: async (): Promise<BundlePreview | null> => {
       if (!source) return null;
 
@@ -39,52 +34,52 @@ export function usePreviewBundle(source: BundleSource | null, enabled: boolean =
         const formData = new FormData();
 
         // Handle different source types
-        if (source.type === "file") {
-          formData.append("bundle_file", source.file);
-        } else if (source.type === "url") {
+        if (source.type === 'file') {
+          formData.append('bundle_file', source.file);
+        } else if (source.type === 'url') {
           // For URL sources, we need to fetch the file first
           // This is a limitation - the backend expects a file upload
-          throw new Error("URL source type not yet supported for preview");
-        } else if (source.type === "vault") {
+          throw new Error('URL source type not yet supported for preview');
+        } else if (source.type === 'vault') {
           // Vault sources also not supported directly
-          throw new Error("Vault source type not yet supported for preview");
+          throw new Error('Vault source type not yet supported for preview');
         }
 
-        const response = await apiRequest<BundlePreview>("/bundles/preview", {
-          method: "POST",
+        const response = await apiRequest<BundlePreview>('/bundles/preview', {
+          method: 'POST',
           body: formData,
           // Don't set Content-Type header - browser will set it with boundary
         });
         return response;
       } catch (error) {
         if (USE_MOCKS) {
-          console.warn("[bundles] Preview API failed, falling back to mock", error);
+          console.warn('[bundles] Preview API failed, falling back to mock', error);
           await new Promise((resolve) => setTimeout(resolve, 500));
 
           // Mock preview
           return {
             bundle: {
-              id: "preview-bundle",
+              id: 'preview-bundle',
               metadata: {
-                name: "Sample Bundle",
-                description: "A sample bundle for testing",
-                tags: ["test", "sample"],
-                author: "Test User",
-                version: "1.0.0",
+                name: 'Sample Bundle',
+                description: 'A sample bundle for testing',
+                tags: ['test', 'sample'],
+                author: 'Test User',
+                version: '1.0.0',
                 createdAt: new Date().toISOString(),
               },
               artifacts: [
                 {
                   artifact: {
-                    id: "1",
-                    name: "canvas-design",
-                    type: "skill",
-                    scope: "user",
-                    status: "active",
-                    version: "v2.1.0",
+                    id: '1',
+                    name: 'canvas-design',
+                    type: 'skill',
+                    scope: 'user',
+                    status: 'active',
+                    version: 'v2.1.0',
                     metadata: {
-                      title: "Canvas Design",
-                      description: "Create visual designs",
+                      title: 'Canvas Design',
+                      description: 'Create visual designs',
                     },
                     upstreamStatus: { hasUpstream: false, isOutdated: false },
                     usageStats: {
@@ -98,13 +93,13 @@ export function usePreviewBundle(source: BundleSource | null, enabled: boolean =
                 },
               ],
               exportedAt: new Date().toISOString(),
-              exportedBy: "test-user",
-              format: "zip",
+              exportedBy: 'test-user',
+              format: 'zip',
               size: 1024 * 1024,
-              checksumSha256: "mock-checksum",
+              checksumSha256: 'mock-checksum',
             },
             conflicts: [],
-            newArtifacts: ["1"],
+            newArtifacts: ['1'],
             existingArtifacts: [],
             willImport: 1,
             willSkip: 0,
@@ -139,40 +134,40 @@ export function useImportBundle({
         const formData = new FormData();
 
         // Handle bundle source
-        if (request.source.type === "file") {
-          formData.append("bundle_file", request.source.file);
-        } else if (request.source.type === "url") {
+        if (request.source.type === 'file') {
+          formData.append('bundle_file', request.source.file);
+        } else if (request.source.type === 'url') {
           // URL sources need different handling
-          throw new Error("URL source type not yet supported for import");
-        } else if (request.source.type === "vault") {
+          throw new Error('URL source type not yet supported for import');
+        } else if (request.source.type === 'vault') {
           // Vault sources need different handling
-          throw new Error("Vault source type not yet supported for import");
+          throw new Error('Vault source type not yet supported for import');
         }
 
         // The backend expects form fields, but the current ImportRequest
         // type may not have all needed fields. Add them as they become available.
         // TODO: Update ImportRequest type to match backend schema
 
-        const response = await apiRequest<ImportBundleResult>("/bundles/import", {
-          method: "POST",
+        const response = await apiRequest<ImportBundleResult>('/bundles/import', {
+          method: 'POST',
           body: formData,
           // Don't set Content-Type header - browser will set it with boundary
         });
         return response;
       } catch (error) {
         if (USE_MOCKS) {
-          console.warn("[bundles] Import API failed, falling back to mock", error);
+          console.warn('[bundles] Import API failed, falling back to mock', error);
           await new Promise((resolve) => setTimeout(resolve, 1500));
 
           // Mock response
           const result: ImportResult = {
             success: true,
-            imported: ["1"],
+            imported: ['1'],
             skipped: [],
             merged: [],
             forked: [],
             errors: [],
-            summary: "Successfully imported 1 artifact",
+            summary: 'Successfully imported 1 artifact',
           };
 
           return {
@@ -185,12 +180,12 @@ export function useImportBundle({
     },
     onSuccess: (data) => {
       // Invalidate artifact and bundle queries
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-      queryClient.invalidateQueries({ queryKey: ["bundles"] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['bundles'] });
       onSuccess?.(data);
     },
     onError: (error: Error) => {
-      console.error("Import failed:", error);
+      console.error('Import failed:', error);
       onError?.(error);
     },
   });
@@ -202,7 +197,9 @@ export function useImportBundle({
  */
 export function useValidateImport() {
   return useMutation({
-    mutationFn: async (req: Partial<ImportRequest>): Promise<{
+    mutationFn: async (
+      req: Partial<ImportRequest>
+    ): Promise<{
       valid: boolean;
       errors: string[];
       warnings: string[];
@@ -214,7 +211,7 @@ export function useValidateImport() {
       const warnings: string[] = [];
 
       if (!req.source) {
-        errors.push("Bundle source is required");
+        errors.push('Bundle source is required');
       }
 
       return {

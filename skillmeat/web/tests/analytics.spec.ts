@@ -32,11 +32,7 @@ test.describe('Analytics Widgets', () => {
   test.describe('Dashboard Page', () => {
     test('should display dashboard header', async ({ page }) => {
       await expectTextVisible(page, 'h1', 'Dashboard');
-      await expectTextVisible(
-        page,
-        'p',
-        'Welcome to SkillMeat - Your personal collection manager'
-      );
+      await expectTextVisible(page, 'p', 'Welcome to SkillMeat - Your personal collection manager');
     });
 
     test('should load analytics grid', async ({ page }) => {
@@ -54,11 +50,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should show total artifacts', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="stat-card"]',
-        'Total Artifacts'
-      );
+      await expectTextVisible(page, '[data-testid="stat-card"]', 'Total Artifacts');
       await expectTextVisible(
         page,
         '[data-testid="stat-card"]',
@@ -67,11 +59,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should show total deployments', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="stat-card"]',
-        'Total Deployments'
-      );
+      await expectTextVisible(page, '[data-testid="stat-card"]', 'Total Deployments');
       await expectTextVisible(
         page,
         '[data-testid="stat-card"]',
@@ -80,11 +68,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should show active projects', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="stat-card"]',
-        'Active Projects'
-      );
+      await expectTextVisible(page, '[data-testid="stat-card"]', 'Active Projects');
       await expectTextVisible(
         page,
         '[data-testid="stat-card"]',
@@ -93,11 +77,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should show usage this week', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="stat-card"]',
-        'Usage This Week'
-      );
+      await expectTextVisible(page, '[data-testid="stat-card"]', 'Usage This Week');
       await expectTextVisible(
         page,
         '[data-testid="stat-card"]',
@@ -133,11 +113,7 @@ test.describe('Analytics Widgets', () => {
 
   test.describe('Top Artifacts Widget', () => {
     test('should display widget title', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="top-artifacts-widget"]',
-        'Top Artifacts'
-      );
+      await expectTextVisible(page, '[data-testid="top-artifacts-widget"]', 'Top Artifacts');
     });
 
     test('should show artifact list', async ({ page }) => {
@@ -156,14 +132,10 @@ test.describe('Analytics Widgets', () => {
       const firstItem = page.locator('[data-testid="artifact-item"]').first();
 
       // Should show artifact name
-      await expect(firstItem).toContainText(
-        mockAnalytics.topArtifacts[0].name
-      );
+      await expect(firstItem).toContainText(mockAnalytics.topArtifacts[0].name);
 
       // Should show usage count
-      await expect(firstItem).toContainText(
-        mockAnalytics.topArtifacts[0].count.toString()
-      );
+      await expect(firstItem).toContainText(mockAnalytics.topArtifacts[0].count.toString());
     });
 
     test('should show artifact type badges', async ({ page }) => {
@@ -173,15 +145,11 @@ test.describe('Analytics Widgets', () => {
       const typeBadge = firstItem.locator('[data-testid="type-badge"]');
 
       await expect(typeBadge).toBeVisible();
-      await expect(typeBadge).toContainText(
-        mockAnalytics.topArtifacts[0].type
-      );
+      await expect(typeBadge).toContainText(mockAnalytics.topArtifacts[0].type);
     });
 
     test('should display chart when enabled', async ({ page }) => {
-      const chart = page.locator(
-        '[data-testid="top-artifacts-widget"] [data-testid="chart"]'
-      );
+      const chart = page.locator('[data-testid="top-artifacts-widget"] [data-testid="chart"]');
 
       if (await chart.isVisible()) {
         // Chart should be visible
@@ -226,11 +194,7 @@ test.describe('Analytics Widgets', () => {
 
   test.describe('Usage Trends Widget', () => {
     test('should display widget title', async ({ page }) => {
-      await expectTextVisible(
-        page,
-        '[data-testid="usage-trends-widget"]',
-        'Usage Trends'
-      );
+      await expectTextVisible(page, '[data-testid="usage-trends-widget"]', 'Usage Trends');
     });
 
     test('should show trend chart', async ({ page }) => {
@@ -271,9 +235,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should display chart type toggle', async ({ page }) => {
-      const chartTypeToggle = page.locator(
-        '[data-testid="usage-trends-widget"] [role="group"]'
-      );
+      const chartTypeToggle = page.locator('[data-testid="usage-trends-widget"] [role="group"]');
 
       if (await chartTypeToggle.isVisible()) {
         await expect(chartTypeToggle).toBeVisible();
@@ -405,12 +367,7 @@ test.describe('Analytics Widgets', () => {
     });
 
     test('should handle analytics error gracefully', async ({ page }) => {
-      await mockApiRoute(
-        page,
-        '/api/analytics*',
-        { error: 'Failed to load analytics' },
-        500
-      );
+      await mockApiRoute(page, '/api/analytics*', { error: 'Failed to load analytics' }, 500);
 
       await page.goto('/');
       await page.waitForTimeout(500);

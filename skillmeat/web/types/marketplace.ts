@@ -59,7 +59,7 @@ export interface BrokerInfo {
 export interface InstallRequest {
   listing_id: string;
   broker?: string;
-  strategy: "merge" | "fork" | "skip";
+  strategy: 'merge' | 'fork' | 'skip';
 }
 
 export interface InstallResponse {
@@ -83,7 +83,7 @@ export interface PublishRequest {
 
 export interface PublishResponse {
   submission_id: string;
-  status: "pending" | "approved" | "rejected";
+  status: 'pending' | 'approved' | 'rejected';
   message: string;
   broker: string;
   listing_url?: string;

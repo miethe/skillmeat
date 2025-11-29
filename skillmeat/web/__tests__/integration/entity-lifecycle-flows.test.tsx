@@ -6,11 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ManagePage from '@/app/manage/page';
 import { apiRequest } from '@/lib/api';
-import type {
-  ArtifactListResponse,
-  ArtifactResponse,
-  ProjectListResponse,
-} from '@/sdk';
+import type { ArtifactListResponse, ArtifactResponse, ProjectListResponse } from '@/sdk';
 
 // Mock the API module
 jest.mock('@/lib/api', () => ({
@@ -41,30 +37,27 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('type=skill'),
 }));
 
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      cacheTime: 0,
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        cacheTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
     },
-    mutations: {
-      retry: false,
+    logger: {
+      log: console.log,
+      warn: console.warn,
+      error: () => {},
     },
-  },
-  logger: {
-    log: console.log,
-    warn: console.warn,
-    error: () => {},
-  },
-});
+  });
 
 const renderWithProviders = (component: React.ReactNode) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-    </QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{component}</QueryClientProvider>);
 };
 
 const mockEntities: ArtifactResponse[] = [
@@ -165,11 +158,14 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
 
       // Find entity and click deploy action
       const entityCards = screen.getAllByText('canvas-design');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
         // Look for deploy button/action
-        const deployButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Deploy/i });
+        const deployButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Deploy/i,
+        });
 
         if (deployButton) {
           await user.click(deployButton);
@@ -229,10 +225,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       const consoleSpy = jest.spyOn(console, 'log');
 
       const entityCards = screen.getAllByText('canvas-design');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const deployButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Deploy/i });
+        const deployButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Deploy/i,
+        });
 
         if (deployButton) {
           await user.click(deployButton);
@@ -280,10 +279,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       const consoleSpy = jest.spyOn(console, 'log');
 
       const entityCards = screen.getAllByText('canvas-design');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const deployButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Deploy/i });
+        const deployButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Deploy/i,
+        });
 
         if (deployButton) {
           await user.click(deployButton);
@@ -304,10 +306,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       });
 
       const entityCards = screen.getAllByText('canvas-design');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const deployButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Deploy/i });
+        const deployButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Deploy/i,
+        });
 
         if (deployButton) {
           await user.click(deployButton);
@@ -364,10 +369,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       const consoleSpy = jest.spyOn(console, 'log');
 
       const entityCards = screen.getAllByText('docx-processor');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const syncButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Sync/i });
+        const syncButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Sync/i,
+        });
 
         if (syncButton) {
           await user.click(syncButton);
@@ -493,10 +501,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       const consoleSpy = jest.spyOn(console, 'log');
 
       const entityCards = screen.getAllByText('canvas-design');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const rollbackButton = within(entityCard as HTMLElement).queryByRole('button', { name: /Rollback/i });
+        const rollbackButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /Rollback/i,
+        });
 
         if (rollbackButton) {
           await user.click(rollbackButton);
@@ -540,10 +551,13 @@ describe('Entity Lifecycle Flows - Deploy & Sync', () => {
       const consoleSpy = jest.spyOn(console, 'log');
 
       const entityCards = screen.getAllByText('docx-processor');
-      const entityCard = entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
+      const entityCard =
+        entityCards[0].closest('[role="article"]') || entityCards[0].parentElement?.parentElement;
 
       if (entityCard) {
-        const viewDiffButton = within(entityCard as HTMLElement).queryByRole('button', { name: /View Diff/i });
+        const viewDiffButton = within(entityCard as HTMLElement).queryByRole('button', {
+          name: /View Diff/i,
+        });
 
         if (viewDiffButton) {
           await user.click(viewDiffButton);

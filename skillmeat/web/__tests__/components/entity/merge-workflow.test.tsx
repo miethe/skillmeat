@@ -1,17 +1,17 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MergeWorkflow } from "@/components/entity/merge-workflow";
-import type { ArtifactDiffResponse } from "@/sdk";
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MergeWorkflow } from '@/components/entity/merge-workflow';
+import type { ArtifactDiffResponse } from '@/sdk';
 
 // Mock the API
-jest.mock("@/lib/api", () => ({
+jest.mock('@/lib/api', () => ({
   apiRequest: jest.fn(),
 }));
 
 const mockDiffResponse: ArtifactDiffResponse = {
-  artifact_id: "skill:test",
+  artifact_id: 'skill:test',
   has_changes: true,
   summary: {
     added: 1,
@@ -21,13 +21,13 @@ const mockDiffResponse: ArtifactDiffResponse = {
   },
   files: [
     {
-      file_path: "src/new.ts",
-      status: "added",
+      file_path: 'src/new.ts',
+      status: 'added',
       unified_diff: null,
     },
     {
-      file_path: "src/modified.ts",
-      status: "modified",
+      file_path: 'src/modified.ts',
+      status: 'modified',
       unified_diff: `@@ -1,3 +1,3 @@
  function test() {
 -  return 'old';
@@ -35,8 +35,8 @@ const mockDiffResponse: ArtifactDiffResponse = {
  }`,
     },
     {
-      file_path: "src/changed.ts",
-      status: "modified",
+      file_path: 'src/changed.ts',
+      status: 'modified',
       unified_diff: `@@ -1,2 +1,2 @@
 -const a = 1;
 +const a = 2;`,
@@ -45,7 +45,7 @@ const mockDiffResponse: ArtifactDiffResponse = {
 };
 
 const mockEmptyDiffResponse: ArtifactDiffResponse = {
-  artifact_id: "skill:test",
+  artifact_id: 'skill:test',
   has_changes: false,
   summary: {
     added: 0,
@@ -56,14 +56,14 @@ const mockEmptyDiffResponse: ArtifactDiffResponse = {
   files: [],
 };
 
-describe("MergeWorkflow", () => {
+describe('MergeWorkflow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const { apiRequest } = require("@/lib/api");
+    const { apiRequest } = require('@/lib/api');
     apiRequest.mockResolvedValue(mockDiffResponse);
   });
 
-  it("renders loading state initially", () => {
+  it('renders loading state initially', () => {
     render(
       <MergeWorkflow
         entityId="skill:test"
@@ -74,11 +74,11 @@ describe("MergeWorkflow", () => {
       />
     );
 
-    expect(screen.getByRole("progressbar", { hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { hidden: true })).toBeInTheDocument();
   });
 
-  it("loads diff data on mount", async () => {
-    const { apiRequest } = require("@/lib/api");
+  it('loads diff data on mount', async () => {
+    const { apiRequest } = require('@/lib/api');
 
     render(
       <MergeWorkflow
@@ -92,14 +92,14 @@ describe("MergeWorkflow", () => {
 
     await waitFor(() => {
       expect(apiRequest).toHaveBeenCalledWith(
-        expect.stringContaining("/artifacts/skill:test/diff")
+        expect.stringContaining('/artifacts/skill:test/diff')
       );
     });
   });
 
-  it("displays error when diff loading fails", async () => {
-    const { apiRequest } = require("@/lib/api");
-    apiRequest.mockRejectedValue(new Error("Failed to load"));
+  it('displays error when diff loading fails', async () => {
+    const { apiRequest } = require('@/lib/api');
+    apiRequest.mockRejectedValue(new Error('Failed to load'));
 
     render(
       <MergeWorkflow
@@ -112,14 +112,14 @@ describe("MergeWorkflow", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to load diff")).toBeInTheDocument();
-      expect(screen.getByText("Failed to load")).toBeInTheDocument();
+      expect(screen.getByText('Failed to load diff')).toBeInTheDocument();
+      expect(screen.getByText('Failed to load')).toBeInTheDocument();
     });
   });
 
-  describe("Step Indicators", () => {
-    it("renders all three step indicators", async () => {
-      const { apiRequest } = require("@/lib/api");
+  describe('Step Indicators', () => {
+    it('renders all three step indicators', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -133,14 +133,14 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Preview")).toBeInTheDocument();
-        expect(screen.getByText("Resolve")).toBeInTheDocument();
-        expect(screen.getByText("Apply")).toBeInTheDocument();
+        expect(screen.getByText('Preview')).toBeInTheDocument();
+        expect(screen.getByText('Resolve')).toBeInTheDocument();
+        expect(screen.getByText('Apply')).toBeInTheDocument();
       });
     });
 
-    it("shows Preview step as active initially", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('shows Preview step as active initially', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -154,15 +154,15 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const previewStep = screen.getByText("Preview");
-        expect(previewStep.previousSibling).toHaveClass("border-primary");
+        const previewStep = screen.getByText('Preview');
+        expect(previewStep.previousSibling).toHaveClass('border-primary');
       });
     });
   });
 
-  describe("Preview Step", () => {
-    it("displays summary of changes", async () => {
-      const { apiRequest } = require("@/lib/api");
+  describe('Preview Step', () => {
+    it('displays summary of changes', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -176,14 +176,14 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Preview Changes")).toBeInTheDocument();
-        expect(screen.getByText("+1 added")).toBeInTheDocument();
-        expect(screen.getByText("~2 modified")).toBeInTheDocument();
+        expect(screen.getByText('Preview Changes')).toBeInTheDocument();
+        expect(screen.getByText('+1 added')).toBeInTheDocument();
+        expect(screen.getByText('~2 modified')).toBeInTheDocument();
       });
     });
 
-    it("shows conflict warning when conflicts detected", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('shows conflict warning when conflicts detected', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -197,12 +197,12 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Conflicts Detected")).toBeInTheDocument();
+        expect(screen.getByText('Conflicts Detected')).toBeInTheDocument();
       });
     });
 
-    it("shows correct direction description for upstream", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('shows correct direction description for upstream', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -222,8 +222,8 @@ describe("MergeWorkflow", () => {
       });
     });
 
-    it("shows correct direction description for downstream", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('shows correct direction description for downstream', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -243,8 +243,8 @@ describe("MergeWorkflow", () => {
       });
     });
 
-    it("disables Continue button when no changes", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('disables Continue button when no changes', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockEmptyDiffResponse);
 
       render(
@@ -258,13 +258,13 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         expect(continueButton).toBeDisabled();
       });
     });
 
-    it("calls onCancel when Cancel button clicked", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('calls onCancel when Cancel button clicked', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
       const handleCancel = jest.fn();
 
@@ -279,15 +279,15 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const cancelButton = screen.getByRole("button", { name: /Cancel/ });
+        const cancelButton = screen.getByRole('button', { name: /Cancel/ });
         fireEvent.click(cancelButton);
       });
 
       expect(handleCancel).toHaveBeenCalled();
     });
 
-    it("progresses to Resolve step when Continue clicked with conflicts", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('progresses to Resolve step when Continue clicked with conflicts', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -301,27 +301,27 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         fireEvent.click(continueButton);
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Resolve Conflicts")).toBeInTheDocument();
+        expect(screen.getByText('Resolve Conflicts')).toBeInTheDocument();
       });
     });
 
-    it("skips to Apply step when no conflicts", async () => {
+    it('skips to Apply step when no conflicts', async () => {
       const noConflictDiff = {
         ...mockDiffResponse,
         files: [
           {
-            file_path: "src/new.ts",
-            status: "added" as const,
+            file_path: 'src/new.ts',
+            status: 'added' as const,
             unified_diff: null,
           },
         ],
       };
-      const { apiRequest } = require("@/lib/api");
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(noConflictDiff);
 
       render(
@@ -335,19 +335,19 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         fireEvent.click(continueButton);
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Apply Changes")).toBeInTheDocument();
+        expect(screen.getByText('Apply Changes')).toBeInTheDocument();
       });
     });
   });
 
-  describe("Resolve Step", () => {
-    it("displays conflict resolution options for each modified file", async () => {
-      const { apiRequest } = require("@/lib/api");
+  describe('Resolve Step', () => {
+    it('displays conflict resolution options for each modified file', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -361,18 +361,18 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         fireEvent.click(continueButton);
       });
 
       await waitFor(() => {
-        expect(screen.getByText("src/modified.ts")).toBeInTheDocument();
-        expect(screen.getByText("src/changed.ts")).toBeInTheDocument();
+        expect(screen.getByText('src/modified.ts')).toBeInTheDocument();
+        expect(screen.getByText('src/changed.ts')).toBeInTheDocument();
       });
     });
 
-    it("enables Continue button when all conflicts resolved", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('enables Continue button when all conflicts resolved', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -386,19 +386,19 @@ describe("MergeWorkflow", () => {
       );
 
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         fireEvent.click(continueButton);
       });
 
       await waitFor(() => {
         // Default resolution should be set, so Continue should be enabled
-        const resolveButton = screen.getByRole("button", { name: /Continue/ });
+        const resolveButton = screen.getByRole('button', { name: /Continue/ });
         expect(resolveButton).not.toBeDisabled();
       });
     });
 
-    it("navigates back to Preview when Back clicked", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('navigates back to Preview when Back clicked', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -413,25 +413,25 @@ describe("MergeWorkflow", () => {
 
       // Go to Resolve step
       await waitFor(() => {
-        const continueButton = screen.getByRole("button", { name: /Continue/ });
+        const continueButton = screen.getByRole('button', { name: /Continue/ });
         fireEvent.click(continueButton);
       });
 
       // Click Back
       await waitFor(() => {
-        const backButton = screen.getByRole("button", { name: /Back/ });
+        const backButton = screen.getByRole('button', { name: /Back/ });
         fireEvent.click(backButton);
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Preview Changes")).toBeInTheDocument();
+        expect(screen.getByText('Preview Changes')).toBeInTheDocument();
       });
     });
   });
 
-  describe("Apply Step", () => {
-    it("displays summary before applying", async () => {
-      const { apiRequest } = require("@/lib/api");
+  describe('Apply Step', () => {
+    it('displays summary before applying', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
 
       render(
@@ -446,27 +446,27 @@ describe("MergeWorkflow", () => {
 
       // Navigate to Apply step
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Apply Changes")).toBeInTheDocument();
+        expect(screen.getByText('Apply Changes')).toBeInTheDocument();
         expect(screen.getByText(/Files to add:/)).toBeInTheDocument();
         expect(screen.getByText(/Files to modify:/)).toBeInTheDocument();
       });
     });
 
-    it("shows progress indicator when applying changes", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('shows progress indicator when applying changes', async () => {
+      const { apiRequest } = require('@/lib/api');
       apiRequest.mockResolvedValue(mockDiffResponse);
       apiRequest.mockResolvedValueOnce(mockDiffResponse); // For initial load
       apiRequest.mockResolvedValueOnce({
         success: true,
-        message: "Sync completed",
+        message: 'Sync completed',
       }); // For sync
 
       render(
@@ -481,16 +481,16 @@ describe("MergeWorkflow", () => {
 
       // Navigate to Apply step
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       // Click Apply Changes
       await waitFor(() => {
-        const applyButton = screen.getByRole("button", { name: /Apply Changes/ });
+        const applyButton = screen.getByRole('button', { name: /Apply Changes/ });
         fireEvent.click(applyButton);
       });
 
@@ -499,11 +499,11 @@ describe("MergeWorkflow", () => {
       });
     });
 
-    it("displays success message on completion", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('displays success message on completion', async () => {
+      const { apiRequest } = require('@/lib/api');
       const syncResponse = {
         success: true,
-        message: "Successfully synced 3 files",
+        message: 'Successfully synced 3 files',
         synced_files_count: 3,
       };
 
@@ -522,28 +522,28 @@ describe("MergeWorkflow", () => {
 
       // Navigate through steps
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Apply Changes/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Apply Changes/ }));
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Successfully synced 3 files")).toBeInTheDocument();
+        expect(screen.getByText('Successfully synced 3 files')).toBeInTheDocument();
       });
     });
 
-    it("calls onComplete after successful sync", async () => {
-      const { apiRequest } = require("@/lib/api");
+    it('calls onComplete after successful sync', async () => {
+      const { apiRequest } = require('@/lib/api');
       const handleComplete = jest.fn();
       const syncResponse = {
         success: true,
-        message: "Synced successfully",
+        message: 'Synced successfully',
       };
 
       apiRequest.mockResolvedValueOnce(mockDiffResponse);
@@ -561,15 +561,15 @@ describe("MergeWorkflow", () => {
 
       // Navigate and apply
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
       });
 
       await waitFor(() => {
-        fireEvent.click(screen.getByRole("button", { name: /Apply Changes/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Apply Changes/ }));
       });
 
       // Wait for onComplete to be called (after 2s delay)
@@ -582,8 +582,8 @@ describe("MergeWorkflow", () => {
     });
   });
 
-  it("renders all progress steps during apply", async () => {
-    const { apiRequest } = require("@/lib/api");
+  it('renders all progress steps during apply', async () => {
+    const { apiRequest } = require('@/lib/api');
     apiRequest.mockResolvedValueOnce(mockDiffResponse);
 
     render(
@@ -598,15 +598,15 @@ describe("MergeWorkflow", () => {
 
     // Navigate to Apply step
     await waitFor(() => {
-      fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
     });
 
     await waitFor(() => {
-      fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Apply Changes")).toBeInTheDocument();
+      expect(screen.getByText('Apply Changes')).toBeInTheDocument();
     });
   });
 });

@@ -1,18 +1,11 @@
-"use client";
+'use client';
 
-import { useMemo } from "react";
-import {
-  FolderOpen,
-  GitBranch,
-  AlertTriangle,
-  CheckCircle2,
-  Calendar,
-  Hash,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { VersionGraph, VersionGraphNode } from "@/types/version";
+import { useMemo } from 'react';
+import { FolderOpen, GitBranch, AlertTriangle, CheckCircle2, Calendar, Hash } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { VersionGraph, VersionGraphNode } from '@/types/version';
 
 interface VersionTreeViewProps {
   graph: VersionGraph | null | undefined;
@@ -30,14 +23,14 @@ function formatRelativeTime(dateString: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "just now";
+  if (diffMins < 1) return 'just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 30) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -52,7 +45,7 @@ function truncateSha(sha: string, length: number = 8): string {
  * Extract project name from path
  */
 function getProjectName(path: string): string {
-  const parts = path.split("/");
+  const parts = path.split('/');
   return parts[parts.length - 1] || path;
 }
 
@@ -71,12 +64,12 @@ function VersionTreeNode({
   depth?: number;
 }) {
   const { version_info, children, metadata } = node;
-  const isCollection = version_info.location_type === "collection";
+  const isCollection = version_info.location_type === 'collection';
   const isModified = version_info.is_modified;
 
   // Determine display values
   const displayLocation = isCollection
-    ? metadata.collection_name || "Collection"
+    ? metadata.collection_name || 'Collection'
     : getProjectName(version_info.location);
 
   const createdTime = formatRelativeTime(version_info.created_at);
@@ -91,13 +84,13 @@ function VersionTreeNode({
             className="absolute top-5 border-t border-border"
             style={{
               left: `${(depth - 1) * 24 + 4}px`,
-              width: "16px",
+              width: '16px',
             }}
           />
           {/* Vertical line from parent */}
           {!isLast && (
             <div
-              className="absolute top-0 bottom-0 border-l border-border"
+              className="absolute bottom-0 top-0 border-l border-border"
               style={{
                 left: `${(depth - 1) * 24 + 4}px`,
               }}
@@ -110,10 +103,10 @@ function VersionTreeNode({
       <Card
         className={`mb-3 ${
           isCollection
-            ? "border-primary/50 bg-primary/5"
+            ? 'border-primary/50 bg-primary/5'
             : isModified
-              ? "border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20"
-              : "border-border bg-card"
+              ? 'border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20'
+              : 'border-border bg-card'
         }`}
         style={{
           marginLeft: `${depth * 24}px`,
@@ -123,32 +116,26 @@ function VersionTreeNode({
           <div className="flex items-start gap-3">
             {/* Icon */}
             <div
-              className={`flex-shrink-0 p-2 rounded-lg ${
-                isCollection
-                  ? "bg-primary/10"
-                  : isModified
-                    ? "bg-yellow-500/10"
-                    : "bg-muted"
+              className={`flex-shrink-0 rounded-lg p-2 ${
+                isCollection ? 'bg-primary/10' : isModified ? 'bg-yellow-500/10' : 'bg-muted'
               }`}
             >
               {isCollection ? (
                 <FolderOpen
-                  className={`h-4 w-4 ${isCollection ? "text-primary" : "text-muted-foreground"}`}
+                  className={`h-4 w-4 ${isCollection ? 'text-primary' : 'text-muted-foreground'}`}
                 />
               ) : (
                 <GitBranch
-                  className={`h-4 w-4 ${isModified ? "text-yellow-600" : "text-muted-foreground"}`}
+                  className={`h-4 w-4 ${isModified ? 'text-yellow-600' : 'text-muted-foreground'}`}
                 />
               )}
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="min-w-0 flex-1 space-y-2">
               {/* Header */}
               <div className="flex items-center gap-2">
-                <h4 className="font-semibold text-sm truncate">
-                  {displayLocation}
-                </h4>
+                <h4 className="truncate text-sm font-semibold">{displayLocation}</h4>
                 {isCollection && (
                   <Badge variant="outline" className="text-xs">
                     Source
@@ -157,18 +144,18 @@ function VersionTreeNode({
                 {isModified && (
                   <Badge
                     variant="outline"
-                    className="text-xs bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                    className="border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-700 dark:text-yellow-400"
                   >
-                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    <AlertTriangle className="mr-1 h-3 w-3" />
                     Modified
                   </Badge>
                 )}
                 {!isModified && !isCollection && (
                   <Badge
                     variant="outline"
-                    className="text-xs bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30"
+                    className="border-green-500/30 bg-green-500/10 text-xs text-green-700 dark:text-green-400"
                   >
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
                     Synced
                   </Badge>
                 )}
@@ -179,9 +166,7 @@ function VersionTreeNode({
                 {/* Content SHA */}
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <Hash className="h-3 w-3" />
-                  <code className="font-mono">
-                    {truncateSha(version_info.content_sha)}
-                  </code>
+                  <code className="font-mono">{truncateSha(version_info.content_sha)}</code>
                 </div>
 
                 {/* Created time */}
@@ -202,7 +187,7 @@ function VersionTreeNode({
 
                 {/* Project path (if project deployment) */}
                 {!isCollection && (
-                  <div className="col-span-2 text-muted-foreground truncate">
+                  <div className="col-span-2 truncate text-muted-foreground">
                     <span className="text-xs">{version_info.location}</span>
                   </div>
                 )}
@@ -263,7 +248,7 @@ function VersionStatistics({ graph }: { graph: VersionGraph }) {
   const { statistics } = graph;
 
   return (
-    <div className="grid grid-cols-4 gap-4 mb-6">
+    <div className="mb-6 grid grid-cols-4 gap-4">
       <Card>
         <CardContent className="p-4">
           <div className="text-2xl font-bold">{statistics.total_deployments}</div>
@@ -272,25 +257,19 @@ function VersionStatistics({ graph }: { graph: VersionGraph }) {
       </Card>
       <Card>
         <CardContent className="p-4">
-          <div className="text-2xl font-bold text-green-600">
-            {statistics.unmodified_count}
-          </div>
+          <div className="text-2xl font-bold text-green-600">{statistics.unmodified_count}</div>
           <div className="text-xs text-muted-foreground">Synced</div>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
-          <div className="text-2xl font-bold text-yellow-600">
-            {statistics.modified_count}
-          </div>
+          <div className="text-2xl font-bold text-yellow-600">{statistics.modified_count}</div>
           <div className="text-xs text-muted-foreground">Modified</div>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="p-4">
-          <div className="text-2xl font-bold text-orange-600">
-            {statistics.orphaned_count}
-          </div>
+          <div className="text-2xl font-bold text-orange-600">{statistics.orphaned_count}</div>
           <div className="text-xs text-muted-foreground">Orphaned</div>
         </CardContent>
       </Card>
@@ -306,12 +285,10 @@ export function VersionTreeView({ graph, isLoading }: VersionTreeViewProps) {
   const treeContent = useMemo(() => {
     if (!graph || !graph.root) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          <GitBranch className="h-12 w-12 mx-auto mb-3 opacity-50" />
+        <div className="py-8 text-center text-muted-foreground">
+          <GitBranch className="mx-auto mb-3 h-12 w-12 opacity-50" />
           <p>No version information available</p>
-          <p className="text-xs mt-2">
-            This artifact has not been deployed to any projects yet.
-          </p>
+          <p className="mt-2 text-xs">This artifact has not been deployed to any projects yet.</p>
         </div>
       );
     }
@@ -320,9 +297,7 @@ export function VersionTreeView({ graph, isLoading }: VersionTreeViewProps) {
       <>
         <VersionStatistics graph={graph} />
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground mb-4">
-            Version Tree
-          </h3>
+          <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Version Tree</h3>
           <VersionTreeNode node={graph.root} isRoot={true} />
         </div>
       </>

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Upload, Folder, AlertTriangle } from "lucide-react";
+import { useState } from 'react';
+import { Upload, Folder, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ProgressIndicator, ProgressStep } from "./progress-indicator";
-import { useDeploy } from "@/hooks/useDeploy";
-import type { Artifact } from "@/types/artifact";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ProgressIndicator, ProgressStep } from './progress-indicator';
+import { useDeploy } from '@/hooks/useDeploy';
+import type { Artifact } from '@/types/artifact';
 
 export interface DeployDialogProps {
   artifact: Artifact | null;
@@ -23,21 +23,16 @@ export interface DeployDialogProps {
   onSuccess?: () => void;
 }
 
-export function DeployDialog({
-  artifact,
-  isOpen,
-  onClose,
-  onSuccess,
-}: DeployDialogProps) {
-  const [projectPath, setProjectPath] = useState("");
+export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDialogProps) {
+  const [projectPath, setProjectPath] = useState('');
   const [overwrite, setOverwrite] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [initialSteps] = useState<ProgressStep[]>([
-    { step: "Validating artifact", status: "pending" },
-    { step: "Checking project path", status: "pending" },
-    { step: "Copying files", status: "pending" },
-    { step: "Updating deployment registry", status: "pending" },
+    { step: 'Validating artifact', status: 'pending' },
+    { step: 'Checking project path', status: 'pending' },
+    { step: 'Copying files', status: 'pending' },
+    { step: 'Updating deployment registry', status: 'pending' },
   ]);
 
   const deployMutation = useDeploy({
@@ -64,7 +59,7 @@ export function DeployDialog({
         overwrite,
       });
     } catch (error) {
-      console.error("Deploy failed:", error);
+      console.error('Deploy failed:', error);
     }
   };
 
@@ -76,7 +71,7 @@ export function DeployDialog({
         onSuccess?.();
         onClose();
         // Reset state
-        setProjectPath("");
+        setProjectPath('');
         setOverwrite(false);
         setStreamUrl(null);
       }, 1500);
@@ -87,7 +82,7 @@ export function DeployDialog({
     if (!isDeploying) {
       onClose();
       // Reset state
-      setProjectPath("");
+      setProjectPath('');
       setOverwrite(false);
       setStreamUrl(null);
       setIsDeploying(false);
@@ -101,14 +96,12 @@ export function DeployDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg bg-primary/10 p-2">
               <Upload className="h-5 w-5 text-primary" />
             </div>
             <div>
               <DialogTitle>Deploy Artifact</DialogTitle>
-              <DialogDescription>
-                Deploy {artifact.name} to a project
-              </DialogDescription>
+              <DialogDescription>Deploy {artifact.name} to a project</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -117,7 +110,7 @@ export function DeployDialog({
           {!isDeploying ? (
             <>
               {/* Artifact Info */}
-              <div className="rounded-lg border p-3 space-y-2">
+              <div className="space-y-2 rounded-lg border p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Artifact</span>
                   <span className="font-medium">{artifact.name}</span>
@@ -128,8 +121,8 @@ export function DeployDialog({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Version</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {artifact.version || "N/A"}
+                  <code className="rounded bg-muted px-2 py-1 text-xs">
+                    {artifact.version || 'N/A'}
                   </code>
                 </div>
               </div>
@@ -138,7 +131,7 @@ export function DeployDialog({
               <div className="space-y-2">
                 <label
                   htmlFor="projectPath"
-                  className="text-sm font-medium flex items-center gap-2"
+                  className="flex items-center gap-2 text-sm font-medium"
                 >
                   <Folder className="h-4 w-4" />
                   Project Path
@@ -151,8 +144,7 @@ export function DeployDialog({
                   disabled={isDeploying}
                 />
                 <p className="text-xs text-muted-foreground">
-                  The artifact will be deployed to the .claude directory in this
-                  project
+                  The artifact will be deployed to the .claude directory in this project
                 </p>
               </div>
 
@@ -160,15 +152,14 @@ export function DeployDialog({
               {artifact.usageStats.totalDeployments > 0 && (
                 <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
                         Existing Deployments
                       </p>
-                      <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-1">
-                        This artifact is already deployed to{" "}
-                        {artifact.usageStats.totalDeployments} project(s). If the
-                        target project already has this artifact, it will be
+                      <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
+                        This artifact is already deployed to {artifact.usageStats.totalDeployments}{' '}
+                        project(s). If the target project already has this artifact, it will be
                         overwritten.
                       </p>
                     </div>
@@ -185,7 +176,7 @@ export function DeployDialog({
                 initialSteps={initialSteps}
                 onComplete={handleComplete}
                 onError={(error) => {
-                  console.error("Deploy error:", error);
+                  console.error('Deploy error:', error);
                   setIsDeploying(false);
                 }}
               />
@@ -194,18 +185,11 @@ export function DeployDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isDeploying}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
             Cancel
           </Button>
-          <Button
-            onClick={handleDeploy}
-            disabled={isDeploying || deployMutation.isPending}
-          >
-            {isDeploying ? "Deploying..." : "Deploy"}
+          <Button onClick={handleDeploy} disabled={isDeploying || deployMutation.isPending}>
+            {isDeploying ? 'Deploying...' : 'Deploy'}
           </Button>
         </DialogFooter>
       </DialogContent>

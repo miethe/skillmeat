@@ -5,7 +5,14 @@ import { Check, Loader2, AlertCircle, ChevronRight, AlertTriangle } from 'lucide
 import { DiffViewer } from './diff-viewer';
 import { ConflictResolver } from './conflict-resolver';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -158,7 +165,8 @@ function analyzeConflicts(unifiedDiff: string | null | undefined): ConflictAnaly
         (delRange.start <= addRange.end && delRange.end >= addRange.start) ||
         (addRange.start <= delRange.end && addRange.end >= delRange.start)
       ) {
-        overlappingLines += Math.min(delRange.end, addRange.end) - Math.max(delRange.start, addRange.start);
+        overlappingLines +=
+          Math.min(delRange.end, addRange.end) - Math.max(delRange.start, addRange.start);
       }
       // Check for adjacent changes (within 2 lines)
       else if (
@@ -170,13 +178,15 @@ function analyzeConflicts(unifiedDiff: string | null | undefined): ConflictAnaly
     }
   }
 
-  const conflictCount = overlappingLines > 0 ? Math.ceil(overlappingLines / 3) :
-                        adjacentLines > 0 ? Math.ceil(adjacentLines / 5) : 0;
+  const conflictCount =
+    overlappingLines > 0
+      ? Math.ceil(overlappingLines / 3)
+      : adjacentLines > 0
+        ? Math.ceil(adjacentLines / 5)
+        : 0;
 
   const severity: ConflictSeverity =
-    overlappingLines > 0 ? 'hard' :
-    adjacentLines > 0 ? 'soft' :
-    'none';
+    overlappingLines > 0 ? 'hard' : adjacentLines > 0 ? 'soft' : 'none';
 
   return {
     severity,
@@ -315,14 +325,11 @@ export function MergeWorkflow({
         strategy: determineStrategy(),
       };
 
-      const response = await apiRequest<ArtifactSyncResponse>(
-        `/artifacts/${entityId}/sync`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncRequest),
-        }
-      );
+      const response = await apiRequest<ArtifactSyncResponse>(`/artifacts/${entityId}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(syncRequest),
+      });
 
       setSyncResult(response);
 
@@ -507,8 +514,14 @@ function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepP
 
   // Memoize expensive conflict analysis
   const conflictAnalysis = useMemo(() => analyzeAllConflicts(diffData.files), [diffData.files]);
-  const hasConflicts = useMemo(() => conflictAnalysis.some((c) => c.conflictCount > 0), [conflictAnalysis]);
-  const conflictCount = useMemo(() => conflictAnalysis.reduce((sum, c) => sum + c.conflictCount, 0), [conflictAnalysis]);
+  const hasConflicts = useMemo(
+    () => conflictAnalysis.some((c) => c.conflictCount > 0),
+    [conflictAnalysis]
+  );
+  const conflictCount = useMemo(
+    () => conflictAnalysis.reduce((sum, c) => sum + c.conflictCount, 0),
+    [conflictAnalysis]
+  );
 
   return (
     <Card className="w-full">
@@ -523,14 +536,18 @@ function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepP
       <CardContent className="space-y-4">
         {/* Conflict Warning */}
         {hasConflicts && (
-          <Alert variant="destructive" className="bg-orange-50 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800">
+          <Alert
+            variant="destructive"
+            className="border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20"
+          >
             <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-500" />
             <AlertTitle className="text-orange-900 dark:text-orange-300">
               Conflicts Detected
             </AlertTitle>
             <AlertDescription className="text-orange-800 dark:text-orange-400">
-              {conflictCount} {conflictCount === 1 ? 'conflict' : 'conflicts'} detected in {summary.modified} modified {summary.modified === 1 ? 'file' : 'files'}.
-              You will need to resolve these in the next step.
+              {conflictCount} {conflictCount === 1 ? 'conflict' : 'conflicts'} detected in{' '}
+              {summary.modified} modified {summary.modified === 1 ? 'file' : 'files'}. You will need
+              to resolve these in the next step.
             </AlertDescription>
           </Alert>
         )}
@@ -538,12 +555,10 @@ function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepP
         {/* Summary */}
         <div className="flex items-center gap-4 rounded-lg border p-4">
           <div className="flex-1">
-            <h4 className="text-sm font-semibold mb-2">Summary of Changes</h4>
+            <h4 className="mb-2 text-sm font-semibold">Summary of Changes</h4>
             <div className="flex items-center gap-4 text-sm">
               {(summary.added ?? 0) > 0 && (
-                <span className="text-green-600 dark:text-green-400">
-                  +{summary.added} added
-                </span>
+                <span className="text-green-600 dark:text-green-400">+{summary.added} added</span>
               )}
               {(summary.modified ?? 0) > 0 && (
                 <span className="text-blue-600 dark:text-blue-400">
@@ -551,20 +566,16 @@ function PreviewStep({ diffData, direction, onContinue, onCancel }: PreviewStepP
                 </span>
               )}
               {(summary.deleted ?? 0) > 0 && (
-                <span className="text-red-600 dark:text-red-400">
-                  -{summary.deleted} deleted
-                </span>
+                <span className="text-red-600 dark:text-red-400">-{summary.deleted} deleted</span>
               )}
-              {!hasChanges && (
-                <span className="text-muted-foreground">No changes detected</span>
-              )}
+              {!hasChanges && <span className="text-muted-foreground">No changes detected</span>}
             </div>
           </div>
         </div>
 
         {/* Diff Viewer */}
         {hasChanges && (
-          <div className="border rounded-lg overflow-hidden" style={{ height: '500px' }}>
+          <div className="overflow-hidden rounded-lg border" style={{ height: '500px' }}>
             <DiffViewer
               files={diffData.files}
               leftLabel={direction === 'upstream' ? 'Collection' : 'Project'}
@@ -606,13 +617,14 @@ function ConflictSummaryPanel({ conflicts }: ConflictSummaryPanelProps) {
   }
 
   return (
-    <Alert variant="destructive" className="bg-orange-50 border-orange-300 dark:bg-orange-950/20 dark:border-orange-800">
+    <Alert
+      variant="destructive"
+      className="border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20"
+    >
       <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-500" />
-      <AlertTitle className="text-orange-900 dark:text-orange-300">
-        Conflicts Detected
-      </AlertTitle>
+      <AlertTitle className="text-orange-900 dark:text-orange-300">Conflicts Detected</AlertTitle>
       <AlertDescription className="text-orange-800 dark:text-orange-400">
-        <div className="space-y-2 mt-2">
+        <div className="mt-2 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span>Total conflicts:</span>
             <span className="font-semibold">{totalConflicts}</span>
@@ -621,7 +633,7 @@ function ConflictSummaryPanel({ conflicts }: ConflictSummaryPanelProps) {
             <span>Files affected:</span>
             <span className="font-semibold">{filesWithConflicts}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-300 dark:border-orange-800">
+          <div className="grid grid-cols-2 gap-2 border-t border-orange-300 pt-2 dark:border-orange-800">
             <div className="space-y-1">
               <div className="text-xs font-medium">Hard Conflicts</div>
               <div className="text-lg font-bold text-red-700 dark:text-red-400">
@@ -636,12 +648,10 @@ function ConflictSummaryPanel({ conflicts }: ConflictSummaryPanelProps) {
               <div className="text-lg font-bold text-yellow-700 dark:text-yellow-400">
                 {softConflicts.length}
               </div>
-              <div className="text-xs text-orange-700 dark:text-orange-500">
-                Adjacent changes
-              </div>
+              <div className="text-xs text-orange-700 dark:text-orange-500">Adjacent changes</div>
             </div>
           </div>
-          <div className="text-xs pt-2 border-t border-orange-300 dark:border-orange-800">
+          <div className="border-t border-orange-300 pt-2 text-xs dark:border-orange-800">
             Review each file carefully and select the appropriate resolution strategy.
           </div>
         </div>
@@ -668,13 +678,18 @@ function ResolveStep({
   canContinue,
 }: ResolveStepProps) {
   // Memoize modified files list
-  const modifiedFiles = useMemo(() => diffData.files.filter((file) => file.status === 'modified'), [diffData.files]);
+  const modifiedFiles = useMemo(
+    () => diffData.files.filter((file) => file.status === 'modified'),
+    [diffData.files]
+  );
 
   // Memoize expensive conflict analysis
   const conflictAnalysis = useMemo(() => analyzeAllConflicts(diffData.files), [diffData.files]);
 
   // Map resolution strategies: 'collection'/'project'/'merge' -> 'theirs'/'ours'/'manual'
-  const mapResolutionToStrategy = (resolution: ConflictResolution | undefined): 'theirs' | 'ours' | 'manual' | null => {
+  const mapResolutionToStrategy = (
+    resolution: ConflictResolution | undefined
+  ): 'theirs' | 'ours' | 'manual' | null => {
     if (!resolution) return null;
     if (resolution === 'collection') return 'theirs';
     if (resolution === 'project') return 'ours';
@@ -714,13 +729,19 @@ function ResolveStep({
                   key={file.file_path}
                   file={file}
                   resolution={mapResolutionToStrategy(conflictResolutions[file.file_path])}
-                  onResolve={(strategy) => onSetResolution(file.file_path, mapStrategyToResolution(strategy))}
-                  conflictInfo={fileConflictInfo ? {
-                    severity: fileConflictInfo.severity,
-                    conflictCount: fileConflictInfo.conflictCount,
-                    additions: fileConflictInfo.additionCount,
-                    deletions: fileConflictInfo.deletionCount,
-                  } : undefined}
+                  onResolve={(strategy) =>
+                    onSetResolution(file.file_path, mapStrategyToResolution(strategy))
+                  }
+                  conflictInfo={
+                    fileConflictInfo
+                      ? {
+                          severity: fileConflictInfo.severity,
+                          conflictCount: fileConflictInfo.conflictCount,
+                          additions: fileConflictInfo.additionCount,
+                          deletions: fileConflictInfo.deletionCount,
+                        }
+                      : undefined
+                  }
                   collectionLabel="Collection"
                   projectLabel="Project"
                 />
@@ -795,10 +816,34 @@ function ApplyStep({
       message: string;
       duration: number;
     }> = [
-      { stage: 'preparing', startPercent: 0, endPercent: 20, message: 'Preparing merge...', duration: 300 },
-      { stage: 'resolving', startPercent: 20, endPercent: 50, message: 'Resolving conflicts...', duration: 600 },
-      { stage: 'applying', startPercent: 50, endPercent: 80, message: 'Applying changes...', duration: 800 },
-      { stage: 'finalizing', startPercent: 80, endPercent: 100, message: 'Finalizing...', duration: 400 },
+      {
+        stage: 'preparing',
+        startPercent: 0,
+        endPercent: 20,
+        message: 'Preparing merge...',
+        duration: 300,
+      },
+      {
+        stage: 'resolving',
+        startPercent: 20,
+        endPercent: 50,
+        message: 'Resolving conflicts...',
+        duration: 600,
+      },
+      {
+        stage: 'applying',
+        startPercent: 50,
+        endPercent: 80,
+        message: 'Applying changes...',
+        duration: 800,
+      },
+      {
+        stage: 'finalizing',
+        startPercent: 80,
+        endPercent: 100,
+        message: 'Finalizing...',
+        duration: 400,
+      },
     ];
 
     let currentStageIndex = 0;
@@ -820,10 +865,7 @@ function ApplyStep({
 
       const stepInterval = setInterval(() => {
         currentStep++;
-        const newPercent = Math.min(
-          stage.startPercent + (stepSize * currentStep),
-          stage.endPercent
-        );
+        const newPercent = Math.min(stage.startPercent + stepSize * currentStep, stage.endPercent);
 
         // Optionally show file-level progress during 'applying' stage
         let currentFile: string | undefined;
@@ -862,13 +904,11 @@ function ApplyStep({
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Apply Changes</CardTitle>
-        <CardDescription>
-          Review the final summary and apply the merge operation.
-        </CardDescription>
+        <CardDescription>Review the final summary and apply the merge operation.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Summary */}
-        <div className="rounded-lg border p-4 space-y-3">
+        <div className="space-y-3 rounded-lg border p-4">
           <h4 className="text-sm font-semibold">Summary</h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
@@ -891,16 +931,14 @@ function ApplyStep({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Files to delete:</span>
-              <span className="font-medium text-red-600 dark:text-red-400">
-                {summary.deleted}
-              </span>
+              <span className="font-medium text-red-600 dark:text-red-400">{summary.deleted}</span>
             </div>
           </div>
         </div>
 
         {/* Conflict Resolutions */}
         {modifiedFiles.length > 0 && (
-          <div className="rounded-lg border p-4 space-y-3">
+          <div className="space-y-3 rounded-lg border p-4">
             <h4 className="text-sm font-semibold">Conflict Resolutions</h4>
             <div className="space-y-2">
               {modifiedFiles.map((file) => (
@@ -910,8 +948,8 @@ function ApplyStep({
                     {conflictResolutions[file.file_path] === 'collection'
                       ? 'Keep Collection'
                       : conflictResolutions[file.file_path] === 'project'
-                      ? 'Keep Project'
-                      : 'Merge Both'}
+                        ? 'Keep Project'
+                        : 'Merge Both'}
                   </Badge>
                 </div>
               ))}
@@ -921,11 +959,13 @@ function ApplyStep({
 
         {/* Progress Indicator - shown when applying */}
         {isApplying && (
-          <div className="rounded-lg border p-6 space-y-4 bg-muted/30">
+          <div className="space-y-4 rounded-lg border bg-muted/30 p-6">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">{progress.message}</span>
-                <span className="text-muted-foreground tabular-nums">{Math.round(progress.percent)}%</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {Math.round(progress.percent)}%
+                </span>
               </div>
               <Progress value={progress.percent} className="h-3" />
             </div>
@@ -956,7 +996,7 @@ function ApplyStep({
 
             {/* File-level progress (optional) */}
             {progress.currentFile && progress.currentFileIndex && progress.totalFiles && (
-              <div className="pt-3 border-t">
+              <div className="border-t pt-3">
                 <p className="text-xs text-muted-foreground">
                   Processing file {progress.currentFileIndex} of {progress.totalFiles}:{' '}
                   <span className="font-mono font-medium">{progress.currentFile}</span>
@@ -974,9 +1014,7 @@ function ApplyStep({
             <AlertDescription>
               {syncResult.message}
               {syncResult.synced_files_count && (
-                <span className="block mt-1">
-                  Synced {syncResult.synced_files_count} file(s)
-                </span>
+                <span className="mt-1 block">Synced {syncResult.synced_files_count} file(s)</span>
               )}
             </AlertDescription>
           </Alert>
@@ -1002,7 +1040,7 @@ function ApplyStep({
           </>
         )}
         {isApplying && (
-          <div className="flex items-center justify-center w-full gap-2 text-muted-foreground">
+          <div className="flex w-full items-center justify-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Applying changes...</span>
           </div>
@@ -1028,7 +1066,7 @@ function ProgressStepItem({ label, isComplete, isActive }: ProgressStepItemProps
     <div className="flex items-center gap-3">
       <div
         className={cn(
-          'flex h-5 w-5 items-center justify-center rounded-full border-2 flex-shrink-0 transition-colors',
+          'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors',
           isComplete && 'border-green-600 bg-green-600',
           isActive && !isComplete && 'border-primary bg-background',
           !isActive && !isComplete && 'border-muted bg-background'
@@ -1045,8 +1083,8 @@ function ProgressStepItem({ label, isComplete, isActive }: ProgressStepItemProps
       <span
         className={cn(
           'text-sm transition-colors',
-          isComplete && 'text-green-600 dark:text-green-400 font-medium',
-          isActive && !isComplete && 'text-foreground font-medium',
+          isComplete && 'font-medium text-green-600 dark:text-green-400',
+          isActive && !isComplete && 'font-medium text-foreground',
           !isActive && !isComplete && 'text-muted-foreground'
         )}
       >

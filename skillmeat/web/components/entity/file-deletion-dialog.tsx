@@ -94,7 +94,7 @@ export function FileDeletionDialog({
             <AlertDescription className="text-sm">
               <span className="font-medium">File to delete:</span>
               <br />
-              <code className="text-xs bg-red-500/20 px-2 py-1 rounded mt-1 inline-block">
+              <code className="mt-1 inline-block rounded bg-red-500/20 px-2 py-1 text-xs">
                 {fileName}
               </code>
             </AlertDescription>
@@ -102,26 +102,16 @@ export function FileDeletionDialog({
 
           {error && (
             <Alert variant="destructive">
-              <AlertDescription className="text-sm">
-                {error}
-              </AlertDescription>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isDeleting}
-          >
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isDeleting}>
             Cancel
           </Button>
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={isDeleting}
-          >
+          <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

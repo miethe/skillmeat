@@ -14,12 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Entity, EntityType, ENTITY_TYPES, getAllEntityTypes } from '@/types/entity';
 import { apiRequest } from '@/lib/api';
 import { ArtifactListResponse, ArtifactDeployRequest } from '@/sdk';
@@ -64,7 +59,7 @@ export function DeployFromCollectionDialog({
 
       const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
 
-      const mappedEntities: Entity[] = response.items.map(item => ({
+      const mappedEntities: Entity[] = response.items.map((item) => ({
         id: item.id,
         name: item.name,
         type: item.type as EntityType,
@@ -142,7 +137,7 @@ export function DeployFromCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col">
         <DialogHeader>
           <DialogTitle>Deploy from Collection</DialogTitle>
           <DialogDescription>
@@ -150,10 +145,10 @@ export function DeployFromCollectionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
             <Input
               placeholder="Search entities..."
               value={searchQuery}
@@ -164,7 +159,7 @@ export function DeployFromCollectionDialog({
 
           {/* Entity Type Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as EntityType)}>
-            <TabsList className="grid w-full grid-cols-5 mb-4">
+            <TabsList className="mb-4 grid w-full grid-cols-5">
               {entityTypes.map((type) => {
                 const config = ENTITY_TYPES[type];
                 const IconComponent = (LucideIcons as any)[config.icon] as LucideIcon;
@@ -180,15 +175,17 @@ export function DeployFromCollectionDialog({
             </TabsList>
 
             {entityTypes.map((type) => (
-              <TabsContent key={type} value={type} className="flex-1 min-h-0">
+              <TabsContent key={type} value={type} className="min-h-0 flex-1">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : filteredEntities.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No {ENTITY_TYPES[type].pluralLabel} Found</h3>
+                    <Package className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">
+                      No {ENTITY_TYPES[type].pluralLabel} Found
+                    </h3>
                     <p className="text-sm text-muted-foreground">
                       {searchQuery
                         ? 'No entities match your search.'
@@ -204,7 +201,7 @@ export function DeployFromCollectionDialog({
                         return (
                           <div
                             key={entity.id}
-                            className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                            className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50"
                             onClick={() => toggleEntity(entity.id)}
                           >
                             <Checkbox
@@ -212,8 +209,8 @@ export function DeployFromCollectionDialog({
                               onCheckedChange={() => toggleEntity(entity.id)}
                               className="mt-1"
                             />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex items-center gap-2">
                                 <h4 className="font-medium">{entity.name}</h4>
                                 {entity.version && (
                                   <Badge variant="outline" className="text-xs">
@@ -222,7 +219,7 @@ export function DeployFromCollectionDialog({
                                 )}
                               </div>
                               {entity.description && (
-                                <p className="text-sm text-muted-foreground mb-2">
+                                <p className="mb-2 text-sm text-muted-foreground">
                                   {entity.description}
                                 </p>
                               )}
@@ -237,7 +234,7 @@ export function DeployFromCollectionDialog({
                               )}
                             </div>
                             {isSelected && (
-                              <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                              <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-primary" />
                             )}
                           </div>
                         );
@@ -251,7 +248,7 @@ export function DeployFromCollectionDialog({
         </div>
 
         <DialogFooter>
-          <div className="flex items-center justify-between w-full">
+          <div className="flex w-full items-center justify-between">
             <div className="text-sm text-muted-foreground">
               {selectedEntities.size} {selectedEntities.size === 1 ? 'entity' : 'entities'} selected
             </div>
@@ -259,18 +256,15 @@ export function DeployFromCollectionDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeploying}>
                 Cancel
               </Button>
-              <Button
-                onClick={handleDeploy}
-                disabled={selectedEntities.size === 0 || isDeploying}
-              >
+              <Button onClick={handleDeploy} disabled={selectedEntities.size === 0 || isDeploying}>
                 {isDeploying ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Deploying...
                   </>
                 ) : (
                   <>
-                    <Package className="h-4 w-4 mr-2" />
+                    <Package className="mr-2 h-4 w-4" />
                     Deploy Selected
                   </>
                 )}

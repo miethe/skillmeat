@@ -70,9 +70,7 @@ test.describe('Keyboard Navigation', () => {
       ];
 
       for (const linkText of navLinks) {
-        const focused = await page.evaluateHandle(
-          () => document.activeElement
-        );
+        const focused = await page.evaluateHandle(() => document.activeElement);
         const text = await focused.evaluate((el) => el.textContent);
 
         if (text?.includes(linkText)) {
@@ -82,9 +80,7 @@ test.describe('Keyboard Navigation', () => {
       }
     });
 
-    test('should have correct tab order in collections grid', async ({
-      page,
-    }) => {
+    test('should have correct tab order in collections grid', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       // Tab to filters
@@ -103,8 +99,8 @@ test.describe('Keyboard Navigation', () => {
       // Should reach artifact cards
       await pressKey(page, 'Tab');
       const focused = await page.evaluateHandle(() => document.activeElement);
-      const role = await focused.evaluate((el) =>
-        el.getAttribute('role') || el.tagName.toLowerCase()
+      const role = await focused.evaluate(
+        (el) => el.getAttribute('role') || el.tagName.toLowerCase()
       );
 
       expect(role).toBeTruthy();
@@ -309,9 +305,7 @@ test.describe('Keyboard Navigation', () => {
           await pressKey(page, 'Tab');
 
           // Check if focus is still within dialog
-          const focused = await page.evaluateHandle(
-            () => document.activeElement
-          );
+          const focused = await page.evaluateHandle(() => document.activeElement);
           const isInDialog = await dialog.evaluate((dialogEl, focusedEl) => {
             return dialogEl.contains(focusedEl as Node);
           }, focused);
@@ -342,9 +336,7 @@ test.describe('Keyboard Navigation', () => {
         // Tab backward
         await page.keyboard.press('Shift+Tab');
 
-        const focused = await page.evaluateHandle(
-          () => document.activeElement
-        );
+        const focused = await page.evaluateHandle(() => document.activeElement);
         expect(focused).toBeTruthy();
       }
     });
@@ -396,16 +388,12 @@ test.describe('Keyboard Navigation', () => {
 
       // Should have some form of focus indicator
       const hasFocusIndicator =
-        styles.outlineWidth !== '0px' ||
-        styles.outline !== 'none' ||
-        styles.boxShadow !== 'none';
+        styles.outlineWidth !== '0px' || styles.outline !== 'none' || styles.boxShadow !== 'none';
 
       expect(hasFocusIndicator).toBeTruthy();
     });
 
-    test('should maintain focus visibility on all interactive elements', async ({
-      page,
-    }) => {
+    test('should maintain focus visibility on all interactive elements', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       // Tab through multiple elements
@@ -442,9 +430,7 @@ test.describe('Keyboard Navigation', () => {
   });
 
   test.describe('Arrow Key Navigation', () => {
-    test('should navigate through radio groups with arrow keys', async ({
-      page,
-    }) => {
+    test('should navigate through radio groups with arrow keys', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       // Look for radio groups
@@ -457,20 +443,14 @@ test.describe('Keyboard Navigation', () => {
         // Arrow down should move to next radio
         await pressKey(page, 'ArrowDown');
 
-        const focused = await page.evaluateHandle(
-          () => document.activeElement
-        );
-        const type = await focused.evaluate((el) =>
-          el.getAttribute('type')
-        );
+        const focused = await page.evaluateHandle(() => document.activeElement);
+        const type = await focused.evaluate((el) => el.getAttribute('type'));
 
         expect(type).toBe('radio');
       }
     });
 
-    test('should navigate through custom lists with arrow keys', async ({
-      page,
-    }) => {
+    test('should navigate through custom lists with arrow keys', async ({ page }) => {
       await navigateToPage(page, '/collection');
 
       // Look for custom listbox
@@ -495,9 +475,7 @@ test.describe('Keyboard Navigation', () => {
       await navigateToPage(page, '/collection');
 
       // Press Ctrl+K (or Cmd+K on Mac)
-      const isMac = await page.evaluate(
-        () => navigator.platform.toLowerCase().includes('mac')
-      );
+      const isMac = await page.evaluate(() => navigator.platform.toLowerCase().includes('mac'));
       const modifier = isMac ? 'Meta' : 'Control';
 
       await page.keyboard.press(`${modifier}+KeyK`);
@@ -547,10 +525,7 @@ test.describe('Keyboard Navigation', () => {
 
         const main = page.locator('main');
         const mainFocused = await main.evaluate((el) => {
-          return (
-            document.activeElement === el ||
-            el.contains(document.activeElement)
-          );
+          return document.activeElement === el || el.contains(document.activeElement);
         });
 
         expect(mainFocused).toBeTruthy();
@@ -571,10 +546,7 @@ test.describe('Keyboard Navigation', () => {
 
         const nav = page.locator('nav');
         const navFocused = await nav.evaluate((el) => {
-          return (
-            document.activeElement === el ||
-            el.contains(document.activeElement)
-          );
+          return document.activeElement === el || el.contains(document.activeElement);
         });
 
         expect(navFocused).toBeTruthy();
@@ -594,12 +566,8 @@ test.describe('Keyboard Navigation', () => {
       for (let i = 0; i < 3; i++) {
         await pressKey(page, 'Tab');
 
-        const focused = await page.evaluateHandle(
-          () => document.activeElement
-        );
-        const tagName = await focused.evaluate((el) =>
-          el.tagName.toLowerCase()
-        );
+        const focused = await page.evaluateHandle(() => document.activeElement);
+        const tagName = await focused.evaluate((el) => el.tagName.toLowerCase());
 
         expect(['input', 'select', 'button', 'a']).toContain(tagName);
       }

@@ -1,13 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  Play,
-  StopCircle,
-  AlertTriangle,
-  Loader2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { Play, StopCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -15,10 +10,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-import type { MCPServer, DeploymentResponse } from "@/types/mcp";
+} from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+import type { MCPServer, DeploymentResponse } from '@/types/mcp';
 
 interface MCPDeployButtonProps {
   server: MCPServer;
@@ -37,7 +32,7 @@ export function MCPDeployButton({
 }: MCPDeployButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
-  const [deploymentStage, setDeploymentStage] = useState<string>("");
+  const [deploymentStage, setDeploymentStage] = useState<string>('');
   const [deploymentProgress, setDeploymentProgress] = useState(0);
   const { toast } = useToast();
 
@@ -55,7 +50,7 @@ export function MCPDeployButton({
     try {
       setIsDeploying(true);
       setDeploymentProgress(0);
-      setDeploymentStage(dryRun ? "Validating configuration..." : "Resolving version...");
+      setDeploymentStage(dryRun ? 'Validating configuration...' : 'Resolving version...');
 
       // Simulate progress updates (in real implementation, use SSE or polling)
       const progressInterval = setInterval(() => {
@@ -68,10 +63,10 @@ export function MCPDeployButton({
       setDeploymentProgress(100);
 
       if (result.success) {
-        setDeploymentStage("Deployment complete!");
+        setDeploymentStage('Deployment complete!');
 
         toast({
-          title: dryRun ? "Validation Successful" : "Deployment Successful",
+          title: dryRun ? 'Validation Successful' : 'Deployment Successful',
           description: result.message,
         });
 
@@ -79,17 +74,17 @@ export function MCPDeployButton({
           setShowDialog(false);
         }
       } else {
-        throw new Error(result.error_message || "Deployment failed");
+        throw new Error(result.error_message || 'Deployment failed');
       }
     } catch (error) {
       toast({
-        title: "Deployment Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
+        title: 'Deployment Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
       });
     } finally {
       setIsDeploying(false);
-      setDeploymentStage("");
+      setDeploymentStage('');
       setDeploymentProgress(0);
     }
   };
@@ -97,27 +92,27 @@ export function MCPDeployButton({
   const handleUndeploy = async () => {
     try {
       setIsDeploying(true);
-      setDeploymentStage("Removing from settings...");
+      setDeploymentStage('Removing from settings...');
 
       const result = await onUndeploy();
 
       if (result.success) {
         toast({
-          title: "Undeployment Successful",
+          title: 'Undeployment Successful',
           description: result.message,
         });
       } else {
-        throw new Error(result.error_message || "Undeployment failed");
+        throw new Error(result.error_message || 'Undeployment failed');
       }
     } catch (error) {
       toast({
-        title: "Undeployment Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
+        title: 'Undeployment Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
       });
     } finally {
       setIsDeploying(false);
-      setDeploymentStage("");
+      setDeploymentStage('');
     }
   };
 
@@ -134,21 +129,21 @@ export function MCPDeployButton({
       <Button
         onClick={handleDeployClick}
         disabled={disabled || isDeploying}
-        variant={deployed ? "outline" : "default"}
+        variant={deployed ? 'outline' : 'default'}
       >
         {isDeploying ? (
           <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            {deploymentStage || "Processing..."}
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {deploymentStage || 'Processing...'}
           </>
         ) : deployed ? (
           <>
-            <StopCircle className="h-4 w-4 mr-2" />
+            <StopCircle className="mr-2 h-4 w-4" />
             Undeploy
           </>
         ) : (
           <>
-            <Play className="h-4 w-4 mr-2" />
+            <Play className="mr-2 h-4 w-4" />
             Deploy
           </>
         )}
@@ -163,19 +158,18 @@ export function MCPDeployButton({
               Deploy MCP Server
             </DialogTitle>
             <DialogDescription>
-              You are about to deploy <strong>{server.name}</strong> to Claude
-              Desktop.
+              You are about to deploy <strong>{server.name}</strong> to Claude Desktop.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Security warning */}
-            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/20">
+              <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 <AlertTriangle className="h-4 w-4" />
                 Security Notice
               </h4>
-              <ul className="text-sm space-y-1 text-muted-foreground list-disc list-inside">
+              <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                 <li>MCP servers have access to system resources</li>
                 <li>Review environment variables before deploying</li>
                 <li>A backup of settings.json will be created</li>
@@ -195,12 +189,8 @@ export function MCPDeployButton({
               </div>
               {Object.keys(server.env_vars).length > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Environment Variables:
-                  </span>
-                  <span className="text-xs">
-                    {Object.keys(server.env_vars).length} configured
-                  </span>
+                  <span className="text-muted-foreground">Environment Variables:</span>
+                  <span className="text-xs">{Object.keys(server.env_vars).length} configured</span>
                 </div>
               )}
             </div>
@@ -209,37 +199,27 @@ export function MCPDeployButton({
             {isDeploying && (
               <div className="space-y-2">
                 <Progress value={deploymentProgress} />
-                <p className="text-sm text-center text-muted-foreground">
-                  {deploymentStage}
-                </p>
+                <p className="text-center text-sm text-muted-foreground">{deploymentStage}</p>
               </div>
             )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setShowDialog(false)}
-              disabled={isDeploying}
-            >
+            <Button variant="outline" onClick={() => setShowDialog(false)} disabled={isDeploying}>
               Cancel
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleDryRun}
-              disabled={isDeploying}
-            >
+            <Button variant="outline" onClick={handleDryRun} disabled={isDeploying}>
               Dry Run
             </Button>
             <Button onClick={handleConfirmDeploy} disabled={isDeploying}>
               {isDeploying ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deploying...
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4 mr-2" />
+                  <Play className="mr-2 h-4 w-4" />
                   Deploy
                 </>
               )}

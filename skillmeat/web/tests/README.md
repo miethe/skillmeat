@@ -191,22 +191,26 @@ test.describe('My Feature', () => {
 ### Best Practices
 
 1. **Use data-testid attributes** for stable selectors:
+
    ```html
    <div data-testid="artifact-card">...</div>
    ```
 
 2. **Mock API responses** for consistent tests:
+
    ```typescript
    await mockApiRoute(page, '/api/artifacts*', mockData);
    ```
 
 3. **Use semantic selectors** when possible:
+
    ```typescript
-   page.locator('[role="button"]')
-   page.locator('[aria-label="Close"]')
+   page.locator('[role="button"]');
+   page.locator('[aria-label="Close"]');
    ```
 
 4. **Wait for elements** before interacting:
+
    ```typescript
    await waitForElement(page, 'selector');
    ```
@@ -238,6 +242,7 @@ Tests run automatically on:
 - Pull requests to `main` or `develop` branches
 
 Tests run in three browsers:
+
 - Chromium
 - Firefox
 - WebKit (Safari)
@@ -253,6 +258,7 @@ pnpm run test:e2e:ui
 ```
 
 Provides interactive debugging with:
+
 - Time travel through test execution
 - Watch mode
 - Pick locators
@@ -299,6 +305,7 @@ pnpm run test:report
 ```
 
 Opens interactive HTML report with:
+
 - Test results
 - Screenshots
 - Videos

@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { MoreVertical, Edit, Settings, Trash2 } from "lucide-react";
+import { useState } from 'react';
+import { MoreVertical, Edit, Settings, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { EditProjectDialog } from "./edit-project-dialog";
-import { DeleteProjectDialog } from "./delete-project-dialog";
-import type { ProjectSummary } from "@/types/project";
-import { useRouter } from "next/navigation";
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { EditProjectDialog } from './edit-project-dialog';
+import { DeleteProjectDialog } from './delete-project-dialog';
+import type { ProjectSummary } from '@/types/project';
+import { useRouter } from 'next/navigation';
 
 export interface ProjectActionsProps {
   project: ProjectSummary;
