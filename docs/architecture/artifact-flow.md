@@ -8,7 +8,7 @@ Overview of how Claude artifacts move through the three-tier SkillMeat system, f
 
 SkillMeat manages artifacts across three distinct levels, each with different responsibilities and concerns:
 
-```
+```text
 SOURCE LEVEL (Upstream)
   - GitHub repositories
   - Local artifact sources
@@ -34,11 +34,13 @@ PROJECT LEVEL (Local)
 The source level represents upstream artifact origins outside of SkillMeat.
 
 **Sources:**
+
 - GitHub repositories (username/repo/path[@version])
 - Local filesystem directories
 - Future: artifact registries, package managers
 
 **Characteristics:**
+
 - External to the SkillMeat system
 - Accessed via SourceManager abstraction
 - Typically larger/heavier than deployed instances
@@ -51,12 +53,14 @@ The collection level is a personal library of artifacts managed within SkillMeat
 **Location:** `~/.skillmeat/collection/`
 
 **Characteristics:**
+
 - Single source of truth per artifact type+name combination
 - Tracks upstream relationships (where artifacts came from)
 - Maintains version history and metadata
 - Artifact composite key: (name, type) - must be unique per collection
 
 **Stored Information:**
+
 - Artifact files (actual SKILL.md, COMMAND.md, etc.)
 - Origin information (GitHub URL, local source)
 - Version specification (latest, v1.0.0, branch-name, SHA)
@@ -64,7 +68,8 @@ The collection level is a personal library of artifacts managed within SkillMeat
 - Metadata extracted from artifact frontmatter
 
 **Example Collection Structure:**
-```
+
+```text
 ~/.skillmeat/collection/
 ├── artifacts.toml          (manifest)
 ├── artifacts.lock          (lock file with resolved versions)
@@ -88,6 +93,7 @@ The project level represents deployed artifacts within a specific project.
 **Location:** `./.claude/` in project root
 
 **Characteristics:**
+
 - Instances of artifacts from the collection
 - Tracks deployment metadata separately
 - Supports local modifications
@@ -95,13 +101,15 @@ The project level represents deployed artifacts within a specific project.
 - Per-project isolation (different projects can have different versions)
 
 **Deployment Metadata:** `.claude/.skillmeat-deployed.toml`
+
 - Lists all deployed artifacts
 - Records deployment time
 - Content hash of deployed version
 - Modification tracking
 
 **Example Project Structure:**
-```
+
+```text
 project-root/
 └── .claude/
     ├── .skillmeat-deployed.toml    (deployment metadata)
@@ -123,7 +131,7 @@ How artifacts move between levels via explicit operations.
 
 Fetch an artifact from source and add it to the personal collection.
 
-```
+```bash
 $ skillmeat add github:anthropics/skills/python-skill[@latest]
     ↓
 1. Resolve version (GitHub: fetch tags/commits)
@@ -134,15 +142,18 @@ $ skillmeat add github:anthropics/skills/python-skill[@latest]
 ```
 
 **Inputs:**
+
 - Source specification (GitHub URL or local path)
 - Version specification (optional: @latest, @v1.0.0, @sha, or omitted for local)
 
 **Outputs:**
+
 - Artifact added to collection
 - artifacts.toml entry created
 - artifacts.lock entry with resolved_sha and resolved_version
 
 **What Gets Stored:**
+
 - Artifact source files (minimal: core files, exclude .git, __pycache__, node_modules)
 - Metadata (author, license, dependencies, version)
 - Origin information (upstream URL)
@@ -151,7 +162,7 @@ $ skillmeat add github:anthropics/skills/python-skill[@latest]
 
 Copy an artifact from collection into a project's .claude/ directory.
 
-```
+```bash
 $ skillmeat deploy -c my-collection python-skill --scope local
     ↓
 1. Lookup artifact in collection
@@ -166,15 +177,18 @@ $ skillmeat deploy -c my-collection python-skill --scope local
 ```
 
 **Inputs:**
+
 - Collection name
 - Artifact name (and optional type)
 - Target scope (local or user)
 
 **Outputs:**
+
 - Artifact instance in ./.claude/
 - Deployment record in .skillmeat-deployed.toml
 
 **What Gets Deployed:**
+
 - Only artifact files (no metadata overhead)
 - Excludes source control and development dependencies
 - Minimal footprint for project
@@ -185,11 +199,21 @@ $ skillmeat deploy -c my-collection python-skill --scope local
 
 How information flows between collection and deployed instances.
 
+### Web UI Sync Status Tab
+
+The web interface provides a visual Sync Status tab for artifacts that displays:
+
+**Upstream Status Section:** Compares the collection version against its GitHub upstream source, showing file diffs and allowing users to pull upstream changes.
+
+**Project Comparison Section:** Compares the collection version against deployed project versions. When viewing collection artifacts, a project selector allows comparison with any deployed instance.
+
+The backend `/api/v1/artifacts/{artifact_id}/upstream-diff` endpoint supports both comparisons, returning file-level diffs for visual review and merge operations.
+
 ### Pull Synchronization (Collection → Project)
 
 Detect when collection has updated and pull changes into project.
 
-```
+```bash
 $ skillmeat sync --pull
     ↓
 1. Compare deployment_hash vs current_collection_hash
@@ -203,6 +227,7 @@ $ skillmeat sync --pull
 **Use Case:** Keep deployed artifacts up-to-date when collection receives updates.
 
 **Safety Mechanisms:**
+
 - Drift detection prevents overwriting local modifications
 - Update strategies let users choose behavior
 - Snapshots enable rollback if needed
@@ -214,7 +239,8 @@ Future capability to push local modifications back to collection.
 **Currently Not Implemented**
 
 When implemented:
-```
+
+```bash
 $ skillmeat sync --push
     ↓
 1. Detect artifacts with local modifications (drift_type = "modified")
@@ -235,7 +261,7 @@ How SkillMeat identifies when artifacts have diverged between versions.
 
 Drift detection uses three-way comparison: base (deployed version) vs. collection vs. local.
 
-```
+```text
                     Deployed (Base)
                           |
           __________________+__________________
@@ -258,7 +284,7 @@ Drift detection uses three-way comparison: base (deployed version) vs. collectio
 
 Content-addressed artifact versioning using SHA-256:
 
-```
+```text
 Collection Version: sha256(artifact files) = "abc123def..."
 Deployed Version:   sha256(deployed files) = "abc123def..." (at time of deployment)
 Current Project:    sha256(current files)  = "xyz789abc..." (latest state)
@@ -270,7 +296,7 @@ Both != deployed → CONFLICT
 
 ### Detection Process
 
-```
+```text
 check_drift(project_path):
   1. Load deployment_metadata from .skillmeat-deployed.toml
   2. For each deployed artifact:
@@ -288,7 +314,7 @@ check_drift(project_path):
 
 Persistent modification tracking across checks:
 
-```
+```text
 deployment_record {
   content_hash: "abc123def..."        // Hash when deployed
   local_modifications: false          // Current state
@@ -305,7 +331,7 @@ How SkillMeat handles conflicts and versions with different update modes.
 
 ### Strategy Types
 
-```python
+```text
 UpdateStrategy:
   PROMPT → Ask user what to do (default, interactive)
   TAKE_UPSTREAM → Always take collection version (lose local changes)
@@ -318,7 +344,8 @@ UpdateStrategy:
 Used when pulling collection updates with local modifications:
 
 **PROMPT Strategy** (default):
-```
+
+```text
 Drift detected: python-skill is modified locally but has collection update
   [1] Keep local version (skip update)
   [2] Take collection version (lose local changes)
@@ -327,13 +354,15 @@ Drift detected: python-skill is modified locally but has collection update
 ```
 
 **TAKE_UPSTREAM Strategy:**
-```
+
+```text
 Automatically overwrites local version with collection version.
 Warning: Local modifications are lost permanently (use snapshots for rollback).
 ```
 
 **KEEP_LOCAL Strategy:**
-```
+
+```text
 Skips the update, keeping local version as-is.
 Artifact remains marked as "modified" in drift detection.
 ```
@@ -342,7 +371,7 @@ Artifact remains marked as "modified" in drift detection.
 
 For conflicts (both collection and local changed):
 
-```
+```text
 If strategy == PROMPT:
   Show conflict details, require user decision
 
@@ -367,7 +396,7 @@ How SkillMeat tracks artifact versions across all three levels.
 
 Every artifact has a unique composite key within a collection:
 
-```
+```text
 Composite Key = (name, type)
 
 Examples:
@@ -382,7 +411,7 @@ Uniqueness: Only one artifact per composite key per collection.
 
 Flexible version specification at the source level:
 
-```
+```text
 github:anthropics/skills/python-skill[@VERSION_SPEC]
 
 VERSION_SPEC options:
@@ -396,7 +425,7 @@ VERSION_SPEC options:
 
 Once fetched, version is resolved to exact SHA and version tag:
 
-```
+```text
 artifacts.lock:
   [lock.entries.python-skill]
   source = "anthropics/skills/python-skill"
@@ -410,7 +439,7 @@ artifacts.lock:
 
 Each deployment records the exact version deployed:
 
-```
+```text
 .skillmeat-deployed.toml:
   [[deployed]]
   artifact_name = "python-skill"
@@ -425,7 +454,7 @@ Each deployment records the exact version deployed:
 
 Deployments track a lineage of versions to enable rollback:
 
-```
+```text
 Version Lineage: [newest, ←, ←, ←, oldest]
   v3: "xyz789..." (current deployed)
   v2: "abc123..." (previously deployed)
@@ -447,7 +476,7 @@ How SkillMeat prevents data loss and enables recovery.
 
 All modifications use atomic operations to prevent partial/corrupted state:
 
-```
+```text
 Add artifact to collection:
   1. Create temp directory
   2. Download/copy artifact files to temp
@@ -467,7 +496,7 @@ Deploy artifact to project:
 
 All artifacts are content-addressed with SHA-256:
 
-```
+```text
 content_hash = SHA-256(artifact files)
 
 Used for:
@@ -481,7 +510,7 @@ Used for:
 
 Before potentially destructive operations, SkillMeat can create snapshots:
 
-```
+```text
 Pre-update snapshot:
   1. Create .claude/.skillmeat-snapshot.toml
   2. Record current state:
@@ -499,7 +528,7 @@ Rollback:
 
 Deployment metadata is never overwritten without backup:
 
-```
+```text
 .skillmeat-deployed.toml (current)
 .skillmeat-deployed.toml.backup (previous)
 .skillmeat-deployed.toml.backup-N (older)
@@ -519,7 +548,7 @@ Concrete example of an artifact moving through the system.
 
 ### Step 1: Add to Collection
 
-```
+```bash
 $ skillmeat add github:anthropics/skills/python-skill@latest
 
 File system:
@@ -556,7 +585,7 @@ File system:
 
 ### Step 2: Deploy to Project
 
-```
+```bash
 $ skillmeat deploy -c default python-skill
 
 File system:
@@ -584,7 +613,7 @@ File system:
 
 ### Step 3: Local Modification
 
-```
+```bash
 $ vi ./.claude/skills/python-skill/python_skill.py
 (User modifies the deployed artifact)
 
@@ -599,7 +628,7 @@ content_hash_at_deployment = "abc123def456..." (unchanged)
 
 ### Step 4: Detect Drift
 
-```
+```bash
 $ skillmeat sync --check
 
 Drift Results:
@@ -614,7 +643,7 @@ Drift Results:
 
 Collection receives update from upstream:
 
-```
+```bash
 $ skillmeat update -c default python-skill
 
 Source: anthropics/skills/python-skill (new version v2.6.0)
@@ -631,7 +660,7 @@ artifacts.lock updated:
 
 ### Step 6: Detect Conflict
 
-```
+```bash
 $ skillmeat sync --check
 
 Drift Results:
@@ -652,7 +681,7 @@ Three-Way State:
 
 **Option A: Keep Local (KEEP_LOCAL strategy)**
 
-```
+```bash
 $ skillmeat sync --pull --strategy local
 
 Result: Project version unchanged (xyz789abc...)
@@ -663,7 +692,7 @@ Result: Project version unchanged (xyz789abc...)
 
 **Option B: Take Upstream (TAKE_UPSTREAM strategy)**
 
-```
+```bash
 $ skillmeat sync --pull --strategy upstream
 
 Result: Local version overwritten
@@ -674,7 +703,7 @@ Result: Local version overwritten
 
 **Option C: Manual Review (PROMPT strategy)**
 
-```
+```bash
 $ skillmeat sync --pull
 
 Prompt:
