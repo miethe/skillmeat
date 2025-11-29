@@ -34,11 +34,7 @@ test.describe('Collections Dashboard', () => {
 
   test('should display page header and description', async ({ page }) => {
     await expectTextVisible(page, 'h1', 'Collection');
-    await expectTextVisible(
-      page,
-      'p',
-      'Browse and manage your artifact collection'
-    );
+    await expectTextVisible(page, 'p', 'Browse and manage your artifact collection');
   });
 
   test('should display artifact count', async ({ page }) => {
@@ -208,11 +204,7 @@ test.describe('Collections Dashboard', () => {
 
   test.describe('Sorting', () => {
     test('should sort by name ascending', async ({ page }) => {
-      await mockApiRoute(
-        page,
-        '/api/artifacts*sort=name*order=asc*',
-        buildApiResponse.artifacts()
-      );
+      await mockApiRoute(page, '/api/artifacts*sort=name*order=asc*', buildApiResponse.artifacts());
 
       const sortSelect = page.locator('select[name="sort"]');
       await sortSelect.selectOption('name');
@@ -221,11 +213,7 @@ test.describe('Collections Dashboard', () => {
     });
 
     test('should sort by updated date', async ({ page }) => {
-      await mockApiRoute(
-        page,
-        '/api/artifacts*sort=updatedAt*',
-        buildApiResponse.artifacts()
-      );
+      await mockApiRoute(page, '/api/artifacts*sort=updatedAt*', buildApiResponse.artifacts());
 
       const sortSelect = page.locator('select[name="sort"]');
       await sortSelect.selectOption('updatedAt');
@@ -306,11 +294,7 @@ test.describe('Collections Dashboard', () => {
       await page.waitForTimeout(500);
 
       // Should show error message
-      await expectTextVisible(
-        page,
-        '[role="alert"], .error, .destructive',
-        /Failed to load/i
-      );
+      await expectTextVisible(page, '[role="alert"], .error, .destructive', /Failed to load/i);
     });
 
     test('should show empty state when no artifacts', async ({ page }) => {

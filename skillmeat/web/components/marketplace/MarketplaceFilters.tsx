@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type { MarketplaceFilters } from "@/types/marketplace";
+import { useState } from 'react';
+import { Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import type { MarketplaceFilters } from '@/types/marketplace';
 
 interface MarketplaceFiltersProps {
   filters: MarketplaceFilters;
@@ -15,27 +15,27 @@ interface MarketplaceFiltersProps {
 }
 
 const COMMON_LICENSES = [
-  "MIT",
-  "Apache-2.0",
-  "GPL-3.0",
-  "BSD-3-Clause",
-  "ISC",
-  "MPL-2.0",
-  "LGPL-3.0",
-  "Unknown",
+  'MIT',
+  'Apache-2.0',
+  'GPL-3.0',
+  'BSD-3-Clause',
+  'ISC',
+  'MPL-2.0',
+  'LGPL-3.0',
+  'Unknown',
 ];
 
 const COMMON_TAGS = [
-  "testing",
-  "python",
-  "javascript",
-  "documentation",
-  "productivity",
-  "code-review",
-  "database",
-  "api",
-  "automation",
-  "security",
+  'testing',
+  'python',
+  'javascript',
+  'documentation',
+  'productivity',
+  'code-review',
+  'database',
+  'api',
+  'automation',
+  'security',
 ];
 
 export function MarketplaceFilters({
@@ -43,12 +43,12 @@ export function MarketplaceFilters({
   onFiltersChange,
   brokers = [],
 }: MarketplaceFiltersProps) {
-  const [tagInput, setTagInput] = useState("");
+  const [tagInput, setTagInput] = useState('');
 
   const handleFilterChange = (key: keyof MarketplaceFilters, value: any) => {
     onFiltersChange({
       ...filters,
-      [key]: value === "all" || value === "" ? undefined : value,
+      [key]: value === 'all' || value === '' ? undefined : value,
     });
   };
 
@@ -63,7 +63,7 @@ export function MarketplaceFilters({
       ...filters,
       tags: [...currentTags, trimmedTag],
     });
-    setTagInput("");
+    setTagInput('');
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -76,12 +76,12 @@ export function MarketplaceFilters({
 
   const handleClearAll = () => {
     onFiltersChange({});
-    setTagInput("");
+    setTagInput('');
   };
 
   // Count active filters
   const activeFilterCount = Object.values(filters).filter(
-    (value) => value !== undefined && value !== "" && (!Array.isArray(value) || value.length > 0)
+    (value) => value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)
   ).length;
 
   const enabledBrokers = brokers.filter((b) => b.enabled);
@@ -90,31 +90,28 @@ export function MarketplaceFilters({
     <div className="space-y-4">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search marketplace listings..."
-          value={filters.query || ""}
-          onChange={(e) => handleFilterChange("query", e.target.value)}
+          value={filters.query || ''}
+          onChange={(e) => handleFilterChange('query', e.target.value)}
           className="pl-9"
           aria-label="Search marketplace"
         />
       </div>
 
       {/* Filter Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Broker Filter */}
         {enabledBrokers.length > 0 && (
           <div>
-            <label
-              htmlFor="broker-filter"
-              className="block text-sm font-medium mb-1.5"
-            >
+            <label htmlFor="broker-filter" className="mb-1.5 block text-sm font-medium">
               Broker
             </label>
             <Select
               id="broker-filter"
-              value={filters.broker || "all"}
-              onChange={(e) => handleFilterChange("broker", e.target.value)}
+              value={filters.broker || 'all'}
+              onChange={(e) => handleFilterChange('broker', e.target.value)}
             >
               <option value="all">All Brokers</option>
               {enabledBrokers.map((broker) => (
@@ -128,16 +125,13 @@ export function MarketplaceFilters({
 
         {/* License Filter */}
         <div>
-          <label
-            htmlFor="license-filter"
-            className="block text-sm font-medium mb-1.5"
-          >
+          <label htmlFor="license-filter" className="mb-1.5 block text-sm font-medium">
             License
           </label>
           <Select
             id="license-filter"
-            value={filters.license || "all"}
-            onChange={(e) => handleFilterChange("license", e.target.value)}
+            value={filters.license || 'all'}
+            onChange={(e) => handleFilterChange('license', e.target.value)}
           >
             <option value="all">All Licenses</option>
             {COMMON_LICENSES.map((license) => (
@@ -150,37 +144,31 @@ export function MarketplaceFilters({
 
         {/* Publisher Filter */}
         <div>
-          <label
-            htmlFor="publisher-filter"
-            className="block text-sm font-medium mb-1.5"
-          >
+          <label htmlFor="publisher-filter" className="mb-1.5 block text-sm font-medium">
             Publisher
           </label>
           <Input
             id="publisher-filter"
             placeholder="Filter by publisher..."
-            value={filters.publisher || ""}
-            onChange={(e) => handleFilterChange("publisher", e.target.value)}
+            value={filters.publisher || ''}
+            onChange={(e) => handleFilterChange('publisher', e.target.value)}
           />
         </div>
       </div>
 
       {/* Tags */}
       <div>
-        <label
-          htmlFor="tag-input"
-          className="block text-sm font-medium mb-1.5"
-        >
+        <label htmlFor="tag-input" className="mb-1.5 block text-sm font-medium">
           Tags
         </label>
-        <div className="flex gap-2 mb-2">
+        <div className="mb-2 flex gap-2">
           <Input
             id="tag-input"
             placeholder="Add tag..."
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === 'Enter') {
                 e.preventDefault();
                 handleAddTag(tagInput);
               }
@@ -198,13 +186,13 @@ export function MarketplaceFilters({
 
         {/* Selected Tags */}
         {filters.tags && filters.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {filters.tags.map((tag) => (
               <Badge key={tag} variant="secondary" className="gap-1">
                 {tag}
                 <button
                   onClick={() => handleRemoveTag(tag)}
-                  className="hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring rounded-full"
+                  className="rounded-full hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring"
                   aria-label={`Remove tag: ${tag}`}
                 >
                   <X className="h-3 w-3" />
@@ -216,41 +204,36 @@ export function MarketplaceFilters({
 
         {/* Suggested Tags */}
         <div className="flex flex-wrap gap-1.5">
-          {COMMON_TAGS.filter(
-            (tag) => !filters.tags?.includes(tag)
-          ).slice(0, 8).map((tag) => (
-            <Badge
-              key={tag}
-              variant="outline"
-              className="cursor-pointer hover:bg-secondary"
-              onClick={() => handleAddTag(tag)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleAddTag(tag);
-                }
-              }}
-            >
-              {tag}
-            </Badge>
-          ))}
+          {COMMON_TAGS.filter((tag) => !filters.tags?.includes(tag))
+            .slice(0, 8)
+            .map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="cursor-pointer hover:bg-secondary"
+                onClick={() => handleAddTag(tag)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleAddTag(tag);
+                  }
+                }}
+              >
+                {tag}
+              </Badge>
+            ))}
         </div>
       </div>
 
       {/* Clear Filters */}
       {activeFilterCount > 0 && (
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between border-t pt-2">
           <span className="text-sm text-muted-foreground">
-            {activeFilterCount} {activeFilterCount === 1 ? "filter" : "filters"} active
+            {activeFilterCount} {activeFilterCount === 1 ? 'filter' : 'filters'} active
           </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearAll}
-            aria-label="Clear all filters"
-          >
+          <Button variant="ghost" size="sm" onClick={handleClearAll} aria-label="Clear all filters">
             Clear all
           </Button>
         </div>

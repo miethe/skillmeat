@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { MarketplaceListingDetail } from "@/components/marketplace/MarketplaceListingDetail";
-import { MarketplaceInstallDialog } from "@/components/marketplace/MarketplaceInstallDialog";
-import { useListing, useInstallListing } from "@/hooks/useMarketplace";
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MarketplaceListingDetail } from '@/components/marketplace/MarketplaceListingDetail';
+import { MarketplaceInstallDialog } from '@/components/marketplace/MarketplaceInstallDialog';
+import { useListing, useInstallListing } from '@/hooks/useMarketplace';
 
 export default function ListingDetailPage() {
   const params = useParams();
@@ -23,7 +23,7 @@ export default function ListingDetailPage() {
     setIsInstallDialogOpen(true);
   };
 
-  const handleInstallConfirm = async (strategy: "merge" | "fork" | "skip") => {
+  const handleInstallConfirm = async (strategy: 'merge' | 'fork' | 'skip') => {
     if (!listing) return;
 
     await installMutation.mutateAsync({
@@ -38,12 +38,8 @@ export default function ListingDetailPage() {
     <div className="space-y-6">
       {/* Breadcrumb / Back Navigation */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push("/marketplace")}
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
+        <Button variant="ghost" size="sm" onClick={() => router.push('/marketplace')}>
+          <ChevronLeft className="mr-1 h-4 w-4" />
           Back to Marketplace
         </Button>
       </div>
@@ -51,17 +47,11 @@ export default function ListingDetailPage() {
       {/* Error State */}
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6">
-          <h2 className="text-lg font-semibold text-destructive mb-2">
-            Failed to Load Listing
-          </h2>
+          <h2 className="mb-2 text-lg font-semibold text-destructive">Failed to Load Listing</h2>
           <p className="text-sm text-destructive">
-            {error instanceof Error ? error.message : "Unknown error occurred"}
+            {error instanceof Error ? error.message : 'Unknown error occurred'}
           </p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => router.push("/marketplace")}
-          >
+          <Button variant="outline" className="mt-4" onClick={() => router.push('/marketplace')}>
             Return to Marketplace
           </Button>
         </div>

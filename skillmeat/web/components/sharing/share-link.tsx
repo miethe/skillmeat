@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Share Link Component
@@ -6,23 +6,15 @@
  * Display and manage shareable links with QR codes and clipboard functionality
  */
 
-import { useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import {
-  Copy,
-  Check,
-  ExternalLink,
-  QrCode,
-  Calendar,
-  Download,
-  Trash2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PermissionBadge } from "./permission-badge";
-import type { ShareLink as ShareLinkType } from "@/types/bundle";
+import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { Copy, Check, ExternalLink, QrCode, Calendar, Download, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PermissionBadge } from './permission-badge';
+import type { ShareLink as ShareLinkType } from '@/types/bundle';
 
 export interface ShareLinkProps {
   shareLink: ShareLinkType;
@@ -31,11 +23,7 @@ export interface ShareLinkProps {
   showAnalytics?: boolean;
 }
 
-export function ShareLink({
-  shareLink,
-  onRevoke,
-  showAnalytics = true,
-}: ShareLinkProps) {
+export function ShareLink({ shareLink, onRevoke, showAnalytics = true }: ShareLinkProps) {
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -45,12 +33,11 @@ export function ShareLink({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
     }
   };
 
-  const isExpired =
-    shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date();
+  const isExpired = shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date();
 
   return (
     <Card>
@@ -60,12 +47,7 @@ export function ShareLink({
           <div className="flex items-center gap-2">
             <PermissionBadge level={shareLink.permissionLevel} />
             {onRevoke && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRevoke}
-                title="Revoke link"
-              >
+              <Button variant="ghost" size="sm" onClick={onRevoke} title="Revoke link">
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             )}
@@ -83,22 +65,13 @@ export function ShareLink({
               readOnly
               className="font-mono text-sm"
             />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleCopy}
-              title="Copy to clipboard"
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+            <Button variant="outline" size="icon" onClick={handleCopy} title="Copy to clipboard">
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
             </Button>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => window.open(shareLink.url, "_blank")}
+              onClick={() => window.open(shareLink.url, '_blank')}
               title="Open in new tab"
             >
               <ExternalLink className="h-4 w-4" />
@@ -116,7 +89,7 @@ export function ShareLink({
 
         {/* QR Code */}
         {showQR && (
-          <div className="flex justify-center p-4 bg-white rounded-lg border">
+          <div className="flex justify-center rounded-lg border bg-white p-4">
             <QRCodeSVG value={shareLink.url} size={200} level="H" />
           </div>
         )}
@@ -129,8 +102,8 @@ export function ShareLink({
                 <Calendar className="h-3 w-3" />
                 <span>Expires</span>
               </div>
-              <p className={isExpired ? "text-destructive font-medium" : ""}>
-                {isExpired ? "Expired" : new Date(shareLink.expiresAt).toLocaleDateString()}
+              <p className={isExpired ? 'font-medium text-destructive' : ''}>
+                {isExpired ? 'Expired' : new Date(shareLink.expiresAt).toLocaleDateString()}
               </p>
             </div>
           )}

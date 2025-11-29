@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import type { EnvVarEntry } from "@/types/mcp";
+import { useState } from 'react';
+import { Plus, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import type { EnvVarEntry } from '@/types/mcp';
 
 interface MCPEnvEditorProps {
   envVars: EnvVarEntry[];
@@ -12,15 +12,11 @@ interface MCPEnvEditorProps {
   disabled?: boolean;
 }
 
-export function MCPEnvEditor({
-  envVars,
-  onChange,
-  disabled,
-}: MCPEnvEditorProps) {
+export function MCPEnvEditor({ envVars, onChange, disabled }: MCPEnvEditorProps) {
   const [showValues, setShowValues] = useState<Record<number, boolean>>({});
 
   const handleAdd = () => {
-    onChange([...envVars, { key: "", value: "" }]);
+    onChange([...envVars, { key: '', value: '' }]);
   };
 
   const handleRemove = (index: number) => {
@@ -62,16 +58,13 @@ export function MCPEnvEditor({
     <div className="space-y-3">
       {/* Environment variable rows */}
       {envVars.length === 0 ? (
-        <div className="text-sm text-muted-foreground text-center py-6 border-2 border-dashed rounded-lg">
+        <div className="rounded-lg border-2 border-dashed py-6 text-center text-sm text-muted-foreground">
           No environment variables configured
         </div>
       ) : (
         <div className="space-y-2">
           {envVars.map((envVar, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-2 p-3 border rounded-lg bg-muted/50"
-            >
+            <div key={index} className="flex items-start gap-2 rounded-lg border bg-muted/50 p-3">
               <div className="flex-1 space-y-2">
                 {/* Key input */}
                 <Input
@@ -86,12 +79,12 @@ export function MCPEnvEditor({
                 {/* Value input */}
                 <div className="relative">
                   <Input
-                    type={showValues[index] ? "text" : "password"}
+                    type={showValues[index] ? 'text' : 'password'}
                     placeholder="Variable value"
                     value={envVar.value}
                     onChange={(e) => handleValueChange(index, e.target.value)}
                     disabled={disabled}
-                    className="font-mono text-sm pr-10"
+                    className="pr-10 font-mono text-sm"
                     aria-label={`Environment variable value ${index + 1}`}
                   />
                   <Button
@@ -101,9 +94,7 @@ export function MCPEnvEditor({
                     onClick={() => toggleShowValue(index)}
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     disabled={disabled}
-                    aria-label={
-                      showValues[index] ? "Hide value" : "Show value"
-                    }
+                    aria-label={showValues[index] ? 'Hide value' : 'Show value'}
                   >
                     {showValues[index] ? (
                       <EyeOff className="h-4 w-4" />
@@ -115,9 +106,7 @@ export function MCPEnvEditor({
 
                 {/* Required indicator */}
                 {envVar.required && (
-                  <p className="text-xs text-muted-foreground">
-                    Required by package.json
-                  </p>
+                  <p className="text-xs text-muted-foreground">Required by package.json</p>
                 )}
               </div>
 
@@ -147,14 +136,14 @@ export function MCPEnvEditor({
         disabled={disabled}
         className="w-full"
       >
-        <Plus className="h-4 w-4 mr-2" />
+        <Plus className="mr-2 h-4 w-4" />
         Add Environment Variable
       </Button>
 
       {/* Help text */}
       <p className="text-sm text-muted-foreground">
-        Environment variables will be added to the MCP server configuration.
-        Sensitive values should be managed securely.
+        Environment variables will be added to the MCP server configuration. Sensitive values should
+        be managed securely.
       </p>
     </div>
   );

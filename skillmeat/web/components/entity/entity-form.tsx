@@ -78,7 +78,11 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   const [tagInput, setTagInput] = useState('');
 
   // Determine the entity type config
-  const typeConfig = entityType ? ENTITY_TYPES[entityType] : entity ? ENTITY_TYPES[entity.type] : null;
+  const typeConfig = entityType
+    ? ENTITY_TYPES[entityType]
+    : entity
+      ? ENTITY_TYPES[entity.type]
+      : null;
 
   const {
     register,
@@ -107,7 +111,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     if (mode === 'edit') {
       // In edit mode, only show editable fields (tags, description)
       return typeConfig.formSchema.fields.filter(
-        field => field.name === 'tags' || field.name === 'description'
+        (field) => field.name === 'tags' || field.name === 'description'
       );
     }
 
@@ -133,7 +137,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(t => t !== tagToRemove));
+    setTags(tags.filter((t) => t !== tagToRemove));
   };
 
   // Form submission
@@ -195,7 +199,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                 {tags.map((tag) => (
                   <div
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary text-secondary-foreground text-sm"
+                    className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-sm text-secondary-foreground"
                   >
                     {tag}
                     <button
@@ -219,12 +223,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                 placeholder={field.placeholder}
                 className="flex-1"
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addTag}
-                disabled={!tagInput.trim()}
-              >
+              <Button type="button" variant="outline" onClick={addTag} disabled={!tagInput.trim()}>
                 Add
               </Button>
             </div>
@@ -239,24 +238,26 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           <div key={field.name} className="space-y-2">
             <Label htmlFor={fieldId}>
               {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
+              {field.required && <span className="ml-1 text-destructive">*</span>}
             </Label>
             <Input
               id={fieldId}
               {...register(field.name, {
                 required: field.required ? `${field.label} is required` : false,
-                pattern: field.name === 'name' ? {
-                  value: /^[a-zA-Z0-9-_]+$/,
-                  message: 'Name must contain only alphanumeric characters, hyphens, and underscores',
-                } : undefined,
+                pattern:
+                  field.name === 'name'
+                    ? {
+                        value: /^[a-zA-Z0-9-_]+$/,
+                        message:
+                          'Name must contain only alphanumeric characters, hyphens, and underscores',
+                      }
+                    : undefined,
               })}
               placeholder={field.placeholder}
               disabled={mode === 'edit'}
             />
             {errors[field.name] && (
-              <p className="text-sm text-destructive">
-                {errors[field.name]?.message as string}
-              </p>
+              <p className="text-sm text-destructive">{errors[field.name]?.message as string}</p>
             )}
           </div>
         );
@@ -266,7 +267,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           <div key={field.name} className="space-y-2">
             <Label htmlFor={fieldId}>
               {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
+              {field.required && <span className="ml-1 text-destructive">*</span>}
             </Label>
             <Textarea
               id={fieldId}
@@ -277,9 +278,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
               rows={3}
             />
             {errors[field.name] && (
-              <p className="text-sm text-destructive">
-                {errors[field.name]?.message as string}
-              </p>
+              <p className="text-sm text-destructive">{errors[field.name]?.message as string}</p>
             )}
           </div>
         );
@@ -289,7 +288,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           <div key={field.name} className="space-y-2">
             <Label htmlFor={fieldId}>
               {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
+              {field.required && <span className="ml-1 text-destructive">*</span>}
             </Label>
             <Select
               id={fieldId}
@@ -305,9 +304,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
               ))}
             </Select>
             {errors[field.name] && (
-              <p className="text-sm text-destructive">
-                {errors[field.name]?.message as string}
-              </p>
+              <p className="text-sm text-destructive">{errors[field.name]?.message as string}</p>
             )}
           </div>
         );
@@ -315,10 +312,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
       case 'boolean':
         return (
           <div key={field.name} className="flex items-center space-x-2">
-            <Checkbox
-              id={fieldId}
-              {...register(field.name)}
-            />
+            <Checkbox id={fieldId} {...register(field.name)} />
             <Label htmlFor={fieldId} className="text-sm font-normal">
               {field.label}
             </Label>
@@ -331,18 +325,14 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   };
 
   if (!typeConfig) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Invalid entity type
-      </div>
-    );
+    return <div className="py-8 text-center text-muted-foreground">Invalid entity type</div>;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Error message */}
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive text-destructive text-sm">
+        <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -353,25 +343,25 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           <div className="space-y-2">
             <Label>Source Type</Label>
             <div className="flex gap-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center space-x-2">
                 <input
                   type="radio"
                   name="sourceType"
                   value="github"
                   checked={sourceType === 'github'}
                   onChange={() => setSourceType('github')}
-                  className="w-4 h-4 text-primary focus:ring-primary"
+                  className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <span className="text-sm">GitHub</span>
               </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center space-x-2">
                 <input
                   type="radio"
                   name="sourceType"
                   value="local"
                   checked={sourceType === 'local'}
                   onChange={() => setSourceType('local')}
-                  className="w-4 h-4 text-primary focus:ring-primary"
+                  className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <span className="text-sm">Local</span>
               </label>
@@ -382,7 +372,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           <div className="space-y-2">
             <Label htmlFor="source">
               Source
-              <span className="text-destructive ml-1">*</span>
+              <span className="ml-1 text-destructive">*</span>
             </Label>
             <Input
               id="source"
@@ -390,9 +380,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                 required: 'Source is required',
               })}
               placeholder={
-                sourceType === 'github'
-                  ? 'owner/repo/path[@version]'
-                  : '/absolute/path/to/artifact'
+                sourceType === 'github' ? 'owner/repo/path[@version]' : '/absolute/path/to/artifact'
               }
             />
             <p className="text-xs text-muted-foreground">
@@ -408,28 +396,25 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
       )}
 
       {/* Dynamic fields */}
-      {fields.map(field => renderField(field))}
+      {fields.map((field) => renderField(field))}
 
       {/* Action buttons */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
+      <div className="flex justify-end gap-3 border-t pt-4">
         {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
         )}
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {mode === 'create' ? 'Adding...' : 'Saving...'}
             </>
+          ) : mode === 'create' ? (
+            `Add ${typeConfig.label}`
           ) : (
-            mode === 'create' ? `Add ${typeConfig.label}` : `Save Changes`
+            `Save Changes`
           )}
         </Button>
       </div>

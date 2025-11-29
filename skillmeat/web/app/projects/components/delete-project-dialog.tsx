@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,14 +9,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useDeleteProject } from "@/hooks/useProjects";
-import { useToast } from "@/hooks/use-toast";
-import type { ProjectSummary } from "@/types/project";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useDeleteProject } from '@/hooks/useProjects';
+import { useToast } from '@/hooks/use-toast';
+import type { ProjectSummary } from '@/types/project';
 
 export interface DeleteProjectDialogProps {
   project: ProjectSummary;
@@ -32,7 +32,7 @@ export function DeleteProjectDialog({
   onSuccess,
 }: DeleteProjectDialogProps) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [confirmName, setConfirmName] = useState("");
+  const [confirmName, setConfirmName] = useState('');
   const [deleteFiles, setDeleteFiles] = useState(false);
 
   const { toast } = useToast();
@@ -42,7 +42,7 @@ export function DeleteProjectDialog({
   useEffect(() => {
     if (open) {
       setStep(1);
-      setConfirmName("");
+      setConfirmName('');
       setDeleteFiles(false);
     }
   }, [open]);
@@ -53,15 +53,15 @@ export function DeleteProjectDialog({
 
   const handleBack = () => {
     setStep(1);
-    setConfirmName("");
+    setConfirmName('');
   };
 
   const handleDelete = async () => {
     if (confirmName !== project.name) {
       toast({
-        title: "Confirmation failed",
+        title: 'Confirmation failed',
         description: "Project name doesn't match",
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -73,7 +73,7 @@ export function DeleteProjectDialog({
       });
 
       toast({
-        title: "Project deleted",
+        title: 'Project deleted',
         description: `Successfully deleted project "${project.name}"`,
       });
 
@@ -81,14 +81,11 @@ export function DeleteProjectDialog({
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error("Failed to delete project:", error);
+      console.error('Failed to delete project:', error);
       toast({
-        title: "Failed to delete project",
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-        variant: "destructive",
+        title: 'Failed to delete project',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
       });
     }
   };
@@ -96,7 +93,7 @@ export function DeleteProjectDialog({
   const handleClose = () => {
     if (!deleteMutation.isPending) {
       setStep(1);
-      setConfirmName("");
+      setConfirmName('');
       setDeleteFiles(false);
       onOpenChange(false);
     }
@@ -109,15 +106,13 @@ export function DeleteProjectDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10">
+            <div className="rounded-lg bg-destructive/10 p-2">
               <Trash2 className="h-5 w-5 text-destructive" />
             </div>
             <div>
               <DialogTitle>Delete Project</DialogTitle>
               <DialogDescription>
-                {step === 1
-                  ? "This action cannot be undone"
-                  : "Confirm project deletion"}
+                {step === 1 ? 'This action cannot be undone' : 'Confirm project deletion'}
               </DialogDescription>
             </div>
           </div>
@@ -129,37 +124,36 @@ export function DeleteProjectDialog({
               {/* Step 1: Warning */}
               <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0 space-y-2">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
+                  <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-sm font-semibold text-destructive">
                       Warning: This action is permanent
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Deleting this project will remove it from the SkillMeat
-                      tracking system. The project will no longer appear in your
-                      projects list.
+                      Deleting this project will remove it from the SkillMeat tracking system. The
+                      project will no longer appear in your projects list.
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Project Info */}
-              <div className="space-y-3 rounded-lg border p-4 bg-muted/50">
+              <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
                 <div>
                   <p className="text-sm font-medium">Project Name</p>
                   <p className="text-sm text-muted-foreground">{project.name}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Project Path</p>
-                  <p className="text-sm font-mono text-muted-foreground break-all">
+                  <p className="break-all font-mono text-sm text-muted-foreground">
                     {project.path}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Deployments</p>
                   <p className="text-sm text-muted-foreground">
-                    {project.deployment_count}{" "}
-                    {project.deployment_count === 1 ? "artifact" : "artifacts"}
+                    {project.deployment_count}{' '}
+                    {project.deployment_count === 1 ? 'artifact' : 'artifacts'}
                   </p>
                 </div>
               </div>
@@ -170,21 +164,16 @@ export function DeleteProjectDialog({
                   <Checkbox
                     id="delete-files"
                     checked={deleteFiles}
-                    onCheckedChange={(checked) =>
-                      setDeleteFiles(checked === true)
-                    }
+                    onCheckedChange={(checked) => setDeleteFiles(checked === true)}
                     className="mt-1"
                   />
-                  <div className="flex-1 min-w-0">
-                    <Label
-                      htmlFor="delete-files"
-                      className="text-sm font-semibold cursor-pointer"
-                    >
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="delete-files" className="cursor-pointer text-sm font-semibold">
                       Also delete files from disk
                     </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      WARNING: This will permanently delete all files in the
-                      project directory. This action cannot be undone.
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      WARNING: This will permanently delete all files in the project directory. This
+                      action cannot be undone.
                     </p>
                   </div>
                 </div>
@@ -195,7 +184,8 @@ export function DeleteProjectDialog({
               {/* Step 2: Confirmation */}
               <div className="space-y-2">
                 <Label htmlFor="confirm-name">
-                  Type <code className="px-2 py-1 bg-muted rounded text-sm">{project.name}</code> to confirm
+                  Type <code className="rounded bg-muted px-2 py-1 text-sm">{project.name}</code> to
+                  confirm
                 </Label>
                 <Input
                   id="confirm-name"
@@ -207,15 +197,15 @@ export function DeleteProjectDialog({
                 />
                 <p className="text-xs text-muted-foreground">
                   This confirms you want to delete this project
-                  {deleteFiles && " and all its files"}
+                  {deleteFiles && ' and all its files'}
                 </p>
               </div>
 
               {deleteFiles && (
                 <div className="rounded-lg border border-destructive bg-destructive/10 p-3">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-destructive font-medium">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                    <p className="text-sm font-medium text-destructive">
                       All files in {project.path} will be permanently deleted
                     </p>
                   </div>
@@ -228,11 +218,7 @@ export function DeleteProjectDialog({
         <DialogFooter>
           {step === 1 ? (
             <>
-              <Button
-                variant="outline"
-                onClick={handleClose}
-                disabled={deleteMutation.isPending}
-              >
+              <Button variant="outline" onClick={handleClose} disabled={deleteMutation.isPending}>
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleNext}>
@@ -241,11 +227,7 @@ export function DeleteProjectDialog({
             </>
           ) : (
             <>
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={deleteMutation.isPending}
-              >
+              <Button variant="outline" onClick={handleBack} disabled={deleteMutation.isPending}>
                 Back
               </Button>
               <Button
@@ -253,7 +235,7 @@ export function DeleteProjectDialog({
                 onClick={handleDelete}
                 disabled={!isConfirmValid || deleteMutation.isPending}
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete Project"}
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete Project'}
               </Button>
             </>
           )}

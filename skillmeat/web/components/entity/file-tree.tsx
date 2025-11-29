@@ -11,7 +11,7 @@ import {
   File,
   Braces,
   Trash2,
-  Plus
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -131,11 +131,7 @@ function TreeNode({
     [node.path, onDelete]
   );
 
-  const IconComponent = isDirectory
-    ? isExpanded
-      ? FolderOpen
-      : Folder
-    : getFileIcon(node.name);
+  const IconComponent = isDirectory ? (isExpanded ? FolderOpen : Folder) : getFileIcon(node.name);
 
   return (
     <div>
@@ -143,7 +139,7 @@ function TreeNode({
         role="button"
         tabIndex={0}
         className={cn(
-          'flex items-center gap-1 py-1 px-2 rounded cursor-pointer group hover:bg-accent transition-colors',
+          'group flex cursor-pointer items-center gap-1 rounded px-2 py-1 transition-colors hover:bg-accent',
           isSelected && 'bg-accent text-accent-foreground',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
         )}
@@ -160,7 +156,7 @@ function TreeNode({
             )}
           </span>
         ) : (
-          <span className="flex-shrink-0 w-4" />
+          <span className="w-4 flex-shrink-0" />
         )}
 
         <IconComponent
@@ -170,13 +166,13 @@ function TreeNode({
           )}
         />
 
-        <span className="text-sm truncate flex-1 min-w-0">{node.name}</span>
+        <span className="min-w-0 flex-1 truncate text-sm">{node.name}</span>
 
         {onDelete && !isDirectory && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
             onClick={handleDelete}
           >
             <Trash2 className="h-3 w-3" />
@@ -212,7 +208,11 @@ function FileTreeSkeleton() {
   return (
     <div className="space-y-2 p-2">
       {[...Array(8)].map((_, i) => (
-        <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${(i % 3) * 12 + 8}px` }}>
+        <div
+          key={i}
+          className="flex items-center gap-2"
+          style={{ paddingLeft: `${(i % 3) * 12 + 8}px` }}
+        >
           <Skeleton className="h-4 w-4" />
           <Skeleton className="h-4 flex-1" />
         </div>
@@ -280,28 +280,21 @@ export function FileTree({
 
   if (files.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-        <Folder className="h-12 w-12 text-muted-foreground opacity-50 mb-4" />
-        <h3 className="text-sm font-medium text-muted-foreground mb-1">No files found</h3>
-        <p className="text-xs text-muted-foreground">
-          This entity does not contain any files yet.
-        </p>
+      <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+        <Folder className="mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+        <h3 className="mb-1 text-sm font-medium text-muted-foreground">No files found</h3>
+        <p className="text-xs text-muted-foreground">This entity does not contain any files yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full flex-col">
       {/* Header with optional actions */}
       {onAddFile && (
-        <div className="flex items-center justify-between p-2 border-b">
+        <div className="flex items-center justify-between border-b p-2">
           <span className="text-xs font-medium text-muted-foreground">FILES</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={onAddFile}
-          >
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddFile}>
             <Plus className="h-3 w-3" />
           </Button>
         </div>

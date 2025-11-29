@@ -5,15 +5,15 @@
  * Uses live API data with mock fallbacks to keep the UI responsive offline.
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ProjectSummary,
   ProjectDetail,
   ProjectsResponse,
   ProjectDetailResponse,
-} from "@/types/project";
-import { ApiError, apiConfig, apiRequest } from "@/lib/api";
-import type { ProjectCreateRequest, ProjectUpdateRequest } from "@/sdk";
+} from '@/types/project';
+import { ApiError, apiConfig, apiRequest } from '@/lib/api';
+import type { ProjectCreateRequest, ProjectUpdateRequest } from '@/sdk';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -21,30 +21,30 @@ const USE_MOCKS = apiConfig.useMocks;
 const generateMockProjects = (): ProjectSummary[] => {
   return [
     {
-      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvd2ViLWFwcA==",
-      path: "/Users/john/projects/web-app",
-      name: "web-app",
+      id: 'L1VzZXJzL2pvaG4vcHJvamVjdHMvd2ViLWFwcA==',
+      path: '/Users/john/projects/web-app',
+      name: 'web-app',
       deployment_count: 8,
       last_deployment: new Date(Date.now() - 86400000).toISOString(),
     },
     {
-      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvYXBpLXNlcnZpY2U=",
-      path: "/Users/john/projects/api-service",
-      name: "api-service",
+      id: 'L1VzZXJzL2pvaG4vcHJvamVjdHMvYXBpLXNlcnZpY2U=',
+      path: '/Users/john/projects/api-service',
+      name: 'api-service',
       deployment_count: 5,
       last_deployment: new Date(Date.now() - 2 * 86400000).toISOString(),
     },
     {
-      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvZGF0YS1waXBlbGluZQ==",
-      path: "/Users/john/projects/data-pipeline",
-      name: "data-pipeline",
+      id: 'L1VzZXJzL2pvaG4vcHJvamVjdHMvZGF0YS1waXBlbGluZQ==',
+      path: '/Users/john/projects/data-pipeline',
+      name: 'data-pipeline',
       deployment_count: 3,
       last_deployment: new Date(Date.now() - 7 * 86400000).toISOString(),
     },
     {
-      id: "L1VzZXJzL2pvaG4vcHJvamVjdHMvbW9iaWxlLWFwcA==",
-      path: "/Users/john/projects/mobile-app",
-      name: "mobile-app",
+      id: 'L1VzZXJzL2pvaG4vcHJvamVjdHMvbW9iaWxlLWFwcA==',
+      path: '/Users/john/projects/mobile-app',
+      name: 'mobile-app',
       deployment_count: 2,
       last_deployment: new Date(Date.now() - 14 * 86400000).toISOString(),
     },
@@ -63,33 +63,33 @@ const generateMockProjectDetail = (projectId: string): ProjectDetail | null => {
     ...project,
     deployments: [
       {
-        artifact_name: "canvas-design",
-        artifact_type: "skill",
-        from_collection: "default",
+        artifact_name: 'canvas-design',
+        artifact_type: 'skill',
+        from_collection: 'default',
         deployed_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-        artifact_path: "skills/canvas-design",
-        version: "v2.1.0",
-        collection_sha: "abc123def456",
+        artifact_path: 'skills/canvas-design',
+        version: 'v2.1.0',
+        collection_sha: 'abc123def456',
         local_modifications: false,
       },
       {
-        artifact_name: "docx-processor",
-        artifact_type: "skill",
-        from_collection: "default",
+        artifact_name: 'docx-processor',
+        artifact_type: 'skill',
+        from_collection: 'default',
         deployed_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-        artifact_path: "skills/docx-processor",
-        version: "v1.5.0",
-        collection_sha: "def789ghi012",
+        artifact_path: 'skills/docx-processor',
+        version: 'v1.5.0',
+        collection_sha: 'def789ghi012',
         local_modifications: true,
       },
       {
-        artifact_name: "review",
-        artifact_type: "command",
-        from_collection: "custom",
+        artifact_name: 'review',
+        artifact_type: 'command',
+        from_collection: 'custom',
         deployed_at: new Date(Date.now() - 10 * 86400000).toISOString(),
-        artifact_path: "commands/review.md",
-        version: "v1.0.0",
-        collection_sha: "ghi345jkl678",
+        artifact_path: 'commands/review.md',
+        version: 'v1.0.0',
+        collection_sha: 'ghi345jkl678',
         local_modifications: false,
       },
     ],
@@ -110,34 +110,30 @@ const generateMockProjectDetail = (projectId: string): ProjectDetail | null => {
 
 // Query keys
 const projectKeys = {
-  all: ["projects"] as const,
-  lists: () => [...projectKeys.all, "list"] as const,
+  all: ['projects'] as const,
+  lists: () => [...projectKeys.all, 'list'] as const,
   list: () => [...projectKeys.lists()] as const,
-  details: () => [...projectKeys.all, "detail"] as const,
+  details: () => [...projectKeys.all, 'detail'] as const,
   detail: (id: string) => [...projectKeys.details(), id] as const,
 };
 
-async function fetchProjectsFromApi(
-  forceRefresh: boolean = false
-): Promise<ProjectSummary[]> {
+async function fetchProjectsFromApi(forceRefresh: boolean = false): Promise<ProjectSummary[]> {
   const params = new URLSearchParams({
-    limit: "100", // Get all projects (they're typically not numerous)
+    limit: '100', // Get all projects (they're typically not numerous)
   });
 
   // Add refresh parameter to bypass backend cache
   if (forceRefresh) {
-    params.set("refresh", "true");
+    params.set('refresh', 'true');
   }
 
   try {
-    const response = await apiRequest<ProjectsResponse>(
-      `/projects?${params.toString()}`
-    );
+    const response = await apiRequest<ProjectsResponse>(`/projects?${params.toString()}`);
 
     return response.items;
   } catch (error) {
     if (USE_MOCKS) {
-      console.warn("[projects] API failed, falling back to mock data", error);
+      console.warn('[projects] API failed, falling back to mock data', error);
       return generateMockProjects();
     }
     throw error;
@@ -166,13 +162,11 @@ async function fetchProjectFromApi(id: string): Promise<ProjectDetail | null> {
   }
 }
 
-async function createProjectApi(
-  data: ProjectCreateRequest
-): Promise<ProjectDetail> {
-  const response = await apiRequest<ProjectDetail>("/projects", {
-    method: "POST",
+async function createProjectApi(data: ProjectCreateRequest): Promise<ProjectDetail> {
+  const response = await apiRequest<ProjectDetail>('/projects', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
   });
@@ -180,14 +174,11 @@ async function createProjectApi(
   return response;
 }
 
-async function updateProjectApi(
-  id: string,
-  data: ProjectUpdateRequest
-): Promise<ProjectDetail> {
+async function updateProjectApi(id: string, data: ProjectUpdateRequest): Promise<ProjectDetail> {
   const response = await apiRequest<ProjectDetail>(`/projects/${id}`, {
-    method: "PUT",
+    method: 'PUT',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
   });
@@ -195,12 +186,9 @@ async function updateProjectApi(
   return response;
 }
 
-async function deleteProjectApi(
-  id: string,
-  deleteFiles: boolean = false
-): Promise<void> {
+async function deleteProjectApi(id: string, deleteFiles: boolean = false): Promise<void> {
   await apiRequest(`/projects/${id}?delete_files=${deleteFiles}`, {
-    method: "DELETE",
+    method: 'DELETE',
   });
 }
 
@@ -298,13 +286,8 @@ export function useDeleteProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      deleteFiles = false,
-    }: {
-      id: string;
-      deleteFiles?: boolean;
-    }) => deleteProjectApi(id, deleteFiles),
+    mutationFn: ({ id, deleteFiles = false }: { id: string; deleteFiles?: boolean }) =>
+      deleteProjectApi(id, deleteFiles),
     onSuccess: () => {
       // Invalidate projects list to refetch
       queryClient.invalidateQueries({ queryKey: projectKeys.list() });

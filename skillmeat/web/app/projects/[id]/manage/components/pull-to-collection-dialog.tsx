@@ -96,13 +96,11 @@ export function PullToCollectionDialog({
   };
 
   const hasChanges = diffData?.files && diffData.files.length > 0;
-  const hasDifferences = diffData?.files?.some(
-    (file) => file.status !== 'unchanged'
-  );
+  const hasDifferences = diffData?.files?.some((file) => file.status !== 'unchanged');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+      <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitMerge className="h-5 w-5" />
@@ -113,23 +111,32 @@ export function PullToCollectionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* Status Badge */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Status:</span>
             {entity.status === 'modified' && (
-              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
-                <AlertTriangle className="h-3 w-3 mr-1" />
+              <Badge
+                variant="outline"
+                className="border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+              >
+                <AlertTriangle className="mr-1 h-3 w-3" />
                 Modified
               </Badge>
             )}
             {entity.status === 'synced' && (
-              <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
+              <Badge
+                variant="outline"
+                className="border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-400"
+              >
                 Synced
               </Badge>
             )}
             {entity.status === 'outdated' && (
-              <Badge variant="outline" className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20">
+              <Badge
+                variant="outline"
+                className="border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+              >
                 Outdated
               </Badge>
             )}
@@ -155,10 +162,10 @@ export function PullToCollectionDialog({
 
           {/* No Changes */}
           {!isLoadingDiff && !error && (!hasChanges || !hasDifferences) && (
-            <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20">
-              <GitMerge className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Changes Detected</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
+            <div className="flex flex-col items-center justify-center rounded-lg border bg-muted/20 py-12 text-center">
+              <GitMerge className="mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold">No Changes Detected</h3>
+              <p className="max-w-md text-sm text-muted-foreground">
                 The project version of this entity is identical to the collection version.
               </p>
             </div>
@@ -166,7 +173,7 @@ export function PullToCollectionDialog({
 
           {/* Diff Viewer */}
           {!isLoadingDiff && !error && hasChanges && hasDifferences && (
-            <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
               <DiffViewer
                 files={diffData.files}
                 leftLabel="Collection"
@@ -177,7 +184,7 @@ export function PullToCollectionDialog({
         </div>
 
         <DialogFooter>
-          <div className="flex items-center justify-between w-full">
+          <div className="flex w-full items-center justify-between">
             <div className="text-sm text-muted-foreground">
               {diffData?.files && (
                 <>
@@ -197,12 +204,12 @@ export function PullToCollectionDialog({
               >
                 {isSyncing ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Pulling...
                   </>
                 ) : (
                   <>
-                    <GitMerge className="h-4 w-4 mr-2" />
+                    <GitMerge className="mr-2 h-4 w-4" />
                     Pull to Collection
                   </>
                 )}

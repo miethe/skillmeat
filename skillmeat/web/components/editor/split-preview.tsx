@@ -41,30 +41,28 @@ export interface SplitPreviewProps {
  * />
  * ```
  */
-export function SplitPreview({
-  content,
-  onChange,
-  isEditing,
-  className,
-}: SplitPreviewProps) {
+export function SplitPreview({ content, onChange, isEditing, className }: SplitPreviewProps) {
   return (
-    <div className={cn('flex flex-col lg:flex-row h-full gap-4 min-w-0 overflow-hidden', className)}>
+    <div
+      className={cn('flex h-full min-w-0 flex-col gap-4 overflow-hidden lg:flex-row', className)}
+    >
       {/* Editor Panel - Only shown in edit mode */}
       {isEditing && (
-        <div className="flex-1 min-w-0 min-h-[300px] lg:min-h-0">
-          <MarkdownEditor
-            initialContent={content}
-            onChange={onChange}
-            className="h-full"
-          />
+        <div className="min-h-[300px] min-w-0 flex-1 lg:min-h-0">
+          <MarkdownEditor initialContent={content} onChange={onChange} className="h-full" />
         </div>
       )}
 
       {/* Preview Panel - Always shown for markdown */}
-      <div className={cn('flex-1 min-w-0 min-h-[300px] lg:min-h-0 overflow-hidden', !isEditing && 'w-full')}>
-        <div className="h-full border rounded-md bg-card overflow-hidden">
+      <div
+        className={cn(
+          'min-h-[300px] min-w-0 flex-1 overflow-hidden lg:min-h-0',
+          !isEditing && 'w-full'
+        )}
+      >
+        <div className="h-full overflow-hidden rounded-md border bg-card">
           <ScrollArea className="h-full w-full">
-            <div className="p-6 prose prose-sm dark:prose-invert max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] prose-headings:break-words prose-p:break-words prose-pre:overflow-x-auto prose-code:break-all">
+            <div className="prose prose-sm w-full max-w-none break-words p-6 [overflow-wrap:anywhere] [word-break:break-word] dark:prose-invert prose-headings:break-words prose-p:break-words prose-code:break-all prose-pre:overflow-x-auto">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {content || '*No content to preview*'}
               </ReactMarkdown>

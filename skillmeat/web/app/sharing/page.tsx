@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Team Sharing Page
@@ -6,25 +6,25 @@
  * Export, import, and manage artifact bundles with team members
  */
 
-import { useState } from "react";
-import { Package, Upload, Download, Share2, Users } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExportDialog } from "@/components/sharing/export-dialog";
-import { ImportDialog } from "@/components/sharing/import-dialog";
-import { BundleList } from "@/components/sharing/bundle-list";
-import { PermissionBadge } from "@/components/sharing/permission-badge";
+import { useState } from 'react';
+import { Package, Upload, Download, Share2, Users } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ExportDialog } from '@/components/sharing/export-dialog';
+import { ImportDialog } from '@/components/sharing/import-dialog';
+import { BundleList } from '@/components/sharing/bundle-list';
+import { PermissionBadge } from '@/components/sharing/permission-badge';
 
 export default function SharingPage() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<"created" | "imported">("created");
+  const [activeTab, setActiveTab] = useState<'created' | 'imported'>('created');
 
   // Mock user permission - would come from auth context in real app
-  const userPermission: "viewer" | "importer" | "publisher" | "admin" = "publisher";
-  const canExport = ["publisher", "admin"].includes(userPermission);
-  const canImport = ["importer", "publisher", "admin"].includes(userPermission);
+  const userPermission: 'viewer' | 'importer' | 'publisher' | 'admin' = 'publisher';
+  const canExport = ['publisher', 'admin'].includes(userPermission);
+  const canImport = ['importer', 'publisher', 'admin'].includes(userPermission);
 
   return (
     <div className="space-y-6">
@@ -32,9 +32,7 @@ export default function SharingPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Team Sharing</h1>
-          <p className="text-muted-foreground mt-1">
-            Share and collaborate on artifact bundles
-          </p>
+          <p className="mt-1 text-muted-foreground">Share and collaborate on artifact bundles</p>
         </div>
         <div className="flex items-center gap-2">
           <PermissionBadge level={userPermission} />
@@ -43,10 +41,10 @@ export default function SharingPage() {
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="transition-shadow hover:shadow-md">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="rounded-lg bg-primary/10 p-2">
                 <Package className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
@@ -58,30 +56,30 @@ export default function SharingPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Package selected artifacts into .skillmeat-pack bundles for sharing with team
-              members. Generate shareable links with customizable permissions and expiration.
+            <p className="mb-4 text-sm text-muted-foreground">
+              Package selected artifacts into .skillmeat-pack bundles for sharing with team members.
+              Generate shareable links with customizable permissions and expiration.
             </p>
             <Button
               onClick={() => setShowExportDialog(true)}
               disabled={!canExport}
               className="w-full"
             >
-              <Upload className="h-4 w-4 mr-2" />
+              <Upload className="mr-2 h-4 w-4" />
               Create Bundle
             </Button>
             {!canExport && (
-              <p className="text-xs text-muted-foreground text-center mt-2">
+              <p className="mt-2 text-center text-xs text-muted-foreground">
                 Publisher or Admin role required
               </p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="transition-shadow hover:shadow-md">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="rounded-lg bg-primary/10 p-2">
                 <Download className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
@@ -93,9 +91,9 @@ export default function SharingPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Import bundles from files, URLs, or cloud vaults. Preview contents and choose
-              conflict resolution strategy before importing.
+            <p className="mb-4 text-sm text-muted-foreground">
+              Import bundles from files, URLs, or cloud vaults. Preview contents and choose conflict
+              resolution strategy before importing.
             </p>
             <Button
               onClick={() => setShowImportDialog(true)}
@@ -103,11 +101,11 @@ export default function SharingPage() {
               variant="outline"
               className="w-full"
             >
-              <Download className="h-4 w-4 mr-2" />
+              <Download className="mr-2 h-4 w-4" />
               Import Bundle
             </Button>
             {!canImport && (
-              <p className="text-xs text-muted-foreground text-center mt-2">
+              <p className="mt-2 text-center text-xs text-muted-foreground">
                 Importer or higher role required
               </p>
             )}
@@ -127,13 +125,13 @@ export default function SharingPage() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="mb-6 grid w-full grid-cols-2">
               <TabsTrigger value="created">
-                <Package className="h-4 w-4 mr-2" />
+                <Package className="mr-2 h-4 w-4" />
                 Created
               </TabsTrigger>
               <TabsTrigger value="imported">
-                <Download className="h-4 w-4 mr-2" />
+                <Download className="mr-2 h-4 w-4" />
                 Imported
               </TabsTrigger>
             </TabsList>
@@ -158,38 +156,25 @@ export default function SharingPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <ul className="list-disc list-inside space-y-1">
-            <li>
-              Use descriptive names and tags to make bundles easy to find
-            </li>
-            <li>
-              Include dependencies to ensure artifacts work correctly when imported
-            </li>
-            <li>
-              Set appropriate permission levels for sensitive bundles
-            </li>
-            <li>
-              Use expiring links for temporary sharing or trial access
-            </li>
-            <li>
-              Monitor analytics to see which artifacts are most popular
-            </li>
+          <ul className="list-inside list-disc space-y-1">
+            <li>Use descriptive names and tags to make bundles easy to find</li>
+            <li>Include dependencies to ensure artifacts work correctly when imported</li>
+            <li>Set appropriate permission levels for sensitive bundles</li>
+            <li>Use expiring links for temporary sharing or trial access</li>
+            <li>Monitor analytics to see which artifacts are most popular</li>
           </ul>
         </CardContent>
       </Card>
 
       {/* Dialogs */}
-      <ExportDialog
-        isOpen={showExportDialog}
-        onClose={() => setShowExportDialog(false)}
-      />
+      <ExportDialog isOpen={showExportDialog} onClose={() => setShowExportDialog(false)} />
 
       <ImportDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onSuccess={() => {
           // Refresh the imported bundles list
-          setActiveTab("imported");
+          setActiveTab('imported');
         }}
       />
     </div>

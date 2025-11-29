@@ -16,12 +16,12 @@ import { test, expect, Page } from '@playwright/test';
 
 // SLA targets (in milliseconds unless noted)
 const SLA_TARGETS = {
-  fcp: 1500,      // First Contentful Paint <1.5s
-  lcp: 2500,      // Largest Contentful Paint <2.5s
-  cls: 0.1,       // Cumulative Layout Shift <0.1
-  fid: 100,       // First Input Delay <100ms
-  ttfb: 600,      // Time to First Byte <600ms
-  search: 1000,   // Search results <1s
+  fcp: 1500, // First Contentful Paint <1.5s
+  lcp: 2500, // Largest Contentful Paint <2.5s
+  cls: 0.1, // Cumulative Layout Shift <0.1
+  fid: 100, // First Input Delay <100ms
+  ttfb: 600, // Time to First Byte <600ms
+  search: 1000, // Search results <1s
   navigation: 500, // Page navigation <500ms
 };
 
@@ -254,7 +254,7 @@ test.describe('Web Vitals Performance', () => {
     // Find a button or interactive element
     const button = page.locator('button').first();
 
-    if (await button.count() > 0) {
+    if ((await button.count()) > 0) {
       const startTime = Date.now();
       await button.click();
       const clickLatency = Date.now() - startTime;

@@ -50,7 +50,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
           <CardDescription>Activity over time</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-80 text-muted-foreground">
+          <div className="flex h-80 items-center justify-center text-muted-foreground">
             <p>Failed to load usage trends data</p>
           </div>
         </CardContent>
@@ -89,9 +89,9 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
           />
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center h-80 text-muted-foreground">
+          <div className="flex h-80 flex-col items-center justify-center text-muted-foreground">
             <p className="text-sm">No usage data available</p>
-            <p className="text-xs mt-2">Deploy artifacts to start tracking usage trends</p>
+            <p className="mt-2 text-xs">Deploy artifacts to start tracking usage trends</p>
           </div>
         </CardContent>
       </Card>
@@ -115,10 +115,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             {showType === 'area' ? (
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
+              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -143,15 +140,9 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px' }}
-                  iconType="circle"
-                />
+                <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
                 <Area
                   type="monotone"
                   dataKey="usage"
@@ -170,10 +161,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                 />
               </AreaChart>
             ) : (
-              <LineChart
-                data={chartData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
+              <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis
                   dataKey="date"
@@ -188,15 +176,9 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px' }}
-                  iconType="circle"
-                />
+                <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
                 <Line
                   type="monotone"
                   dataKey="usage"
@@ -221,7 +203,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
         </div>
 
         {/* Summary stats below chart */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
+        <div className="mt-6 grid grid-cols-3 gap-4 border-t pt-4">
           <div className="text-center">
             <p className="text-2xl font-bold text-blue-600">
               {trends.reduce((sum, t) => sum + t.usage_count, 0)}
@@ -262,7 +244,7 @@ function PeriodSelector({
     <select
       value={selectedIndex}
       onChange={(e) => onChange(parseInt(e.target.value))}
-      className="text-sm border border-input bg-background px-3 py-1.5 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      className="rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
       aria-label="Select time period"
     >
       {options.map((option, index) => (
@@ -285,23 +267,20 @@ function CustomTooltip({ active, payload }: any) {
   const data = payload[0].payload;
 
   return (
-    <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+    <div className="rounded-lg border border-border bg-popover p-3 shadow-lg">
       <div className="space-y-2">
-        <p className="font-semibold text-sm">{data.dateLabel}</p>
+        <p className="text-sm font-semibold">{data.dateLabel}</p>
         <div className="space-y-1">
           {payload.map((entry: any) => (
             <div key={entry.name} className="flex items-center justify-between gap-4">
-              <span className="text-xs flex items-center gap-1">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: entry.color }}
-                />
+              <span className="flex items-center gap-1 text-xs">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
                 {entry.name}:
               </span>
               <span className="text-xs font-medium">{entry.value}</span>
             </div>
           ))}
-          <div className="pt-1 mt-1 border-t text-xs text-muted-foreground">
+          <div className="mt-1 border-t pt-1 text-xs text-muted-foreground">
             Top: {data.topArtifact}
           </div>
         </div>
@@ -325,11 +304,11 @@ export function UsageTrendsWidgetSkeleton() {
       </CardHeader>
       <CardContent>
         <Skeleton className="h-80 w-full" />
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
+        <div className="mt-6 grid grid-cols-3 gap-4 border-t pt-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="text-center space-y-2">
-              <Skeleton className="h-8 w-16 mx-auto" />
-              <Skeleton className="h-3 w-24 mx-auto" />
+            <div key={i} className="space-y-2 text-center">
+              <Skeleton className="mx-auto h-8 w-16" />
+              <Skeleton className="mx-auto h-3 w-24" />
             </div>
           ))}
         </div>

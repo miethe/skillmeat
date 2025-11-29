@@ -11,10 +11,7 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Format a date into a readable, localized string.
  */
-export function formatDate(
-  value: string | number | Date,
-  options?: Intl.DateTimeFormatOptions
-) {
+export function formatDate(value: string | number | Date, options?: Intl.DateTimeFormatOptions) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
 

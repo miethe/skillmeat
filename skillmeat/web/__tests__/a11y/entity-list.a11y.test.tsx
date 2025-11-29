@@ -47,28 +47,23 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 describe('EntityList Accessibility', () => {
   it('should have no violations in grid view', async () => {
-    const { container } = render(
-      <EntityList viewMode="grid" entities={mockEntities} />,
-      { wrapper }
-    );
+    const { container } = render(<EntityList viewMode="grid" entities={mockEntities} />, {
+      wrapper,
+    });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
 
   it('should have no violations in list view', async () => {
-    const { container } = render(
-      <EntityList viewMode="list" entities={mockEntities} />,
-      { wrapper }
-    );
+    const { container } = render(<EntityList viewMode="list" entities={mockEntities} />, {
+      wrapper,
+    });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
 
   it('should have no violations with empty state', async () => {
-    const { container } = render(
-      <EntityList viewMode="grid" entities={[]} />,
-      { wrapper }
-    );
+    const { container } = render(<EntityList viewMode="grid" entities={[]} />, { wrapper });
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -83,10 +78,9 @@ describe('EntityList Accessibility', () => {
   });
 
   it('should have proper heading hierarchy in list view', async () => {
-    const { container } = render(
-      <EntityList viewMode="list" entities={mockEntities} />,
-      { wrapper }
-    );
+    const { container } = render(<EntityList viewMode="list" entities={mockEntities} />, {
+      wrapper,
+    });
 
     // Verify heading exists and is accessible
     const results = await axe(container, {
@@ -98,10 +92,9 @@ describe('EntityList Accessibility', () => {
   });
 
   it('should have accessible table structure in list view', async () => {
-    const { container } = render(
-      <EntityList viewMode="list" entities={mockEntities} />,
-      { wrapper }
-    );
+    const { container } = render(<EntityList viewMode="list" entities={mockEntities} />, {
+      wrapper,
+    });
 
     // Verify table accessibility
     const results = await axe(container, {

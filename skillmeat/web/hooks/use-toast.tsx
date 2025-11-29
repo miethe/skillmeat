@@ -4,12 +4,12 @@
  * Provides a consistent API for showing toast notifications
  */
 
-import { toast as sonnerToast } from "sonner";
+import { toast as sonnerToast } from 'sonner';
 
 export interface ToastProps {
   title: string;
   description?: string;
-  variant?: "default" | "destructive";
+  variant?: 'default' | 'destructive';
 }
 
 export function useToast() {
@@ -23,7 +23,7 @@ export function useToast() {
       title
     );
 
-    if (variant === "destructive") {
+    if (variant === 'destructive') {
       sonnerToast.error(message);
     } else {
       sonnerToast.success(message);

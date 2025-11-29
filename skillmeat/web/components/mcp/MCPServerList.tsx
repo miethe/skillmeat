@@ -1,19 +1,13 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  Server,
-  Search,
-  Filter,
-  Plus,
-  RefreshCcw,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Select } from "@/components/ui/select";
-import type { MCPServer, MCPServerFilters, MCPServerStatus } from "@/types/mcp";
-import { MCPServerCard } from "./MCPServerCard";
+import { useState } from 'react';
+import { Server, Search, Filter, Plus, RefreshCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select } from '@/components/ui/select';
+import type { MCPServer, MCPServerFilters, MCPServerStatus } from '@/types/mcp';
+import { MCPServerCard } from './MCPServerCard';
 
 interface MCPServerListProps {
   servers: MCPServer[];
@@ -27,7 +21,7 @@ function MCPServerListSkeleton() {
   return (
     <div className="space-y-4">
       {[...Array(3)].map((_, i) => (
-        <div key={i} className="border rounded-lg p-4">
+        <div key={i} className="rounded-lg border p-4">
           <div className="space-y-3">
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-4 w-full" />
@@ -50,14 +44,14 @@ export function MCPServerList({
   onRefresh,
 }: MCPServerListProps) {
   const [filters, setFilters] = useState<MCPServerFilters>({
-    status: "all",
-    search: "",
+    status: 'all',
+    search: '',
   });
 
   // Filter servers
   const filteredServers = servers.filter((server) => {
     // Status filter
-    if (filters.status !== "all" && server.status !== filters.status) {
+    if (filters.status !== 'all' && server.status !== filters.status) {
       return false;
     }
 
@@ -66,8 +60,7 @@ export function MCPServerList({
       const searchLower = filters.search.toLowerCase();
       const matchesName = server.name.toLowerCase().includes(searchLower);
       const matchesRepo = server.repo.toLowerCase().includes(searchLower);
-      const matchesDescription =
-        server.description?.toLowerCase().includes(searchLower) || false;
+      const matchesDescription = server.description?.toLowerCase().includes(searchLower) || false;
 
       if (!matchesName && !matchesRepo && !matchesDescription) {
         return false;
@@ -84,7 +77,7 @@ export function MCPServerList({
   const handleStatusFilterChange = (value: string) => {
     setFilters((prev) => ({
       ...prev,
-      status: value as MCPServerStatus | "all",
+      status: value as MCPServerStatus | 'all',
     }));
   };
 
@@ -97,7 +90,7 @@ export function MCPServerList({
       {/* Header with filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 items-center gap-2">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative max-w-sm flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search servers..."
@@ -127,18 +120,13 @@ export function MCPServerList({
 
         <div className="flex items-center gap-2">
           {onRefresh && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefresh}
-              disabled={isLoading}
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading}>
+              <RefreshCcw className="mr-2 h-4 w-4" />
               Refresh
             </Button>
           )}
           <Button onClick={onAddServer}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add Server
           </Button>
         </div>
@@ -146,21 +134,21 @@ export function MCPServerList({
 
       {/* Empty state */}
       {filteredServers.length === 0 && !isLoading && (
-        <div className="text-center py-12 border rounded-lg">
-          <Server className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            {filters.search || filters.status !== "all"
-              ? "No servers found"
-              : "No MCP servers configured"}
+        <div className="rounded-lg border py-12 text-center">
+          <Server className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold">
+            {filters.search || filters.status !== 'all'
+              ? 'No servers found'
+              : 'No MCP servers configured'}
           </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            {filters.search || filters.status !== "all"
-              ? "Try adjusting your filters"
-              : "Get started by adding your first MCP server"}
+          <p className="mb-4 text-sm text-muted-foreground">
+            {filters.search || filters.status !== 'all'
+              ? 'Try adjusting your filters'
+              : 'Get started by adding your first MCP server'}
           </p>
-          {!filters.search && filters.status === "all" && (
+          {!filters.search && filters.status === 'all' && (
             <Button onClick={onAddServer}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Add MCP Server
             </Button>
           )}
@@ -182,9 +170,9 @@ export function MCPServerList({
 
       {/* Results count */}
       {filteredServers.length > 0 && (
-        <div className="text-sm text-muted-foreground text-center">
+        <div className="text-center text-sm text-muted-foreground">
           Showing {filteredServers.length} of {servers.length} server
-          {servers.length !== 1 ? "s" : ""}
+          {servers.length !== 1 ? 's' : ''}
         </div>
       )}
     </div>

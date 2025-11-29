@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Database, FolderCog, GitBranch, Home, Package, Settings, ShoppingBag, Users } from 'lucide-react';
+import {
+  Database,
+  FolderCog,
+  GitBranch,
+  Home,
+  Package,
+  Settings,
+  ShoppingBag,
+  Users,
+} from 'lucide-react';
 
 const navItems = [
   {

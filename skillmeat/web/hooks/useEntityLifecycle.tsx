@@ -8,11 +8,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiConfig } from '@/lib/api';
-import type {
-  Entity,
-  EntityType,
-  EntityStatus,
-} from '@/types/entity';
+import type { Entity, EntityType, EntityStatus } from '@/types/entity';
 import type {
   ArtifactCreateRequest,
   ArtifactCreateResponse,
@@ -195,7 +191,11 @@ const EntityLifecycleContext = createContext<EntityLifecycleContextValue | null>
 // API Mapping Functions
 // ============================================================================
 
-function mapApiArtifactToEntity(artifact: ArtifactResponse, mode: 'collection' | 'project', projectPath?: string): Entity {
+function mapApiArtifactToEntity(
+  artifact: ArtifactResponse,
+  mode: 'collection' | 'project',
+  projectPath?: string
+): Entity {
   const metadata = artifact.metadata || {};
   const upstream = artifact.upstream;
   const isOutdated = upstream?.update_available ?? false;
@@ -365,11 +365,12 @@ export function EntityLifecycleProvider({
       };
 
       await withMockFallback(
-        () => apiRequest<ArtifactCreateResponse>('/artifacts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-        }),
+        () =>
+          apiRequest<ArtifactCreateResponse>('/artifacts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+          }),
         undefined,
         'Create'
       );
@@ -387,11 +388,12 @@ export function EntityLifecycleProvider({
       };
 
       await withMockFallback(
-        () => apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-        }),
+        () =>
+          apiRequest<ArtifactResponse>(`/artifacts/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+          }),
         undefined,
         'Update'
       );
@@ -404,9 +406,10 @@ export function EntityLifecycleProvider({
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await withMockFallback(
-        () => apiRequest<void>(`/artifacts/${id}`, {
-          method: 'DELETE',
-        }),
+        () =>
+          apiRequest<void>(`/artifacts/${id}`, {
+            method: 'DELETE',
+          }),
         undefined,
         'Delete'
       );
@@ -423,11 +426,12 @@ export function EntityLifecycleProvider({
       };
 
       await withMockFallback(
-        () => apiRequest(`/artifacts/${id}/deploy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-        }),
+        () =>
+          apiRequest(`/artifacts/${id}/deploy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+          }),
         undefined,
         'Deploy'
       );
@@ -446,11 +450,12 @@ export function EntityLifecycleProvider({
       };
 
       await withMockFallback(
-        () => apiRequest(`/artifacts/${id}/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-        }),
+        () =>
+          apiRequest(`/artifacts/${id}/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+          }),
         undefined,
         'Sync'
       );
@@ -544,9 +549,7 @@ export function EntityLifecycleProvider({
   };
 
   return (
-    <EntityLifecycleContext.Provider value={value}>
-      {children}
-    </EntityLifecycleContext.Provider>
+    <EntityLifecycleContext.Provider value={value}>{children}</EntityLifecycleContext.Provider>
   );
 }
 
@@ -611,7 +614,7 @@ async function fetchCollectionEntities(
   }
 
   const processResponse = (response: ArtifactListResponse): Entity[] => {
-    const entities = response.items.map(item => mapApiArtifactToEntity(item, 'collection'));
+    const entities = response.items.map((item) => mapApiArtifactToEntity(item, 'collection'));
 
     // Apply search filter client-side
     if (searchQuery) {
@@ -645,7 +648,7 @@ async function fetchProjectEntities(
   const processResponse = (response: ProjectDetail): Entity[] => {
     // Map deployments to entities
     const deployments = response.deployments || [];
-    const entities: Entity[] = deployments.map(deployment => ({
+    const entities: Entity[] = deployments.map((deployment) => ({
       id: `${deployment.artifact_type}:${deployment.artifact_name}`,
       name: deployment.artifact_name,
       type: deployment.artifact_type as EntityType,
@@ -732,7 +735,9 @@ function generateMockCollectionEntities(
     },
   ];
 
-  let filtered = typeFilter ? mockEntities.filter((e: Entity) => e.type === typeFilter) : mockEntities;
+  let filtered = typeFilter
+    ? mockEntities.filter((e: Entity) => e.type === typeFilter)
+    : mockEntities;
 
   if (searchQuery) {
     const searchLower = searchQuery.toLowerCase();
@@ -776,7 +781,9 @@ function generateMockProjectEntities(
     },
   ];
 
-  let filtered = typeFilter ? mockEntities.filter((e: Entity) => e.type === typeFilter) : mockEntities;
+  let filtered = typeFilter
+    ? mockEntities.filter((e: Entity) => e.type === typeFilter)
+    : mockEntities;
 
   if (searchQuery) {
     const searchLower = searchQuery.toLowerCase();

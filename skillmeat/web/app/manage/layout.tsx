@@ -1,7 +1,3 @@
-export default function ManageLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ManageLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

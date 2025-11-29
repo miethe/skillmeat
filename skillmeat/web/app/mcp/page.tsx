@@ -1,23 +1,14 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Database, AlertCircle } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import {
-  useMcpServers,
-  useCreateMcpServer,
-} from "@/hooks/useMcpServers";
-import { MCPServerList } from "@/components/mcp/MCPServerList";
-import { MCPServerForm } from "@/components/mcp/MCPServerForm";
-import type { MCPServer, MCPFormData } from "@/types/mcp";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Database, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useMcpServers, useCreateMcpServer } from '@/hooks/useMcpServers';
+import { MCPServerList } from '@/components/mcp/MCPServerList';
+import { MCPServerForm } from '@/components/mcp/MCPServerForm';
+import type { MCPServer, MCPFormData } from '@/types/mcp';
 
 export default function McpPage() {
   const router = useRouter();
@@ -57,22 +48,22 @@ export default function McpPage() {
       await createMutation.mutateAsync({
         name: formData.name,
         repo: formData.repo,
-        version: formData.version || "latest",
+        version: formData.version || 'latest',
         description: formData.description || undefined,
         env_vars,
       });
 
       toast({
-        title: "Server Added",
+        title: 'Server Added',
         description: `MCP server '${formData.name}' has been added successfully.`,
       });
 
       setShowAddDialog(false);
     } catch (error) {
       toast({
-        title: "Failed to Add Server",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
+        title: 'Failed to Add Server',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
       });
     }
   };
@@ -88,9 +79,7 @@ export default function McpPage() {
       {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">MCP Servers</h1>
-        <p className="text-muted-foreground">
-          Manage Model Context Protocol server configurations
-        </p>
+        <p className="text-muted-foreground">Manage Model Context Protocol server configurations</p>
       </div>
 
       {/* Error state */}
@@ -99,19 +88,14 @@ export default function McpPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-destructive">
-                Failed to Load Servers
-              </CardTitle>
+              <CardTitle className="text-destructive">Failed to Load Servers</CardTitle>
             </div>
             <CardDescription>
-              {error instanceof Error ? error.message : "Unknown error occurred"}
+              {error instanceof Error ? error.message : 'Unknown error occurred'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <button
-              onClick={handleRefresh}
-              className="text-sm text-primary hover:underline"
-            >
+            <button onClick={handleRefresh} className="text-sm text-primary hover:underline">
               Try again
             </button>
           </CardContent>
@@ -152,7 +136,7 @@ export default function McpPage() {
           createMutation.isError
             ? createMutation.error instanceof Error
               ? createMutation.error.message
-              : "Unknown error"
+              : 'Unknown error'
             : undefined
         }
       />

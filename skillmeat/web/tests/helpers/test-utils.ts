@@ -17,12 +17,7 @@ export async function waitForPageLoad(page: Page) {
 /**
  * Mock API route with custom response
  */
-export async function mockApiRoute(
-  page: Page,
-  route: string,
-  response: any,
-  status: number = 200
-) {
+export async function mockApiRoute(page: Page, route: string, response: any, status: number = 200) {
   await page.route(`**${route}`, async (route) => {
     await route.fulfill({
       status,
@@ -57,11 +52,7 @@ export async function navigateToPage(page: Page, path: string) {
 /**
  * Check if an element is visible and has expected text
  */
-export async function expectTextVisible(
-  page: Page,
-  selector: string,
-  text: string | RegExp
-) {
+export async function expectTextVisible(page: Page, selector: string, text: string | RegExp) {
   const element = page.locator(selector);
   await expect(element).toBeVisible();
   await expect(element).toContainText(text);
@@ -106,11 +97,7 @@ export async function expectButtonState(
 /**
  * Wait for an element to appear with timeout
  */
-export async function waitForElement(
-  page: Page,
-  selector: string,
-  timeout: number = 5000
-) {
+export async function waitForElement(page: Page, selector: string, timeout: number = 5000) {
   await page.waitForSelector(selector, { timeout, state: 'visible' });
 }
 
@@ -118,10 +105,7 @@ export async function waitForElement(
  * Click element and wait for navigation
  */
 export async function clickAndWaitForNavigation(page: Page, selector: string) {
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle' }),
-    page.click(selector),
-  ]);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle' }), page.click(selector)]);
 }
 
 /**
@@ -144,11 +128,7 @@ export async function typeInInput(
 /**
  * Select option from dropdown
  */
-export async function selectDropdownOption(
-  page: Page,
-  selector: string,
-  value: string
-) {
+export async function selectDropdownOption(page: Page, selector: string, value: string) {
   await page.selectOption(selector, value);
 }
 
@@ -198,10 +178,7 @@ export async function verifyTabOrder(page: Page, selectors: string[]) {
 /**
  * Get text content of element
  */
-export async function getTextContent(
-  page: Page,
-  selector: string
-): Promise<string> {
+export async function getTextContent(page: Page, selector: string): Promise<string> {
   const element = page.locator(selector);
   return (await element.textContent()) || '';
 }
@@ -234,19 +211,13 @@ export async function takeScreenshot(page: Page, name: string) {
  * Wait for API response
  */
 export async function waitForApiResponse(page: Page, urlPattern: string) {
-  return await page.waitForResponse((response) =>
-    response.url().includes(urlPattern)
-  );
+  return await page.waitForResponse((response) => response.url().includes(urlPattern));
 }
 
 /**
  * Check loading state
  */
-export async function expectLoadingState(
-  page: Page,
-  selector: string,
-  isLoading: boolean
-) {
+export async function expectLoadingState(page: Page, selector: string, isLoading: boolean) {
   const element = page.locator(selector);
   const ariaLive = await element.getAttribute('aria-live');
   const ariaBusy = await element.getAttribute('aria-busy');

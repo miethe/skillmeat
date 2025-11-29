@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Import Dialog Component
@@ -6,9 +6,9 @@
  * Multi-step wizard for importing artifact bundles
  */
 
-import { useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
-import { useDropzone } from "react-dropzone";
+import { useState, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { useDropzone } from 'react-dropzone';
 import {
   Upload,
   ChevronRight,
@@ -18,7 +18,7 @@ import {
   Cloud,
   CheckCircle,
   AlertTriangle,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -26,20 +26,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProgressIndicator, ProgressStep } from "../collection/progress-indicator";
-import { BundlePreview } from "./bundle-preview";
-import { usePreviewBundle, useImportBundle } from "@/hooks/useImportBundle";
-import type {
-  ImportRequest,
-  BundleSource,
-  ImportOptions,
-  ConflictStrategy,
-} from "@/types/bundle";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProgressIndicator, ProgressStep } from '../collection/progress-indicator';
+import { BundlePreview } from './bundle-preview';
+import { usePreviewBundle, useImportBundle } from '@/hooks/useImportBundle';
+import type { ImportRequest, BundleSource, ImportOptions, ConflictStrategy } from '@/types/bundle';
 
 export interface ImportDialogProps {
   isOpen: boolean;
@@ -48,7 +43,7 @@ export interface ImportDialogProps {
 }
 
 type ImportFormData = {
-  sourceType: "file" | "url" | "vault";
+  sourceType: 'file' | 'url' | 'vault';
   url?: string;
   vaultProvider?: string;
   vaultPath?: string;
@@ -57,11 +52,7 @@ type ImportFormData = {
   dryRun: boolean;
 };
 
-export function ImportDialog({
-  isOpen,
-  onClose,
-  onSuccess,
-}: ImportDialogProps) {
+export function ImportDialog({ isOpen, onClose, onSuccess }: ImportDialogProps) {
   const [step, setStep] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
@@ -77,20 +68,17 @@ export function ImportDialog({
     formState: { errors },
   } = useForm<ImportFormData>({
     defaultValues: {
-      sourceType: "file",
-      conflictStrategy: "merge",
+      sourceType: 'file',
+      conflictStrategy: 'merge',
       skipValidation: false,
       dryRun: false,
     },
   });
 
-  const sourceType = watch("sourceType");
-  const conflictStrategy = watch("conflictStrategy");
+  const sourceType = watch('sourceType');
+  const conflictStrategy = watch('conflictStrategy');
 
-  const { data: preview, isLoading: isLoadingPreview } = usePreviewBundle(
-    bundleSource,
-    step === 2
-  );
+  const { data: preview, isLoading: isLoadingPreview } = usePreviewBundle(bundleSource, step === 2);
 
   const importMutation = useImportBundle({
     onSuccess: (data) => {
@@ -102,10 +90,10 @@ export function ImportDialog({
   });
 
   const [initialSteps] = useState<ProgressStep[]>([
-    { step: "Uploading bundle", status: "pending" },
-    { step: "Validating contents", status: "pending" },
-    { step: "Resolving conflicts", status: "pending" },
-    { step: "Installing artifacts", status: "pending" },
+    { step: 'Uploading bundle', status: 'pending' },
+    { step: 'Validating contents', status: 'pending' },
+    { step: 'Resolving conflicts', status: 'pending' },
+    { step: 'Installing artifacts', status: 'pending' },
   ]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -113,7 +101,7 @@ export function ImportDialog({
       const file = acceptedFiles[0];
       if (file) {
         setUploadedFile(file);
-        setBundleSource({ type: "file", file });
+        setBundleSource({ type: 'file', file });
       }
     }
   }, []);
@@ -121,8 +109,8 @@ export function ImportDialog({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "application/zip": [".zip"],
-      "application/gzip": [".tar.gz", ".tgz"],
+      'application/zip': ['.zip'],
+      'application/gzip': ['.tar.gz', '.tgz'],
     },
     maxFiles: 1,
   });
@@ -130,20 +118,20 @@ export function ImportDialog({
   const handleNext = () => {
     if (step === 1) {
       // Set bundle source based on type
-      if (sourceType === "file" && !uploadedFile) {
+      if (sourceType === 'file' && !uploadedFile) {
         return;
       }
-      if (sourceType === "url") {
-        const url = watch("url");
+      if (sourceType === 'url') {
+        const url = watch('url');
         if (!url) return;
-        setBundleSource({ type: "url", url });
+        setBundleSource({ type: 'url', url });
       }
-      if (sourceType === "vault") {
-        const vaultProvider = watch("vaultProvider");
-        const vaultPath = watch("vaultPath");
+      if (sourceType === 'vault') {
+        const vaultProvider = watch('vaultProvider');
+        const vaultPath = watch('vaultPath');
         if (!vaultProvider || !vaultPath) return;
         setBundleSource({
-          type: "vault",
+          type: 'vault',
           vault: { provider: vaultProvider as any },
           path: vaultPath,
         });
@@ -175,7 +163,7 @@ export function ImportDialog({
     try {
       await importMutation.mutateAsync(importReq);
     } catch (error) {
-      console.error("Import failed:", error);
+      console.error('Import failed:', error);
       setIsImporting(false);
     }
   };
@@ -207,19 +195,19 @@ export function ImportDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[700px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg bg-primary/10 p-2">
               <Upload className="h-5 w-5 text-primary" />
             </div>
             <div>
               <DialogTitle>Import Bundle</DialogTitle>
               <DialogDescription>
-                {step === 1 && "Select bundle source"}
-                {step === 2 && "Review and configure import"}
-                {step === 3 && "Importing artifacts"}
-                {step === 4 && "Import complete"}
+                {step === 1 && 'Select bundle source'}
+                {step === 2 && 'Review and configure import'}
+                {step === 3 && 'Importing artifacts'}
+                {step === 4 && 'Import complete'}
               </DialogDescription>
             </div>
           </div>
@@ -232,22 +220,22 @@ export function ImportDialog({
               <Tabs
                 value={sourceType}
                 onValueChange={(value) => {
-                  setValue("sourceType", value as any);
+                  setValue('sourceType', value as any);
                   setUploadedFile(null);
                   setBundleSource(null);
                 }}
               >
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="file">
-                    <FileArchive className="h-4 w-4 mr-2" />
+                    <FileArchive className="mr-2 h-4 w-4" />
                     File
                   </TabsTrigger>
                   <TabsTrigger value="url">
-                    <Link2 className="h-4 w-4 mr-2" />
+                    <Link2 className="mr-2 h-4 w-4" />
                     URL
                   </TabsTrigger>
                   <TabsTrigger value="vault">
-                    <Cloud className="h-4 w-4 mr-2" />
+                    <Cloud className="mr-2 h-4 w-4" />
                     Vault
                   </TabsTrigger>
                 </TabsList>
@@ -255,18 +243,18 @@ export function ImportDialog({
                 <TabsContent value="file" className="space-y-4">
                   <div
                     {...getRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
                       isDragActive
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/25 hover:border-primary/50"
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted-foreground/25 hover:border-primary/50'
                     }`}
                   >
                     <input {...getInputProps()} />
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                     {uploadedFile ? (
                       <div>
                         <p className="font-medium">{uploadedFile.name}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                         <Button
@@ -284,15 +272,11 @@ export function ImportDialog({
                       </div>
                     ) : (
                       <div>
-                        <p className="font-medium mb-2">
-                          {isDragActive
-                            ? "Drop bundle file here"
-                            : "Drag & drop bundle file here"}
+                        <p className="mb-2 font-medium">
+                          {isDragActive ? 'Drop bundle file here' : 'Drag & drop bundle file here'}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          or click to browse
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-2">
+                        <p className="text-sm text-muted-foreground">or click to browse</p>
+                        <p className="mt-2 text-xs text-muted-foreground">
                           Supports .zip, .tar.gz files
                         </p>
                       </div>
@@ -306,13 +290,11 @@ export function ImportDialog({
                     <Input
                       id="url"
                       placeholder="https://example.com/bundles/my-bundle.zip"
-                      {...register("url", {
-                        required: sourceType === "url",
+                      {...register('url', {
+                        required: sourceType === 'url',
                       })}
                     />
-                    {errors.url && (
-                      <p className="text-sm text-destructive">URL is required</p>
-                    )}
+                    {errors.url && <p className="text-sm text-destructive">URL is required</p>}
                     <p className="text-xs text-muted-foreground">
                       Direct link to a .zip or .tar.gz bundle file
                     </p>
@@ -325,8 +307,8 @@ export function ImportDialog({
                     <select
                       id="vaultProvider"
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      {...register("vaultProvider", {
-                        required: sourceType === "vault",
+                      {...register('vaultProvider', {
+                        required: sourceType === 'vault',
                       })}
                     >
                       <option value="">Select provider...</option>
@@ -341,8 +323,8 @@ export function ImportDialog({
                     <Input
                       id="vaultPath"
                       placeholder="bundles/my-bundle.zip"
-                      {...register("vaultPath", {
-                        required: sourceType === "vault",
+                      {...register('vaultPath', {
+                        required: sourceType === 'vault',
                       })}
                     />
                     <p className="text-xs text-muted-foreground">
@@ -365,7 +347,7 @@ export function ImportDialog({
                 <>
                   <BundlePreview preview={preview} />
 
-                  <div className="space-y-3 pt-4 border-t">
+                  <div className="space-y-3 border-t pt-4">
                     <h4 className="text-sm font-medium">Import Options</h4>
 
                     <div className="space-y-2">
@@ -373,7 +355,7 @@ export function ImportDialog({
                       <select
                         id="conflictStrategy"
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                        {...register("conflictStrategy")}
+                        {...register('conflictStrategy')}
                       >
                         <option value="merge">Merge - Update existing artifacts</option>
                         <option value="fork">Fork - Create renamed copies</option>
@@ -381,27 +363,26 @@ export function ImportDialog({
                         <option value="overwrite">Overwrite - Replace completely</option>
                       </select>
                       <p className="text-xs text-muted-foreground">
-                        {conflictStrategy === "merge" &&
-                          "Existing artifacts will be updated with new versions"}
-                        {conflictStrategy === "fork" &&
-                          "Conflicts will create new artifacts with modified names"}
-                        {conflictStrategy === "skip" &&
-                          "Existing artifacts will not be modified"}
-                        {conflictStrategy === "overwrite" &&
-                          "Existing artifacts will be completely replaced"}
+                        {conflictStrategy === 'merge' &&
+                          'Existing artifacts will be updated with new versions'}
+                        {conflictStrategy === 'fork' &&
+                          'Conflicts will create new artifacts with modified names'}
+                        {conflictStrategy === 'skip' && 'Existing artifacts will not be modified'}
+                        {conflictStrategy === 'overwrite' &&
+                          'Existing artifacts will be completely replaced'}
                       </p>
                     </div>
 
                     {preview.conflicts.length > 0 && (
                       <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
                         <div className="flex items-start gap-2">
-                          <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
                           <div className="text-sm">
                             <p className="font-medium text-yellow-900 dark:text-yellow-100">
                               {preview.conflicts.length} conflict
-                              {preview.conflicts.length > 1 ? "s" : ""} detected
+                              {preview.conflicts.length > 1 ? 's' : ''} detected
                             </p>
-                            <p className="text-yellow-800 dark:text-yellow-200 mt-1">
+                            <p className="mt-1 text-yellow-800 dark:text-yellow-200">
                               Strategy "{conflictStrategy}" will be applied to all conflicts
                             </p>
                           </div>
@@ -426,7 +407,7 @@ export function ImportDialog({
               initialSteps={initialSteps}
               onComplete={handleComplete}
               onError={(error) => {
-                console.error("Import error:", error);
+                console.error('Import error:', error);
                 setIsImporting(false);
               }}
             />
@@ -437,25 +418,25 @@ export function ImportDialog({
             <div className="space-y-4">
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <div
-                  className={`p-3 rounded-full mb-4 ${
+                  className={`mb-4 rounded-full p-3 ${
                     importResult.success
-                      ? "bg-green-100 dark:bg-green-900/20"
-                      : "bg-yellow-100 dark:bg-yellow-900/20"
+                      ? 'bg-green-100 dark:bg-green-900/20'
+                      : 'bg-yellow-100 dark:bg-yellow-900/20'
                   }`}
                 >
                   <CheckCircle
                     className={`h-8 w-8 ${
-                      importResult.success ? "text-green-600" : "text-yellow-600"
+                      importResult.success ? 'text-green-600' : 'text-yellow-600'
                     }`}
                   />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">
-                  {importResult.success ? "Import Complete!" : "Import Completed with Warnings"}
+                <h3 className="mb-2 text-lg font-semibold">
+                  {importResult.success ? 'Import Complete!' : 'Import Completed with Warnings'}
                 </h3>
                 <p className="text-sm text-muted-foreground">{importResult.summary}</p>
               </div>
 
-              <div className="rounded-lg border p-4 space-y-2">
+              <div className="space-y-2 rounded-lg border p-4">
                 {importResult.imported.length > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Imported</span>
@@ -467,9 +448,7 @@ export function ImportDialog({
                 {importResult.merged.length > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Merged</span>
-                    <span className="font-medium text-blue-600">
-                      {importResult.merged.length}
-                    </span>
+                    <span className="font-medium text-blue-600">{importResult.merged.length}</span>
                   </div>
                 )}
                 {importResult.forked.length > 0 && (
@@ -491,7 +470,7 @@ export function ImportDialog({
               </div>
 
               {importResult.errors.length > 0 && (
-                <div className="rounded-lg border border-destructive/50 p-3 space-y-2">
+                <div className="space-y-2 rounded-lg border border-destructive/50 p-3">
                   <p className="text-sm font-medium text-destructive">Errors</p>
                   {importResult.errors.map((error: any, index: number) => (
                     <div key={index} className="text-xs text-destructive/80">
@@ -507,7 +486,7 @@ export function ImportDialog({
         <DialogFooter>
           {step > 1 && step < 4 && !isImporting && (
             <Button variant="outline" onClick={handleBack}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
+              <ChevronLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
           )}
@@ -515,13 +494,13 @@ export function ImportDialog({
             <Button
               onClick={handleNext}
               disabled={
-                (sourceType === "file" && !uploadedFile) ||
-                (sourceType === "url" && !watch("url")) ||
-                (sourceType === "vault" && (!watch("vaultProvider") || !watch("vaultPath")))
+                (sourceType === 'file' && !uploadedFile) ||
+                (sourceType === 'url' && !watch('url')) ||
+                (sourceType === 'vault' && (!watch('vaultProvider') || !watch('vaultPath')))
               }
             >
               Next
-              <ChevronRight className="h-4 w-4 ml-2" />
+              <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
           {step === 2 && !isImporting && (
@@ -533,15 +512,11 @@ export function ImportDialog({
               }}
               disabled={!preview || isLoadingPreview}
             >
-              <Upload className="h-4 w-4 mr-2" />
+              <Upload className="mr-2 h-4 w-4" />
               Import Bundle
             </Button>
           )}
-          {step === 4 && (
-            <Button onClick={handleDone}>
-              Done
-            </Button>
-          )}
+          {step === 4 && <Button onClick={handleDone}>Done</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

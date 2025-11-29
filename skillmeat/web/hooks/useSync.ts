@@ -2,8 +2,8 @@
  * Sync hook for artifact synchronization operations
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 export interface SyncRequest {
   artifactId: string;
@@ -11,7 +11,7 @@ export interface SyncRequest {
   artifactType: string;
   collectionName?: string;
   force?: boolean;
-  mergeStrategy?: "ours" | "theirs" | "manual";
+  mergeStrategy?: 'ours' | 'theirs' | 'manual';
 }
 
 export interface SyncResponse {
@@ -31,7 +31,7 @@ export interface SyncResponse {
 
 export interface ConflictInfo {
   filePath: string;
-  conflictType: "modified" | "deleted" | "added";
+  conflictType: 'modified' | 'deleted' | 'added';
   currentVersion: string;
   upstreamVersion: string;
   description: string;
@@ -61,8 +61,8 @@ export function useSync(options: UseSyncOptions = {}) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           force: request.force,
-          strategy: request.mergeStrategy
-        })
+          strategy: request.mergeStrategy,
+        }),
       });
 
       if (!response.ok) {
@@ -77,20 +77,26 @@ export function useSync(options: UseSyncOptions = {}) {
       if (data.hasConflicts && data.conflicts) {
         options.onConflict?.(data.conflicts, variables);
 
-        toast.warning("Conflicts detected", {
-          description: "Please resolve conflicts before syncing",
+        toast.warning('Conflicts detected', {
+          description: 'Please resolve conflicts before syncing',
         });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-        queryClient.invalidateQueries({ queryKey: ["artifact", variables.artifactId] });
+        queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+        queryClient.invalidateQueries({ queryKey: ['artifact', variables.artifactId] });
 
         const summary = data.changesSummary;
         let description;
         if (summary) {
-          description = summary.filesModified + " modified, " + summary.filesAdded + " added, " + summary.filesDeleted + " deleted";
+          description =
+            summary.filesModified +
+            ' modified, ' +
+            summary.filesAdded +
+            ' added, ' +
+            summary.filesDeleted +
+            ' deleted';
         }
 
-        toast.success(data.message || "Sync successful", {
+        toast.success(data.message || 'Sync successful', {
           description,
         });
 
@@ -100,7 +106,7 @@ export function useSync(options: UseSyncOptions = {}) {
 
     onError: (error: any, variables) => {
       const syncError: SyncError = {
-        message: error.message || "Sync failed",
+        message: error.message || 'Sync failed',
         code: error.code,
         details: error.details,
         conflicts: error.conflicts,
@@ -121,7 +127,9 @@ export function useCheckUpstream() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_artifactId: string): Promise<{
+    mutationFn: async (
+      _artifactId: string
+    ): Promise<{
       hasUpdate: boolean;
       currentVersion: string;
       upstreamVersion?: string;
@@ -133,29 +141,29 @@ export function useCheckUpstream() {
 
       return {
         hasUpdate,
-        currentVersion: "v1.0.0",
-        upstreamVersion: hasUpdate ? "v1.1.0" : undefined,
+        currentVersion: 'v1.0.0',
+        upstreamVersion: hasUpdate ? 'v1.1.0' : undefined,
         updateAvailable: hasUpdate,
       };
     },
 
     onSuccess: (data) => {
       if (data.updateAvailable) {
-        const description = "New version " + data.upstreamVersion + " is available";
-        toast.info("Update available", {
+        const description = 'New version ' + data.upstreamVersion + ' is available';
+        toast.info('Update available', {
           description,
         });
       } else {
-        toast.success("Up to date", {
-          description: "No updates available",
+        toast.success('Up to date', {
+          description: 'No updates available',
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
 
     onError: (error: any) => {
-      toast.error("Failed to check for updates", {
+      toast.error('Failed to check for updates', {
         description: error.message,
       });
     },

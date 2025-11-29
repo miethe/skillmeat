@@ -60,12 +60,10 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
 
   return (
     <div className={lineClasses}>
-      <span className="text-gray-400 select-none w-10 text-right pr-2 flex-shrink-0 border-r border-border/50 text-xs">
+      <span className="w-10 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-xs text-gray-400">
         {lineNumber !== undefined ? lineNumber : ''}
       </span>
-      <span className="px-2 flex-1 whitespace-pre-wrap break-all">
-        {content}
-      </span>
+      <span className="flex-1 whitespace-pre-wrap break-all px-2">{content}</span>
     </div>
   );
 }
@@ -201,15 +199,16 @@ export function ConflictResolver({
     <Card
       className={cn(
         'w-full transition-colors',
-        isHardConflict && 'border-red-400 dark:border-red-800 bg-red-50/30 dark:bg-red-950/10',
-        isSoftConflict && 'border-yellow-400 dark:border-yellow-800 bg-yellow-50/30 dark:bg-yellow-950/10',
+        isHardConflict && 'border-red-400 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10',
+        isSoftConflict &&
+          'border-yellow-400 bg-yellow-50/30 dark:border-yellow-800 dark:bg-yellow-950/10',
         resolution && 'ring-2 ring-primary ring-offset-2'
       )}
     >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardTitle className="text-base font-mono">{file.file_path}</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="font-mono text-base">{file.file_path}</CardTitle>
             <Badge variant="secondary" className="text-xs">
               Modified
             </Badge>
@@ -218,12 +217,15 @@ export function ConflictResolver({
                 variant="destructive"
                 className={cn(
                   'flex items-center gap-1 text-xs',
-                  isHardConflict && 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800',
-                  isSoftConflict && 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-800'
+                  isHardConflict &&
+                    'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800',
+                  isSoftConflict &&
+                    'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-800'
                 )}
               >
                 <AlertTriangle className="h-3 w-3" />
-                {conflictInfo.conflictCount} {conflictInfo.conflictCount === 1 ? 'conflict' : 'conflicts'}
+                {conflictInfo.conflictCount}{' '}
+                {conflictInfo.conflictCount === 1 ? 'conflict' : 'conflicts'}
               </Badge>
             )}
           </div>
@@ -255,11 +257,11 @@ export function ConflictResolver({
       <CardContent className="space-y-4">
         {/* Side-by-side diff preview */}
         {file.unified_diff && (
-          <div className="border rounded-lg overflow-hidden" style={{ height: '300px' }}>
+          <div className="overflow-hidden rounded-lg border" style={{ height: '300px' }}>
             <div className="flex h-full">
               {/* Left panel - Collection */}
-              <div className="flex-1 flex flex-col border-r">
-                <div className="px-3 py-1.5 bg-muted/50 border-b text-xs font-medium text-muted-foreground">
+              <div className="flex flex-1 flex-col border-r">
+                <div className="border-b bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                   {collectionLabel}
                 </div>
                 <div ref={leftScrollRef} className="flex-1 overflow-y-auto">
@@ -281,8 +283,8 @@ export function ConflictResolver({
               </div>
 
               {/* Right panel - Project */}
-              <div className="flex-1 flex flex-col">
-                <div className="px-3 py-1.5 bg-muted/50 border-b text-xs font-medium text-muted-foreground">
+              <div className="flex flex-1 flex-col">
+                <div className="border-b bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                   {projectLabel}
                 </div>
                 <div ref={rightScrollRef} className="flex-1 overflow-y-auto">
@@ -337,11 +339,11 @@ export function ConflictResolver({
 
         {/* Resolution summary */}
         {resolution && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3">
+            <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
             <div className="text-sm">
               <div className="font-medium text-primary">Resolution Selected</div>
-              <div className="text-muted-foreground text-xs mt-0.5">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {resolution === 'theirs' && `Will use ${collectionLabel} version of this file`}
                 {resolution === 'ours' && `Will keep ${projectLabel} version of this file`}
                 {resolution === 'manual' && 'Will manually merge both versions (placeholder)'}
@@ -375,19 +377,19 @@ function ResolutionOption({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'relative flex flex-col items-start gap-1 p-3 rounded-lg border-2 transition-all text-left',
+        'relative flex flex-col items-start gap-1 rounded-lg border-2 p-3 text-left transition-all',
         'hover:border-primary/50 hover:bg-accent/50',
         'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
         selected && 'border-primary bg-primary/5 shadow-sm',
         !selected && 'border-border bg-background',
-        disabled && 'opacity-50 cursor-not-allowed hover:border-border hover:bg-background'
+        disabled && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-background'
       )}
     >
       {/* Radio indicator */}
-      <div className="absolute top-3 right-3">
+      <div className="absolute right-3 top-3">
         <div
           className={cn(
-            'h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors',
+            'flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors',
             selected && 'border-primary bg-primary',
             !selected && 'border-muted-foreground/30'
           )}
@@ -399,7 +401,9 @@ function ResolutionOption({
       <div className="pr-6">
         <div className="text-sm font-medium">{label}</div>
         <div className="text-xs text-muted-foreground">{description}</div>
-        {disabled && <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">Coming soon</div>}
+        {disabled && (
+          <div className="mt-1 text-xs text-orange-600 dark:text-orange-400">Coming soon</div>
+        )}
       </div>
     </button>
   );

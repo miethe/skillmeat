@@ -147,6 +147,7 @@ All acceptance criteria have been met. The Deploy & Sync UI is fully functional 
 ## Key Features
 
 ### Deploy Flow
+
 1. User clicks "Deploy to Project" in artifact detail
 2. Deploy dialog opens showing artifact information
 3. User optionally enters project path (defaults to current directory)
@@ -157,6 +158,7 @@ All acceptance criteria have been met. The Deploy & Sync UI is fully functional 
 8. Artifacts list is automatically refreshed
 
 ### Sync Flow
+
 1. User clicks "Sync with Upstream" in artifact detail
 2. Sync dialog opens showing version comparison
 3. System displays update availability or up-to-date status
@@ -168,6 +170,7 @@ All acceptance criteria have been met. The Deploy & Sync UI is fully functional 
 9. Artifacts list is automatically refreshed
 
 ### Conflict Resolution
+
 1. System detects conflicts during sync
 2. Conflict Resolver displays list of conflicted files
 3. For each file, shows:
@@ -209,12 +212,14 @@ All acceptance criteria have been met. The Deploy & Sync UI is fully functional 
 All operations currently use mock implementations:
 
 ### Deploy Mock
+
 - Simulates 1-second deployment
 - Returns mock deployment ID
 - Provides SSE stream URL
 - Shows 4-step progress (validate → check → copy → register)
 
 ### Sync Mock
+
 - Simulates 1.5-second sync
 - 20% chance of conflicts for testing
 - Returns version update to v1.1.0
@@ -222,6 +227,7 @@ All operations currently use mock implementations:
 - Change summary: 2 modified files
 
 ### SSE Mock
+
 - Simulates connection states
 - Provides step-by-step progress updates
 - Supports progress, complete, and error_event types
@@ -232,30 +238,33 @@ All operations currently use mock implementations:
 When backend endpoints are ready, update these locations:
 
 ### 1. Deploy Endpoint
+
 File: `/home/user/skillmeat/skillmeat/web/hooks/useDeploy.ts`
 Lines: 47-53 (uncomment API call)
 
 ```typescript
-const response = await fetch("/api/v1/deploy", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
+const response = await fetch('/api/v1/deploy', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(request),
 });
 ```
 
 ### 2. Sync Endpoint
+
 File: `/home/user/skillmeat/skillmeat/web/hooks/useSync.ts`
 Lines: 61-70 (uncomment API call)
 
 ```typescript
-const response = await fetch("/api/v1/sync", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
+const response = await fetch('/api/v1/sync', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(request),
 });
 ```
 
 ### 3. SSE Implementation
+
 File: `/home/user/skillmeat/skillmeat/web/hooks/useSSE.ts`
 Lines: 40-44 (replace stub with full implementation)
 
@@ -264,14 +273,17 @@ Reference: See full implementation in `DEPLOY_SYNC_UI_IMPLEMENTATION.md`
 ## Required Backend Endpoints
 
 ### Deploy Operations
+
 - `POST /api/v1/deploy` - Initiate deployment
 - `GET /api/v1/deploy/{id}/stream` - SSE progress stream
 
 ### Sync Operations
+
 - `POST /api/v1/sync` - Initiate sync
 - `GET /api/v1/sync/{id}/stream` - SSE progress stream
 
 ### Upstream Checking
+
 - `GET /api/v1/artifacts/{id}/upstream` - Check for updates
 
 See `DEPLOY_SYNC_UI_IMPLEMENTATION.md` for detailed API specifications.
@@ -281,6 +293,7 @@ See `DEPLOY_SYNC_UI_IMPLEMENTATION.md` for detailed API specifications.
 All files are in `/home/user/skillmeat/skillmeat/web/`:
 
 ### New Components
+
 - `components/ui/dialog.tsx`
 - `components/ui/progress.tsx`
 - `components/ui/toaster.tsx`
@@ -290,15 +303,18 @@ All files are in `/home/user/skillmeat/skillmeat/web/`:
 - `components/collection/conflict-resolver.tsx`
 
 ### New Hooks
+
 - `hooks/useSSE.ts`
 - `hooks/useDeploy.ts`
 - `hooks/useSync.ts`
 
 ### Modified Files
+
 - `components/providers.tsx`
 - `components/collection/artifact-detail.tsx`
 
 ### Documentation
+
 - `DEPLOY_SYNC_UI_IMPLEMENTATION.md`
 - `P1-002_IMPLEMENTATION_STATUS.md`
 - `DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md` (this file)
@@ -306,30 +322,35 @@ All files are in `/home/user/skillmeat/skillmeat/web/`:
 ## Architecture Highlights
 
 ### Component Composition
+
 - Small, focused components
 - Clear separation of concerns
 - Reusable UI primitives
 - Type-safe interfaces
 
 ### State Management
+
 - React Query for server state
 - React hooks for local state
 - Optimistic updates
 - Automatic cache invalidation
 
 ### Real-time Updates
+
 - SSE for progress tracking
 - Connection state visualization
 - Automatic reconnection
 - Clean disconnect logic
 
 ### Error Handling
+
 - Try-catch blocks in all async operations
 - User-friendly error messages
 - Toast notifications for feedback
 - Error boundaries ready
 
 ### User Experience
+
 - Non-blocking notifications
 - Progress visualization
 - Clear action buttons

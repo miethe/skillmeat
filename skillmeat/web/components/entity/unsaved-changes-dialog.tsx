@@ -5,10 +5,10 @@
  * Offers options to save, discard, or cancel the navigation.
  */
 
-"use client";
+'use client';
 
-import * as React from "react";
-import { AlertTriangle, Save, Trash2 } from "lucide-react";
+import * as React from 'react';
+import { AlertTriangle, Save, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 /**
  * Props for UnsavedChangesDialog component
@@ -106,7 +106,7 @@ export function UnsavedChangesDialog({
           {currentFile && (
             <div className="text-sm">
               <span className="text-muted-foreground">Current file: </span>
-              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                 {currentFile}
               </span>
             </div>
@@ -114,14 +114,12 @@ export function UnsavedChangesDialog({
           {targetFile && (
             <div className="text-sm">
               <span className="text-muted-foreground">Navigating to: </span>
-              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                {targetFile}
-              </span>
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{targetFile}</span>
             </div>
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button
             variant="outline"
             onClick={handleCancel}
@@ -140,11 +138,7 @@ export function UnsavedChangesDialog({
             Discard
           </Button>
           {onSave && (
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="sm:order-3"
-            >
+            <Button onClick={handleSave} disabled={isSaving} className="sm:order-3">
               {isSaving ? (
                 <>
                   <Save className="mr-2 h-4 w-4 animate-pulse" />

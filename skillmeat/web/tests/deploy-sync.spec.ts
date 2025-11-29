@@ -90,9 +90,7 @@ test.describe('Deploy and Sync Flows', () => {
       await waitForElement(page, '[data-testid="deploy-modal"]');
 
       // Try to deploy without selecting project
-      const confirmButton = page.locator(
-        '[data-testid="deploy-modal"] button:has-text("Deploy")'
-      );
+      const confirmButton = page.locator('[data-testid="deploy-modal"] button:has-text("Deploy")');
       await confirmButton.click();
 
       // Should show validation error
@@ -101,11 +99,7 @@ test.describe('Deploy and Sync Flows', () => {
 
     test('should deploy artifact successfully', async ({ page }) => {
       // Mock successful deploy
-      await mockApiRoute(
-        page,
-        '/api/deploy',
-        buildApiResponse.deploySuccess()
-      );
+      await mockApiRoute(page, '/api/deploy', buildApiResponse.deploySuccess());
 
       const deployButton = page.locator('button:has-text("Deploy")');
       await deployButton.click();
@@ -117,9 +111,7 @@ test.describe('Deploy and Sync Flows', () => {
       await projectSelect.selectOption(mockProjects[0].id);
 
       // Confirm deployment
-      const confirmButton = page.locator(
-        '[data-testid="deploy-modal"] button:has-text("Deploy")'
-      );
+      const confirmButton = page.locator('[data-testid="deploy-modal"] button:has-text("Deploy")');
       await confirmButton.click();
 
       // Should show success message
@@ -132,12 +124,7 @@ test.describe('Deploy and Sync Flows', () => {
 
     test('should handle deploy error', async ({ page }) => {
       // Mock deploy error
-      await mockApiRoute(
-        page,
-        '/api/deploy',
-        buildErrorResponse.serverError(),
-        500
-      );
+      await mockApiRoute(page, '/api/deploy', buildErrorResponse.serverError(), 500);
 
       const deployButton = page.locator('button:has-text("Deploy")');
       await deployButton.click();
@@ -148,9 +135,7 @@ test.describe('Deploy and Sync Flows', () => {
       const projectSelect = page.locator('select[name="project"]');
       await projectSelect.selectOption(mockProjects[0].id);
 
-      const confirmButton = page.locator(
-        '[data-testid="deploy-modal"] button:has-text("Deploy")'
-      );
+      const confirmButton = page.locator('[data-testid="deploy-modal"] button:has-text("Deploy")');
       await confirmButton.click();
 
       // Should show error message
@@ -164,9 +149,7 @@ test.describe('Deploy and Sync Flows', () => {
       await waitForElement(page, '[data-testid="deploy-modal"]');
 
       // Click cancel button
-      const cancelButton = page.locator(
-        '[data-testid="deploy-modal"] button:has-text("Cancel")'
-      );
+      const cancelButton = page.locator('[data-testid="deploy-modal"] button:has-text("Cancel")');
       await cancelButton.click();
 
       // Modal should close
@@ -205,9 +188,7 @@ test.describe('Deploy and Sync Flows', () => {
       const projectSelect = page.locator('select[name="project"]');
       await projectSelect.selectOption(mockProjects[0].id);
 
-      const confirmButton = page.locator(
-        '[data-testid="deploy-modal"] button:has-text("Deploy")'
-      );
+      const confirmButton = page.locator('[data-testid="deploy-modal"] button:has-text("Deploy")');
       await confirmButton.click();
 
       // Should show loading state
@@ -242,11 +223,7 @@ test.describe('Deploy and Sync Flows', () => {
       await waitForElement(page, '[data-testid="sync-modal"]');
 
       // Should show project name
-      await expectTextVisible(
-        page,
-        '[data-testid="sync-modal"]',
-        mockProjects[0].name
-      );
+      await expectTextVisible(page, '[data-testid="sync-modal"]', mockProjects[0].name);
 
       // Should show last sync time
       await expectTextVisible(page, '[data-testid="sync-modal"]', /last sync/i);
@@ -262,9 +239,7 @@ test.describe('Deploy and Sync Flows', () => {
       await waitForElement(page, '[data-testid="sync-modal"]');
 
       // Confirm sync
-      const confirmButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Sync")'
-      );
+      const confirmButton = page.locator('[data-testid="sync-modal"] button:has-text("Sync")');
       await confirmButton.click();
 
       // Should show success message
@@ -277,21 +252,14 @@ test.describe('Deploy and Sync Flows', () => {
 
     test('should handle sync error', async ({ page }) => {
       // Mock sync error
-      await mockApiRoute(
-        page,
-        '/api/sync',
-        buildErrorResponse.serverError(),
-        500
-      );
+      await mockApiRoute(page, '/api/sync', buildErrorResponse.serverError(), 500);
 
       const syncButton = page.locator('button:has-text("Sync")').first();
       await syncButton.click();
 
       await waitForElement(page, '[data-testid="sync-modal"]');
 
-      const confirmButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Sync")'
-      );
+      const confirmButton = page.locator('[data-testid="sync-modal"] button:has-text("Sync")');
       await confirmButton.click();
 
       // Should show error message
@@ -325,17 +293,11 @@ test.describe('Deploy and Sync Flows', () => {
 
       await waitForElement(page, '[data-testid="sync-modal"]');
 
-      const confirmButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Sync")'
-      );
+      const confirmButton = page.locator('[data-testid="sync-modal"] button:has-text("Sync")');
       await confirmButton.click();
 
       // Should show conflict resolution UI
-      await expectTextVisible(
-        page,
-        '[data-testid="sync-modal"]',
-        /conflict/i
-      );
+      await expectTextVisible(page, '[data-testid="sync-modal"]', /conflict/i);
     });
 
     test('should close sync modal on cancel', async ({ page }) => {
@@ -344,9 +306,7 @@ test.describe('Deploy and Sync Flows', () => {
 
       await waitForElement(page, '[data-testid="sync-modal"]');
 
-      const cancelButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Cancel")'
-      );
+      const cancelButton = page.locator('[data-testid="sync-modal"] button:has-text("Cancel")');
       await cancelButton.click();
 
       await expectModalClosed(page, '[data-testid="sync-modal"]');
@@ -368,9 +328,7 @@ test.describe('Deploy and Sync Flows', () => {
 
       await waitForElement(page, '[data-testid="sync-modal"]');
 
-      const confirmButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Sync")'
-      );
+      const confirmButton = page.locator('[data-testid="sync-modal"] button:has-text("Sync")');
       await confirmButton.click();
 
       // Should show progress indicator
@@ -386,9 +344,7 @@ test.describe('Deploy and Sync Flows', () => {
 
       await waitForElement(page, '[data-testid="sync-modal"]');
 
-      const confirmButton = page.locator(
-        '[data-testid="sync-modal"] button:has-text("Sync")'
-      );
+      const confirmButton = page.locator('[data-testid="sync-modal"] button:has-text("Sync")');
       await confirmButton.click();
 
       await page.waitForTimeout(1500);
@@ -416,9 +372,7 @@ test.describe('Deploy and Sync Flows', () => {
         await secondCheckbox.check();
 
         // Batch deploy button should appear
-        const batchDeployButton = page.locator(
-          'button:has-text("Deploy Selected")'
-        );
+        const batchDeployButton = page.locator('button:has-text("Deploy Selected")');
         await expect(batchDeployButton).toBeVisible();
       }
     });

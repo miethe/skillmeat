@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2, Upload } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { MarketplaceBrokerSelector } from "./MarketplaceBrokerSelector";
-import type { BrokerInfo, PublishFormData, PublishWizardStep } from "@/types/marketplace";
+import { useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Loader2, Upload } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { MarketplaceBrokerSelector } from './MarketplaceBrokerSelector';
+import type { BrokerInfo, PublishFormData, PublishWizardStep } from '@/types/marketplace';
 
 interface MarketplacePublishWizardProps {
   brokers: BrokerInfo[];
@@ -20,23 +20,23 @@ interface MarketplacePublishWizardProps {
 const STEPS: PublishWizardStep[] = [
   {
     id: 1,
-    title: "Select Bundle",
-    description: "Choose the bundle to publish",
+    title: 'Select Bundle',
+    description: 'Choose the bundle to publish',
   },
   {
     id: 2,
-    title: "Choose Broker",
-    description: "Select marketplace broker",
+    title: 'Choose Broker',
+    description: 'Select marketplace broker',
   },
   {
     id: 3,
-    title: "Bundle Metadata",
-    description: "Provide additional information",
+    title: 'Bundle Metadata',
+    description: 'Provide additional information',
   },
   {
     id: 4,
-    title: "Review & Confirm",
-    description: "Review your submission",
+    title: 'Review & Confirm',
+    description: 'Review your submission',
   },
 ];
 
@@ -50,7 +50,7 @@ export function MarketplacePublishWizard({
     tags: [],
   });
   const [isPublishing, setIsPublishing] = useState(false);
-  const [tagInput, setTagInput] = useState("");
+  const [tagInput, setTagInput] = useState('');
 
   const updateFormData = (updates: Partial<PublishFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -62,7 +62,7 @@ export function MarketplacePublishWizard({
       return;
     }
     updateFormData({ tags: [...(formData.tags || []), trimmedTag] });
-    setTagInput("");
+    setTagInput('');
   };
 
   const handleRemoveTag = (tag: string) => {
@@ -121,9 +121,7 @@ export function MarketplacePublishWizard({
           <span className="font-medium">
             Step {currentStep} of {STEPS.length}
           </span>
-          <span className="text-muted-foreground">
-            {STEPS[currentStep - 1].title}
-          </span>
+          <span className="text-muted-foreground">{STEPS[currentStep - 1].title}</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
@@ -137,18 +135,16 @@ export function MarketplacePublishWizard({
           return (
             <div
               key={step.id}
-              className={`flex items-center ${
-                index < STEPS.length - 1 ? "flex-1" : ""
-              }`}
+              className={`flex items-center ${index < STEPS.length - 1 ? 'flex-1' : ''}`}
             >
               <div className="flex flex-col items-center">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
                     isActive
-                      ? "border-primary bg-primary text-primary-foreground"
+                      ? 'border-primary bg-primary text-primary-foreground'
                       : isCompleted
-                      ? "border-green-500 bg-green-500 text-white"
-                      : "border-muted-foreground bg-background"
+                        ? 'border-green-500 bg-green-500 text-white'
+                        : 'border-muted-foreground bg-background'
                   }`}
                 >
                   {isCompleted ? (
@@ -158,19 +154,15 @@ export function MarketplacePublishWizard({
                   )}
                 </div>
                 <p
-                  className={`text-xs mt-1 text-center ${
-                    isActive ? "font-medium" : "text-muted-foreground"
+                  className={`mt-1 text-center text-xs ${
+                    isActive ? 'font-medium' : 'text-muted-foreground'
                   }`}
                 >
                   {step.title}
                 </p>
               </div>
               {index < STEPS.length - 1 && (
-                <div
-                  className={`flex-1 h-0.5 mx-2 ${
-                    isCompleted ? "bg-green-500" : "bg-muted"
-                  }`}
-                />
+                <div className={`mx-2 h-0.5 flex-1 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
               )}
             </div>
           );
@@ -183,24 +175,22 @@ export function MarketplacePublishWizard({
           {currentStep === 1 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold mb-1">
-                  Select Bundle to Publish
-                </h3>
+                <h3 className="mb-1 text-lg font-semibold">Select Bundle to Publish</h3>
                 <p className="text-sm text-muted-foreground">
                   Enter the path to your signed bundle file
                 </p>
               </div>
               <div>
-                <label htmlFor="bundle-path" className="block text-sm font-medium mb-2">
+                <label htmlFor="bundle-path" className="mb-2 block text-sm font-medium">
                   Bundle Path
                 </label>
                 <Input
                   id="bundle-path"
                   placeholder="/path/to/bundle.tar.gz"
-                  value={formData.bundle_path || ""}
+                  value={formData.bundle_path || ''}
                   onChange={(e) => updateFormData({ bundle_path: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   The bundle must be signed with your publisher key
                 </p>
               </div>
@@ -210,7 +200,7 @@ export function MarketplacePublishWizard({
           {currentStep === 2 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold mb-1">Choose Broker</h3>
+                <h3 className="mb-1 text-lg font-semibold">Choose Broker</h3>
                 <p className="text-sm text-muted-foreground">
                   Select the marketplace to publish to
                 </p>
@@ -226,63 +216,63 @@ export function MarketplacePublishWizard({
           {currentStep === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold mb-1">Bundle Metadata</h3>
+                <h3 className="mb-1 text-lg font-semibold">Bundle Metadata</h3>
                 <p className="text-sm text-muted-foreground">
                   Add optional information about your bundle
                 </p>
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium mb-2">
+                <label htmlFor="description" className="mb-2 block text-sm font-medium">
                   Description
                 </label>
                 <Textarea
                   id="description"
                   placeholder="Describe what your bundle does..."
-                  value={formData.description || ""}
+                  value={formData.description || ''}
                   onChange={(e) => updateFormData({ description: e.target.value })}
                   rows={4}
                 />
               </div>
 
               <div>
-                <label htmlFor="homepage" className="block text-sm font-medium mb-2">
+                <label htmlFor="homepage" className="mb-2 block text-sm font-medium">
                   Homepage URL (optional)
                 </label>
                 <Input
                   id="homepage"
                   type="url"
                   placeholder="https://example.com"
-                  value={formData.homepage || ""}
+                  value={formData.homepage || ''}
                   onChange={(e) => updateFormData({ homepage: e.target.value })}
                 />
               </div>
 
               <div>
-                <label htmlFor="repository" className="block text-sm font-medium mb-2">
+                <label htmlFor="repository" className="mb-2 block text-sm font-medium">
                   Repository URL (optional)
                 </label>
                 <Input
                   id="repository"
                   type="url"
                   placeholder="https://github.com/user/repo"
-                  value={formData.repository || ""}
+                  value={formData.repository || ''}
                   onChange={(e) => updateFormData({ repository: e.target.value })}
                 />
               </div>
 
               <div>
-                <label htmlFor="tags" className="block text-sm font-medium mb-2">
+                <label htmlFor="tags" className="mb-2 block text-sm font-medium">
                   Tags
                 </label>
-                <div className="flex gap-2 mb-2">
+                <div className="mb-2 flex gap-2">
                   <Input
                     id="tags"
                     placeholder="Add tag..."
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
                         handleAddTag();
                       }
@@ -318,33 +308,31 @@ export function MarketplacePublishWizard({
           {currentStep === 4 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold mb-1">Review & Confirm</h3>
+                <h3 className="mb-1 text-lg font-semibold">Review & Confirm</h3>
                 <p className="text-sm text-muted-foreground">
                   Please review your submission before publishing
                 </p>
               </div>
 
               <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b">
+                <div className="flex justify-between border-b py-2">
                   <span className="text-sm font-medium">Bundle Path:</span>
-                  <span className="text-sm text-muted-foreground font-mono">
+                  <span className="font-mono text-sm text-muted-foreground">
                     {formData.bundle_path}
                   </span>
                 </div>
-                <div className="flex justify-between py-2 border-b">
+                <div className="flex justify-between border-b py-2">
                   <span className="text-sm font-medium">Broker:</span>
                   <span className="text-sm capitalize">{formData.broker}</span>
                 </div>
                 {formData.description && (
-                  <div className="py-2 border-b">
+                  <div className="border-b py-2">
                     <span className="text-sm font-medium">Description:</span>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {formData.description}
-                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{formData.description}</p>
                   </div>
                 )}
                 {formData.homepage && (
-                  <div className="flex justify-between py-2 border-b">
+                  <div className="flex justify-between border-b py-2">
                     <span className="text-sm font-medium">Homepage:</span>
                     <a
                       href={formData.homepage}
@@ -357,7 +345,7 @@ export function MarketplacePublishWizard({
                   </div>
                 )}
                 {formData.repository && (
-                  <div className="flex justify-between py-2 border-b">
+                  <div className="flex justify-between border-b py-2">
                     <span className="text-sm font-medium">Repository:</span>
                     <a
                       href={formData.repository}
@@ -372,7 +360,7 @@ export function MarketplacePublishWizard({
                 {formData.tags && formData.tags.length > 0 && (
                   <div className="py-2">
                     <span className="text-sm font-medium">Tags:</span>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {formData.tags.map((tag) => (
                         <Badge key={tag} variant="secondary">
                           {tag}
@@ -394,31 +382,25 @@ export function MarketplacePublishWizard({
           onClick={currentStep === 1 ? onCancel : handleBack}
           disabled={isPublishing}
         >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          {currentStep === 1 ? "Cancel" : "Back"}
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          {currentStep === 1 ? 'Cancel' : 'Back'}
         </Button>
 
         {currentStep < STEPS.length ? (
-          <Button
-            onClick={handleNext}
-            disabled={!canProceed() || isPublishing}
-          >
+          <Button onClick={handleNext} disabled={!canProceed() || isPublishing}>
             Next
-            <ChevronRight className="h-4 w-4 ml-2" />
+            <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={!canProceed() || isPublishing}
-          >
+          <Button onClick={handleSubmit} disabled={!canProceed() || isPublishing}>
             {isPublishing ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Publishing...
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="mr-2 h-4 w-4" />
                 Publish Bundle
               </>
             )}

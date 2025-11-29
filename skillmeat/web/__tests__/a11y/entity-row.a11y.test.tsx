@@ -25,9 +25,7 @@ describe('EntityRow Accessibility', () => {
   });
 
   it('should have no violations when selectable', async () => {
-    const { container } = render(
-      <EntityRow entity={mockEntity} selectable={true} />
-    );
+    const { container } = render(<EntityRow entity={mockEntity} selectable={true} />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -41,9 +39,7 @@ describe('EntityRow Accessibility', () => {
   });
 
   it('should have accessible checkbox when selectable', async () => {
-    const { getByRole, container } = render(
-      <EntityRow entity={mockEntity} selectable={true} />
-    );
+    const { getByRole, container } = render(<EntityRow entity={mockEntity} selectable={true} />);
 
     const checkbox = getByRole('checkbox');
     expect(checkbox).toBeInTheDocument();

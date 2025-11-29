@@ -5,9 +5,9 @@
  * with SSE progress tracking.
  */
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { apiRequest } from "@/lib/api";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { apiRequest } from '@/lib/api';
 
 export interface DeployRequest {
   artifactId: string;
@@ -51,21 +51,18 @@ export function useDeploy(options: UseDeployOptions = {}) {
       const artifactId = `${request.artifactType}:${request.artifactName}`;
 
       // Call backend API
-      const response = await apiRequest<DeployResponse>(
-        `/artifacts/${artifactId}/deploy`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_path: request.projectPath,
-            overwrite: request.overwrite ?? false,
-          }),
-        }
-      );
+      const response = await apiRequest<DeployResponse>(`/artifacts/${artifactId}/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_path: request.projectPath,
+          overwrite: request.overwrite ?? false,
+        }),
+      });
 
       // Check if deployment was successful
       if (!response.success) {
-        throw new Error(response.error_message || response.message || "Deploy failed");
+        throw new Error(response.error_message || response.message || 'Deploy failed');
       }
 
       return response;
@@ -73,12 +70,12 @@ export function useDeploy(options: UseDeployOptions = {}) {
 
     onSuccess: (data, variables) => {
       // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-      queryClient.invalidateQueries({ queryKey: ["deployments"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
 
       // Show success toast
-      toast.success(data.message || "Deployment successful");
+      toast.success(data.message || 'Deployment successful');
 
       // Call custom success handler
       options.onSuccess?.(data, variables);
@@ -86,7 +83,7 @@ export function useDeploy(options: UseDeployOptions = {}) {
 
     onError: (error: any, variables) => {
       const deployError: DeployError = {
-        message: error.message || "Deployment failed",
+        message: error.message || 'Deployment failed',
         code: error.code,
         details: error.details,
       };
@@ -121,41 +118,38 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       const artifactId = `${request.artifactType}:${request.artifactName}`;
 
       if (!request.projectPath) {
-        throw new Error("Project path is required for undeploy");
+        throw new Error('Project path is required for undeploy');
       }
 
       // Call backend API
-      const response = await apiRequest<DeployResponse>(
-        `/artifacts/${artifactId}/undeploy`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_path: request.projectPath,
-          }),
-        }
-      );
+      const response = await apiRequest<DeployResponse>(`/artifacts/${artifactId}/undeploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_path: request.projectPath,
+        }),
+      });
 
       // Check if undeploy was successful
       if (!response.success) {
-        throw new Error(response.error_message || response.message || "Undeploy failed");
+        throw new Error(response.error_message || response.message || 'Undeploy failed');
       }
 
       return response;
     },
 
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-      queryClient.invalidateQueries({ queryKey: ["deployments"] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
 
-      toast.success(data.message || "Artifact removed successfully");
+      toast.success(data.message || 'Artifact removed successfully');
 
       options.onSuccess?.(data, variables as DeployRequest);
     },
 
     onError: (error: any, variables) => {
       const deployError: DeployError = {
-        message: error.message || "Failed to remove artifact",
+        message: error.message || 'Failed to remove artifact',
       };
 
       toast.error(deployError.message);

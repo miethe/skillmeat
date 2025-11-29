@@ -12,7 +12,7 @@ export interface ArtifactVersionInfo {
   artifact_name: string;
   artifact_type: string;
   location: string;
-  location_type: "collection" | "project";
+  location_type: 'collection' | 'project';
   content_sha: string;
   parent_sha: string | null;
   is_modified: boolean;

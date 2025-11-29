@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Folder, Plus } from "lucide-react";
+import { useState } from 'react';
+import { Folder, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,14 +9,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useCreateProject } from "@/hooks/useProjects";
-import { useToast } from "@/hooks/use-toast";
-import type { ProjectCreateRequest } from "@/sdk";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useCreateProject } from '@/hooks/useProjects';
+import { useToast } from '@/hooks/use-toast';
+import type { ProjectCreateRequest } from '@/sdk';
 
 export interface CreateProjectDialogProps {
   open: boolean;
@@ -24,14 +24,10 @@ export interface CreateProjectDialogProps {
   onSuccess?: () => void;
 }
 
-export function CreateProjectDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: CreateProjectDialogProps) {
-  const [name, setName] = useState("");
-  const [path, setPath] = useState("");
-  const [description, setDescription] = useState("");
+export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreateProjectDialogProps) {
+  const [name, setName] = useState('');
+  const [path, setPath] = useState('');
+  const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<{
     name?: string;
     path?: string;
@@ -45,19 +41,18 @@ export function CreateProjectDialog({
 
     // Name validation: 1-100 chars, alphanumeric + hyphens/underscores
     if (!name.trim()) {
-      newErrors.name = "Project name is required";
+      newErrors.name = 'Project name is required';
     } else if (name.length < 1 || name.length > 100) {
-      newErrors.name = "Name must be between 1 and 100 characters";
+      newErrors.name = 'Name must be between 1 and 100 characters';
     } else if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      newErrors.name =
-        "Name can only contain letters, numbers, hyphens, and underscores";
+      newErrors.name = 'Name can only contain letters, numbers, hyphens, and underscores';
     }
 
     // Path validation: must be absolute path
     if (!path.trim()) {
-      newErrors.path = "Project path is required";
-    } else if (!path.startsWith("/")) {
-      newErrors.path = "Path must be an absolute path (starting with /)";
+      newErrors.path = 'Project path is required';
+    } else if (!path.startsWith('/')) {
+      newErrors.path = 'Path must be an absolute path (starting with /)';
     }
 
     setErrors(newErrors);
@@ -79,37 +74,34 @@ export function CreateProjectDialog({
       await createMutation.mutateAsync(requestBody);
 
       toast({
-        title: "Project created",
+        title: 'Project created',
         description: `Successfully created project "${name}"`,
       });
 
       // Reset form
-      setName("");
-      setPath("");
-      setDescription("");
+      setName('');
+      setPath('');
+      setDescription('');
       setErrors({});
 
       // Close dialog and call success callback
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error("Failed to create project:", error);
+      console.error('Failed to create project:', error);
       toast({
-        title: "Failed to create project",
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-        variant: "destructive",
+        title: 'Failed to create project',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
       });
     }
   };
 
   const handleClose = () => {
     if (!createMutation.isPending) {
-      setName("");
-      setPath("");
-      setDescription("");
+      setName('');
+      setPath('');
+      setDescription('');
       setErrors({});
       onOpenChange(false);
     }
@@ -120,7 +112,7 @@ export function CreateProjectDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg bg-primary/10 p-2">
               <Plus className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -149,11 +141,9 @@ export function CreateProjectDialog({
                 }
               }}
               disabled={createMutation.isPending}
-              className={errors.name ? "border-destructive" : ""}
+              className={errors.name ? 'border-destructive' : ''}
             />
-            {errors.name && (
-              <p className="text-sm text-destructive">{errors.name}</p>
-            )}
+            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
             <p className="text-xs text-muted-foreground">
               Letters, numbers, hyphens, and underscores only
             </p>
@@ -176,14 +166,10 @@ export function CreateProjectDialog({
                 }
               }}
               disabled={createMutation.isPending}
-              className={errors.path ? "border-destructive" : ""}
+              className={errors.path ? 'border-destructive' : ''}
             />
-            {errors.path && (
-              <p className="text-sm text-destructive">{errors.path}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Absolute path to the project directory
-            </p>
+            {errors.path && <p className="text-sm text-destructive">{errors.path}</p>}
+            <p className="text-xs text-muted-foreground">Absolute path to the project directory</p>
           </div>
 
           {/* Description Input */}
@@ -201,15 +187,11 @@ export function CreateProjectDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={createMutation.isPending}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={createMutation.isPending}>
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Creating..." : "Create Project"}
+            {createMutation.isPending ? 'Creating...' : 'Create Project'}
           </Button>
         </DialogFooter>
       </DialogContent>

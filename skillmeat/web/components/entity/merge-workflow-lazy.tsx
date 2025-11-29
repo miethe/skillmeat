@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 // Lazy load the heavy MergeWorkflow component
 const MergeWorkflowDynamic = dynamic(
-  () => import('./merge-workflow').then(mod => ({ default: mod.MergeWorkflow })),
+  () => import('./merge-workflow').then((mod) => ({ default: mod.MergeWorkflow })),
   {
     loading: () => (
       <Card className="w-full">

@@ -6,18 +6,18 @@
  */
 
 // Import testing library matchers
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom';
 
 // Import jest-axe matchers for accessibility testing
-import { toHaveNoViolations } from 'jest-axe'
-expect.extend(toHaveNoViolations)
+import { toHaveNoViolations } from 'jest-axe';
+expect.extend(toHaveNoViolations);
 
 // Import TextEncoder/TextDecoder for Node.js environment
-import { TextEncoder, TextDecoder } from 'util'
+import { TextEncoder, TextDecoder } from 'util';
 
 // Polyfill TextEncoder/TextDecoder for Node.js environment
-global.TextEncoder = TextEncoder
-global.TextDecoder = TextDecoder
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -32,7 +32,7 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
   })),
-})
+});
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
@@ -40,10 +40,10 @@ global.IntersectionObserver = class IntersectionObserver {
   disconnect() {}
   observe() {}
   takeRecords() {
-    return []
+    return [];
   }
   unobserve() {}
-}
+};
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
@@ -51,7 +51,7 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
   observe() {}
   unobserve() {}
-}
+};
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -66,26 +66,26 @@ jest.mock('next/navigation', () => ({
       pathname: '/',
       query: {},
       asPath: '/',
-    }
+    };
   },
   usePathname() {
-    return '/'
+    return '/';
   },
   useSearchParams() {
-    return new URLSearchParams()
+    return new URLSearchParams();
   },
   useParams() {
-    return {}
+    return {};
   },
   useSelectedLayoutSegment() {
-    return null
+    return null;
   },
   useSelectedLayoutSegments() {
-    return []
+    return [];
   },
   redirect: jest.fn(),
   notFound: jest.fn(),
-}))
+}));
 
 // Mock next/headers
 jest.mock('next/headers', () => ({
@@ -96,7 +96,7 @@ jest.mock('next/headers', () => ({
       delete: jest.fn(),
       has: jest.fn(),
       getAll: jest.fn(),
-    }
+    };
   },
   headers() {
     return {
@@ -106,14 +106,14 @@ jest.mock('next/headers', () => ({
       entries: jest.fn(),
       keys: jest.fn(),
       values: jest.fn(),
-    }
+    };
   },
-}))
+}));
 
 // Mock environment variables
-process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000'
-process.env.NEXT_PUBLIC_WS_URL = 'ws://localhost:8000'
-process.env.NODE_ENV = 'test'
+process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000';
+process.env.NEXT_PUBLIC_WS_URL = 'ws://localhost:8000';
+process.env.NODE_ENV = 'test';
 
 // Suppress console errors/warnings in tests (optional)
 // Uncomment if you want cleaner test output
@@ -127,21 +127,21 @@ process.env.NODE_ENV = 'test'
 expect.extend({
   toBeValidUrl(received) {
     try {
-      new URL(received)
+      new URL(received);
       return {
         message: () => `expected ${received} not to be a valid URL`,
         pass: true,
-      }
+      };
     } catch (error) {
       return {
         message: () => `expected ${received} to be a valid URL`,
         pass: false,
-      }
+      };
     }
   },
-})
+});
 
 // Clean up after each test
 afterEach(() => {
-  jest.clearAllMocks()
-})
+  jest.clearAllMocks();
+});

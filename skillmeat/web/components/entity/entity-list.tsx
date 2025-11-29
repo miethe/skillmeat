@@ -5,15 +5,15 @@
  * Supports multi-select and empty state.
  */
 
-"use client";
+'use client';
 
-import * as React from "react";
-import { FileQuestion } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Entity } from "@/types/entity";
-import { EntityCard, EntityCardSkeleton } from "./entity-card";
-import { EntityRow } from "./entity-row";
-import { useEntityLifecycle } from "@/hooks/useEntityLifecycle";
+import * as React from 'react';
+import { FileQuestion } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import type { Entity } from '@/types/entity';
+import { EntityCard, EntityCardSkeleton } from './entity-card';
+import { EntityRow } from './entity-row';
+import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 
 const { useCallback } = React;
 
@@ -24,7 +24,7 @@ const { useCallback } = React;
  */
 export interface EntityListProps {
   /** Display mode: "grid" for card layout, "list" for table layout */
-  viewMode: "grid" | "list";
+  viewMode: 'grid' | 'list';
   /** Optional array of entities to display. If not provided, uses context. */
   entities?: Entity[];
   /** Callback when an entity is clicked (outside of action menu) */
@@ -86,86 +86,98 @@ export function EntityList({
   const { selectEntity, deselectEntity, isLoading } = context;
 
   // Memoize handlers to prevent EntityCard/EntityRow re-renders
-  const handleEntityClick = useCallback((entity: Entity) => {
-    onEntityClick?.(entity);
-  }, [onEntityClick]);
+  const handleEntityClick = useCallback(
+    (entity: Entity) => {
+      onEntityClick?.(entity);
+    },
+    [onEntityClick]
+  );
 
-  const handleSelect = useCallback((entity: Entity, selected: boolean) => {
-    if (selected) {
-      selectEntity(entity.id);
-    } else {
-      deselectEntity(entity.id);
-    }
-  }, [selectEntity, deselectEntity]);
+  const handleSelect = useCallback(
+    (entity: Entity, selected: boolean) => {
+      if (selected) {
+        selectEntity(entity.id);
+      } else {
+        deselectEntity(entity.id);
+      }
+    },
+    [selectEntity, deselectEntity]
+  );
 
   // ALL useCallback hooks must be defined BEFORE any early returns
   // to comply with React's Rules of Hooks (same order on every render)
-  const renderEntityCard = useCallback((entity: Entity) => {
-    return (
-      <EntityCard
-        key={entity.id}
-        entity={entity}
-        selected={selectedEntities.includes(entity.id)}
-        selectable={selectable}
-        onSelect={(selected) => handleSelect(entity, selected)}
-        onClick={() => handleEntityClick(entity)}
-        onEdit={onEdit ? () => onEdit(entity) : undefined}
-        onDelete={onDelete ? () => onDelete(entity) : undefined}
-        onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
-        onSync={onSync ? () => onSync(entity) : undefined}
-        onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
-        onRollback={onRollback ? () => onRollback(entity) : undefined}
-      />
-    );
-  }, [
-    selectedEntities,
-    selectable,
-    handleSelect,
-    handleEntityClick,
-    onEdit,
-    onDelete,
-    onDeploy,
-    onSync,
-    onViewDiff,
-    onRollback,
-  ]);
+  const renderEntityCard = useCallback(
+    (entity: Entity) => {
+      return (
+        <EntityCard
+          key={entity.id}
+          entity={entity}
+          selected={selectedEntities.includes(entity.id)}
+          selectable={selectable}
+          onSelect={(selected) => handleSelect(entity, selected)}
+          onClick={() => handleEntityClick(entity)}
+          onEdit={onEdit ? () => onEdit(entity) : undefined}
+          onDelete={onDelete ? () => onDelete(entity) : undefined}
+          onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
+          onSync={onSync ? () => onSync(entity) : undefined}
+          onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
+          onRollback={onRollback ? () => onRollback(entity) : undefined}
+        />
+      );
+    },
+    [
+      selectedEntities,
+      selectable,
+      handleSelect,
+      handleEntityClick,
+      onEdit,
+      onDelete,
+      onDeploy,
+      onSync,
+      onViewDiff,
+      onRollback,
+    ]
+  );
 
-  const renderEntityRow = useCallback((entity: Entity) => {
-    return (
-      <EntityRow
-        key={entity.id}
-        entity={entity}
-        selected={selectedEntities.includes(entity.id)}
-        selectable={selectable}
-        onSelect={(selected) => handleSelect(entity, selected)}
-        onClick={() => handleEntityClick(entity)}
-        onEdit={onEdit ? () => onEdit(entity) : undefined}
-        onDelete={onDelete ? () => onDelete(entity) : undefined}
-        onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
-        onSync={onSync ? () => onSync(entity) : undefined}
-        onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
-        onRollback={onRollback ? () => onRollback(entity) : undefined}
-      />
-    );
-  }, [
-    selectedEntities,
-    selectable,
-    handleSelect,
-    handleEntityClick,
-    onEdit,
-    onDelete,
-    onDeploy,
-    onSync,
-    onViewDiff,
-    onRollback,
-  ]);
+  const renderEntityRow = useCallback(
+    (entity: Entity) => {
+      return (
+        <EntityRow
+          key={entity.id}
+          entity={entity}
+          selected={selectedEntities.includes(entity.id)}
+          selectable={selectable}
+          onSelect={(selected) => handleSelect(entity, selected)}
+          onClick={() => handleEntityClick(entity)}
+          onEdit={onEdit ? () => onEdit(entity) : undefined}
+          onDelete={onDelete ? () => onDelete(entity) : undefined}
+          onDeploy={onDeploy ? () => onDeploy(entity) : undefined}
+          onSync={onSync ? () => onSync(entity) : undefined}
+          onViewDiff={onViewDiff ? () => onViewDiff(entity) : undefined}
+          onRollback={onRollback ? () => onRollback(entity) : undefined}
+        />
+      );
+    },
+    [
+      selectedEntities,
+      selectable,
+      handleSelect,
+      handleEntityClick,
+      onEdit,
+      onDelete,
+      onDeploy,
+      onSync,
+      onViewDiff,
+      onRollback,
+    ]
+  );
 
   // Loading state - show skeletons
   if (isLoading) {
-    if (viewMode === "grid") {
+    if (viewMode === 'grid') {
       return (
         <ScrollArea className="h-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <EntityCardSkeleton key={i} />
             ))}
@@ -176,14 +188,14 @@ export function EntityList({
       return (
         <ScrollArea className="h-full">
           <div className="border-t">
-            <div className="flex items-center gap-4 px-4 py-2 border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-              {selectable && <div className="flex-shrink-0 w-4" />}
+            <div className="flex items-center gap-4 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+              {selectable && <div className="w-4 flex-shrink-0" />}
               <div className="w-48">Name</div>
               <div className="w-24">Type</div>
               <div className="flex-1">Description</div>
               <div className="w-40">Tags</div>
               <div className="w-24">Status</div>
-              <div className="flex-shrink-0 w-8">Actions</div>
+              <div className="w-8 flex-shrink-0">Actions</div>
             </div>
             {Array.from({ length: 6 }).map((_, i) => (
               <EntityCardSkeleton key={i} />
@@ -198,22 +210,22 @@ export function EntityList({
   if (!entities || entities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No entities found</h3>
-        <p className="text-sm text-muted-foreground max-w-md">
+        <FileQuestion className="mb-4 h-12 w-12 text-muted-foreground" />
+        <h3 className="mb-2 text-lg font-semibold">No entities found</h3>
+        <p className="max-w-md text-sm text-muted-foreground">
           {selectable
-            ? "No entities match your current filters. Try adjusting your search or filters."
-            : "Get started by adding your first entity to your collection."}
+            ? 'No entities match your current filters. Try adjusting your search or filters.'
+            : 'Get started by adding your first entity to your collection.'}
         </p>
       </div>
     );
   }
 
   // Grid view
-  if (viewMode === "grid") {
+  if (viewMode === 'grid') {
     return (
       <ScrollArea className="h-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {entities.map(renderEntityCard)}
         </div>
       </ScrollArea>
@@ -225,14 +237,14 @@ export function EntityList({
     <ScrollArea className="h-full">
       <div className="border-t">
         {/* Header row */}
-        <div className="flex items-center gap-4 px-4 py-2 border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-          {selectable && <div className="flex-shrink-0 w-4" />}
+        <div className="flex items-center gap-4 border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+          {selectable && <div className="w-4 flex-shrink-0" />}
           <div className="w-48">Name</div>
           <div className="w-24">Type</div>
           <div className="flex-1">Description</div>
           <div className="w-40">Tags</div>
           <div className="w-24">Status</div>
-          <div className="flex-shrink-0 w-8">Actions</div>
+          <div className="w-8 flex-shrink-0">Actions</div>
         </div>
 
         {/* Entity rows */}

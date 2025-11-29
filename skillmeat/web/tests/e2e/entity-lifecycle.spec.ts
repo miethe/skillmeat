@@ -9,42 +9,44 @@
  * 5. Project Settings
  */
 
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from '@playwright/test';
 
-test.describe("Entity Lifecycle Management E2E", () => {
+test.describe('Entity Lifecycle Management E2E', () => {
   /**
    * Helper to wait for loading states to complete
    */
   async function waitForPageReady(page: Page) {
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState('networkidle');
     // Wait for any loading spinners to disappear
-    await page.waitForSelector('[class*="animate-spin"]', {
-      state: "hidden",
-      timeout: 10000,
-    }).catch(() => {
-      // Ignore if no spinner found
-    });
+    await page
+      .waitForSelector('[class*="animate-spin"]', {
+        state: 'hidden',
+        timeout: 10000,
+      })
+      .catch(() => {
+        // Ignore if no spinner found
+      });
   }
 
   /**
    * Critical Path 1: Create Project and Add Entity
    */
-  test.describe("Create Project and Add Entity", () => {
-    test("successfully creates project and adds entity from collection", async ({ page }) => {
+  test.describe('Create Project and Add Entity', () => {
+    test('successfully creates project and adds entity from collection', async ({ page }) => {
       // Navigate to projects page
-      await page.goto("/projects");
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       // Verify we're on the projects page
-      await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
 
       // Click "New Project" button
-      const newProjectButton = page.getByRole("button", { name: /New Project/i });
+      const newProjectButton = page.getByRole('button', { name: /New Project/i });
       await newProjectButton.click();
 
       // Verify dialog opened
-      await expect(page.getByRole("dialog")).toBeVisible();
-      await expect(page.getByText("Create New Project")).toBeVisible();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByText('Create New Project')).toBeVisible();
 
       // Fill in project details
       const projectName = `test-project-${Date.now()}`;
@@ -52,10 +54,10 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
       await page.fill('input[id="name"]', projectName);
       await page.fill('input[id="path"]', projectPath);
-      await page.fill('textarea[id="description"]', "Test project for E2E testing");
+      await page.fill('textarea[id="description"]', 'Test project for E2E testing');
 
       // Submit form
-      const createButton = page.getByRole("button", { name: "Create Project" });
+      const createButton = page.getByRole('button', { name: 'Create Project' });
       await createButton.click();
 
       // Wait for project creation and toast
@@ -70,7 +72,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
       await projectCard.click();
 
       // Navigate to manage entities page
-      const manageButton = page.getByRole("button", { name: /Manage Entities/i }).first();
+      const manageButton = page.getByRole('button', { name: /Manage Entities/i }).first();
       if (await manageButton.isVisible()) {
         await manageButton.click();
       } else {
@@ -82,22 +84,22 @@ test.describe("Entity Lifecycle Management E2E", () => {
       await waitForPageReady(page);
 
       // Verify we're on the manage page
-      await expect(page.getByText("Project Entity Management")).toBeVisible();
+      await expect(page.getByText('Project Entity Management')).toBeVisible();
 
       // Click "Add from Collection" button
-      const addFromCollectionButton = page.getByRole("button", {
-        name: /Add from Collection/i
+      const addFromCollectionButton = page.getByRole('button', {
+        name: /Add from Collection/i,
       });
       await addFromCollectionButton.click();
 
       // Verify deploy dialog opened
-      await expect(page.getByRole("dialog")).toBeVisible();
+      await expect(page.getByRole('dialog')).toBeVisible();
       await page.waitForTimeout(500);
 
       // If there are entities in the collection, select one
       // This test assumes there's at least one entity available
       const entityCheckboxes = page.locator('input[type="checkbox"]').filter({
-        hasNot: page.locator('[disabled]')
+        hasNot: page.locator('[disabled]'),
       });
 
       const checkboxCount = await entityCheckboxes.count();
@@ -106,7 +108,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await entityCheckboxes.first().click();
 
         // Click deploy button
-        const deployButton = page.getByRole("button", { name: /Deploy Selected/i });
+        const deployButton = page.getByRole('button', { name: /Deploy Selected/i });
         await deployButton.click();
 
         // Wait for deployment to complete
@@ -119,32 +121,32 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("validates project creation form", async ({ page }) => {
-      await page.goto("/projects");
+    test('validates project creation form', async ({ page }) => {
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       // Open create dialog
-      await page.getByRole("button", { name: /New Project/i }).click();
-      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.getByRole('button', { name: /New Project/i }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
 
       // Try to submit with empty name
-      const createButton = page.getByRole("button", { name: "Create Project" });
+      const createButton = page.getByRole('button', { name: 'Create Project' });
       await createButton.click();
 
       // Verify validation errors
       await expect(page.getByText(/required/i)).toBeVisible();
 
       // Fill invalid name (with spaces)
-      await page.fill('input[id="name"]', "invalid name with spaces");
-      await page.fill('input[id="path"]', "/tmp/test");
+      await page.fill('input[id="name"]', 'invalid name with spaces');
+      await page.fill('input[id="path"]', '/tmp/test');
       await createButton.click();
 
       // Verify validation error for invalid characters
       await expect(page.getByText(/letters, numbers, hyphens/i)).toBeVisible();
 
       // Fill invalid path (relative)
-      await page.fill('input[id="name"]', "valid-name");
-      await page.fill('input[id="path"]', "relative/path");
+      await page.fill('input[id="name"]', 'valid-name');
+      await page.fill('input[id="path"]', 'relative/path');
       await createButton.click();
 
       // Verify path validation error
@@ -155,10 +157,10 @@ test.describe("Entity Lifecycle Management E2E", () => {
   /**
    * Critical Path 2: Entity Merge Workflow
    */
-  test.describe("Entity Merge Workflow", () => {
-    test("completes merge workflow through all steps", async ({ page }) => {
+  test.describe('Entity Merge Workflow', () => {
+    test('completes merge workflow through all steps', async ({ page }) => {
       // Navigate to manage page
-      await page.goto("/manage");
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Look for an entity with changes (modified status)
@@ -175,23 +177,23 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await expect(page.getByText(/Entity Details/i)).toBeVisible();
 
         // Click sync/merge button
-        const syncButton = page.getByRole("button", { name: /Sync|Merge/i }).first();
+        const syncButton = page.getByRole('button', { name: /Sync|Merge/i }).first();
         await syncButton.click();
 
         // Step 1: Preview
-        await expect(page.getByText("Preview Changes")).toBeVisible();
+        await expect(page.getByText('Preview Changes')).toBeVisible();
         await expect(page.getByText(/Summary of Changes/i)).toBeVisible();
 
         // Verify stepper shows preview as active
         await expect(page.locator('text=Preview').locator('..')).toHaveClass(/active|primary/);
 
         // Click continue
-        const continueButton = page.getByRole("button", { name: "Continue" });
+        const continueButton = page.getByRole('button', { name: 'Continue' });
         await continueButton.click();
 
         // Step 2: Resolve conflicts (if any)
         // Check if we're on resolve step or skipped to apply
-        const isResolveStep = await page.getByText("Resolve Conflicts").isVisible();
+        const isResolveStep = await page.getByText('Resolve Conflicts').isVisible();
 
         if (isResolveStep) {
           // Select resolution strategy for conflicts
@@ -200,25 +202,27 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
           if (radioCount > 0) {
             // Select "Keep Collection" strategy
-            const collectionRadio = page.getByRole("radio", {
-              name: /Collection|theirs/i
-            }).first();
+            const collectionRadio = page
+              .getByRole('radio', {
+                name: /Collection|theirs/i,
+              })
+              .first();
             await collectionRadio.click();
           }
 
           // Continue to apply step
-          await page.getByRole("button", { name: "Continue" }).click();
+          await page.getByRole('button', { name: 'Continue' }).click();
         }
 
         // Step 3: Apply
-        await expect(page.getByText("Apply Changes")).toBeVisible();
+        await expect(page.getByText('Apply Changes')).toBeVisible();
         await expect(page.getByText(/Summary/i)).toBeVisible();
 
         // Verify conflict resolutions are shown
         await expect(page.getByText(/Conflict Resolutions|Direction/i)).toBeVisible();
 
         // Click apply
-        const applyButton = page.getByRole("button", { name: "Apply Changes" });
+        const applyButton = page.getByRole('button', { name: 'Apply Changes' });
         await applyButton.click();
 
         // Wait for progress indicator
@@ -226,7 +230,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
         // Wait for completion
         await expect(page.getByText(/Success|Complete/i)).toBeVisible({
-          timeout: 15000
+          timeout: 15000,
         });
 
         // Verify success message
@@ -234,8 +238,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("allows navigation back through workflow steps", async ({ page }) => {
-      await page.goto("/manage");
+    test('allows navigation back through workflow steps', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Find a modified entity
@@ -246,25 +250,25 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await modifiedEntity.click();
 
         // Open merge workflow
-        const syncButton = page.getByRole("button", { name: /Sync|Merge/i }).first();
+        const syncButton = page.getByRole('button', { name: /Sync|Merge/i }).first();
         await syncButton.click();
 
         // Wait for preview step
-        await expect(page.getByText("Preview Changes")).toBeVisible();
+        await expect(page.getByText('Preview Changes')).toBeVisible();
 
         // Continue to next step
-        await page.getByRole("button", { name: "Continue" }).click();
+        await page.getByRole('button', { name: 'Continue' }).click();
 
         // Check if on resolve or apply step
-        const isResolveStep = await page.getByText("Resolve Conflicts").isVisible();
+        const isResolveStep = await page.getByText('Resolve Conflicts').isVisible();
 
         if (isResolveStep) {
           // Click back button
-          const backButton = page.getByRole("button", { name: "Back" });
+          const backButton = page.getByRole('button', { name: 'Back' });
           await backButton.click();
 
           // Verify we're back on preview
-          await expect(page.getByText("Preview Changes")).toBeVisible();
+          await expect(page.getByText('Preview Changes')).toBeVisible();
         }
       }
     });
@@ -273,9 +277,9 @@ test.describe("Entity Lifecycle Management E2E", () => {
   /**
    * Critical Path 3: Version Rollback
    */
-  test.describe("Version Rollback", () => {
-    test("successfully rolls back entity to collection version", async ({ page }) => {
-      await page.goto("/manage");
+  test.describe('Version Rollback', () => {
+    test('successfully rolls back entity to collection version', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Find a modified entity
@@ -287,13 +291,13 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await modifiedEntity.click();
 
         // Find and click rollback button
-        const rollbackButton = page.getByRole("button", { name: /Rollback/i });
+        const rollbackButton = page.getByRole('button', { name: /Rollback/i });
 
         if (await rollbackButton.isVisible()) {
           await rollbackButton.click();
 
           // Verify rollback dialog opened
-          await expect(page.getByRole("dialog")).toBeVisible();
+          await expect(page.getByRole('dialog')).toBeVisible();
           await expect(page.getByText(/Rollback to Collection Version/i)).toBeVisible();
 
           // Verify warning is shown
@@ -305,14 +309,14 @@ test.describe("Entity Lifecycle Management E2E", () => {
           await expect(page.getByText(/Target.*Collection/i)).toBeVisible();
 
           // Click rollback button
-          const confirmButton = page.getByRole("button", { name: "Rollback" });
+          const confirmButton = page.getByRole('button', { name: 'Rollback' });
           await confirmButton.click();
 
           // Wait for rollback to complete
           await page.waitForTimeout(1000);
 
           // Verify dialog closed
-          await expect(page.getByRole("dialog")).not.toBeVisible();
+          await expect(page.getByRole('dialog')).not.toBeVisible();
 
           // Verify entity status changed or success message
           await page.waitForTimeout(500);
@@ -320,8 +324,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("can cancel rollback dialog", async ({ page }) => {
-      await page.goto("/manage");
+    test('can cancel rollback dialog', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       const modifiedEntity = page.locator('[data-status="modified"]').first();
@@ -330,20 +334,20 @@ test.describe("Entity Lifecycle Management E2E", () => {
       if (hasModifiedEntity) {
         await modifiedEntity.click();
 
-        const rollbackButton = page.getByRole("button", { name: /Rollback/i });
+        const rollbackButton = page.getByRole('button', { name: /Rollback/i });
 
         if (await rollbackButton.isVisible()) {
           await rollbackButton.click();
 
           // Wait for dialog
-          await expect(page.getByRole("dialog")).toBeVisible();
+          await expect(page.getByRole('dialog')).toBeVisible();
 
           // Click cancel
-          const cancelButton = page.getByRole("button", { name: "Cancel" });
+          const cancelButton = page.getByRole('button', { name: 'Cancel' });
           await cancelButton.click();
 
           // Verify dialog closed
-          await expect(page.getByRole("dialog")).not.toBeVisible();
+          await expect(page.getByRole('dialog')).not.toBeVisible();
         }
       }
     });
@@ -352,9 +356,9 @@ test.describe("Entity Lifecycle Management E2E", () => {
   /**
    * Critical Path 4: Entity Search and Filter
    */
-  test.describe("Entity Search and Filter", () => {
-    test("filters entities by search query", async ({ page }) => {
-      await page.goto("/manage");
+  test.describe('Entity Search and Filter', () => {
+    test('filters entities by search query', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Get initial entity count
@@ -362,7 +366,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
       // Find search input
       const searchInput = page.getByPlaceholder(/Search/i);
-      await searchInput.fill("test");
+      await searchInput.fill('test');
 
       // Wait for debounce
       await page.waitForTimeout(600);
@@ -380,12 +384,12 @@ test.describe("Entity Lifecycle Management E2E", () => {
       await page.waitForTimeout(600);
     });
 
-    test("filters entities by type", async ({ page }) => {
-      await page.goto("/manage");
+    test('filters entities by type', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Click on different entity type tabs
-      const skillTab = page.getByRole("tab", { name: /Skill/i });
+      const skillTab = page.getByRole('tab', { name: /Skill/i });
       if (await skillTab.isVisible()) {
         await skillTab.click();
         await page.waitForTimeout(300);
@@ -394,7 +398,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await expect(page).toHaveURL(/type=skill/);
       }
 
-      const commandTab = page.getByRole("tab", { name: /Command/i });
+      const commandTab = page.getByRole('tab', { name: /Command/i });
       if (await commandTab.isVisible()) {
         await commandTab.click();
         await page.waitForTimeout(300);
@@ -403,7 +407,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await expect(page).toHaveURL(/type=command/);
       }
 
-      const agentTab = page.getByRole("tab", { name: /Agent/i });
+      const agentTab = page.getByRole('tab', { name: /Agent/i });
       if (await agentTab.isVisible()) {
         await agentTab.click();
         await page.waitForTimeout(300);
@@ -413,8 +417,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("filters entities by status", async ({ page }) => {
-      await page.goto("/manage");
+    test('filters entities by status', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Look for status filter dropdown or radio group
@@ -425,7 +429,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await statusFilter.click();
 
         // Select "Modified" status
-        const modifiedOption = page.getByRole("option", { name: /Modified/i });
+        const modifiedOption = page.getByRole('option', { name: /Modified/i });
         if (await modifiedOption.isVisible()) {
           await modifiedOption.click();
           await page.waitForTimeout(300);
@@ -442,17 +446,17 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("combines multiple filters", async ({ page }) => {
-      await page.goto("/manage");
+    test('combines multiple filters', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Apply search filter
       const searchInput = page.getByPlaceholder(/Search/i);
-      await searchInput.fill("skill");
+      await searchInput.fill('skill');
       await page.waitForTimeout(600);
 
       // Apply type filter
-      const skillTab = page.getByRole("tab", { name: /Skill/i });
+      const skillTab = page.getByRole('tab', { name: /Skill/i });
       if (await skillTab.isVisible()) {
         await skillTab.click();
         await page.waitForTimeout(300);
@@ -467,13 +471,13 @@ test.describe("Entity Lifecycle Management E2E", () => {
       await page.waitForTimeout(600);
     });
 
-    test("shows empty state when no results match filters", async ({ page }) => {
-      await page.goto("/manage");
+    test('shows empty state when no results match filters', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Search for something that won't match
       const searchInput = page.getByPlaceholder(/Search/i);
-      await searchInput.fill("xyzabc123nonexistent");
+      await searchInput.fill('xyzabc123nonexistent');
       await page.waitForTimeout(600);
 
       // Verify empty state
@@ -484,10 +488,10 @@ test.describe("Entity Lifecycle Management E2E", () => {
   /**
    * Critical Path 5: Project Settings
    */
-  test.describe("Project Settings", () => {
-    test("successfully updates project settings", async ({ page }) => {
+  test.describe('Project Settings', () => {
+    test('successfully updates project settings', async ({ page }) => {
       // First, create or navigate to a project
-      await page.goto("/projects");
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       // Click on first project in list
@@ -498,7 +502,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await firstProject.click();
 
         // Navigate to settings
-        const settingsButton = page.getByRole("button", { name: /Settings/i });
+        const settingsButton = page.getByRole('button', { name: /Settings/i });
         if (await settingsButton.isVisible()) {
           await settingsButton.click();
         } else {
@@ -511,7 +515,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await waitForPageReady(page);
 
         // Verify we're on settings page
-        await expect(page.getByText("Project Settings")).toBeVisible();
+        await expect(page.getByText('Project Settings')).toBeVisible();
 
         // Get current name
         const nameInput = page.locator('input[id="settings-name"]');
@@ -524,10 +528,10 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
         // Update description
         const descriptionInput = page.locator('textarea[id="settings-description"]');
-        await descriptionInput.fill("Updated description for E2E test");
+        await descriptionInput.fill('Updated description for E2E test');
 
         // Save changes
-        const saveButton = page.getByRole("button", { name: /Save Changes/i });
+        const saveButton = page.getByRole('button', { name: /Save Changes/i });
         await expect(saveButton).toBeEnabled();
         await saveButton.click();
 
@@ -539,8 +543,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("validates project settings form", async ({ page }) => {
-      await page.goto("/projects");
+    test('validates project settings form', async ({ page }) => {
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       const firstProject = page.locator('[class*="cursor-pointer"]').first();
@@ -563,14 +567,14 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await nameInput.clear();
 
         // Try to save
-        const saveButton = page.getByRole("button", { name: /Save Changes/i });
+        const saveButton = page.getByRole('button', { name: /Save Changes/i });
         await saveButton.click();
 
         // Verify validation error
         await expect(page.getByText(/required/i)).toBeVisible();
 
         // Fill invalid name
-        await nameInput.fill("invalid name with spaces");
+        await nameInput.fill('invalid name with spaces');
         await saveButton.click();
 
         // Verify validation error
@@ -578,8 +582,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
       }
     });
 
-    test("displays project statistics correctly", async ({ page }) => {
-      await page.goto("/projects");
+    test('displays project statistics correctly', async ({ page }) => {
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       const firstProject = page.locator('[class*="cursor-pointer"]').first();
@@ -597,19 +601,22 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await waitForPageReady(page);
 
         // Verify statistics section exists
-        await expect(page.getByText("Project Statistics")).toBeVisible();
+        await expect(page.getByText('Project Statistics')).toBeVisible();
         await expect(page.getByText(/Total Deployments/i)).toBeVisible();
         await expect(page.getByText(/Modified Artifacts/i)).toBeVisible();
         await expect(page.getByText(/Last Deployment/i)).toBeVisible();
 
         // Verify statistics have values
-        const deploymentCount = page.locator('text=/Total Deployments/i').locator('..').locator('text=/\\d+/');
+        const deploymentCount = page
+          .locator('text=/Total Deployments/i')
+          .locator('..')
+          .locator('text=/\\d+/');
         await expect(deploymentCount.first()).toBeVisible();
       }
     });
 
-    test("shows delete project option in danger zone", async ({ page }) => {
-      await page.goto("/projects");
+    test('shows delete project option in danger zone', async ({ page }) => {
+      await page.goto('/projects');
       await waitForPageReady(page);
 
       const firstProject = page.locator('[class*="cursor-pointer"]').first();
@@ -627,8 +634,8 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await waitForPageReady(page);
 
         // Verify danger zone exists
-        await expect(page.getByText("Danger Zone")).toBeVisible();
-        await expect(page.getByRole("button", { name: /Delete Project/i })).toBeVisible();
+        await expect(page.getByText('Danger Zone')).toBeVisible();
+        await expect(page.getByRole('button', { name: /Delete Project/i })).toBeVisible();
 
         // Verify warning text
         await expect(page.getByText(/cannot be undone/i)).toBeVisible();
@@ -639,19 +646,19 @@ test.describe("Entity Lifecycle Management E2E", () => {
   /**
    * Additional integration tests
    */
-  test.describe("Integration Scenarios", () => {
-    test("switches between grid and list view modes", async ({ page }) => {
-      await page.goto("/manage");
+  test.describe('Integration Scenarios', () => {
+    test('switches between grid and list view modes', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Find view mode toggle
-      const viewToggle = page.getByRole("button", { name: /Grid|List/i }).first();
+      const viewToggle = page.getByRole('button', { name: /Grid|List/i }).first();
 
       if (await viewToggle.isVisible()) {
         await viewToggle.click();
 
         // Select list view
-        const listOption = page.getByRole("menuitemradio", { name: /List/i });
+        const listOption = page.getByRole('menuitemradio', { name: /List/i });
         if (await listOption.isVisible()) {
           await listOption.click();
           await page.waitForTimeout(300);
@@ -662,15 +669,15 @@ test.describe("Entity Lifecycle Management E2E", () => {
 
         // Switch back to grid
         await viewToggle.click();
-        const gridOption = page.getByRole("menuitemradio", { name: /Grid/i });
+        const gridOption = page.getByRole('menuitemradio', { name: /Grid/i });
         if (await gridOption.isVisible()) {
           await gridOption.click();
         }
       }
     });
 
-    test("entity detail panel opens and closes", async ({ page }) => {
-      await page.goto("/manage");
+    test('entity detail panel opens and closes', async ({ page }) => {
+      await page.goto('/manage');
       await waitForPageReady(page);
 
       // Click on first entity
@@ -684,7 +691,7 @@ test.describe("Entity Lifecycle Management E2E", () => {
         await expect(page.getByText(/Entity Details|Details/i)).toBeVisible();
 
         // Close panel
-        const closeButton = page.getByRole("button", { name: /Close/i }).first();
+        const closeButton = page.getByRole('button', { name: /Close/i }).first();
         if (await closeButton.isVisible()) {
           await closeButton.click();
 

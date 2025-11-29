@@ -31,8 +31,8 @@ export function AnalyticsGrid({ enableLiveUpdates = true }: AnalyticsGridProps) 
           <div className="flex items-center gap-2 text-sm">
             <div
               className={cn(
-                'w-2 h-2 rounded-full transition-colors',
-                status.isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                'h-2 w-2 rounded-full transition-colors',
+                status.isConnected ? 'animate-pulse bg-green-500' : 'bg-gray-400'
               )}
               data-testid="status-dot"
               aria-label={status.isConnected ? 'Connected' : 'Disconnected'}
@@ -47,7 +47,10 @@ export function AnalyticsGrid({ enableLiveUpdates = true }: AnalyticsGridProps) 
             )}
           </div>
           {status.eventCount > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="event-count">
+            <div
+              className="flex items-center gap-1 text-xs text-muted-foreground"
+              data-testid="event-count"
+            >
               <Activity className="h-3 w-3" aria-hidden="true" />
               <span>{status.eventCount} updates</span>
             </div>

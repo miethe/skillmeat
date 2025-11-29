@@ -5,7 +5,10 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Grid3x3, List, Loader2, ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { EntityLifecycleProvider, useEntityLifecycle } from '@/components/entity/EntityLifecycleProvider';
+import {
+  EntityLifecycleProvider,
+  useEntityLifecycle,
+} from '@/components/entity/EntityLifecycleProvider';
 import { EntityList } from '@/components/entity/entity-list';
 import { EntityForm } from '@/components/entity/entity-form';
 import { EntityTabs } from '@/app/manage/components/entity-tabs';
@@ -63,11 +66,10 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
   }, [activeEntityType, setTypeFilter]);
 
   // Filter entities by tags client-side
-  const filteredEntities = tagFilter.length > 0
-    ? entities.filter((entity) =>
-        tagFilter.some((tag) => entity.tags?.includes(tag))
-      )
-    : entities;
+  const filteredEntities =
+    tagFilter.length > 0
+      ? entities.filter((entity) => tagFilter.some((tag) => entity.tags?.includes(tag)))
+      : entities;
 
   // Memoize event handlers to prevent EntityList re-renders
   const handleEntityClick = useCallback((entity: Entity) => {
@@ -79,16 +81,19 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
     setEditingEntity(entity);
   }, []);
 
-  const handleDelete = useCallback(async (entity: Entity) => {
-    if (confirm(`Are you sure you want to remove ${entity.name} from this project?`)) {
-      try {
-        await deleteEntity(entity.id);
-      } catch (error) {
-        console.error('Delete failed:', error);
-        alert('Failed to remove entity from project');
+  const handleDelete = useCallback(
+    async (entity: Entity) => {
+      if (confirm(`Are you sure you want to remove ${entity.name} from this project?`)) {
+        try {
+          await deleteEntity(entity.id);
+        } catch (error) {
+          console.error('Delete failed:', error);
+          alert('Failed to remove entity from project');
+        }
       }
-    }
-  }, [deleteEntity]);
+    },
+    [deleteEntity]
+  );
 
   const handleSync = useCallback(async (entity: Entity) => {
     setPullDialogEntity(entity);
@@ -106,25 +111,17 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
   }, []);
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-screen flex-col">
       {/* Header */}
       <div className="border-b p-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/projects/${projectId}`)}
-          >
+        <div className="mb-4 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push(`/projects/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold">Project Entity Management</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage entities deployed to this project
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 font-mono">
-              {projectPath}
-            </p>
+            <p className="mt-1 text-muted-foreground">Manage entities deployed to this project</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{projectPath}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Refresh button */}
@@ -135,24 +132,31 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
               disabled={isRefetching}
               title="Refresh entities"
             >
-              <RefreshCw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
             </Button>
 
             {/* View mode toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  {viewMode === 'grid' ? <Grid3x3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                  {viewMode === 'grid' ? (
+                    <Grid3x3 className="h-4 w-4" />
+                  ) : (
+                    <List className="h-4 w-4" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'list')}>
+                <DropdownMenuRadioGroup
+                  value={viewMode}
+                  onValueChange={(v) => setViewMode(v as 'grid' | 'list')}
+                >
                   <DropdownMenuRadioItem value="grid">
-                    <Grid3x3 className="h-4 w-4 mr-2" />
+                    <Grid3x3 className="mr-2 h-4 w-4" />
                     Grid
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="list">
-                    <List className="h-4 w-4 mr-2" />
+                    <List className="mr-2 h-4 w-4" />
                     List
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -161,7 +165,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
 
             {/* Deploy from Collection button */}
             <Button onClick={() => setDeployDialogOpen(true)}>
-              <Package className="h-4 w-4 mr-2" />
+              <Package className="mr-2 h-4 w-4" />
               Add from Collection
             </Button>
           </div>
@@ -171,7 +175,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
         <div className="mt-4">
           <EntityTabs>
             {(entityType) => (
-              <div className="flex flex-col h-full">
+              <div className="flex h-full flex-col">
                 {/* Filters */}
                 <EntityFilters
                   searchQuery={searchQuery}
@@ -183,7 +187,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
                 />
 
                 {/* Entity count */}
-                <div className="px-4 py-2 text-sm text-muted-foreground border-b">
+                <div className="border-b px-4 py-2 text-sm text-muted-foreground">
                   {isLoading ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -253,7 +257,7 @@ function ProjectManagePageContent({ projectPath, projectId }: ProjectManagePageC
       {/* Edit Dialog */}
       {editingEntity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-6 shadow-lg">
             <EntityForm
               mode="edit"
               entity={editingEntity}
@@ -276,7 +280,7 @@ export default function ProjectManagePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
@@ -284,9 +288,9 @@ export default function ProjectManagePage() {
 
   if (error || !project) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
+          <h2 className="mb-2 text-2xl font-bold">Project Not Found</h2>
           <p className="text-muted-foreground">
             The project you're looking for doesn't exist or couldn't be loaded.
           </p>
@@ -300,11 +304,13 @@ export default function ProjectManagePage() {
 
   return (
     <EntityLifecycleProvider mode="project" projectPath={projectPath}>
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-screen">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        }
+      >
         <ProjectManagePageContent projectPath={projectPath} projectId={projectId} />
       </Suspense>
     </EntityLifecycleProvider>

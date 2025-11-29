@@ -40,7 +40,7 @@ async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
       };
     }
     // eslint-disable-next-line no-console
-    console.error("[analytics] Failed to fetch summary from API", error);
+    console.error('[analytics] Failed to fetch summary from API', error);
     throw error;
   }
 }
@@ -48,19 +48,14 @@ async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
 /**
  * Fetch top artifacts
  */
-async function fetchTopArtifacts(
-  limit = 10,
-  artifactType?: string
-): Promise<TopArtifactsResponse> {
+async function fetchTopArtifacts(limit = 10, artifactType?: string): Promise<TopArtifactsResponse> {
   const params = new URLSearchParams({
     limit: limit.toString(),
     ...(artifactType && { artifact_type: artifactType }),
   });
 
   try {
-    return await apiRequest<TopArtifactsResponse>(
-      `/analytics/top-artifacts?${params.toString()}`
-    );
+    return await apiRequest<TopArtifactsResponse>(`/analytics/top-artifacts?${params.toString()}`);
   } catch (error) {
     if (USE_MOCKS && error instanceof ApiError && (error.status === 404 || error.status === 503)) {
       return {

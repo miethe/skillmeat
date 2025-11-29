@@ -4,13 +4,13 @@
  * Types for exporting, importing, and sharing artifact bundles
  */
 
-import type { Artifact } from "./artifact";
+import type { Artifact } from './artifact';
 
-export type BundleFormat = "zip" | "tar.gz";
-export type CompressionLevel = "none" | "fast" | "balanced" | "best";
-export type ConflictStrategy = "merge" | "fork" | "skip" | "overwrite";
-export type PermissionLevel = "viewer" | "importer" | "publisher" | "admin";
-export type VaultProvider = "local" | "github" | "s3" | "gdrive";
+export type BundleFormat = 'zip' | 'tar.gz';
+export type CompressionLevel = 'none' | 'fast' | 'balanced' | 'best';
+export type ConflictStrategy = 'merge' | 'fork' | 'skip' | 'overwrite';
+export type PermissionLevel = 'viewer' | 'importer' | 'publisher' | 'admin';
+export type VaultProvider = 'local' | 'github' | 's3' | 'gdrive';
 
 export interface BundleMetadata {
   name: string;
@@ -90,7 +90,7 @@ export interface ConflictInfo {
   artifactName: string;
   existingVersion: string;
   incomingVersion: string;
-  conflictType: "version" | "content" | "metadata";
+  conflictType: 'version' | 'content' | 'metadata';
   suggestedStrategy: ConflictStrategy;
 }
 
@@ -108,7 +108,7 @@ export interface ImportError {
   artifactId: string;
   artifactName: string;
   error: string;
-  severity: "warning" | "error";
+  severity: 'warning' | 'error';
 }
 
 export interface ExportRequest {
@@ -123,9 +123,9 @@ export interface ImportRequest {
 }
 
 export type BundleSource =
-  | { type: "file"; file: File }
-  | { type: "url"; url: string }
-  | { type: "vault"; vault: VaultConfig; path: string };
+  | { type: 'file'; file: File }
+  | { type: 'url'; url: string }
+  | { type: 'vault'; vault: VaultConfig; path: string };
 
 export interface BundleListItem {
   id: string;

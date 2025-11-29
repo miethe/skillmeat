@@ -3,6 +3,7 @@
 ## MODULE_NOT_FOUND Errors
 
 ### Symptoms
+
 ```
 Error: Cannot find module '/path/to/node_modules/.pnpm/next@15.5.6.../next/dist/cli/next-start.js'
   at __webpack_require__.f.require (.next/server/webpack-runtime.js:190:28)
@@ -10,13 +11,16 @@ Error: Cannot find module '/path/to/node_modules/.pnpm/next@15.5.6.../next/dist/
 ```
 
 ### Root Cause
+
 This error occurs when Next.js build caches become corrupted or out of sync, typically when:
+
 1. **Mixed development and production builds** - Both dev and prod webpack caches exist simultaneously
 2. **Stale standalone builds** - The `.next/standalone` directory has outdated dependencies
 3. **Dependency changes** - `node_modules` updated but `.next/cache` wasn't cleared
 4. **Interrupted builds** - Build process was terminated mid-execution
 
 ### Quick Fix
+
 ```bash
 # Option 1: Clean build cache only
 pnpm clean
@@ -31,6 +35,7 @@ pnpm clean:all
 ### Prevention
 
 #### Use the right commands
+
 ```bash
 # Development
 pnpm dev              # Always use for development
@@ -41,18 +46,23 @@ pnpm start            # Start production server
 ```
 
 #### Pre-build validation
+
 Run the validation script before building:
+
 ```bash
 ./scripts/validate-build.sh
 ```
 
 This checks for:
+
 - Conflicting development/production caches
 - Stale standalone builds
 - Missing dependencies
 
 #### CI/CD Best Practices
+
 Always clean before production builds:
+
 ```yaml
 # In your CI/CD pipeline
 - run: pnpm clean
@@ -61,13 +71,13 @@ Always clean before production builds:
 
 ### Available Scripts
 
-| Script | Purpose | When to Use |
-|--------|---------|-------------|
-| `pnpm clean` | Remove `.next` directory | After dependency changes or when errors occur |
-| `pnpm clean:cache` | Remove only webpack cache | When you want to keep type definitions |
-| `pnpm clean:all` | Remove `.next` and `node_modules`, reinstall | Nuclear option for persistent issues |
-| `pnpm build:fresh` | Clean and build | Before production deploys |
-| `./scripts/validate-build.sh` | Check build environment | Before any build to catch issues early |
+| Script                        | Purpose                                      | When to Use                                   |
+| ----------------------------- | -------------------------------------------- | --------------------------------------------- |
+| `pnpm clean`                  | Remove `.next` directory                     | After dependency changes or when errors occur |
+| `pnpm clean:cache`            | Remove only webpack cache                    | When you want to keep type definitions        |
+| `pnpm clean:all`              | Remove `.next` and `node_modules`, reinstall | Nuclear option for persistent issues          |
+| `pnpm build:fresh`            | Clean and build                              | Before production deploys                     |
+| `./scripts/validate-build.sh` | Check build environment                      | Before any build to catch issues early        |
 
 ### Understanding the Cache Structure
 
@@ -89,16 +99,19 @@ Always clean before production builds:
 ### Debugging Steps
 
 1. **Check what's in your cache**:
+
    ```bash
    ls -la .next/cache/webpack/
    ```
 
 2. **Check cache size** (large = potential issues):
+
    ```bash
    du -sh .next/cache
    ```
 
 3. **Identify mixed caches**:
+
    ```bash
    # If both exist, you have a problem:
    ls .next/cache/webpack/client-development
@@ -124,6 +137,7 @@ Always clean before production builds:
 - **After switching branches**: `pnpm clean`
 
 ### Related Issues
+
 - Next.js standalone builds: https://nextjs.org/docs/app/api-reference/next-config-js/output
 - Webpack caching: https://webpack.js.org/configuration/cache/
 - pnpm store management: https://pnpm.io/cli/store

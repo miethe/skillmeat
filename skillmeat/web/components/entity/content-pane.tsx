@@ -35,7 +35,19 @@ export interface ContentPaneProps {
  * Check if a file is editable based on its extension
  */
 function isEditableFile(path: string): boolean {
-  const editableExtensions = ['.md', '.txt', '.json', '.ts', '.tsx', '.js', '.jsx', '.py', '.yml', '.yaml', '.toml'];
+  const editableExtensions = [
+    '.md',
+    '.txt',
+    '.json',
+    '.ts',
+    '.tsx',
+    '.js',
+    '.jsx',
+    '.py',
+    '.yml',
+    '.yaml',
+    '.toml',
+  ];
   return editableExtensions.some((ext) => path.toLowerCase().endsWith(ext));
 }
 
@@ -59,13 +71,17 @@ function pathToBreadcrumbs(path: string): string[] {
 
 function ContentPaneSkeleton() {
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full flex-col">
       <div className="border-b p-4">
         <Skeleton className="h-5 w-48" />
       </div>
-      <div className="flex-1 p-4 space-y-2">
+      <div className="flex-1 space-y-2 p-4">
         {[...Array(20)].map((_, i) => (
-          <Skeleton key={i} className="h-4 w-full" style={{ width: `${60 + Math.random() * 40}%` }} />
+          <Skeleton
+            key={i}
+            className="h-4 w-full"
+            style={{ width: `${60 + Math.random() * 40}%` }}
+          />
         ))}
       </div>
     </div>
@@ -78,10 +94,10 @@ function ContentPaneSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center py-12">
-      <FileText className="h-12 w-12 text-muted-foreground opacity-50 mb-4" />
-      <h3 className="text-sm font-medium text-muted-foreground mb-1">No file selected</h3>
-      <p className="text-xs text-muted-foreground max-w-sm">
+    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+      <FileText className="mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+      <h3 className="mb-1 text-sm font-medium text-muted-foreground">No file selected</h3>
+      <p className="max-w-sm text-xs text-muted-foreground">
         Select a file from the tree on the left to view its contents.
       </p>
     </div>
@@ -98,12 +114,10 @@ interface ErrorStateProps {
 
 function ErrorState({ error }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-4">
+    <div className="flex h-full flex-col items-center justify-center p-4">
       <Alert variant="destructive" className="max-w-md">
         <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="text-sm">
-          {error}
-        </AlertDescription>
+        <AlertDescription className="text-sm">{error}</AlertDescription>
       </Alert>
     </div>
   );
@@ -125,11 +139,7 @@ function Breadcrumb({ path }: BreadcrumbProps) {
       {segments.map((segment, index) => (
         <div key={index} className="flex items-center gap-1">
           {index > 0 && <ChevronRight className="h-3 w-3" />}
-          <span
-            className={cn(
-              index === segments.length - 1 && 'text-foreground font-medium'
-            )}
-          >
+          <span className={cn(index === segments.length - 1 && 'font-medium text-foreground')}>
             {segment}
           </span>
         </div>
@@ -148,7 +158,7 @@ interface LineNumbersProps {
 
 function LineNumbers({ lineCount }: LineNumbersProps) {
   return (
-    <div className="select-none text-right pr-4 text-xs text-muted-foreground font-mono">
+    <div className="select-none pr-4 text-right font-mono text-xs text-muted-foreground">
       {[...Array(lineCount)].map((_, i) => (
         <div key={i} className="leading-6">
           {i + 1}
@@ -173,7 +183,7 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
   return (
     <div className="flex">
       {showLineNumbers && <LineNumbers lineCount={lines.length} />}
-      <pre className="flex-1 text-xs font-mono leading-6 whitespace-pre-wrap break-words">
+      <pre className="flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-6">
         {content}
       </pre>
     </div>
@@ -276,9 +286,9 @@ export function ContentPane({
   // Empty content - file is empty or couldn't be loaded
   if (content === null || content === '') {
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex h-full flex-col">
         {/* Header with breadcrumb */}
-        <div className="border-b p-4 flex items-center justify-between bg-muted/20">
+        <div className="flex items-center justify-between border-b bg-muted/20 p-4">
           <Breadcrumb path={path} />
           {canEdit && !isEditing && (
             <Button variant="ghost" size="sm" onClick={handleEditClick}>
@@ -288,21 +298,11 @@ export function ContentPane({
           )}
           {isEditing && (
             <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelClick}
-                disabled={isSaving}
-              >
+              <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
                 <X className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleSaveClick}
-                disabled={isSaving}
-              >
+              <Button variant="default" size="sm" onClick={handleSaveClick} disabled={isSaving}>
                 <Save className="mr-2 h-4 w-4" />
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
@@ -311,9 +311,9 @@ export function ContentPane({
         </div>
 
         {/* Empty content message */}
-        <div className="flex-1 flex items-center justify-center text-center">
+        <div className="flex flex-1 items-center justify-center text-center">
           <div>
-            <FileText className="h-8 w-8 text-muted-foreground opacity-50 mx-auto mb-2" />
+            <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50" />
             <p className="text-sm text-muted-foreground">This file is empty</p>
           </div>
         </div>
@@ -324,27 +324,17 @@ export function ContentPane({
   // Markdown file - always use split preview (shows rendered markdown)
   if (isMarkdown) {
     return (
-      <div className="h-full w-full flex flex-col overflow-hidden">
+      <div className="flex h-full w-full flex-col overflow-hidden">
         {/* Header with breadcrumb and actions */}
-        <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/20 p-4">
           <Breadcrumb path={path} />
           {isEditing ? (
             <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelClick}
-                disabled={isSaving}
-              >
+              <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
                 <X className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleSaveClick}
-                disabled={isSaving}
-              >
+              <Button variant="default" size="sm" onClick={handleSaveClick} disabled={isSaving}>
                 <Save className="mr-2 h-4 w-4" />
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
@@ -360,7 +350,7 @@ export function ContentPane({
         </div>
 
         {/* Split-view editor and preview - preview always shown for markdown */}
-        <div className="flex-1 p-4 overflow-x-auto overflow-y-hidden min-h-0 min-w-0">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden p-4">
           <SplitPreview
             content={isEditing ? editedContent : content}
             onChange={(newContent) => onEditChange?.(newContent)}
@@ -373,9 +363,9 @@ export function ContentPane({
 
   // Content display (read-only mode for non-markdown files)
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header with breadcrumb and actions */}
-      <div className="border-b p-4 flex items-center justify-between bg-muted/20 flex-shrink-0">
+      <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/20 p-4">
         <Breadcrumb path={path} />
         {canEdit && !isEditing && (
           <Button variant="ghost" size="sm" onClick={handleEditClick}>
@@ -386,9 +376,9 @@ export function ContentPane({
       </div>
 
       {/* Scrollable content area with horizontal scroll when needed */}
-      <ScrollArea className="flex-1 min-h-0 min-w-0">
+      <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="p-4">
-          <div className="overflow-x-auto max-w-full">
+          <div className="max-w-full overflow-x-auto">
             <ContentDisplay content={content} showLineNumbers={false} />
           </div>
         </div>

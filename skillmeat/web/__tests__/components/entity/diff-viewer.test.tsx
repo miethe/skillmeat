@@ -1,13 +1,13 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent } from "@testing-library/react";
-import { DiffViewer } from "@/components/entity/diff-viewer";
-import type { FileDiff } from "@/sdk/models/FileDiff";
+import { render, screen, fireEvent } from '@testing-library/react';
+import { DiffViewer } from '@/components/entity/diff-viewer';
+import type { FileDiff } from '@/sdk/models/FileDiff';
 
 const mockFileDiffModified: FileDiff = {
-  file_path: "src/example.ts",
-  status: "modified",
+  file_path: 'src/example.ts',
+  status: 'modified',
   unified_diff: `@@ -1,3 +1,3 @@
  function example() {
 -  console.log('old');
@@ -16,33 +16,33 @@ const mockFileDiffModified: FileDiff = {
 };
 
 const mockFileDiffAdded: FileDiff = {
-  file_path: "src/new-file.ts",
-  status: "added",
+  file_path: 'src/new-file.ts',
+  status: 'added',
   unified_diff: null,
 };
 
 const mockFileDiffDeleted: FileDiff = {
-  file_path: "src/old-file.ts",
-  status: "deleted",
+  file_path: 'src/old-file.ts',
+  status: 'deleted',
   unified_diff: null,
 };
 
 const mockFileDiffUnchanged: FileDiff = {
-  file_path: "src/unchanged.ts",
-  status: "unchanged",
+  file_path: 'src/unchanged.ts',
+  status: 'unchanged',
   unified_diff: null,
 };
 
-describe("DiffViewer", () => {
-  it("renders file list correctly", () => {
+describe('DiffViewer', () => {
+  it('renders file list correctly', () => {
     const files = [mockFileDiffModified, mockFileDiffAdded];
     render(<DiffViewer files={files} />);
 
-    expect(screen.getByText("src/example.ts")).toBeInTheDocument();
-    expect(screen.getByText("src/new-file.ts")).toBeInTheDocument();
+    expect(screen.getByText('src/example.ts')).toBeInTheDocument();
+    expect(screen.getByText('src/new-file.ts')).toBeInTheDocument();
   });
 
-  it("displays summary statistics in header", () => {
+  it('displays summary statistics in header', () => {
     const files = [
       mockFileDiffModified,
       mockFileDiffAdded,
@@ -51,18 +51,18 @@ describe("DiffViewer", () => {
     ];
     render(<DiffViewer files={files} />);
 
-    expect(screen.getByText("+1")).toBeInTheDocument(); // Added
-    expect(screen.getByText("~1")).toBeInTheDocument(); // Modified
-    expect(screen.getByText("-1")).toBeInTheDocument(); // Deleted
+    expect(screen.getByText('+1')).toBeInTheDocument(); // Added
+    expect(screen.getByText('~1')).toBeInTheDocument(); // Modified
+    expect(screen.getByText('-1')).toBeInTheDocument(); // Deleted
   });
 
-  it("renders empty state when no files provided", () => {
+  it('renders empty state when no files provided', () => {
     render(<DiffViewer files={[]} />);
 
-    expect(screen.getByText("No changes to display")).toBeInTheDocument();
+    expect(screen.getByText('No changes to display')).toBeInTheDocument();
   });
 
-  it("shows file status badges correctly", () => {
+  it('shows file status badges correctly', () => {
     const files = [
       mockFileDiffModified,
       mockFileDiffAdded,
@@ -71,13 +71,13 @@ describe("DiffViewer", () => {
     ];
     render(<DiffViewer files={files} />);
 
-    expect(screen.getByText("Modified")).toBeInTheDocument();
-    expect(screen.getByText("Added")).toBeInTheDocument();
-    expect(screen.getByText("Deleted")).toBeInTheDocument();
-    expect(screen.getByText("Unchanged")).toBeInTheDocument();
+    expect(screen.getByText('Modified')).toBeInTheDocument();
+    expect(screen.getByText('Added')).toBeInTheDocument();
+    expect(screen.getByText('Deleted')).toBeInTheDocument();
+    expect(screen.getByText('Unchanged')).toBeInTheDocument();
   });
 
-  it("parses unified diff format and displays diff lines", () => {
+  it('parses unified diff format and displays diff lines', () => {
     render(<DiffViewer files={[mockFileDiffModified]} />);
 
     // Should show old and new content
@@ -85,111 +85,91 @@ describe("DiffViewer", () => {
     expect(screen.getByText(/console\.log\('new'\)/)).toBeInTheDocument();
   });
 
-  it("renders side-by-side view for modified files", () => {
-    render(
-      <DiffViewer
-        files={[mockFileDiffModified]}
-        leftLabel="Before"
-        rightLabel="After"
-      />
-    );
+  it('renders side-by-side view for modified files', () => {
+    render(<DiffViewer files={[mockFileDiffModified]} leftLabel="Before" rightLabel="After" />);
 
-    expect(screen.getByText("Before")).toBeInTheDocument();
-    expect(screen.getByText("After")).toBeInTheDocument();
+    expect(screen.getByText('Before')).toBeInTheDocument();
+    expect(screen.getByText('After')).toBeInTheDocument();
   });
 
-  it("displays custom labels for left and right panels", () => {
+  it('displays custom labels for left and right panels', () => {
     render(
-      <DiffViewer
-        files={[mockFileDiffModified]}
-        leftLabel="Collection"
-        rightLabel="Project"
-      />
+      <DiffViewer files={[mockFileDiffModified]} leftLabel="Collection" rightLabel="Project" />
     );
 
-    expect(screen.getByText("Collection")).toBeInTheDocument();
-    expect(screen.getByText("Project")).toBeInTheDocument();
+    expect(screen.getByText('Collection')).toBeInTheDocument();
+    expect(screen.getByText('Project')).toBeInTheDocument();
   });
 
-  it("shows message for added files", () => {
+  it('shows message for added files', () => {
     render(<DiffViewer files={[mockFileDiffAdded]} rightLabel="New Version" />);
 
-    expect(
-      screen.getByText(/This file was added in New Version/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/This file was added in New Version/)).toBeInTheDocument();
   });
 
-  it("shows message for deleted files", () => {
-    render(
-      <DiffViewer files={[mockFileDiffDeleted]} leftLabel="Old Version" />
-    );
+  it('shows message for deleted files', () => {
+    render(<DiffViewer files={[mockFileDiffDeleted]} leftLabel="Old Version" />);
 
-    expect(
-      screen.getByText(/This file was deleted from Old Version/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/This file was deleted from Old Version/)).toBeInTheDocument();
   });
 
-  it("displays no changes message for unchanged files", () => {
+  it('displays no changes message for unchanged files', () => {
     render(<DiffViewer files={[mockFileDiffUnchanged]} />);
 
-    expect(screen.getByText("No changes in this file")).toBeInTheDocument();
+    expect(screen.getByText('No changes in this file')).toBeInTheDocument();
   });
 
-  it("allows file selection by clicking", () => {
+  it('allows file selection by clicking', () => {
     const files = [mockFileDiffModified, mockFileDiffAdded];
     render(<DiffViewer files={files} />);
 
-    const secondFile = screen.getByText("src/new-file.ts");
+    const secondFile = screen.getByText('src/new-file.ts');
     fireEvent.click(secondFile);
 
     // Should display the selected file
-    expect(
-      screen.getByText(/Content preview not available for added files/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Content preview not available for added files/)).toBeInTheDocument();
   });
 
-  it("calls onClose handler when close button is clicked", () => {
+  it('calls onClose handler when close button is clicked', () => {
     const handleClose = jest.fn();
     render(<DiffViewer files={[mockFileDiffModified]} onClose={handleClose} />);
 
-    const closeButton = screen.getByRole("button", { name: "" });
+    const closeButton = screen.getByRole('button', { name: '' });
     fireEvent.click(closeButton);
 
     expect(handleClose).toHaveBeenCalled();
   });
 
-  it("expands and collapses file details", () => {
+  it('expands and collapses file details', () => {
     render(<DiffViewer files={[mockFileDiffModified]} />);
 
-    const fileButton = screen.getByText("src/example.ts");
+    const fileButton = screen.getByText('src/example.ts');
 
     // Initially should be expanded (first file)
-    expect(
-      screen.getByText(/1 additions, 1 deletions/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/1 additions, 1 deletions/)).toBeInTheDocument();
 
     // Click to collapse
-    const chevronButton = fileButton.parentElement?.querySelector("button");
+    const chevronButton = fileButton.parentElement?.querySelector('button');
     if (chevronButton) {
       fireEvent.click(chevronButton);
     }
   });
 
-  it("handles empty diff gracefully", () => {
+  it('handles empty diff gracefully', () => {
     const emptyDiff: FileDiff = {
-      file_path: "empty.ts",
-      status: "modified",
-      unified_diff: "",
+      file_path: 'empty.ts',
+      status: 'modified',
+      unified_diff: '',
     };
     render(<DiffViewer files={[emptyDiff]} />);
 
-    expect(screen.getByText("empty.ts")).toBeInTheDocument();
+    expect(screen.getByText('empty.ts')).toBeInTheDocument();
   });
 
-  it("handles complex unified diff with multiple hunks", () => {
+  it('handles complex unified diff with multiple hunks', () => {
     const complexDiff: FileDiff = {
-      file_path: "complex.ts",
-      status: "modified",
+      file_path: 'complex.ts',
+      status: 'modified',
       unified_diff: `@@ -1,5 +1,6 @@
  function test() {
 -  const a = 1;
@@ -206,12 +186,12 @@ describe("DiffViewer", () => {
     };
     render(<DiffViewer files={[complexDiff]} />);
 
-    expect(screen.getByText("complex.ts")).toBeInTheDocument();
+    expect(screen.getByText('complex.ts')).toBeInTheDocument();
   });
 
-  it("renders Diff Viewer title", () => {
+  it('renders Diff Viewer title', () => {
     render(<DiffViewer files={[mockFileDiffModified]} />);
 
-    expect(screen.getByText("Diff Viewer")).toBeInTheDocument();
+    expect(screen.getByText('Diff Viewer')).toBeInTheDocument();
   });
 });

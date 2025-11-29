@@ -13,17 +13,20 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 ### Core UI Components
 
 #### 1. Dialog Component (`/components/ui/dialog.tsx`)
+
 - Full-featured dialog component built on Radix UI
 - Supports overlay, content, header, footer, title, and description
 - Keyboard navigation and accessibility features
 - Responsive design with animations
 
 #### 2. Progress Component (`/components/ui/progress.tsx`)
+
 - Visual progress bar with percentage indicator
 - Smooth transitions
 - Accessible ARIA attributes
 
 #### 3. Toaster Component (`/components/ui/toaster.tsx`)
+
 - Toast notification system using Sonner
 - Positioned at top-right
 - Supports success, error, warning, and info toasts
@@ -36,6 +39,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 **Purpose**: Real-time progress tracking for long-running operations
 
 **Features**:
+
 - SSE-based live updates
 - Connection status indicator (connecting, connected, disconnected)
 - Step-by-step progress visualization
@@ -44,20 +48,22 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 - Completion detection
 
 **Usage**:
+
 ```tsx
 <ProgressIndicator
   streamUrl="/api/v1/deploy/123/stream"
   enabled={true}
   initialSteps={[
-    { step: "Validating", status: "pending" },
-    { step: "Copying files", status: "pending" },
+    { step: 'Validating', status: 'pending' },
+    { step: 'Copying files', status: 'pending' },
   ]}
-  onComplete={(success) => console.log("Done:", success)}
+  onComplete={(success) => console.log('Done:', success)}
   onError={(error) => console.error(error)}
 />
 ```
 
 **SSE Event Format**:
+
 ```json
 // Progress event
 {
@@ -96,6 +102,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 **Purpose**: Deploy artifacts to projects
 
 **Features**:
+
 - Artifact information display
 - Project path input (defaults to current directory)
 - Overwrite warning for existing deployments
@@ -104,6 +111,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 - Auto-close on completion
 
 **Flow**:
+
 1. User opens dialog from artifact detail view
 2. User enters project path (optional)
 3. User clicks "Deploy"
@@ -112,6 +120,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 6. Invalidates relevant React Query caches
 
 **API Integration**:
+
 - `POST /api/v1/deploy` - Initiates deployment
 - `GET /api/v1/deploy/{id}/stream` - SSE progress stream
 
@@ -120,6 +129,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 **Purpose**: Sync artifacts with upstream sources
 
 **Features**:
+
 - Current vs upstream version comparison
 - Update availability indicator
 - Local modifications warning
@@ -128,12 +138,14 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 - Success/error handling with change summary
 
 **States**:
+
 - `ready` - Initial state, shows sync options
 - `syncing` - Active sync operation with progress
 - `conflicts` - Conflicts detected, resolution required
 - `complete` - Sync completed successfully
 
 **Flow**:
+
 1. User opens dialog from artifact detail view
 2. Dialog shows current vs upstream status
 3. User clicks "Sync Now"
@@ -143,6 +155,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 7. On completion, shows summary and closes
 
 **API Integration**:
+
 - `POST /api/v1/sync` - Initiates sync
 - `GET /api/v1/sync/{id}/stream` - SSE progress stream
 
@@ -151,6 +164,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 **Purpose**: Resolve conflicts between local and upstream versions
 
 **Features**:
+
 - Displays conflicted files with details
 - Shows local vs upstream versions
 - Two resolution strategies:
@@ -160,6 +174,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 - Conflict type badges (modified, deleted, added)
 
 **Conflict Types**:
+
 - `modified` - File changed in both local and upstream
 - `deleted` - File deleted in one version
 - `added` - File added in one version
@@ -171,6 +186,7 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 **Purpose**: Generic Server-Sent Events connection management
 
 **Features**:
+
 - Auto-reconnection with configurable attempts
 - Connection state tracking
 - Message buffering
@@ -179,17 +195,15 @@ The Deploy & Sync UI provides users with interactive dialogs for deploying artif
 - Cleanup on unmount
 
 **Usage**:
+
 ```tsx
-const { isConnected, lastMessage, disconnect } = useSSE(
-  "/api/v1/deploy/123/stream",
-  {
-    enabled: true,
-    autoReconnect: true,
-    maxReconnectAttempts: 5,
-    onMessage: (msg) => console.log(msg),
-    onError: (err) => console.error(err),
-  }
-);
+const { isConnected, lastMessage, disconnect } = useSSE('/api/v1/deploy/123/stream', {
+  enabled: true,
+  autoReconnect: true,
+  maxReconnectAttempts: 5,
+  onMessage: (msg) => console.log(msg),
+  onError: (err) => console.error(err),
+});
 ```
 
 #### 2. useDeploy Hook (`/hooks/useDeploy.ts`)
@@ -197,6 +211,7 @@ const { isConnected, lastMessage, disconnect } = useSSE(
 **Purpose**: React Query mutation for deployment operations
 
 **Features**:
+
 - Deploy mutation with optimistic updates
 - Undeploy mutation for removal
 - Automatic cache invalidation
@@ -204,17 +219,18 @@ const { isConnected, lastMessage, disconnect } = useSSE(
 - Custom callbacks
 
 **Usage**:
+
 ```tsx
 const deployMutation = useDeploy({
-  onSuccess: (data) => console.log("Deployed:", data),
+  onSuccess: (data) => console.log('Deployed:', data),
   onError: (error) => console.error(error),
 });
 
 deployMutation.mutate({
-  artifactId: "skill:canvas",
-  artifactName: "canvas",
-  artifactType: "skill",
-  projectPath: "/path/to/project",
+  artifactId: 'skill:canvas',
+  artifactName: 'canvas',
+  artifactType: 'skill',
+  projectPath: '/path/to/project',
   overwrite: true,
 });
 ```
@@ -224,6 +240,7 @@ deployMutation.mutate({
 **Purpose**: React Query mutation for sync operations
 
 **Features**:
+
 - Sync mutation with conflict detection
 - Check upstream mutation (non-destructive)
 - Automatic cache invalidation
@@ -231,19 +248,20 @@ deployMutation.mutate({
 - Conflict callback handler
 
 **Usage**:
+
 ```tsx
 const syncMutation = useSync({
-  onSuccess: (data) => console.log("Synced:", data),
+  onSuccess: (data) => console.log('Synced:', data),
   onConflict: (conflicts) => handleConflicts(conflicts),
   onError: (error) => console.error(error),
 });
 
 syncMutation.mutate({
-  artifactId: "skill:canvas",
-  artifactName: "canvas",
-  artifactType: "skill",
+  artifactId: 'skill:canvas',
+  artifactName: 'canvas',
+  artifactType: 'skill',
   force: false,
-  mergeStrategy: "theirs",
+  mergeStrategy: 'theirs',
 });
 ```
 
@@ -252,6 +270,7 @@ syncMutation.mutate({
 ### Artifact Detail View (`/components/collection/artifact-detail.tsx`)
 
 **Changes**:
+
 - Added "Deploy to Project" button
 - Added "Sync with Upstream" button (conditional on hasUpstream)
 - Integrated DeployDialog and SyncDialog
@@ -267,6 +286,7 @@ syncMutation.mutate({
 **POST /api/v1/deploy**
 
 Request:
+
 ```json
 {
   "artifactId": "skill:canvas",
@@ -279,6 +299,7 @@ Request:
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -291,6 +312,7 @@ Response:
 **GET /api/v1/deploy/{deploymentId}/stream**
 
 SSE Stream:
+
 ```
 event: progress
 data: {"step": "Validating", "status": "running", "message": "Checking artifact...", "progress": 25}
@@ -307,6 +329,7 @@ data: {"message": "Deployment successful", "success": true}
 **POST /api/v1/sync**
 
 Request:
+
 ```json
 {
   "artifactId": "skill:canvas",
@@ -319,6 +342,7 @@ Request:
 ```
 
 Response (Success):
+
 ```json
 {
   "success": true,
@@ -336,6 +360,7 @@ Response (Success):
 ```
 
 Response (Conflicts):
+
 ```json
 {
   "success": false,
@@ -356,6 +381,7 @@ Response (Conflicts):
 **GET /api/v1/sync/{syncId}/stream**
 
 SSE Stream:
+
 ```
 event: progress
 data: {"step": "Checking upstream", "status": "running", "message": "Fetching latest...", "progress": 25}
@@ -372,6 +398,7 @@ data: {"message": "Sync successful", "success": true}
 **GET /api/v1/artifacts/{artifactId}/upstream**
 
 Response:
+
 ```json
 {
   "artifactId": "skill:canvas",
@@ -404,6 +431,7 @@ Currently, the hooks use mock implementations for development. The actual API ca
 ### SSE Implementation
 
 The SSE hook supports:
+
 - Multiple event types (progress, complete, error_event)
 - Automatic reconnection (up to 5 attempts)
 - Connection state tracking
@@ -411,6 +439,7 @@ The SSE hook supports:
 - Clean disconnect
 
 Backend should implement:
+
 ```python
 from fastapi.responses import StreamingResponse
 from typing import AsyncGenerator
@@ -438,6 +467,7 @@ async def stream_deployment(deployment_id: str):
 ### Error Handling
 
 All operations include comprehensive error handling:
+
 - Toast notifications for user feedback
 - Error boundaries around async operations
 - Graceful degradation if SSE not available
@@ -446,12 +476,14 @@ All operations include comprehensive error handling:
 ### Cache Invalidation
 
 Operations invalidate relevant React Query caches:
+
 - Deploy: `["artifacts"]`, `["deployments"]`, `["projects"]`
 - Sync: `["artifacts"]`, `["artifact", id]`
 
 ### Accessibility
 
 All components include:
+
 - Keyboard navigation
 - ARIA labels and roles
 - Focus management
@@ -489,6 +521,7 @@ All components include:
 ### Integration Testing
 
 Once backend endpoints are ready:
+
 1. Test actual deployment to project
 2. Test actual sync from GitHub
 3. Test real conflict scenarios

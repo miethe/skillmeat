@@ -41,11 +41,7 @@ interface FileCreationDialogProps {
  * />
  * ```
  */
-export function FileCreationDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-}: FileCreationDialogProps) {
+export function FileCreationDialog({ open, onOpenChange, onConfirm }: FileCreationDialogProps) {
   const [fileName, setFileName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,8 +108,8 @@ export function FileCreationDialog({
         <DialogHeader>
           <DialogTitle>Create New File</DialogTitle>
           <DialogDescription>
-            Enter a file name or path (e.g., "README.md" or "docs/guide.md").
-            Parent directories will be created automatically.
+            Enter a file name or path (e.g., "README.md" or "docs/guide.md"). Parent directories
+            will be created automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -132,24 +128,15 @@ export function FileCreationDialog({
               disabled={isCreating}
               autoFocus
             />
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isCreating}
-          >
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isCreating}>
             Cancel
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={isCreating || !fileName.trim()}
-          >
+          <Button onClick={handleConfirm} disabled={isCreating || !fileName.trim()}>
             {isCreating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

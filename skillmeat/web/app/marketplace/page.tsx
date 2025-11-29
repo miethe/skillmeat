@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Loader2, Search as SearchIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { MarketplaceListingCard } from "@/components/marketplace/MarketplaceListingCard";
-import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
-import { MarketplaceStats } from "@/components/marketplace/MarketplaceStats";
-import { MarketplaceInstallDialog } from "@/components/marketplace/MarketplaceInstallDialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useListings, useBrokers, useInstallListing } from "@/hooks/useMarketplace";
-import { useRouter } from "next/navigation";
-import type { MarketplaceListing, MarketplaceFilters as Filters } from "@/types/marketplace";
+import { useState, useEffect } from 'react';
+import { Loader2, Search as SearchIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MarketplaceListingCard } from '@/components/marketplace/MarketplaceListingCard';
+import { MarketplaceFilters } from '@/components/marketplace/MarketplaceFilters';
+import { MarketplaceStats } from '@/components/marketplace/MarketplaceStats';
+import { MarketplaceInstallDialog } from '@/components/marketplace/MarketplaceInstallDialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useListings, useBrokers, useInstallListing } from '@/hooks/useMarketplace';
+import { useRouter } from 'next/navigation';
+import type { MarketplaceListing, MarketplaceFilters as Filters } from '@/types/marketplace';
 
 export default function MarketplacePage() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function MarketplacePage() {
     setIsInstallDialogOpen(true);
   };
 
-  const handleInstallConfirm = async (strategy: "merge" | "fork" | "skip") => {
+  const handleInstallConfirm = async (strategy: 'merge' | 'fork' | 'skip') => {
     if (!selectedListing) return;
 
     await installMutation.mutateAsync({
@@ -65,9 +65,7 @@ export default function MarketplacePage() {
             Browse and install bundles from marketplace brokers
           </p>
         </div>
-        <Button onClick={() => router.push("/marketplace/publish")}>
-          Publish Bundle
-        </Button>
+        <Button onClick={() => router.push('/marketplace/publish')}>Publish Bundle</Button>
       </div>
 
       {/* Stats */}
@@ -76,11 +74,7 @@ export default function MarketplacePage() {
       {/* Filters */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Filters</h2>
-        <MarketplaceFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          brokers={brokers}
-        />
+        <MarketplaceFilters filters={filters} onFiltersChange={setFilters} brokers={brokers} />
       </div>
 
       {/* Results Header */}
@@ -89,11 +83,10 @@ export default function MarketplacePage() {
           {isLoading ? (
             <Skeleton className="h-6 w-32" />
           ) : error ? (
-            "Error loading listings"
+            'Error loading listings'
           ) : (
             <>
-              {allListings.length}{" "}
-              {allListings.length === 1 ? "Listing" : "Listings"}
+              {allListings.length} {allListings.length === 1 ? 'Listing' : 'Listings'}
             </>
           )}
         </h2>
@@ -105,17 +98,17 @@ export default function MarketplacePage() {
           <p className="text-sm text-destructive">
             Failed to load marketplace listings. Please try again later.
           </p>
-          <p className="text-xs text-destructive/80 mt-1">
-            {error instanceof Error ? error.message : "Unknown error"}
+          <p className="mt-1 text-xs text-destructive/80">
+            {error instanceof Error ? error.message : 'Unknown error'}
           </p>
         </div>
       )}
 
       {/* Loading State */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="p-4 border rounded-lg space-y-3">
+            <div key={i} className="space-y-3 rounded-lg border p-4">
               <Skeleton className="h-6 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
               <Skeleton className="h-16 w-full" />
@@ -132,17 +125,13 @@ export default function MarketplacePage() {
       {/* Empty State */}
       {!isLoading && !error && allListings.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <SearchIcon className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No listings found</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
+          <SearchIcon className="mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold">No listings found</h3>
+          <p className="max-w-md text-sm text-muted-foreground">
             Try adjusting your filters or search terms to find what you're looking for.
           </p>
           {Object.keys(filters).length > 0 && (
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setFilters({})}
-            >
+            <Button variant="outline" className="mt-4" onClick={() => setFilters({})}>
               Clear Filters
             </Button>
           )}
@@ -152,7 +141,7 @@ export default function MarketplacePage() {
       {/* Listings Grid */}
       {!isLoading && !error && allListings.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {allListings.map((listing) => (
               <MarketplaceListingCard
                 key={listing.listing_id}
@@ -165,18 +154,14 @@ export default function MarketplacePage() {
           {/* Load More */}
           {hasNextPage && (
             <div className="flex justify-center pt-6">
-              <Button
-                variant="outline"
-                onClick={handleLoadMore}
-                disabled={isFetchingNextPage}
-              >
+              <Button variant="outline" onClick={handleLoadMore} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Loading...
                   </>
                 ) : (
-                  "Load More"
+                  'Load More'
                 )}
               </Button>
             </div>

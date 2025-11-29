@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
   GitBranch,
   ArrowLeft,
@@ -15,17 +15,17 @@ import {
   Plug,
   Code,
   Settings,
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EntityLifecycleProvider } from "@/components/entity/EntityLifecycleProvider";
-import { UnifiedEntityModal } from "@/components/entity/unified-entity-modal";
-import { useProject } from "@/hooks/useProjects";
-import { useArtifacts } from "@/hooks/useArtifacts";
-import type { DeployedArtifact } from "@/types/project";
-import type { Artifact } from "@/types/artifact";
-import type { Entity } from "@/types/entity";
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { EntityLifecycleProvider } from '@/components/entity/EntityLifecycleProvider';
+import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { useProject } from '@/hooks/useProjects';
+import { useArtifacts } from '@/hooks/useArtifacts';
+import type { DeployedArtifact } from '@/types/project';
+import type { Artifact } from '@/types/artifact';
+import type { Entity } from '@/types/entity';
 
 const artifactTypeIcons = {
   skill: Folder,
@@ -36,11 +36,11 @@ const artifactTypeIcons = {
 };
 
 const artifactTypeColors = {
-  skill: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  command: "bg-green-500/10 text-green-500 border-green-500/20",
-  agent: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  mcp: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  hook: "bg-pink-500/10 text-pink-500 border-pink-500/20",
+  skill: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+  command: 'bg-green-500/10 text-green-500 border-green-500/20',
+  agent: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+  mcp: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+  hook: 'bg-pink-500/10 text-pink-500 border-pink-500/20',
 };
 
 export default function ProjectDetailPage() {
@@ -64,8 +64,8 @@ export default function ProjectDetailPage() {
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
@@ -78,7 +78,10 @@ export default function ProjectDetailPage() {
   };
 
   const getArtifactColorClass = (type: string) => {
-    return artifactTypeColors[type as keyof typeof artifactTypeColors] || "bg-gray-500/10 text-gray-500 border-gray-500/20";
+    return (
+      artifactTypeColors[type as keyof typeof artifactTypeColors] ||
+      'bg-gray-500/10 text-gray-500 border-gray-500/20'
+    );
   };
 
   const groupArtifactsByType = (artifacts: DeployedArtifact[]) => {
@@ -137,16 +140,16 @@ export default function ProjectDetailPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => router.push("/projects")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+        <Button variant="ghost" onClick={() => router.push('/projects')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Projects
         </Button>
         <Card>
           <CardContent className="pt-6">
             <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-muted rounded w-1/3" />
-              <div className="h-4 bg-muted rounded w-1/2" />
-              <div className="h-32 bg-muted rounded" />
+              <div className="h-8 w-1/3 rounded bg-muted" />
+              <div className="h-4 w-1/2 rounded bg-muted" />
+              <div className="h-32 rounded bg-muted" />
             </div>
           </CardContent>
         </Card>
@@ -157,8 +160,8 @@ export default function ProjectDetailPage() {
   if (error || !project) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => router.push("/projects")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+        <Button variant="ghost" onClick={() => router.push('/projects')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Projects
         </Button>
         <Card className="border-destructive">
@@ -180,8 +183,8 @@ export default function ProjectDetailPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="space-y-4">
-          <Button variant="ghost" onClick={() => router.push("/projects")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+          <Button variant="ghost" onClick={() => router.push('/projects')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Projects
           </Button>
 
@@ -191,11 +194,11 @@ export default function ProjectDetailPage() {
                 <GitBranch className="h-8 w-8 text-muted-foreground" />
                 <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
               </div>
-              <p className="text-sm font-mono text-muted-foreground">{project.path}</p>
+              <p className="font-mono text-sm text-muted-foreground">{project.path}</p>
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={() => router.push(`/projects/${projectId}/manage`)}>
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="mr-2 h-4 w-4" />
                 Manage Entities
               </Button>
               <Button variant="outline" asChild>
@@ -234,7 +237,7 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold">
-                {project.last_deployment ? formatDate(project.last_deployment) : "Never"}
+                {project.last_deployment ? formatDate(project.last_deployment) : 'Never'}
               </div>
             </CardContent>
           </Card>
@@ -259,13 +262,13 @@ export default function ProjectDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium mb-3">By Type</h3>
+              <h3 className="mb-3 text-sm font-medium">By Type</h3>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(project.stats.by_type).map(([type, count]) => {
                   const Icon = getArtifactIcon(type);
                   return (
                     <Badge key={type} variant="outline" className="px-3 py-1.5">
-                      <Icon className="h-3 w-3 mr-1.5" />
+                      <Icon className="mr-1.5 h-3 w-3" />
                       {type}: {count}
                     </Badge>
                   );
@@ -273,10 +276,10 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className="border-t my-4" />
+            <div className="my-4 border-t" />
 
             <div>
-              <h3 className="text-sm font-medium mb-3">By Collection</h3>
+              <h3 className="mb-3 text-sm font-medium">By Collection</h3>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(project.stats.by_collection).map(([collection, count]) => (
                   <Badge key={collection} variant="secondary" className="px-3 py-1.5">
@@ -292,9 +295,7 @@ export default function ProjectDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Deployed Artifacts</CardTitle>
-            <CardDescription>
-              Complete list of artifacts deployed to this project
-            </CardDescription>
+            <CardDescription>Complete list of artifacts deployed to this project</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -304,8 +305,8 @@ export default function ProjectDetailPage() {
 
                 return (
                   <div key={type}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className={`p-2 rounded-md border ${colorClass}`}>
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className={`rounded-md border p-2 ${colorClass}`}>
                         <Icon className="h-4 w-4" />
                       </div>
                       <h3 className="font-semibold capitalize">
@@ -317,23 +318,23 @@ export default function ProjectDetailPage() {
                       {artifacts.map((artifact) => (
                         <div
                           key={`${artifact.artifact_type}-${artifact.artifact_name}`}
-                          className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                          className="flex cursor-pointer items-start justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
                           onClick={() => handleArtifactClick(artifact)}
                           role="button"
                           tabIndex={0}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
+                            if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault();
                               handleArtifactClick(artifact);
                             }
                           }}
                         >
-                          <div className="space-y-1 flex-1">
+                          <div className="flex-1 space-y-1">
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{artifact.artifact_name}</p>
                               {artifact.local_modifications && (
                                 <Badge variant="outline" className="text-xs">
-                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  <AlertCircle className="mr-1 h-3 w-3" />
                                   Modified
                                 </Badge>
                               )}

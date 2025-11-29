@@ -1,9 +1,9 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || "v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN;
-const ENABLE_API_MOCKS = process.env.NEXT_PUBLIC_ENABLE_API_MOCKS === "true";
-const ENABLE_API_TRACE = process.env.NEXT_PUBLIC_API_TRACE === "true";
+const ENABLE_API_MOCKS = process.env.NEXT_PUBLIC_ENABLE_API_MOCKS === 'true';
+const ENABLE_API_TRACE = process.env.NEXT_PUBLIC_API_TRACE === 'true';
 
 export const apiConfig = {
   baseUrl: API_BASE_URL,
@@ -26,7 +26,7 @@ export class ApiError extends Error {
 }
 
 function buildApiUrl(path: string) {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${API_BASE_URL}/api/${API_VERSION}${normalizedPath}`;
 }
 
@@ -39,7 +39,7 @@ function trace(event: string, detail: Record<string, unknown>) {
 }
 
 export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: 'application/json' };
 
   const extraEntries =
     extra instanceof Headers
@@ -47,11 +47,11 @@ export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
       : (extra as Record<string, string> | undefined);
 
   if (API_TOKEN) {
-    headers["Authorization"] = `Bearer ${API_TOKEN}`;
+    headers['Authorization'] = `Bearer ${API_TOKEN}`;
   }
 
   if (API_KEY) {
-    headers["X-API-Key"] = API_KEY;
+    headers['X-API-Key'] = API_KEY;
   }
 
   return {
@@ -67,23 +67,23 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   };
 
   const url = buildApiUrl(path);
-  trace("request:start", { url, method: requestInit.method || "GET" });
+  trace('request:start', { url, method: requestInit.method || 'GET' });
 
   const response = await fetch(url, requestInit);
-  const contentType = response.headers.get("content-type");
-  const isJson = contentType?.includes("application/json");
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType?.includes('application/json');
   const body = isJson ? await response.json() : undefined;
 
   if (!response.ok) {
-    trace("request:error", {
+    trace('request:error', {
       url,
       status: response.status,
       statusText: response.statusText,
       body,
     });
-    throw new ApiError("Request failed", response.status, body);
+    throw new ApiError('Request failed', response.status, body);
   }
 
-  trace("request:success", { url, status: response.status });
+  trace('request:success', { url, status: response.status });
   return body as T;
 }

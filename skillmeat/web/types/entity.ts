@@ -91,31 +91,31 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
           label: 'Name',
           type: 'text',
           required: true,
-          placeholder: 'my-skill'
+          placeholder: 'my-skill',
         },
         {
           name: 'source',
           label: 'Source',
           type: 'text',
           required: true,
-          placeholder: 'user/repo/path or local path'
+          placeholder: 'user/repo/path or local path',
         },
         {
           name: 'description',
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this skill do?'
+          placeholder: 'What does this skill do?',
         },
         {
           name: 'tags',
           label: 'Tags',
           type: 'tags',
           required: false,
-          placeholder: 'Add tags...'
+          placeholder: 'Add tags...',
         },
-      ]
-    }
+      ],
+    },
   },
   command: {
     type: 'command',
@@ -131,31 +131,31 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
           label: 'Name',
           type: 'text',
           required: true,
-          placeholder: 'my-command'
+          placeholder: 'my-command',
         },
         {
           name: 'source',
           label: 'Source',
           type: 'text',
           required: true,
-          placeholder: 'user/repo/path or local path'
+          placeholder: 'user/repo/path or local path',
         },
         {
           name: 'description',
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this command do?'
+          placeholder: 'What does this command do?',
         },
         {
           name: 'tags',
           label: 'Tags',
           type: 'tags',
           required: false,
-          placeholder: 'Add tags...'
+          placeholder: 'Add tags...',
         },
-      ]
-    }
+      ],
+    },
   },
   agent: {
     type: 'agent',
@@ -171,31 +171,31 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
           label: 'Name',
           type: 'text',
           required: true,
-          placeholder: 'my-agent'
+          placeholder: 'my-agent',
         },
         {
           name: 'source',
           label: 'Source',
           type: 'text',
           required: true,
-          placeholder: 'user/repo/path or local path'
+          placeholder: 'user/repo/path or local path',
         },
         {
           name: 'description',
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this agent do?'
+          placeholder: 'What does this agent do?',
         },
         {
           name: 'tags',
           label: 'Tags',
           type: 'tags',
           required: false,
-          placeholder: 'Add tags...'
+          placeholder: 'Add tags...',
         },
-      ]
-    }
+      ],
+    },
   },
   mcp: {
     type: 'mcp',
@@ -211,31 +211,31 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
           label: 'Name',
           type: 'text',
           required: true,
-          placeholder: 'my-mcp-server'
+          placeholder: 'my-mcp-server',
         },
         {
           name: 'command',
           label: 'Command',
           type: 'text',
           required: true,
-          placeholder: 'npx @modelcontextprotocol/server-example'
+          placeholder: 'npx @modelcontextprotocol/server-example',
         },
         {
           name: 'args',
           label: 'Arguments',
           type: 'text',
           required: false,
-          placeholder: '--port 3000'
+          placeholder: '--port 3000',
         },
         {
           name: 'description',
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this MCP server provide?'
+          placeholder: 'What does this MCP server provide?',
         },
-      ]
-    }
+      ],
+    },
   },
   hook: {
     type: 'hook',
@@ -251,7 +251,7 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
           label: 'Name',
           type: 'text',
           required: true,
-          placeholder: 'my-hook'
+          placeholder: 'my-hook',
         },
         {
           name: 'trigger',
@@ -262,24 +262,24 @@ export const ENTITY_TYPES: Record<EntityType, EntityTypeConfig> = {
             { value: 'pre-commit', label: 'Pre-commit' },
             { value: 'post-commit', label: 'Post-commit' },
             { value: 'pre-push', label: 'Pre-push' },
-          ]
+          ],
         },
         {
           name: 'script',
           label: 'Script',
           type: 'textarea',
           required: true,
-          placeholder: '#!/bin/bash\necho "Running hook..."'
+          placeholder: '#!/bin/bash\necho "Running hook..."',
         },
         {
           name: 'description',
           label: 'Description',
           type: 'textarea',
           required: false,
-          placeholder: 'What does this hook do?'
+          placeholder: 'What does this hook do?',
         },
-      ]
-    }
+      ],
+    },
   },
 };
 

@@ -12,11 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ManagePage from '@/app/manage/page';
 import { apiRequest } from '@/lib/api';
 import type { Entity } from '@/types/entity';
-import type {
-  ArtifactListResponse,
-  ArtifactCreateResponse,
-  ArtifactResponse
-} from '@/sdk';
+import type { ArtifactListResponse, ArtifactCreateResponse, ArtifactResponse } from '@/sdk';
 
 // Mock the API module
 jest.mock('@/lib/api', () => ({
@@ -48,35 +44,35 @@ jest.mock('next/navigation', () => ({
 }));
 
 // Helper to create a new QueryClient for each test
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      cacheTime: 0,
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        cacheTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
     },
-    mutations: {
-      retry: false,
+    logger: {
+      log: console.log,
+      warn: console.warn,
+      error: () => {}, // Suppress error logs in tests
     },
-  },
-  logger: {
-    log: console.log,
-    warn: console.warn,
-    error: () => {}, // Suppress error logs in tests
-  },
-});
+  });
 
 // Helper to render with providers
 const renderWithProviders = (component: React.ReactNode) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-    </QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{component}</QueryClientProvider>);
 };
 
 // Helper to open entity actions dropdown menu
-const openEntityActionsMenu = async (user: ReturnType<typeof userEvent.setup>, entityName: string) => {
+const openEntityActionsMenu = async (
+  user: ReturnType<typeof userEvent.setup>,
+  entityName: string
+) => {
   const entityTexts = screen.getAllByText(entityName);
   for (const entityText of entityTexts) {
     const card = entityText.closest('.p-4');
@@ -175,20 +171,23 @@ describe('Entity CRUD Flows - Integration Tests', () => {
         // Return updated list including new entity
         if (path.startsWith('/artifacts?')) {
           return {
-            items: [...mockEntities, {
-              id: 'skill:my-new-skill',
-              name: 'my-new-skill',
-              type: 'skill',
-              source: 'user/repo/my-skill',
-              version: 'v1.0.0',
-              added: new Date().toISOString(),
-              updated: new Date().toISOString(),
-              aliases: [],
-              metadata: {
-                description: 'A brand new skill',
-                tags: ['testing', 'new'],
+            items: [
+              ...mockEntities,
+              {
+                id: 'skill:my-new-skill',
+                name: 'my-new-skill',
+                type: 'skill',
+                source: 'user/repo/my-skill',
+                version: 'v1.0.0',
+                added: new Date().toISOString(),
+                updated: new Date().toISOString(),
+                aliases: [],
+                metadata: {
+                  description: 'A brand new skill',
+                  tags: ['testing', 'new'],
+                },
               },
-            }],
+            ],
             total: mockEntities.length + 1,
             limit: 100,
             offset: 0,
@@ -468,7 +467,7 @@ describe('Entity CRUD Flows - Integration Tests', () => {
 
         if (path.startsWith('/artifacts?')) {
           return {
-            items: mockEntities.filter(e => e.id !== 'skill:canvas-design'),
+            items: mockEntities.filter((e) => e.id !== 'skill:canvas-design'),
             total: mockEntities.length - 1,
             limit: 100,
             offset: 0,
@@ -491,9 +490,7 @@ describe('Entity CRUD Flows - Integration Tests', () => {
 
       // Verify confirmation was requested
       await waitFor(() => {
-        expect(confirmSpy).toHaveBeenCalledWith(
-          expect.stringContaining('canvas-design')
-        );
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('canvas-design'));
       });
 
       // Verify API was called
@@ -627,8 +624,8 @@ describe('Entity CRUD Flows - Integration Tests', () => {
 
       // Find status filter
       const statusButtons = screen.getAllByRole('button');
-      const statusFilter = statusButtons.find(btn =>
-        btn.textContent?.includes('Status') || btn.textContent?.includes('All')
+      const statusFilter = statusButtons.find(
+        (btn) => btn.textContent?.includes('Status') || btn.textContent?.includes('All')
       );
 
       if (statusFilter) {
@@ -661,7 +658,7 @@ describe('Entity CRUD Flows - Integration Tests', () => {
 
       // Find view toggle button (has Grid/List icon)
       const buttons = screen.getAllByRole('button');
-      const viewToggleButton = buttons.find(btn => {
+      const viewToggleButton = buttons.find((btn) => {
         const svg = btn.querySelector('svg');
         return svg?.classList.contains('lucide-grid-3x3') || svg?.classList.contains('lucide-list');
       });
@@ -695,12 +692,19 @@ describe('Entity CRUD Flows - Integration Tests', () => {
     it('shows loading state while fetching entities', async () => {
       // Mock slow API response
       mockApiRequest.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          items: mockEntities,
-          total: mockEntities.length,
-          limit: 100,
-          offset: 0,
-        }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  items: mockEntities,
+                  total: mockEntities.length,
+                  limit: 100,
+                  offset: 0,
+                }),
+              100
+            )
+          )
       );
 
       renderWithProviders(<ManagePage />);
@@ -709,9 +713,12 @@ describe('Entity CRUD Flows - Integration Tests', () => {
       expect(screen.getByText(/Loading/i)).toBeInTheDocument();
 
       // Wait for data to load
-      await waitFor(() => {
-        expect(screen.getByText('canvas-design')).toBeInTheDocument();
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('canvas-design')).toBeInTheDocument();
+        },
+        { timeout: 2000 }
+      );
     });
 
     it('refetches entities after successful operations', async () => {

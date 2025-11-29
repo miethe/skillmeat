@@ -69,9 +69,12 @@ describe('MergeWorkflow Accessibility', () => {
     );
 
     // Wait for data to load
-    await waitFor(() => {
-      expect(container.querySelector('[class*="text-sm"]')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(container.querySelector('[class*="text-sm"]')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     // Disable heading-order check as Alert component's heading is presentational
     const results = await axe(container, {
@@ -94,9 +97,12 @@ describe('MergeWorkflow Accessibility', () => {
       { wrapper }
     );
 
-    await waitFor(() => {
-      expect(container.querySelector('button')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(container.querySelector('button')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     // Verify stepper accessibility - disable heading-order for Alert components
     const results = await axe(container, {
@@ -119,9 +125,12 @@ describe('MergeWorkflow Accessibility', () => {
       { wrapper }
     );
 
-    await waitFor(() => {
-      expect(container.querySelector('button')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(container.querySelector('button')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     // Disable heading-order for Alert components
     const results = await axe(container, {
@@ -144,9 +153,12 @@ describe('MergeWorkflow Accessibility', () => {
       { wrapper }
     );
 
-    await waitFor(() => {
-      expect(container.querySelector('[class*="text-"]')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(container.querySelector('[class*="text-"]')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     const results = await axe(container, {
       rules: {
@@ -168,9 +180,12 @@ describe('MergeWorkflow Accessibility', () => {
       { wrapper }
     );
 
-    await waitFor(() => {
-      expect(container.querySelector('[class*="border"]')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(container.querySelector('[class*="border"]')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     // Verify alert role accessibility
     const results = await axe(container, {

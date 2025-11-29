@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-import { useSSE } from "@/hooks/useSSE";
+import { useEffect, useState } from 'react';
+import { CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { useSSE } from '@/hooks/useSSE';
 
 export interface ProgressStep {
   step: string;
-  status: "pending" | "running" | "completed" | "error";
+  status: 'pending' | 'running' | 'completed' | 'error';
   message?: string;
   progress?: number;
 }
@@ -41,7 +41,7 @@ export interface ProgressIndicatorProps {
 
 interface ProgressData {
   step: string;
-  status: "running" | "completed" | "error";
+  status: 'running' | 'completed' | 'error';
   message: string;
   progress?: number;
   totalSteps?: number;
@@ -60,68 +60,65 @@ export function ProgressIndicator({
   const [isComplete, setIsComplete] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  const { isConnected, isConnecting, error } = useSSE<ProgressData>(
-    streamUrl,
-    {
-      enabled,
-      onMessage: (message) => {
-        if (message.event === "progress" && message.data) {
-          const data = message.data as ProgressData;
+  const { isConnected, isConnecting, error } = useSSE<ProgressData>(streamUrl, {
+    enabled,
+    onMessage: (message) => {
+      if (message.event === 'progress' && message.data) {
+        const data = message.data as ProgressData;
 
-          setSteps((prev) => {
-            const existing = prev.find((s) => s.step === data.step);
-            if (existing) {
-              return prev.map((s) =>
-                s.step === data.step
-                  ? {
-                      ...s,
-                      status: data.status,
-                      message: data.message,
-                      progress: data.progress,
-                    }
-                  : s
-              );
-            } else {
-              return [
-                ...prev,
-                {
-                  step: data.step,
-                  status: data.status,
-                  message: data.message,
-                  progress: data.progress,
-                },
-              ];
-            }
-          });
-
-          // Update overall progress
-          if (data.totalSteps && data.currentStep) {
-            setOverallProgress((data.currentStep / data.totalSteps) * 100);
-          } else if (data.progress !== undefined) {
-            setOverallProgress(data.progress);
+        setSteps((prev) => {
+          const existing = prev.find((s) => s.step === data.step);
+          if (existing) {
+            return prev.map((s) =>
+              s.step === data.step
+                ? {
+                    ...s,
+                    status: data.status,
+                    message: data.message,
+                    progress: data.progress,
+                  }
+                : s
+            );
+          } else {
+            return [
+              ...prev,
+              {
+                step: data.step,
+                status: data.status,
+                message: data.message,
+                progress: data.progress,
+              },
+            ];
           }
+        });
 
-          // Check for errors
-          if (data.status === "error") {
-            setHasError(true);
-            onError?.(new Error(data.message));
-          }
-        } else if (message.event === "complete") {
-          setIsComplete(true);
-          setOverallProgress(100);
-          onComplete?.(true, message.data?.message);
-        } else if (message.event === "error_event") {
-          setHasError(true);
-          onError?.(new Error(message.data?.message || "Operation failed"));
-          onComplete?.(false, message.data?.message);
+        // Update overall progress
+        if (data.totalSteps && data.currentStep) {
+          setOverallProgress((data.currentStep / data.totalSteps) * 100);
+        } else if (data.progress !== undefined) {
+          setOverallProgress(data.progress);
         }
-      },
-      onError: (err) => {
+
+        // Check for errors
+        if (data.status === 'error') {
+          setHasError(true);
+          onError?.(new Error(data.message));
+        }
+      } else if (message.event === 'complete') {
+        setIsComplete(true);
+        setOverallProgress(100);
+        onComplete?.(true, message.data?.message);
+      } else if (message.event === 'error_event') {
         setHasError(true);
-        onError?.(err);
-      },
-    }
-  );
+        onError?.(new Error(message.data?.message || 'Operation failed'));
+        onComplete?.(false, message.data?.message);
+      }
+    },
+    onError: (err) => {
+      setHasError(true);
+      onError?.(err);
+    },
+  });
 
   // Handle SSE connection error
   useEffect(() => {
@@ -141,18 +138,16 @@ export function ProgressIndicator({
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">
             {isComplete
-              ? "Complete"
+              ? 'Complete'
               : hasError
-                ? "Error"
+                ? 'Error'
                 : isConnecting
-                  ? "Connecting..."
+                  ? 'Connecting...'
                   : isConnected
-                    ? "In Progress"
-                    : "Waiting..."}
+                    ? 'In Progress'
+                    : 'Waiting...'}
           </span>
-          <span className="text-muted-foreground">
-            {Math.round(overallProgress)}%
-          </span>
+          <span className="text-muted-foreground">{Math.round(overallProgress)}%</span>
         </div>
         <Progress value={overallProgress} className="h-2" />
       </div>
@@ -168,7 +163,7 @@ export function ProgressIndicator({
           )}
           {isConnected && !isComplete && (
             <>
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
               <span>Connected</span>
             </>
           )}
@@ -183,7 +178,7 @@ export function ProgressIndicator({
 
       {/* Step-by-step Progress */}
       {steps.length > 0 && (
-        <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="max-h-60 space-y-2 overflow-y-auto">
           {steps.map((step, index) => (
             <StepItem key={`${step.step}-${index}`} step={step} />
           ))}
@@ -194,14 +189,10 @@ export function ProgressIndicator({
       {hasError && error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-destructive">
-                Operation Failed
-              </p>
-              <p className="text-xs text-destructive/80 mt-1">
-                {error.message}
-              </p>
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-destructive">Operation Failed</p>
+              <p className="mt-1 text-xs text-destructive/80">{error.message}</p>
             </div>
           </div>
         </div>
@@ -212,9 +203,7 @@ export function ProgressIndicator({
 
 function StepItem({ step }: { step: ProgressStep }) {
   const StatusIcon = {
-    pending: () => (
-      <div className="h-4 w-4 rounded-full border-2 border-muted" />
-    ),
+    pending: () => <div className="h-4 w-4 rounded-full border-2 border-muted" />,
     running: () => <Loader2 className="h-4 w-4 animate-spin text-primary" />,
     completed: () => <CheckCircle className="h-4 w-4 text-green-600" />,
     error: () => <XCircle className="h-4 w-4 text-destructive" />,
@@ -223,12 +212,10 @@ function StepItem({ step }: { step: ProgressStep }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border p-3">
       <StatusIcon />
-      <div className="flex-1 min-w-0 space-y-1">
+      <div className="min-w-0 flex-1 space-y-1">
         <p className="text-sm font-medium">{step.step}</p>
-        {step.message && (
-          <p className="text-xs text-muted-foreground">{step.message}</p>
-        )}
-        {step.progress !== undefined && step.status === "running" && (
+        {step.message && <p className="text-xs text-muted-foreground">{step.message}</p>}
+        {step.progress !== undefined && step.status === 'running' && (
           <Progress value={step.progress} className="h-1" />
         )}
       </div>

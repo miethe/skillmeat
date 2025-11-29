@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { use, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Server,
@@ -12,17 +12,11 @@ import {
   AlertCircle,
   CheckCircle2,
   FileCode,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -30,8 +24,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 import {
   useMcpServer,
   useMcpDeploymentStatus,
@@ -39,10 +33,10 @@ import {
   useDeleteMcpServer,
   useDeployMcpServer,
   useUndeployMcpServer,
-} from "@/hooks/useMcpServers";
-import { MCPServerForm } from "@/components/mcp/MCPServerForm";
-import { MCPDeployButton } from "@/components/mcp/MCPDeployButton";
-import type { MCPFormData, MCPServerStatus } from "@/types/mcp";
+} from '@/hooks/useMcpServers';
+import { MCPServerForm } from '@/components/mcp/MCPServerForm';
+import { MCPDeployButton } from '@/components/mcp/MCPDeployButton';
+import type { MCPFormData, MCPServerStatus } from '@/types/mcp';
 
 interface MCPServerDetailPageProps {
   params: Promise<{ name: string }>;
@@ -50,12 +44,12 @@ interface MCPServerDetailPageProps {
 
 const statusConfig: Record<
   MCPServerStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
 > = {
-  installed: { label: "Installed", variant: "default" },
-  not_installed: { label: "Not Installed", variant: "secondary" },
-  updating: { label: "Updating", variant: "outline" },
-  error: { label: "Error", variant: "destructive" },
+  installed: { label: 'Installed', variant: 'default' },
+  not_installed: { label: 'Not Installed', variant: 'secondary' },
+  updating: { label: 'Updating', variant: 'outline' },
+  error: { label: 'Error', variant: 'destructive' },
 };
 
 export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
@@ -79,7 +73,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
   const undeployMutation = useUndeployMcpServer(serverName);
 
   const handleBack = () => {
-    router.push("/mcp");
+    router.push('/mcp');
   };
 
   const handleEdit = () => {
@@ -95,16 +89,16 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
       await deleteMutation.mutateAsync(serverName);
 
       toast({
-        title: "Server Deleted",
+        title: 'Server Deleted',
         description: `MCP server '${serverName}' has been deleted.`,
       });
 
-      router.push("/mcp");
+      router.push('/mcp');
     } catch (error) {
       toast({
-        title: "Failed to Delete Server",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
+        title: 'Failed to Delete Server',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
       });
     }
   };
@@ -130,16 +124,16 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
       });
 
       toast({
-        title: "Server Updated",
+        title: 'Server Updated',
         description: `MCP server '${serverName}' has been updated successfully.`,
       });
 
       setShowEditDialog(false);
     } catch (error) {
       toast({
-        title: "Failed to Update Server",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
+        title: 'Failed to Update Server',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
       });
     }
   };
@@ -157,7 +151,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
       <div className="space-y-6">
         <div>
           <Button variant="ghost" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Servers
           </Button>
         </div>
@@ -169,7 +163,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
               <CardTitle className="text-destructive">Server Not Found</CardTitle>
             </div>
             <CardDescription>
-              {error instanceof Error ? error.message : "Unknown error occurred"}
+              {error instanceof Error ? error.message : 'Unknown error occurred'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -203,22 +197,17 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
       {/* Back button and header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Servers
         </Button>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleEdit}>
-            <Edit className="h-4 w-4 mr-2" />
+            <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deployed}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleDelete} disabled={deployed}>
+            <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </Button>
         </div>
@@ -234,9 +223,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
                 <CardTitle className="text-2xl">{server.name}</CardTitle>
                 <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
               </div>
-              {server.description && (
-                <CardDescription>{server.description}</CardDescription>
-              )}
+              {server.description && <CardDescription>{server.description}</CardDescription>}
             </div>
           </div>
         </CardHeader>
@@ -244,11 +231,11 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
         <CardContent className="space-y-6">
           {/* Repository information */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
               <Package className="h-4 w-4" />
               Repository
             </h3>
-            <div className="pl-6 space-y-2 text-sm">
+            <div className="space-y-2 pl-6 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Source:</span>
                 <span className="font-mono text-xs">{server.repo}</span>
@@ -260,17 +247,13 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
               {server.resolved_version && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Resolved Version:</span>
-                  <span className="font-mono text-xs">
-                    {server.resolved_version}
-                  </span>
+                  <span className="font-mono text-xs">{server.resolved_version}</span>
                 </div>
               )}
               {server.resolved_sha && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Resolved SHA:</span>
-                  <span className="font-mono text-xs">
-                    {server.resolved_sha.substring(0, 8)}
-                  </span>
+                  <span className="font-mono text-xs">{server.resolved_sha.substring(0, 8)}</span>
                 </div>
               )}
             </div>
@@ -278,7 +261,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
 
           {/* Environment variables */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
               <Settings className="h-4 w-4" />
               Environment Variables
             </h3>
@@ -287,16 +270,16 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
                 No environment variables configured
               </p>
             ) : (
-              <div className="pl-6 space-y-2">
+              <div className="space-y-2 pl-6">
                 {Object.entries(server.env_vars).map(([key, value]) => (
                   <div
                     key={key}
-                    className="flex justify-between items-center text-sm p-2 bg-muted/50 rounded"
+                    className="flex items-center justify-between rounded bg-muted/50 p-2 text-sm"
                   >
                     <span className="font-mono text-xs">{key}</span>
                     <span className="font-mono text-xs text-muted-foreground">
                       {value.substring(0, 20)}
-                      {value.length > 20 ? "..." : ""}
+                      {value.length > 20 ? '...' : ''}
                     </span>
                   </div>
                 ))}
@@ -305,12 +288,12 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
           </div>
 
           {/* Deployment section */}
-          <div className="space-y-3 pt-4 border-t">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
+          <div className="space-y-3 border-t pt-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
               <FileCode className="h-4 w-4" />
               Deployment
             </h3>
-            <div className="pl-6 space-y-3">
+            <div className="space-y-3 pl-6">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status:</span>
                 <div className="flex items-center gap-2">
@@ -322,9 +305,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
                   ) : (
                     <>
                       <AlertCircle className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-muted-foreground">
-                        Not Deployed
-                      </span>
+                      <span className="text-sm text-muted-foreground">Not Deployed</span>
                     </>
                   )}
                 </div>
@@ -333,7 +314,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
               {deploymentStatus?.settings_path && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Settings Path:</span>
-                  <span className="font-mono text-xs max-w-md truncate">
+                  <span className="max-w-md truncate font-mono text-xs">
                     {deploymentStatus.settings_path}
                   </span>
                 </div>
@@ -343,8 +324,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Command:</span>
                   <span className="font-mono text-xs">
-                    {deploymentStatus.command}{" "}
-                    {deploymentStatus.args?.join(" ")}
+                    {deploymentStatus.command} {deploymentStatus.args?.join(' ')}
                   </span>
                 </div>
               )}
@@ -360,8 +340,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
 
               {deployed && (
                 <p className="text-sm text-muted-foreground">
-                  Note: You may need to restart Claude Desktop for changes to take
-                  effect.
+                  Note: You may need to restart Claude Desktop for changes to take effect.
                 </p>
               )}
             </div>
@@ -380,7 +359,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
           updateMutation.isError
             ? updateMutation.error instanceof Error
               ? updateMutation.error.message
-              : "Unknown error"
+              : 'Unknown error'
             : undefined
         }
       />
@@ -394,16 +373,15 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
               Delete MCP Server
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{server.name}</strong>?
-              This action cannot be undone.
+              Are you sure you want to delete <strong>{server.name}</strong>? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
 
           {deployed && (
-            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/20">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                Warning: This server is currently deployed. Undeploy it first before
-                deleting.
+                Warning: This server is currently deployed. Undeploy it first before deleting.
               </p>
             </div>
           )}
@@ -421,7 +399,7 @@ export default function MCPServerDetailPage(props: MCPServerDetailPageProps) {
               onClick={handleConfirmDelete}
               disabled={deleteMutation.isPending || deployed}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Server"}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete Server'}
             </Button>
           </DialogFooter>
         </DialogContent>

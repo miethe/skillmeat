@@ -1,20 +1,17 @@
-"use client";
+'use client';
 
-import { Download, ExternalLink, Package, Star, Tag } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type { MarketplaceListing } from "@/types/marketplace";
+import { Download, ExternalLink, Package, Star, Tag } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import type { MarketplaceListing } from '@/types/marketplace';
 
 interface MarketplaceListingCardProps {
   listing: MarketplaceListing;
   onClick?: (listing: MarketplaceListing) => void;
 }
 
-export function MarketplaceListingCard({
-  listing,
-  onClick,
-}: MarketplaceListingCardProps) {
+export function MarketplaceListingCard({ listing, onClick }: MarketplaceListingCardProps) {
   const handleClick = () => {
     if (onClick) {
       onClick(listing);
@@ -22,7 +19,7 @@ export function MarketplaceListingCard({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleClick();
     }
@@ -30,7 +27,7 @@ export function MarketplaceListingCard({
 
   return (
     <Card
-      className="p-4 hover:shadow-lg transition-shadow cursor-pointer focus-within:ring-2 focus-within:ring-ring"
+      className="cursor-pointer p-4 transition-shadow focus-within:ring-2 focus-within:ring-ring hover:shadow-lg"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -38,14 +35,12 @@ export function MarketplaceListingCard({
       aria-label={`View listing: ${listing.name}`}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-lg truncate" title={listing.name}>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-semibold" title={listing.name}>
             {listing.name}
           </h3>
-          <p className="text-sm text-muted-foreground truncate">
-            by {listing.publisher}
-          </p>
+          <p className="truncate text-sm text-muted-foreground">by {listing.publisher}</p>
         </div>
         {listing.price === 0 ? (
           <Badge variant="secondary" className="shrink-0">
@@ -60,13 +55,11 @@ export function MarketplaceListingCard({
 
       {/* Description */}
       {listing.description && (
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-          {listing.description}
-        </p>
+        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{listing.description}</p>
       )}
 
       {/* Metadata */}
-      <div className="flex items-center gap-4 mb-3 text-sm text-muted-foreground">
+      <div className="mb-3 flex items-center gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-1" title="Number of artifacts">
           <Package className="h-4 w-4" />
           <span>{listing.artifact_count}</span>
@@ -93,10 +86,10 @@ export function MarketplaceListingCard({
 
       {/* Tags */}
       {listing.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="mb-3 flex flex-wrap gap-1.5">
           {listing.tags.slice(0, 3).map((tag) => (
             <Badge key={tag} variant="secondary" className="text-xs">
-              <Tag className="h-3 w-3 mr-1" />
+              <Tag className="mr-1 h-3 w-3" />
               {tag}
             </Badge>
           ))}
@@ -125,7 +118,7 @@ export function MarketplaceListingCard({
           variant="outline"
           onClick={(e) => {
             e.stopPropagation();
-            window.open(listing.source_url, "_blank", "noopener,noreferrer");
+            window.open(listing.source_url, '_blank', 'noopener,noreferrer');
           }}
           aria-label="Open listing in new tab"
         >
