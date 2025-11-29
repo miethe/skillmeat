@@ -1,517 +1,367 @@
 ---
 name: artifact-tracking
-description: "Use this skill when creating, updating, or querying AI-optimized tracking artifacts (progress files, context notes, bug fixes, observation logs) in YAML+Markdown hybrid format for 95% token reduction. Invoke for: creating phase progress tracking, updating task status and blockers, querying pending work across phases, generating session handoff reports, validating artifact completeness, or migrating existing markdown files to hybrid format. Provides three embedded agents (artifact-tracker, artifact-query, artifact-validator) plus Python migration tools for efficient multi-phase project tracking."
+description: "Use this skill when creating, updating, or querying AI-optimized tracking artifacts. Invoke for: creating phase progress tracking, updating task status, querying pending/blocked tasks, generating session handoffs, validating artifacts, or understanding how to use progress files for orchestration. Provides YAML+Markdown hybrid format with 95% token reduction. Core functions: CREATE, UPDATE, QUERY, VALIDATE, ORCHESTRATE."
 ---
 
 # Artifact Tracking Skill
 
-Create, update, query, and validate AI-optimized tracking artifacts with 95% token efficiency.
+Token-efficient tracking artifacts for AI agent orchestration.
 
 ## Why This Skill
 
 Traditional tracking artifacts (pure markdown) waste tokens:
-- **Querying "all pending tasks"**: 92KB file returns everything (98.7% waste)
-- **Getting blockers**: 160KB context for 800B answer (99.5% waste)
-- **Session handoff**: Must read entire file every time
+- Querying "all pending tasks": 92KB file returns everything (98.7% waste)
+- Getting blockers: 160KB context for 800B answer (99.5% waste)
+- Session handoff: Must read entire file every time
 
-This skill provides a **hybrid YAML+Markdown format** optimized for AI agent consumption:
-- **Field-level queries**: Get exactly what you need (1KB instead of 92KB)
-- **Structured metadata**: Programmatically filter tasks by status, agent, priority
-- **Efficient updates**: Change one field without rewriting entire file
-- **Token savings**: 95-99% reduction in token usage
+This skill provides a **YAML+Markdown hybrid format** optimized for AI agent consumption:
+- Field-level queries: Get exactly what you need (1KB instead of 92KB)
+- Structured metadata: Programmatically filter tasks by status, agent, priority
+- Efficient updates: Change one field without rewriting entire file
+- Token savings: 95-99% reduction in token usage
 
-## When to Use This Skill
+## When to Use
 
-### Create Progress Tracking
-Starting a new phase of implementation? Create a phase progress file with structured task list, success criteria, and blockers.
-
-**Example**: "Create Phase 2 progress tracking for authentication-overhaul PRD"
-
-### Update Task Status
-Need to mark a task complete, move it to in-progress, or block it? Surgical field-level updates without full-file rewrites.
-
-**Example**: "Update TASK-003 status to 'in_progress' and add blocker reference"
-
-### Query Pending Work
-Need to find all pending tasks for a specific agent? Or all blockers across phases? Query with filters.
-
-**Example**: "Show all blocked tasks in advanced-editing-v2 phases 1-3"
-
-### Record Implementation Context
-Add worknotes during development for other agents. Context files are PRD-level sticky pads where agents leave brief observations, decisions, and gotchas. Files start nearly empty and grow organically.
-
-**Example**: "Add note to artifact-flow-modal-redesign context: SVG paths for flow connectors provide better button positioning than CSS"
-
-### Generate Session Handoff
-Handing off work to another agent or session? Get a concise summary of pending tasks, blockers, and next actions.
-
-**Example**: "Generate session handoff for frontend-developer to continue Phase 3"
-
-### Validate Artifact Quality
-Before phase completion, verify tracking files are complete, consistent, and accurate.
-
-**Example**: "Validate Phase 2 progress file for schema compliance and metric accuracy"
-
-### Migrate Existing Artifacts
-Have old markdown progress files? Convert them to hybrid format with Python migration tool.
-
-**Example**: "Migrate legacy progress files to hybrid YAML+Markdown format"
+| Need | Function | Reference |
+|------|----------|-----------|
+| Create progress/context file | CREATE | `./creating-artifacts.md` |
+| Update task status | UPDATE | `./updating-artifacts.md` |
+| Find tasks/blockers | QUERY | `./querying-artifacts.md` |
+| Validate before completion | VALIDATE | `./validating-artifacts.md` |
+| Delegate tasks efficiently | ORCHESTRATE | `./orchestration-reference.md` |
 
 ## Quick Start
 
-### 1. Create Progress Tracking (Most Common)
+### CREATE Progress Tracking
 
 ```markdown
-Task("artifact-tracker", "Create progress tracking for Phase 2 of listings-enhancements-v3 PRD. Include 5 main tasks: implement search API, add filtering UI, optimize database query, write tests, and documentation. Mark all as pending status.")
+Task("artifact-tracker", "Create Phase 2 progress for auth-overhaul PRD")
 ```
 
-This will create `.claude/progress/listings-enhancements-v3/phase-2-progress.md` with structured YAML metadata and task list.
+Creates `.claude/progress/auth-overhaul/phase-2-progress.md` with structured YAML metadata.
 
-### 2. Update Task Status
+See `./creating-artifacts.md` for detailed creation patterns.
+
+### UPDATE Task Status
 
 ```markdown
-Task("artifact-tracker", "Update phase-2-progress.md for advanced-editing-v2: Mark TASK-1.5 (React modal optimization) as 'in_progress' and update overall progress to 40%")
+Task("artifact-tracker", "Update auth-overhaul phase 2: Mark TASK-2.1 complete")
 ```
 
-YAML metadata is updated surgically without touching task descriptions or other sections.
+Surgical field-level update without full-file rewrite.
 
-### 3. Query Pending Tasks
+See `./updating-artifacts.md` for all update operations.
+
+### QUERY Pending Work
 
 ```markdown
-Task("artifact-query", "Find all blocked tasks in blocks-v2-implementation phases 1-3. Show task ID, description, blocker reason, and assigned agent")
+Task("artifact-query", "Show all blocked tasks in auth-overhaul phases 1-3")
 ```
 
-Returns structured results filtered by status across multiple files.
+Returns filtered results across multiple files.
 
-### 4. Generate Session Handoff
+See `./querying-artifacts.md` for query patterns.
+
+### VALIDATE Before Completion
 
 ```markdown
-Task("artifact-query", "Generate session handoff for ui-engineer-enhanced continuing Phase 4 of advanced-editing-v2. Include pending tasks, current blockers, next session agenda, and architecture context")
+Task("artifact-validator", "Validate Phase 2 progress for auth-overhaul PRD")
 ```
 
-Concise summary with all info needed to continue work.
+Schema compliance and quality checks.
 
-### 5. Validate Completeness
+See `./validating-artifacts.md` for validation types.
+
+### ORCHESTRATE Task Delegation
 
 ```markdown
-Task("artifact-validator", "Validate Phase 1 and Phase 2 progress files for prompt-card-v1. Check schema compliance, metric accuracy, and link validity")
+# Read progress file YAML → get batch strategy → copy Task() commands
+# See ./orchestration-reference.md for complete workflow
 ```
 
-Automated quality checks before phase completion.
+This is the KEY function for Opus-level orchestration. See `./orchestration-reference.md` for step-by-step guidance on token-efficient task delegation.
 
-## Core Workflows
+## Directory Structure
 
-### Workflow: Create Progress Tracking
+```
+.claude/
+├── progress/[prd]/phase-N-progress.md   # ONE per phase
+└── worknotes/[prd]/context.md           # ONE per PRD
+```
 
-**When**: Starting implementation of a new phase from PRD
-
-**Steps**:
-1. Delegate to `artifact-tracker` agent with task list from implementation plan
-2. Agent creates file at `.claude/progress/[prd-name]/phase-[N]-progress.md`
-3. File includes YAML frontmatter + markdown body with task tables
-4. **CRITICAL**: Delegate to `lead-architect` agent to analyze plan and annotate:
-   - `assigned_to`: Which subagent(s) should handle each task
-   - `dependencies`: Which prior tasks must complete first
-   - `parallelization`: Batch groupings (parallel vs sequential)
-5. Progress defaults to 0%, all tasks pending
-6. Ready for orchestration agent to delegate tasks with minimal token usage
-
-**Result**: Structured file optimized for minimal-understanding delegation by orchestration agents
-
-### Workflow: Update Task Status
-
-**When**: Task completes, enters work, gets blocked, or becomes at-risk
-
-**Steps**:
-1. Delegate to `artifact-tracker` agent
-2. Provide: file location, task ID, new status, any notes
-3. Agent updates YAML frontmatter (task counts, progress percentage, updated timestamp)
-4. Agent updates task in markdown table (status, notes)
-5. One surgical update, no full-file rewrite
-6. File remains queryable and efficient
-
-**Result**: Minimal token usage (~1KB update vs ~25KB full-file approach)
-
-### Workflow: Query Work Status
-
-**When**: Need to find tasks by criteria (agent, status, priority, blocker status)
-
-**Steps**:
-1. Delegate to `artifact-query` agent
-2. Provide: scope (one phase or all), filter criteria (status, agent, priority, blocking/blocked)
-3. Agent loads relevant progress files
-4. Agent extracts YAML and applies filters
-5. Agent returns formatted results with task locations
-6. Results are concise and actionable
-
-**Result**: Seconds to answer queries that would take minutes reading full files
-
-### Workflow: Validate Before Completion
-
-**When**: Phase nearing completion, want to ensure tracking is accurate
-
-**Steps**:
-1. Delegate to `artifact-validator` agent
-2. Provide: phase number and PRD name
-3. Agent validates: YAML schema, field types, required fields, metric calculations, link integrity
-4. Agent identifies inconsistencies or missing data
-5. Agent suggests fixes or generates automated cleanup
-6. You review and approve
-
-**Result**: High-confidence phase completion tracking
-
-### Workflow: Migrate Legacy Files
-
-**When**: Have old markdown progress files to update to new format
-
-**Steps**:
-1. Run Python migration script: `python scripts/convert_to_hybrid.py path/to/old/file.md`
-2. Script parses existing markdown structure
-3. Script generates YAML frontmatter from content
-4. Script preserves markdown body and adds task tables if needed
-5. Output written to new hybrid format
-6. You review and commit
-
-**Result**: Bulk migration without manual rewriting
+**Policy**: See `.claude/specs/doc-policy-spec.md` for documentation limits.
 
 ## Embedded Agents
 
-### artifact-tracker (Haiku 4.5)
-Creates and updates progress files with field-level precision. Specializes in:
-- Creating new progress tracking files from templates
-- Updating task status (pending → in_progress → completed)
-- Recording blockers and dependencies
-- Documenting implementation decisions in context files
-- Surgical field updates without full-file rewrites
+| Agent | Model | Use For |
+|-------|-------|---------|
+| artifact-tracker | Haiku | Create/update files |
+| artifact-query | Haiku | Find tasks, generate reports |
+| artifact-validator | Sonnet | Validate quality |
 
-Use when: Creating or updating tracking files, recording decisions
+**Configuration**: See `./agents/` directory for agent prompts.
 
-### artifact-query (Haiku 4.5)
-Queries and synthesizes tracking artifacts efficiently. Specializes in:
-- Finding tasks by status, agent, priority, phase, or custom criteria
-- Identifying and aggregating blockers across phases
-- Generating session handoff reports
-- Synthesizing implementation decisions from context files
-- Calculating progress metrics across phases
+## Format Overview
 
-Use when: Finding information, generating reports, creating handoffs
-
-### artifact-validator (Sonnet 4.5)
-Validates and maintains artifact quality. Specializes in:
-- Schema validation (YAML structure, required fields, data types)
-- Completeness checks (all tasks tracked, metrics accurate)
-- Quality assurance (token efficiency, link integrity)
-- Cleanup and archiving
-- Consistency enforcement
-
-Use when: Validating files, checking quality, finding/fixing issues
-
-## Orchestration Requirements (Critical)
-
-**For Opus-Level Orchestration Agents**: Progress files are optimized to minimize your token usage.
-
-### Required Fields (Every Task)
-
-All progress files MUST include these fields in YAML frontmatter for each task:
-
-```yaml
-tasks:
-  - id: "TASK-1.1"
-    description: "Brief task description"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]  # REQUIRED
-    dependencies: []                       # REQUIRED (empty array if none)
-    estimated_effort: "2h"                 # Optional
-    priority: "high"                       # Optional
-```
-
-### Orchestration Quick Reference Section
-
-Every progress file includes an "Orchestration Quick Reference" markdown section with:
-- **Parallelization Strategy**: Which tasks can run simultaneously vs sequentially
-- **Critical Path**: Longest dependency chain
-- **Task Delegation Commands**: Ready-to-use Task() calls
-
-**Example**:
-```markdown
-## Orchestration Quick Reference
-
-**Batch 1** (Parallel - No Dependencies):
-- TASK-1.1 → `ui-engineer-enhanced` (2h)
-- TASK-1.2 → `ui-engineer-enhanced` (1.5h)
-
-**Batch 2** (Sequential - Depends on Batch 1):
-- TASK-2.1 → `ui-engineer-enhanced` (3h) - **Blocked by**: TASK-1.1, TASK-1.2
-
-### Task Delegation Commands
-\```
-# Batch 1 (Launch in parallel)
-Task("ui-engineer-enhanced", "TASK-1.1: [description]")
-Task("ui-engineer-enhanced", "TASK-1.2: [description]")
-\```
-```
-
-This enables you to delegate all tasks in a phase with minimal token usage and zero deep understanding.
-
-## Format Reference
-
-Tracking artifacts use **hybrid YAML+Markdown format**:
+YAML+Markdown hybrid with machine-readable frontmatter:
 
 ```yaml
 ---
-# Machine-readable metadata (YAML frontmatter)
 type: progress
-prd: "artifact-flow-modal-redesign"
-phase: 1
-title: "3-Panel Sync Status Redesign"
+prd: "auth-overhaul"
+phase: 2
 status: in_progress
 progress: 40
 total_tasks: 10
 completed_tasks: 4
-in_progress_tasks: 2
-blocked_tasks: 0
-owners: ["ui-engineer-enhanced"]
 
-# === ORCHESTRATION QUICK REFERENCE (NEW) ===
 tasks:
-  - id: "TASK-1.1"
-    description: "Create ArtifactFlowBanner component"
-    status: "complete"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
   - id: "TASK-2.1"
-    description: "Create SyncStatusTab composite"
-    status: "in_progress"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
-    estimated_effort: "3h"
+    status: "complete"
+    assigned_to: ["ui-engineer"]     # REQUIRED for orchestration
+    dependencies: []                  # REQUIRED for orchestration
 
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2", "TASK-1.3"]
-  batch_2: ["TASK-2.1"]
-  critical_path: ["TASK-1.1", "TASK-2.1"]
+  batch_1: ["TASK-2.1", "TASK-2.2"]
+  batch_2: ["TASK-2.3"]
 ---
 
-# Artifact Flow Modal - Phase 1
+# Phase 2: Auth Overhaul
 
 ## Orchestration Quick Reference
-
-**Batch 1** (Parallel): TASK-1.1, TASK-1.2, TASK-1.3
-**Batch 2** (Sequential): TASK-2.1 (blocked by Batch 1)
-
-## Tasks
-
-| ID | Task | Status | Agent | Dependencies | Est |
-|----|------|--------|-------|--------------|-----|
-| TASK-1.1 | ArtifactFlowBanner | ✓ | ui-engineer-enhanced | None | 2h |
-| TASK-2.1 | SyncStatusTab | 🔄 | ui-engineer-enhanced | TASK-1.1, TASK-1.2 | 3h |
+[Pre-built Task() delegation commands here]
 ```
 
-See `./format-specification.md` for complete format documentation with all YAML fields, value types, and validation rules.
+See `./format-specification.md` for complete field reference and schemas.
 
-## Directory Structure
+## Token Efficiency
 
-Progress and context tracking structure:
+| Operation | Traditional | Optimized | Savings |
+|-----------|-------------|-----------|---------|
+| Task list | 25KB | 2KB | 92% |
+| Query blockers | 75KB | 3KB | 96% |
+| Session handoff | 150KB | 5KB | 97% |
 
-```
-.claude/
-├── progress/
-│   └── [prd-name]/
-│       ├── phase-1-progress.md     # ONE per phase (REQUIRED: assigned_to, dependencies)
-│       ├── phase-2-progress.md
-│       └── phase-3-progress.md
-│
-└── worknotes/
-    ├── [prd-name]/
-    │   └── context.md              # ONE per PRD (worknotes for all phases)
-    │
-    ├── fixes/
-    │   └── bug-fixes-tracking-11-25.md  # Monthly tracking
-    │
-    └── observations/
-        └── observation-log-11-25.md     # Monthly observations
-```
+## Function Reference
 
-**Key Changes**:
-- **Progress**: ONE file per phase, MUST include `assigned_to` and `dependencies` for every task
-- **Context**: ONE file per PRD (not per phase), serves as shared worknotes pad for all agents
-- Context files start empty/minimal and grow as agents add observations during development
+For detailed guidance on each function:
 
-## Using Scripts
+- **CREATE**: `./creating-artifacts.md`
+  - Creating progress files
+  - Creating context files
+  - Annotation workflow
+  - Template usage
 
-Python utilities in `./scripts/` for programmatic operations:
+- **UPDATE**: `./updating-artifacts.md`
+  - Task status updates
+  - Progress percentage
+  - Adding/resolving blockers
+  - Context notes
 
-### convert_to_hybrid.py
-Migrate old markdown files to hybrid YAML+Markdown format:
+- **QUERY**: `./querying-artifacts.md`
+  - Finding pending/blocked tasks
+  - Agent-specific queries
+  - Session handoffs
+  - Cross-phase queries
 
-```bash
-python scripts/convert_to_hybrid.py /path/to/old/progress.md
-# Output: progress_hybrid.md (converted format)
-```
+- **VALIDATE**: `./validating-artifacts.md`
+  - Schema compliance
+  - Metric accuracy
+  - Orchestration readiness
+  - Quality checks
 
-### validate_artifact.py
-Validate tracking files against schema:
+- **ORCHESTRATE**: `./orchestration-reference.md`
+  - Reading YAML metadata
+  - Batch execution
+  - Task delegation
+  - Token optimization
 
-```bash
-python scripts/validate_artifact.py /path/to/progress.md
-# Output: validation report with issues and recommendations
-```
+## Scripts
 
-### query_artifacts.py
-Query tracking files programmatically:
+Python utilities in `./scripts/`:
 
-```bash
-python scripts/query_artifacts.py \
-  --prd "listings-enhancements-v3" \
-  --status "blocked" \
-  --phase 2
-# Output: JSON of matching tasks
-```
+- `convert_to_hybrid.py` - Migrate legacy markdown to hybrid format
+- `validate_artifact.py` - Schema validation
+- `query_artifacts.py` - Programmatic queries
 
-### migrate_all.py
-Bulk migration of all legacy files:
+See `./migration-guide.md` for converting existing tracking files.
 
-```bash
-python scripts/migrate_all.py /path/to/legacy/dir
-# Output: Migrated files in hybrid format
-```
+## Templates
 
-See `./scripts/README.md` for complete documentation.
+See `./templates/` directory:
 
-## Token Efficiency Metrics
+- `progress-template.md` - Phase progress tracking template
+- `context-template.md` - PRD context notes template
+- `bug-fix-template.md` - Bug fix tracking template
+- `observation-log-template.md` - Monthly observation log template
 
-### Example: Query All Pending Tasks
+See `./TEMPLATES-INDEX.md` for complete template catalog.
 
-**Traditional Approach**:
-- Read full phase-1-progress.md: 160KB
-- Read full phase-2-progress.md: 140KB
-- Read full phase-3-progress.md: 180KB
-- Total: 480KB (~144,000 tokens)
-- Return all content, grep for "pending"
+## Schemas
 
-**Artifact-Tracking Approach**:
-- Query YAML metadata: 3KB (metadata only)
-- Load YAML arrays of pending tasks: 2KB
-- Format results: 1KB
-- Total: 6KB (~1,800 tokens)
-- Direct answer to query
+YAML schemas in `./schemas/`:
 
-**Savings**: 474KB (~142,200 tokens) **98.75% reduction**
+- `progress.schema.yaml` - Progress file validation schema
+- `context.schema.yaml` - Context file validation schema
+- `common-fields.yaml` - Shared field definitions
 
-### Example: Get Session Handoff
+## Advanced Usage
 
-**Traditional Approach**:
-- Read 3 progress files: 480KB
-- Read 3 context files: 340KB
-- Manual synthesis of key info
-- Total: 820KB (~246,000 tokens)
+### Query Patterns
 
-**Artifact-Tracking Approach**:
-- Query pending tasks: 2KB
-- Query blockers: 1KB
-- Load context summary fields: 3KB
-- Query next session agenda: 1KB
-- Total: 7KB (~2,100 tokens)
-- Structured handoff ready to use
+See `./query-patterns.md` for:
+- Cross-phase aggregation
+- Filter combinations
+- Timeline queries
+- Critical path analysis
 
-**Savings**: 813KB (~243,900 tokens) **97.1% reduction**
+### Migration
 
-## Examples
+See `./migration-guide.md` for:
+- Converting legacy markdown
+- Batch migration strategies
+- Data preservation
+- Validation after migration
 
-### Example 1: Create Phase Progress
+### Format Specification
 
-```markdown
-Task("artifact-tracker", "Create Phase 1 progress tracking for blocks-v2-implementation PRD. Phase title: 'Core Blocks Model Implementation'. Include these tasks: implement Block model schema, add database migrations, create block repository layer, add CRUD endpoints, write integration tests. All tasks start as pending with medium priority. Assign to backend-engineer.")
-```
-
-Result: `.claude/progress/blocks-v2-implementation/phase-1-progress.md` created with structured YAML metadata and task list.
-
-### Example 2: Update Progress
-
-```markdown
-Task("artifact-tracker", "Update phase-1-progress.md for advanced-editing-v2: Mark TASK-1.1 (Modal component skeleton) as complete. Mark TASK-1.2 (Form inputs integration) as in_progress. Update overall progress from 20% to 35%. Add note: 'UI skeleton complete, working on form integration'")
-```
-
-Result: YAML metadata updated surgically, progress metrics recalculated.
-
-### Example 3: Query Blockers
-
-```markdown
-Task("artifact-query", "Find all critical and high-severity blockers across all phases of prompt-card-v1 PRD. Show blocker ID, title, what tasks it's blocking, and resolution path.")
-```
-
-Result: Structured list of blockers with impact analysis.
-
-### Example 4: Session Handoff
-
-```markdown
-Task("artifact-query", "Generate session handoff for ai-artifacts-engineer continuing work on listings-enhancements-v3. Show: current phase, pending tasks in priority order, active blockers, implementation decisions from context files, and immediate next actions for new session.")
-```
-
-Result: Concise handoff with all context needed to continue.
+See `./format-specification.md` for:
+- Complete YAML field reference
+- Markdown section guidelines
+- Status value enumerations
+- ID naming conventions
 
 ## Best Practices
 
-### 1. ONE Progress File Per Phase
+### CREATE
 
-Never create multiple progress files for the same phase. Use a single `.claude/progress/[prd]/phase-[N]-progress.md` and update it across sessions.
+1. **ONE progress file per phase** - Never create duplicates
+2. **Annotate immediately** - Add assigned_to and dependencies right away
+3. **Use consistent IDs** - Pattern: TASK-[PHASE].[SEQUENCE]
 
-### 2. Update Metadata Regularly
+### UPDATE
 
-Keep YAML frontmatter current:
-- `progress`: Update as tasks complete
-- `updated`: Set when making changes
-- `blockers`: Add/remove as situation changes
-- `completed_tasks`, `in_progress_tasks`: Keep in sync with markdown tasks
+1. **Update immediately** after task completion
+2. **Include notes** for context on decisions
+3. **Use artifact-tracker** (not manual Edit)
+4. **Mark blockers** when tasks can't proceed
 
-### 3. Use Consistent Task IDs
+### QUERY
 
-Task IDs should follow pattern: `TASK-[PHASE].[SEQUENCE]` (e.g., `TASK-2.1`, `TASK-2.2`, `TASK-2.3`)
+1. **Query YAML only** for orchestration data
+2. **Use filters** to reduce token usage
+3. **Generate handoffs** for session transitions
 
-### 4. Link Tasks to Blockers
+### VALIDATE
 
-When a task is blocked, reference the blocker ID:
-- In markdown: `Blocked by BLOCKER-001`
-- In YAML `blockers.blocking` array: `["TASK-2.3", "TASK-2.4"]`
+1. **Validate before phase completion**
+2. **Fix warnings** even if not errors
+3. **Check orchestration readiness** before delegating
 
-### 5. Query Before Reading Full Files
+### ORCHESTRATE
 
-Never read entire progress files manually when querying. Use `artifact-query` agent:
-- "Show all blocked tasks" → Query returns 1KB
-- Reading full files → 480KB waste
+1. **Read YAML frontmatter only** (~2KB vs ~25KB)
+2. **Copy Task() commands** from Quick Reference section
+3. **Execute batches in parallel** (single message)
+4. **Update status immediately** after completion
 
-### 6. Archive Completed Phases
+See `./orchestration-reference.md` for complete orchestration workflow.
 
-Use `artifact-validator` to clean up after phase completion:
-- Mark phase as `status: complete`
-- Archive to history/ if keeping reference
-- Remove from active tracking
+## Common Patterns
 
-## Reference Guides
+### Create + Annotate Flow
 
-**Complete Format Specification**: See `./format-specification.md` for all YAML fields, value types, constraints, and validation rules.
+```markdown
+# Step 1: Create progress file
+Task("artifact-tracker", "Create Phase 1 progress for sync-redesign PRD.
+Tasks: ArtifactFlowBanner, ComparisonSelector, DiffPreviewPanel.
+Phase title: 'Sync Status Sub-Components'")
 
-**Migration Guide**: See `./migration-guide.md` for step-by-step instructions to convert existing markdown artifacts to hybrid format.
+# Step 2: Annotate for orchestration
+Task("lead-architect", "Annotate Phase 1 progress for sync-redesign:
+- All tasks → ui-engineer-enhanced
+- All independent (no dependencies)
+- Generate batch_1 with all tasks parallel")
+```
 
-**Query Patterns**: See `./query-patterns.md` for common query examples and efficient filter combinations.
+### Query + Delegate Flow
 
-**Template Reference**: See `./TEMPLATES-INDEX.md` for all available templates (progress, context, bug fixes, observations).
+```markdown
+# Step 1: Query pending tasks
+Task("artifact-query", "Show pending tasks in sync-redesign Phase 1 batch_1")
 
-**Schema Reference**: See `./schemas/` directory for validation schemas and examples.
+# Step 2: Delegate in parallel (single message)
+Task("ui-engineer-enhanced", "TASK-1.1: Create ArtifactFlowBanner...")
+Task("ui-engineer-enhanced", "TASK-1.2: Create ComparisonSelector...")
+Task("ui-engineer-enhanced", "TASK-1.3: Create DiffPreviewPanel...")
 
-## Integration with Other Skills
+# Step 3: Update after completion
+Task("artifact-tracker", "Update sync-redesign phase 1:
+- TASK-1.1: complete
+- TASK-1.2: complete
+- TASK-1.3: complete")
+```
 
-This skill works with:
+### Validate + Complete Flow
 
-- **Documentation writer** - For permanent docs about tracking system
-- **Lead PM** - For orchestrating multi-phase projects
-- **Code reviewer** - For validating tracking before merge
-- **Implementation planner** - For creating initial task lists
+```markdown
+# Step 1: Validate completeness
+Task("artifact-validator", "Validate Phase 1 progress for sync-redesign:
+- All tasks complete
+- No active blockers
+- Progress at 100%")
 
-When starting a new PRD:
-1. **Planner** creates implementation plan with phases and tasks
-2. **artifact-tracker** creates phase progress files from plan
-3. **Teams** update files as work progresses
-4. **artifact-query** generates reports on progress
-5. **artifact-validator** audits quality before phase completion
+# Step 2: Mark phase complete
+Task("artifact-tracker", "Update sync-redesign phase 1: Set status to complete")
+```
+
+## Integration Points
+
+### With Documentation Policy
+
+Artifact tracking files are the ONLY allowed per-phase tracking files:
+- `.claude/progress/[prd]/phase-N-progress.md` - ONE per phase
+- `.claude/worknotes/[prd]/context.md` - ONE per PRD
+- `.claude/worknotes/fixes/bug-fixes-YYYY-MM.md` - ONE per month
+- `.claude/worknotes/observations/observation-log-MM-YY.md` - ONE per month
+
+See `.claude/specs/doc-policy-spec.md` for complete policy.
+
+### With Phase Execution
+
+The `/dev:execute-phase` command uses orchestration patterns from this skill:
+1. Reads progress file YAML
+2. Identifies ready tasks from parallelization batches
+3. Delegates using pre-built Task() commands
+4. Updates status after completion
+5. Validates before marking phase complete
+
+### With Agent Delegation
+
+All specialized agents (ui-engineer-enhanced, python-backend-engineer, etc.) expect:
+- Tasks with clear IDs (TASK-X.Y)
+- Assigned agent specified
+- Dependencies noted
+- Status tracking after completion
+
+This skill provides the tracking infrastructure for the entire agent delegation system.
+
+## Related Resources
+
+- **Documentation Policy**: `.claude/specs/doc-policy-spec.md`
+- **Agent Prompts**: `.claude/agents/`
+- **Phase Execution**: `.claude/commands/execute-phase.md`
+- **Task Delegation**: See CLAUDE.md "Agent Delegation" section
+
+## Summary
+
+This skill provides **token-efficient tracking artifacts** that enable Opus-level orchestration with 95% token reduction. The five core functions (CREATE, UPDATE, QUERY, VALIDATE, ORCHESTRATE) cover the complete lifecycle of progress tracking.
+
+**Most Important**:
+- For creating files: See `./creating-artifacts.md`
+- For updating status: See `./updating-artifacts.md`
+- For querying tasks: See `./querying-artifacts.md`
+- For validation: See `./validating-artifacts.md`
+- **For orchestration: See `./orchestration-reference.md`** (KEY for Opus agents)
+
+Keep YAML frontmatter under 2KB, use surgical updates, and leverage pre-computed Task() commands for maximum token efficiency.
