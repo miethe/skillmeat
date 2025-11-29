@@ -103,7 +103,7 @@ export default function ProjectDetailPage() {
     if (matchingArtifact) {
       // Convert Artifact to Entity with project context
       const entity: Entity = {
-        id: matchingArtifact.name,
+        id: `${matchingArtifact.type}:${matchingArtifact.name}`,
         name: matchingArtifact.name,
         type: matchingArtifact.type,
         description: matchingArtifact.metadata?.description,
