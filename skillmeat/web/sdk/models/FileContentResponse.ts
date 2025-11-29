@@ -2,11 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { FileDiff } from './FileDiff';
 /**
- * Response for artifact diff.
+ * Response for artifact file content.
  */
-export type ArtifactDiffResponse = {
+export type FileContentResponse = {
   /**
    * Artifact identifier
    */
@@ -24,19 +23,19 @@ export type ArtifactDiffResponse = {
    */
   collection_name: string;
   /**
-   * Project path
+   * Relative file path within artifact
    */
-  project_path: string;
+  path: string;
   /**
-   * Whether any changes detected
+   * File content (UTF-8 encoded)
    */
-  has_changes: boolean;
+  content: string;
   /**
-   * List of file diffs
+   * File size in bytes
    */
-  files: Array<FileDiff>;
+  size: number;
   /**
-   * Summary counts: added, modified, deleted, unchanged
+   * MIME type of the file
    */
-  summary: Record<string, number>;
+  mime_type?: string | null;
 };

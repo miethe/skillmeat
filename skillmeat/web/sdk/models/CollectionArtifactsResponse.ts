@@ -10,13 +10,12 @@ import type { PageInfo } from './PageInfo';
  * Returns lightweight artifact summaries for efficient collection browsing.
  */
 export type CollectionArtifactsResponse = {
-    /**
-     * List of items for this page
-     */
-    items: Array<ArtifactSummary>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of items for this page
+   */
+  items: Array<ArtifactSummary>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-

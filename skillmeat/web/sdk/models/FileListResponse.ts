@@ -2,10 +2,15 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { FileNode } from './FileNode';
 /**
- * Popular artifact statistics.
+ * Response for artifact file listing.
  */
-export type ArtifactPopularity = {
+export type FileListResponse = {
+  /**
+   * Artifact identifier
+   */
+  artifact_id: string;
   /**
    * Artifact name
    */
@@ -15,11 +20,11 @@ export type ArtifactPopularity = {
    */
   artifact_type: string;
   /**
-   * Number of times deployed
+   * Collection name
    */
-  deploy_count: number;
+  collection_name: string;
   /**
-   * ISO 8601 timestamp of last deployment
+   * File tree structure
    */
-  last_deployed?: string | null;
+  files: Array<FileNode>;
 };

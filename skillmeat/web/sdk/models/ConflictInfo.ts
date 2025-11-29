@@ -6,13 +6,12 @@
  * Information about a sync conflict.
  */
 export type ConflictInfo = {
-    /**
-     * Path to conflicted file relative to artifact root
-     */
-    file_path: string;
-    /**
-     * Type of conflict
-     */
-    conflict_type: string;
+  /**
+   * Path to conflicted file relative to artifact root
+   */
+  file_path: string;
+  /**
+   * Type of conflict
+   */
+  conflict_type: string;
 };
-

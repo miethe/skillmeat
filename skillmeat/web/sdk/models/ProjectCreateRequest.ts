@@ -6,17 +6,16 @@
  * Request schema for creating a project.
  */
 export type ProjectCreateRequest = {
-    /**
-     * Project name (1-100 characters, letters, numbers, hyphens, underscores only)
-     */
-    name: string;
-    /**
-     * Absolute path to project directory
-     */
-    path: string;
-    /**
-     * Project description
-     */
-    description?: (string | null);
+  /**
+   * Project name (1-100 characters, letters, numbers, hyphens, underscores only)
+   */
+  name: string;
+  /**
+   * Absolute path to project directory
+   */
+  path: string;
+  /**
+   * Project description
+   */
+  description?: string | null;
 };
-

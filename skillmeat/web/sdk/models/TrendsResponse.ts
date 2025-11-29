@@ -9,25 +9,24 @@ import type { TrendDataPoint } from './TrendDataPoint';
  * Provides time-series data for usage patterns and trends.
  */
 export type TrendsResponse = {
-    /**
-     * Aggregation period (hour, day, week, month)
-     */
-    period_type: string;
-    /**
-     * Start of trend period
-     */
-    start_date: string;
-    /**
-     * End of trend period
-     */
-    end_date: string;
-    /**
-     * Time-series data points
-     */
-    data_points: Array<TrendDataPoint>;
-    /**
-     * Number of periods in the response
-     */
-    total_periods: number;
+  /**
+   * Aggregation period (hour, day, week, month)
+   */
+  period_type: string;
+  /**
+   * Start of trend period
+   */
+  start_date: string;
+  /**
+   * End of trend period
+   */
+  end_date: string;
+  /**
+   * Time-series data points
+   */
+  data_points: Array<TrendDataPoint>;
+  /**
+   * Number of periods in the response
+   */
+  total_periods: number;
 };
-

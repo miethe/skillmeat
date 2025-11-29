@@ -8,21 +8,20 @@
  * Lightweight artifact representation for collection listings.
  */
 export type ArtifactSummary = {
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Artifact type (skill, command, agent)
-     */
-    type: string;
-    /**
-     * Current version
-     */
-    version?: (string | null);
-    /**
-     * Source specification
-     */
-    source: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Artifact type (skill, command, agent)
+   */
+  type: string;
+  /**
+   * Current version
+   */
+  version?: string | null;
+  /**
+   * Source specification
+   */
+  source: string;
 };
-
