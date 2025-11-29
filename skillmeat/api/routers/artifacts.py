@@ -31,6 +31,7 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactSyncRequest,
     ArtifactSyncResponse,
     ArtifactUpdateRequest,
+    ArtifactUpstreamDiffResponse,
     ArtifactUpstreamInfo,
     ArtifactUpstreamResponse,
     ArtifactVersionInfo,
@@ -2545,6 +2546,395 @@ async def get_artifact_diff(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get artifact diff: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/upstream-diff",
+    response_model=ArtifactUpstreamDiffResponse,
+    summary="Get artifact upstream diff",
+    description="Compare collection artifact with its GitHub upstream source",
+    responses={
+        200: {"description": "Successfully retrieved upstream diff"},
+        400: {"model": ErrorResponse, "description": "Invalid request or no upstream source"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_artifact_upstream_diff(
+    artifact_id: str,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> ArtifactUpstreamDiffResponse:
+    """Get diff between collection version and GitHub upstream source.
+
+    Compares the artifact in the collection with the latest version from GitHub,
+    showing file-level differences with unified diff format for modified files.
+
+    This endpoint:
+    1. Finds the artifact in the collection
+    2. Fetches the latest upstream version from GitHub
+    3. Compares all files between collection and upstream
+    4. Returns detailed diff information
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection filter
+
+    Returns:
+        ArtifactUpstreamDiffResponse with file-level diffs and summary
+
+    Raises:
+        HTTPException: If artifact not found, no upstream source, or on error
+
+    Example:
+        GET /api/v1/artifacts/skill:pdf-processor/upstream-diff?collection=default
+
+        Returns:
+        {
+            "artifact_id": "skill:pdf-processor",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "collection_name": "default",
+            "upstream_source": "anthropics/skills/pdf",
+            "upstream_version": "abc123def456",
+            "has_changes": true,
+            "files": [
+                {
+                    "file_path": "SKILL.md",
+                    "status": "modified",
+                    "collection_hash": "abc123",
+                    "project_hash": "def456",
+                    "unified_diff": "--- a/SKILL.md\\n+++ b/SKILL.md\\n..."
+                }
+            ],
+            "summary": {
+                "added": 0,
+                "modified": 1,
+                "deleted": 0,
+                "unchanged": 3
+            }
+        }
+    """
+    import difflib
+    import hashlib
+    import shutil
+
+    try:
+        logger.info(
+            f"Getting upstream diff for artifact: {artifact_id} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact in collection
+        artifact = None
+        collection_name = collection
+        if collection:
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                coll = collection_mgr.load_collection(collection)
+                artifact = coll.find_artifact(artifact_name, artifact_type)
+                if artifact:
+                    collection_name = collection
+            except ValueError:
+                pass
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    coll = collection_mgr.load_collection(coll_name)
+                    artifact = coll.find_artifact(artifact_name, artifact_type)
+                    collection_name = coll_name
+                    break
+                except ValueError:
+                    continue
+
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection",
+            )
+
+        # Check if artifact has upstream tracking
+        if artifact.origin != "github":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Artifact origin '{artifact.origin}' does not support upstream diff. Only GitHub artifacts are supported.",
+            )
+
+        if not artifact.upstream:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Artifact does not have upstream tracking configured",
+            )
+
+        # Fetch latest upstream version
+        logger.info(f"Fetching upstream update for {artifact_id}")
+        fetch_result = artifact_mgr.fetch_update(
+            artifact_name=artifact_name,
+            artifact_type=artifact_type,
+            collection_name=collection_name,
+        )
+
+        # Check for fetch errors
+        if fetch_result.error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch upstream: {fetch_result.error}",
+            )
+
+        if not fetch_result.fetch_result or not fetch_result.temp_workspace:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch upstream artifact",
+            )
+
+        # Get paths
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+        collection_artifact_path = collection_path / artifact.path
+        upstream_artifact_path = fetch_result.fetch_result.artifact_path
+
+        if not collection_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Collection artifact path does not exist: {collection_artifact_path}",
+            )
+
+        if not upstream_artifact_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Upstream artifact path does not exist: {upstream_artifact_path}",
+            )
+
+        # Collect all files from both locations
+        collection_files = set()
+        upstream_files = set()
+
+        if collection_artifact_path.is_dir():
+            collection_files = {
+                str(f.relative_to(collection_artifact_path))
+                for f in collection_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            collection_files = {collection_artifact_path.name}
+
+        if upstream_artifact_path.is_dir():
+            upstream_files = {
+                str(f.relative_to(upstream_artifact_path))
+                for f in upstream_artifact_path.rglob("*")
+                if f.is_file()
+            }
+        else:
+            upstream_files = {upstream_artifact_path.name}
+
+        # Get all unique files
+        all_files = sorted(collection_files | upstream_files)
+
+        # Helper function to compute file hash
+        def compute_file_hash(file_path: Path) -> str:
+            """Compute SHA256 hash of a single file."""
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+
+        # Helper function to check if file is binary
+        def is_binary_file(file_path: Path) -> bool:
+            """Check if file is binary by reading first 8KB."""
+            try:
+                with open(file_path, "rb") as f:
+                    chunk = f.read(8192)
+                    # Check for null bytes
+                    return b"\x00" in chunk
+            except Exception:
+                return True  # Treat as binary if can't read
+
+        # Build file diffs
+        file_diffs: List[FileDiff] = []
+        summary = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0}
+
+        for file_rel_path in all_files:
+            in_collection = file_rel_path in collection_files
+            in_upstream = file_rel_path in upstream_files
+
+            # Determine status
+            if in_collection and in_upstream:
+                # File exists in both - check if modified
+                if collection_artifact_path.is_dir():
+                    coll_file_path = collection_artifact_path / file_rel_path
+                else:
+                    coll_file_path = collection_artifact_path
+
+                if upstream_artifact_path.is_dir():
+                    upstream_file_path = upstream_artifact_path / file_rel_path
+                else:
+                    upstream_file_path = upstream_artifact_path
+
+                coll_hash = compute_file_hash(coll_file_path)
+                upstream_hash = compute_file_hash(upstream_file_path)
+
+                if coll_hash == upstream_hash:
+                    # Unchanged
+                    file_status = "unchanged"
+                    unified_diff = None
+                    summary["unchanged"] += 1
+                else:
+                    # Modified
+                    file_status = "modified"
+                    summary["modified"] += 1
+
+                    # Generate unified diff if text file
+                    unified_diff = None
+                    if not is_binary_file(coll_file_path) and not is_binary_file(
+                        upstream_file_path
+                    ):
+                        try:
+                            with open(coll_file_path, "r", encoding="utf-8") as f:
+                                coll_lines = f.readlines()
+                            with open(upstream_file_path, "r", encoding="utf-8") as f:
+                                upstream_lines = f.readlines()
+
+                            diff_lines = difflib.unified_diff(
+                                coll_lines,
+                                upstream_lines,
+                                fromfile=f"collection/{file_rel_path}",
+                                tofile=f"upstream/{file_rel_path}",
+                                lineterm="",
+                            )
+                            unified_diff = "\n".join(diff_lines)
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to generate diff for {file_rel_path}: {e}"
+                            )
+                            unified_diff = f"[Error generating diff: {str(e)}]"
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=coll_hash,
+                        project_hash=upstream_hash,
+                        unified_diff=unified_diff,
+                    )
+                )
+
+            elif in_collection and not in_upstream:
+                # File deleted in upstream (only in collection)
+                file_status = "deleted"
+                summary["deleted"] += 1
+
+                if collection_artifact_path.is_dir():
+                    coll_file_path = collection_artifact_path / file_rel_path
+                else:
+                    coll_file_path = collection_artifact_path
+
+                coll_hash = compute_file_hash(coll_file_path)
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=coll_hash,
+                        project_hash=None,
+                        unified_diff=None,
+                    )
+                )
+
+            elif not in_collection and in_upstream:
+                # File added in upstream (only in upstream)
+                file_status = "added"
+                summary["added"] += 1
+
+                if upstream_artifact_path.is_dir():
+                    upstream_file_path = upstream_artifact_path / file_rel_path
+                else:
+                    upstream_file_path = upstream_artifact_path
+
+                upstream_hash = compute_file_hash(upstream_file_path)
+
+                file_diffs.append(
+                    FileDiff(
+                        file_path=file_rel_path,
+                        status=file_status,
+                        collection_hash=None,
+                        project_hash=upstream_hash,
+                        unified_diff=None,
+                    )
+                )
+
+        # Determine if there are changes
+        has_changes = (
+            summary["added"] > 0 or summary["modified"] > 0 or summary["deleted"] > 0
+        )
+
+        # Extract upstream version info
+        upstream_version = "unknown"
+        if fetch_result.update_info:
+            upstream_version = (
+                getattr(fetch_result.update_info, "latest_sha", None) or "unknown"
+            )
+
+        logger.info(
+            f"Upstream diff computed for {artifact_id}: {len(file_diffs)} files, "
+            f"has_changes={has_changes}, summary={summary}"
+        )
+
+        # Clean up temp workspace
+        try:
+            if fetch_result.temp_workspace and fetch_result.temp_workspace.exists():
+                shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
+                logger.debug(f"Cleaned up temp workspace: {fetch_result.temp_workspace}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temp workspace: {e}")
+
+        return ArtifactUpstreamDiffResponse(
+            artifact_id=artifact_id,
+            artifact_name=artifact_name,
+            artifact_type=artifact_type.value,
+            collection_name=collection_name,
+            upstream_source=artifact.upstream.spec if artifact.upstream else "unknown",
+            upstream_version=upstream_version,
+            has_changes=has_changes,
+            files=file_diffs,
+            summary=summary,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting upstream diff for '{artifact_id}': {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get artifact upstream diff: {str(e)}",
         )
 
 

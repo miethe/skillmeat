@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Calendar, Tag, GitBranch, AlertCircle, CheckCircle2, Clock, Loader2, RotateCcw, ArrowUp, ArrowDown, FileText, User, GitMerge, RefreshCw } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -27,6 +27,7 @@ import { ContentPane } from '@/components/entity/content-pane';
 import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
+import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactSyncRequest } from '@/sdk';
@@ -209,6 +210,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showFileCreationDialog, setShowFileCreationDialog] = useState(false);
   const [showFileDeletionDialog, setShowFileDeletionDialog] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  // Selected project for diff comparison (when viewing collection-mode entities)
+  const [selectedProjectForDiff, setSelectedProjectForDiff] = useState<string | null>(null);
   // Edit mode state (lifted from ContentPane)
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
@@ -283,12 +286,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Check if there are unsaved changes
   const hasUnsavedChanges = isEditing && editedContent !== (contentData?.content || '');
 
-  // Fetch diff data when sync tab is active and entity has changes
+  // Determine which project path to use for diff
+  // If entity has projectPath (project-mode), use that
+  // If entity is collection-mode but user selected a project, use selectedProjectForDiff
+  const effectiveProjectPath = entity?.projectPath || selectedProjectForDiff;
+
+  // Fetch diff data when sync tab is active and we have a project path to compare against
+  // Allow diff fetching for ALL statuses (synced, modified, outdated, conflict)
+  // Key requirement: must have a valid entity ID and effectiveProjectPath
   const shouldFetchDiff = !!(
     activeTab === 'sync' &&
-    entity &&
-    (entity.status === 'modified' || entity.status === 'outdated') &&
-    entity.projectPath
+    entity?.id &&
+    effectiveProjectPath
   );
 
   const {
@@ -297,19 +306,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     error: diffError,
     refetch: refetchDiff,
   } = useQuery<ArtifactDiffResponse>({
-    queryKey: ['artifact-diff', entity?.id, entity?.projectPath],
+    queryKey: ['artifact-diff', entity?.id, effectiveProjectPath],
     queryFn: async () => {
       if (!entity?.id) {
         throw new Error('Missing entity ID for diff');
       }
 
-      if (!entity?.projectPath) {
+      if (!effectiveProjectPath) {
         throw new Error('Missing project path for diff');
       }
 
       // Ensure projectPath is properly encoded
       const params = new URLSearchParams({
-        project_path: entity.projectPath,
+        project_path: effectiveProjectPath,
       });
 
       if (entity.collection) {
@@ -340,22 +349,28 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
-  // Show toast notification when diff fetch fails
-  if (diffError && shouldFetchDiff) {
-    // Only show toast once per error by checking if it's a new error
-    const errorMessage = diffError instanceof Error ? diffError.message : 'Failed to load diff';
+  // Track if we've shown the error toast to prevent spam
+  const shownErrorRef = useRef<string | null>(null);
 
-    // Use a ref or state to track if we've shown this error
-    // For simplicity, we'll show it on every render when error exists
-    // In production, you might want to debounce this or use a ref
-    if (activeTab === 'sync') {
-      toast({
-        title: 'Diff Load Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+  // Show toast notification when diff fetch fails (only once per unique error)
+  useEffect(() => {
+    if (diffError && shouldFetchDiff && activeTab === 'sync') {
+      const errorMessage = diffError instanceof Error ? diffError.message : 'Failed to load diff';
+
+      // Only show toast if this is a new error message
+      if (shownErrorRef.current !== errorMessage) {
+        shownErrorRef.current = errorMessage;
+        toast({
+          title: 'Diff Load Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
+    } else if (!diffError) {
+      // Reset when error is cleared
+      shownErrorRef.current = null;
     }
-  }
+  }, [diffError, shouldFetchDiff, activeTab, toast]);
 
   if (!entity) {
     return null;
@@ -743,8 +758,30 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // ============================================================================
 
   const renderDiffSection = () => {
-    // Only show diff section for modified or outdated entities with a project path
-    if (!(entity.status === 'modified' || entity.status === 'outdated') || !entity.projectPath) {
+    // Show project selector for collection-mode entities (no projectPath)
+    // This allows users to select which project to compare against
+    if (!entity.projectPath && entity.collection) {
+      return (
+        <div>
+          <ProjectSelectorForDiff
+            entityId={entity.id}
+            entityName={entity.name}
+            entityType={entity.type}
+            collection={entity.collection}
+            onProjectSelected={(projectPath) => {
+              setSelectedProjectForDiff(projectPath);
+              // Auto-refetch diff once project is selected
+              if (shouldFetchDiff) {
+                refetchDiff();
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
+    // If we have an effective project path (either from entity or user selection), show diff viewer
+    if (!effectiveProjectPath) {
       return null;
     }
 

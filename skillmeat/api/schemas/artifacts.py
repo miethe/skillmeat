@@ -874,6 +874,52 @@ class ArtifactDiffResponse(BaseModel):
         }
 
 
+class ArtifactUpstreamDiffResponse(BaseModel):
+    """Response for upstream diff comparing collection with GitHub source."""
+
+    artifact_id: str = Field(description="Artifact identifier")
+    artifact_name: str = Field(description="Artifact name")
+    artifact_type: str = Field(description="Artifact type")
+    collection_name: str = Field(description="Collection name")
+    upstream_source: str = Field(description="GitHub upstream source specification")
+    upstream_version: str = Field(description="Upstream version (SHA or tag)")
+    has_changes: bool = Field(description="Whether any changes detected")
+    files: List[FileDiff] = Field(description="List of file diffs")
+    summary: Dict[str, int] = Field(
+        description="Summary counts: added, modified, deleted, unchanged"
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:pdf-processor",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "collection_name": "default",
+                "upstream_source": "anthropics/skills/pdf",
+                "upstream_version": "abc123def456",
+                "has_changes": True,
+                "files": [
+                    {
+                        "file_path": "SKILL.md",
+                        "status": "modified",
+                        "collection_hash": "abc123",
+                        "project_hash": "def456",
+                        "unified_diff": "--- a/SKILL.md\n+++ b/SKILL.md\n...",
+                    }
+                ],
+                "summary": {
+                    "added": 0,
+                    "modified": 1,
+                    "deleted": 0,
+                    "unchanged": 3,
+                },
+            }
+        }
+
+
 # ===========================
 # File Content Schemas
 # ===========================
