@@ -54,3 +54,4 @@ export type { EntityListProps } from './entity-list';
 export { ConflictResolver } from './conflict-resolver';
 export type { ConflictResolverProps } from './conflict-resolver';
 export { MergeWorkflow } from './merge-workflow';
+export { ProjectSelectorForDiff } from './project-selector-for-diff';
