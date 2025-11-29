@@ -57,6 +57,7 @@ skillmeat web start --data-dir /custom/path
 ### Accessing the Web UI
 
 Open your browser and navigate to:
+
 - Local access: `http://localhost:3000`
 - Remote access: `http://<server-ip>:3000`
 
@@ -125,21 +126,23 @@ The Collections section lets you browse and manage your artifact library.
 ### Searching and Filtering
 
 **Search:**
+
 Enter keywords to search across:
+
 - Artifact names
 - Descriptions
 - Tags
 - Author/publisher
 
-```
 Search examples:
+
 - "python automation" - Find artifacts mentioning Python and automation
 - "tag:productivity" - Find artifacts with productivity tag
 - "source:github" - Find artifacts from GitHub
 - "type:skill" - Find only skills
-```
 
 **Filters:**
+
 - Type: Skills, Commands, Agents, MCP Servers
 - Source: Local, GitHub, Marketplace, Teams
 - Status: Active, Inactive, Updates Available
@@ -151,12 +154,14 @@ Search examples:
 Click any artifact to open the details drawer with:
 
 **Header:**
+
 - Artifact name and icon
 - Type badge
 - Status indicator
 - Quick actions (deploy, edit, delete)
 
 **Information:**
+
 - Description (full text)
 - Author/publisher
 - Version
@@ -165,12 +170,14 @@ Click any artifact to open the details drawer with:
 - Source link (clickable)
 
 **Metadata:**
+
 - Date added
 - Last modified
 - Installation count (from marketplace)
 - User rating (if published)
 
 **Actions:**
+
 - View source - Open source repository
 - Deploy - Deploy to project
 - Update - If update available
@@ -183,6 +190,7 @@ Click any artifact to open the details drawer with:
 ### Adding Artifacts
 
 **Via Add Dialog:**
+
 1. Click "Add Artifact" button
 2. Choose source:
    - GitHub (specify `user/repo/path`)
@@ -193,12 +201,14 @@ Click any artifact to open the details drawer with:
 4. Add to your collection
 
 **Via GitHub:**
-```
+
+```text
 Enter: anthropics/skills/document-skills/docx
 Resolves to latest stable version
 ```
 
 **Via Marketplace:**
+
 1. Search marketplace
 2. Click listing
 3. Click "Install to Collection"
@@ -207,6 +217,7 @@ Resolves to latest stable version
 ### Editing Metadata
 
 Click the edit icon on an artifact card to modify:
+
 - Tags
 - Custom description
 - Local notes
@@ -218,16 +229,64 @@ Changes sync automatically to your collection.
 ### Bulk Operations
 
 **Select Multiple Artifacts:**
+
 - Click checkboxes on artifact cards
 - Use Ctrl+A to select all (filtered results)
 - Actions toolbar appears at bottom
 
 **Bulk Actions:**
+
 - Deploy selected - Choose project and deploy all
 - Delete selected - Remove multiple artifacts
 - Update tags - Add/remove tags from selection
 - Export - Create bundle from selection
 - Publish - Publish selected to marketplace
+
+## Sync Status
+
+The Sync Status tab shows comparison views for tracking artifact versions across the SkillMeat system.
+
+### Upstream Status Section
+
+Compares your collection artifact with its source on GitHub:
+
+- **Latest upstream version** - Most recent version available
+- **Current collection version** - What you have in your collection
+- **File differences** - Detailed diff view of changed files
+- **Pull from upstream** - Button to fetch latest changes
+
+Use this to keep your collection synchronized with upstream updates and review changes before pulling them in.
+
+### Project Comparison Section
+
+Compares collection artifacts with deployed versions in projects:
+
+**In Collection View:**
+
+- Project selector at top - Choose which project to compare against
+- Current collection version on left
+- Deployed project version on right
+- File-level diffs shown in center
+
+**In Project View:**
+
+- Automatically compares against current project
+- Shows what's deployed vs. what's in collection
+- Helps identify local modifications or updates
+
+### Viewing and Applying Changes
+
+**Diff View:**
+
+- Modified files listed with status (added, modified, removed, renamed)
+- Click file to view side-by-side diff
+- Navigate between changes with arrows
+
+**Actions:**
+
+- **Pull/Deploy** - Apply changes to collection or project
+- **Review Details** - Expand file diffs for detailed review
+- **Merge** - Use merge workflow for complex changes
 
 ## Deploying to Projects
 
@@ -236,16 +295,19 @@ The deploy interface lets you distribute artifacts to projects and manage deploy
 ### Starting a Deployment
 
 **Method 1: From Artifact Card**
+
 1. Click artifact
 2. Click "Deploy" in drawer
 3. Proceed to target selection
 
 **Method 2: Bulk Deploy**
+
 1. Select artifacts (checkboxes)
 2. Click "Deploy Selected" button
 3. Proceed to target selection
 
 **Method 3: Deploy Page**
+
 1. Click "Deploy" in sidebar
 2. Select artifacts
 3. Select project
@@ -254,13 +316,16 @@ The deploy interface lets you distribute artifacts to projects and manage deploy
 ### Target Selection
 
 **Choose Project:**
+
 1. Browse available projects
 2. Filter by location, type, etc.
 3. Click project to select
 4. Click "Next"
 
 **Scope Selection:**
+
 Choose deployment scope:
+
 - **User Scope** - Global to all projects
 - **Local Scope** - This project only
 - **Project Scope** - Specific subdirectory
@@ -270,6 +335,7 @@ Choose deployment scope:
 If artifacts already exist:
 
 **Available Strategies:**
+
 - **Merge** - Overwrite with new version
 - **Fork** - Keep both versions (rename new)
 - **Skip** - Keep existing, don't install
@@ -280,6 +346,7 @@ Select strategy and click "Next"
 ### Review and Deploy
 
 **Review Summary:**
+
 - Artifacts to deploy
 - Target project
 - Scope
@@ -287,11 +354,13 @@ Select strategy and click "Next"
 - Estimated time
 
 **Deploy Options:**
+
 - Dry run - Simulate without changes
 - Backup - Backup project before deploy
 - Verify - Run verification after deploy
 
 Click "Deploy" to start. Monitor progress with:
+
 - Real-time status updates
 - Success/error messages
 - Detailed log (expand for details)
@@ -299,21 +368,27 @@ Click "Deploy" to start. Monitor progress with:
 ### Post-Deployment
 
 **Verification:**
+
 System automatically verifies deployment:
+
 - Artifacts present
 - Correct versions
 - Dependencies resolved
 - Syntax validation
 
 **Success Page:**
+
 Shows:
+
 - Deployment summary
 - Deployment ID (for reference)
 - Artifacts deployed
 - Next steps
 
 **Rollback (if needed):**
+
 Recent deployments offer rollback:
+
 1. Click deployment in activity
 2. Click "Rollback"
 3. Confirm
@@ -326,17 +401,20 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Usage Analytics
 
 **Top Artifacts:**
+
 - Most frequently used artifacts
 - Usage count
 - Last 30-day trend
 - Artifact type distribution
 
 **Usage by Type:**
+
 - Chart showing distribution (skills, commands, agents, MCP)
 - Percentage breakdown
 - Growth trends
 
 **Usage Timeline:**
+
 - 30-day usage history
 - Daily granularity
 - Hover for details
@@ -345,12 +423,14 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Deployment Analytics
 
 **Deployment Map:**
+
 - Projects by location
 - Artifact count per project
 - Deployment status
 - Last sync time
 
 **Deployment Trends:**
+
 - New deployments per day
 - Deployment success rate
 - Average deployment time
@@ -359,6 +439,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Update Management
 
 **Updates Available:**
+
 - Artifacts with available updates
 - Update type (minor, patch, major)
 - Release date
@@ -366,6 +447,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 - Auto-update status
 
 **Update History:**
+
 - Recent updates applied
 - Update source
 - Timestamp
@@ -374,6 +456,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Export Analytics
 
 **Generate Report:**
+
 1. Select date range
 2. Choose metrics
 3. Select format (PDF, CSV, JSON)
@@ -384,6 +467,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Profile Settings
 
 **Account:**
+
 - Display name
 - Email
 - Avatar/profile picture
@@ -391,6 +475,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 - Language
 
 **Preferences:**
+
 - Default view (grid/list)
 - Default sort order
 - Items per page
@@ -400,12 +485,14 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### API Configuration
 
 **API Keys:**
+
 - Generate new API key
 - View existing keys
 - Revoke keys
 - Set key permissions
 
 **API Settings:**
+
 - Rate limit
 - Webhook configuration
 - API logging level
@@ -413,12 +500,14 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Integration Settings
 
 **GitHub Integration:**
+
 - Connect GitHub account
 - Select authorized repositories
 - Configure personal access token
 - View authorized scopes
 
 **Marketplace Integration:**
+
 - Configure marketplace brokers
 - Set preferred broker
 - Marketplace API token (if required)
@@ -427,12 +516,14 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Data Management
 
 **Backups:**
+
 - View backup history
 - Create manual backup
 - Download backup
 - Restore from backup
 
 **Import/Export:**
+
 - Export collection (select artifacts)
 - Import collection/bundle
 - Export analytics data
@@ -441,19 +532,88 @@ The Analytics section provides insights into artifact usage and deployment patte
 ### Security
 
 **Two-Factor Authentication:**
+
 - Enable 2FA
 - View recovery codes
 - Manage trusted devices
 
 **Session Management:**
+
 - View active sessions
 - Sign out other sessions
 - Set session timeout
 - View login history
 
+## API Reference
+
+### Upstream Diff Endpoint
+
+**Endpoint:** `GET /api/v1/artifacts/{artifact_id}/upstream-diff`
+
+**Purpose:** Compare a collection artifact with its GitHub upstream source or a deployed project version.
+
+**Parameters:**
+
+```typescript
+artifact_id: string  // Format: "type:name" (e.g., "skill:pdf-processor")
+collection?: string  // Collection name (default: "default")
+project_id?: string  // Optional: Project ID for project comparison
+```
+
+**Response (200 OK):**
+
+```typescript
+{
+  "artifact_id": "skill:pdf-processor",
+  "artifact_name": "pdf-processor",
+  "artifact_type": "skill",
+  "collection_name": "default",
+  "upstream_source": "anthropics/skills/pdf",
+  "upstream_version": "v2.1.0",
+  "has_changes": true,
+  "files": [
+    {
+      "file_path": "SKILL.md",
+      "status": "modified",  // added | modified | removed | renamed
+      "collection_hash": "abc123def456",
+      "upstream_hash": "xyz789abc123",
+      "size_bytes": 2048,
+      "content_preview": "..."  // First 500 chars
+    }
+  ],
+  "summary": {
+    "total_changes": 5,
+    "added": 1,
+    "modified": 3,
+    "removed": 1,
+    "renamed": 0
+  }
+}
+```
+
+**Error Responses:**
+
+- **400 Bad Request** - Invalid artifact ID or no upstream source configured
+- **401 Unauthorized** - User not authenticated
+- **404 Not Found** - Artifact not found
+- **500 Internal Error** - Server error
+
+**Example Usage:**
+
+```bash
+# Compare with upstream
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v1/artifacts/skill:pdf-processor/upstream-diff?collection=default"
+
+# Compare with project deployment
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v1/artifacts/skill:pdf-processor/upstream-diff?collection=default&project_id=my-project"
+```
+
 ## Keyboard Shortcuts
 
 **Navigation:**
+
 - `?` - Show shortcuts help
 - `g h` - Go to home/dashboard
 - `g c` - Go to collections
@@ -462,12 +622,14 @@ The Analytics section provides insights into artifact usage and deployment patte
 - `g s` - Go to settings
 
 **Search and Filter:**
+
 - `/` - Focus search box
 - `Esc` - Clear search
 - `Ctrl+K` - Quick command palette
 - `Ctrl+F` - Filter current view
 
 **Artifact Actions:**
+
 - `d` - Deploy selected
 - `e` - Edit selected
 - `Shift+Del` - Delete selected
@@ -475,6 +637,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 - `Ctrl+C` - Copy artifact details
 
 **View Control:**
+
 - `v g` - Switch to grid view
 - `v l` - Switch to list view
 - `v c` - Switch to compact view
@@ -482,6 +645,7 @@ The Analytics section provides insights into artifact usage and deployment patte
 - `Ctrl+]` - Increase content width
 
 **Dialog Controls:**
+
 - `Enter` - Confirm dialog
 - `Esc` - Cancel dialog
 - `Tab` - Move focus
@@ -574,25 +738,29 @@ kill -9 <PID>
 If issues persist:
 
 1. **Check Logs:**
+
    ```bash
    tail -f ~/.skillmeat/logs/web.log
    tail -f ~/.skillmeat/logs/api.log
    ```
 
 2. **Enable Debug Mode:**
+
    ```bash
    skillmeat web start --api-log debug
    ```
 
 3. **Collect Diagnostics:**
+
    ```bash
    skillmeat diagnose --output diagnostics.json
    ```
 
 4. **Contact Support:**
+
    - Email: support@skillmeat.com
-   - GitHub Issues: https://github.com/skillmeat/skillmeat/issues
-   - Discussions: https://github.com/skillmeat/skillmeat/discussions
+   - GitHub Issues: [https://github.com/skillmeat/skillmeat/issues](https://github.com/skillmeat/skillmeat/issues)
+   - Discussions: [https://github.com/skillmeat/skillmeat/discussions](https://github.com/skillmeat/skillmeat/discussions)
 
 ## See Also
 
