@@ -63,7 +63,7 @@ Bug fixes resolved during November 2025.
   3. Created polymorphic component selector: `const Comp = asChild ? Slot : "button"` (line 44)
   4. Replaced hardcoded `<button>` with dynamic `<Comp>` element (lines 46-50)
   5. Installed `@radix-ui/react-slot` dependency
-- **Commit(s)**: `TBD`
+- **Commit(s)**: `ee7c59d`
 - **Status**: RESOLVED
 
 ---
@@ -78,5 +78,5 @@ Bug fixes resolved during November 2025.
   1. Changed Entity `id` from `matchingArtifact.name` to `${matchingArtifact.type}:${matchingArtifact.name}` (line 106)
   2. Ensures consistency with Entity interface spec: `id` should be "Unique identifier in format 'type:name'"
   3. Enables proper API routing for sync, deploy, and other entity operations
-- **Commit(s)**: `TBD`
+- **Commit(s)**: `ee7c59d`
 - **Status**: RESOLVED
