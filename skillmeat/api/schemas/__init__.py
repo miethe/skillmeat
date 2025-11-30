@@ -9,6 +9,11 @@ from .common import (
     PaginatedResponse,
     ValidationErrorDetail,
 )
+from .errors import (
+    ErrorDetail,
+    ErrorResponse as StandardErrorResponse,
+    ErrorCodes,
+)
 from .collections import (
     CollectionCreateRequest,
     CollectionResponse,
@@ -46,6 +51,10 @@ __all__ = [
     "PageInfo",
     "PaginatedResponse",
     "ValidationErrorDetail",
+    # Error handling
+    "ErrorDetail",
+    "StandardErrorResponse",
+    "ErrorCodes",
     # Collections
     "CollectionCreateRequest",
     "CollectionResponse",
