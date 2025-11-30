@@ -301,6 +301,9 @@ export function SyncStatusTab({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
 
+  // Helper to detect local-only artifacts
+  const isLocalOnly = !entity.source || entity.source === 'local';
+
   // ============================================================================
   // Queries
   // ============================================================================
@@ -317,7 +320,7 @@ export function SyncStatusTab({
       if (!response.ok) throw new Error('Failed to fetch upstream diff');
       return response.json();
     },
-    enabled: !!entity.id && !!entity.source,
+    enabled: !!entity.id && !!entity.source && entity.source !== 'local',
   });
 
   // Project diff (collection vs project)
@@ -351,6 +354,26 @@ export function SyncStatusTab({
     },
     enabled: !!entity.id && !!selectedFile,
   });
+
+  // ============================================================================
+  // Early Return: Local-Only Artifacts with Source Comparison
+  // ============================================================================
+
+  // If this is a local-only artifact and user is trying to compare with source,
+  // show a helpful message instead of an error
+  if (isLocalOnly && comparisonScope === 'source-vs-collection') {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            This is a local-only artifact with no remote source to compare against.
+            Try comparing Collection vs Project instead.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   // ============================================================================
   // Mutations
