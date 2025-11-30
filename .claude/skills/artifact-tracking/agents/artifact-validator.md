@@ -2,7 +2,7 @@
 name: artifact-validator
 description: Validate and maintain quality of AI-optimized tracking artifacts. Specializes in schema validation, completeness checks, and automated cleanup. Token usage ~5KB per validation vs 30 min manual audit.
 color: purple
-model: sonnet-4-5
+#model: sonnet-4-5
 ---
 
 # Artifact Validator Agent

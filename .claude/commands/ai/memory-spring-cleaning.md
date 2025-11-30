@@ -2,7 +2,7 @@
 allowed-tools: Read, Write, Edit, Glob
 argument-hint: [scope] | --claude-md | --documentation | --outdated-patterns | --implementation-sync
 description: Clean and organize project memory files with implementation synchronization and pattern updates
-model: sonnet
+#model: sonnet
 ---
 
 # Memory Spring Cleaning

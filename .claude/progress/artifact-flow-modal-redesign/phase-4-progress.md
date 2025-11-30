@@ -3,10 +3,10 @@ type: progress
 prd: "artifact-flow-modal-redesign"
 phase: 4
 title: "Polish & Action Wiring"
-status: pending
-progress: 0
+status: "completed"
+progress: 100
 total_tasks: 2
-completed_tasks: 0
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 owners: ["ui-engineer-enhanced"]
@@ -16,7 +16,7 @@ updated: "2025-11-29"
 tasks:
   - id: "TASK-4.1"
     description: "Wire all action buttons to API hooks (~100 lines)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-3.1"]
     estimated_effort: "2h"
@@ -29,7 +29,7 @@ tasks:
 
   - id: "TASK-4.2"
     description: "Add Coming Soon tooltips for unimplemented features (~50 lines)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-3.1"]
     estimated_effort: "1h"
@@ -119,6 +119,40 @@ Task("ui-engineer-enhanced", "TASK-4.2: Add Coming Soon tooltips using shadcn/ui
 - [ ] Keyboard navigation works
 - [ ] No console errors
 
+## Completion Note
+
+All action wiring and polish completed successfully on 2025-11-29:
+
+TASK-4.1: Action Button Wiring
+- Pull from Source connected to useSync (upstream direction)
+- Deploy to Project connected to useDeploy
+- Sync from Collection connected to useSync (downstream direction)
+- Merge Conflicts integrated with MergeWorkflow component
+- Resolve All implemented for batch conflict resolution
+- Apply button executes pending actions queue
+- Cancel clears actions and closes modal
+- Loading spinners implemented on all mutations
+- Success/error toast notifications active
+- Query invalidation refreshes UI after mutations
+- Proper disabled states during loading
+
+TASK-4.2: Coming Soon Tooltips
+- Push to Collection button: Ghost variant, disabled, tooltip active
+- Push Local Changes button: Ghost variant, disabled, tooltip active
+- Rollback button: Conditional visibility, Coming Soon state
+- Tooltips styled with shadcn/ui Tooltip component
+- Keyboard accessible (focus triggers tooltips)
+- aria-disabled="true" attributes on buttons
+- Toast notifications on click with informative messages
+
 ## Final Phase
 
-After completion, feature is COMPLETE and ready for deployment.
+Feature COMPLETED and ready for deployment.
+
+### Delivery Summary
+- Phase 1: 5 sub-components created (ArtifactFlowBanner, ComparisonSelector, DriftAlertBanner, FilePreviewPane, SyncActionsFooter)
+- Phase 2: SyncStatusTab orchestration component created (476 lines)
+- Phase 3: Integration into unified-entity-modal.tsx completed
+- Phase 4: All action buttons wired and Coming Soon states implemented
+- Total implementation: ~1100+ lines across 8 components
+- Ready for production deployment

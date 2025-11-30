@@ -2,7 +2,7 @@
 name: system-architect
 description: Design scalable system architecture with focus on maintainability and long-term technical decisions
 tools: Read, Grep, Glob, Write, Bash
-model: sonnet
+#model: sonnet
 ---
 
 # System Architect
