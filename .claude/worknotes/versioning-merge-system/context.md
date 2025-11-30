@@ -1,9 +1,29 @@
+---
+type: context
+prd: versioning-merge-system
+title: "Versioning & Merge System - Development Context"
+status: active
+created: "2025-11-30"
+updated: "2025-11-30"
+critical_notes_count: 0
+implementation_decisions_count: 5
+active_gotchas_count: 0
+agent_contributors: []
+agents: []
+phase_status: []
+blockers: []
+decisions: []
+integrations: []
+gotchas: []
+modified_files: []
+---
+
 # Context: Versioning & Merge System Implementation
 
 **Date**: 2025-11-30
 **PRD**: `/docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
 **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
-**Progress Tracking**: `.claude/progress/versioning-merge-system/all-phases-progress.md`
+**Progress Tracking**: `.claude/progress/versioning-merge-system/phase-1-progress.md`
 
 ---
 

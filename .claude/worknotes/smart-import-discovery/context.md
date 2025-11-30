@@ -1,7 +1,27 @@
+---
+type: context
+prd: smart-import-discovery
+title: "Smart Import & Discovery - Development Context"
+status: active
+created: "2025-11-30"
+updated: "2025-11-30"
+critical_notes_count: 0
+implementation_decisions_count: 5
+active_gotchas_count: 0
+agent_contributors: []
+agents: []
+phase_status: []
+blockers: []
+decisions: []
+integrations: []
+gotchas: []
+modified_files: []
+---
+
 # Smart Import & Discovery - Implementation Context
 
 **PRD**: `/docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md`
-**Progress Tracking**: `.claude/progress/smart-import-discovery/all-phases-progress.md`
+**Progress Tracking**: `.claude/progress/smart-import-discovery/phase-1-progress.md`
 **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/smart-import-discovery-v1.md`
 
 **Last Updated**: 2025-11-30
