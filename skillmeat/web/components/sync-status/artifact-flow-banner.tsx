@@ -261,9 +261,10 @@ export function ArtifactFlowBanner({
           </svg>
           <Button
             size="sm"
+            variant="ghost"
             onClick={onPushToCollection}
             disabled={true}
-            className="h-7 text-xs"
+            className="h-7 text-xs opacity-60"
             title="Coming Soon: Push local changes back to collection"
           >
             <ArrowRight className="mr-1 h-3 w-3 rotate-180" />
