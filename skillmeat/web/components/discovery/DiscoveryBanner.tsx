@@ -23,10 +23,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Info, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { useTrackDiscovery } from '@/lib/analytics';
 
 export interface DiscoveryBannerProps {
   /** Number of artifacts discovered */
@@ -43,6 +44,14 @@ export function DiscoveryBanner({
   dismissible = true,
 }: DiscoveryBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+  const tracking = useTrackDiscovery();
+
+  // Track banner view when it appears
+  useEffect(() => {
+    if (discoveredCount > 0 && !dismissed) {
+      tracking.trackBannerView(discoveredCount);
+    }
+  }, [discoveredCount, dismissed, tracking]);
 
   if (dismissed || discoveredCount === 0) {
     return null;

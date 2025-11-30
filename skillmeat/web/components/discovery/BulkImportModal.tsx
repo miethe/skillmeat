@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Pencil, Package } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { showImportResultToast, showErrorToast } from '@/lib/toast-utils';
+import { useTrackDiscovery } from '@/lib/analytics';
+import { TableSkeleton } from './skeletons';
 
 /**
  * Discovered artifact from local filesystem
@@ -48,7 +50,14 @@ export interface BulkImportModalProps {
 export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImportModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
-  const { toast } = useToast();
+  const tracking = useTrackDiscovery();
+
+  // Track modal open
+  useEffect(() => {
+    if (open && artifacts.length > 0) {
+      tracking.trackModalOpen(artifacts.length);
+    }
+  }, [open, artifacts.length, tracking]);
 
   const isAllSelected = artifacts.length > 0 && selected.size === artifacts.length;
   const isPartiallySelected = selected.size > 0 && selected.size < artifacts.length;
@@ -75,13 +84,25 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     if (selected.size === 0) return;
 
     setIsImporting(true);
+    const startTime = Date.now();
     try {
       const selectedArtifacts = artifacts.filter((a) => selected.has(a.path));
       await onImport(selectedArtifacts);
 
-      toast({
-        title: 'Import successful',
-        description: `Successfully imported ${selected.size} artifact${selected.size > 1 ? 's' : ''}`,
+      const duration = Date.now() - startTime;
+
+      // Show success toast
+      showImportResultToast({
+        total_imported: selected.size,
+        total_failed: 0,
+      });
+
+      // Track import
+      tracking.trackImport({
+        total_requested: selected.size,
+        total_imported: selected.size,
+        total_failed: 0,
+        duration_ms: duration,
       });
 
       // Reset state and close
@@ -89,10 +110,15 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
       onClose();
     } catch (error) {
       console.error('Import failed:', error);
-      toast({
-        title: 'Import failed',
-        description: error instanceof Error ? error.message : 'An error occurred during import',
-        variant: 'destructive',
+      showErrorToast(error, 'Import failed');
+
+      // Track failed import
+      const duration = Date.now() - startTime;
+      tracking.trackImport({
+        total_requested: selected.size,
+        total_imported: 0,
+        total_failed: selected.size,
+        duration_ms: duration,
       });
     } finally {
       setIsImporting(false);
@@ -129,34 +155,39 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
         </DialogHeader>
 
         <div className="flex-1 overflow-auto border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all artifacts"
-                    data-indeterminate={isPartiallySelected}
-                  />
-                </TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead className="min-w-[200px]">Source</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {artifacts.length === 0 ? (
+          {isImporting ? (
+            <div className="p-4">
+              <TableSkeleton rows={artifacts.length > 5 ? 5 : artifacts.length} />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    No artifacts discovered
-                  </TableCell>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all artifacts"
+                      data-indeterminate={isPartiallySelected}
+                    />
+                  </TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead className="min-w-[200px]">Source</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead className="w-20">Actions</TableHead>
                 </TableRow>
-              ) : (
-                artifacts.map((artifact) => (
+              </TableHeader>
+              <TableBody>
+                {artifacts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      No artifacts discovered
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  artifacts.map((artifact) => (
                   <TableRow
                     key={artifact.path}
                     data-state={selected.has(artifact.path) ? 'selected' : undefined}
@@ -204,11 +235,12 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </div>
 
         <DialogFooter>
