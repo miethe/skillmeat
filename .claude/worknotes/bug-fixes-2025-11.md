@@ -274,3 +274,38 @@
 - **Fix**: Changed `artifact.upstream.spec` to `artifact.upstream` to correctly use the string value directly.
 - **Commit(s)**: `46a6fd6`
 - **Status**: RESOLVED
+
+---
+
+### SyncStatusTab Missing Skeleton Loading State
+
+**Issue**: The SyncStatusTab in artifacts modal shows only a centered spinner while loading, lacking proper structure that other tabs display.
+
+- **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:582-591`
+- **Root Cause**: Loading state used a simple `Loader2` spinner centered on screen instead of skeleton components that reflect the actual layout. Other tabs like Contents use proper `Skeleton` components.
+- **Fix**:
+  1. Created `SyncStatusTabSkeleton` component matching actual layout structure
+  2. Skeleton includes: banner area (h-24), file tree column (w-60), center diff pane, right preview column (w-80)
+  3. Uses randomized widths for realistic loading appearance
+  4. Replaced simple spinner with `<SyncStatusTabSkeleton />`
+  5. Removed unused `Loader2` import
+- **Commit(s)**: `626a13c`
+- **Status**: RESOLVED
+
+---
+
+### SyncStatusTab Upstream-Diff 404 Error
+
+**Issue**: Clicking Sync Status tab returns 404 for `/api/artifacts/{id}/upstream-diff` endpoint
+
+- **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:223,239,254,269,304,346`
+- **Error**: `GET /api/artifacts/skill%3Anotebooklm-skill/upstream-diff HTTP/1.1 404`
+- **Root Cause**: Frontend fetch calls used `/api/artifacts/...` but backend serves at `/api/v1/artifacts/...`. The generated SDK correctly uses `/api/v1/` but the component made direct fetch calls bypassing the SDK.
+- **Fix**: Updated all 6 fetch paths from `/api/artifacts/` to `/api/v1/artifacts/`:
+  - Upstream diff query
+  - Project diff query
+  - File content query
+  - Sync mutation
+  - Deploy mutation (2 occurrences)
+- **Commit(s)**: `626a13c`
+- **Status**: RESOLVED
