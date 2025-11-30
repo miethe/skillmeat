@@ -330,3 +330,19 @@
   4. FilePreviewPane: Added `<ScrollBar orientation="horizontal" />` to Radix ScrollArea
 - **Commit(s)**: `85aaf9d`
 - **Status**: RESOLVED
+
+---
+
+### SyncStatusTab 400 Error for Local-Only Artifacts
+
+**Issue**: Opening the Sync Status tab for locally-added artifacts (e.g., Planning skill) causes a 400 error and breaks the tab.
+
+- **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:308-321`
+- **Error**: `GET /api/v1/artifacts/skill%3Aplanning/upstream-diff HTTP/1.1 400` - "Artifact origin 'local' does not support upstream diff"
+- **Root Cause**: The SyncStatusTab component's upstream-diff query had an `enabled` condition that checked for any truthy `entity.source` value, but local artifacts have `source: "local"` (truthy). The backend correctly rejects local artifacts since they have no remote upstream to compare against, but the frontend was making the request anyway and displaying a generic error.
+- **Fix**:
+  1. Added `isLocalOnly` helper: `const isLocalOnly = !entity.source || entity.source === 'local'`
+  2. Updated query `enabled` condition to exclude local artifacts: `entity.source !== 'local'`
+  3. Added early return with user-friendly Alert for local artifacts when comparison scope is 'source-vs-collection', explaining they have no remote source and suggesting "Collection vs Project" comparison instead
+- **Commit(s)**: `a353b2a`
+- **Status**: RESOLVED
