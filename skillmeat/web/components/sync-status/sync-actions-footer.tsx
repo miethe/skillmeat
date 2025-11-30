@@ -40,17 +40,17 @@ export function SyncActionsFooter({
           Pull Collection Updates
         </Button>
 
-        <div title="Coming Soon: Push local changes to collection">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onPushLocalChanges}
-            disabled={true}
-          >
-            <ArrowUp className="mr-2 h-4 w-4" />
-            Push Local Changes
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onPushLocalChanges}
+          disabled={true}
+          className="opacity-60"
+          title="Coming Soon: Push local changes to collection"
+        >
+          <ArrowUp className="mr-2 h-4 w-4" />
+          Push Local Changes
+        </Button>
 
         {hasConflicts && (
           <>

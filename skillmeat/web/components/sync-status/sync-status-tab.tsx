@@ -269,17 +269,32 @@ export function SyncStatusTab({
       const response = await fetch(`/api/artifacts/${entity.id}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direction: 'pull' }),
+        body: JSON.stringify({
+          // Empty body syncs from upstream source (not project)
+          // project_path is omitted to trigger upstream sync
+        }),
       });
-      if (!response.ok) throw new Error('Sync failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Sync failed' }));
+        throw new Error(errorData.detail || 'Sync failed');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
-      toast({ title: 'Success', description: 'Synced from source' });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      toast({
+        title: 'Sync Successful',
+        description: 'Pulled latest changes from source',
+      });
     },
     onError: (error: Error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Sync Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -289,17 +304,89 @@ export function SyncStatusTab({
       const response = await fetch(`/api/artifacts/${entity.id}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_path: projectPath }),
+        body: JSON.stringify({
+          project_path: projectPath,
+          overwrite: false,
+        }),
       });
-      if (!response.ok) throw new Error('Deploy failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Deploy failed' }));
+        throw new Error(errorData.detail || 'Deploy failed');
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      toast({ title: 'Success', description: 'Deployed to project' });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+      toast({
+        title: 'Deploy Successful',
+        description: `Deployed ${entity.name} to project`,
+      });
     },
     onError: (error: Error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Deploy Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Take upstream mutation (overwrite with upstream/collection version)
+  const takeUpstreamMutation = useMutation({
+    mutationFn: async () => {
+      // Strategy depends on comparison scope
+      if (comparisonScope === 'source-vs-collection') {
+        // Pull from source to collection
+        return syncMutation.mutateAsync();
+      } else {
+        // Deploy from collection to project (overwrite)
+        const response = await fetch(`/api/artifacts/${entity.id}/deploy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_path: projectPath,
+            overwrite: true,
+          }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to take upstream' }));
+          throw new Error(errorData.detail || 'Failed to take upstream');
+        }
+        return response.json();
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+      toast({
+        title: 'Changes Accepted',
+        description: 'Upstream version applied successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Take Upstream',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Keep local mutation (dismiss drift alert)
+  const keepLocalMutation = useMutation({
+    mutationFn: async () => {
+      // This is a no-op for now - just a UI acknowledgment
+      // In the future, this could mark the drift as "acknowledged"
+      return Promise.resolve();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Local Version Kept',
+        description: 'Local changes preserved',
+      });
     },
   });
 
@@ -327,6 +414,14 @@ export function SyncStatusTab({
     deployMutation.mutate();
   };
 
+  const handleTakeUpstream = () => {
+    takeUpstreamMutation.mutate();
+  };
+
+  const handleKeepLocal = () => {
+    keepLocalMutation.mutate();
+  };
+
   const handleMerge = () => {
     toast({ title: 'Coming Soon', description: 'Merge workflow in Phase 3' });
   };
@@ -334,6 +429,11 @@ export function SyncStatusTab({
   const handleApplyActions = () => {
     if (pendingActions.length === 0) return;
     toast({ title: 'Info', description: 'Batch actions not yet implemented' });
+  };
+
+  const handleViewDiffs = () => {
+    // Scroll to diff viewer - for now just a no-op
+    // Could implement smooth scroll to diff section
   };
 
   // ============================================================================
@@ -417,12 +517,10 @@ export function SyncStatusTab({
       deleted: currentDiff?.summary?.deleted || 0,
       unchanged: currentDiff?.summary?.unchanged || 0,
     },
-    onViewDiffs: () => {
-      // Scroll to diff viewer (no-op for now)
-    },
+    onViewDiffs: handleViewDiffs,
     onMerge: handleMerge,
-    onTakeUpstream: handlePullFromSource,
-    onKeepLocal: () => toast({ title: 'Coming Soon' }),
+    onTakeUpstream: handleTakeUpstream,
+    onKeepLocal: handleKeepLocal,
   };
 
   const fileTreeProps = {
@@ -454,7 +552,11 @@ export function SyncStatusTab({
     onApply: handleApplyActions,
     hasPendingActions: pendingActions.length > 0,
     hasConflicts: driftStatus === 'conflict',
-    isApplying: syncMutation.isPending || deployMutation.isPending,
+    isApplying:
+      syncMutation.isPending ||
+      deployMutation.isPending ||
+      takeUpstreamMutation.isPending ||
+      keepLocalMutation.isPending,
   };
 
   // ============================================================================
