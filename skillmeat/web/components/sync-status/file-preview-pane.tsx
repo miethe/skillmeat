@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { File, FileText, FileCode } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-type DriftStatus = 'none' | 'modified' | 'outdated' | 'conflict';
-type ComparisonScope = 'collection-vs-project' | 'source-vs-collection' | 'source-vs-project';
+export type DriftStatus = 'none' | 'modified' | 'outdated' | 'conflict';
+export type ComparisonScope = 'collection-vs-project' | 'source-vs-collection' | 'source-vs-project';
 
-interface DriftAlertBannerProps {
+export interface DriftAlertBannerProps {
   driftStatus: DriftStatus;
   comparisonScope: ComparisonScope;
   summary: {

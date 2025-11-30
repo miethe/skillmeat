@@ -1,7 +1,7 @@
 ---
 name: documentation-complex
 description: Use this agent ONLY for truly complex documentation requiring deep analysis and synthesis. Includes multi-system integrations, complex architectural guides, and strategic technical documentation. Uses Sonnet model - more expensive than Haiku. Examples: <example>Context: Complex multi-system integration user: 'Document the complete integration between 10 different microservices with all data flows and error scenarios' assistant: 'I'll use the documentation-complex agent for this multi-system integration documentation' <commentary>Complex integration docs with many systems and trade-offs justify Sonnet usage</commentary></example> <example>Context: Complex architectural guide user: 'Write comprehensive guide analyzing the trade-offs between 5 different caching strategies across our stack' assistant: 'I'll use the documentation-complex agent for this deep architectural analysis' <commentary>Deep architectural analysis with many trade-offs requires Sonnet capabilities</commentary></example> <example>Context: Strategic technical doc user: 'Document our complete observability strategy covering logging, metrics, tracing, and alerting across all services' assistant: 'I'll use the documentation-complex agent for this strategic technical documentation' <commentary>Strategic cross-domain documentation benefits from Sonnet's deeper analysis</commentary></example>
-model: sonnet
+#model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash, WebSearch
 color: blue
 ---
