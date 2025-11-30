@@ -301,7 +301,7 @@ export function FileTree({
       )}
 
       {/* File tree */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-auto p-2">
         {files.map((node) => (
           <TreeNode
             key={node.path}

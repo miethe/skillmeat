@@ -51,7 +51,7 @@ function DiffLine({ content, type, lineNumber }: DiffLineProps) {
       <span className="w-12 flex-shrink-0 select-none border-r border-border/50 pr-2 text-right text-gray-400">
         {lineNumber !== undefined ? lineNumber : ''}
       </span>
-      <span className="flex-1 whitespace-pre-wrap break-all px-2">{content}</span>
+      <span className="flex-1 whitespace-pre px-2">{content}</span>
     </div>
   );
 }
@@ -264,7 +264,7 @@ export function DiffViewer({
 
       <div className="flex flex-1 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-64 overflow-y-auto border-r bg-muted/20">
+        <div className="w-64 overflow-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
             {files.map((file, index) => {
               const isExpanded = expandedFiles.has(index);
@@ -344,7 +344,7 @@ export function DiffViewer({
                 <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div ref={leftScrollRef} className="flex-1 overflow-y-auto">
+                <div ref={leftScrollRef} className="flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'addition') return null;
                     if (line.type === 'header') {
@@ -370,7 +370,7 @@ export function DiffViewer({
                 <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div ref={rightScrollRef} className="flex-1 overflow-y-auto">
+                <div ref={rightScrollRef} className="flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'deletion') return null;
                     if (line.type === 'header') {
