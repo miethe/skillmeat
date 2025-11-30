@@ -67,7 +67,8 @@
     "remark-gfm": "^4.0.0",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.4",
-    "use-debounce": "^10.0.6"
+    "use-debounce": "^10.0.6",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
