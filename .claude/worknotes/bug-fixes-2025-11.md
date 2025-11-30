@@ -309,3 +309,24 @@
   - Deploy mutation (2 occurrences)
 - **Commit(s)**: `626a13c`
 - **Status**: RESOLVED
+
+---
+
+## 2025-11-30
+
+### Missing Scrollbars in Sync Status Diff Viewer
+
+**Issue**: The Diff Viewer on the Sync Status page lacks horizontal scrollbars, making code content wider than the viewport inaccessible. File tree, left/right diff panels, and File Preview pane all have no horizontal scroll capability.
+
+- **Location**:
+  - `skillmeat/web/components/entity/diff-viewer.tsx:54,267,347,373`
+  - `skillmeat/web/components/entity/file-tree.tsx:304`
+  - `skillmeat/web/components/sync-status/file-preview-pane.tsx:6,279`
+- **Root Cause**: All scroll containers used `overflow-y-auto` (vertical only) instead of `overflow-auto` (both directions). The Radix ScrollArea in FilePreviewPane only rendered vertical ScrollBar by default. Additionally, DiffLine used `whitespace-pre-wrap break-all` which prevented horizontal scrolling by forcing text wrap.
+- **Fix**:
+  1. DiffViewer: Changed `overflow-y-auto` to `overflow-auto` for file list sidebar, left/right diff panels
+  2. DiffLine: Changed `whitespace-pre-wrap break-all` to `whitespace-pre` to allow horizontal scroll on long lines
+  3. FileTree: Changed `overflow-y-auto` to `overflow-auto` for long file paths
+  4. FilePreviewPane: Added `<ScrollBar orientation="horizontal" />` to Radix ScrollArea
+- **Commit(s)**: `85aaf9d`
+- **Status**: RESOLVED
