@@ -6,7 +6,7 @@ database connections, and configuration.
 """
 
 import logging
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -41,6 +41,7 @@ class AppState:
         self.token_manager: Optional[TokenManager] = None
         self.sync_manager: Optional[SyncManager] = None
         self.settings: Optional[APISettings] = None
+        self.metadata_cache: Optional[Any] = None  # MetadataCache, lazily initialized
 
     def initialize(self, settings: APISettings) -> None:
         """Initialize all managers with settings.
@@ -72,6 +73,7 @@ class AppState:
         self.artifact_manager = None
         self.token_manager = None
         self.sync_manager = None
+        self.metadata_cache = None
         logger.info("Application state shutdown complete")
 
 

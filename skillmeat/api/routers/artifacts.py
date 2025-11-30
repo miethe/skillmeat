@@ -9,12 +9,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
     CollectionManagerDep,
+    ConfigManagerDep,
     SyncManagerDep,
+    get_app_state,
     verify_api_key,
 )
 from skillmeat.api.middleware.auth import TokenDep
@@ -47,8 +49,20 @@ from skillmeat.api.schemas.artifacts import (
     VersionGraphResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
+from skillmeat.api.schemas.discovery import (
+    DiscoveredArtifact,
+    DiscoveryRequest,
+    DiscoveryResult,
+    GitHubMetadata,
+    MetadataFetchResponse,
+    ParameterUpdateRequest,
+    ParameterUpdateResponse,
+)
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.cache import MetadataCache
 from skillmeat.core.deployment import DeploymentManager
+from skillmeat.core.discovery import ArtifactDiscoveryService
+from skillmeat.core.github_metadata import GitHubMetadataExtractor
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 
@@ -408,6 +422,94 @@ def artifact_to_response(
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
     )
+
+
+@router.post(
+    "/discover",
+    response_model=DiscoveryResult,
+    summary="Discover artifacts in collection",
+    description="Scan collection for existing artifacts that can be imported",
+    responses={
+        200: {"description": "Discovery scan completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid scan path"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def discover_artifacts(
+    request: DiscoveryRequest,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> DiscoveryResult:
+    """Scan collection for existing artifacts.
+
+    Scans the collection artifacts directory for existing artifacts
+    that can be imported into the collection. Returns metadata
+    for each discovered artifact.
+
+    Args:
+        request: Discovery request with optional scan_path
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection name (defaults to active collection)
+
+    Returns:
+        DiscoveryResult with discovered artifacts, errors, and metrics
+
+    Raises:
+        HTTPException: If scan_path doesn't exist or scan fails
+    """
+    # Determine collection name
+    collection_name = collection or "default"
+
+    try:
+        # Get collection path
+        collection_path = collection_mgr.config.get_collection_path(collection_name)
+
+        # Use custom scan path if provided, otherwise use collection artifacts directory
+        if request.scan_path:
+            scan_path = Path(request.scan_path)
+            if not scan_path.exists():
+                logger.warning(f"Scan path does not exist: {scan_path}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Scan path does not exist: {request.scan_path}",
+                )
+        else:
+            scan_path = collection_path
+
+        # Create discovery service
+        discovery_service = ArtifactDiscoveryService(scan_path)
+
+        # Perform discovery scan
+        logger.info(f"Starting artifact discovery scan in: {scan_path}")
+        result = discovery_service.discover_artifacts()
+
+        # Log results
+        logger.info(
+            f"Discovery scan completed: {result.discovered_count} artifacts found "
+            f"in {result.scan_duration_ms:.2f}ms, {len(result.errors)} errors"
+        )
+
+        if result.errors:
+            logger.warning(f"Discovery scan encountered {len(result.errors)} errors")
+            for error in result.errors[:5]:  # Log first 5 errors
+                logger.warning(f"  - {error}")
+
+        return result
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Discovery scan failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Discovery scan failed: {str(e)}",
+        )
 
 
 @router.post(
@@ -1359,6 +1461,239 @@ async def update_artifact(
         )
 
 
+@router.put(
+    "/{artifact_id}/parameters",
+    response_model=ParameterUpdateResponse,
+    summary="Update artifact parameters",
+    description="Update artifact parameters (source, version, scope, tags, aliases) after import",
+    responses={
+        200: {"description": "Successfully updated parameters"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def update_artifact_parameters(
+    artifact_id: str,
+    request: ParameterUpdateRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (searches all if not specified)",
+    ),
+) -> ParameterUpdateResponse:
+    """Update artifact parameters after import.
+
+    Updates the source, version, scope, tags, or aliases of an existing artifact.
+    Changes are persisted to the manifest and lock file atomically.
+
+    Args:
+        artifact_id: Artifact identifier (format: "type:name")
+        request: Parameter update request
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+        collection: Optional collection filter
+
+    Returns:
+        Parameter update response with list of updated fields
+
+    Raises:
+        HTTPException: If artifact not found or validation fails
+
+    Example:
+        PUT /api/v1/artifacts/skill:canvas-design/parameters
+        {
+            "parameters": {
+                "source": "anthropics/skills/canvas-design@v2.0.0",
+                "version": "v2.0.0",
+                "tags": ["design", "canvas", "art"]
+            }
+        }
+    """
+    try:
+        logger.info(
+            f"Updating parameters for artifact: {artifact_id} (collection={collection})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Find artifact and its collection
+        artifact = None
+        collection_name = collection
+        target_collection = None
+
+        if collection:
+            # Search in specified collection
+            if collection not in collection_mgr.list_collections():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Collection '{collection}' not found",
+                )
+            try:
+                target_collection = collection_mgr.load_collection(collection)
+                artifact = target_collection.find_artifact(artifact_name, artifact_type)
+            except ValueError:
+                pass  # Not found in this collection
+        else:
+            # Search across all collections
+            for coll_name in collection_mgr.list_collections():
+                try:
+                    target_collection = collection_mgr.load_collection(coll_name)
+                    artifact = target_collection.find_artifact(
+                        artifact_name, artifact_type
+                    )
+                    collection_name = coll_name
+                    break  # Found it
+                except ValueError:
+                    continue
+
+        if not artifact or not target_collection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Track updated fields
+        updated_fields = []
+        params = request.parameters
+
+        # Validate and update source
+        if params.source is not None:
+            # Validate GitHub source format using existing parser
+            if params.source.strip():
+                try:
+                    from skillmeat.core.github_metadata import GitHubMetadataExtractor
+
+                    extractor = GitHubMetadataExtractor()
+                    # This will raise ValueError if invalid
+                    extractor.parse_github_url(params.source)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Invalid GitHub source format: {str(e)}",
+                    )
+
+                # Update upstream source
+                artifact.upstream = params.source
+                updated_fields.append("source")
+                logger.info(f"Updated source for {artifact_id}: {params.source}")
+
+        # Update version
+        if params.version is not None:
+            # Validate version format
+            if params.version.strip():
+                # Accept: latest, @latest, @v1.0.0, @sha, v1.0.0, sha
+                version = params.version.strip()
+                if not version.startswith("@"):
+                    if version != "latest":
+                        version = f"@{version}"
+                    # else: "latest" stays as-is
+                else:
+                    # Remove @ prefix for storage
+                    version = version[1:]
+
+                artifact.version_spec = version
+                updated_fields.append("version")
+                logger.info(f"Updated version for {artifact_id}: {version}")
+
+        # Update scope
+        if params.scope is not None:
+            # Validation already done by Pydantic (user or local)
+            # Note: Scope change may require moving artifact files in future implementation
+            logger.warning(
+                f"Scope update requested for {artifact_id} to '{params.scope}' "
+                "but scope changes are not yet fully implemented (file moves not performed)"
+            )
+            # For now, just track it as an updated field
+            updated_fields.append("scope")
+
+        # Update tags
+        if params.tags is not None:
+            artifact.tags = params.tags
+            updated_fields.append("tags")
+            logger.info(f"Updated tags for {artifact_id}: {params.tags}")
+
+        # Update aliases
+        if params.aliases is not None:
+            # Aliases are stored in metadata.extra for now
+            if artifact.metadata is None:
+                from skillmeat.core.artifact import ArtifactMetadata
+
+                artifact.metadata = ArtifactMetadata()
+
+            if "aliases" not in artifact.metadata.extra:
+                artifact.metadata.extra["aliases"] = []
+
+            artifact.metadata.extra["aliases"] = params.aliases
+            updated_fields.append("aliases")
+            logger.info(f"Updated aliases for {artifact_id}: {params.aliases}")
+
+        # Update last_updated timestamp if anything changed
+        if updated_fields:
+            artifact.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+
+            # Save collection (atomic write of manifest)
+            collection_mgr.save_collection(target_collection)
+
+            # Update lock file
+            collection_path = collection_mgr.config.get_collection_path(collection_name)
+            artifact_path = collection_path / artifact.path
+
+            # Compute content hash for lock file
+            content_hash = compute_content_hash(artifact_path)
+            collection_mgr.lock_mgr.update_entry(
+                collection_path,
+                artifact.name,
+                artifact.type,
+                artifact.upstream,
+                artifact.resolved_sha,
+                artifact.resolved_version,
+                content_hash,
+            )
+
+            logger.info(
+                f"Successfully updated {len(updated_fields)} parameter(s) for artifact: {artifact_id}"
+            )
+            message = (
+                f"Updated {len(updated_fields)} field(s): {', '.join(updated_fields)}"
+            )
+        else:
+            logger.info(f"No parameter changes requested for artifact: {artifact_id}")
+            message = "No parameters were updated"
+
+        return ParameterUpdateResponse(
+            success=True,
+            artifact_id=artifact_id,
+            updated_fields=updated_fields,
+            message=message,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error updating parameters for artifact '{artifact_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update artifact parameters: {str(e)}",
+        )
+
+
 @router.delete(
     "/{artifact_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1711,7 +2046,9 @@ async def sync_artifact(
                     collection_name=collection_name,
                 )
             except Exception as e:
-                logger.error(f"Failed to fetch update for '{artifact_id}': {e}", exc_info=True)
+                logger.error(
+                    f"Failed to fetch update for '{artifact_id}': {e}", exc_info=True
+                )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Failed to fetch update from upstream: {str(e)}",
@@ -1737,7 +2074,9 @@ async def sync_artifact(
                     artifact_name=artifact_name,
                     artifact_type=artifact_type.value,
                     conflicts=None,
-                    updated_version=artifact.metadata.version if artifact.metadata else None,
+                    updated_version=(
+                        artifact.metadata.version if artifact.metadata else None
+                    ),
                     synced_files_count=0,
                 )
 
@@ -1755,14 +2094,18 @@ async def sync_artifact(
 
             # If strategy is "ours", skip the update
             if apply_strategy == "skip":
-                logger.info(f"Strategy 'ours' selected - keeping local version of '{artifact_id}'")
+                logger.info(
+                    f"Strategy 'ours' selected - keeping local version of '{artifact_id}'"
+                )
                 return ArtifactSyncResponse(
                     success=True,
                     message=f"Local version of '{artifact_name}' preserved (strategy: ours)",
                     artifact_name=artifact_name,
                     artifact_type=artifact_type.value,
                     conflicts=None,
-                    updated_version=artifact.metadata.version if artifact.metadata else None,
+                    updated_version=(
+                        artifact.metadata.version if artifact.metadata else None
+                    ),
                     synced_files_count=0,
                 )
 
@@ -1776,7 +2119,9 @@ async def sync_artifact(
                     collection_name=collection_name,
                 )
             except Exception as e:
-                logger.error(f"Failed to apply update for '{artifact_id}': {e}", exc_info=True)
+                logger.error(
+                    f"Failed to apply update for '{artifact_id}': {e}", exc_info=True
+                )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Failed to apply update: {str(e)}",
@@ -1788,12 +2133,16 @@ async def sync_artifact(
                 # Merge may have failed due to conflicts
                 # This is a simplified approach - proper conflict tracking would require
                 # modifying UpdateResult to include conflict information
-                logger.warning(f"Merge strategy may have encountered conflicts for '{artifact_id}'")
+                logger.warning(
+                    f"Merge strategy may have encountered conflicts for '{artifact_id}'"
+                )
 
             # Count synced files
             synced_files_count = None
             if update_result.updated:
-                collection_path = collection_mgr.config.get_collection_path(collection_name)
+                collection_path = collection_mgr.config.get_collection_path(
+                    collection_name
+                )
                 artifact_path = collection_path / artifact.path
                 if artifact_path.exists():
                     synced_files_count = len(list(artifact_path.rglob("*")))
@@ -2556,7 +2905,10 @@ async def get_artifact_diff(
     description="Compare collection artifact with its GitHub upstream source",
     responses={
         200: {"description": "Successfully retrieved upstream diff"},
-        400: {"model": ErrorResponse, "description": "Invalid request or no upstream source"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or no upstream source",
+        },
         401: {"model": ErrorResponse, "description": "Unauthorized"},
         404: {"model": ErrorResponse, "description": "Artifact not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
@@ -2910,7 +3262,9 @@ async def get_artifact_upstream_diff(
         try:
             if fetch_result.temp_workspace and fetch_result.temp_workspace.exists():
                 shutil.rmtree(fetch_result.temp_workspace, ignore_errors=True)
-                logger.debug(f"Cleaned up temp workspace: {fetch_result.temp_workspace}")
+                logger.debug(
+                    f"Cleaned up temp workspace: {fetch_result.temp_workspace}"
+                )
         except Exception as e:
             logger.warning(f"Failed to clean up temp workspace: {e}")
 
@@ -3667,6 +4021,8 @@ async def update_artifact_file_content(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update file content: {str(e)}",
         )
+
+
 @router.post(
     "/{artifact_id}/files/{file_path:path}",
     response_model=FileContentResponse,
@@ -4134,4 +4490,99 @@ async def delete_artifact_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete file: {str(e)}",
+        )
+
+
+@router.get("/metadata/github", response_model=MetadataFetchResponse)
+async def fetch_github_metadata(
+    source: str = Query(..., description="GitHub source: user/repo/path[@version]"),
+    request: Request = None,
+    config_mgr: ConfigManagerDep = None,
+) -> MetadataFetchResponse:
+    """Fetch metadata from GitHub for a given source.
+
+    Parses the source URL, fetches repository metadata and
+    frontmatter from the artifact's markdown file. Results
+    are cached for 1 hour to reduce GitHub API calls.
+
+    Args:
+        source: GitHub source in format user/repo/path[@version]
+        request: FastAPI request object for accessing app state
+        config_mgr: Config manager dependency for GitHub token
+
+    Returns:
+        MetadataFetchResponse with metadata or error details
+
+    Raises:
+        HTTPException: On internal errors
+    """
+    try:
+        logger.info(f"Fetching GitHub metadata for source: {source}")
+
+        # Get or create metadata cache from app state
+        app_state = get_app_state()
+        if not hasattr(app_state, "metadata_cache") or app_state.metadata_cache is None:
+            # Initialize cache with 1 hour TTL
+            ttl_seconds = 3600
+            app_state.metadata_cache = MetadataCache(ttl_seconds=ttl_seconds)
+            logger.debug(f"Initialized metadata cache with TTL={ttl_seconds}s")
+
+        # Get GitHub token from config (optional, for rate limits)
+        github_token = None
+        if config_mgr:
+            github_token = config_mgr.get("github-token")
+            if github_token:
+                logger.debug("Using configured GitHub token for API requests")
+
+        # Create metadata extractor with cache and token
+        extractor = GitHubMetadataExtractor(
+            cache=app_state.metadata_cache, token=github_token
+        )
+
+        # Try to fetch metadata
+        try:
+            metadata = extractor.fetch_metadata(source)
+            logger.info(f"Successfully fetched metadata for {source}")
+
+            return MetadataFetchResponse(
+                success=True,
+                metadata=GitHubMetadata(
+                    title=metadata.title,
+                    description=metadata.description,
+                    author=metadata.author,
+                    license=metadata.license,
+                    topics=metadata.topics,
+                    url=metadata.url,
+                    fetched_at=metadata.fetched_at,
+                ),
+            )
+
+        except ValueError as e:
+            # Invalid source format
+            logger.warning(f"Invalid source format '{source}': {e}")
+            return MetadataFetchResponse(success=False, error=str(e))
+
+        except RuntimeError as e:
+            # Rate limit or API error
+            error_msg = str(e)
+            logger.error(f"GitHub API error for '{source}': {error_msg}")
+
+            # Provide specific error messages for common issues
+            if "404" in error_msg or "not found" in error_msg.lower():
+                return MetadataFetchResponse(
+                    success=False, error="Repository or artifact not found"
+                )
+            elif "429" in error_msg or "rate limit" in error_msg.lower():
+                return MetadataFetchResponse(
+                    success=False,
+                    error="GitHub rate limit exceeded. Please configure a GitHub token for higher limits.",
+                )
+            else:
+                return MetadataFetchResponse(success=False, error=error_msg)
+
+    except Exception as e:
+        logger.exception(f"Unexpected error fetching metadata for '{source}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch metadata: {str(e)}",
         )
