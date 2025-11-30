@@ -42,6 +42,7 @@ import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
+import { SyncStatusTab } from '@/components/sync-status';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactUpstreamDiffResponse, ArtifactSyncRequest } from '@/sdk';
@@ -1118,7 +1119,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden p-0 lg:max-w-5xl xl:max-w-6xl">
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
@@ -1331,93 +1332,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Sync Status Tab */}
-            <TabsContent value="sync" className="mt-0 flex-1">
-              <ScrollArea className="h-[calc(90vh-12rem)]">
-                <div className="space-y-6 py-4">
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Sync Status</h3>
-                    <div className="mb-4 flex items-center gap-2">
-                      {getStatusIcon()}
-                      <span className="text-sm">{getStatusLabel()}</span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleDeploy}
-                        disabled={isDeploying || !entity.collection}
-                        size="sm"
-                      >
-                        {isDeploying ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deploying...
-                          </>
-                        ) : (
-                          'Deploy to Project'
-                        )}
-                      </Button>
-                      <Button
-                        onClick={handleSync}
-                        disabled={isSyncing || !entity.projectPath}
-                        variant="outline"
-                        size="sm"
-                      >
-                        {isSyncing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Syncing...
-                          </>
-                        ) : (
-                          'Sync with Upstream'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Upstream Status Section */}
-                  {renderUpstreamSection()}
-
-                  {/* Project Comparison Section */}
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Project Comparison</h3>
-                    {renderDiffSection()}
-                  </div>
-
-                  {/* Status Alerts */}
-                  {entity.status === 'outdated' && (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription className="text-sm text-blue-700 dark:text-blue-400">
-                        A newer version is available upstream. Click "Sync with Upstream" to update.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {entity.status === 'conflict' && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription className="space-y-3">
-                        <p className="text-sm">
-                          There are conflicting changes between local and upstream versions. Use the
-                          merge workflow to resolve conflicts interactively.
-                        </p>
-                        {entity.projectPath && (
-                          <Button
-                            onClick={() => setShowMergeWorkflow(true)}
-                            variant="outline"
-                            size="sm"
-                            className="bg-background hover:bg-muted"
-                          >
-                            <GitMerge className="mr-2 h-4 w-4" />
-                            Resolve Conflicts
-                          </Button>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              </ScrollArea>
+            <TabsContent value="sync" className="mt-0 flex-1 overflow-hidden">
+              <SyncStatusTab
+                entity={entity}
+                mode={entity.projectPath ? 'project' : 'collection'}
+                projectPath={entity.projectPath || selectedProjectForDiff || undefined}
+                onClose={onClose}
+              />
             </TabsContent>
 
             {/* History Tab */}
