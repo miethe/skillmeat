@@ -1,11 +1,21 @@
 ---
 type: context
-prd: "persistent-project-cache"
-created: 2025-11-30
-updated: 2025-11-30
-phases: 6
-total_effort: "88 story points"
-timeline: "6 weeks"
+prd: persistent-project-cache
+title: "Persistent Project Cache - Development Context"
+status: active
+created: "2025-11-30"
+updated: "2025-11-30"
+critical_notes_count: 0
+implementation_decisions_count: 5
+active_gotchas_count: 0
+agent_contributors: []
+agents: []
+phase_status: []
+blockers: []
+decisions: []
+integrations: []
+gotchas: []
+modified_files: []
 ---
 
 # Persistent Project Cache - Implementation Context
@@ -413,7 +423,7 @@ skillmeat/
 5. Document architectural decisions via ADR
 
 **Important Files**:
-- Progress tracking: `.claude/progress/persistent-project-cache/all-phases-progress.md`
+- Progress tracking: `.claude/progress/persistent-project-cache/phase-1-progress.md`
 - Context notes: `.claude/worknotes/persistent-project-cache/context.md`
 - PRD: `docs/project_plans/PRDs/enhancements/persistent-project-cache-v1.md`
 - Implementation plan: `docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1.md`
