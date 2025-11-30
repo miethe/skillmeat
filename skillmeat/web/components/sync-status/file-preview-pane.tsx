@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { File, FileText, FileCode } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ============================================================================
@@ -276,6 +276,7 @@ export function FilePreviewPane({ filePath, content, tier, isLoading }: FilePrev
           {fileType === 'code' && <CodeContent content={content} filePath={filePath} />}
           {fileType === 'text' && <TextContent content={content} />}
         </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </div>
   );
