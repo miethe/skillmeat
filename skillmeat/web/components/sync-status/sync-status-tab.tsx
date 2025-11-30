@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import type { Entity } from '@/types/entity';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -151,6 +152,98 @@ function getTierFromScope(scope: ComparisonScope): 'source' | 'collection' | 'pr
 }
 
 // ============================================================================
+// Loading Skeleton
+// ============================================================================
+
+/**
+ * SyncStatusTabSkeleton - Loading state matching the actual layout
+ *
+ * Mimics the 3-part structure:
+ * - Top: ArtifactFlowBanner (3-tier visualization)
+ * - Middle: ComparisonSelector + content area
+ * - Bottom: Split pane (file tree + content)
+ */
+function SyncStatusTabSkeleton() {
+  return (
+    <div className="flex h-full flex-col">
+      {/* Top: Flow Banner Skeleton */}
+      <div className="flex-shrink-0 border-b p-4">
+        <Skeleton className="h-24 w-full" />
+      </div>
+
+      {/* Middle: 3-Panel Layout Skeleton */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: File Tree Skeleton (240px) */}
+        <div className="w-60 flex-shrink-0 border-r p-4">
+          <Skeleton className="mb-3 h-5 w-32" />
+          <div className="space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton
+                  className="h-4"
+                  style={{ width: `${40 + Math.random() * 40}%` }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Center Panel: Comparison + Diff Skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Comparison Selector Skeleton */}
+          <div className="flex-shrink-0 space-y-3 border-b p-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+
+          {/* Diff Content Skeleton */}
+          <div className="flex-1 space-y-2 p-6">
+            {[...Array(12)].map((_, i) => (
+              <Skeleton
+                key={i}
+                className="h-5"
+                style={{ width: `${60 + Math.random() * 30}%` }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Right Panel: File Preview Skeleton (320px) */}
+        <div className="w-80 flex-shrink-0 border-l">
+          <div className="border-b p-4">
+            <Skeleton className="h-5 w-48" />
+          </div>
+          <div className="space-y-3 p-6">
+            {[...Array(10)].map((_, i) => (
+              <Skeleton
+                key={i}
+                className="h-4"
+                style={{ width: `${50 + Math.random() * 40}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: Actions Footer Skeleton */}
+      <div className="flex-shrink-0 border-t p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-20" />
+            <Skeleton className="h-9 w-20" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -220,7 +313,7 @@ export function SyncStatusTab({
   } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity.id],
     queryFn: async () => {
-      const response = await fetch(`/api/artifacts/${entity.id}/upstream-diff`);
+      const response = await fetch(`/api/v1/artifacts/${entity.id}/upstream-diff`);
       if (!response.ok) throw new Error('Failed to fetch upstream diff');
       return response.json();
     },
@@ -236,7 +329,7 @@ export function SyncStatusTab({
     queryKey: ['project-diff', entity.id, projectPath],
     queryFn: async () => {
       const params = new URLSearchParams({ project_path: projectPath! });
-      const response = await fetch(`/api/artifacts/${entity.id}/diff?${params}`);
+      const response = await fetch(`/api/v1/artifacts/${entity.id}/diff?${params}`);
       if (!response.ok) throw new Error('Failed to fetch project diff');
       return response.json();
     },
@@ -251,7 +344,7 @@ export function SyncStatusTab({
     queryKey: ['file-content', entity.id, selectedFile],
     queryFn: async () => {
       const response = await fetch(
-        `/api/artifacts/${entity.id}/files/${encodeURIComponent(selectedFile!)}`
+        `/api/v1/artifacts/${entity.id}/files/${encodeURIComponent(selectedFile!)}`
       );
       if (!response.ok) throw new Error('Failed to fetch file content');
       return response.text();
@@ -266,7 +359,7 @@ export function SyncStatusTab({
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/artifacts/${entity.id}/sync`, {
+      const response = await fetch(`/api/v1/artifacts/${entity.id}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -301,7 +394,7 @@ export function SyncStatusTab({
   // Deploy mutation (deploy to project)
   const deployMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/artifacts/${entity.id}/deploy`, {
+      const response = await fetch(`/api/v1/artifacts/${entity.id}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -343,7 +436,7 @@ export function SyncStatusTab({
         return syncMutation.mutateAsync();
       } else {
         // Deploy from collection to project (overwrite)
-        const response = await fetch(`/api/artifacts/${entity.id}/deploy`, {
+        const response = await fetch(`/api/v1/artifacts/${entity.id}/deploy`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -580,14 +673,7 @@ export function SyncStatusTab({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading diff data...</p>
-        </div>
-      </div>
-    );
+    return <SyncStatusTabSkeleton />;
   }
 
   // ============================================================================
