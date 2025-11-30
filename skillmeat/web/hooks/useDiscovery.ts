@@ -10,6 +10,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import type {
   DiscoveryResult,
   BulkImportRequest,
@@ -33,11 +34,20 @@ export function useDiscovery() {
   const discoverQuery = useQuery({
     queryKey: ['artifacts', 'discover'],
     queryFn: async (): Promise<DiscoveryResult> => {
-      return await apiRequest<DiscoveryResult>('/artifacts/discover', {
+      const result = await apiRequest<DiscoveryResult>('/artifacts/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
+
+      // Track discovery scan completion after successful fetch
+      trackEvent('discovery_scan', {
+        discovered_count: result.discovered_count,
+        duration_ms: result.scan_duration_ms,
+        has_errors: result.errors.length > 0,
+      });
+
+      return result;
     },
     enabled: false, // Manual trigger with refetch
     staleTime: 0, // Always refetch when triggered
