@@ -60,6 +60,15 @@ from skillmeat.api.schemas.discovery import (
     ParameterUpdateRequest,
     ParameterUpdateResponse,
 )
+from skillmeat.api.schemas.errors import ErrorCodes, ErrorDetail
+from skillmeat.api.utils.error_handlers import (
+    create_bad_request_error,
+    create_internal_error,
+    create_not_found_error,
+    create_rate_limit_error,
+    create_validation_error,
+    validate_artifact_request,
+)
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.cache import MetadataCache
 from skillmeat.core.deployment import DeploymentManager
@@ -482,9 +491,9 @@ async def discover_artifacts(
             scan_path = Path(request.scan_path)
             if not scan_path.exists():
                 logger.warning(f"Scan path does not exist: {scan_path}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Scan path does not exist: {request.scan_path}",
+                raise create_bad_request_error(
+                    f"Scan path does not exist: {request.scan_path}",
+                    ErrorCodes.NOT_FOUND
                 )
         else:
             scan_path = collection_path
@@ -514,10 +523,7 @@ async def discover_artifacts(
         raise
     except Exception as e:
         logger.error(f"Discovery scan failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Discovery scan failed: {str(e)}",
-        )
+        raise create_internal_error("Discovery scan failed", e)
 
 
 @router.post(
@@ -600,6 +606,28 @@ async def bulk_import_artifacts(
     collection_name = collection or "default"
 
     try:
+        # Validate all artifacts before importing
+        validation_errors = []
+        for i, artifact in enumerate(request.artifacts):
+            error = validate_artifact_request(
+                source=artifact.source,
+                artifact_type=artifact.artifact_type,
+                scope=artifact.scope,
+                name=artifact.name,
+                tags=artifact.tags,
+            )
+            if error:
+                # Extract validation details and add index context
+                detail = error.detail
+                if isinstance(detail, dict) and "details" in detail:
+                    for err_detail in detail["details"]:
+                        err_detail["message"] = f"Artifact {i}: {err_detail['message']}"
+                        validation_errors.append(ErrorDetail(**err_detail))
+
+        # If validation errors found and auto_resolve_conflicts is False, fail fast
+        if validation_errors and not request.auto_resolve_conflicts:
+            raise create_validation_error(validation_errors)
+
         # Create importer service
         importer = ArtifactImporter(
             artifact_manager=artifact_mgr,
@@ -658,12 +686,12 @@ async def bulk_import_artifacts(
             duration_ms=result_data.duration_ms,
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.exception(f"Bulk import failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Bulk import failed: {str(e)}",
-        )
+        raise create_internal_error("Bulk import failed", e)
 
 
 @router.post(
@@ -4671,6 +4699,14 @@ async def fetch_github_metadata(
         HTTPException: On internal errors
     """
     try:
+        # Validate source format first
+        from skillmeat.core.validation import validate_github_source
+
+        is_valid, error_msg = validate_github_source(source)
+        if not is_valid:
+            logger.warning(f"Invalid source format '{source}': {error_msg}")
+            return MetadataFetchResponse(success=False, error=error_msg)
+
         logger.info(f"Fetching GitHub metadata for source: {source}")
 
         # Get or create metadata cache from app state
@@ -4712,7 +4748,7 @@ async def fetch_github_metadata(
             )
 
         except ValueError as e:
-            # Invalid source format
+            # Invalid source format (should be caught above, but handle anyway)
             logger.warning(f"Invalid source format '{source}': {e}")
             return MetadataFetchResponse(success=False, error=str(e))
 
@@ -4734,9 +4770,9 @@ async def fetch_github_metadata(
             else:
                 return MetadataFetchResponse(success=False, error=error_msg)
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error fetching metadata for '{source}': {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch metadata: {str(e)}",
-        )
+        raise create_internal_error("Failed to fetch metadata", e)
