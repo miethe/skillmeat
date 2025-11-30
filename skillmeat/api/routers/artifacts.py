@@ -50,6 +50,8 @@ from skillmeat.api.schemas.artifacts import (
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.discovery import (
+    BulkImportRequest,
+    BulkImportResult,
     DiscoveredArtifact,
     DiscoveryRequest,
     DiscoveryResult,
@@ -63,6 +65,12 @@ from skillmeat.core.cache import MetadataCache
 from skillmeat.core.deployment import DeploymentManager
 from skillmeat.core.discovery import ArtifactDiscoveryService
 from skillmeat.core.github_metadata import GitHubMetadataExtractor
+from skillmeat.core.importer import (
+    ArtifactImporter,
+    BulkImportArtifactData,
+    BulkImportResultData,
+    ImportResultData,
+)
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 
@@ -509,6 +517,152 @@ async def discover_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Discovery scan failed: {str(e)}",
+        )
+
+
+@router.post(
+    "/discover/import",
+    response_model=BulkImportResult,
+    status_code=status.HTTP_200_OK,
+    summary="Bulk import artifacts",
+    description="Import multiple artifacts from discovered artifacts or external sources with atomic transaction",
+    responses={
+        200: {"description": "Bulk import completed (check results for per-artifact status)"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def bulk_import_artifacts(
+    request: BulkImportRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> BulkImportResult:
+    """
+    Bulk import multiple artifacts with atomic transaction.
+
+    Validates all artifacts before importing. If any validation fails
+    and auto_resolve_conflicts is False, no artifacts are imported.
+    If True, failed artifacts are skipped.
+
+    The endpoint supports importing from:
+    - GitHub sources (e.g., "anthropics/skills/canvas-design@latest")
+    - Discovered artifacts from the collection
+
+    Process:
+    1. Validate all artifact specifications
+    2. Check for duplicates in target collection
+    3. Import artifacts (skip duplicates if auto_resolve_conflicts=True)
+    4. Update collection manifest and lock files
+
+    Args:
+        request: BulkImportRequest with list of artifacts to import
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        _token: Authentication token (dependency injection)
+        collection: Optional collection name (defaults to "default")
+
+    Returns:
+        BulkImportResult with per-artifact status and summary counts
+
+    Raises:
+        HTTPException: 400 if validation fails, 500 if import fails
+
+    Examples:
+        Import multiple artifacts:
+        ```json
+        {
+            "artifacts": [
+                {
+                    "source": "anthropics/skills/canvas-design@latest",
+                    "artifact_type": "skill",
+                    "name": "canvas-design",
+                    "tags": ["design", "canvas"],
+                    "scope": "user"
+                },
+                {
+                    "source": "anthropics/skills/pdf@v1.0.0",
+                    "artifact_type": "skill",
+                    "name": "pdf",
+                    "tags": ["document"],
+                    "scope": "user"
+                }
+            ],
+            "auto_resolve_conflicts": false
+        }
+        ```
+    """
+    # Determine collection name
+    collection_name = collection or "default"
+
+    try:
+        # Create importer service
+        importer = ArtifactImporter(
+            artifact_manager=artifact_mgr,
+            collection_manager=collection_mgr,
+        )
+
+        # Convert Pydantic schemas to data classes
+        artifacts_data = [
+            BulkImportArtifactData(
+                source=a.source,
+                artifact_type=a.artifact_type,
+                name=a.name,
+                description=a.description,
+                author=a.author,
+                tags=a.tags,
+                scope=a.scope,
+            )
+            for a in request.artifacts
+        ]
+
+        # Perform bulk import
+        logger.info(
+            f"Starting bulk import of {len(artifacts_data)} artifacts "
+            f"to collection '{collection_name}'"
+        )
+
+        result_data = importer.bulk_import(
+            artifacts=artifacts_data,
+            collection_name=collection_name,
+            auto_resolve_conflicts=request.auto_resolve_conflicts,
+        )
+
+        logger.info(
+            f"Bulk import completed: {result_data.total_imported}/{result_data.total_requested} "
+            f"imported, {result_data.total_failed} failed in {result_data.duration_ms:.1f}ms"
+        )
+
+        # Convert data class results back to Pydantic schemas
+        from skillmeat.api.schemas.discovery import ImportResult
+
+        results = [
+            ImportResult(
+                artifact_id=r.artifact_id,
+                success=r.success,
+                message=r.message,
+                error=r.error,
+            )
+            for r in result_data.results
+        ]
+
+        return BulkImportResult(
+            total_requested=result_data.total_requested,
+            total_imported=result_data.total_imported,
+            total_failed=result_data.total_failed,
+            results=results,
+            duration_ms=result_data.duration_ms,
+        )
+
+    except Exception as e:
+        logger.exception(f"Bulk import failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk import failed: {str(e)}",
         )
 
 
