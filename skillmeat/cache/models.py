@@ -239,7 +239,7 @@ class Artifact(Base):
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="artifacts")
-    metadata: Mapped[Optional["ArtifactMetadata"]] = relationship(
+    artifact_metadata: Mapped[Optional["ArtifactMetadata"]] = relationship(
         "ArtifactMetadata",
         back_populates="artifact",
         cascade="all, delete-orphan",
@@ -283,8 +283,8 @@ class Artifact(Base):
         }
 
         # Include metadata if loaded
-        if self.metadata:
-            result["metadata"] = self.metadata.to_dict()
+        if self.artifact_metadata:
+            result["metadata"] = self.artifact_metadata.to_dict()
 
         return result
 
@@ -297,7 +297,7 @@ class ArtifactMetadata(Base):
 
     Attributes:
         artifact_id: Foreign key to artifacts.id (primary key)
-        metadata: Full YAML frontmatter as JSON (for exact preservation)
+        metadata_json: Full YAML frontmatter as JSON (for exact preservation)
         description: Extracted description for quick access
         tags: Comma-separated tags for searchability
         aliases: Comma-separated aliases for alias resolution
@@ -317,13 +317,17 @@ class ArtifactMetadata(Base):
     )
 
     # Metadata fields
-    metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(
+        "metadata", Text, nullable=True
+    )
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     aliases: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
-    artifact: Mapped["Artifact"] = relationship("Artifact", back_populates="metadata")
+    artifact: Mapped["Artifact"] = relationship(
+        "Artifact", back_populates="artifact_metadata"
+    )
 
     def __repr__(self) -> str:
         """Return string representation of ArtifactMetadata."""
@@ -337,9 +341,9 @@ class ArtifactMetadata(Base):
         """
         # Parse JSON metadata if present
         metadata_dict = None
-        if self.metadata:
+        if self.metadata_json:
             try:
-                metadata_dict = json.loads(self.metadata)
+                metadata_dict = json.loads(self.metadata_json)
             except json.JSONDecodeError:
                 metadata_dict = None
 
@@ -357,11 +361,11 @@ class ArtifactMetadata(Base):
         Returns:
             Parsed metadata dictionary or None if invalid/missing
         """
-        if not self.metadata:
+        if not self.metadata_json:
             return None
 
         try:
-            return json.loads(self.metadata)
+            return json.loads(self.metadata_json)
         except json.JSONDecodeError:
             return None
 
@@ -371,7 +375,7 @@ class ArtifactMetadata(Base):
         Args:
             metadata_dict: Dictionary to serialize as JSON
         """
-        self.metadata = json.dumps(metadata_dict)
+        self.metadata_json = json.dumps(metadata_dict)
 
     def get_tags_list(self) -> List[str]:
         """Get tags as a list.
