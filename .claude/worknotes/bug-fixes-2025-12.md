@@ -10,3 +10,20 @@
 - **Fix**: Replaced all 5 occurrences of `get_collection` with `load_collection` in sync.py; updated corresponding test mocks in tests/test_sync.py
 - **Commit(s)**: b13c97d
 - **Status**: RESOLVED
+
+### Select Component Import Errors on Web Build
+
+**Issue**: Web build fails with numerous import errors from `@/components/ui/select` - components trying to import Radix UI sub-components that don't exist
+- **Location**: `skillmeat/web/components/ui/select.tsx` and 8 consuming components
+- **Root Cause**: `select.tsx` was a simple native HTML wrapper, but 2 discovery components expected Radix UI Select sub-components (`SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`)
+- **Fix**:
+  1. Replaced `select.tsx` with full Radix UI-based shadcn/ui Select component
+  2. Migrated 6 components from old native API to new Radix API:
+     - `components/collection/filters.tsx`
+     - `components/entity/entity-form.tsx`
+     - `components/sync-status/comparison-selector.tsx`
+     - `components/mcp/MCPServerList.tsx`
+     - `components/marketplace/MarketplaceFilters.tsx`
+     - `components/marketplace/MarketplaceInstallDialog.tsx`
+- **Commit(s)**: 62cca2f
+- **Status**: RESOLVED

@@ -11,7 +11,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import type { MarketplaceListing } from '@/types/marketplace';
 
@@ -73,14 +79,18 @@ export function MarketplaceInstallDialog({
               Conflict Resolution Strategy
             </label>
             <Select
-              id="strategy-select"
               value={strategy}
-              onChange={(e) => setStrategy(e.target.value as 'merge' | 'fork' | 'skip')}
+              onValueChange={(value) => setStrategy(value as 'merge' | 'fork' | 'skip')}
               disabled={isInstalling}
             >
-              <option value="merge">Merge - Update existing artifacts</option>
-              <option value="fork">Fork - Create copies with new names</option>
-              <option value="skip">Skip - Only install new artifacts</option>
+              <SelectTrigger id="strategy-select">
+                <SelectValue placeholder="Select a strategy..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="merge">Merge - Update existing artifacts</SelectItem>
+                <SelectItem value="fork">Fork - Create copies with new names</SelectItem>
+                <SelectItem value="skip">Skip - Only install new artifacts</SelectItem>
+              </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {strategy === 'merge' && 'Existing artifacts will be updated with new versions.'}

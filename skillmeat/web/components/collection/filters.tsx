@@ -2,7 +2,7 @@
 
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
 interface FiltersProps {
@@ -20,17 +20,17 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     });
   };
 
-  const handleSortFieldChange = (field: string) => {
+  const handleSortFieldChange = (value: string) => {
     onSortChange({
       ...sort,
-      field: field as SortField,
+      field: value as SortField,
     });
   };
 
-  const handleSortOrderChange = (order: string) => {
+  const handleSortOrderChange = (value: string) => {
     onSortChange({
       ...sort,
-      order: order as SortOrder,
+      order: value as SortOrder,
     });
   };
 
@@ -55,16 +55,20 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
             Type
           </label>
           <Select
-            id="type-filter"
             value={filters.type || 'all'}
-            onChange={(e) => handleFilterChange('type', e.target.value)}
+            onValueChange={(value) => handleFilterChange('type', value)}
           >
-            <option value="all">All Types</option>
-            <option value="skill">Skills</option>
-            <option value="command">Commands</option>
-            <option value="agent">Agents</option>
-            <option value="mcp">MCP Servers</option>
-            <option value="hook">Hooks</option>
+            <SelectTrigger id="type-filter">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="skill">Skills</SelectItem>
+              <SelectItem value="command">Commands</SelectItem>
+              <SelectItem value="agent">Agents</SelectItem>
+              <SelectItem value="mcp">MCP Servers</SelectItem>
+              <SelectItem value="hook">Hooks</SelectItem>
+            </SelectContent>
           </Select>
         </div>
 
@@ -74,15 +78,19 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
             Status
           </label>
           <Select
-            id="status-filter"
             value={filters.status || 'all'}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
+            onValueChange={(value) => handleFilterChange('status', value)}
           >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="outdated">Outdated</option>
-            <option value="conflict">Conflict</option>
-            <option value="error">Error</option>
+            <SelectTrigger id="status-filter">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="outdated">Outdated</SelectItem>
+              <SelectItem value="conflict">Conflict</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+            </SelectContent>
           </Select>
         </div>
 
@@ -92,13 +100,17 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
             Scope
           </label>
           <Select
-            id="scope-filter"
             value={filters.scope || 'all'}
-            onChange={(e) => handleFilterChange('scope', e.target.value)}
+            onValueChange={(value) => handleFilterChange('scope', value)}
           >
-            <option value="all">All Scopes</option>
-            <option value="user">User (Global)</option>
-            <option value="local">Local (Project)</option>
+            <SelectTrigger id="scope-filter">
+              <SelectValue placeholder="All Scopes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Scopes</SelectItem>
+              <SelectItem value="user">User (Global)</SelectItem>
+              <SelectItem value="local">Local (Project)</SelectItem>
+            </SelectContent>
           </Select>
         </div>
 
@@ -109,23 +121,29 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           </label>
           <div className="flex gap-2">
             <Select
-              id="sort-field"
               value={sort.field}
-              onChange={(e) => handleSortFieldChange(e.target.value)}
-              className="flex-1"
+              onValueChange={handleSortFieldChange}
             >
-              <option value="name">Name</option>
-              <option value="updatedAt">Last Updated</option>
-              <option value="usageCount">Usage Count</option>
+              <SelectTrigger id="sort-field" className="flex-1">
+                <SelectValue placeholder="Name" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="updatedAt">Last Updated</SelectItem>
+                <SelectItem value="usageCount">Usage Count</SelectItem>
+              </SelectContent>
             </Select>
             <Select
-              id="sort-order"
               value={sort.order}
-              onChange={(e) => handleSortOrderChange(e.target.value)}
-              aria-label="Sort order"
+              onValueChange={handleSortOrderChange}
             >
-              <option value="asc">A-Z</option>
-              <option value="desc">Z-A</option>
+              <SelectTrigger id="sort-order" aria-label="Sort order">
+                <SelectValue placeholder="A-Z" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">A-Z</SelectItem>
+                <SelectItem value="desc">Z-A</SelectItem>
+              </SelectContent>
             </Select>
           </div>
         </div>
