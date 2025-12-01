@@ -9,15 +9,29 @@ Cache Architecture:
     - WAL mode for concurrent access
     - TTL-based refresh strategy
     - Support for local and marketplace artifacts
+    - FileWatcher for automatic cache invalidation
 
 Main Components:
     - schema: Database schema definition and initialization
-    - models: SQLAlchemy ORM models (future)
-    - repository: Data access layer (future)
+    - models: SQLAlchemy ORM models
+    - repository: Data access layer
+    - watcher: File system monitoring for cache invalidation
 
 Example:
     >>> from skillmeat.cache.schema import init_database
     >>> init_database()  # Creates database with schema
+    >>>
+    >>> # Start file watcher for automatic invalidation
+    >>> from skillmeat.cache.repository import CacheRepository
+    >>> from skillmeat.cache.watcher import FileWatcher
+    >>> repo = CacheRepository()
+    >>> watcher = FileWatcher(cache_repository=repo)
+    >>> watcher.start()
 """
 
 __version__ = "0.1.0"
+
+from skillmeat.cache.repository import CacheRepository
+from skillmeat.cache.watcher import FileWatcher
+
+__all__ = ["CacheRepository", "FileWatcher"]
