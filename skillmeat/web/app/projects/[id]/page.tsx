@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   GitBranch,
@@ -23,9 +23,14 @@ import { EntityLifecycleProvider } from '@/components/entity/EntityLifecycleProv
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { useProject } from '@/hooks/useProjects';
 import { useArtifacts } from '@/hooks/useArtifacts';
+import { useProjectDiscovery } from '@/hooks/useProjectDiscovery';
+import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
+import { BulkImportModal } from '@/components/discovery/BulkImportModal';
+import { useToast } from '@/hooks/use-toast';
 import type { DeployedArtifact } from '@/types/project';
 import type { Artifact } from '@/types/artifact';
 import type { Entity } from '@/types/entity';
+import type { DiscoveredArtifact } from '@/types/discovery';
 
 const artifactTypeIcons = {
   skill: Folder,
@@ -47,6 +52,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
+  const { toast } = useToast();
 
   const { data: project, isLoading, error } = useProject(projectId);
 
@@ -54,9 +60,27 @@ export default function ProjectDetailPage() {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFetchingEntity, setIsFetchingEntity] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Fetch all artifacts to match by name
   const { data: artifactsData } = useArtifacts();
+
+  // Project-specific discovery hook
+  const {
+    discoveredArtifacts,
+    discoveredCount,
+    isDiscovering,
+    refetchDiscovery,
+    bulkImport,
+    isImporting,
+  } = useProjectDiscovery(project?.path);
+
+  // Trigger discovery when project loads
+  useEffect(() => {
+    if (project?.path) {
+      refetchDiscovery();
+    }
+  }, [project?.path, refetchDiscovery]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -137,6 +161,45 @@ export default function ProjectDetailPage() {
     setTimeout(() => setSelectedEntity(null), 300);
   };
 
+  // Handle bulk import from discovery
+  const handleImport = async (selected: DiscoveredArtifact[]) => {
+    try {
+      const result = await bulkImport({
+        artifacts: selected.map((a) => ({
+          source: a.source || a.path,
+          artifact_type: a.type,
+          name: a.name,
+          description: a.description,
+          tags: a.tags,
+          scope: a.scope || 'user',
+        })),
+      });
+
+      if (result.total_imported > 0) {
+        toast({
+          title: 'Import Successful',
+          description: `Imported ${result.total_imported} artifact(s) into collection`,
+        });
+        // Refetch discovery to update the list
+        refetchDiscovery();
+      }
+      if (result.total_failed > 0) {
+        toast({
+          title: 'Partial Import',
+          description: `${result.total_failed} artifact(s) failed to import`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Import Failed',
+        description: error instanceof Error ? error.message : 'Failed to import artifacts',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -181,6 +244,15 @@ export default function ProjectDetailPage() {
   return (
     <EntityLifecycleProvider mode="project" projectPath={project?.path}>
       <div className="space-y-6">
+        {/* Discovery Banner */}
+        {discoveredCount > 0 && !isDiscovering && (
+          <DiscoveryBanner
+            discoveredCount={discoveredCount}
+            onReview={() => setShowImportModal(true)}
+            dismissible
+          />
+        )}
+
         {/* Header */}
         <div className="space-y-4">
           <Button variant="ghost" onClick={() => router.push('/projects')}>
@@ -370,6 +442,14 @@ export default function ProjectDetailPage() {
           entity={selectedEntity}
           open={isDetailOpen}
           onClose={handleDetailClose}
+        />
+
+        {/* Bulk Import Modal */}
+        <BulkImportModal
+          artifacts={discoveredArtifacts}
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onImport={handleImport}
         />
       </div>
     </EntityLifecycleProvider>
