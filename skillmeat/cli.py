@@ -343,6 +343,18 @@ def remove(
             keep_files=keep_files,
         )
 
+        # Invalidate cache after successful remove
+        try:
+            from skillmeat.cache.manager import CacheManager
+
+            cache_mgr = CacheManager()
+            cache_mgr.initialize_cache()
+            cache_mgr.invalidate_cache()
+            console.print("[dim]Cache invalidated[/dim]")
+        except Exception as e:
+            # Log but don't fail the command - cache is non-critical
+            logger.debug(f"Cache invalidation failed: {e}")
+
     except ValueError as e:
         console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
@@ -446,6 +458,18 @@ def _add_artifact_from_spec(
             console.print(
                 f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
             )
+
+        # Invalidate cache after successful add
+        try:
+            from skillmeat.cache.manager import CacheManager
+
+            cache_mgr = CacheManager()
+            cache_mgr.initialize_cache()
+            cache_mgr.invalidate_cache()
+            console.print("[dim]Cache invalidated[/dim]")
+        except Exception as e:
+            # Log but don't fail the command - cache is non-critical
+            logger.debug(f"Cache invalidation failed: {e}")
 
     except ValueError as e:
         console.print(f"[red]Invalid specification: {e}[/red]")
@@ -698,6 +722,18 @@ def deploy(
         for deployment in deployments:
             console.print(f"  {deployment.artifact_name} -> {deployment.artifact_path}")
 
+        # Invalidate cache after successful deploy
+        try:
+            from skillmeat.cache.manager import CacheManager
+
+            cache_mgr = CacheManager()
+            cache_mgr.initialize_cache()
+            cache_mgr.invalidate_cache()
+            console.print("[dim]Cache invalidated[/dim]")
+        except Exception as e:
+            # Log but don't fail the command - cache is non-critical
+            logger.debug(f"Cache invalidation failed: {e}")
+
     except ValueError as e:
         console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
@@ -749,6 +785,18 @@ def undeploy(
             project_path=project,
             artifact_type=type_filter,
         )
+
+        # Invalidate cache after successful undeploy
+        try:
+            from skillmeat.cache.manager import CacheManager
+
+            cache_mgr = CacheManager()
+            cache_mgr.initialize_cache()
+            cache_mgr.invalidate_cache()
+            console.print("[dim]Cache invalidated[/dim]")
+        except Exception as e:
+            # Log but don't fail the command - cache is non-critical
+            logger.debug(f"Cache invalidation failed: {e}")
 
     except ValueError as e:
         console.print(f"[yellow]{e}[/yellow]")
