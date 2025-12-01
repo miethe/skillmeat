@@ -411,7 +411,7 @@ class SyncManager:
         try:
             # Get collection path
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = collection.path
+            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
 
             artifacts = []
 
@@ -620,7 +620,7 @@ class SyncManager:
 
         try:
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = collection.path
+            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
         except Exception as e:
             logger.warning(f"Failed to get collection path: {e}")
             return self.sync_from_project(
@@ -760,7 +760,8 @@ class SyncManager:
                 coll_name = collection_name or metadata.collection
                 try:
                     collection = self.collection_mgr.get_collection(coll_name)
-                    if not collection or not collection.path.exists():
+                    coll_path = self.collection_mgr.config.get_collection_path(coll_name)
+                    if not collection or not coll_path.exists():
                         issues.append(
                             f"Collection '{coll_name}' not found or path does not exist.\n"
                             f"  Create the collection or deploy from a different collection."
@@ -1096,7 +1097,7 @@ class SyncManager:
             collection_name = metadata.collection if metadata else "default"
 
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = collection.path
+            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
 
             artifact_type_plural = self._get_artifact_type_plural(artifact_type)
             collection_artifact_path = (
@@ -1426,12 +1427,13 @@ class SyncManager:
                 metadata = self._load_deployment_metadata(Path("."))
                 collection_name = metadata.collection if metadata else "default"
                 collection = self.collection_mgr.load_collection(collection_name)
+                collection_path = self.collection_mgr.config.get_collection_path(collection_name)
 
                 # Compute new hash
                 artifact_type_plural = self._get_artifact_type_plural(
                     drift.artifact_type
                 )
-                artifact_path = collection.path / artifact_type_plural / artifact_name
+                artifact_path = collection_path / artifact_type_plural / artifact_name
                 new_sha = self._compute_artifact_hash(artifact_path)
 
                 # Update lock file
