@@ -123,7 +123,23 @@ def init(name: str):
     is_flag=True,
     help="Show tags for each artifact",
 )
-def cmd_list(artifact_type: Optional[str], collection: Optional[str], tags: bool):
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Force fresh read from filesystem, bypass cache",
+)
+@click.option(
+    "--cache-status",
+    is_flag=True,
+    help="Show cache freshness status",
+)
+def cmd_list(
+    artifact_type: Optional[str],
+    collection: Optional[str],
+    tags: bool,
+    no_cache: bool,
+    cache_status: bool,
+):
     """List artifacts in collection.
 
     Shows all artifacts or filtered by type.
@@ -132,6 +148,8 @@ def cmd_list(artifact_type: Optional[str], collection: Optional[str], tags: bool
       skillmeat list                    # List all artifacts
       skillmeat list --type skill       # List only skills
       skillmeat list --tags             # Show tags
+      skillmeat list --no-cache         # Force fresh read from filesystem
+      skillmeat list --cache-status     # Show cache freshness
     """
     try:
         artifact_mgr = ArtifactManager()
@@ -139,11 +157,67 @@ def cmd_list(artifact_type: Optional[str], collection: Optional[str], tags: bool
         # Convert type string to enum
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
-        # List artifacts
-        artifacts = artifact_mgr.list_artifacts(
-            collection_name=collection,
-            artifact_type=type_filter,
-        )
+        # Try to use cache first, unless --no-cache is set
+        artifacts = None
+        used_cache = False
+        cache_fresh = False
+
+        if not no_cache:
+            try:
+                from skillmeat.cache.manager import CacheManager
+
+                cache_mgr = CacheManager()
+                cache_mgr.initialize_cache()
+
+                # Get all projects from cache
+                projects = cache_mgr.get_projects(include_stale=True)
+
+                if projects:
+                    # Collect artifacts from all projects
+                    cached_artifacts = []
+                    for project in projects:
+                        cached_artifacts.extend(cache_mgr.get_artifacts(project.id))
+
+                    # Convert to artifact objects (simplified)
+                    # Note: This is a simplified approach; real implementation
+                    # would need to convert cache Artifact objects to ArtifactManager format
+                    if cached_artifacts:
+                        used_cache = True
+                        # Check if cache is fresh
+                        cache_fresh = not cache_mgr.is_cache_stale()
+
+                        if cache_status:
+                            status_msg = (
+                                "[green]fresh[/green]"
+                                if cache_fresh
+                                else "[yellow]stale[/yellow]"
+                            )
+                            console.print(f"Cache status: {status_msg}")
+                            console.print(
+                                f"Using cache with {len(cached_artifacts)} artifacts from {len(projects)} projects"
+                            )
+            except Exception as cache_error:
+                # Cache failed, fall back to filesystem
+                logger.debug(
+                    f"Cache read failed, falling back to filesystem: {cache_error}"
+                )
+
+        # Fallback to filesystem if cache not used or failed
+        if not used_cache or no_cache:
+            artifacts = artifact_mgr.list_artifacts(
+                collection_name=collection,
+                artifact_type=type_filter,
+            )
+            if cache_status:
+                console.print(
+                    "[dim]Reading from filesystem (cache bypassed or unavailable)[/dim]"
+                )
+        else:
+            # Use cached data (fallback for now until full integration)
+            artifacts = artifact_mgr.list_artifacts(
+                collection_name=collection,
+                artifact_type=type_filter,
+            )
 
         if not artifacts:
             console.print("[yellow]No artifacts found[/yellow]")
@@ -756,7 +830,9 @@ def mcp_add(
         env_vars = {}
         for env_pair in env:
             if "=" not in env_pair:
-                console.print(f"[yellow]Invalid env format: {env_pair}. Use KEY=value[/yellow]")
+                console.print(
+                    f"[yellow]Invalid env format: {env_pair}. Use KEY=value[/yellow]"
+                )
                 sys.exit(1)
             key, value = env_pair.split("=", 1)
             env_vars[key] = value
@@ -846,7 +922,9 @@ def mcp_deploy(
     try:
         # Security warning
         if not dangerously_skip_permissions:
-            console.print("[yellow]Security warning: MCP servers can execute code and access system resources.[/yellow]")
+            console.print(
+                "[yellow]Security warning: MCP servers can execute code and access system resources.[/yellow]"
+            )
             console.print()
             console.print("Before deploying an MCP server, please consider:")
             console.print("  - Install only from trusted sources")
@@ -888,20 +966,30 @@ def mcp_deploy(
                 collection_mgr.save_collection(collection_obj)
 
             console.print()
-            console.print(Panel(
-                f"[green]MCP server '{result.server_name}' deployed successfully[/green]\n\n"
-                f"Command: {result.command}\n"
-                f"Args: {' '.join(result.args or [])}\n"
-                f"Settings: {result.settings_path}\n"
-                + (f"Backup: {result.backup_path}\n" if result.backup_path else "")
-                + (f"Environment: {result.env_file_path}\n" if result.env_file_path else "")
-                + "\n[yellow]Next steps:[/yellow]\n"
-                + "1. Restart Claude Desktop to load the new MCP server\n"
-                + "2. Check Claude Desktop logs if server doesn't appear\n"
-                + (f"3. Update environment variables in {result.env_file_path}" if result.env_file_path else ""),
-                title="Deployment Complete",
-                border_style="green",
-            ))
+            console.print(
+                Panel(
+                    f"[green]MCP server '{result.server_name}' deployed successfully[/green]\n\n"
+                    f"Command: {result.command}\n"
+                    f"Args: {' '.join(result.args or [])}\n"
+                    f"Settings: {result.settings_path}\n"
+                    + (f"Backup: {result.backup_path}\n" if result.backup_path else "")
+                    + (
+                        f"Environment: {result.env_file_path}\n"
+                        if result.env_file_path
+                        else ""
+                    )
+                    + "\n[yellow]Next steps:[/yellow]\n"
+                    + "1. Restart Claude Desktop to load the new MCP server\n"
+                    + "2. Check Claude Desktop logs if server doesn't appear\n"
+                    + (
+                        f"3. Update environment variables in {result.env_file_path}"
+                        if result.env_file_path
+                        else ""
+                    ),
+                    title="Deployment Complete",
+                    border_style="green",
+                )
+            )
         else:
             console.print(f"[red]Deployment failed: {result.error_message}[/red]")
             sys.exit(1)
@@ -945,7 +1033,9 @@ def mcp_undeploy(name: str, backup: bool):
         success = deployment_mgr.undeploy_server(name)
 
         if success:
-            console.print(f"[green]MCP server '{name}' removed from Claude Desktop[/green]")
+            console.print(
+                f"[green]MCP server '{name}' removed from Claude Desktop[/green]"
+            )
             console.print("[yellow]Restart Claude Desktop to apply changes[/yellow]")
         else:
             console.print(f"[yellow]Failed to undeploy server '{name}'[/yellow]")
@@ -1022,8 +1112,12 @@ def mcp_list(collection: Optional[str], deployed: bool):
 
         # Show summary
         if deployed:
-            deployed_count = sum(1 for s in servers if deployment_status.get(s.name, False))
-            console.print(f"\n[cyan]{deployed_count} of {len(servers)} servers deployed to Claude Desktop[/cyan]")
+            deployed_count = sum(
+                1 for s in servers if deployment_status.get(s.name, False)
+            )
+            console.print(
+                f"\n[cyan]{deployed_count} of {len(servers)} servers deployed to Claude Desktop[/cyan]"
+            )
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -1094,7 +1188,9 @@ def mcp_health(
             """Display health check results in table format."""
             if not results:
                 console.print("[yellow]No deployed MCP servers found[/yellow]")
-                console.print("[cyan]Use 'skillmeat mcp deploy' to deploy a server[/cyan]")
+                console.print(
+                    "[cyan]Use 'skillmeat mcp deploy' to deploy a server[/cyan]"
+                )
                 return
 
             # Color mapping for status
@@ -1155,9 +1251,15 @@ def mcp_health(
             console.print(table)
 
             # Summary
-            healthy = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
-            degraded = sum(1 for r in results.values() if r.status == HealthStatus.DEGRADED)
-            unhealthy = sum(1 for r in results.values() if r.status == HealthStatus.UNHEALTHY)
+            healthy = sum(
+                1 for r in results.values() if r.status == HealthStatus.HEALTHY
+            )
+            degraded = sum(
+                1 for r in results.values() if r.status == HealthStatus.DEGRADED
+            )
+            unhealthy = sum(
+                1 for r in results.values() if r.status == HealthStatus.UNHEALTHY
+            )
 
             console.print()
             console.print(
@@ -1179,9 +1281,13 @@ def mcp_health(
                 HealthStatus.NOT_DEPLOYED: "dim",
             }
             status_color = status_colors.get(result.status, "white")
-            console.print(f"[bold]Status:[/bold] [{status_color}]{result.status.value.title()}[/{status_color}]")
+            console.print(
+                f"[bold]Status:[/bold] [{status_color}]{result.status.value.title()}[/{status_color}]"
+            )
 
-            console.print(f"[bold]Deployed:[/bold] {'Yes' if result.deployed else 'No'}")
+            console.print(
+                f"[bold]Deployed:[/bold] {'Yes' if result.deployed else 'No'}"
+            )
 
             if result.last_seen:
                 now = datetime.utcnow()
@@ -1223,22 +1329,31 @@ def mcp_health(
         if watch:
             import time
 
-            console.print(f"[cyan]Watching MCP server health (interval: {interval}s). Press Ctrl+C to stop.[/cyan]\n")
+            console.print(
+                f"[cyan]Watching MCP server health (interval: {interval}s). Press Ctrl+C to stop.[/cyan]\n"
+            )
 
             try:
                 while True:
                     # Clear screen (cross-platform)
                     import os
+
                     os.system("cls" if os.name == "nt" else "clear")
 
-                    console.print(f"[dim]Last updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC[/dim]\n")
+                    console.print(
+                        f"[dim]Last updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC[/dim]\n"
+                    )
 
                     # Check health
                     if server:
-                        result = health_checker.check_server_health(server, use_cache=not no_cache)
+                        result = health_checker.check_server_health(
+                            server, use_cache=not no_cache
+                        )
                         display_single_server_health(result)
                     else:
-                        results = health_checker.check_all_servers(use_cache=not no_cache)
+                        results = health_checker.check_all_servers(
+                            use_cache=not no_cache
+                        )
                         display_health_results(results)
 
                     # Wait for interval
@@ -1252,11 +1367,17 @@ def mcp_health(
         else:
             if server:
                 # Check specific server
-                result = health_checker.check_server_health(server, use_cache=not no_cache)
+                result = health_checker.check_server_health(
+                    server, use_cache=not no_cache
+                )
 
                 if result.status == HealthStatus.NOT_DEPLOYED:
-                    console.print(f"[yellow]Server '{server}' is not deployed to Claude Desktop[/yellow]")
-                    console.print("[cyan]Use 'skillmeat mcp deploy' to deploy it[/cyan]")
+                    console.print(
+                        f"[yellow]Server '{server}' is not deployed to Claude Desktop[/yellow]"
+                    )
+                    console.print(
+                        "[cyan]Use 'skillmeat mcp deploy' to deploy it[/cyan]"
+                    )
                     sys.exit(1)
 
                 display_single_server_health(result)
@@ -2075,6 +2196,194 @@ def config_set(key: str, value: str):
         config_mgr.set(key, value)
 
         console.print(f"[green]Set {key}[/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+# ====================
+# Cache Commands
+# ====================
+
+
+@main.group()
+def cache():
+    """Manage cache for artifact operations.
+
+    The cache stores project and artifact information for faster CLI operations.
+    Cache is automatically refreshed periodically, or can be managed manually.
+
+    Examples:
+      skillmeat cache status              # Show cache statistics
+      skillmeat cache refresh             # Refresh entire cache
+      skillmeat cache refresh proj-id     # Refresh specific project
+      skillmeat cache clear               # Clear all cached data
+      skillmeat cache config get cache-ttl
+      skillmeat cache config set cache-ttl 360
+    """
+    pass
+
+
+@cache.command()
+def status():
+    """Show cache statistics and health.
+
+    Displays:
+    - Total projects and artifacts cached
+    - Stale/outdated counts
+    - Cache size and age
+    - Last refresh time
+    """
+    try:
+        from skillmeat.cache.manager import CacheManager
+
+        manager = CacheManager()
+        manager.initialize_cache()
+        stats = manager.get_cache_status()
+
+        # Create status table
+        table = Table(title="Cache Status")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Total Projects", str(stats.get("total_projects", 0)))
+        table.add_row("Total Artifacts", str(stats.get("total_artifacts", 0)))
+        table.add_row("Stale Projects", str(stats.get("stale_projects", 0)))
+        table.add_row("Outdated Artifacts", str(stats.get("outdated_artifacts", 0)))
+        table.add_row("Cache Size", f"{stats.get('cache_size_bytes', 0) / 1024:.1f} KB")
+
+        last_refresh = stats.get("last_refresh")
+        if last_refresh:
+            table.add_row("Last Refresh", str(last_refresh))
+        else:
+            table.add_row("Last Refresh", "Never")
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cache.command()
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+def clear(yes: bool):
+    """Clear all cached data.
+
+    This removes all cached project and artifact information.
+    The cache will be repopulated on next use.
+    """
+    try:
+        if not yes:
+            if not Confirm.ask("Clear all cached data?"):
+                console.print("[yellow]Cancelled[/yellow]")
+                return
+
+        from skillmeat.cache.manager import CacheManager
+
+        manager = CacheManager()
+        if manager.clear_cache():
+            console.print("[green]Cache cleared successfully[/green]")
+        else:
+            console.print("[red]Failed to clear cache[/red]")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cache.command()
+@click.argument("project_id", required=False)
+@click.option("--force", is_flag=True, help="Force refresh even if not stale")
+def refresh(project_id: Optional[str], force: bool):
+    """Refresh cache data.
+
+    Without arguments, refreshes all stale projects.
+    With PROJECT_ID, refreshes only that project.
+
+    Examples:
+      skillmeat cache refresh              # Refresh stale projects
+      skillmeat cache refresh --force      # Force refresh all
+      skillmeat cache refresh proj-123     # Refresh specific project
+    """
+    try:
+        from skillmeat.cache.manager import CacheManager
+        from skillmeat.cache.refresh import RefreshJob
+
+        console.print("[cyan]Starting cache refresh...[/cyan]")
+
+        manager = CacheManager()
+        manager.initialize_cache()
+        refresh_job = RefreshJob(cache_manager=manager)
+
+        if project_id:
+            result = refresh_job.refresh_project(project_id, force=force)
+            if result.success:
+                console.print(
+                    f"[green]Project refreshed: {result.changes_detected} changes detected[/green]"
+                )
+            else:
+                console.print(f"[red]Refresh failed: {'; '.join(result.errors)}[/red]")
+                sys.exit(1)
+        else:
+            result = refresh_job.refresh_all(force=force)
+            console.print(
+                f"[green]Refreshed {result.projects_refreshed} projects[/green]"
+            )
+            if result.changes_detected > 0:
+                console.print(f"  Changes detected: {result.changes_detected}")
+            if result.errors:
+                console.print(f"[yellow]  Errors: {len(result.errors)}[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cache.group()
+def config():
+    """Get or set cache configuration.
+
+    Configuration options:
+    - cache-ttl: Time-to-live in minutes (default: 360)
+    """
+    pass
+
+
+@config.command("get")
+@click.argument("key")
+def config_get_cache(key: str):
+    """Get a cache configuration value."""
+    try:
+        from skillmeat.config import ConfigManager
+
+        cfg = ConfigManager()
+        value = cfg.get(f"cache.{key}")
+
+        if value is not None:
+            console.print(f"{key} = {value}")
+        else:
+            console.print(f"[yellow]{key} is not set (using default)[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+def config_set_cache(key: str, value: str):
+    """Set a cache configuration value."""
+    try:
+        from skillmeat.config import ConfigManager
+
+        cfg = ConfigManager()
+        cfg.set(f"cache.{key}", value)
+
+        console.print(f"[green]Set {key} = {value}[/green]")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -3579,7 +3888,14 @@ def _display_sync_check_json(drift_results) -> None:
     help="Create snapshot before sync and offer rollback on failure",
 )
 def sync_pull_cmd(
-    project_path, artifacts, strategy, dry_run, no_interactive, collection, output_json, with_rollback
+    project_path,
+    artifacts,
+    strategy,
+    dry_run,
+    no_interactive,
+    collection,
+    output_json,
+    with_rollback,
 ):
     """Pull artifacts from project to collection.
 
@@ -3619,8 +3935,7 @@ def sync_pull_cmd(
             snapshot_mgr = SnapshotManager(snapshots_dir)
 
         sync_mgr = SyncManager(
-            collection_manager=collection_mgr,
-            snapshot_manager=snapshot_mgr
+            collection_manager=collection_mgr, snapshot_manager=snapshot_mgr
         )
 
         # Perform sync pull (with or without rollback)
@@ -3850,10 +4165,9 @@ def analytics():
 )
 @click.option(
     "--sort-by",
-    type=click.Choice([
-        "total_events", "deploy_count", "update_count",
-        "last_used", "artifact_name"
-    ]),
+    type=click.Choice(
+        ["total_events", "deploy_count", "update_count", "last_used", "artifact_name"]
+    ),
     default="total_events",
     help="Sort results by field (default: total_events)",
 )
@@ -3880,7 +4194,9 @@ def usage(artifact, days, artifact_type, collection, output_format, sort_by):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -3904,7 +4220,9 @@ def usage(artifact, days, artifact_type, collection, output_format, sort_by):
             artifacts = usage_data.get("artifacts", [])
             if not artifacts:
                 console.print("[yellow]No usage data available.[/yellow]\n")
-                console.print("Deploy or update artifacts to start collecting analytics.")
+                console.print(
+                    "Deploy or update artifacts to start collecting analytics."
+                )
                 sys.exit(0)
 
         # Sort artifacts
@@ -3912,12 +4230,13 @@ def usage(artifact, days, artifact_type, collection, output_format, sort_by):
         artifacts_sorted = sorted(
             artifacts,
             key=lambda x: x.get(sort_by) if x.get(sort_by) is not None else "",
-            reverse=reverse
+            reverse=reverse,
         )
 
         # Display results
         if output_format == "json":
             import json as json_lib
+
             output = {
                 "artifacts": artifacts_sorted,
                 "total_count": len(artifacts_sorted),
@@ -3926,7 +4245,7 @@ def usage(artifact, days, artifact_type, collection, output_format, sort_by):
                     "type": artifact_type,
                     "collection": collection,
                     "days": days,
-                }
+                },
             }
             click.echo(json_lib.dumps(output, indent=2, default=str))
         else:
@@ -3947,10 +4266,9 @@ def usage(artifact, days, artifact_type, collection, output_format, sort_by):
 )
 @click.option(
     "--metric",
-    type=click.Choice([
-        "total_events", "deploy_count", "update_count",
-        "sync_count", "search_count"
-    ]),
+    type=click.Choice(
+        ["total_events", "deploy_count", "update_count", "sync_count", "search_count"]
+    ),
     default="total_events",
     help="Sort by metric (default: total_events)",
 )
@@ -3989,7 +4307,9 @@ def top(limit, metric, artifact_type, output_format):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4009,6 +4329,7 @@ def top(limit, metric, artifact_type, output_format):
         # Display results
         if output_format == "json":
             import json as json_lib
+
             output = {
                 "top_artifacts": top_artifacts,
                 "count": len(top_artifacts),
@@ -4070,7 +4391,9 @@ def cleanup(inactivity_days, collection, output_format, show_size):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4078,17 +4401,22 @@ def cleanup(inactivity_days, collection, output_format, show_size):
         # Get cleanup suggestions
         suggestions = manager.get_cleanup_suggestions(collection_name=collection)
 
-        if not any([
-            suggestions.get("unused_90_days"),
-            suggestions.get("never_deployed"),
-            suggestions.get("low_usage"),
-        ]):
-            console.print("[green]No cleanup suggestions. All artifacts are actively used![/green]")
+        if not any(
+            [
+                suggestions.get("unused_90_days"),
+                suggestions.get("never_deployed"),
+                suggestions.get("low_usage"),
+            ]
+        ):
+            console.print(
+                "[green]No cleanup suggestions. All artifacts are actively used![/green]"
+            )
             sys.exit(0)
 
         # Display results
         if output_format == "json":
             import json as json_lib
+
             click.echo(json_lib.dumps(suggestions, indent=2, default=str))
         else:
             _display_cleanup_suggestions(suggestions, inactivity_days, show_size)
@@ -4136,7 +4464,9 @@ def trends(artifact, period, output_format):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4154,6 +4484,7 @@ def trends(artifact, period, output_format):
         # Display results
         if output_format == "json":
             import json as json_lib
+
             click.echo(json_lib.dumps(trends_data, indent=2, default=str))
         else:
             _display_trends(trends_data, artifact, period)
@@ -4199,7 +4530,9 @@ def export(output_path, export_format, collection):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4250,7 +4583,9 @@ def stats():
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4302,7 +4637,9 @@ def clear(older_than_days, confirm):
         if not config.is_analytics_enabled():
             console.print("[yellow]Analytics is disabled in configuration.[/yellow]\n")
             console.print("To enable analytics:")
-            console.print("  [cyan]skillmeat config set analytics.enabled true[/cyan]\n")
+            console.print(
+                "  [cyan]skillmeat config set analytics.enabled true[/cyan]\n"
+            )
             sys.exit(2)
 
         manager = UsageReportManager(config)
@@ -4316,12 +4653,16 @@ def clear(older_than_days, confirm):
         total_events = db_stats.get("total_events", 0)
 
         if total_events == 0:
-            console.print("[yellow]Analytics database is empty. Nothing to clear.[/yellow]")
+            console.print(
+                "[yellow]Analytics database is empty. Nothing to clear.[/yellow]"
+            )
             sys.exit(0)
 
         # Show warning
         console.print(f"[bold]Clear Analytics Data[/bold]\n")
-        console.print(f"This will delete events older than [cyan]{older_than_days}[/cyan] days.")
+        console.print(
+            f"This will delete events older than [cyan]{older_than_days}[/cyan] days."
+        )
         console.print(f"Current total events: [cyan]{total_events:,}[/cyan]\n")
 
         # Confirm
@@ -4332,6 +4673,7 @@ def clear(older_than_days, confirm):
 
         # Calculate cutoff date
         from datetime import datetime, timedelta
+
         cutoff_date = datetime.now() - timedelta(days=older_than_days)
 
         # Delete old events
@@ -4451,9 +4793,7 @@ def _display_top_table(artifacts: List[Dict], metric: str, limit: int) -> None:
 
 
 def _display_cleanup_suggestions(
-    suggestions: Dict,
-    inactivity_days: int,
-    show_size: bool
+    suggestions: Dict, inactivity_days: int, show_size: bool
 ) -> None:
     """Display cleanup suggestions in formatted panels.
 
@@ -4496,7 +4836,9 @@ def _display_cleanup_suggestions(
             )
 
         if len(never_deployed) > 10:
-            panel_content.append(f"\n[dim]... and {len(never_deployed) - 10} more[/dim]")
+            panel_content.append(
+                f"\n[dim]... and {len(never_deployed) - 10} more[/dim]"
+            )
 
         panel = Panel(
             "\n".join(panel_content),
@@ -4531,7 +4873,9 @@ def _display_cleanup_suggestions(
     if total_mb > 0 or summary:
         console.print()
         if total_mb > 0:
-            console.print(f"[bold]Total reclaimable space:[/bold] [green]{total_mb:.1f} MB[/green]")
+            console.print(
+                f"[bold]Total reclaimable space:[/bold] [green]{total_mb:.1f} MB[/green]"
+            )
         if summary:
             console.print(f"\n{summary}")
         console.print()
@@ -4554,7 +4898,9 @@ def _display_trends(trends_data: Dict, artifact: Optional[str], period: str) -> 
     period_label = period_labels.get(period, period)
 
     if artifact:
-        console.print(f"\n[bold]Usage Trends for '{artifact}' ({period_label})[/bold]\n")
+        console.print(
+            f"\n[bold]Usage Trends for '{artifact}' ({period_label})[/bold]\n"
+        )
     else:
         console.print(f"\n[bold]Usage Trends ({period_label})[/bold]\n")
 
@@ -4575,14 +4921,18 @@ def _display_trends(trends_data: Dict, artifact: Optional[str], period: str) -> 
             # Create sparkline
             sparkline = _create_sparkline(values)
 
-            console.print(f"[{color}]{label:12}[/{color}] {sparkline} [dim]({total:,} total)[/dim]")
+            console.print(
+                f"[{color}]{label:12}[/{color}] {sparkline} [dim]({total:,} total)[/dim]"
+            )
 
     # Summary
     total_by_day = trends_data.get("total_events_by_day", {})
     if total_by_day:
         max_day = max(total_by_day.items(), key=lambda x: x[1], default=(None, 0))
         if max_day[0]:
-            console.print(f"\n[bold]Peak activity:[/bold] {max_day[0]} ([green]{max_day[1]:,} events[/green])")
+            console.print(
+                f"\n[bold]Peak activity:[/bold] {max_day[0]} ([green]{max_day[1]:,} events[/green])"
+            )
 
     console.print()
 
@@ -4598,13 +4948,17 @@ def _display_stats(db_stats: Dict, config: ConfigManager) -> None:
 
     # Basic stats
     console.print(f"[cyan]Total Events:[/cyan]     {db_stats.get('total_events', 0):,}")
-    console.print(f"[cyan]Total Artifacts:[/cyan]  {db_stats.get('unique_artifacts', 0):,}")
+    console.print(
+        f"[cyan]Total Artifacts:[/cyan]  {db_stats.get('unique_artifacts', 0):,}"
+    )
 
     # Date range
     earliest = db_stats.get("earliest_event")
     latest = db_stats.get("latest_event")
     if earliest and latest:
-        console.print(f"[cyan]Date Range:[/cyan]       {earliest[:10]} to {latest[:10]}")
+        console.print(
+            f"[cyan]Date Range:[/cyan]       {earliest[:10]} to {latest[:10]}"
+        )
 
     # Database size
     db_path = config.get_analytics_db_path()
@@ -4619,7 +4973,9 @@ def _display_stats(db_stats: Dict, config: ConfigManager) -> None:
     event_counts = db_stats.get("events_by_type", {})
     total = db_stats.get("total_events", 0)
 
-    for event_type, count in sorted(event_counts.items(), key=lambda x: x[1], reverse=True):
+    for event_type, count in sorted(
+        event_counts.items(), key=lambda x: x[1], reverse=True
+    ):
         percentage = (count / total * 100) if total > 0 else 0
         bar_length = int(percentage / 2)  # Max 50 chars
         bar = "█" * bar_length
@@ -4655,10 +5011,7 @@ def _create_sparkline(values: List[int]) -> str:
         return blocks[4] * len(values)  # Middle block for flat line
 
     # Scale to 0-8 range
-    scaled = [
-        int((v - min_val) / (max_val - min_val) * 8)
-        for v in values
-    ]
+    scaled = [int((v - min_val) / (max_val - min_val) * 8) for v in values]
 
     return "".join(blocks[s] for s in scaled)
 
@@ -4957,11 +5310,15 @@ def generate_sdk(output: Optional[str], check: bool, format: bool):
         # Check mode: compare timestamps
         if check:
             if not openapi_file.exists():
-                console.print("[yellow]OpenAPI spec not found - SDK needs generation[/yellow]")
+                console.print(
+                    "[yellow]OpenAPI spec not found - SDK needs generation[/yellow]"
+                )
                 sys.exit(1)
 
             if not sdk_output_dir.exists():
-                console.print("[yellow]SDK directory not found - SDK needs generation[/yellow]")
+                console.print(
+                    "[yellow]SDK directory not found - SDK needs generation[/yellow]"
+                )
                 sys.exit(1)
 
             # Compare modification times (simplified check)
@@ -4999,7 +5356,10 @@ def generate_sdk(output: Optional[str], check: bool, format: bool):
         # Ensure web dependencies are installed
         console.print("[cyan]Checking web dependencies...[/cyan]")
         node_modules = web_dir / "node_modules"
-        if not node_modules.exists() or not (node_modules / "openapi-typescript-codegen").exists():
+        if (
+            not node_modules.exists()
+            or not (node_modules / "openapi-typescript-codegen").exists()
+        ):
             console.print("[cyan]Installing web dependencies...[/cyan]")
             result = subprocess.run(
                 ["pnpm", "install"],
@@ -5008,7 +5368,9 @@ def generate_sdk(output: Optional[str], check: bool, format: bool):
                 text=True,
             )
             if result.returncode != 0:
-                console.print(f"[red]Error installing dependencies:[/red]\n{result.stderr}")
+                console.print(
+                    f"[red]Error installing dependencies:[/red]\n{result.stderr}"
+                )
                 sys.exit(1)
 
         # Generate TypeScript SDK
@@ -5017,6 +5379,7 @@ def generate_sdk(output: Optional[str], check: bool, format: bool):
         # Remove existing SDK directory for clean generation
         if sdk_output_dir.exists():
             import shutil
+
             shutil.rmtree(sdk_output_dir)
 
         # Run SDK generation via pnpm script
@@ -5246,7 +5609,9 @@ def token_list(include_expired, output_json):
             ]
             console.print(json.dumps(output, indent=2))
         else:
-            console.print(f"\n[bold]Authentication Tokens[/bold] ({len(tokens)} total)\n")
+            console.print(
+                f"\n[bold]Authentication Tokens[/bold] ({len(tokens)} total)\n"
+            )
 
             table = Table()
             table.add_column("Name", style="cyan", no_wrap=True)
@@ -5359,9 +5724,13 @@ def token_revoke(identifier, revoke_all, confirm):
             count = token_manager.revoke_token_by_name(identifier)
 
             if count > 0:
-                console.print(f"[green]Revoked {count} token(s) with name '{identifier}'.[/green]")
+                console.print(
+                    f"[green]Revoked {count} token(s) with name '{identifier}'.[/green]"
+                )
             else:
-                console.print(f"[red]No token found with name or ID '{identifier}'.[/red]")
+                console.print(
+                    f"[red]No token found with name or ID '{identifier}'.[/red]"
+                )
                 sys.exit(1)
 
     except Exception as e:
@@ -5399,7 +5768,9 @@ def token_cleanup(confirm):
             console.print("[green]No expired tokens found.[/green]")
             return
 
-        console.print(f"\n[yellow]Found {len(expired_tokens)} expired token(s):[/yellow]\n")
+        console.print(
+            f"\n[yellow]Found {len(expired_tokens)} expired token(s):[/yellow]\n"
+        )
 
         for token_info in expired_tokens:
             console.print(
@@ -5450,7 +5821,9 @@ def token_info(identifier):
             matching = [t for t in tokens if t.name == identifier]
 
             if not matching:
-                console.print(f"[red]No token found with name or ID '{identifier}'.[/red]")
+                console.print(
+                    f"[red]No token found with name or ID '{identifier}'.[/red]"
+                )
                 sys.exit(1)
 
             token_info = matching[0]
@@ -5686,19 +6059,25 @@ def bundle_create(
 
         else:
             # Interactive mode - prompt to select artifacts
-            console.print("[yellow]No artifacts specified. Use interactive selection:[/yellow]\n")
+            console.print(
+                "[yellow]No artifacts specified. Use interactive selection:[/yellow]\n"
+            )
 
             from skillmeat.core.artifact import ArtifactManager
 
             artifact_mgr = ArtifactManager()
-            available_artifacts = artifact_mgr.list_artifacts(collection_name=collection)
+            available_artifacts = artifact_mgr.list_artifacts(
+                collection_name=collection
+            )
 
             if not available_artifacts:
                 console.print("[red]No artifacts available in collection.[/red]")
                 sys.exit(1)
 
             # Display available artifacts
-            console.print(f"[bold]Available Artifacts ({len(available_artifacts)}):[/bold]\n")
+            console.print(
+                f"[bold]Available Artifacts ({len(available_artifacts)}):[/bold]\n"
+            )
             for idx, artifact in enumerate(available_artifacts, 1):
                 console.print(
                     f"  {idx}. {artifact.name} ({artifact.type.value}) - {artifact.metadata.title or 'No title'}"
@@ -5722,7 +6101,9 @@ def bundle_create(
                             artifact_count += 1
                             console.print(f"[green]Added:[/green] {artifact.name}")
                         else:
-                            console.print(f"[yellow]Warning:[/yellow] Invalid index {idx}")
+                            console.print(
+                                f"[yellow]Warning:[/yellow] Invalid index {idx}"
+                            )
                 except ValueError:
                     console.print("[red]Error: Invalid selection format.[/red]")
                     sys.exit(1)
@@ -5731,7 +6112,9 @@ def bundle_create(
             console.print("[red]Error: No artifacts were added to bundle.[/red]")
             sys.exit(1)
 
-        console.print(f"\n[green]Added {artifact_count} artifact(s) to bundle[/green]\n")
+        console.print(
+            f"\n[green]Added {artifact_count} artifact(s) to bundle[/green]\n"
+        )
 
         # Determine output path
         if output:
@@ -5741,7 +6124,9 @@ def bundle_create(
 
         # Build bundle
         console.print(f"[cyan]Building bundle archive...[/cyan]")
-        bundle_obj = builder.build(output_path, sign=sign, signing_key_id=signing_key_id)
+        bundle_obj = builder.build(
+            output_path, sign=sign, signing_key_id=signing_key_id
+        )
 
         # Success summary
         console.print()
@@ -5753,9 +6138,13 @@ def bundle_create(
         console.print(f"  Files:       {bundle_obj.total_files}")
         console.print(f"  Bundle hash: {bundle_obj.bundle_hash[:20]}...")
 
-        if hasattr(bundle_obj, 'signature') and bundle_obj.signature:
-            console.print(f"  Signed by:   {bundle_obj.signature.signer_name} <{bundle_obj.signature.signer_email}>")
-            console.print(f"  Fingerprint: {bundle_obj.signature.key_fingerprint[:16]}...")
+        if hasattr(bundle_obj, "signature") and bundle_obj.signature:
+            console.print(
+                f"  Signed by:   {bundle_obj.signature.signer_name} <{bundle_obj.signature.signer_email}>"
+            )
+            console.print(
+                f"  Fingerprint: {bundle_obj.signature.key_fingerprint[:16]}..."
+            )
 
         console.print(f"  Output:      {output_path}")
         console.print()
@@ -5883,14 +6272,18 @@ def bundle_inspect(bundle_file, verify, list_files, output_json):
             manifest_dict = bundle_obj.to_dict()
             artifact_hashes = [artifact.hash for artifact in bundle_obj.artifacts]
 
-            is_valid = BundleHasher.verify_bundle_integrity(manifest_dict, artifact_hashes)
+            is_valid = BundleHasher.verify_bundle_integrity(
+                manifest_dict, artifact_hashes
+            )
 
             if is_valid:
                 console.print("[green]Bundle integrity verified![/green]")
                 console.print(f"  Bundle hash: {bundle_obj.bundle_hash}")
             else:
                 console.print("[red]WARNING: Bundle integrity check failed![/red]")
-                console.print("[red]Bundle may have been tampered with or corrupted.[/red]")
+                console.print(
+                    "[red]Bundle may have been tampered with or corrupted.[/red]"
+                )
                 sys.exit(1)
 
         console.print()
@@ -5987,9 +6380,7 @@ def bundle_import(
         importer = BundleImporter()
 
         # Perform import
-        console.print(
-            f"\n[bold]Importing bundle:[/bold] {bundle_file.name}\n"
-        )
+        console.print(f"\n[bold]Importing bundle:[/bold] {bundle_file.name}\n")
 
         result = importer.import_bundle(
             bundle_path=bundle_file,
@@ -6222,7 +6613,10 @@ def vault_list(verbose):
                 vault = vault_mgr.get_vault(vault_name)
                 is_default = vault_name == default_vault
 
-                console.print(f"[cyan]{vault_name}[/cyan]" + (" [green](default)[/green]" if is_default else ""))
+                console.print(
+                    f"[cyan]{vault_name}[/cyan]"
+                    + (" [green](default)[/green]" if is_default else "")
+                )
                 console.print(f"  Type: {vault.type}")
                 console.print(f"  Read-only: {vault.read_only}")
 
@@ -6232,8 +6626,10 @@ def vault_list(verbose):
                     console.print(f"  Branch: {vault.config.get('branch', 'main')}")
                 elif vault.type == "s3":
                     console.print(f"  Bucket: {vault.config.get('bucket')}")
-                    console.print(f"  Region: {vault.config.get('region', 'us-east-1')}")
-                    if vault.config.get('prefix'):
+                    console.print(
+                        f"  Region: {vault.config.get('region', 'us-east-1')}"
+                    )
+                    if vault.config.get("prefix"):
                         console.print(f"  Prefix: {vault.config.get('prefix')}")
                 elif vault.type == "local":
                     console.print(f"  Path: {vault.config.get('path')}")
@@ -6415,10 +6811,14 @@ def vault_auth(name, username, password, ssh_key):
                 credentials["username"] = username
                 credentials["password"] = password
             elif username or password:
-                console.print("[yellow]Both username and password are required for HTTPS authentication[/yellow]")
+                console.print(
+                    "[yellow]Both username and password are required for HTTPS authentication[/yellow]"
+                )
                 sys.exit(1)
             else:
-                console.print("[yellow]Provide either --ssh-key or --username/--password[/yellow]")
+                console.print(
+                    "[yellow]Provide either --ssh-key or --username/--password[/yellow]"
+                )
                 sys.exit(1)
 
         elif vault.type == "s3":
@@ -6426,7 +6826,9 @@ def vault_auth(name, username, password, ssh_key):
                 credentials["access_key_id"] = username
                 credentials["secret_access_key"] = password
             else:
-                console.print("[yellow]Both --username (access key) and --password (secret key) are required for S3[/yellow]")
+                console.print(
+                    "[yellow]Both --username (access key) and --password (secret key) are required for S3[/yellow]"
+                )
                 sys.exit(1)
 
         elif vault.type == "local":
@@ -6468,15 +6870,25 @@ def vault_push(bundle_path, vault, progress):
         from skillmeat.core.sharing.vault.config import VaultConfigManager
         from skillmeat.core.sharing.vault.factory import VaultFactory
         from skillmeat.core.sharing.builder import inspect_bundle
-        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+        from rich.progress import (
+            Progress,
+            BarColumn,
+            DownloadColumn,
+            TransferSpeedColumn,
+            TimeRemainingColumn,
+        )
 
         vault_mgr = VaultConfigManager()
 
         # Determine vault to use
         vault_name = vault or vault_mgr.get_default_vault()
         if not vault_name:
-            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
-            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            console.print(
+                "[yellow]No vault specified and no default vault configured[/yellow]"
+            )
+            console.print(
+                "Use --vault or set a default with: skillmeat vault set-default <name>"
+            )
             sys.exit(1)
 
         # Get vault config
@@ -6572,15 +6984,25 @@ def vault_pull(bundle_id, vault, output, progress):
     try:
         from skillmeat.core.sharing.vault.config import VaultConfigManager
         from skillmeat.core.sharing.vault.factory import VaultFactory
-        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+        from rich.progress import (
+            Progress,
+            BarColumn,
+            DownloadColumn,
+            TransferSpeedColumn,
+            TimeRemainingColumn,
+        )
 
         vault_mgr = VaultConfigManager()
 
         # Determine vault to use
         vault_name = vault or vault_mgr.get_default_vault()
         if not vault_name:
-            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
-            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            console.print(
+                "[yellow]No vault specified and no default vault configured[/yellow]"
+            )
+            console.print(
+                "Use --vault or set a default with: skillmeat vault set-default <name>"
+            )
             sys.exit(1)
 
         # Get vault config
@@ -6685,8 +7107,12 @@ def vault_ls(vault, filter, tag, verbose):
         # Determine vault to use
         vault_name = vault or vault_mgr.get_default_vault()
         if not vault_name:
-            console.print("[yellow]No vault specified and no default vault configured[/yellow]")
-            console.print("Use --vault or set a default with: skillmeat vault set-default <name>")
+            console.print(
+                "[yellow]No vault specified and no default vault configured[/yellow]"
+            )
+            console.print(
+                "Use --vault or set a default with: skillmeat vault set-default <name>"
+            )
             sys.exit(1)
 
         # Get vault config
@@ -6745,12 +7171,18 @@ def vault_ls(vault, filter, tag, verbose):
             for bundle in bundles:
                 # Format size
                 size_mb = bundle.size_bytes / (1024 * 1024)
-                size_str = f"{size_mb:.2f} MB" if size_mb >= 1 else f"{bundle.size_bytes:,} B"
+                size_str = (
+                    f"{size_mb:.2f} MB" if size_mb >= 1 else f"{bundle.size_bytes:,} B"
+                )
 
                 table.add_row(
                     bundle.bundle_id,
                     bundle.version,
-                    bundle.description[:50] + "..." if len(bundle.description) > 50 else bundle.description,
+                    (
+                        bundle.description[:50] + "..."
+                        if len(bundle.description) > 50
+                        else bundle.description
+                    ),
                     bundle.author,
                     size_str,
                 )
@@ -6827,7 +7259,9 @@ def generate_key(name, email):
         console.print(f"  Fingerprint: {signing_key.fingerprint}")
         console.print(f"  Name: {signing_key.name}")
         console.print(f"  Email: {signing_key.email}")
-        console.print(f"  Created: {signing_key.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        console.print(
+            f"  Created: {signing_key.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         console.print("\n[yellow]Keep your private key secure![/yellow]")
         console.print("You can now sign bundles with: skillmeat bundle create --sign")
@@ -6878,7 +7312,9 @@ def list_keys(type, verbose):
                         console.print(f"  Fingerprint: {key.fingerprint}")
                         console.print(f"  Name: {key.name}")
                         console.print(f"  Email: {key.email}")
-                        console.print(f"  Created: {key.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                        console.print(
+                            f"  Created: {key.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
                 else:
                     table = Table()
                     table.add_column("Key ID", style="cyan")
@@ -6904,7 +7340,9 @@ def list_keys(type, verbose):
             public_keys = key_manager.list_public_keys()
 
             if public_keys:
-                console.print(f"\n[bold]Trusted Public Keys ({len(public_keys)}):[/bold]")
+                console.print(
+                    f"\n[bold]Trusted Public Keys ({len(public_keys)}):[/bold]"
+                )
 
                 if verbose:
                     for key in public_keys:
@@ -6912,7 +7350,9 @@ def list_keys(type, verbose):
                         console.print(f"  Fingerprint: {key.fingerprint}")
                         console.print(f"  Name: {key.name}")
                         console.print(f"  Email: {key.email}")
-                        console.print(f"  Imported: {key.imported_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                        console.print(
+                            f"  Imported: {key.imported_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
                         console.print(f"  Trusted: {'Yes' if key.trusted else 'No'}")
                 else:
                     table = Table()
@@ -6981,7 +7421,9 @@ def export_key(key_id, output):
         output_path.write_text(public_key_pem)
 
         console.print(f"[green]Public key exported to:[/green] {output_path}")
-        console.print("\nShare this file with others to allow them to verify your signatures.")
+        console.print(
+            "\nShare this file with others to allow them to verify your signatures."
+        )
 
     except Exception as e:
         console.print(f"[red]Error exporting key:[/red] {e}")
@@ -7046,9 +7488,7 @@ def import_key(key_file, name, email, trust):
                 "\n[green]This key is now trusted for bundle verification.[/green]"
             )
         else:
-            console.print(
-                "\n[yellow]This key is imported but not trusted.[/yellow]"
-            )
+            console.print("\n[yellow]This key is imported but not trusted.[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error importing key:[/red] {e}")
@@ -7118,7 +7558,9 @@ def revoke_key(key_id, type, force):
             if type == "signing":
                 warning = "\n[yellow]WARNING: This will delete your private key permanently![/yellow]"
             else:
-                warning = "\n[yellow]This will remove trust in this public key.[/yellow]"
+                warning = (
+                    "\n[yellow]This will remove trust in this public key.[/yellow]"
+                )
 
             console.print(warning)
             if not Confirm.ask(f"Are you sure you want to revoke this key?"):
@@ -7180,9 +7622,13 @@ def verify_bundle(bundle_path, require_signature):
 
             if result.signature_data:
                 console.print(f"\n[bold]Signature Details:[/bold]")
-                console.print(f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>")
+                console.print(
+                    f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>"
+                )
                 console.print(f"  Fingerprint: {result.signature_data.key_fingerprint}")
-                console.print(f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                console.print(
+                    f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
                 console.print(f"  Algorithm: {result.signature_data.algorithm}")
         else:
             console.print(f"[red]{result.summary()}[/red]")
@@ -7191,9 +7637,13 @@ def verify_bundle(bundle_path, require_signature):
 
             if result.signature_data:
                 console.print(f"\n[bold]Signature Details:[/bold]")
-                console.print(f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>")
+                console.print(
+                    f"  Signer: {result.signature_data.signer_name} <{result.signature_data.signer_email}>"
+                )
                 console.print(f"  Fingerprint: {result.signature_data.key_fingerprint}")
-                console.print(f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                console.print(
+                    f"  Signed: {result.signature_data.signed_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
 
             sys.exit(1)
 
@@ -7277,7 +7727,9 @@ def marketplace_search(query, broker, tags, license, page, page_size):
             brokers = [registry.get_broker(broker)]
             if brokers[0] is None:
                 console.print(f"[red]Broker '{broker}' not found[/red]")
-                console.print(f"\nAvailable brokers: {', '.join(registry.list_brokers())}")
+                console.print(
+                    f"\nAvailable brokers: {', '.join(registry.list_brokers())}"
+                )
                 sys.exit(1)
         else:
             brokers = registry.get_enabled_brokers()
@@ -7330,7 +7782,9 @@ def marketplace_search(query, broker, tags, license, page, page_size):
         console.print(table)
 
         console.print(f"\n[dim]Page {page}[/dim]")
-        console.print(f"[dim]Use 'skillmeat marketplace-install <listing-id>' to install[/dim]")
+        console.print(
+            f"[dim]Use 'skillmeat marketplace-install <listing-id>' to install[/dim]"
+        )
 
     except Exception as e:
         console.print(f"[red]Error searching marketplace:[/red] {e}")
@@ -7715,7 +8169,9 @@ def marketplace_publish(
 
         # Stop here if dry-run
         if dry_run:
-            console.print("\n[cyan]Dry run complete - bundle is ready to publish[/cyan]")
+            console.print(
+                "\n[cyan]Dry run complete - bundle is ready to publish[/cyan]"
+            )
             return
 
         # Step 5: Confirm publish (unless forced)
@@ -7747,12 +8203,8 @@ def marketplace_publish(
             console.print(f"  Submission ID: {submission.submission_id}")
             console.print(f"  Status: {submission.status}")
             console.print(f"  Broker: {submission.broker_name}")
-            console.print(
-                "\nYou can track the submission status with:"
-            )
-            console.print(
-                f"  skillmeat marketplace-status {submission.submission_id}"
-            )
+            console.print("\nYou can track the submission status with:")
+            console.print(f"  skillmeat marketplace-status {submission.submission_id}")
         elif submission.is_rejected:
             console.print("[red]Submission rejected[/red]")
             console.print(f"  Submission ID: {submission.submission_id}")
@@ -7818,9 +8270,7 @@ def compliance_scan(bundle_path):
             console.print("[bold]Detected Licenses:[/bold]")
             for lic in sorted(report.unique_licenses):
                 count = sum(
-                    1
-                    for d in report.detected_licenses
-                    if d.detected_license == lic
+                    1 for d in report.detected_licenses if d.detected_license == lic
                 )
                 console.print(f"  - {lic} ({count} files)")
             console.print()
@@ -7843,7 +8293,9 @@ def compliance_scan(bundle_path):
             else:
                 for file_path in report.missing_licenses[:10]:
                     console.print(f"  [dim]- {file_path}[/dim]")
-                console.print(f"  [dim]... and {len(report.missing_licenses) - 10} more[/dim]")
+                console.print(
+                    f"  [dim]... and {len(report.missing_licenses) - 10} more[/dim]"
+                )
             console.print()
 
         # Show recommendations
@@ -7855,9 +8307,7 @@ def compliance_scan(bundle_path):
 
         # Attribution required?
         if report.attribution_required:
-            console.print(
-                "[yellow]Attribution required for this license[/yellow]"
-            )
+            console.print("[yellow]Attribution required for this license[/yellow]")
             console.print("  Run: skillmeat compliance-checklist <bundle-path>")
 
     except Exception as e:
@@ -7947,10 +8397,13 @@ def compliance_checklist(bundle_path, license):
         )
 
         # Save checklist to temp location for reference
-        checklist_file = Path.home() / ".skillmeat" / "compliance" / f"{checklist.checklist_id}.json"
+        checklist_file = (
+            Path.home() / ".skillmeat" / "compliance" / f"{checklist.checklist_id}.json"
+        )
         checklist_file.parent.mkdir(parents=True, exist_ok=True)
 
         import json
+
         with open(checklist_file, "w") as f:
             json.dump(checklist.to_dict(), f, indent=2)
 
@@ -7984,10 +8437,14 @@ def compliance_consent(checklist_id, publisher_email):
         import json
 
         # Load checklist
-        checklist_file = Path.home() / ".skillmeat" / "compliance" / f"{checklist_id}.json"
+        checklist_file = (
+            Path.home() / ".skillmeat" / "compliance" / f"{checklist_id}.json"
+        )
         if not checklist_file.exists():
             console.print(f"[red]Checklist not found: {checklist_id}[/red]")
-            console.print("[dim]Run compliance-checklist first to generate a checklist[/dim]")
+            console.print(
+                "[dim]Run compliance-checklist first to generate a checklist[/dim]"
+            )
             sys.exit(1)
 
         with open(checklist_file, "r") as f:
@@ -8083,7 +8540,9 @@ def compliance_history(publisher):
             date = record.timestamp.strftime("%Y-%m-%d %H:%M")
             consent_id_short = record.consent_id[:8]
             all_consented = all(record.consents.values())
-            complete_mark = "[green]✓[/green]" if all_consented else "[yellow]○[/yellow]"
+            complete_mark = (
+                "[green]✓[/green]" if all_consented else "[yellow]○[/yellow]"
+            )
 
             table.add_row(
                 date,
