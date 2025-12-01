@@ -150,8 +150,6 @@ export function ParameterEditorModal({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent
         className="sm:max-w-[500px]"
-        aria-labelledby="param-editor-title"
-        aria-describedby="param-editor-description"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -159,8 +157,8 @@ export function ParameterEditorModal({
               <Edit className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div>
-              <DialogTitle id="param-editor-title">Edit Parameters</DialogTitle>
-              <DialogDescription id="param-editor-description">
+              <DialogTitle>Edit Parameters</DialogTitle>
+              <DialogDescription>
                 Update parameters for {artifact.type}: {artifact.name}
               </DialogDescription>
             </div>
