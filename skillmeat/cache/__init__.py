@@ -10,12 +10,15 @@ Cache Architecture:
     - TTL-based refresh strategy
     - Support for local and marketplace artifacts
     - FileWatcher for automatic cache invalidation
+    - RefreshJob for background cache refresh
 
 Main Components:
     - schema: Database schema definition and initialization
     - models: SQLAlchemy ORM models
     - repository: Data access layer
+    - manager: Service layer for cache operations
     - watcher: File system monitoring for cache invalidation
+    - refresh: Background refresh job with scheduling
 
 Example:
     >>> from skillmeat.cache.schema import init_database
@@ -27,11 +30,33 @@ Example:
     >>> repo = CacheRepository()
     >>> watcher = FileWatcher(cache_repository=repo)
     >>> watcher.start()
+    >>>
+    >>> # Start background refresh job
+    >>> from skillmeat.cache.manager import CacheManager
+    >>> from skillmeat.cache.refresh import RefreshJob
+    >>> manager = CacheManager()
+    >>> job = RefreshJob(cache_manager=manager, interval_hours=6.0)
+    >>> job.start_scheduler()
 """
 
 __version__ = "0.1.0"
 
+from skillmeat.cache.manager import CacheManager
+from skillmeat.cache.refresh import (
+    RefreshEvent,
+    RefreshEventType,
+    RefreshJob,
+    RefreshResult,
+)
 from skillmeat.cache.repository import CacheRepository
 from skillmeat.cache.watcher import FileWatcher
 
-__all__ = ["CacheRepository", "FileWatcher"]
+__all__ = [
+    "CacheManager",
+    "CacheRepository",
+    "FileWatcher",
+    "RefreshJob",
+    "RefreshEvent",
+    "RefreshEventType",
+    "RefreshResult",
+]
