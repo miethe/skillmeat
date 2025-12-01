@@ -375,7 +375,7 @@ class TestCheckDrift:
 
         # Setup collection mock
         class MockCollectionManager:
-            def get_collection(self, name):
+            def load_collection(self, name):
                 class Collection:
                     path = tmp_path / "collection"
 
@@ -405,7 +405,7 @@ class TestCheckDrift:
         """Test detects when artifact modified in collection."""
 
         class MockCollectionManager:
-            def get_collection(self, name):
+            def load_collection(self, name):
                 class Collection:
                     path = tmp_path / "collection"
 
@@ -444,7 +444,7 @@ class TestCheckDrift:
         """Test detects when artifact added to collection."""
 
         class MockCollectionManager:
-            def get_collection(self, name):
+            def load_collection(self, name):
                 class Collection:
                     path = tmp_path / "collection"
 
@@ -485,7 +485,7 @@ class TestCheckDrift:
         """Test detects when artifact removed from collection."""
 
         class MockCollectionManager:
-            def get_collection(self, name):
+            def load_collection(self, name):
                 class Collection:
                     path = tmp_path / "collection"
 
@@ -525,7 +525,7 @@ class TestCheckDrift:
         """Test drift detection with custom collection name."""
 
         class MockCollectionManager:
-            def get_collection(self, name):
+            def load_collection(self, name):
                 class Collection:
                     path = tmp_path / "my-collection"
 

@@ -410,7 +410,7 @@ class SyncManager:
 
         try:
             # Get collection path
-            collection = self.collection_mgr.get_collection(collection_name)
+            collection = self.collection_mgr.load_collection(collection_name)
             collection_path = collection.path
 
             artifacts = []
@@ -619,7 +619,7 @@ class SyncManager:
             )
 
         try:
-            collection = self.collection_mgr.get_collection(collection_name)
+            collection = self.collection_mgr.load_collection(collection_name)
             collection_path = collection.path
         except Exception as e:
             logger.warning(f"Failed to get collection path: {e}")
@@ -1095,7 +1095,7 @@ class SyncManager:
             metadata = self._load_deployment_metadata(project_path)
             collection_name = metadata.collection if metadata else "default"
 
-            collection = self.collection_mgr.get_collection(collection_name)
+            collection = self.collection_mgr.load_collection(collection_name)
             collection_path = collection.path
 
             artifact_type_plural = self._get_artifact_type_plural(artifact_type)
@@ -1425,7 +1425,7 @@ class SyncManager:
                 # Get collection path
                 metadata = self._load_deployment_metadata(Path("."))
                 collection_name = metadata.collection if metadata else "default"
-                collection = self.collection_mgr.get_collection(collection_name)
+                collection = self.collection_mgr.load_collection(collection_name)
 
                 # Compute new hash
                 artifact_type_plural = self._get_artifact_type_plural(
