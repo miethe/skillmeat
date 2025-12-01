@@ -400,11 +400,21 @@ class ArtifactDiscoveryService:
         try:
             yaml_data = extract_yaml_frontmatter(metadata_file)
             if yaml_data:
+                # Extract name first (needed for synthetic source)
+                name = yaml_data.get("name", yaml_data.get("title", artifact_path.stem))
+
+                # Extract source, with fallback to synthetic local source
+                source = yaml_data.get("source", yaml_data.get("upstream"))
+                if not source:
+                    # Generate synthetic local source for artifacts without GitHub source
+                    source = f"local/{artifact_type}/{name}"
+                    logger.debug(f"Generated synthetic local source: {source}")
+
                 # Normalize metadata fields
                 metadata = {
-                    "name": yaml_data.get("name", yaml_data.get("title")),
+                    "name": name,
                     "description": yaml_data.get("description"),
-                    "source": yaml_data.get("source", yaml_data.get("upstream")),
+                    "source": source,
                     "version": yaml_data.get("version"),
                     "scope": yaml_data.get("scope"),
                     "tags": yaml_data.get("tags", []),

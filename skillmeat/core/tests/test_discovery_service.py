@@ -371,7 +371,8 @@ description: Only has name and description
         assert metadata["description"] == "Only has name and description"
         assert "author" not in metadata
         assert "version" not in metadata
-        assert "source" not in metadata
+        # Source is now generated as synthetic local source when not provided
+        assert metadata["source"] == "local/skill/partial"
 
     def test_extract_metadata_minimal(self, tmp_path):
         """Test extraction with only name field."""
@@ -384,6 +385,8 @@ description: Only has name and description
 
         assert metadata["name"] == "minimal"
         assert "description" not in metadata
+        # Source is now generated as synthetic local source when not provided
+        assert metadata["source"] == "local/skill/minimal"
 
     def test_extract_metadata_invalid_yaml(self, tmp_path):
         """Test handling of corrupted/invalid YAML frontmatter."""

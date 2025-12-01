@@ -7,15 +7,16 @@ from skillmeat.core.github_metadata import GitHubMetadataExtractor
 
 def validate_github_source(source: str) -> Tuple[bool, Optional[str]]:
     """
-    Validate GitHub source format.
+    Validate GitHub source format or local source.
 
     Valid formats:
     - user/repo/path
     - user/repo/path@version
     - https://github.com/user/repo/tree/branch/path
+    - local/{type}/{name} (for discovered local artifacts)
 
     Args:
-        source: GitHub source string
+        source: GitHub source string or local source
 
     Returns:
         Tuple of (is_valid, error_message)
@@ -25,6 +26,14 @@ def validate_github_source(source: str) -> Tuple[bool, Optional[str]]:
 
     if not source.strip():
         return False, "Source cannot be empty or whitespace"
+
+    # Accept local sources (from discovered local artifacts)
+    if source.startswith("local/"):
+        # Validate format: local/{type}/{name}
+        parts = source.split("/")
+        if len(parts) != 3:
+            return False, "Local source must be in format: local/{type}/{name}"
+        return True, None
 
     try:
         # Use the extractor's parser (without cache for validation)
