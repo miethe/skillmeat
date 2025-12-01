@@ -79,11 +79,12 @@ class DiscoveryResult(BaseModel):
 
 
 class ArtifactDiscoveryService:
-    """Service for discovering artifacts in .claude/ directories.
+    """Service for discovering artifacts in .claude/ directories or collection artifacts.
 
-    This service scans the collection artifacts directory recursively,
-    detects artifact types, extracts metadata from frontmatter, and
-    validates artifact structure.
+    This service supports two scan modes:
+    - project mode: Scans .claude/ subdirectories (skills/, commands/, agents/, hooks/, mcp/)
+    - collection mode: Scans collection/artifacts/ subdirectories (legacy)
+    - auto mode: Detects mode based on directory structure
 
     Supported artifact types:
     - Skills: Identified by SKILL.md
@@ -97,14 +98,36 @@ class ArtifactDiscoveryService:
 
     supported_types: List[str] = ["skill", "command", "agent", "hook", "mcp"]
 
-    def __init__(self, collection_path: Path):
+    def __init__(self, base_path: Path, scan_mode: str = "auto"):
         """Initialize the discovery service.
 
         Args:
-            collection_path: Path to the collection root directory
+            base_path: Base path to scan (project root or collection root)
+            scan_mode: Scan mode - "project" (.claude/), "collection" (artifacts/), or "auto" (detect)
         """
-        self.collection_path = collection_path
-        self.artifacts_path = collection_path / "artifacts"
+        self.base_path = base_path
+        self.scan_mode = scan_mode
+
+        # Auto-detect mode based on directory structure
+        if scan_mode == "auto":
+            if (base_path / ".claude").exists():
+                self.scan_mode = "project"
+                self.artifacts_base = base_path / ".claude"
+            elif (base_path / "artifacts").exists():
+                self.scan_mode = "collection"
+                self.artifacts_base = base_path / "artifacts"
+            else:
+                # Default to project mode
+                self.scan_mode = "project"
+                self.artifacts_base = base_path / ".claude"
+        elif scan_mode == "project":
+            self.artifacts_base = base_path / ".claude"
+        else:  # collection
+            self.artifacts_base = base_path / "artifacts"
+
+        # Maintain backward compatibility with collection_path attribute
+        self.collection_path = base_path
+        self.artifacts_path = self.artifacts_base
 
     @log_performance("discovery_scan")
     def discover_artifacts(self) -> DiscoveryResult:
@@ -125,12 +148,19 @@ class ArtifactDiscoveryService:
 
         logger.info(
             "Starting artifact discovery",
-            extra={"path": str(self.collection_path)}
+            extra={
+                "path": str(self.base_path),
+                "scan_mode": self.scan_mode,
+                "artifacts_base": str(self.artifacts_base)
+            }
         )
 
         # Validate artifacts directory exists
-        if not self.artifacts_path.exists():
-            error_msg = f"Artifacts directory not found: {self.artifacts_path}"
+        if not self.artifacts_base.exists():
+            error_msg = (
+                f"Artifacts directory not found: {self.artifacts_base} "
+                f"(scan_mode={self.scan_mode})"
+            )
             logger.warning(error_msg)
             errors.append(error_msg)
             discovery_scans_total.labels(status="no_artifacts_dir").inc()
@@ -144,7 +174,7 @@ class ArtifactDiscoveryService:
 
         # Scan each artifact type directory
         try:
-            for type_dir in self.artifacts_path.iterdir():
+            for type_dir in self.artifacts_base.iterdir():
                 if not type_dir.is_dir():
                     continue
 
