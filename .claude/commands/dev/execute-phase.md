@@ -8,7 +8,7 @@ allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
 
 # /dev:execute-phase
 
-You are Claude Code executing Phase `$ARGUMENTS` following MeatyPrompts implementation standards and the layered architecture: **routers → services → repositories → DB**.
+You are Claude Code executing Phase `$ARGUMENTS` following the project implementation standards and the layered architecture: **routers → services → repositories → DB**.
 
 This command leverages the **artifact-tracking skill** for YAML-driven orchestration, enabling token-efficient batch delegation and parallel task execution.
 
@@ -141,7 +141,7 @@ parallelization:
 
 **Batch 1:**
 ```
-Task("ui-engineer-enhanced", "TASK-1.1: Implement X component - Create React component with Y pattern following MP architecture")
+Task("ui-engineer-enhanced", "TASK-1.1: Implement X component - Create React component with Y pattern following Projectarchitecture")
 Task("python-pro", "TASK-1.2: Add API endpoint for X - Create FastAPI endpoint following layered architecture (router → service → repository)")
 ```
 
@@ -197,7 +197,7 @@ Create ONE context file per PRD (not per phase) at `.claude/worknotes/${PRD_NAME
 ## Key Decisions (Across All Phases)
 
 - **Architecture:** [Key architectural choices made]
-- **Patterns:** [MP patterns being followed]
+- **Patterns:** [Projectpatterns being followed]
 - **Trade-offs:** [Important trade-offs made]
 
 ---
@@ -294,7 +294,7 @@ Phase ${phase_num}, {task_id}: {task_title}
 
 {task_description}
 
-MP Patterns to Follow:
+ProjectPatterns to Follow:
 - Layered architecture: routers → services → repositories → DB
 - ErrorResponse envelopes for errors
 - Cursor pagination for lists
@@ -325,14 +325,14 @@ Files changed:
 
 Please validate:
 1. All acceptance criteria met
-2. MP architecture patterns followed
+2. Projectarchitecture patterns followed
 3. Tests exist and pass
 4. No regression introduced
 ```
 
 **Validation checklist per task:**
 - [ ] Acceptance criteria met
-- [ ] Code follows MP layered architecture
+- [ ] Code follows Projectlayered architecture
 - [ ] Tests exist and pass
 - [ ] TypeScript/Python types correct
 - [ ] Error handling implemented
@@ -348,7 +348,7 @@ After each completed task (or logical unit of work), commit:
 git add {files}
 
 # Commit with conventional commits format
-git commit -m "feat(web): implement {feature} following MP architecture
+git commit -m "feat(web): implement {feature} following Projectarchitecture
 
 - Added {component/service/etc}
 - Wired telemetry spans
@@ -757,9 +757,9 @@ Stop execution and report to user with:
 
 ---
 
-## MP Architecture Compliance Checklist
+## ProjectArchitecture Compliance Checklist
 
-Ensure every implementation follows MP patterns:
+Ensure every implementation follows Projectpatterns:
 
 ### Backend Implementation
 - [ ] **Layered architecture:** router → service → repository → DB

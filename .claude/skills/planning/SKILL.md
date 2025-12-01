@@ -291,89 +291,9 @@ Token Efficiency:
 
 **Process**:
 
-1. **Extract Implementation Tasks**
-   - Read Implementation Plan (or "Implementation" section of PRD)
-   - Extract all tasks by phase
-   - Capture task IDs, names, descriptions, estimates
+Utilize artifact-tracking skill to create progress tracking and context artifacts per the skill instructions.
 
-2. **Structure Progress File**
-   - Use template: `./templates/progress-tracking-template.md`
-   - Follow CLAUDE.md policy: ONE file per feature (all phases)
-   - Location: `.claude/progress/[feature-name]/all-phases-progress.md`
-   - Format: Phase overview table + detailed phase sections
-
-3. **Add Subagent Assignments**
-   - Use `./references/subagent-assignments.md`
-   - Add to each task based on type
-   - Format: "Assigned Subagent(s): agent-1, agent-2"
-   - Example task types:
-     - Database schema: data-layer-expert
-     - API endpoints: python-backend-engineer, backend-architect
-     - React components: ui-engineer-enhanced, frontend-developer
-     - Testing: testing specialists
-     - Documentation: documentation-writer
-
-4. **Set Up Tracking Structure**
-   - Phase Overview table with status/completion
-   - Per-phase sections with:
-     - Completion checklist (tasks as checkboxes)
-     - Subagent assignments
-     - Success criteria
-     - Key files involved
-   - Status tracking: NOT STARTED, IN PROGRESS, BLOCKED, COMPLETE
-
-5. **Link from PRD**
-   - Update PRD's "Implementation" section
-   - Add link to progress tracking file
-   - Format: `See progress tracking: .claude/progress/[feature-name]/all-phases-progress.md`
-
-**Output**:
-- Progress tracking file at: `.claude/progress/[feature-name]/all-phases-progress.md`
-- Linked from PRD
-- Tasks organized by phase
-- Subagent assignments on every task
-- Ready for implementation tracking
-
-**Example**:
-
-```markdown
-Input PRD: docs/project_plans/PRDs/harden-polish/data-layer-fixes-filtering-v1.md
-
-Output: .claude/progress/data-layer-fixes-filtering-v1/all-phases-progress.md
-
-Structure:
-# All-Phases Progress: Data Layer Fixes & Filtering
-
-**Status**: NOT STARTED
-**Last Updated**: 2025-11-11
-**Completion**: 0% (0 of 24 story points)
-
-## Phase Overview
-| Phase | Title | Effort | Status | Completion |
-|-------|-------|--------|--------|-----------|
-| 1 | Repository Layer - Transaction Mgmt | 8 pts | NOT STARTED | 0% |
-| 2 | Repository Layer - Filter Queries | 8 pts | NOT STARTED | 0% |
-| 3 | Service Layer - Validation & DTOs | 5 pts | NOT STARTED | 0% |
-| 4 | Frontend Layer - React Query | 5 pts | NOT STARTED | 0% |
-
-## Phase 1: Repository Layer - Transaction Management
-**Assigned Subagent(s)**: data-layer-expert, python-backend-engineer
-
-### Completion Checklist
-- [ ] TX-001: Fix BaseRepository Rollback (3 pts)
-      Assigned Subagent(s): data-layer-expert
-- [ ] TX-002: Update PromptRepository Error Handling (3 pts)
-      Assigned Subagent(s): python-backend-engineer
-- [ ] TX-003: Add Transaction Telemetry (1 pt)
-      Assigned Subagent(s): backend-architect
-- [ ] TX-004: Integration Tests (1 pt)
-      Assigned Subagent(s): testing-specialist
-
-### Success Criteria
-- [ ] All repository exceptions trigger automatic rollback
-- [ ] Transaction state correctly reset after errors
-...
-```
+You should NOT create these files from this skill, as there are specific optimizations and structures required by the artifact-tracking skill.
 
 ## Templates Reference
 
@@ -420,21 +340,6 @@ Structure:
 - Post-Implementation Plan (monitoring, maintenance)
 
 **When to Use**: Creating implementation plan from PRD
-
-### progress-tracking-template.md
-
-**Location**: `./templates/progress-tracking-template.md`
-
-**Purpose**: Track implementation progress across all phases
-
-**Key Sections**:
-- Status header (overall status, completion %, last updated)
-- Phase Overview table (phase, title, effort, status, completion)
-- Per-phase sections (completion checklist, success criteria, key files)
-- Subagent assignments per task
-- Links to PRD and Implementation Plan
-
-**When to Use**: Setting up progress tracking for multi-phase work
 
 ### phase-breakdown-template.md
 
@@ -511,125 +416,22 @@ All scripts are in `./scripts/` directory and use Node.js (NOT Python).
 
 **Output**: List of created phase files
 
-### assign-subagents.sh
-
-**Purpose**: Add subagent assignments to tasks in plan
-
-**Usage**:
-```bash
-./scripts/assign-subagents.sh "path/to/plan.md"
-```
-
-**Process**:
-1. Read plan and extract tasks
-2. Determine task type (database, API, frontend, etc.)
-3. Map to appropriate subagents using `./references/subagent-assignments.md`
-4. Add assignment note to each task
-5. Update plan file
-
-**Output**: Updated plan with subagent assignments
-
-### create-progress-tracking.sh
-
-**Purpose**: Create progress tracking document from plan
-
-**Usage**:
-```bash
-./scripts/create-progress-tracking.sh "path/to/plan.md"
-```
-
-**Process**:
-1. Read implementation plan
-2. Extract all phases and tasks
-3. Generate progress tracking structure
-4. Add subagent assignments
-5. Write to `.claude/progress/[feature-name]/all-phases-progress.md`
-6. Update PRD with link to progress file
-
-**Output**: Progress tracking file path
-
 ## References
-
-### mp-architecture.md
-
-**Location**: `./references/mp-architecture.md`
-
-**Purpose**: Summary of MeatyPrompts layered architecture
-
-**Content**:
-- Layered architecture: routers → services → repositories → DB
-- Repositories own all DB I/O and RLS
-- Services return DTOs only
-- Routers handle HTTP + validation
-- ErrorResponse envelope for errors
-- Cursor pagination for lists: `{ items, pageInfo }`
-- OpenTelemetry spans and structured logging
-
-**Used By**: PRD generation, implementation planning
 
 ### subagent-assignments.md
 
 **Location**: `./references/subagent-assignments.md`
-
 **Purpose**: Mapping of task types to appropriate subagents
-
-**Content**:
-
-| Task Type | Subagents | Notes |
-|-----------|-----------|-------|
-| Database Schema | data-layer-expert | Tables, indexes, RLS policies |
-| Database Migrations | data-layer-expert, python-backend-engineer | Alembic migrations |
-| Repository Layer | python-backend-engineer, data-layer-expert | DB I/O, transactions |
-| Service Layer | python-backend-engineer, backend-architect | Business logic, DTOs |
-| API Endpoints | python-backend-engineer, backend-architect | FastAPI routers |
-| Frontend Components | ui-engineer-enhanced, frontend-developer | React components |
-| UI Design | ui-designer, ux-researcher | Design system, wireframes |
-| Testing | testing specialists | Unit, integration, E2E |
-| Documentation | documentation-writer, documentation-complex | Based on complexity |
-| Performance | react-performance-optimizer | React optimization |
-| Accessibility | web-accessibility-checker | WCAG compliance |
-
 **Used By**: Implementation planning, progress tracking creation
 
 ### file-structure.md
 
 **Location**: `./references/file-structure.md`
-
 **Purpose**: Directory structure conventions for plans and progress
-
-**Content**:
-
-```
-docs/project_plans/
-├── PRDs/
-│   ├── harden-polish/         # Bug fixes, polish
-│   ├── features/              # New features
-│   ├── enhancements/          # Feature enhancements
-│   └── refactors/             # Architecture refactors
-│
-└── implementation_plans/
-    ├── harden-polish/
-    │   ├── feature-name-v1.md              # Main plan
-    │   └── feature-name-v1/                # Phase breakouts
-    │       ├── phase-1-database.md
-    │       ├── phase-2-3-backend.md
-    │       └── phase-4-5-frontend.md
-    ├── features/
-    ├── enhancements/
-    └── refactors/
-
-.claude/
-└── progress/
-    └── feature-name/
-        └── all-phases-progress.md          # ONE file per feature
-```
-
 **Naming Conventions**:
 - PRDs: `[feature-name]-v1.md` (kebab-case)
 - Implementation Plans: `[feature-name]-v1.md`
 - Phase Files: `phase-[N]-[name].md` or `phase-[N]-[M]-[name].md` (grouped)
-- Progress: `all-phases-progress.md` (one per feature)
-
 **Used By**: File creation, optimization
 
 ### optimization-patterns.md
@@ -710,10 +512,6 @@ docs/project_plans/
 - Can group: `phase-1-3-backend.md`
 - Descriptive name (database, repository, frontend)
 
-**Progress Files**: `all-phases-progress.md`
-- ONE file per feature (all phases together)
-- Location: `.claude/progress/[feature-name]/`
-
 ### Directory Organization
 
 **PRDs**:
@@ -724,32 +522,6 @@ docs/project_plans/
 - `docs/project_plans/implementation_plans/[category]/`
 - Match PRD category
 - Phase breakouts in subdirectory: `[plan-name]/`
-
-**Progress Tracking**:
-- `.claude/progress/[feature-name]/`
-- One directory per feature
-- Contains: `all-phases-progress.md`
-
-### Subagent Assignment Strategy
-
-**Match Task Type to Specialist**:
-- Database work → data-layer-expert
-- API implementation → python-backend-engineer, backend-architect
-- React components → ui-engineer-enhanced, frontend-developer
-- UI design → ui-designer, ux-researcher
-- Testing → appropriate testing specialists
-- Documentation → documentation-writer (90%), documentation-complex (10%)
-
-**Assignment Format**:
-```markdown
-- [ ] TASK-001: Task Name (3 pts)
-      Assigned Subagent(s): python-backend-engineer, backend-architect
-```
-
-**Multiple Agents**:
-- Primary agent first
-- Supporting agents after
-- Consider expertise overlap
 
 ### Token Efficiency Tips
 
@@ -804,9 +576,6 @@ related:
   - /docs/project_plans/PRDs/category/feature-name-v1.md
 ---
 ```
-
-**Progress Tracking**:
-No frontmatter required for `.claude/progress/` files (per CLAUDE.md)
 
 ## Examples
 
@@ -936,79 +705,15 @@ Created Phase Files:
 Token Efficiency: 67% reduction for targeted queries
 ```
 
-### Example 4: Create Progress Tracking
-
-**Input**:
-```
-User: "Create progress tracking for data-layer-fixes-filtering PRD"
-```
-
-**Process**:
-1. Read PRD: docs/project_plans/PRDs/harden-polish/data-layer-fixes-filtering-v1.md
-2. Extract "Implementation" section tasks
-3. Organize by 5 phases
-4. Assign subagents:
-   - Phase 1 (Transaction Mgmt): data-layer-expert, python-backend-engineer
-   - Phase 2 (Filter Queries): python-backend-engineer
-   - Phase 3 (Service Layer): backend-architect, python-backend-engineer
-   - Phase 4 (Frontend): ui-engineer-enhanced, frontend-developer
-   - Phase 5 (Testing): testing specialists
-5. Create progress file with checkboxes and success criteria
-6. Update PRD with link to progress file
-
-**Output**:
-```
-Created: .claude/progress/data-layer-fixes-filtering-v1/all-phases-progress.md
-
-Updated PRD Section:
-## Implementation
-
-See progress tracking: `.claude/progress/data-layer-fixes-filtering-v1/all-phases-progress.md`
-
-Progress File Structure:
-# All-Phases Progress: Data Layer Fixes & Filtering
-
-**Status**: NOT STARTED
-**Last Updated**: 2025-11-11
-**Completion**: 0% (0 of 24 story points)
-
-## Phase Overview
-| Phase | Title | Effort | Status | Completion |
-| 1 | Repository - Transaction Mgmt | 8 pts | NOT STARTED | 0% |
-| 2 | Repository - Filter Queries | 8 pts | NOT STARTED | 0% |
-...
-
-## Phase 1: Repository Layer - Transaction Management
-**Assigned Subagent(s)**: data-layer-expert, python-backend-engineer
-
-### Completion Checklist
-- [ ] TX-001: Fix BaseRepository Rollback (3 pts)
-      Assigned Subagent(s): data-layer-expert
-- [ ] TX-002: Update PromptRepository Error Handling (3 pts)
-      Assigned Subagent(s): python-backend-engineer
-...
-
-### Success Criteria
-- [ ] All repository exceptions trigger automatic rollback
-- [ ] Transaction state correctly reset after errors
-...
-```
-
-## Integration with MeatyPrompts
+## Integration with Project Standards
 
 ### Architecture Compliance
 
-All plans follow MP layered architecture:
-- **Routers** → Services → Repositories → DB
-- Services return **DTOs only**
-- Repositories own **all DB I/O and RLS**
-- **Cursor pagination** for lists: `{ items, pageInfo }`
-- **ErrorResponse** envelope for errors
-- **OpenTelemetry** spans and structured logging
+All plans follow project layered architecture.
 
 ### Subagent Ecosystem
 
-Plans integrate with 50+ MeatyPrompts subagents:
+Plans integrate with 50+ project subagents:
 
 **Architecture**: lead-architect, backend-architect, data-layer-expert
 **Development**: python-backend-engineer, frontend-developer, ui-engineer-enhanced
@@ -1023,15 +728,12 @@ Plans integrate with 50+ MeatyPrompts subagents:
 Follows CLAUDE.md documentation policy:
 - PRDs are product-planning docs (allowed)
 - Implementation Plans are product-planning docs (allowed)
-- Progress Tracking follows structured format (.claude/progress/)
-- One progress file per feature (all phases)
-- Frontmatter required for `/docs/`, not for `.claude/`
+- NO reports, summaries, etc unless explicitly requested
 
 ### File Organization
 
 **PRDs**: `/docs/project_plans/PRDs/[category]/[feature-name]-v1.md`
 **Plans**: `/docs/project_plans/implementation_plans/[category]/[feature-name]-v1.md`
-**Progress**: `.claude/progress/[feature-name]/all-phases-progress.md`
 **Phase Files**: `[plan-name]/phase-[N]-[name].md`
 
 ## Advanced Usage
@@ -1082,62 +784,9 @@ Regularly optimize plans as work progresses:
 3. Break out new sections if plan grows >800 lines
 4. Archive completed phases
 
-## Troubleshooting
-
-### PRD Generation Issues
-
-**Problem**: PRD missing key sections
-
-**Solution**:
-- Check template is complete: `./templates/prd-template.md`
-- Verify feature description is detailed enough
-- Review example PRDs: `/docs/project_plans/PRDs/`
-
-### Implementation Plan Too Long
-
-**Problem**: Generated plan exceeds 800 lines
-
-**Solution**:
-- Automatically triggers phase breakout
-- Creates phase-specific files
-- Updates parent with links
-- If still too long: Group fewer phases per file
-
-### Subagent Assignment Unclear
-
-**Problem**: Not sure which subagent to assign to task
-
-**Solution**:
-- Check `./references/subagent-assignments.md`
-- Look for similar tasks in existing progress files
-- Default patterns:
-  - Database → data-layer-expert
-  - Backend → python-backend-engineer
-  - Frontend → ui-engineer-enhanced
-  - Docs → documentation-writer
-
-### File Organization Confusion
-
-**Problem**: Not sure where to place generated files
-
-**Solution**:
-- Check `./references/file-structure.md`
-- PRDs: `/docs/project_plans/PRDs/[category]/`
-- Plans: `/docs/project_plans/implementation_plans/[category]/`
-- Progress: `.claude/progress/[feature-name]/`
-- Phase files: Subdirectory of plan: `[plan-name]/`
-
-### Progress Tracking Not Updating
-
-**Problem**: Progress file created but not linked from PRD
-
-**Solution**:
-- Manually add link to PRD's "Implementation" section
-- Format: `See progress tracking: .claude/progress/[feature-name]/all-phases-progress.md`
-- Ensure progress file exists at expected location
-
 ## Related Skills
 
+- **artifact-tracking**: Create progress tracking and context artifacts
 - **skill-builder**: Create new custom skills
 - **symbols**: Token-efficient codebase indexing
 - **codebase-explorer**: Fast pattern discovery
@@ -1149,7 +798,7 @@ Regularly optimize plans as work progresses:
 - **prd-writer**: PRD creation
 - **implementation-planner**: Detailed implementation planning
 - **task-decomposition-expert**: Task breakdown
-- **lead-architect**: Architecture planning assistance
+- **lead-architect**: Architecture planning assistance, task delegation
 - **documentation-writer**: Documentation for plans
 
 ## Version History
@@ -1159,3 +808,4 @@ Regularly optimize plans as work progresses:
   - 4 templates (PRD, Plan, Progress, Phase)
   - 5 scripts (generate-prd, generate-impl-plan, optimize-plan, assign-subagents, create-progress-tracking)
   - 4 references (architecture, subagents, file-structure, optimization-patterns)
+- **2025-12-01**: Remove Tracking Creation from this skill; delegate to artifact-tracking skill

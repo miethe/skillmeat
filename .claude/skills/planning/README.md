@@ -8,7 +8,6 @@ The Planning Skill generates and optimizes Product Requirements Documents (PRDs)
 - Generate PRDs from feature requests
 - Create phased Implementation Plans with subagent assignments
 - Optimize long planning docs by breaking into phase-specific files
-- Set up progress tracking for multi-phase implementations
 
 ---
 
@@ -51,18 +50,6 @@ Skill:
 4. Results in 50-70% token reduction
 ```
 
-### Create Progress Tracking
-
-```
-User: "Create progress tracking for data-layer-fixes PRD"
-
-Skill:
-1. Extracts implementation tasks from PRD
-2. Organizes by phase
-3. Adds subagent assignments
-4. Creates: .claude/progress/data-layer-fixes/all-phases-progress.md
-```
-
 ---
 
 ## Key Concepts
@@ -74,14 +61,9 @@ Files optimized for AI loading:
 - **Strategy**: Progressive disclosure (summary → detail)
 - **Result**: 50-70% token reduction for most queries
 
-### MeatyPrompts Architecture Compliance
+### Project Architecture Compliance
 
-All plans follow layered architecture:
-- Routers → Services → Repositories → Database
-- DTOs only (no ORM in services/routers)
-- Cursor pagination for lists
-- ErrorResponse envelope for errors
-- OpenTelemetry spans for observability
+All plans follow layered architecture.
 
 ### Subagent Integration
 
@@ -109,7 +91,7 @@ docs/project_plans/
 
 .claude/progress/
 └── feature-name/
-    └── all-phases-progress.md (one file, all phases)
+    └── phase-{N}-progress.md (one file per phase)
 ```
 
 ---
@@ -120,8 +102,7 @@ Located in `./templates/`:
 
 1. **prd-template.md** - Standard PRD structure
 2. **implementation-plan-template.md** - 8-phase plan structure
-3. **progress-tracking-template.md** - Progress tracking format
-4. **phase-breakdown-template.md** - Individual phase file format
+3. **phase-breakdown-template.md** - Individual phase file format
 
 ---
 
@@ -129,10 +110,9 @@ Located in `./templates/`:
 
 Located in `./references/`:
 
-1. **mp-architecture.md** - MeatyPrompts layered architecture
-2. **subagent-assignments.md** - Task type to subagent mapping
-3. **file-structure.md** - Directory organization and naming
-4. **optimization-patterns.md** - Strategies for breaking up large files
+1. **subagent-assignments.md** - Task type to subagent mapping
+2. **file-structure.md** - Directory organization and naming
+3. **optimization-patterns.md** - Strategies for breaking up large files
 
 ---
 
@@ -145,8 +125,6 @@ Located in `./scripts/`:
 1. **generate-prd.sh** - Generate PRD from description
 2. **generate-impl-plan.sh** - Generate plan from PRD
 3. **optimize-plan.sh** - Break up long plan
-4. **assign-subagents.sh** - Add subagent assignments
-5. **create-progress-tracking.sh** - Create progress doc
 
 ---
 
@@ -156,8 +134,7 @@ Located in `./scripts/`:
 
 1. Generate PRD: `"Create PRD for [feature]"`
 2. Generate Plan: `"Create implementation plan for [prd-path]"`
-3. Create Progress: `"Create progress tracking for [feature]"`
-4. Start Implementation: Development agents use progress tracking
+3. Start Implementation: Development agents use progress tracking
 
 ### Workflow 2: Optimize Existing Planning Docs
 
@@ -165,12 +142,6 @@ Located in `./scripts/`:
 2. Optimize: `"Optimize [plan-path]"` if >800 lines
 3. Validate: Ensure all content preserved
 4. Update Links: Cross-link phase files
-
-### Workflow 3: Add Progress Tracking to Existing PRD
-
-1. Identify PRD: `docs/project_plans/PRDs/[category]/[feature]-v1.md`
-2. Create Progress: `"Create progress tracking for [feature]"`
-3. Link from PRD: Add link to progress file in PRD's Implementation section
 
 ---
 
@@ -181,7 +152,6 @@ Located in `./scripts/`:
 3. **Cross-Linking**: Always link related documents (PRD ↔ Plan ↔ Progress)
 4. **Subagent Assignments**: Use reference guide for consistent assignments
 5. **Progressive Disclosure**: Summary in parent, details in phase files
-6. **One Progress File**: Always one `all-phases-progress.md` per feature
 
 ---
 
@@ -191,22 +161,19 @@ See SKILL.md "Examples" section for:
 - Creating PRD for advanced filtering
 - Generating implementation plan with phase breakout
 - Optimizing long plan
-- Creating progress tracking with subagent assignments
 
 ---
 
-## Integration with MeatyPrompts
+## Integration with Project
 
 ### Documentation Policy
 
 Follows CLAUDE.md:
 - PRDs/Plans: `/docs/` with YAML frontmatter
-- Progress Tracking: `.claude/progress/` without frontmatter
-- One progress file per feature (all phases)
 
 ### Subagent Ecosystem
 
-Integrates with 50+ MeatyPrompts subagents:
+Integrates with 50+ subagents:
 - Architecture: lead-architect, backend-architect, data-layer-expert
 - Development: python-backend-engineer, frontend-developer, ui-engineer-enhanced
 - Review: code-reviewer, task-completion-validator
@@ -244,13 +211,8 @@ See `SKILL.md` for:
 - Keep summary in parent (200-300 lines)
 - Use descriptive phase file names
 
-**Progress Tracking**:
-- One file per feature (all phases)
-- Include subagent assignments
-- Track completion with checkboxes
-
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-11-11
+**Version**: 2.0
+**Last Updated**: 2025-12-01
 **Skill Location**: `.claude/skills/planning/`

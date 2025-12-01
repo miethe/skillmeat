@@ -82,65 +82,6 @@ docs/project_plans/implementation_plans/
 
 ---
 
-### Progress Tracking
-
-**Location**: `.claude/progress/[feature-name]/all-phases-progress.md`
-
-**Structure**:
-- One directory per feature
-- One file per feature: `all-phases-progress.md` (all phases together)
-- NO frontmatter (per CLAUDE.md policy)
-
-**Naming Convention**:
-- Directory: `[feature-name]` (matches PRD/plan name without -v1)
-- File: Always `all-phases-progress.md`
-
-**Example**:
-```
-.claude/progress/
-├── data-layer-fixes-filtering-v1/
-│   └── all-phases-progress.md
-├── prompt-modal-improvements-v1/
-│   └── all-phases-progress.md
-├── sidebar-functionality-polish-v1/
-│   └── all-phases-progress.md
-└── realtime-collaboration/
-    └── all-phases-progress.md
-```
-
----
-
-### Worknotes & Context
-
-**Location**: `.claude/worknotes/[prd-name]/phase-[N]-context.md`
-
-**Purpose**: Implementation notes, context, decisions per phase
-
-**Structure**:
-- One directory per PRD
-- One context file per phase (if needed)
-- NO frontmatter
-
-**Naming Convention**:
-- Directory: `[prd-name]` (matches PRD name)
-- File: `phase-[N]-context.md`
-
-**Example**:
-```
-.claude/worknotes/
-├── harden-polish-11-25/
-│   ├── phase-1-context.md
-│   ├── phase-2-context.md
-│   └── phase-3-context.md
-├── realtime-collaboration/
-│   ├── phase-1-context.md
-│   └── phase-2-context.md
-└── observations/
-    └── observation-log-11-25.md      # Monthly observations
-```
-
----
-
 ## Naming Conventions Summary
 
 ### PRDs
@@ -178,26 +119,6 @@ Rules:
   - lowercase, hyphens
 ```
 
-### Progress Files
-```
-Format: all-phases-progress.md
-Location: .claude/progress/[feature-name]/
-Rules:
-  - always named "all-phases-progress.md"
-  - one file per feature (all phases)
-  - directory name matches feature (without -v1)
-```
-
-### Context Files
-```
-Format: phase-[N]-context.md
-Location: .claude/worknotes/[prd-name]/
-Rules:
-  - one file per phase
-  - directory name matches PRD name
-  - optional (create as needed)
-```
-
 ---
 
 ## File Size Guidelines
@@ -209,7 +130,6 @@ Rules:
 | PRD | 400-600 lines | 800 lines | Move sections to appendices |
 | Implementation Plan | 400-600 lines | 800 lines | Break into phase files |
 | Phase File | 300-500 lines | 800 lines | Split into sub-phases |
-| Progress Tracking | Varies by phases | No limit | One file for all phases |
 
 ### Breakout Strategy
 
@@ -244,7 +164,7 @@ See implementation plan: `docs/project_plans/implementation_plans/[category]/[fe
 ```markdown
 ## Implementation
 
-See progress tracking: `.claude/progress/[feature-name]/all-phases-progress.md`
+See progress tracking: `.claude/progress/[feature-name]/phase-{PHASE}-progress.md`
 ```
 
 ### From Implementation Plan to Phase Files
@@ -254,14 +174,6 @@ See progress tracking: `.claude/progress/[feature-name]/all-phases-progress.md`
 ## Phase 2: Repository Layer
 
 See [Phase 2 Implementation Details](./[feature-name]-v1/phase-2-repository.md)
-```
-
-### From Progress to PRD/Plan
-
-**In Progress File Header**:
-```markdown
-**PRD**: `/docs/project_plans/PRDs/[category]/[feature-name]-v1.md`
-**Implementation Plan**: `/docs/project_plans/implementation_plans/[category]/[feature-name]-v1.md`
 ```
 
 ### From Phase File to Parent
@@ -312,14 +224,6 @@ related:
 ### Phase Files - Optional
 
 Frontmatter optional for phase files (internal organization).
-
-### Progress Tracking - No Frontmatter
-
-NO frontmatter for files in `.claude/` directory (per CLAUDE.md).
-
-### Context Files - No Frontmatter
-
-NO frontmatter for files in `.claude/worknotes/`.
 
 ---
 
@@ -414,7 +318,11 @@ project_plans/
 .claude/
 ├── progress/
 │   └── large-feature/
-│       └── all-phases-progress.md
+        ├── phase-1-progress.md
+        ├── phase-2-progress.md
+        ├── phase-3-progress.md
+        ├── phase-4-progress.md
+        └── phase-5-progress.md
 └── worknotes/
     └── large-feature/
         ├── phase-1-context.md
@@ -430,26 +338,21 @@ project_plans/
 
 1. **Match Names**: PRD, plan, and progress directory names should match
 2. **Version Sync**: PRD and plan versions should match
-3. **One Progress File**: Always one `all-phases-progress.md` per feature
-4. **Logical Grouping**: Group related short phases (1-3, 4-5, 6-8)
-5. **Token Efficiency**: Keep files <800 lines for optimal AI loading
-6. **Progressive Disclosure**: Summary in parent, details in phase files
-7. **Cross-Link**: Always link related documents
-8. **Descriptive Names**: Use intention-revealing names for phase files
-9. **Consistent Structure**: Follow templates for consistency
-10. **No Frontmatter in .claude/**: Skip YAML for `.claude/` files
+3. **Logical Grouping**: Group related short phases (1-3, 4-5, 6-8)
+4. **Token Efficiency**: Keep files <800 lines for optimal AI loading
+5. **Progressive Disclosure**: Summary in parent, details in phase files
+6. **Cross-Link**: Always link related documents
+7. **Descriptive Names**: Use intention-revealing names for phase files
+8. **Consistent Structure**: Follow templates for consistency
 
 ---
 
 ## Anti-Patterns to Avoid
 
-❌ Multiple progress files per feature (use one `all-phases-progress.md`)
 ❌ Generic phase names (`phase-1.md` instead of `phase-1-database.md`)
 ❌ Mismatched PRD/plan names
 ❌ Missing cross-links between documents
 ❌ Files >800 lines without breakout
 ❌ Deep nesting (keep structure flat)
 ❌ Version mismatches between PRD and plan
-❌ YAML frontmatter in `.claude/` files
-❌ Breaking up progress by phase (keep all phases in one file)
 ❌ Inconsistent naming conventions
