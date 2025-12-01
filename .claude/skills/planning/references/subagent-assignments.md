@@ -354,6 +354,8 @@ This reference helps assign the appropriate specialist subagents to implementati
 
 ## Available Subagents
 
+May not be all-inclusive; refer to subagent registry in context for full list.
+
 ### Architecture
 - lead-architect
 - backend-architect
