@@ -139,22 +139,32 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[80vh] flex flex-col">
+      <DialogContent
+        className="sm:max-w-[900px] max-h-[80vh] flex flex-col"
+        aria-labelledby="bulk-import-title"
+        aria-describedby="bulk-import-description"
+      >
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">
-              <Package className="h-5 w-5 text-primary" />
+              <Package className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div>
-              <DialogTitle>Review Discovered Artifacts</DialogTitle>
-              <DialogDescription>
+              <DialogTitle id="bulk-import-title">Review Discovered Artifacts</DialogTitle>
+              <DialogDescription id="bulk-import-description">
                 Select artifacts to import into your collection ({artifacts.length} discovered)
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto border rounded-md">
+        {isImporting && (
+          <span className="sr-only" role="status" aria-live="polite">
+            Importing {selected.size} artifacts, please wait...
+          </span>
+        )}
+
+        <div className="flex-1 overflow-auto border rounded-md" aria-busy={isImporting}>
           {isImporting ? (
             <div className="p-4">
               <TableSkeleton rows={artifacts.length > 5 ? 5 : artifacts.length} />

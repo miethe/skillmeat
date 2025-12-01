@@ -4,9 +4,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { axe, toHaveNoViolations } from 'jest-axe';
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
 import type { DiscoveredArtifact } from '@/types/discovery';
+
+expect.extend(toHaveNoViolations);
 
 // Test wrapper with providers
 function TestWrapper({ children }: { children: React.ReactNode }) {
@@ -456,5 +459,101 @@ describe('BulkImportModal', () => {
     );
 
     expect(screen.queryByText('Review Discovered Artifacts')).not.toBeInTheDocument();
+  });
+});
+
+describe('Accessibility Tests', () => {
+  const mockArtifacts: DiscoveredArtifact[] = [
+    {
+      type: 'skill',
+      name: 'test-skill',
+      source: 'user/repo/skill',
+      version: 'latest',
+      path: '/path/to/skill',
+      discovered_at: '2025-01-01T00:00:00Z',
+    },
+  ];
+
+  it('DiscoveryBanner has no accessibility violations', async () => {
+    const onReview = jest.fn();
+    const { container } = render(
+      <TestWrapper>
+        <DiscoveryBanner discoveredCount={5} onReview={onReview} />
+      </TestWrapper>
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('BulkImportModal has no accessibility violations', async () => {
+    const onClose = jest.fn();
+    const onImport = jest.fn();
+    const { container } = render(
+      <TestWrapper>
+        <BulkImportModal
+          artifacts={mockArtifacts}
+          open={true}
+          onClose={onClose}
+          onImport={onImport}
+        />
+      </TestWrapper>
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('DiscoveryBanner keyboard navigation works', async () => {
+    const onReview = jest.fn();
+    render(
+      <TestWrapper>
+        <DiscoveryBanner discoveredCount={5} onReview={onReview} dismissible />
+      </TestWrapper>
+    );
+
+    // Tab to Review & Import button
+    const reviewButton = screen.getByRole('button', { name: /Review & Import/i });
+    reviewButton.focus();
+    expect(reviewButton).toHaveFocus();
+
+    // Press Enter to activate
+    fireEvent.keyDown(reviewButton, { key: 'Enter', code: 'Enter' });
+    await userEvent.keyboard('{Enter}');
+
+    // Should call onReview
+    expect(onReview).toHaveBeenCalled();
+  });
+
+  it('BulkImportModal announces loading state to screen readers', async () => {
+    const onClose = jest.fn();
+    const onImport = jest
+      .fn()
+      .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
+
+    render(
+      <TestWrapper>
+        <BulkImportModal
+          artifacts={mockArtifacts}
+          open={true}
+          onClose={onClose}
+          onImport={onImport}
+        />
+      </TestWrapper>
+    );
+
+    // Select an artifact
+    const checkboxes = screen.getAllByRole('checkbox');
+    await userEvent.click(checkboxes[1]);
+
+    // Click import
+    const importButton = screen.getByRole('button', { name: /Import \(1\)/i });
+    await userEvent.click(importButton);
+
+    // Should announce loading to screen readers
+    await waitFor(() => {
+      const loadingAnnouncement = screen.getByText(/Importing.*artifacts.*please wait/i);
+      expect(loadingAnnouncement).toBeInTheDocument();
+      expect(loadingAnnouncement).toHaveAttribute('role', 'status');
+      expect(loadingAnnouncement).toHaveAttribute('aria-live', 'polite');
+    });
   });
 });
