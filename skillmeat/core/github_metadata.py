@@ -18,6 +18,12 @@ import yaml
 from pydantic import BaseModel, Field
 
 from skillmeat.core.cache import MetadataCache
+from skillmeat.core.discovery_metrics import (
+    discovery_metrics,
+    github_metadata_fetch_duration,
+    github_metadata_requests_total,
+    log_performance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +94,17 @@ class GitHubMetadataExtractor:
         Args:
             cache: MetadataCache instance for caching API responses
             token: Optional GitHub personal access token. If not provided,
-                will check GITHUB_TOKEN environment variable. Used for
-                higher rate limits (5000/hr vs 60/hr unauthenticated).
+                will check SKILLMEAT_GITHUB_TOKEN then GITHUB_TOKEN environment
+                variables. Used for higher rate limits (5000/hr vs 60/hr
+                unauthenticated).
         """
         self.cache = cache
-        self.token = token or os.environ.get("GITHUB_TOKEN")
+        # Priority: explicit token > SKILLMEAT_GITHUB_TOKEN env > GITHUB_TOKEN env
+        self.token = (
+            token
+            or os.environ.get("SKILLMEAT_GITHUB_TOKEN")
+            or os.environ.get("GITHUB_TOKEN")
+        )
         self.session = requests.Session()
 
         if self.token:
@@ -184,6 +196,7 @@ class GitHubMetadataExtractor:
 
         return GitHubSourceSpec(owner=owner, repo=repo, path=path, version=version)
 
+    @log_performance("metadata_fetch")
     def fetch_metadata(self, source: str) -> GitHubMetadata:
         """Fetch metadata from GitHub with caching support.
 
@@ -210,15 +223,27 @@ class GitHubMetadataExtractor:
             >>> print(metadata.topics)
             ['design', 'canvas', 'art']
         """
+        start_time = time.perf_counter()
+
         # Check cache first
         cache_key = f"github_metadata:{source}"
         cached = self.cache.get(cache_key)
 
         if cached:
-            logger.debug(f"Cache hit for {source}")
+            logger.info(
+                "Cache hit for GitHub metadata",
+                extra={"source": source, "cache_hit": True}
+            )
+            github_metadata_requests_total.labels(cache_hit="true").inc()
+            discovery_metrics.record_metadata_fetch(cache_hit=True)
             return GitHubMetadata(**cached)
 
-        logger.debug(f"Fetching metadata for {source}")
+        logger.info(
+            "Fetching metadata from GitHub",
+            extra={"source": source, "cache_hit": False}
+        )
+        github_metadata_requests_total.labels(cache_hit="false").inc()
+        discovery_metrics.record_metadata_fetch(cache_hit=False)
 
         # Parse source to get owner/repo/path
         try:
@@ -274,7 +299,20 @@ class GitHubMetadataExtractor:
 
         # Cache the result
         self.cache.set(cache_key, metadata.model_dump())
-        logger.debug(f"Cached metadata for {source}")
+
+        # Record duration
+        duration = time.perf_counter() - start_time
+        github_metadata_fetch_duration.observe(duration)
+
+        logger.info(
+            f"Cached metadata for {source}",
+            extra={
+                "source": source,
+                "duration_ms": round(duration * 1000, 2),
+                "has_title": metadata.title is not None,
+                "has_description": metadata.description is not None,
+            }
+        )
 
         return metadata
 

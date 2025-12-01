@@ -19,6 +19,7 @@ import {
   Github,
   ChevronDown,
   ChevronRight,
+  Pencil,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -43,10 +44,13 @@ import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
+import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
+import { useEditArtifactParameters } from '@/hooks/useDiscovery';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import type { ArtifactDiffResponse, ArtifactUpstreamDiffResponse, ArtifactSyncRequest } from '@/sdk';
 import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
+import type { ArtifactParameters } from '@/types/discovery';
 
 interface UnifiedEntityModalProps {
   entity: Entity | null;
@@ -245,6 +249,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     type: 'file' | 'tab';
     target: string;
   } | null>(null);
+  // Parameter editor state
+  const [showParameterEditor, setShowParameterEditor] = useState(false);
+  const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -774,6 +781,33 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     }
   };
 
+  const handleSaveParameters = async (parameters: ArtifactParameters) => {
+    if (!entity) return;
+
+    try {
+      await updateParameters({
+        artifactId: entity.id,
+        parameters,
+      });
+
+      toast({
+        title: 'Parameters Updated',
+        description: `Updated parameters for ${entity.name}`,
+      });
+
+      // Refresh entity data
+      refetch();
+    } catch (error) {
+      console.error('Parameter update failed:', error);
+      toast({
+        title: 'Update Failed',
+        description: error instanceof Error ? error.message : 'Failed to update parameters',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   // ============================================================================
   // Status Helpers
   // ============================================================================
@@ -1175,6 +1209,17 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="overview" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-6 py-4">
+                  {/* Edit Parameters Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowParameterEditor(true)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Parameters
+                    </Button>
+                  </div>
                   {/* Status */}
                   {entity.status && (
                     <div>
@@ -1518,6 +1563,24 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           setShowUnsavedChangesDialog(false);
         }}
       />
+
+      {/* Parameter Editor Modal */}
+      {entity && (
+        <ParameterEditorModal
+          artifact={{
+            name: entity.name,
+            type: entity.type as any,
+            source: entity.source,
+            version: entity.version,
+            scope: (entity.collection || 'user') as any,
+            tags: entity.tags,
+            aliases: entity.aliases,
+          }}
+          open={showParameterEditor}
+          onClose={() => setShowParameterEditor(false)}
+          onSave={handleSaveParameters}
+        />
+      )}
     </>
   );
 }

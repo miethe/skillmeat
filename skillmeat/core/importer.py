@@ -7,6 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.discovery_metrics import (
+    bulk_import_artifacts_total,
+    bulk_import_duration,
+    bulk_import_requests_total,
+    discovery_metrics,
+    log_performance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +79,7 @@ class ArtifactImporter:
         self.artifact_manager = artifact_manager
         self.collection_manager = collection_manager
 
+    @log_performance("bulk_import")
     def bulk_import(
         self,
         artifacts: List[BulkImportArtifactData],
@@ -99,6 +107,15 @@ class ArtifactImporter:
         results: List[ImportResultData] = []
         imported_count = 0
         failed_count = 0
+
+        logger.info(
+            "Starting bulk import",
+            extra={
+                "artifact_count": len(artifacts),
+                "collection": collection_name,
+                "auto_resolve_conflicts": auto_resolve_conflicts,
+            }
+        )
 
         # Phase 1: Validate all artifacts
         validation_errors = self._validate_batch(artifacts)
@@ -171,14 +188,42 @@ class ArtifactImporter:
                 )
                 failed_count += 1
 
-        duration = (time.perf_counter() - start_time) * 1000
+        duration_sec = time.perf_counter() - start_time
+        duration_ms = duration_sec * 1000
+
+        # Determine batch size range for metrics
+        batch_size = len(artifacts)
+        if batch_size <= 10:
+            batch_size_range = "1-10"
+        elif batch_size <= 50:
+            batch_size_range = "11-50"
+        else:
+            batch_size_range = "51+"
+
+        # Record metrics
+        status = "success" if failed_count == 0 else "partial_success"
+        bulk_import_requests_total.labels(status=status).inc()
+        bulk_import_artifacts_total.labels(result="success").inc(imported_count)
+        bulk_import_artifacts_total.labels(result="failed").inc(failed_count)
+        bulk_import_duration.labels(batch_size_range=batch_size_range).observe(duration_sec)
+        discovery_metrics.record_import(imported_count, failed_count)
+
+        logger.info(
+            f"Bulk import completed: {imported_count} imported, {failed_count} failed",
+            extra={
+                "imported_count": imported_count,
+                "failed_count": failed_count,
+                "duration_ms": round(duration_ms, 2),
+                "status": status,
+            }
+        )
 
         return BulkImportResultData(
             total_requested=len(artifacts),
             total_imported=imported_count,
             total_failed=failed_count,
             results=results,
-            duration_ms=duration,
+            duration_ms=duration_ms,
         )
 
     def _get_artifact_id(self, artifact: BulkImportArtifactData) -> str:

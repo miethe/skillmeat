@@ -460,6 +460,7 @@ async def discover_artifacts(
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
+    req: Request = None,
 ) -> DiscoveryResult:
     """Scan collection for existing artifacts.
 
@@ -472,6 +473,7 @@ async def discover_artifacts(
         collection_mgr: Collection manager dependency
         _token: Authentication token (dependency injection)
         collection: Optional collection name (defaults to active collection)
+        req: FastAPI request object for accessing settings
 
     Returns:
         DiscoveryResult with discovered artifacts, errors, and metrics
@@ -479,6 +481,17 @@ async def discover_artifacts(
     Raises:
         HTTPException: If scan_path doesn't exist or scan fails
     """
+    # Check if discovery feature is enabled
+    from skillmeat.api.config import get_settings
+
+    settings = get_settings()
+    if not settings.enable_auto_discovery:
+        logger.warning("Discovery feature is disabled")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Artifact auto-discovery feature is currently disabled. Enable with SKILLMEAT_ENABLE_AUTO_DISCOVERY=true",
+        )
+
     # Determine collection name
     collection_name = collection or "default"
 
@@ -4685,7 +4698,7 @@ async def fetch_github_metadata(
 
     Parses the source URL, fetches repository metadata and
     frontmatter from the artifact's markdown file. Results
-    are cached for 1 hour to reduce GitHub API calls.
+    are cached to reduce GitHub API calls (configurable TTL).
 
     Args:
         source: GitHub source in format user/repo/path[@version]
@@ -4696,8 +4709,19 @@ async def fetch_github_metadata(
         MetadataFetchResponse with metadata or error details
 
     Raises:
-        HTTPException: On internal errors
+        HTTPException: On internal errors or if feature is disabled
     """
+    # Check if auto-population feature is enabled
+    from skillmeat.api.config import get_settings
+
+    settings = get_settings()
+    if not settings.enable_auto_population:
+        logger.warning("Auto-population feature is disabled")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="GitHub metadata auto-population feature is currently disabled. Enable with SKILLMEAT_ENABLE_AUTO_POPULATION=true",
+        )
+
     try:
         # Validate source format first
         from skillmeat.core.validation import validate_github_source
@@ -4712,17 +4736,20 @@ async def fetch_github_metadata(
         # Get or create metadata cache from app state
         app_state = get_app_state()
         if not hasattr(app_state, "metadata_cache") or app_state.metadata_cache is None:
-            # Initialize cache with 1 hour TTL
-            ttl_seconds = 3600
+            # Initialize cache with configurable TTL from settings
+            ttl_seconds = settings.discovery_cache_ttl
             app_state.metadata_cache = MetadataCache(ttl_seconds=ttl_seconds)
             logger.debug(f"Initialized metadata cache with TTL={ttl_seconds}s")
 
-        # Get GitHub token from config (optional, for rate limits)
-        github_token = None
-        if config_mgr:
+        # Get GitHub token from settings first, then fallback to config manager
+        github_token = settings.github_token
+        if not github_token and config_mgr:
             github_token = config_mgr.get("github-token")
-            if github_token:
-                logger.debug("Using configured GitHub token for API requests")
+
+        if github_token:
+            logger.debug("Using configured GitHub token for API requests")
+        else:
+            logger.debug("No GitHub token configured, using unauthenticated requests (60 req/hr limit)")
 
         # Create metadata extractor with cache and token
         extractor = GitHubMetadataExtractor(
@@ -4776,3 +4803,103 @@ async def fetch_github_metadata(
     except Exception as e:
         logger.exception(f"Unexpected error fetching metadata for '{source}': {e}")
         raise create_internal_error("Failed to fetch metadata", e)
+
+
+# =============================================================================
+# Discovery Metrics & Health Endpoints
+# =============================================================================
+
+@router.get(
+    "/metrics/discovery",
+    summary="Get discovery feature metrics",
+    description="""
+    Get metrics and statistics for discovery features including:
+    - Total discovery scans performed
+    - Total artifacts discovered
+    - Total bulk imports
+    - GitHub metadata fetch statistics
+    - Cache hit/miss rates
+    - Error counts
+    - Last scan information
+
+    This endpoint provides simple metrics without requiring Prometheus infrastructure.
+    For production monitoring, use the /metrics endpoint exposed by the Prometheus client.
+    """,
+    response_description="Discovery metrics and statistics",
+    tags=["discovery", "metrics"],
+)
+async def get_discovery_metrics():
+    """Get discovery feature metrics and statistics.
+
+    Returns a dictionary with current metrics including scan counts,
+    cache performance, and timing information.
+
+    Returns:
+        Dictionary with metrics data
+    """
+    from skillmeat.core.discovery_metrics import discovery_metrics
+
+    try:
+        stats = discovery_metrics.get_stats()
+        logger.debug("Retrieved discovery metrics")
+        return stats
+    except Exception as e:
+        logger.exception(f"Failed to retrieve discovery metrics: {e}")
+        raise create_internal_error("Failed to retrieve metrics", e)
+
+
+@router.get(
+    "/health/discovery",
+    summary="Discovery feature health check",
+    description="""
+    Check the health status of discovery features including:
+    - Discovery service availability
+    - Auto-population feature status
+    - Cache configuration
+    - Current metrics
+
+    Returns 200 OK if all discovery features are operational.
+    """,
+    response_description="Discovery health status",
+    tags=["discovery", "health"],
+)
+async def discovery_health_check():
+    """Check discovery feature health and configuration.
+
+    Validates that discovery features are properly configured and operational.
+    Includes feature flags, cache settings, and basic metrics.
+
+    Returns:
+        Dictionary with health status and configuration
+    """
+    from skillmeat.api.config import get_settings
+    from skillmeat.core.discovery_metrics import discovery_metrics
+
+    try:
+        settings = get_settings()
+
+        # Basic health status
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "features": {
+                "discovery_enabled": True,  # Always available
+                "auto_population_enabled": getattr(settings, "enable_auto_population", False),
+                "github_token_configured": bool(getattr(settings, "github_token", None)),
+            },
+            "configuration": {
+                "cache_ttl_seconds": getattr(settings, "discovery_cache_ttl", 3600),
+            },
+            "metrics": discovery_metrics.get_stats(),
+        }
+
+        logger.debug("Discovery health check passed")
+        return health_status
+
+    except Exception as e:
+        logger.exception(f"Discovery health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "error": str(e),
+        }

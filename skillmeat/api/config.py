@@ -158,6 +158,28 @@ class APISettings(BaseSettings):
         description="Maximum requests per minute",
     )
 
+    # Discovery feature flags
+    enable_auto_discovery: bool = Field(
+        default=True,
+        description="Enable artifact auto-discovery feature",
+    )
+
+    enable_auto_population: bool = Field(
+        default=True,
+        description="Enable automatic GitHub metadata population",
+    )
+
+    discovery_cache_ttl: int = Field(
+        default=3600,
+        ge=0,
+        description="Cache TTL for discovery metadata in seconds (default: 1 hour)",
+    )
+
+    github_token: Optional[str] = Field(
+        default=None,
+        description="GitHub personal access token for higher API rate limits (5000/hr vs 60/hr)",
+    )
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, CheckCircle2 } from 'lucide-react';
 import { EntityType, EntityFormField, ENTITY_TYPES, Entity } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
+import { useGitHubMetadata } from '@/hooks/useDiscovery';
+import { useDebouncedCallback } from 'use-debounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -77,6 +79,9 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   const [tags, setTags] = useState<string[]>(entity?.tags || []);
   const [tagInput, setTagInput] = useState('');
 
+  // GitHub metadata auto-population
+  const { mutate: fetchMetadata, data: metadata, isPending: isMetadataLoading } = useGitHubMetadata();
+
   // Determine the entity type config
   const typeConfig = entityType
     ? ENTITY_TYPES[entityType]
@@ -89,6 +94,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     handleSubmit,
     formState: { errors },
     setValue,
+    getValues,
   } = useForm<FormData>({
     defaultValues: {
       name: entity?.name || '',
@@ -103,6 +109,33 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   useEffect(() => {
     setValue('tags', tags);
   }, [tags, setValue]);
+
+  // Auto-populate fields when GitHub metadata arrives
+  useEffect(() => {
+    if (metadata && mode === 'create') {
+      // Only auto-populate if fields are empty
+      const currentName = getValues('name');
+      const currentDesc = getValues('description');
+
+      if (!currentName && metadata.title) {
+        setValue('name', metadata.title);
+      }
+      if (!currentDesc && metadata.description) {
+        setValue('description', metadata.description);
+      }
+      // Auto-populate tags from GitHub topics
+      if (metadata.topics && metadata.topics.length > 0 && tags.length === 0) {
+        setTags(metadata.topics);
+      }
+    }
+  }, [metadata, mode, setValue, getValues, tags.length]);
+
+  // Debounced GitHub metadata fetch
+  const handleSourceChange = useDebouncedCallback((source: string) => {
+    if (sourceType === 'github' && source.includes('/')) {
+      fetchMetadata(source);
+    }
+  }, 500);
 
   // Get editable fields based on mode
   const getFields = (): EntityFormField[] => {
@@ -374,20 +407,35 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
               Source
               <span className="ml-1 text-destructive">*</span>
             </Label>
-            <Input
-              id="source"
-              {...register('source', {
-                required: 'Source is required',
-              })}
-              placeholder={
-                sourceType === 'github' ? 'owner/repo/path[@version]' : '/absolute/path/to/artifact'
-              }
-            />
+            <div className="relative">
+              <Input
+                id="source"
+                {...register('source', {
+                  required: 'Source is required',
+                  onChange: (e) => handleSourceChange(e.target.value),
+                })}
+                placeholder={
+                  sourceType === 'github' ? 'owner/repo/path[@version]' : '/absolute/path/to/artifact'
+                }
+              />
+              {isMetadataLoading && (
+                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {metadata && !isMetadataLoading && (
+                <CheckCircle2 className="absolute right-3 top-2.5 h-4 w-4 text-green-600" />
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {sourceType === 'github'
                 ? 'Example: anthropics/skills/canvas-design@v2.1.0'
                 : 'Provide the absolute path to the artifact directory'}
             </p>
+            {metadata && !isMetadataLoading && (
+              <p className="text-sm text-green-600 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Metadata fetched - fields auto-populated
+              </p>
+            )}
             {errors.source && (
               <p className="text-sm text-destructive">{errors.source.message as string}</p>
             )}
