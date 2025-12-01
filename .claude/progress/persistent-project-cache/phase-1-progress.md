@@ -552,7 +552,7 @@ None yet.
 ## Additional Resources
 
 - **PRD Reference**: `/docs/project_plans/PRDs/enhancements/persistent-project-cache-v1.md`
-- **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1.md`
+- **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1/phase-1-2-infrastructure.md`
 - **SQLAlchemy 2.0 Docs**: https://docs.sqlalchemy.org/en/20/
 - **Alembic Tutorial**: https://alembic.sqlalchemy.org/en/latest/tutorial.html
 - **Repository Pattern**: https://martinfowler.com/eaaCatalog/repository.html

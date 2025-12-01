@@ -18,226 +18,24 @@ This command leverages the **artifact-tracking skill** for YAML-driven orchestra
 
 Remember that all documentation work MUST be delegated to the documentation-writer subagent. You MUST NOT write documentation yourself.
 
-### Phase 0: Initialize Context & Tracking
+You should NOT create any reports, summaries, etc of work done; only track progress/worknotes via the artifact-tracking skill.
 
-Extract PRD name as `{PRD_NAME}` from attached plan or PRD and phase number from `$ARGUMENTS` and set up tracking infrastructure:
-
-```bash
-# Parse arguments
-phase_num="${1}"
-plan_path="${2}"
-
-# Default plan path if not provided
-if [ -z "$plan_path" ]; then
-  plan_path="docs/project_plans/impl_tracking/${PRD_NAME}/phase-${phase_num}-*-implementation-plan.md"
-  plan_path=$(ls $plan_path 2>/dev/null | head -1)
-fi
-
-if [ ! -f "$plan_path" ]; then
-  echo "ERROR: Implementation plan not found at $plan_path"
-  echo "Specify plan with: /dev:execute-phase ${phase_num} --plan=<path>"
-  exit 1
-fi
-
-# Set up tracking directories
-mkdir -p .claude/progress/${PRD_NAME}
-mkdir -p .claude/worknotes/${PRD_NAME}
-
-progress_file=".claude/progress/${PRD_NAME}/phase-${phase_num}-progress.md"
-context_file=".claude/worknotes/${PRD_NAME}/context.md"
-
-echo "📋 Phase ${phase_num} Execution Started"
-echo "Plan: $plan_path"
-echo "Progress: $progress_file"
-echo "Context: $context_file"
-```
+You MAY keep very brief observation notes within a running log in `.claude/worknotes/observations/observation-log-{YYYY-MM}.md` regarding any key points that might arise during implementation, generally unrelated to the PRD tasks themselves. This log is project-wide, not PRD specific
 
 **Read the implementation plan thoroughly.** This is your execution blueprint. Note:
 - **DO NOT** load the linked PRD into context unless specific clarification is needed
 - The plan should contain all necessary details
 - Reference PRD only for ambiguous requirements
 
-### Phase 1: Initialize Progress & Context Documents
+Note: The artifact-tracker subagent is available via the artifact-tracking skill to query and update progress tracking and context artifacts.
 
-#### 1.1 Create Progress Tracker with Orchestration
+### Phase 1: Initialize Context & Tracking
 
-Use the **artifact-tracking skill** to create a YAML-orchestrated progress file:
+Extract PRD name as `{PRD_NAME}` from attached plan or PRD and phase number from `$ARGUMENTS` and validate tracking infrastructure exists within:
 
-```
-Task("artifact-tracker", "Create Phase ${phase_num} progress tracking for ${PRD_NAME} PRD from implementation plan at ${plan_path}. Include all tasks with descriptions from the plan's development checklist.")
-```
+`.claude/progress/{PRD_NAME}/phase-{PHASE_NUM}-progress.md`
 
-The artifact-tracker will create a progress file with basic task structure. Next, enhance it with orchestration metadata:
-
-```
-Task("lead-architect", "Annotate Phase ${phase_num} progress file for ${PRD_NAME} at ${progress_file}:
-- Add 'assigned_to' field to every task (choose from: python-pro, ui-engineer, ui-engineer-enhanced, backend-typescript-architect, data-layer-expert, documentation-writer, code-reviewer, task-completion-validator)
-- Add 'dependencies' field to every task (empty array [] if no dependencies)
-- Add 'estimated_time' field (e.g., '2h', '4h', '1d')
-- Compute parallelization strategy (which tasks can run in parallel vs sequentially)
-- Generate batches in 'parallelization' YAML section (batch_1, batch_2, etc.)
-- Create 'Orchestration Quick Reference' section with ready-to-copy Task() delegation commands for each batch")
-```
-
-**Expected Progress File Structure:**
-
-```yaml
----
-prd: ${PRD_NAME}
-phase: ${phase_num}
-status: in_progress
-started: ${timestamp}
-updated: ${timestamp}
-completion: 0%
-
-tasks:
-  - id: TASK-1.1
-    title: "Implement X component"
-    description: "Create React component with Y pattern"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_time: "2h"
-    status: pending
-
-  - id: TASK-1.2
-    title: "Add API endpoint for X"
-    description: "Create FastAPI endpoint following layered architecture"
-    assigned_to: ["python-pro"]
-    dependencies: []
-    estimated_time: "3h"
-    status: pending
-
-  - id: TASK-2.1
-    title: "Wire X component to API"
-    description: "Integrate component with React Query"
-    assigned_to: ["ui-engineer"]
-    dependencies: ["TASK-1.1", "TASK-1.2"]
-    estimated_time: "1h"
-    status: pending
-
-parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2"]  # No dependencies, run in parallel
-  batch_2: ["TASK-2.1"]              # Depends on batch_1, run after
-  critical_path: ["TASK-1.1", "TASK-2.1"]
-  estimated_total_time: "6h"
----
-
-# Phase ${phase_num} Progress Tracker
-
-**Plan:** ${plan_path}
-**Started:** ${timestamp}
-**Status:** In Progress
-
-## Orchestration Quick Reference
-
-**Batch 1** (Parallel - 3h estimated):
-- TASK-1.1 → `ui-engineer-enhanced` (2h)
-- TASK-1.2 → `python-pro` (3h)
-
-**Batch 2** (Sequential - 1h estimated):
-- TASK-2.1 → `ui-engineer` (1h) - Depends on: TASK-1.1, TASK-1.2
-
-### Task Delegation Commands
-
-**Batch 1:**
-```
-Task("ui-engineer-enhanced", "TASK-1.1: Implement X component - Create React component with Y pattern following Projectarchitecture")
-Task("python-pro", "TASK-1.2: Add API endpoint for X - Create FastAPI endpoint following layered architecture (router → service → repository)")
-```
-
-**Batch 2:**
-```
-Task("ui-engineer", "TASK-2.1: Wire X component to API - Integrate component with React Query, handle loading/error states")
-```
-
----
-
-## Success Criteria
-- [ ] [Copy from plan - Performance/Accessibility/Testing requirements]
-
----
-
-## Work Log
-
-[Session entries added here as tasks complete]
-
----
-
-## Decisions Log
-
-[Architectural decisions logged here]
-
----
-
-## Files Changed
-
-[Tracked automatically by artifact-tracker]
-```
-
-#### 1.2 Create/Update Working Context Document
-
-Create ONE context file per PRD (not per phase) at `.claude/worknotes/${PRD_NAME}/context.md`:
-
-```markdown
-# ${PRD_NAME} Working Context
-
-**Purpose:** Token-efficient context for resuming work across AI turns and phases
-
----
-
-## Current State
-
-**Active Phase:** ${phase_num}
-**Branch:** ${branch_name}
-**Last Commit:** ${commit_hash}
-**Current Task:** [What you're working on now]
-
----
-
-## Key Decisions (Across All Phases)
-
-- **Architecture:** [Key architectural choices made]
-- **Patterns:** [Projectpatterns being followed]
-- **Trade-offs:** [Important trade-offs made]
-
----
-
-## Important Learnings
-
-- **Gotcha 1:** [Brief description + how to avoid]
-- **Gotcha 2:** [Brief description + how to avoid]
-
----
-
-## Quick Reference
-
-### Environment Setup
-\`\`\`bash
-# API
-export PYTHONPATH="$PWD/services/api"
-
-# Web
-pnpm --filter "./apps/web" dev
-
-# Tests
-pnpm --filter "./apps/web" test -- --testPathPattern="pattern"
-\`\`\`
-
-### Key Files
-- Schema: services/api/app/schemas/X.py
-- Repository: services/api/app/repositories/X.py
-- Service: services/api/app/services/X.py
-- Router: services/api/app/api/v1/endpoints/X.py
-- UI: apps/web/src/components/X.tsx
-
----
-
-## Phase ${phase_num} Scope
-
-[Copy executive summary from plan - 2-3 sentences max]
-
-**Success Metric:** [Copy key metric from plan]
-```
+If not, utilize artifact-tracking skill to create necessary progress and context artifacts.
 
 ### Phase 2: Execute Using Orchestration Quick Reference
 
@@ -245,7 +43,7 @@ Work through the plan using the pre-computed parallelization strategy in the pro
 
 #### 2.1 Read Progress File YAML Only (Token Efficient)
 
-**DO NOT** read the entire progress file. Instead, extract only the YAML frontmatter:
+**DO NOT** read the entire progress file yourself; your delegates can read the relevant sections during implementation. Instead, extract only the YAML frontmatter:
 
 ```bash
 # Extract YAML frontmatter (first ~100 lines, ~2KB vs ~25KB for full file)
@@ -294,7 +92,7 @@ Phase ${phase_num}, {task_id}: {task_title}
 
 {task_description}
 
-ProjectPatterns to Follow:
+Project Patterns to Follow:
 - Layered architecture: routers → services → repositories → DB
 - ErrorResponse envelopes for errors
 - Cursor pagination for lists
@@ -325,14 +123,14 @@ Files changed:
 
 Please validate:
 1. All acceptance criteria met
-2. Projectarchitecture patterns followed
+2. Project architecture patterns followed
 3. Tests exist and pass
 4. No regression introduced
 ```
 
 **Validation checklist per task:**
 - [ ] Acceptance criteria met
-- [ ] Code follows Projectlayered architecture
+- [ ] Code follows Project layered architecture
 - [ ] Tests exist and pass
 - [ ] TypeScript/Python types correct
 - [ ] Error handling implemented
@@ -348,7 +146,7 @@ After each completed task (or logical unit of work), commit:
 git add {files}
 
 # Commit with conventional commits format
-git commit -m "feat(web): implement {feature} following Projectarchitecture
+git commit -m "feat(web): implement {feature} following Project architecture
 
 - Added {component/service/etc}
 - Wired telemetry spans
@@ -635,7 +433,7 @@ echo "✅ All quality gates passed"
 
 #### 5.4 Final Progress Update
 
-Update progress tracker with final status via artifact-tracker:
+Update progress tracker with final status via artifact-tracker from artifact-tracking skill:
 
 ```
 Task("artifact-tracker", "Finalize ${PRD_NAME} phase ${phase_num}:
@@ -757,9 +555,9 @@ Stop execution and report to user with:
 
 ---
 
-## ProjectArchitecture Compliance Checklist
+## Project Architecture Compliance Checklist
 
-Ensure every implementation follows Projectpatterns:
+Ensure every implementation follows Project patterns:
 
 ### Backend Implementation
 - [ ] **Layered architecture:** router → service → repository → DB
@@ -857,7 +655,7 @@ Provide clear, structured status updates throughout:
 /dev:execute-phase 4
 
 # Execute phase 1 with explicit plan path
-/dev:execute-phase 1 --plan=docs/project_plans/impl_tracking/web-v2/phase-1-foundation-implementation-plan.md
+/dev:execute-phase 1 docs/project_plans/impl_tracking/web-v2/phase-1-foundation-implementation-plan.md
 
 # Resume phase 2 (will pick up from progress tracker)
 /dev:execute-phase 2
@@ -869,10 +667,8 @@ Provide clear, structured status updates throughout:
 
 This command integrates with the **artifact-tracking skill** for:
 
-1. **Progress Creation**: `artifact-tracker` creates initial progress files from implementation plans
-2. **Orchestration**: `lead-architect` annotates tasks with delegation metadata
-3. **Status Updates**: `artifact-tracker` updates task status, completion, and work logs
-4. **Finalization**: `artifact-tracker` generates phase completion summaries
+1. **Orchestration**: Load the progress file YAML to identify tasks, dependencies, and parallelization to delegate work efficiently
+2. **Status Updates**: `artifact-tracker` updates task status, completion, and work logs
 
 **Skill Reference:** `.claude/skills/artifact-tracking/SKILL.md`
 
