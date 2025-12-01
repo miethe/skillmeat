@@ -22,6 +22,7 @@ from .routers import (
     analytics,
     artifacts,
     bundles,
+    cache,
     collections,
     deployments,
     health,
@@ -234,6 +235,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
+    app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
     app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
