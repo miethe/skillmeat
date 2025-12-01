@@ -63,3 +63,32 @@
   4. Removed discovery functionality from `/manage` page
 - **Commit(s)**: a14063c, 0ab58c3
 - **Status**: RESOLVED
+
+### Invalid Artifact Structure for Planning Skill
+
+**Issue**: Discovery scan encounters "Invalid artifact structure" warning for `.claude/skills/planning`
+- **Location**: `.claude/skills/planning/SKILL.md:3`
+- **Root Cause**: YAML frontmatter had unquoted colons in the description field (e.g., "Supports: 1)", "Example: ") which YAML interprets as key-value pairs, causing parsing to fail at column 271
+- **Fix**: Converted description to YAML folded block scalar syntax (`>`) which safely handles colons and special characters
+- **Commit(s)**: 14c249a
+- **Status**: RESOLVED
+
+### Import 422 Error - Source Must Include Owner and Repository
+
+**Issue**: Importing discovered local artifacts fails with 422 error "Source must include owner and repository"
+- **Location**: `skillmeat/core/validation.py:36`, `skillmeat/core/discovery.py:407`
+- **Root Cause**: Local artifacts in `.claude/` directories don't have GitHub-format source fields (owner/repo/path) in their frontmatter. Validation required this format unconditionally.
+- **Fix**:
+  1. Discovery service now generates synthetic `local/{type}/{name}` sources for artifacts without GitHub sources
+  2. Validation accepts `local/` prefix as valid source format
+- **Commit(s)**: a010f2c
+- **Status**: RESOLVED
+
+### DialogContent Missing DialogTitle Accessibility Warning
+
+**Issue**: Navigating to `/projects/{id}` page throws "DialogContent requires a DialogTitle for accessibility"
+- **Location**: `skillmeat/web/components/discovery/BulkImportModal.tsx:143`, `ParameterEditorModal.tsx:153`
+- **Root Cause**: Custom ARIA attributes (`aria-labelledby`, `aria-describedby`) on DialogContent were overriding Radix UI's automatic ARIA linking, making Radix think DialogTitle was missing
+- **Fix**: Removed custom `aria-labelledby`, `aria-describedby` attributes and `id` attributes from DialogTitle/DialogDescription in both modals. Radix UI handles ARIA automatically.
+- **Commit(s)**: 0abde84
+- **Status**: RESOLVED
