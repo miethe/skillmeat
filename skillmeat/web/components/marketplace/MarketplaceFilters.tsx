@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { MarketplaceFilters } from '@/types/marketplace';
@@ -109,16 +115,20 @@ export function MarketplaceFilters({
               Broker
             </label>
             <Select
-              id="broker-filter"
               value={filters.broker || 'all'}
-              onChange={(e) => handleFilterChange('broker', e.target.value)}
+              onValueChange={(value) => handleFilterChange('broker', value)}
             >
-              <option value="all">All Brokers</option>
-              {enabledBrokers.map((broker) => (
-                <option key={broker.name} value={broker.name}>
-                  {broker.name}
-                </option>
-              ))}
+              <SelectTrigger id="broker-filter">
+                <SelectValue placeholder="All Brokers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brokers</SelectItem>
+                {enabledBrokers.map((broker) => (
+                  <SelectItem key={broker.name} value={broker.name}>
+                    {broker.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
         )}
@@ -129,16 +139,20 @@ export function MarketplaceFilters({
             License
           </label>
           <Select
-            id="license-filter"
             value={filters.license || 'all'}
-            onChange={(e) => handleFilterChange('license', e.target.value)}
+            onValueChange={(value) => handleFilterChange('license', value)}
           >
-            <option value="all">All Licenses</option>
-            {COMMON_LICENSES.map((license) => (
-              <option key={license} value={license}>
-                {license}
-              </option>
-            ))}
+            <SelectTrigger id="license-filter">
+              <SelectValue placeholder="All Licenses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Licenses</SelectItem>
+              {COMMON_LICENSES.map((license) => (
+                <SelectItem key={license} value={license}>
+                  {license}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
 

@@ -5,7 +5,13 @@ import { Server, Search, Filter, Plus, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { MCPServer, MCPServerFilters, MCPServerStatus } from '@/types/mcp';
 import { MCPServerCard } from './MCPServerCard';
 
@@ -103,16 +109,17 @@ export function MCPServerList({
           <div className="w-[150px]">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select
-                value={filters.status}
-                onChange={(e) => handleStatusFilterChange(e.target.value)}
-                className="w-full"
-              >
-                <option value="all">All Status</option>
-                <option value="installed">Installed</option>
-                <option value="not_installed">Not Installed</option>
-                <option value="updating">Updating</option>
-                <option value="error">Error</option>
+              <Select value={filters.status} onValueChange={handleStatusFilterChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="installed">Installed</SelectItem>
+                  <SelectItem value="not_installed">Not Installed</SelectItem>
+                  <SelectItem value="updating">Updating</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>

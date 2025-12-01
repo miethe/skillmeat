@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Loader2, X, CheckCircle2 } from 'lucide-react';
 import { EntityType, EntityFormField, ENTITY_TYPES, Entity } from '@/types/entity';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
@@ -10,7 +10,13 @@ import { useDebouncedCallback } from 'use-debounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -95,6 +101,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     formState: { errors },
     setValue,
     getValues,
+    control,
   } = useForm<FormData>({
     defaultValues: {
       name: entity?.name || '',
@@ -323,19 +330,27 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
               {field.label}
               {field.required && <span className="ml-1 text-destructive">*</span>}
             </Label>
-            <Select
-              id={fieldId}
-              {...register(field.name, {
+            <Controller
+              name={field.name}
+              control={control}
+              rules={{
                 required: field.required ? `${field.label} is required` : false,
-              })}
-            >
-              <option value="">Select {field.label.toLowerCase()}...</option>
-              {field.options?.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+              }}
+              render={({ field: { onChange, value } }) => (
+                <Select value={value} onValueChange={onChange}>
+                  <SelectTrigger id={fieldId}>
+                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {field.options?.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors[field.name] && (
               <p className="text-sm text-destructive">{errors[field.name]?.message as string}</p>
             )}

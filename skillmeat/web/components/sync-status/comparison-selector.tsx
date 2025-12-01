@@ -4,7 +4,13 @@ import * as React from 'react';
 import { GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
 export type ComparisonScope =
@@ -57,10 +63,6 @@ export function ComparisonSelector({
   hasSource,
   hasProject,
 }: ComparisonSelectorProps) {
-  const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange(event.target.value as ComparisonScope);
-  };
-
   const isOptionDisabled = (option: ScopeOption): boolean => {
     if (option.requiresSource && !hasSource) return true;
     if (option.requiresProject && !hasProject) return true;
@@ -88,21 +90,21 @@ export function ComparisonSelector({
         <Label htmlFor="comparison-select" className="text-sm">
           Compare:
         </Label>
-        <Select
-          id="comparison-select"
-          value={value}
-          onChange={handleSelectChange}
-          className="flex-1"
-        >
-          {scopeOptions.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              disabled={isOptionDisabled(option)}
-            >
-              {option.label}
-            </option>
-          ))}
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger id="comparison-select" className="flex-1">
+            <SelectValue placeholder="Select comparison..." />
+          </SelectTrigger>
+          <SelectContent>
+            {scopeOptions.map((option) => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                disabled={isOptionDisabled(option)}
+              >
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
 
