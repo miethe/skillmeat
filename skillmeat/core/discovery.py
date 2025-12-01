@@ -13,6 +13,14 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.discovery_metrics import (
+    discovery_artifacts_found,
+    discovery_errors_total,
+    discovery_metrics,
+    discovery_scan_duration,
+    discovery_scans_total,
+    log_performance,
+)
 from skillmeat.utils.metadata import extract_yaml_frontmatter
 
 logger = logging.getLogger(__name__)
@@ -98,6 +106,7 @@ class ArtifactDiscoveryService:
         self.collection_path = collection_path
         self.artifacts_path = collection_path / "artifacts"
 
+    @log_performance("discovery_scan")
     def discover_artifacts(self) -> DiscoveryResult:
         """Scan artifacts directory and discover all artifacts.
 
@@ -114,11 +123,17 @@ class ArtifactDiscoveryService:
         discovered_artifacts: List[DiscoveredArtifact] = []
         errors: List[str] = []
 
+        logger.info(
+            "Starting artifact discovery",
+            extra={"path": str(self.collection_path)}
+        )
+
         # Validate artifacts directory exists
         if not self.artifacts_path.exists():
             error_msg = f"Artifacts directory not found: {self.artifacts_path}"
             logger.warning(error_msg)
             errors.append(error_msg)
+            discovery_scans_total.labels(status="no_artifacts_dir").inc()
 
             return DiscoveryResult(
                 discovered_count=0,
@@ -165,10 +180,24 @@ class ArtifactDiscoveryService:
 
         # Calculate scan duration
         scan_duration_ms = (time.time() - start_time) * 1000
+        scan_duration_sec = scan_duration_ms / 1000
+
+        # Record metrics
+        discovery_scans_total.labels(
+            status="success" if not errors else "partial_success"
+        ).inc()
+        discovery_artifacts_found.set(len(discovered_artifacts))
+        discovery_scan_duration.observe(scan_duration_sec)
+        discovery_metrics.record_scan(len(discovered_artifacts), scan_duration_ms)
 
         logger.info(
             f"Discovery scan completed: {len(discovered_artifacts)} artifacts "
-            f"found in {scan_duration_ms:.2f}ms"
+            f"found in {scan_duration_ms:.2f}ms",
+            extra={
+                "artifact_count": len(discovered_artifacts),
+                "error_count": len(errors),
+                "duration_ms": round(scan_duration_ms, 2),
+            }
         )
 
         return DiscoveryResult(

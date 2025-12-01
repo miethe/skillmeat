@@ -15,7 +15,7 @@ import { EntityTabs } from './components/entity-tabs';
 import { EntityFilters } from './components/entity-filters';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { AddEntityDialog } from './components/add-entity-dialog';
-import { Entity, EntityType, EntityStatus } from '@/types/entity';
+import { Entity, EntityType } from '@/types/entity';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,10 +23,16 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useDiscovery } from '@/hooks/useDiscovery';
+import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
+import { BulkImportModal } from '@/components/discovery/BulkImportModal';
+import { useToast } from '@/hooks/use-toast';
+import type { DiscoveredArtifact } from '@/types/discovery';
 
 function ManagePageContent() {
   const searchParams = useSearchParams();
   const activeEntityType = (searchParams.get('type') as EntityType) || 'skill';
+  const { toast } = useToast();
 
   const {
     entities,
@@ -39,8 +45,17 @@ function ManagePageContent() {
     searchQuery,
     statusFilter,
     deleteEntity,
-    updateEntity,
   } = useEntityLifecycle();
+
+  // Discovery hook
+  const {
+    discoveredArtifacts,
+    discoveredCount,
+    isDiscovering,
+    refetchDiscovery,
+    bulkImport,
+    isImporting,
+  } = useDiscovery();
 
   // Local state
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -49,11 +64,17 @@ function ManagePageContent() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Update type filter when tab changes
   useEffect(() => {
     setTypeFilter(activeEntityType);
   }, [activeEntityType, setTypeFilter]);
+
+  // Trigger discovery on mount
+  useEffect(() => {
+    refetchDiscovery();
+  }, [refetchDiscovery]);
 
   // Filter entities by tags client-side
   const filteredEntities =
@@ -109,8 +130,61 @@ function ManagePageContent() {
     setDetailPanelOpen(true);
   }, []);
 
+  // Handle bulk import
+  const handleImport = useCallback(
+    async (selected: DiscoveredArtifact[]) => {
+      try {
+        const result = await bulkImport({
+          artifacts: selected.map((a) => ({
+            source: a.source || a.path,
+            artifact_type: a.type,
+            name: a.name,
+            description: a.description,
+            tags: a.tags,
+            scope: a.scope || 'user',
+          })),
+        });
+
+        if (result.total_imported > 0) {
+          toast({
+            title: 'Import Successful',
+            description: `Imported ${result.total_imported} artifact(s)`,
+          });
+          // Refresh entity list after import
+          refetch();
+        }
+        if (result.total_failed > 0) {
+          toast({
+            title: 'Partial Import',
+            description: `${result.total_failed} artifact(s) failed to import`,
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: 'Import Failed',
+          description: error instanceof Error ? error.message : 'Failed to import artifacts',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+    },
+    [bulkImport, toast, refetch]
+  );
+
   return (
     <div className="flex h-screen flex-col">
+      {/* Discovery Banner */}
+      {discoveredCount > 0 && !isDiscovering && (
+        <div className="border-b px-6 pt-6">
+          <DiscoveryBanner
+            discoveredCount={discoveredCount}
+            onReview={() => setShowImportModal(true)}
+            dismissible
+          />
+        </div>
+      )}
+
       {/* Header */}
       <div className="border-b p-6">
         <div className="mb-4 flex items-center justify-between">
@@ -243,6 +317,14 @@ function ManagePageContent() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        artifacts={discoveredArtifacts}
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+      />
     </div>
   );
 }
