@@ -6,10 +6,10 @@ Provides REST API for managing artifacts within collections.
 import base64
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path as PathLib
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -501,7 +501,7 @@ async def discover_artifacts(
 
         # Use custom scan path if provided, otherwise use collection artifacts directory
         if request.scan_path:
-            scan_path = Path(request.scan_path)
+            scan_path = PathLib(request.scan_path)
             if not scan_path.exists():
                 logger.warning(f"Scan path does not exist: {scan_path}")
                 raise create_bad_request_error(
@@ -537,6 +537,120 @@ async def discover_artifacts(
     except Exception as e:
         logger.error(f"Discovery scan failed: {e}", exc_info=True)
         raise create_internal_error("Discovery scan failed", e)
+
+
+def resolve_project_path(project_id: str) -> PathLib:
+    """Resolve project ID to filesystem path.
+
+    Args:
+        project_id: URL-encoded project path
+
+    Returns:
+        Resolved PathLib object
+
+    Raises:
+        HTTPException: If path is invalid or doesn't exist
+    """
+    from urllib.parse import unquote
+
+    # URL-decode the path
+    decoded_path = unquote(project_id)
+    project_path = PathLib(decoded_path)
+
+    if not project_path.is_absolute():
+        raise create_bad_request_error(
+            f"Project path must be absolute: {decoded_path}",
+            ErrorCodes.VALIDATION_FAILED
+        )
+
+    if not project_path.exists():
+        raise create_not_found_error(
+            f"Project path not found: {decoded_path}",
+            ErrorCodes.NOT_FOUND
+        )
+
+    return project_path
+
+
+@router.post(
+    "/discover/project/{project_id:path}",
+    response_model=DiscoveryResult,
+    summary="Discover artifacts in a project",
+    description="Scan a project's .claude/ directory for existing artifacts that can be imported",
+    responses={
+        200: {"description": "Discovery scan completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid project path"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def discover_project_artifacts(
+    project_id: str = Path(..., description="URL-encoded project path"),
+    _token: TokenDep = None,
+) -> DiscoveryResult:
+    """Discover artifacts in a specific project's .claude/ directory.
+
+    Args:
+        project_id: Project ID (URL-encoded path)
+        _token: Authentication token
+
+    Returns:
+        DiscoveryResult with discovered artifacts from the project
+
+    Raises:
+        HTTPException: If project path is invalid, doesn't exist, or scan fails
+    """
+    # Check if discovery feature is enabled
+    from skillmeat.api.config import get_settings
+
+    settings = get_settings()
+    if not settings.enable_auto_discovery:
+        logger.warning("Discovery feature is disabled")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Artifact auto-discovery feature is currently disabled. Enable with SKILLMEAT_ENABLE_AUTO_DISCOVERY=true",
+        )
+
+    try:
+        # Resolve and validate project path
+        project_path = resolve_project_path(project_id)
+        logger.info(f"Resolved project path: {project_path}")
+
+        # Check that .claude/ directory exists
+        claude_dir = project_path / ".claude"
+        if not claude_dir.exists() or not claude_dir.is_dir():
+            raise create_bad_request_error(
+                f"Project does not contain a .claude/ directory: {project_path}",
+                ErrorCodes.VALIDATION_FAILED
+            )
+
+        # Create discovery service with project scan mode
+        discovery_service = ArtifactDiscoveryService(project_path, scan_mode="project")
+
+        # Perform discovery scan
+        logger.info(f"Starting artifact discovery scan in project: {project_path}")
+        result = discovery_service.discover_artifacts()
+
+        # Log results
+        logger.info(
+            f"Discovery scan completed: {result.discovered_count} artifacts found "
+            f"in {result.scan_duration_ms:.2f}ms, {len(result.errors)} errors"
+        )
+
+        if result.errors:
+            logger.warning(f"Discovery scan encountered {len(result.errors)} errors")
+            for error in result.errors[:5]:  # Log first 5 errors
+                logger.warning(f"  - {error}")
+
+        return result
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Project discovery scan failed: {e}", exc_info=True)
+        raise create_internal_error("Project discovery scan failed", e)
 
 
 @router.post(
@@ -885,9 +999,7 @@ async def create_artifact(
             # Handle local source
             try:
                 # Validate path exists
-                from pathlib import Path
-
-                source_path = Path(request.source)
+                source_path = PathLib(request.source)
                 if not source_path.exists():
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -1112,7 +1224,7 @@ async def list_artifacts(
                     detail="project_path is required when check_drift=true",
                 )
 
-            project_path_obj = Path(project_path)
+            project_path_obj = PathLib(project_path)
             if not project_path_obj.exists():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -2059,7 +2171,7 @@ async def deploy_artifact(
             )
 
         # Validate project path
-        project_path = Path(request.project_path)
+        project_path = PathLib(request.project_path)
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -2358,7 +2470,7 @@ async def sync_artifact(
             )
 
         # Validate project path
-        project_path = Path(request.project_path)
+        project_path = PathLib(request.project_path)
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -2564,7 +2676,7 @@ async def undeploy_artifact(
             )
 
         # Validate project path
-        proj_path = Path(project_path)
+        proj_path = PathLib(project_path)
         if not proj_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -2846,7 +2958,7 @@ async def get_artifact_diff(
             )
 
         # Validate project path
-        proj_path = Path(project_path)
+        proj_path = PathLib(project_path)
         if not proj_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -4168,7 +4280,7 @@ async def update_artifact_file_content(
                 suffix=f"_{full_path.name}",
             ) as tmp:
                 tmp.write(request.content)
-                tmp_path = Path(tmp.name)
+                tmp_path = PathLib(tmp.name)
 
             # Atomic rename (same filesystem)
             tmp_path.replace(full_path)
@@ -4429,7 +4541,7 @@ async def create_artifact_file(
                 suffix=f"_{full_path.name}",
             ) as tmp:
                 tmp.write(request.content)
-                tmp_path = Path(tmp.name)
+                tmp_path = PathLib(tmp.name)
 
             # Atomic rename (same filesystem)
             tmp_path.replace(full_path)
