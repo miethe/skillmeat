@@ -141,8 +141,6 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         className="sm:max-w-[900px] max-h-[80vh] flex flex-col"
-        aria-labelledby="bulk-import-title"
-        aria-describedby="bulk-import-description"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -150,8 +148,8 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
               <Package className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div>
-              <DialogTitle id="bulk-import-title">Review Discovered Artifacts</DialogTitle>
-              <DialogDescription id="bulk-import-description">
+              <DialogTitle>Review Discovered Artifacts</DialogTitle>
+              <DialogDescription>
                 Select artifacts to import into your collection ({artifacts.length} discovered)
               </DialogDescription>
             </div>
