@@ -27,3 +27,12 @@
      - `components/marketplace/MarketplaceInstallDialog.tsx`
 - **Commit(s)**: 62cca2f
 - **Status**: RESOLVED
+
+### Collection Object Missing path Attribute
+
+**Issue**: `skillmeat sync-check` fails with `'Collection' object has no attribute 'path'`
+- **Location**: `skillmeat/core/sync.py:414,623,764,1099,1436`
+- **Root Cause**: Code accessed `collection.path` but `Collection` is a dataclass without a `path` attribute. Path is managed by `ConfigManager`, not the Collection object.
+- **Fix**: Replaced all 5 occurrences of `collection.path` with `self.collection_mgr.config.get_collection_path(collection_name)`
+- **Commit(s)**: fc24e7b
+- **Status**: RESOLVED
