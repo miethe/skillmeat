@@ -65,4 +65,4 @@ Refer to implementation plan for detailed task breakdown.
 ## Additional Resources
 
 - **PRD**: `/Users/miethe/dev/homelab/development/skillmeat/docs/project_plans/PRDs/enhancements/persistent-project-cache-v1.md`
-- **Implementation Plan**: `/Users/miethe/dev/homelab/development/skillmeat/docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1.md`
+- **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/persistent-project-cache-v1/phase-1-2-infrastructure.md`
