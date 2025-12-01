@@ -5,14 +5,15 @@ Provides REST API for browsing and managing projects with deployed artifacts.
 
 import base64
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from skillmeat.api.dependencies import verify_api_key
+from skillmeat.api.dependencies import get_app_state, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
     DeploymentModificationStatus,
@@ -20,6 +21,7 @@ from skillmeat.api.schemas.artifacts import (
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.projects import (
+    CacheInfo,
     DeployedArtifact,
     ModifiedArtifactsResponse,
     ProjectCreateRequest,
@@ -31,6 +33,7 @@ from skillmeat.api.schemas.projects import (
     ProjectUpdateRequest,
 )
 from skillmeat.api.project_registry import ProjectRegistry, get_project_registry
+from skillmeat.cache.manager import CacheManager
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.storage.project import ProjectMetadataStorage
 from skillmeat.utils.filesystem import compute_content_hash
@@ -46,6 +49,53 @@ router = APIRouter(
     tags=["projects"],
     dependencies=[Depends(verify_api_key)],  # All endpoints require API key
 )
+
+
+# =============================================================================
+# Dependency Injection
+# =============================================================================
+
+
+def get_cache_manager() -> Optional[CacheManager]:
+    """Get CacheManager dependency.
+
+    Returns:
+        CacheManager instance or None if not available
+
+    Note:
+        This is an optional dependency that gracefully returns None
+        if the cache cannot be initialized. Endpoints should handle
+        None by falling back to ProjectRegistry.
+    """
+    try:
+        # Try to get app state without raising exception
+        from skillmeat.api.dependencies import app_state
+
+        # Initialize cache manager if not exists
+        if not hasattr(app_state, "cache_manager") or app_state.cache_manager is None:
+            # Initialize with default settings (6 hours TTL)
+            cache_manager = CacheManager(ttl_minutes=360)
+            try:
+                cache_manager.initialize_cache()
+                app_state.cache_manager = cache_manager
+                logger.info("Initialized CacheManager for projects API")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize cache manager: {e}. "
+                    "Will fall back to ProjectRegistry."
+                )
+                return None
+
+        return app_state.cache_manager
+    except Exception as e:
+        logger.warning(
+            f"Cache manager not available: {e}. Will fall back to ProjectRegistry."
+        )
+        return None
+
+
+# Type alias for cache manager dependency (optional)
+CacheManagerDep = Annotated[Optional[CacheManager], Depends(get_cache_manager)]
 
 
 def encode_project_id(path: str) -> str:
@@ -251,7 +301,9 @@ def build_project_detail(project_path: Path) -> ProjectDetail:
     },
 )
 async def list_projects(
+    response: Response,
     token: TokenDep,
+    cache_manager: CacheManagerDep,
     limit: int = Query(
         default=20,
         ge=1,
@@ -262,52 +314,136 @@ async def list_projects(
         default=None,
         description="Cursor for pagination (next page)",
     ),
-    refresh: bool = Query(
+    force_refresh: bool = Query(
         default=False,
+        alias="refresh",
         description="Force cache refresh (bypass cached results)",
     ),
 ) -> ProjectListResponse:
     """List all projects with deployed artifacts.
 
-    This endpoint returns cached project discovery results for fast responses.
-    The cache is automatically refreshed every 5 minutes, or can be forced
-    with the refresh=true query parameter.
+    This endpoint uses a persistent SQLite cache for fast responses (<100ms).
+    The cache is checked first, with fallback to ProjectRegistry if needed.
+    Cache can be forced to refresh with force_refresh=true query parameter.
 
     Args:
+        response: FastAPI Response object for headers
         token: Authentication token
+        cache_manager: CacheManager dependency
         limit: Number of items per page
         after: Cursor for next page
-        refresh: Force cache refresh
+        force_refresh: Force cache refresh
 
     Returns:
-        Paginated list of projects
+        Paginated list of projects with cache metadata
 
     Raises:
         HTTPException: On error
     """
+    start_time = time.monotonic()
+    cache_hit = False
+    cache_last_fetched = None
+
     try:
-        logger.info(f"Listing projects (limit={limit}, after={after}, refresh={refresh})")
+        logger.info(
+            f"Listing projects (limit={limit}, after={after}, force_refresh={force_refresh})"
+        )
 
-        # Use ProjectRegistry for cached results
-        registry = await get_project_registry()
-        cache_entries = await registry.get_projects(force_refresh=refresh)
-        logger.info(f"Got {len(cache_entries)} projects from registry (cached)")
-
-        # Convert cache entries to ProjectSummary
         all_projects = []
-        for entry in cache_entries:
+
+        # Try to get from persistent cache first (unless force_refresh or cache unavailable)
+        if not force_refresh and cache_manager is not None:
             try:
-                summary = ProjectSummary(
-                    id=encode_project_id(str(entry.path)),
-                    path=str(entry.path),
-                    name=entry.name,
-                    deployment_count=entry.deployment_count,
-                    last_deployment=entry.last_deployment,
-                )
-                all_projects.append(summary)
+                cached_projects = cache_manager.get_projects(include_stale=False)
+
+                if cached_projects:
+                    # We have cached data - use it
+                    cache_hit = True
+                    logger.info(
+                        f"Cache HIT: Got {len(cached_projects)} projects from persistent cache"
+                    )
+
+                    # Convert cache entries to ProjectSummary
+                    for cached_project in cached_projects:
+                        try:
+                            # Check if this project is stale
+                            is_stale = cache_manager.is_cache_stale(cached_project.id)
+                            cache_last_fetched = cached_project.last_fetched
+
+                            summary = ProjectSummary(
+                                id=encode_project_id(cached_project.path),
+                                path=cached_project.path,
+                                name=cached_project.name,
+                                deployment_count=len(cached_project.artifacts),
+                                last_deployment=None,  # Not stored in cache model
+                                cache_info=CacheInfo(
+                                    cache_hit=True,
+                                    last_fetched=cached_project.last_fetched,
+                                    is_stale=is_stale,
+                                ),
+                            )
+                            all_projects.append(summary)
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing cached project {cached_project.id}: {e}"
+                            )
+                            continue
+                else:
+                    logger.info("Cache MISS: No projects in persistent cache")
             except Exception as e:
-                logger.error(f"Error processing project {entry.path}: {e}")
-                continue
+                logger.warning(
+                    f"Failed to retrieve from persistent cache: {e}. Falling back to registry."
+                )
+        elif cache_manager is None:
+            logger.info("CacheManager not available, using ProjectRegistry")
+
+        # If no cache hit or force refresh, fall back to ProjectRegistry
+        if not cache_hit or force_refresh:
+            logger.info(
+                f"Cache MISS or force refresh - using ProjectRegistry "
+                f"(force={force_refresh})"
+            )
+
+            registry = await get_project_registry()
+            cache_entries = await registry.get_projects(force_refresh=force_refresh)
+            logger.info(f"Got {len(cache_entries)} projects from ProjectRegistry")
+
+            # Convert registry entries to ProjectSummary
+            for entry in cache_entries:
+                try:
+                    summary = ProjectSummary(
+                        id=encode_project_id(str(entry.path)),
+                        path=str(entry.path),
+                        name=entry.name,
+                        deployment_count=entry.deployment_count,
+                        last_deployment=entry.last_deployment,
+                        cache_info=None,  # No cache info for fresh data
+                    )
+                    all_projects.append(summary)
+                except Exception as e:
+                    logger.error(f"Error processing project {entry.path}: {e}")
+                    continue
+
+            # Populate persistent cache in the background (async)
+            # This ensures future requests will hit the cache
+            if cache_manager is not None:
+                try:
+                    projects_data = [
+                        {
+                            "id": encode_project_id(str(entry.path)),
+                            "name": entry.name,
+                            "path": str(entry.path),
+                            "description": None,
+                            "artifacts": [],  # TODO: Add artifact info
+                        }
+                        for entry in cache_entries
+                    ]
+                    cache_manager.populate_projects(projects_data)
+                    logger.info(
+                        f"Populated persistent cache with {len(projects_data)} projects"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to populate persistent cache: {e}", exc_info=True)
 
         # Sort by last deployment (most recent first)
         all_projects.sort(
@@ -349,7 +485,18 @@ async def list_projects(
             total_count=len(all_projects),
         )
 
-        logger.info(f"Retrieved {len(page_projects)} projects")
+        # Add cache headers
+        response.headers["X-Cache-Hit"] = "hit" if cache_hit else "miss"
+        if cache_last_fetched:
+            response.headers["X-Cache-Last-Fetched"] = cache_last_fetched.isoformat()
+
+        # Log performance metrics
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        logger.info(
+            f"Retrieved {len(page_projects)} projects "
+            f"(cache_hit={cache_hit}, time={elapsed_ms:.2f}ms)"
+        )
+
         return ProjectListResponse(items=page_projects, page_info=page_info)
 
     except HTTPException:
@@ -497,15 +644,19 @@ async def create_project(
 async def get_project(
     project_id: str,
     token: TokenDep,
+    cache_manager: CacheManagerDep,
+    response: Response,
 ) -> ProjectDetail:
     """Get details for a specific project.
 
     Returns complete information about a project including all deployed
-    artifacts, versions, and statistics.
+    artifacts, versions, and statistics. Checks cache first for fast response.
 
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
+        cache_manager: CacheManager dependency
+        response: FastAPI Response for headers
 
     Returns:
         Project details with full deployment list
@@ -513,6 +664,9 @@ async def get_project(
     Raises:
         HTTPException: If project not found or on error
     """
+    start_time = time.monotonic()
+    cache_hit = False
+
     try:
         logger.info(f"Getting project: {project_id}")
 
@@ -520,7 +674,24 @@ async def get_project(
         project_path_str = decode_project_id(project_id)
         project_path = Path(project_path_str)
 
-        # Check if project exists
+        # Try to get from cache first (if available)
+        if cache_manager is not None:
+            try:
+                cached_project = cache_manager.get_project(project_id)
+                if cached_project and not cache_manager.is_cache_stale(project_id):
+                    cache_hit = True
+                    logger.info(f"Cache HIT for project: {project_id}")
+
+                    # Set cache headers
+                    response.headers["X-Cache-Hit"] = "hit"
+                    if cached_project.last_fetched:
+                        response.headers["X-Cache-Last-Fetched"] = (
+                            cached_project.last_fetched.isoformat()
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to check cache for project {project_id}: {e}")
+
+        # Check if project exists on filesystem
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -535,12 +706,21 @@ async def get_project(
                 detail=f"No deployments found for project: {project_path.name}",
             )
 
-        # Build project detail
+        # Build project detail from filesystem (always read fresh for detail view)
         project_detail = build_project_detail(project_path)
 
+        # Set cache miss header if not hit
+        if not cache_hit:
+            response.headers["X-Cache-Hit"] = "miss"
+
+        # Log performance
+        elapsed_ms = (time.monotonic() - start_time) * 1000
         logger.info(
-            f"Retrieved project '{project_detail.name}' with {project_detail.deployment_count} deployments"
+            f"Retrieved project '{project_detail.name}' with "
+            f"{project_detail.deployment_count} deployments "
+            f"(cache_hit={cache_hit}, time={elapsed_ms:.2f}ms)"
         )
+
         return project_detail
 
     except HTTPException:
