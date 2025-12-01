@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Edit, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -21,6 +21,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { ArtifactType, ArtifactScope } from '@/types/artifact';
 
@@ -68,6 +75,7 @@ export function ParameterEditorModal({
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -140,15 +148,19 @@ export function ParameterEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[500px]"
+        aria-labelledby="param-editor-title"
+        aria-describedby="param-editor-description"
+      >
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">
-              <Edit className="h-5 w-5 text-primary" />
+              <Edit className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div>
-              <DialogTitle>Edit Parameters</DialogTitle>
-              <DialogDescription>
+              <DialogTitle id="param-editor-title">Edit Parameters</DialogTitle>
+              <DialogDescription id="param-editor-description">
                 Update parameters for {artifact.type}: {artifact.name}
               </DialogDescription>
             </div>
@@ -178,8 +190,15 @@ export function ParameterEditorModal({
               placeholder="user/repo/path"
               {...register('source')}
               disabled={isSubmitting}
+              aria-invalid={!!errors.source}
+              aria-describedby={errors.source ? 'source-error' : 'source-hint'}
             />
-            <p className="text-xs text-muted-foreground">
+            {errors.source && (
+              <p id="source-error" className="text-xs text-destructive" role="alert">
+                {errors.source.message}
+              </p>
+            )}
+            <p id="source-hint" className="text-xs text-muted-foreground">
               GitHub source in format: user/repo/path
             </p>
           </div>
@@ -201,15 +220,25 @@ export function ParameterEditorModal({
           {/* Scope */}
           <div className="space-y-2">
             <Label htmlFor="scope">Scope</Label>
-            <select
-              id="scope"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              {...register('scope')}
-              disabled={isSubmitting}
-            >
-              <option value="user">User (Global)</option>
-              <option value="local">Local (Project)</option>
-            </select>
+            <Controller
+              name="scope"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="scope">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User (Global)</SelectItem>
+                    <SelectItem value="local">Local (Project)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
             <p className="text-xs text-muted-foreground">
               User scope is global, local scope is per-project
             </p>

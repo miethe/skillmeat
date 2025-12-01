@@ -155,9 +155,15 @@ export function AutoPopulationForm({
             onChange={(e) => handleSourceChange(e.target.value)}
             disabled={isSubmitting}
             aria-describedby="source-hint"
+            aria-invalid={!!error}
           />
           {isLoading && (
-            <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+            <>
+              <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+              <span className="sr-only" role="status" aria-live="polite">
+                Loading metadata...
+              </span>
+            </>
           )}
         </div>
         <p id="source-hint" className="text-sm text-muted-foreground">
@@ -173,15 +179,15 @@ export function AutoPopulationForm({
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+        <Alert variant="destructive" role="alert" aria-live="assertive">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Loading Skeleton */}
       {isLoading && (
-        <div className="space-y-4">
+        <div className="space-y-4" aria-busy="true">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-10 w-full" />
