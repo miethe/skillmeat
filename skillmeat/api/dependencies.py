@@ -42,6 +42,8 @@ class AppState:
         self.sync_manager: Optional[SyncManager] = None
         self.settings: Optional[APISettings] = None
         self.metadata_cache: Optional[Any] = None  # MetadataCache, lazily initialized
+        self.cache_manager: Optional[Any] = None  # CacheManager, lazily initialized
+        self.refresh_job: Optional[Any] = None  # RefreshJob, lazily initialized
 
     def initialize(self, settings: APISettings) -> None:
         """Initialize all managers with settings.
@@ -68,12 +70,22 @@ class AppState:
         """Clean up resources on shutdown."""
         logger.info("Shutting down application state...")
         # Add cleanup logic here if needed (close DB connections, etc.)
+
+        # Stop refresh job scheduler if running
+        if self.refresh_job is not None:
+            try:
+                self.refresh_job.stop_scheduler(wait=True)
+            except Exception as e:
+                logger.warning(f"Error stopping refresh job: {e}")
+
         self.config_manager = None
         self.collection_manager = None
         self.artifact_manager = None
         self.token_manager = None
         self.sync_manager = None
         self.metadata_cache = None
+        self.cache_manager = None
+        self.refresh_job = None
         logger.info("Application state shutdown complete")
 
 
