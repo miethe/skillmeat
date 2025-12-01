@@ -52,6 +52,23 @@ class DeployedArtifact(BaseModel):
     )
 
 
+class CacheInfo(BaseModel):
+    """Cache metadata for cached responses."""
+
+    cache_hit: bool = Field(
+        description="Whether this response was served from cache",
+        examples=[True],
+    )
+    last_fetched: Optional[datetime] = Field(
+        default=None,
+        description="When this data was last fetched/refreshed",
+    )
+    is_stale: bool = Field(
+        default=False,
+        description="Whether the cached data is considered stale (past TTL)",
+    )
+
+
 class ProjectSummary(BaseModel):
     """Summary information about a project with deployments.
 
@@ -79,6 +96,10 @@ class ProjectSummary(BaseModel):
     last_deployment: Optional[datetime] = Field(
         default=None,
         description="Timestamp of most recent deployment",
+    )
+    cache_info: Optional[CacheInfo] = Field(
+        default=None,
+        description="Cache metadata (only present when served from cache)",
     )
 
 
