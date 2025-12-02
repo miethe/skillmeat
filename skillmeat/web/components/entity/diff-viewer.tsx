@@ -238,9 +238,9 @@ export function DiffViewer({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header with summary */}
-      <div className="flex items-center justify-between border-b p-4">
+      <div className="flex flex-shrink-0 items-center justify-between border-b p-4">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold">Diff Viewer</h3>
           <div className="flex items-center gap-2 text-sm">
@@ -262,9 +262,9 @@ export function DiffViewer({
         )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-64 overflow-auto border-r bg-muted/20">
+        <div className="w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
             {files.map((file, index) => {
               const isExpanded = expandedFiles.has(index);
@@ -327,9 +327,9 @@ export function DiffViewer({
         </div>
 
         {/* Diff viewer */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* File header */}
-          <div className="border-b bg-muted/30 px-4 py-2">
+          <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-sm font-semibold">{selectedFile?.file_path}</span>
               <FileStatusBadge status={selectedFile?.status || 'unchanged'} />
@@ -338,13 +338,13 @@ export function DiffViewer({
 
           {/* Side-by-side diff */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex min-h-0 flex-1 overflow-hidden">
               {/* Left panel */}
-              <div className="flex flex-1 flex-col border-r">
-                <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
+              <div className="flex min-h-0 flex-1 flex-col border-r">
+                <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div ref={leftScrollRef} className="flex-1 overflow-auto">
+                <div ref={leftScrollRef} className="min-h-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'addition') return null;
                     if (line.type === 'header') {
@@ -366,11 +366,11 @@ export function DiffViewer({
               </div>
 
               {/* Right panel */}
-              <div className="flex flex-1 flex-col">
-                <div className="border-b bg-muted/50 px-4 py-2 text-sm font-medium">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div ref={rightScrollRef} className="flex-1 overflow-auto">
+                <div ref={rightScrollRef} className="min-h-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'deletion') return null;
                     if (line.type === 'header') {
@@ -392,20 +392,20 @@ export function DiffViewer({
               </div>
             </div>
           ) : selectedFile?.status === 'added' ? (
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex-shrink-0 bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">
                 This file was added in {rightLabel}
               </div>
-              <div className="flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
                 Content preview not available for added files.
               </div>
             </div>
           ) : selectedFile?.status === 'deleted' ? (
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex-shrink-0 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
                 This file was deleted from {leftLabel}
               </div>
-              <div className="flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
                 Content preview not available for deleted files.
               </div>
             </div>
