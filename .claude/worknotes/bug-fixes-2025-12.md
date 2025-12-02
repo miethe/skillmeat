@@ -216,3 +216,15 @@
 - **Fix**: Changed query parameter from `'/projects?force_refresh=true'` to `'/projects?refresh=true'` to match backend's expected parameter name.
 - **Commit(s)**: 18831eb
 - **Status**: RESOLVED
+
+### Diff Viewer Scroll Clipped Inside Sync Status Modal (Another follow-up)
+
+**Issue**: Diff Viewer still overflows the artifact modal on the Sync Status tab; long diffs can't be scrolled independently and horizontal overflow is clipped.
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx`, `skillmeat/web/components/sync-status/sync-status-tab.tsx`, `skillmeat/web/components/entity/diff-viewer.tsx`
+- **Root Cause**: The modal and tab containers lacked `min-h-0/min-w-0`, so flex children could not shrink and overflow handling never engaged. DiffViewer also synchronized pane scrolling, preventing independent scrollbars and exacerbating overflow when one side was longer.
+- **Fix**:
+  1. Added `h-[90vh]` plus `min-h-0/min-w-0` to the modal shell, Tabs, and SyncStatusTab so the layout has a real, bounded height for scroll containers and keeps the footer visible.
+  2. Added `max-h-[55vh]` and `min-h-[320px]` around DiffViewer to enforce an internal scrollable region while leaving space for bottom actions.
+  3. Added `min-w-0` to both diff panes/scroll containers for horizontal overflow and removed scroll synchronization between left/right panes to keep scrollbars independent.
+- **Commit(s)**: pending
+- **Status**: RESOLVED (Actually Fixed)

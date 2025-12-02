@@ -1154,7 +1154,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl min-h-0">
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
@@ -1177,7 +1177,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           <Tabs
             value={activeTab}
             onValueChange={handleTabChange}
-            className="flex flex-1 flex-col px-6"
+            className="flex h-full min-h-0 flex-1 flex-col px-6"
           >
             <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
               <TabsTrigger
@@ -1381,7 +1381,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Sync Status Tab */}
-            <TabsContent value="sync" className="mt-0 flex-1 overflow-hidden">
+            <TabsContent value="sync" className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <SyncStatusTab
                 entity={entity}
                 mode={entity.projectPath ? 'project' : 'collection'}
