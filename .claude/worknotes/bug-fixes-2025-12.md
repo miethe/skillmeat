@@ -114,5 +114,7 @@
   2. Added `path` field to `BulkImportArtifactData` dataclass (`skillmeat/core/importer.py:32`)
   3. Updated `_import_single()` to detect `local/` sources and route to `add_from_local()` instead of `add_from_github()` (`skillmeat/core/importer.py:322-345`)
   4. Updated router to pass path field to importer (`skillmeat/api/routers/artifacts.py:774`)
-- **Commit(s)**: TBD
+  5. Added `path` field to frontend `BulkImportArtifact` type (`skillmeat/web/types/discovery.ts:44`)
+  6. Updated `handleImport` to include path and generate proper local source identifiers (`skillmeat/web/app/projects/[id]/page.tsx:169-176`)
+- **Commit(s)**: d796666, TBD
 - **Status**: RESOLVED

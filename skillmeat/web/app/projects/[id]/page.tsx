@@ -166,12 +166,13 @@ export default function ProjectDetailPage() {
     try {
       const result = await bulkImport({
         artifacts: selected.map((a) => ({
-          source: a.source || a.path,
+          source: a.source || `local/${a.type}/${a.name}`,
           artifact_type: a.type,
           name: a.name,
           description: a.description,
           tags: a.tags,
           scope: a.scope || 'user',
+          path: a.path,
         })),
       });
 

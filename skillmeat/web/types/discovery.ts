@@ -41,6 +41,7 @@ export interface BulkImportArtifact {
   author?: string;
   tags?: string[];
   scope?: string;
+  path?: string;
 }
 
 /**
