@@ -293,8 +293,8 @@ export function FileTree({
       {/* Header with optional actions */}
       {onAddFile && (
         <div className="flex items-center justify-between border-b p-2">
-          <span className="text-xs font-medium text-muted-foreground">FILES</span>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddFile}>
+          <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">FILES</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={onAddFile}>
             <Plus className="h-3 w-3" />
           </Button>
         </div>

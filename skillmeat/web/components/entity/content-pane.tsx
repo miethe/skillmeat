@@ -350,12 +350,14 @@ export function ContentPane({
         </div>
 
         {/* Split-view editor and preview - preview always shown for markdown */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden p-4">
-          <SplitPreview
-            content={isEditing ? editedContent : content}
-            onChange={(newContent) => onEditChange?.(newContent)}
-            isEditing={isEditing}
-          />
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto p-4">
+          <div className="min-w-0">
+            <SplitPreview
+              content={isEditing ? editedContent : content}
+              onChange={(newContent) => onEditChange?.(newContent)}
+              isEditing={isEditing}
+            />
+          </div>
         </div>
       </div>
     );
