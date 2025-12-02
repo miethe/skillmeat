@@ -95,7 +95,7 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center gap-2">
-                        <h3 className="truncate text-base font-semibold">{bundle.metadata.name}</h3>
+                        <h3 className="truncate text-base font-semibold">{bundle.metadata?.name || 'Unnamed Bundle'}</h3>
                         {bundle.isImported && (
                           <Badge variant="secondary" className="flex-shrink-0 text-xs">
                             Imported
@@ -103,13 +103,13 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
                         )}
                       </div>
 
-                      {bundle.metadata.description && (
+                      {bundle.metadata?.description && (
                         <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                           {bundle.metadata.description}
                         </p>
                       )}
 
-                      {bundle.metadata.tags && bundle.metadata.tags.length > 0 && (
+                      {bundle.metadata?.tags && bundle.metadata.tags.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-1">
                           {bundle.metadata.tags.slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-xs">
@@ -190,7 +190,7 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
             <DialogHeader>
               <DialogTitle>Share Bundle</DialogTitle>
               <DialogDescription>
-                Share {selectedBundle.metadata.name} with others
+                Share {selectedBundle.metadata?.name || 'this bundle'} with others
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -247,7 +247,7 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
           <DialogHeader>
             <DialogTitle>Delete Bundle?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedBundle?.metadata.name}"? This action cannot
+              Are you sure you want to delete "{selectedBundle?.metadata?.name || 'this bundle'}"? This action cannot
               be undone.
             </DialogDescription>
           </DialogHeader>
