@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import { FileDiff } from '../../sdk/models/FileDiff';
 import { Badge } from '@/components/ui/badge';
@@ -135,7 +135,7 @@ function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
  *
  * Displays unified diffs in a professional side-by-side format. Features include:
  * - File list sidebar with expandable items showing change statistics
- * - Side-by-side diff panels with synchronized scrolling
+ * - Side-by-side diff panels with independent scrollbars
  * - Color-coded additions (green), deletions (red), and context lines
  * - File status badges (added, modified, deleted, unchanged)
  * - Change summary (total files added, modified, deleted)
@@ -161,8 +161,6 @@ export function DiffViewer({
 }: DiffViewerProps) {
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
-  const leftScrollRef = useRef<HTMLDivElement>(null);
-  const rightScrollRef = useRef<HTMLDivElement>(null);
 
   const selectedFile = files[selectedFileIndex];
 
@@ -196,29 +194,6 @@ export function DiffViewer({
     return cache;
   }, [files]);
 
-  // Synchronized scrolling
-  useEffect(() => {
-    const leftScroll = leftScrollRef.current;
-    const rightScroll = rightScrollRef.current;
-
-    if (!leftScroll || !rightScroll) return;
-
-    const syncScroll = (source: HTMLDivElement, target: HTMLDivElement) => {
-      target.scrollTop = source.scrollTop;
-    };
-
-    const onLeftScroll = () => syncScroll(leftScroll, rightScroll);
-    const onRightScroll = () => syncScroll(rightScroll, leftScroll);
-
-    leftScroll.addEventListener('scroll', onLeftScroll);
-    rightScroll.addEventListener('scroll', onRightScroll);
-
-    return () => {
-      leftScroll.removeEventListener('scroll', onLeftScroll);
-      rightScroll.removeEventListener('scroll', onRightScroll);
-    };
-  }, []);
-
   const toggleFileExpansion = (index: number) => {
     const newExpanded = new Set(expandedFiles);
     if (newExpanded.has(index)) {
@@ -238,7 +213,7 @@ export function DiffViewer({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       {/* Header with summary */}
       <div className="flex flex-shrink-0 items-center justify-between border-b p-4">
         <div className="flex items-center gap-4">
@@ -262,9 +237,9 @@ export function DiffViewer({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 min-w-0 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
+        <div className="w-64 min-h-0 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
             {files.map((file, index) => {
               const isExpanded = expandedFiles.has(index);
@@ -327,7 +302,7 @@ export function DiffViewer({
         </div>
 
         {/* Diff viewer */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden">
           {/* File header */}
           <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2">
             <div className="flex items-center justify-between">
@@ -338,13 +313,13 @@ export function DiffViewer({
 
           {/* Side-by-side diff */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
-            <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className="flex min-h-0 flex-1 min-w-0 overflow-hidden">
               {/* Left panel */}
-              <div className="flex min-h-0 flex-1 flex-col border-r">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r">
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {leftLabel}
                 </div>
-                <div ref={leftScrollRef} className="min-h-0 flex-1 overflow-auto">
+                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'addition') return null;
                     if (line.type === 'header') {
@@ -366,11 +341,11 @@ export function DiffViewer({
               </div>
 
               {/* Right panel */}
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
                   {rightLabel}
                 </div>
-                <div ref={rightScrollRef} className="min-h-0 flex-1 overflow-auto">
+                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
                   {parsedDiff.map((line, idx) => {
                     if (line.type === 'deletion') return null;
                     if (line.type === 'header') {
@@ -392,20 +367,20 @@ export function DiffViewer({
               </div>
             </div>
           ) : selectedFile?.status === 'added' ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex-shrink-0 bg-green-500/10 px-4 py-2 text-sm text-green-700 dark:text-green-400">
                 This file was added in {rightLabel}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
                 Content preview not available for added files.
               </div>
             </div>
           ) : selectedFile?.status === 'deleted' ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="flex-shrink-0 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400">
                 This file was deleted from {leftLabel}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 text-sm text-muted-foreground">
                 Content preview not available for deleted files.
               </div>
             </div>

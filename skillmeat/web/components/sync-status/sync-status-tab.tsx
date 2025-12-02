@@ -704,32 +704,34 @@ export function SyncStatusTab({
   // ============================================================================
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Top: Flow Banner */}
       <div className="flex-shrink-0 border-b">
         <ArtifactFlowBanner {...bannerProps} />
       </div>
 
       {/* Middle: 3-Panel Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left Panel: File Tree (240px fixed) */}
-        <div className="w-60 flex-shrink-0 border-r">
+        <div className="w-60 flex-shrink-0 border-r min-h-0 overflow-auto">
           <FileTree {...fileTreeProps} />
         </div>
 
         {/* Center Panel: Comparison + Diff (flex-1) */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
           <div className="flex-shrink-0 space-y-2 border-b p-4">
             <ComparisonSelector {...comparisonProps} />
             <DriftAlertBanner {...alertProps} />
           </div>
-          <div className="flex-1 overflow-hidden min-h-0">
-            <DiffViewer {...diffProps} />
+          <div className="flex-1 overflow-hidden min-h-0 min-w-0">
+            <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
+              <DiffViewer {...diffProps} />
+            </div>
           </div>
         </div>
 
         {/* Right Panel: File Preview (320px fixed) */}
-        <div className="w-80 flex-shrink-0 border-l">
+        <div className="w-80 flex-shrink-0 border-l min-h-0 overflow-auto">
           <FilePreviewPane {...previewProps} />
         </div>
       </div>
