@@ -3365,6 +3365,20 @@ async def get_artifact_upstream_diff(
                 detail=f"Failed to fetch upstream: {fetch_result.error}",
             )
 
+        # If no update detected (SHA matches), return empty diff
+        if not fetch_result.has_update:
+            return ArtifactUpstreamDiffResponse(
+                artifact_id=artifact_id,
+                artifact_name=artifact_name,
+                artifact_type=artifact_type.value,
+                collection_name=collection_name,
+                upstream_source=artifact.upstream or "",
+                upstream_version=artifact.resolved_sha or artifact.version_spec or "",
+                has_changes=False,
+                files=[],
+                summary={"added": 0, "modified": 0, "deleted": 0, "unchanged": 0},
+            )
+
         if not fetch_result.fetch_result or not fetch_result.temp_workspace:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
