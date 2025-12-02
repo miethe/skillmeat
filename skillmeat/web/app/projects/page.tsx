@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GitBranch, Plus } from 'lucide-react';
+import { GitBranch, Plus, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,14 +10,20 @@ import { useProjectCache } from '@/hooks/useProjectCache';
 import { ProjectsToolbar } from '@/components/ProjectsToolbar';
 import { ProjectsList } from '@/components/ProjectsList';
 import { CreateProjectDialog } from './components/create-project-dialog';
+import { useOutdatedArtifacts } from '@/hooks/useOutdatedArtifacts';
+import { UpdateAvailableModal } from '@/components/UpdateAvailableModal';
 import type { ProjectSummary } from '@/types/project';
+import type { OutdatedArtifact } from '@/hooks/useOutdatedArtifacts';
 
 export default function ProjectsPage() {
   const router = useRouter();
   const { projects, isLoading, error, cacheInfo, refetch } = useProjectCache();
+  const { data: outdatedData } = useOutdatedArtifacts();
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedOutdatedArtifact, setSelectedOutdatedArtifact] =
+    useState<OutdatedArtifact | null>(null);
 
   const handleProjectClick = (project: ProjectSummary) => {
     setSelectedProject(project);
@@ -79,6 +85,38 @@ export default function ProjectsPage() {
         cacheHit={cacheInfo?.cacheHit ?? false}
         onRefreshComplete={handleRefreshComplete}
       />
+
+      {/* Outdated Artifacts Alert */}
+      {outdatedData && outdatedData.total > 0 && (
+        <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="flex items-center justify-between pt-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                  {outdatedData.total} {outdatedData.total === 1 ? 'Artifact' : 'Artifacts'} with
+                  Updates Available
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Newer versions are available for some of your deployed artifacts
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-600 text-amber-900 hover:bg-amber-100 dark:border-amber-400 dark:text-amber-100 dark:hover:bg-amber-900/30"
+              onClick={() => {
+                if (outdatedData.items.length > 0) {
+                  setSelectedOutdatedArtifact(outdatedData.items[0]);
+                }
+              }}
+            >
+              View Details
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error State */}
       {error && (
@@ -160,6 +198,23 @@ export default function ProjectsPage() {
         onOpenChange={setIsCreateOpen}
         onSuccess={handleCreateSuccess}
       />
+
+      {/* Update Available Modal */}
+      {selectedOutdatedArtifact && (
+        <UpdateAvailableModal
+          isOpen={!!selectedOutdatedArtifact}
+          onClose={() => setSelectedOutdatedArtifact(null)}
+          artifact={{
+            id: selectedOutdatedArtifact.id,
+            name: selectedOutdatedArtifact.name,
+            type: selectedOutdatedArtifact.type,
+            projectName: selectedOutdatedArtifact.project_name,
+            deployedVersion: selectedOutdatedArtifact.deployed_version,
+            upstreamVersion: selectedOutdatedArtifact.upstream_version,
+            versionDifference: selectedOutdatedArtifact.version_difference,
+          }}
+        />
+      )}
     </div>
   );
 }
