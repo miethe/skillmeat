@@ -771,6 +771,7 @@ async def bulk_import_artifacts(
                 author=a.author,
                 tags=a.tags,
                 scope=a.scope,
+                path=a.path,
             )
             for a in request.artifacts
         ]
