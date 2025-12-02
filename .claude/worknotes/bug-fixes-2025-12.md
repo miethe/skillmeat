@@ -116,5 +116,5 @@
   4. Updated router to pass path field to importer (`skillmeat/api/routers/artifacts.py:774`)
   5. Added `path` field to frontend `BulkImportArtifact` type (`skillmeat/web/types/discovery.ts:44`)
   6. Updated `handleImport` to include path and generate proper local source identifiers (`skillmeat/web/app/projects/[id]/page.tsx:169-176`)
-- **Commit(s)**: d796666, TBD
+- **Commit(s)**: d796666, 7783486
 - **Status**: RESOLVED
