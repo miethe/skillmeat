@@ -1342,7 +1342,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
             {/* Contents Tab */}
             <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
-              <div className="-mx-6 flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
+              <div className="flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
                 <div className={cn(
                   "flex-shrink-0 overflow-hidden border-r transition-all duration-200",

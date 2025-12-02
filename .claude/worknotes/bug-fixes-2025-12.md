@@ -228,3 +228,12 @@
   3. Added `min-w-0` to both diff panes/scroll containers for horizontal overflow and removed scroll synchronization between left/right panes to keep scrollbars independent.
 - **Commit(s)**: pending
 - **Status**: RESOLVED (Actually Fixed)
+
+### Contents Tab File Tree Label Cut Off
+
+**Issue**: In the Unified Entity modal Contents tab, the file tree hugs the left edge and the "FILES" label is clipped to "ES".
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx`
+- **Root Cause**: The contents pane used a negative horizontal margin (`-mx-6`) combined with an `overflow-hidden` parent, clipping the leftmost portion of the file tree.
+- **Fix**: Removed the negative margin on the contents pane flex wrapper so the file tree sits fully inside the modal padding without being clipped.
+- **Commit(s)**: pending
+- **Status**: RESOLVED
