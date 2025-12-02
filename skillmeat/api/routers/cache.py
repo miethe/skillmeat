@@ -20,7 +20,11 @@ from skillmeat.api.schemas.cache import (
     CachedArtifactsListResponse,
     CachedProjectResponse,
     CachedProjectsListResponse,
+    MarketplaceEntryResponse,
+    MarketplaceListResponse,
     RefreshJobStatus,
+    SearchResult,
+    SearchResultsResponse,
     StaleArtifactResponse,
     StaleArtifactsListResponse,
 )
@@ -456,7 +460,7 @@ async def list_cached_artifacts(
     response_model=StaleArtifactsListResponse,
     status_code=status.HTTP_200_OK,
     summary="List outdated artifacts",
-    description="Get list of artifacts that have newer upstream versions available.",
+    description="Get list of artifacts that have newer upstream versions available with sorting and filtering.",
 )
 async def list_stale_artifacts(
     cache_manager: CacheManagerDep,
@@ -465,6 +469,21 @@ async def list_stale_artifacts(
         alias="type",
         description="Filter by artifact type",
         examples=["skill"],
+    ),
+    project_id: Optional[str] = Query(
+        None,
+        description="Filter by project ID",
+        examples=["proj-1"],
+    ),
+    sort_by: str = Query(
+        "name",
+        description="Sort field (name, type, project, version_diff)",
+        examples=["name"],
+    ),
+    sort_order: str = Query(
+        "asc",
+        description="Sort order (asc, desc)",
+        examples=["asc"],
     ),
     skip: int = Query(
         0,
@@ -480,11 +499,14 @@ async def list_stale_artifacts(
         examples=[100],
     ),
 ) -> StaleArtifactsListResponse:
-    """List outdated artifacts.
+    """List outdated artifacts with sorting and filtering.
 
     Args:
         cache_manager: CacheManager dependency
         artifact_type: Optional artifact type filter
+        project_id: Optional project ID filter
+        sort_by: Field to sort by (name, type, project, version_diff)
+        sort_order: Sort order (asc, desc)
         skip: Number of items to skip
         limit: Maximum items to return
 
@@ -492,9 +514,12 @@ async def list_stale_artifacts(
         List of outdated artifacts
 
     Raises:
-        HTTPException: On retrieval failure
+        HTTPException: On retrieval failure or invalid sort parameters
     """
     try:
+        # Import version comparison utility
+        from skillmeat.cache.version_utils import VersionComparator
+
         # Get outdated artifacts
         outdated_artifacts = cache_manager.get_outdated_artifacts()
 
@@ -504,25 +529,86 @@ async def list_stale_artifacts(
                 a for a in outdated_artifacts if a.type == artifact_type
             ]
 
-        total = len(outdated_artifacts)
+        # Apply project filter if specified
+        if project_id:
+            outdated_artifacts = [
+                a for a in outdated_artifacts if a.project_id == project_id
+            ]
 
-        # Apply pagination
-        paginated_artifacts = outdated_artifacts[skip : skip + limit]
-
-        # Get project names for each artifact
-        items = []
-        for artifact in paginated_artifacts:
+        # Build artifact data with project info and version diff
+        artifact_data = []
+        for artifact in outdated_artifacts:
             project = cache_manager.get_project(artifact.project_id)
             project_name = project.name if project else "Unknown"
 
+            # Calculate version difference
+            version_diff = None
+            if artifact.deployed_version and artifact.upstream_version:
+                version_diff = VersionComparator.get_version_difference(
+                    artifact.deployed_version, artifact.upstream_version
+                )
+
+            artifact_data.append(
+                {
+                    "artifact": artifact,
+                    "project_name": project_name,
+                    "version_diff": version_diff,
+                }
+            )
+
+        # Sort artifacts
+        reverse = sort_order.lower() == "desc"
+
+        if sort_by == "name":
+            artifact_data.sort(
+                key=lambda x: x["artifact"].name.lower(),
+                reverse=reverse,
+            )
+        elif sort_by == "type":
+            artifact_data.sort(
+                key=lambda x: x["artifact"].type,
+                reverse=reverse,
+            )
+        elif sort_by == "project":
+            artifact_data.sort(
+                key=lambda x: x["project_name"].lower(),
+                reverse=reverse,
+            )
+        elif sort_by == "version_diff":
+            # Sort by version difference (nulls last)
+            artifact_data.sort(
+                key=lambda x: (
+                    x["version_diff"] is None,
+                    x["version_diff"] or "",
+                ),
+                reverse=reverse,
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}. "
+                "Valid options: name, type, project, version_diff",
+            )
+
+        total = len(artifact_data)
+
+        # Apply pagination
+        paginated_data = artifact_data[skip : skip + limit]
+
+        # Convert to response schema
+        items = []
+        for data in paginated_data:
+            artifact = data["artifact"]
             items.append(
                 StaleArtifactResponse(
                     id=artifact.id,
                     name=artifact.name,
                     type=artifact.type,
-                    project_name=project_name,
+                    project_name=data["project_name"],
+                    project_id=artifact.project_id,
                     deployed_version=artifact.deployed_version,
                     upstream_version=artifact.upstream_version,
+                    version_difference=data["version_diff"],
                 )
             )
 
@@ -531,11 +617,148 @@ async def list_stale_artifacts(
             total=total,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to list stale artifacts: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list stale artifacts: {str(e)}",
+        )
+
+
+# =============================================================================
+# Cache Management Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/search",
+    response_model=SearchResultsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Search cached artifacts",
+    description=(
+        "Search artifacts by name with pagination and sorting. "
+        "Supports relevance scoring (exact > prefix > contains)."
+    ),
+)
+async def search_cache(
+    cache_manager: CacheManagerDep,
+    query: str = Query(
+        ...,
+        min_length=1,
+        description="Search query string",
+        examples=["docker"],
+    ),
+    project_id: Optional[str] = Query(
+        None,
+        description="Filter by project ID",
+        examples=["proj-1"],
+    ),
+    artifact_type: Optional[str] = Query(
+        None,
+        alias="type",
+        description="Filter by artifact type",
+        examples=["skill"],
+    ),
+    skip: int = Query(
+        0,
+        ge=0,
+        description="Number of items to skip",
+        examples=[0],
+    ),
+    limit: int = Query(
+        50,
+        ge=1,
+        le=200,
+        description="Maximum items to return",
+        examples=[50],
+    ),
+    sort_by: str = Query(
+        "relevance",
+        description="Sort order (relevance, name, type, updated)",
+        examples=["relevance"],
+    ),
+) -> SearchResultsResponse:
+    """Search cached artifacts.
+
+    Args:
+        cache_manager: CacheManager dependency
+        query: Search query string
+        project_id: Optional project ID filter
+        artifact_type: Optional artifact type filter
+        skip: Number of items to skip
+        limit: Maximum items to return
+        sort_by: Sort order
+
+    Returns:
+        Paginated search results with relevance scores
+
+    Raises:
+        HTTPException: On search failure
+    """
+    try:
+        # Validate sort_by parameter
+        valid_sorts = ["relevance", "name", "type", "updated"]
+        if sort_by not in valid_sorts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by value. Must be one of: {', '.join(valid_sorts)}",
+            )
+
+        # Perform search
+        artifacts, total = cache_manager.search_artifacts(
+            query=query,
+            project_id=project_id,
+            artifact_type=artifact_type,
+            skip=skip,
+            limit=limit,
+            sort_by=sort_by,
+        )
+
+        # Calculate scores and get project names
+        items = []
+        for artifact in artifacts:
+            # Get project name
+            project = cache_manager.get_project(artifact.project_id)
+            project_name = project.name if project else "Unknown"
+
+            # Calculate relevance score (same logic as repository)
+            name_lower = artifact.name.lower()
+            query_lower = query.lower()
+            if name_lower == query_lower:
+                score = 100.0  # Exact match
+            elif name_lower.startswith(query_lower):
+                score = 80.0  # Prefix match
+            else:
+                score = 60.0  # Contains match
+
+            items.append(
+                SearchResult(
+                    id=artifact.id,
+                    name=artifact.name,
+                    type=artifact.type,
+                    project_id=artifact.project_id,
+                    project_name=project_name,
+                    score=score,
+                )
+            )
+
+        return SearchResultsResponse(
+            items=items,
+            total=total,
+            query=query,
+            skip=skip,
+            limit=limit,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to search artifacts: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}",
         )
 
 
@@ -606,4 +829,104 @@ async def invalidate_cache(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to invalidate cache: {str(e)}",
+        )
+
+
+# =============================================================================
+# Marketplace Cache Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/marketplace",
+    response_model=MarketplaceListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get cached marketplace entries",
+    description=(
+        "Get list of cached marketplace artifact entries with optional filtering "
+        "by artifact type. Returns cached data with 24-hour TTL."
+    ),
+)
+async def get_marketplace_cache(
+    cache_manager: CacheManagerDep,
+    entry_type: Optional[str] = Query(
+        None,
+        alias="type",
+        description="Filter by artifact type",
+        examples=["skill"],
+    ),
+    skip: int = Query(
+        0,
+        ge=0,
+        description="Number of items to skip",
+        examples=[0],
+    ),
+    limit: int = Query(
+        100,
+        ge=1,
+        le=500,
+        description="Maximum items to return",
+        examples=[100],
+    ),
+) -> MarketplaceListResponse:
+    """Get cached marketplace entries.
+
+    Args:
+        cache_manager: CacheManager dependency
+        entry_type: Optional artifact type filter
+        skip: Number of items to skip
+        limit: Maximum items to return
+
+    Returns:
+        Paginated list of marketplace entries
+
+    Raises:
+        HTTPException: On retrieval failure
+    """
+    try:
+        # Get marketplace entries
+        all_entries = cache_manager.get_marketplace_entries(entry_type=entry_type)
+
+        total = len(all_entries)
+
+        # Apply pagination
+        paginated_entries = all_entries[skip : skip + limit]
+
+        # Convert to response schema
+        items = []
+        for entry in paginated_entries:
+            # Parse data JSON if present
+            data_dict = None
+            if entry.data:
+                try:
+                    import json
+
+                    data_dict = json.loads(entry.data)
+                except Exception as e:
+                    logger.warning(f"Failed to parse entry data: {e}")
+
+            items.append(
+                MarketplaceEntryResponse(
+                    id=entry.id,
+                    name=entry.name,
+                    type=entry.type,
+                    url=entry.url,
+                    description=entry.description,
+                    cached_at=entry.cached_at,
+                    data=data_dict,
+                )
+            )
+
+        return MarketplaceListResponse(
+            items=items,
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get marketplace cache: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get marketplace cache: {str(e)}",
         )

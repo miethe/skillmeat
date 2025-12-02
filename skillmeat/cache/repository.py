@@ -798,34 +798,56 @@ class CacheRepository:
         query: str,
         project_id: Optional[str] = None,
         artifact_type: Optional[str] = None,
-    ) -> List[Artifact]:
-        """Search artifacts by name or description.
+        skip: int = 0,
+        limit: int = 100,
+        sort_by: str = "relevance",
+    ) -> tuple[List[Artifact], int]:
+        """Search artifacts with pagination, filtering, and relevance scoring.
+
+        Implements relevance scoring:
+            - Exact match: score = 100
+            - Prefix match: score = 80
+            - Contains match: score = 60
 
         Args:
             query: Search query string (matched against name)
             project_id: Optional project ID filter
             artifact_type: Optional artifact type filter
+            skip: Number of results to skip (for pagination)
+            limit: Maximum number of results to return
+            sort_by: Sort order ('relevance', 'name', 'type', 'updated')
 
         Returns:
-            List of matching Artifact objects
+            Tuple of (artifacts, total_count) where:
+                - artifacts: List of matching Artifact objects (paginated)
+                - total_count: Total number of matches (before pagination)
 
         Example:
-            >>> # Search all artifacts
-            >>> results = repo.search_artifacts("docker")
+            >>> # Search all artifacts with pagination
+            >>> results, total = repo.search_artifacts("docker", skip=0, limit=20)
             >>>
-            >>> # Search within a project
-            >>> results = repo.search_artifacts("api", project_id="proj-123")
+            >>> # Search within a project, sorted by name
+            >>> results, total = repo.search_artifacts(
+            ...     "api",
+            ...     project_id="proj-123",
+            ...     sort_by="name"
+            ... )
             >>>
             >>> # Search for specific type
-            >>> results = repo.search_artifacts("test", artifact_type="skill")
+            >>> results, total = repo.search_artifacts(
+            ...     "test",
+            ...     artifact_type="skill",
+            ...     sort_by="updated"
+            ... )
         """
         session = self._get_session()
         try:
             # Build base query
             q = session.query(Artifact).options(joinedload(Artifact.artifact_metadata))
 
-            # Add name filter
-            q = q.filter(Artifact.name.like(f"%{query}%"))
+            # Add name filter (case-insensitive)
+            query_lower = query.lower()
+            q = q.filter(Artifact.name.ilike(f"%{query}%"))
 
             # Add optional filters
             if project_id:
@@ -833,12 +855,64 @@ class CacheRepository:
             if artifact_type:
                 q = q.filter(Artifact.type == artifact_type)
 
-            artifacts = q.all()
+            # Get total count before pagination
+            total_count = q.count()
+
+            # Fetch all matching artifacts for sorting
+            all_artifacts = q.all()
+
+            # Calculate relevance scores and sort
+            scored_artifacts = []
+            for artifact in all_artifacts:
+                name_lower = artifact.name.lower()
+
+                # Calculate relevance score
+                if name_lower == query_lower:
+                    score = 100.0  # Exact match
+                elif name_lower.startswith(query_lower):
+                    score = 80.0  # Prefix match
+                else:
+                    score = 60.0  # Contains match
+
+                scored_artifacts.append((artifact, score))
+
+            # Sort based on sort_by parameter
+            if sort_by == "relevance":
+                # Sort by score (descending), then name (ascending)
+                scored_artifacts.sort(key=lambda x: (-x[1], x[0].name))
+            elif sort_by == "name":
+                # Sort by name (ascending)
+                scored_artifacts.sort(key=lambda x: x[0].name)
+            elif sort_by == "type":
+                # Sort by type (ascending), then name (ascending)
+                scored_artifacts.sort(key=lambda x: (x[0].type, x[0].name))
+            elif sort_by == "updated":
+                # Sort by updated_at (descending, most recent first)
+                scored_artifacts.sort(
+                    key=lambda x: (
+                        x[0].updated_at
+                        if hasattr(x[0], "updated_at") and x[0].updated_at
+                        else datetime.min
+                    ),
+                    reverse=True,
+                )
+            else:
+                # Default to relevance
+                scored_artifacts.sort(key=lambda x: (-x[1], x[0].name))
+
+            # Extract artifacts (discard scores)
+            sorted_artifacts = [artifact for artifact, _ in scored_artifacts]
+
+            # Apply pagination
+            paginated_artifacts = sorted_artifacts[skip : skip + limit]
+
             logger.debug(
-                f"Search found {len(artifacts)} artifacts "
-                f"(query={query}, project={project_id}, type={artifact_type})"
+                f"Search found {len(paginated_artifacts)} of {total_count} artifacts "
+                f"(query={query}, project={project_id}, type={artifact_type}, "
+                f"skip={skip}, limit={limit}, sort={sort_by})"
             )
-            return artifacts
+
+            return paginated_artifacts, total_count
         finally:
             session.close()
 

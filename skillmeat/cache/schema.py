@@ -81,6 +81,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_last_fetched ON projects(last_fetched);
 --   - idx_artifacts_type: Filter by artifact type (skill, agent, command, etc.)
 --   - idx_artifacts_is_outdated: Find artifacts needing updates
 --   - idx_artifacts_updated_at: Sort by recency
+--   - idx_artifacts_name: Search by artifact name (for full-text search)
 --   - idx_artifacts_project_type: Composite for "all skills in project X" queries
 --   - idx_artifacts_outdated_type: Composite for "all outdated skills" queries
 --
@@ -106,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_project_id ON artifacts(project_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type);
 CREATE INDEX IF NOT EXISTS idx_artifacts_is_outdated ON artifacts(is_outdated);
 CREATE INDEX IF NOT EXISTS idx_artifacts_updated_at ON artifacts(updated_at);
+CREATE INDEX IF NOT EXISTS idx_artifacts_name ON artifacts(name);
 CREATE INDEX IF NOT EXISTS idx_artifacts_project_type ON artifacts(project_id, type);
 CREATE INDEX IF NOT EXISTS idx_artifacts_outdated_type ON artifacts(is_outdated, type);
 

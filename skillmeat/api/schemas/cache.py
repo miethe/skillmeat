@@ -331,8 +331,10 @@ class StaleArtifactResponse(BaseModel):
         name: Artifact name
         type: Artifact type
         project_name: Name of project this artifact belongs to
+        project_id: Project ID this artifact belongs to
         deployed_version: Currently deployed version
         upstream_version: Available upstream version
+        version_difference: Human-readable description of version difference
     """
 
     id: str = Field(
@@ -351,6 +353,10 @@ class StaleArtifactResponse(BaseModel):
         description="Project name",
         examples=["My Project"],
     )
+    project_id: str = Field(
+        description="Project ID",
+        examples=["proj-1"],
+    )
     deployed_version: Optional[str] = Field(
         default=None,
         description="Currently deployed version",
@@ -360,6 +366,11 @@ class StaleArtifactResponse(BaseModel):
         default=None,
         description="Available upstream version",
         examples=["1.1.0"],
+    )
+    version_difference: Optional[str] = Field(
+        default=None,
+        description="Human-readable description of version difference",
+        examples=["minor version upgrade (0 -> 1)"],
     )
 
 
@@ -377,4 +388,153 @@ class StaleArtifactsListResponse(BaseModel):
     total: int = Field(
         description="Total number of stale artifacts",
         examples=[3],
+    )
+
+
+class SearchResult(BaseModel):
+    """Search result for a single artifact.
+
+    Attributes:
+        id: Artifact ID
+        name: Artifact name
+        type: Artifact type
+        project_id: Project ID
+        project_name: Project name
+        score: Relevance score (100=exact, 80=prefix, 60=contains)
+    """
+
+    id: str = Field(
+        description="Artifact ID",
+        examples=["art-1"],
+    )
+    name: str = Field(
+        description="Artifact name",
+        examples=["my-skill"],
+    )
+    type: str = Field(
+        description="Artifact type",
+        examples=["skill"],
+    )
+    project_id: str = Field(
+        description="Project ID",
+        examples=["proj-1"],
+    )
+    project_name: str = Field(
+        description="Project name",
+        examples=["My Project"],
+    )
+    score: float = Field(
+        description="Relevance score (100=exact match, 80=prefix, 60=contains)",
+        examples=[80.0],
+    )
+
+
+class SearchResultsResponse(BaseModel):
+    """Paginated search results.
+
+    Attributes:
+        items: List of search results
+        total: Total number of matches (before pagination)
+        query: Original search query
+        skip: Number of items skipped
+        limit: Maximum items per page
+    """
+
+    items: List[SearchResult] = Field(
+        description="List of search results",
+    )
+    total: int = Field(
+        description="Total number of matches",
+        examples=[25],
+    )
+    query: str = Field(
+        description="Search query",
+        examples=["docker"],
+    )
+    skip: int = Field(
+        description="Number of items skipped",
+        examples=[0],
+    )
+    limit: int = Field(
+        description="Maximum items per page",
+        examples=[50],
+    )
+
+
+class MarketplaceEntryResponse(BaseModel):
+    """Marketplace entry information.
+
+    Attributes:
+        id: Entry ID
+        name: Artifact name
+        type: Artifact type
+        url: URL to artifact
+        description: Entry description
+        cached_at: When entry was cached
+        data: Additional marketplace data (publisher, license, tags, etc.)
+    """
+
+    id: str = Field(
+        description="Marketplace entry ID",
+        examples=["mkt-1"],
+    )
+    name: str = Field(
+        description="Artifact name",
+        examples=["awesome-skill"],
+    )
+    type: str = Field(
+        description="Artifact type",
+        examples=["skill"],
+    )
+    url: str = Field(
+        description="URL to artifact",
+        examples=["https://github.com/user/skill"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Entry description",
+        examples=["An awesome skill"],
+    )
+    cached_at: datetime = Field(
+        description="When entry was cached",
+        examples=["2024-01-15T12:00:00Z"],
+    )
+    data: Optional[dict] = Field(
+        default=None,
+        description="Additional marketplace data",
+        examples=[
+            {
+                "publisher": "user",
+                "license": "MIT",
+                "tags": ["automation", "testing"],
+                "version": "1.0.0",
+            }
+        ],
+    )
+
+
+class MarketplaceListResponse(BaseModel):
+    """Paginated list of marketplace entries.
+
+    Attributes:
+        items: List of marketplace entries
+        total: Total number of entries
+        skip: Number of items skipped
+        limit: Maximum items per page
+    """
+
+    items: List[MarketplaceEntryResponse] = Field(
+        description="List of marketplace entries",
+    )
+    total: int = Field(
+        description="Total number of marketplace entries",
+        examples=[50],
+    )
+    skip: int = Field(
+        description="Number of items skipped",
+        examples=[0],
+    )
+    limit: int = Field(
+        description="Maximum items per page",
+        examples=[100],
     )
