@@ -171,3 +171,21 @@
   3. Made file tree width dynamic: `w-48` when editing, `w-64 lg:w-72` otherwise, with smooth transition (unified-entity-modal.tsx)
 - **Commit(s)**: 6d1fdc9
 - **Status**: RESOLVED
+
+### Regression: cn Not Defined in Unified Entity Modal
+
+**Issue**: Clicking artifact card throws "cn is not defined" error at unified-entity-modal.tsx:1346
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx:1346`
+- **Root Cause**: Previous fix (6d1fdc9) added `cn()` usage for dynamic file tree width but didn't add the import
+- **Fix**: Added `import { cn } from '@/lib/utils'` at line 4
+- **Commit(s)**: 2e576e8
+- **Status**: RESOLVED
+
+### Regression: React Key Warning in Bundle List
+
+**Issue**: Navigating to /sharing throws "Each child in a list should have unique key prop" warning
+- **Location**: `skillmeat/web/components/sharing/bundle-list.tsx:88`
+- **Root Cause**: Some bundles may have undefined `id` values, causing duplicate keys
+- **Fix**: Added index fallback: `key={bundle.id || \`bundle-${index}\`}`
+- **Commit(s)**: 2e576e8
+- **Status**: RESOLVED
