@@ -118,3 +118,56 @@
   6. Updated `handleImport` to include path and generate proper local source identifiers (`skillmeat/web/app/projects/[id]/page.tsx:169-176`)
 - **Commit(s)**: d796666, 7783486
 - **Status**: RESOLVED
+
+### Projects Page Metadata Shows 0/Never After Navigation
+
+**Issue**: When navigating to `/projects`, away, and back, metadata shows 0 artifacts and "Never" for last deployed time. However, `/projects/{id}` displays correct data.
+- **Location**: `skillmeat/web/hooks/useProjectCache.ts:63,95`
+- **Root Cause**: Cache key mismatch - hook used `['projects', 'cached']` but mutations invalidated `['projects', 'list']`. This meant cache invalidations from deployments never reached the projects list cache.
+- **Fix**: Changed cache key from `['projects', 'cached']` to `['projects', 'list']` in both query definition (line 63) and cache update (line 95)
+- **Commit(s)**: 933b0c3
+- **Status**: RESOLVED
+
+### Sharing Page TypeError on bundle.metadata.name
+
+**Issue**: Navigating to `/sharing` page throws TypeError: `Cannot read properties of undefined (reading 'name')` at bundle-list.tsx:98
+- **Location**: `skillmeat/web/components/sharing/bundle-list.tsx:98,106,112,193,250`
+- **Root Cause**: Component accessed `bundle.metadata.name` directly without null checks. While TypeScript types defined metadata as required, API could return incomplete data.
+- **Fix**: Added optional chaining (`?.`) to all metadata accesses with sensible fallbacks:
+  - `bundle.metadata?.name || 'Unnamed Bundle'`
+  - `bundle.metadata?.description && ...`
+  - `bundle.metadata?.tags && ...`
+  - `selectedBundle.metadata?.name || 'this bundle'`
+- **Commit(s)**: 1eb4fc7
+- **Status**: RESOLVED
+
+### Diff Viewer Content Overflow in Artifact Modal
+
+**Issue**: In artifact modal Sync Status tab, Diff Viewer content overflows viewport and can't be scrolled. Buttons at bottom become hidden.
+- **Location**: `skillmeat/web/components/entity/diff-viewer.tsx`, `unified-entity-modal.tsx:990`
+- **Root Cause**: Parent containers had `overflow-hidden` without proper flex constraints. Missing `min-h-0` on flex children prevented CSS overflow from working correctly.
+- **Fix**:
+  1. Added `min-h-0` to flex containers in diff-viewer (lines 241, 265, 330, 343, 369)
+  2. Added `flex-shrink-0` to headers to prevent shrinking (lines 243, 332)
+  3. Changed file sidebar to `overflow-y-auto` with `flex-shrink-0` (line 267)
+  4. Changed modal wrapper from `max-h-[400px] overflow-hidden` to `h-[400px]` (line 990)
+- **Commit(s)**: f958e1a
+- **Status**: RESOLVED
+
+### Contents Tab Edit Mode Layout Issues
+
+**Issue**: Multiple layout issues in artifact modal Contents tab Edit mode:
+1. Preview pane cut off horizontally (no horizontal scroll)
+2. File tree header "FILES" truncated to "ES"
+3. File tree should collapse to give more editing space
+- **Location**: `skillmeat/web/components/entity/file-tree.tsx:296-297`, `content-pane.tsx:353-360`, `unified-entity-modal.tsx:1346-1349`
+- **Root Cause**:
+  1. Missing `min-w-0` wrapper around SplitPreview prevented horizontal scroll
+  2. Header text lacked `whitespace-nowrap` so it wrapped/truncated
+  3. File tree used fixed width regardless of edit state
+- **Fix**:
+  1. Added `whitespace-nowrap` to FILES label and `flex-shrink-0` to Plus button (file-tree.tsx)
+  2. Changed to `overflow-auto` and wrapped SplitPreview in `min-w-0` div (content-pane.tsx)
+  3. Made file tree width dynamic: `w-48` when editing, `w-64 lg:w-72` otherwise, with smooth transition (unified-entity-modal.tsx)
+- **Commit(s)**: 6d1fdc9
+- **Status**: RESOLVED
