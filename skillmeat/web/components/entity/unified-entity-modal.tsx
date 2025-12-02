@@ -984,10 +984,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   upstreamDiff.files &&
                   upstreamDiff.files.length > 0 && (
                     <div className="mt-4 overflow-hidden rounded-lg border">
-                      <div className="border-b bg-muted/30 px-3 py-2">
+                      <div className="flex-shrink-0 border-b bg-muted/30 px-3 py-2">
                         <p className="text-xs font-medium">Changes from Upstream</p>
                       </div>
-                      <div className="max-h-[400px] overflow-hidden">
+                      <div className="h-[400px]">
                         <DiffViewer
                           files={upstreamDiff.files}
                           leftLabel="Collection"
@@ -1342,8 +1342,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             {/* Contents Tab */}
             <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
               <div className="-mx-6 flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
-                {/* File Tree - Left Panel */}
-                <div className="w-64 flex-shrink-0 overflow-hidden border-r lg:w-72">
+                {/* File Tree - Left Panel - Narrower in edit mode */}
+                <div className={cn(
+                  "flex-shrink-0 overflow-hidden border-r transition-all duration-200",
+                  isEditing ? "w-48" : "w-64 lg:w-72"
+                )}>
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
