@@ -332,6 +332,11 @@ class BulkImportArtifact(BaseModel):
         description="GitHub source or local path",
         examples=["anthropics/skills/canvas-design@latest"],
     )
+    path: Optional[str] = Field(
+        default=None,
+        description="Filesystem path for local artifacts (required when source starts with 'local/')",
+        examples=["/Users/user/.claude/skills/my-skill"],
+    )
     artifact_type: str = Field(
         ...,
         description="Type: skill, command, agent, hook, mcp",

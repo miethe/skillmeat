@@ -92,3 +92,27 @@
 - **Fix**: Removed custom `aria-labelledby`, `aria-describedby` attributes and `id` attributes from DialogTitle/DialogDescription in both modals. Radix UI handles ARIA automatically.
 - **Commit(s)**: 0abde84
 - **Status**: RESOLVED
+
+## 2025-12-02
+
+### APScheduler Module Not Found on Web Build
+
+**Issue**: Web app fails to start with `ModuleNotFoundError: No module named 'apscheduler'`
+- **Location**: `skillmeat/cache/refresh.py:70`
+- **Root Cause**: Environment not synchronized after `apscheduler>=3.10.0` was added to `pyproject.toml:60` dependencies
+- **Fix**: Reinstalled package with `pip install -e ".[dev]"` to sync environment with declared dependencies
+- **Commit(s)**: N/A (environment sync, no code changes)
+- **Status**: RESOLVED
+
+### Local Source Import Fails with GitHub API 404 Error
+
+**Issue**: Importing auto-discovered local artifacts fails with 404 error: "Failed to resolve version: 404 Client Error: Not Found for url: https://api.github.com/repos/local/skill"
+- **Location**: `skillmeat/core/importer.py:324`
+- **Root Cause**: `ArtifactImporter._import_single()` always called `add_from_github()` regardless of source type. Local sources (e.g., `local/skill/name`) were incorrectly sent to GitHub API, which tried to fetch from non-existent `local/skill` repository.
+- **Fix**:
+  1. Added `path` field to `BulkImportArtifact` schema (`skillmeat/api/schemas/discovery.py:335-339`) for filesystem path of local artifacts
+  2. Added `path` field to `BulkImportArtifactData` dataclass (`skillmeat/core/importer.py:32`)
+  3. Updated `_import_single()` to detect `local/` sources and route to `add_from_local()` instead of `add_from_github()` (`skillmeat/core/importer.py:322-345`)
+  4. Updated router to pass path field to importer (`skillmeat/api/routers/artifacts.py:774`)
+- **Commit(s)**: TBD
+- **Status**: RESOLVED

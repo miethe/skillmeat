@@ -29,6 +29,7 @@ class BulkImportArtifactData:
     author: Optional[str] = None
     tags: List[str] = None
     scope: str = "user"
+    path: Optional[str] = None
 
     def __post_init__(self):
         """Initialize default values."""
@@ -313,34 +314,45 @@ class ArtifactImporter:
             ImportResultData with import status
         """
         try:
-            # Derive name from source if not provided
+            # Extract name from source
             name = artifact.name or artifact.source.split("/")[-1].split("@")[0]
-
-            # Convert string type to ArtifactType enum
             artifact_type = ArtifactType(artifact.artifact_type)
 
-            # Use artifact manager to add the artifact from GitHub
-            # This will fetch from GitHub, validate, and add to collection
-            added_artifact = self.artifact_manager.add_from_github(
-                spec=artifact.source,
-                artifact_type=artifact_type,
-                collection_name=collection_name,
-                custom_name=name,
-                tags=artifact.tags if artifact.tags else None,
-                force=False,  # Don't overwrite existing (we checked duplicates earlier)
-            )
+            # Route based on source type
+            if artifact.source.startswith("local/"):
+                # Local source - requires path field
+                if not artifact.path:
+                    raise ValueError(
+                        f"Local source '{artifact.source}' requires 'path' field with actual filesystem location"
+                    )
+                added_artifact = self.artifact_manager.add_from_local(
+                    path=artifact.path,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    custom_name=name,
+                    tags=artifact.tags if artifact.tags else None,
+                    force=False,
+                )
+            else:
+                # GitHub source
+                added_artifact = self.artifact_manager.add_from_github(
+                    spec=artifact.source,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                    custom_name=name,
+                    tags=artifact.tags if artifact.tags else None,
+                    force=False,
+                )
 
             return ImportResultData(
                 artifact_id=f"{artifact.artifact_type}:{added_artifact.name}",
                 success=True,
-                message=f"Imported successfully",
+                message="Imported successfully",
             )
-
         except Exception as e:
             logger.error(f"Failed to import artifact: {e}")
             return ImportResultData(
-                artifact_id=self._get_artifact_id(artifact),
+                artifact_id=f"{artifact.artifact_type}:{artifact.name or 'unknown'}",
                 success=False,
-                message="Import failed",
                 error=str(e),
             )
