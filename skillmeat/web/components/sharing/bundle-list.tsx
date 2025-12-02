@@ -84,8 +84,8 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
   return (
     <>
       <div className="space-y-3">
-        {bundles.map((bundle) => (
-          <Card key={bundle.id} className="group cursor-pointer transition-shadow hover:shadow-md">
+        {bundles.map((bundle, index) => (
+          <Card key={bundle.id || `bundle-${index}`} className="group cursor-pointer transition-shadow hover:shadow-md">
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
