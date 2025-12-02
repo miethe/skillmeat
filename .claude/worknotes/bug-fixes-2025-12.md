@@ -189,3 +189,12 @@
 - **Fix**: Added index fallback: `key={bundle.id || \`bundle-${index}\`}`
 - **Commit(s)**: 2e576e8
 - **Status**: RESOLVED
+
+### Sync Status Tab 500 Error - upstream-diff Endpoint Fails
+
+**Issue**: Opening artifact modal Sync Status tab throws 500 error: "Failed to fetch upstream artifact"
+- **Location**: `skillmeat/api/routers/artifacts.py:3368-3372`
+- **Root Cause**: When `fetch_update` determines no update exists (SHA matches), it returns without `fetch_result` or `temp_workspace`. The API treated this as an error instead of "no changes".
+- **Fix**: Added check for `not fetch_result.has_update` before the error check, returning valid `ArtifactUpstreamDiffResponse` with `has_changes=false` and empty files list
+- **Commit(s)**: 29ba27a
+- **Status**: RESOLVED
