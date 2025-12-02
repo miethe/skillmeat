@@ -723,7 +723,7 @@ export function SyncStatusTab({
             <ComparisonSelector {...comparisonProps} />
             <DriftAlertBanner {...alertProps} />
           </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden min-h-0">
             <DiffViewer {...diffProps} />
           </div>
         </div>
