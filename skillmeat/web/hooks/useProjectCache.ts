@@ -91,7 +91,7 @@ export function useProjectCache(options: UseProjectCacheOptions = {}) {
    * @returns Promise with fresh project data
    */
   const forceRefresh = async () => {
-    const response = await apiRequest<ProjectsResponse>('/projects?force_refresh=true');
+    const response = await apiRequest<ProjectsResponse>('/projects?refresh=true');
     queryClient.setQueryData(['projects', 'list'], response);
     return response;
   };
