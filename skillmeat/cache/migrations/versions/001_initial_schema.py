@@ -20,6 +20,7 @@ The schema is designed for:
 
 Schema Version: 1.0.0
 """
+
 from __future__ import annotations
 
 from typing import Sequence, Union
@@ -140,12 +141,8 @@ def upgrade() -> None:
     op.create_index("idx_artifacts_type", "artifacts", ["type"])
     op.create_index("idx_artifacts_is_outdated", "artifacts", ["is_outdated"])
     op.create_index("idx_artifacts_updated_at", "artifacts", ["updated_at"])
-    op.create_index(
-        "idx_artifacts_project_type", "artifacts", ["project_id", "type"]
-    )
-    op.create_index(
-        "idx_artifacts_outdated_type", "artifacts", ["is_outdated", "type"]
-    )
+    op.create_index("idx_artifacts_project_type", "artifacts", ["project_id", "type"])
+    op.create_index("idx_artifacts_outdated_type", "artifacts", ["is_outdated", "type"])
 
     # ==========================================================================
     # Artifact Metadata Table

@@ -75,7 +75,7 @@ def cache_repository(temp_cache: Path) -> Generator[CacheRepository, None, None]
     """
     repo = CacheRepository(db_path=str(temp_cache))
     yield repo
-    repo.close()
+    # No explicit close needed - SQLAlchemy handles connection cleanup
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def cache_manager(temp_cache: Path) -> Generator[CacheManager, None, None]:
     manager = CacheManager(db_path=str(temp_cache), ttl_minutes=360)
     manager.initialize_cache()
     yield manager
-    manager.close()
+    # No explicit close needed - CacheManager uses repository which handles cleanup
 
 
 # =============================================================================
@@ -245,8 +245,7 @@ def client(test_settings: APISettings, temp_cache: Path) -> Generator[TestClient
 
         yield test_client
 
-        # Cleanup
-        cache_mgr.close()
+        # Cleanup - no explicit close needed, SQLAlchemy handles connection cleanup
 
 
 # =============================================================================

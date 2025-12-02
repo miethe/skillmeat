@@ -48,14 +48,10 @@ def get_alembic_config(db_path: Optional[str | Path] = None) -> Config:
     # Create Alembic config
     alembic_cfg = Config()
     alembic_cfg.set_main_option("script_location", str(migrations_dir))
-    alembic_cfg.set_main_option(
-        "sqlalchemy.url", f"sqlite:///{db_path.absolute()}"
-    )
+    alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path.absolute()}")
 
     # Set version locations to migrations/versions
-    alembic_cfg.set_main_option(
-        "version_locations", str(migrations_dir / "versions")
-    )
+    alembic_cfg.set_main_option("version_locations", str(migrations_dir / "versions"))
 
     return alembic_cfg
 
