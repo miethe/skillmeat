@@ -654,8 +654,9 @@ class TestArtifactOperations:
             repo.create_artifact(artifact)
 
         # Search for "docker"
-        results = repo.search_artifacts("docker")
+        results, total = repo.search_artifacts("docker")
 
+        assert total == 2
         assert len(results) == 2
         assert all("docker" in a.name for a in results)
 
@@ -684,21 +685,24 @@ class TestArtifactOperations:
                 repo.create_artifact(artifact)
 
         # Search with project filter
-        results = repo.search_artifacts("test", project_id=sample_project.id)
+        results, total = repo.search_artifacts("test", project_id=sample_project.id)
+        assert total == 2
         assert len(results) == 2
         assert all(a.project_id == sample_project.id for a in results)
 
         # Search with type filter
-        results = repo.search_artifacts("test", artifact_type="skill")
+        results, total = repo.search_artifacts("test", artifact_type="skill")
+        assert total == 2
         assert len(results) == 2
         assert all(a.type == "skill" for a in results)
 
         # Search with both filters
-        results = repo.search_artifacts(
+        results, total = repo.search_artifacts(
             "test",
             project_id=sample_project.id,
             artifact_type="command",
         )
+        assert total == 1
         assert len(results) == 1
         assert results[0].project_id == sample_project.id
         assert results[0].type == "command"

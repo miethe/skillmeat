@@ -513,7 +513,13 @@ class FileWatcher:
 
         if filename == "manifest.toml":
             self.on_manifest_modified(path)
-        elif filename.upper() in ["SKILL.md", "COMMAND.md", "AGENT.md", "MCP.md", "HOOK.md"]:
+        elif filename.upper() in [
+            "SKILL.md",
+            "COMMAND.md",
+            "AGENT.md",
+            "MCP.md",
+            "HOOK.md",
+        ]:
             self.on_deployment_modified(path)
         elif ".claude" in path and filename.endswith(".md"):
             self.on_deployment_modified(path)
@@ -621,7 +627,9 @@ class FileWatcher:
                 )
                 logger.info(f"Invalidated project cache: {project_id}")
             else:
-                logger.debug(f"Project not in cache, skipping invalidation: {project_id}")
+                logger.debug(
+                    f"Project not in cache, skipping invalidation: {project_id}"
+                )
         except Exception as e:
             logger.error(f"Failed to invalidate project {project_id}: {e}")
 
