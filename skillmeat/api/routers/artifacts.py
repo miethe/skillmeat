@@ -71,7 +71,7 @@ from skillmeat.api.utils.error_handlers import (
 )
 from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.cache import MetadataCache
-from skillmeat.core.deployment import DeploymentManager
+from skillmeat.core.deployment import Deployment, DeploymentManager
 from skillmeat.core.discovery import ArtifactDiscoveryService
 from skillmeat.core.github_metadata import GitHubMetadataExtractor
 from skillmeat.core.importer import (
@@ -674,6 +674,10 @@ async def bulk_import_artifacts(
     collection: Optional[str] = Query(
         None, description="Collection name (uses default if not specified)"
     ),
+    project_id: Optional[str] = Query(
+        None,
+        description="Base64-encoded project path to also record deployments for the imports",
+    ),
 ) -> BulkImportResult:
     """
     Bulk import multiple artifacts with atomic transaction.
@@ -805,6 +809,98 @@ async def bulk_import_artifacts(
             )
             for r in result_data.results
         ]
+
+        # If we know which project initiated the import, record deployments so UI reflects the change
+        if project_id:
+            project_path: Optional[PathLib] = None
+            try:
+                decoded_path = base64.b64decode(project_id.encode()).decode()
+                project_path = PathLib(decoded_path).resolve()
+                if not project_path.exists():
+                    logger.warning(
+                        f"Provided project_id path does not exist: {project_path}"
+                    )
+                    project_path = None
+            except Exception as e:
+                logger.warning(f"Invalid project_id provided to bulk import: {e}")
+                project_path = None
+
+            if project_path:
+                try:
+                    claude_dir = project_path / ".claude"
+                    if not claude_dir.exists():
+                        logger.warning(
+                            f"Cannot record deployments for {project_path}: .claude directory missing"
+                        )
+                    else:
+                        deployments = DeploymentTracker.read_deployments(project_path)
+                        updated = False
+
+                        for artifact_payload, import_result in zip(
+                            request.artifacts, result_data.results
+                        ):
+                            if not import_result.success:
+                                continue
+
+                            if not artifact_payload.path:
+                                logger.debug(
+                                    f"Skipping deployment record for {import_result.artifact_id}: missing path"
+                                )
+                                continue
+
+                            artifact_path = PathLib(artifact_payload.path).resolve()
+                            try:
+                                artifact_path.relative_to(claude_dir)
+                            except ValueError:
+                                logger.warning(
+                                    f"Artifact path {artifact_path} is outside project .claude ({claude_dir}); skipping deployment record"
+                                )
+                                continue
+
+                            artifact_name = (
+                                artifact_payload.name or artifact_path.stem
+                            )
+
+                            try:
+                                content_hash = compute_content_hash(artifact_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to hash artifact at {artifact_path}: {e}"
+                                )
+                                continue
+
+                            deployment = Deployment(
+                                artifact_name=artifact_name,
+                                artifact_type=artifact_payload.artifact_type,
+                                from_collection=collection_name,
+                                deployed_at=datetime.now(),
+                                artifact_path=artifact_path.relative_to(claude_dir),
+                                content_hash=content_hash,
+                                local_modifications=False,
+                            )
+
+                            deployments = [
+                                d
+                                for d in deployments
+                                if not (
+                                    d.artifact_name == deployment.artifact_name
+                                    and d.artifact_type == deployment.artifact_type
+                                )
+                            ]
+                            deployments.append(deployment)
+                            updated = True
+
+                        if updated:
+                            DeploymentTracker.write_deployments(
+                                project_path, deployments
+                            )
+                            logger.info(
+                                f"Recorded deployments for {project_path} after import"
+                            )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to update project deployments for {project_path}: {e}"
+                    )
 
         return BulkImportResult(
             total_requested=result_data.total_requested,

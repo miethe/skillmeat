@@ -73,7 +73,7 @@ export default function ProjectDetailPage() {
     refetchDiscovery,
     bulkImport,
     isImporting,
-  } = useProjectDiscovery(project?.path);
+  } = useProjectDiscovery(project?.path, projectId);
 
   // Trigger discovery when project loads
   useEffect(() => {
@@ -191,6 +191,8 @@ export default function ProjectDetailPage() {
           variant: 'destructive',
         });
       }
+
+      return result;
     } catch (error) {
       toast({
         title: 'Import Failed',

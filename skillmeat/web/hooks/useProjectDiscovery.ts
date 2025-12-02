@@ -15,7 +15,7 @@ import type { DiscoveryResult, BulkImportRequest, BulkImportResult } from '@/typ
  * @param projectPath - The filesystem path to the project
  * @returns Discovery state and functions
  */
-export function useProjectDiscovery(projectPath: string | undefined) {
+export function useProjectDiscovery(projectPath: string | undefined, projectId?: string) {
   const queryClient = useQueryClient();
 
   // Encode the project path for URL
@@ -46,7 +46,9 @@ export function useProjectDiscovery(projectPath: string | undefined) {
   // Bulk import mutation
   const bulkImportMutation = useMutation({
     mutationFn: async (request: BulkImportRequest): Promise<BulkImportResult> => {
-      return await apiRequest<BulkImportResult>('/artifacts/discover/import', {
+      const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+
+      return await apiRequest<BulkImportResult>(`/artifacts/discover/import${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -56,6 +58,10 @@ export function useProjectDiscovery(projectPath: string | undefined) {
       // Invalidate both project discovery and artifacts list
       queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover', 'project', projectPath] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projects', 'list'] });
+      }
     },
   });
 

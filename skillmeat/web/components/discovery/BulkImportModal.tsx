@@ -24,6 +24,7 @@ import { Loader2, Pencil, Package } from 'lucide-react';
 import { showImportResultToast, showErrorToast } from '@/lib/toast-utils';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
+import type { BulkImportResult } from '@/types/discovery';
 
 /**
  * Discovered artifact from local filesystem
@@ -44,7 +45,7 @@ export interface BulkImportModalProps {
   artifacts: DiscoveredArtifact[];
   open: boolean;
   onClose: () => void;
-  onImport: (selected: DiscoveredArtifact[]) => Promise<void>;
+  onImport: (selected: DiscoveredArtifact[]) => Promise<BulkImportResult>;
 }
 
 export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImportModalProps) {
@@ -87,21 +88,21 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     const startTime = Date.now();
     try {
       const selectedArtifacts = artifacts.filter((a) => selected.has(a.path));
-      await onImport(selectedArtifacts);
+      const result = await onImport(selectedArtifacts);
 
       const duration = Date.now() - startTime;
 
       // Show success toast
       showImportResultToast({
-        total_imported: selected.size,
-        total_failed: 0,
+        total_imported: result.total_imported,
+        total_failed: result.total_failed,
       });
 
       // Track import
       tracking.trackImport({
-        total_requested: selected.size,
-        total_imported: selected.size,
-        total_failed: 0,
+        total_requested: result.total_requested,
+        total_imported: result.total_imported,
+        total_failed: result.total_failed,
         duration_ms: duration,
       });
 
