@@ -237,3 +237,21 @@
 - **Fix**: Removed the negative margin on the contents pane flex wrapper so the file tree sits fully inside the modal padding without being clipped.
 - **Commit(s)**: pending
 - **Status**: RESOLVED
+
+### Projects Page Metadata Resets to 0/Never After Cache Hit (Persistent Cache Bug)
+
+**Issue**: Navigating back to `/projects` shows 0 deployments and "Never" last deployed even though `/projects/{id}` is correct.
+- **Location**: `skillmeat/api/routers/projects.py:354-410`
+- **Root Cause**: Persistent cache stored skeleton project records with empty artifacts and no last deployment. When the cache was hit, the API returned those zeroed values instead of reading real deployment metadata from disk.
+- **Fix**: On cache hits, rebuild `ProjectSummary` from the actual deployment tracker (using `build_project_summary`) and attach cache metadata, ensuring deployment counts and last deployed timestamps stay accurate even with cached project IDs.
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### Project Discovery Import Doesn't Add Artifact to Project
+
+**Issue**: Importing discovered artifacts from `/projects/{id}` returns 200 with success toasts, but the artifact never appears in the project or codebase.
+- **Location**: `skillmeat/api/routers/artifacts.py:657-759`, `skillmeat/web/hooks/useProjectDiscovery.ts`, `skillmeat/web/components/discovery/BulkImportModal.tsx`, `skillmeat/web/app/projects/[id]/page.tsx`
+- **Root Cause**: The bulk import endpoint only added artifacts to the collection and never recorded deployments for the initiating project; the frontend also didn't pass project context and always showed a success toast regardless of actual import results.
+- **Fix**: Added optional `project_id` to `/artifacts/discover/import` and record successful imports into the project's `.skillmeat-deployed.toml` (with content hashes). The frontend now passes the project ID, invalidates project queries after import, and shows toast counts from the real `BulkImportResult` instead of always reporting success.
+- **Commit(s)**: pending
+- **Status**: RESOLVED

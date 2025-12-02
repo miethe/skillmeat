@@ -370,12 +370,15 @@ async def list_projects(
                             is_stale = cache_manager.is_cache_stale(cached_project.id)
                             cache_last_fetched = cached_project.last_fetched
 
+                            # Read deployment metadata from disk to keep counts/dates accurate
+                            summary_base = build_project_summary(Path(cached_project.path))
+
                             summary = ProjectSummary(
-                                id=encode_project_id(cached_project.path),
-                                path=cached_project.path,
-                                name=cached_project.name,
-                                deployment_count=len(cached_project.artifacts),
-                                last_deployment=None,  # Not stored in cache model
+                                id=summary_base.id,
+                                path=summary_base.path,
+                                name=summary_base.name,
+                                deployment_count=summary_base.deployment_count,
+                                last_deployment=summary_base.last_deployment,
                                 cache_info=CacheInfo(
                                     cache_hit=True,
                                     last_fetched=cached_project.last_fetched,
