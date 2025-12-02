@@ -70,6 +70,7 @@ from typing import Any, Callable, Dict, List, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from skillmeat.cache.manager import CacheManager
+from skillmeat.cache.models import Artifact
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -670,6 +671,34 @@ class RefreshJob:
             self.cache_manager.populate_projects([new_data])
             self.cache_manager.mark_project_refreshed(project_id)
 
+            # Fetch and update upstream versions for artifacts
+            artifacts = self.cache_manager.get_artifacts(project_id)
+            if artifacts:
+                logger.debug(
+                    f"Fetching upstream versions for {len(artifacts)} artifacts"
+                )
+
+                # This is async but we need to run it in sync context
+                # Use asyncio.run if available (Python 3.7+), otherwise run synchronously
+                try:
+                    import asyncio
+
+                    version_map = asyncio.run(self._fetch_upstream_versions(artifacts))
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to fetch upstream versions asynchronously: {e}"
+                    )
+                    # Fallback to synchronous version
+                    version_map = self._fetch_upstream_versions_sync(artifacts)
+
+                if version_map:
+                    updated_count = self.cache_manager.update_upstream_versions(
+                        version_map
+                    )
+                    logger.info(
+                        f"Updated upstream versions for {updated_count} artifacts"
+                    )
+
             # Detect changes
             changes_detected = self._detect_changes(old_data, new_data)
 
@@ -870,3 +899,244 @@ class RefreshJob:
         except Exception as e:
             logger.error(f"Default data fetcher failed for {project_id}: {e}")
             return None
+
+    # =========================================================================
+    # Marketplace Refresh Operations
+    # =========================================================================
+
+    def refresh_marketplace(self) -> RefreshResult:
+        """Refresh marketplace cache with fresh data.
+
+        Fetches marketplace listings and updates the cache.
+
+        Returns:
+            RefreshResult with operation details
+
+        Example:
+            >>> result = job.refresh_marketplace()
+            >>> if result.success:
+            ...     print(f"Updated {result.projects_refreshed} marketplace entries")
+        """
+        start_time = time.time()
+
+        logger.info("Starting marketplace cache refresh")
+
+        try:
+            # Check if marketplace cache is stale
+            if not self.cache_manager.is_marketplace_cache_stale():
+                logger.debug("Marketplace cache is fresh, skipping refresh")
+                return RefreshResult(
+                    success=True,
+                    projects_refreshed=0,
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Fetch marketplace data (placeholder - implement actual fetcher)
+            marketplace_data = self._fetch_marketplace_data()
+
+            if marketplace_data is None or not marketplace_data:
+                error_msg = "Failed to fetch marketplace data"
+                logger.error(error_msg)
+                return RefreshResult(
+                    success=False,
+                    projects_refreshed=0,
+                    errors=[error_msg],
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Update cache
+            count = self.cache_manager.update_marketplace_cache(marketplace_data)
+
+            duration = time.time() - start_time
+            logger.info(
+                f"Marketplace refresh completed: {count} entries, "
+                f"duration={duration:.2f}s"
+            )
+
+            return RefreshResult(
+                success=True,
+                projects_refreshed=count,
+                changes_detected=count > 0,
+                duration_seconds=duration,
+            )
+
+        except Exception as e:
+            error_msg = f"Marketplace refresh failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return RefreshResult(
+                success=False,
+                projects_refreshed=0,
+                errors=[error_msg],
+                duration_seconds=time.time() - start_time,
+            )
+
+    def _fetch_marketplace_data(self) -> Optional[List[Dict]]:
+        """Fetch marketplace data from registry.
+
+        Returns:
+            List of marketplace entry dicts or None on failure
+
+        This is a placeholder. In production, this should:
+        1. Query marketplace brokers
+        2. Fetch artifact listings
+        3. Transform to cache format
+        """
+        try:
+            # Placeholder implementation
+            # In production, this should query the marketplace registry
+            from skillmeat.marketplace.registry import MarketplaceRegistry
+
+            registry = MarketplaceRegistry()
+            listings = registry.list_all()
+
+            # Transform to cache format
+            entries = []
+            for listing in listings:
+                entry = {
+                    "id": listing.listing_id,
+                    "name": listing.name,
+                    "type": "skill",  # Default type, should be inferred from listing
+                    "url": listing.source_url,
+                    "description": listing.description,
+                    "data": {
+                        "publisher": listing.publisher,
+                        "license": listing.license,
+                        "artifact_count": listing.artifact_count,
+                        "price": listing.price,
+                        "tags": listing.tags,
+                        "version": listing.version,
+                        "downloads": listing.downloads,
+                        "rating": listing.rating,
+                    },
+                }
+                entries.append(entry)
+
+            logger.debug(f"Fetched {len(entries)} marketplace entries")
+            return entries
+
+        except ImportError:
+            # MarketplaceRegistry not available - skip marketplace refresh
+            logger.warning(
+                "MarketplaceRegistry not available, skipping marketplace refresh"
+            )
+            return []
+        except Exception as e:
+            logger.error(f"Failed to fetch marketplace data: {e}", exc_info=True)
+            return None
+
+    async def _fetch_upstream_versions(
+        self, artifacts: List[Artifact]
+    ) -> Dict[str, str]:
+        """Fetch latest versions from upstream sources for artifacts.
+
+        Fetches the latest available versions for artifacts that have
+        GitHub sources. Uses the GitHubClient to resolve version specs.
+
+        Args:
+            artifacts: List of artifacts to check for upstream versions
+
+        Returns:
+            Dict mapping artifact_id -> upstream_version.
+            Only includes artifacts where upstream version was successfully fetched.
+
+        Note:
+            Handles errors gracefully - logs failures but doesn't fail entire operation.
+            Only supports GitHub sources currently. Other sources return empty dict.
+        """
+        version_map: Dict[str, str] = {}
+
+        # Group artifacts by source type
+        github_artifacts = [
+            a for a in artifacts if a.source and a.source.startswith("github:")
+        ]
+
+        if not github_artifacts:
+            logger.debug("No GitHub artifacts to fetch upstream versions for")
+            return version_map
+
+        # Import GitHub client (lazy import to avoid circular dependency)
+        try:
+            from skillmeat.sources.github import ArtifactSpec, GitHubClient
+        except ImportError as e:
+            logger.error(f"Failed to import GitHubClient: {e}")
+            return version_map
+
+        # Initialize GitHub client
+        github_client = GitHubClient()
+
+        # Fetch versions for each artifact
+        for artifact in github_artifacts:
+            try:
+                # Parse source to get spec
+                # Format: github:username/repo/path[@version]
+                source = artifact.source.removeprefix("github:")
+
+                # Parse spec
+                spec = ArtifactSpec.parse(source)
+
+                # Resolve version to get latest SHA/version
+                resolved_sha, resolved_version = github_client.resolve_version(spec)
+
+                # Use resolved_version if available, otherwise use SHA
+                upstream_version = resolved_version or resolved_sha[:7]
+
+                version_map[artifact.id] = upstream_version
+
+                logger.debug(
+                    f"Fetched upstream version for {artifact.name}: {upstream_version}"
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to fetch upstream version for {artifact.name} ({artifact.id}): {e}",
+                    exc_info=True,
+                )
+                # Continue with other artifacts even if one fails
+
+        logger.info(
+            f"Fetched upstream versions for {len(version_map)}/{len(github_artifacts)} GitHub artifacts"
+        )
+
+        return version_map
+
+    def _fetch_upstream_versions_sync(
+        self, artifacts: List[Artifact]
+    ) -> Dict[str, str]:
+        """Synchronous version of _fetch_upstream_versions for fallback.
+
+        Args:
+            artifacts: List of artifacts to check for upstream versions
+
+        Returns:
+            Dict mapping artifact_id -> upstream_version
+        """
+        version_map: Dict[str, str] = {}
+
+        github_artifacts = [
+            a for a in artifacts if a.source and a.source.startswith("github:")
+        ]
+
+        if not github_artifacts:
+            return version_map
+
+        try:
+            from skillmeat.sources.github import ArtifactSpec, GitHubClient
+        except ImportError as e:
+            logger.error(f"Failed to import GitHubClient: {e}")
+            return version_map
+
+        github_client = GitHubClient()
+
+        for artifact in github_artifacts:
+            try:
+                source = artifact.source.removeprefix("github:")
+                spec = ArtifactSpec.parse(source)
+                resolved_sha, resolved_version = github_client.resolve_version(spec)
+                upstream_version = resolved_version or resolved_sha[:7]
+                version_map[artifact.id] = upstream_version
+            except Exception as e:
+                logger.error(
+                    f"Failed to fetch upstream version for {artifact.name}: {e}"
+                )
+
+        return version_map

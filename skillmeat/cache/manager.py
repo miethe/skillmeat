@@ -210,7 +210,8 @@ class CacheManager:
                     # Get all projects and filter out stale ones
                     all_projects = self.repository.list_projects()
                     stale_ids = {
-                        p.id for p in self.repository.get_stale_projects(self.ttl_minutes)
+                        p.id
+                        for p in self.repository.get_stale_projects(self.ttl_minutes)
                     }
                     projects = [p for p in all_projects if p.id not in stale_ids]
                     logger.debug(
@@ -331,44 +332,66 @@ class CacheManager:
         query: str,
         project_id: Optional[str] = None,
         artifact_type: Optional[str] = None,
-    ) -> List[Artifact]:
-        """Search artifacts by name with optional filters.
+        skip: int = 0,
+        limit: int = 100,
+        sort_by: str = "relevance",
+    ) -> tuple[List[Artifact], int]:
+        """Search artifacts by name with pagination and sorting.
 
         Args:
             query: Search query string (matched against artifact name)
             project_id: Optional project ID filter
             artifact_type: Optional artifact type filter
+            skip: Number of results to skip (for pagination)
+            limit: Maximum number of results to return
+            sort_by: Sort order ('relevance', 'name', 'type', 'updated')
 
         Returns:
-            List of matching Artifact objects
+            Tuple of (artifacts, total_count) where:
+                - artifacts: List of matching Artifact objects
+                - total_count: Total number of matches (before pagination)
 
         Example:
-            >>> # Search all artifacts
-            >>> results = manager.search_artifacts("docker")
+            >>> # Search all artifacts with pagination
+            >>> results, total = manager.search_artifacts("docker", skip=0, limit=20)
+            >>> print(f"Showing {len(results)} of {total} results")
             >>>
-            >>> # Search within a project
-            >>> results = manager.search_artifacts("api", project_id="proj-123")
+            >>> # Search within a project, sorted by name
+            >>> results, total = manager.search_artifacts(
+            ...     "api",
+            ...     project_id="proj-123",
+            ...     sort_by="name"
+            ... )
             >>>
-            >>> # Search for specific type
-            >>> results = manager.search_artifacts("test", artifact_type="skill")
+            >>> # Search for specific type with pagination
+            >>> results, total = manager.search_artifacts(
+            ...     "test",
+            ...     artifact_type="skill",
+            ...     skip=10,
+            ...     limit=10
+            ... )
         """
         try:
             with self._lock:
-                artifacts = self.repository.search_artifacts(
+                artifacts, total = self.repository.search_artifacts(
                     query=query,
                     project_id=project_id,
                     artifact_type=artifact_type,
+                    skip=skip,
+                    limit=limit,
+                    sort_by=sort_by,
                 )
                 logger.debug(
-                    f"Search returned {len(artifacts)} artifacts "
-                    f"(query={query}, project={project_id}, type={artifact_type})"
+                    f"Search returned {len(artifacts)} of {total} artifacts "
+                    f"(query={query}, project={project_id}, type={artifact_type}, "
+                    f"skip={skip}, limit={limit}, sort={sort_by})"
                 )
-                return artifacts
+                return artifacts, total
         except Exception as e:
             logger.error(
                 f"Failed to search artifacts (query={query}): {e}", exc_info=True
             )
-            return []
+            return [], 0
 
     # =========================================================================
     # Write Operations (Populate)
@@ -426,9 +449,7 @@ class CacheManager:
                         self.repository.update_project(
                             project_data["id"],
                             **{
-                                k: v
-                                for k, v in project_data.items()
-                                if k not in ["id"]
+                                k: v for k, v in project_data.items() if k not in ["id"]
                             },
                         )
                         logger.debug(f"Updated project: {project_data['id']}")
@@ -538,9 +559,7 @@ class CacheManager:
 
                     count += 1
 
-                logger.info(
-                    f"Populated {count} artifacts for project: {project_id}"
-                )
+                logger.info(f"Populated {count} artifacts for project: {project_id}")
                 return count
         except Exception as e:
             logger.error(
@@ -594,8 +613,12 @@ class CacheManager:
                     return False
 
                 # Determine new versions
-                new_deployed = deployed if deployed is not None else artifact.deployed_version
-                new_upstream = upstream if upstream is not None else artifact.upstream_version
+                new_deployed = (
+                    deployed if deployed is not None else artifact.deployed_version
+                )
+                new_upstream = (
+                    upstream if upstream is not None else artifact.upstream_version
+                )
 
                 # Calculate is_outdated
                 is_outdated = (
@@ -627,6 +650,94 @@ class CacheManager:
                 exc_info=True,
             )
             return False
+
+    def update_upstream_versions(self, version_map: Dict[str, str]) -> int:
+        """Batch update upstream versions for multiple artifacts.
+
+        Updates the upstream_version field for multiple artifacts in a single
+        transaction. Automatically sets is_outdated flag based on version
+        comparison.
+
+        Args:
+            version_map: Dict mapping artifact_id -> upstream_version
+
+        Returns:
+            Count of artifacts successfully updated
+
+        Example:
+            >>> version_map = {
+            ...     "art-1": "1.2.0",
+            ...     "art-2": "2.0.0",
+            ...     "art-3": "abc1234",
+            ... }
+            >>> count = manager.update_upstream_versions(version_map)
+            >>> print(f"Updated {count} artifacts")
+        """
+        if not version_map:
+            logger.debug("Empty version map provided")
+            return 0
+
+        try:
+            with self._lock:
+                updated_count = 0
+
+                for artifact_id, upstream_version in version_map.items():
+                    try:
+                        # Get current artifact
+                        artifact = self.repository.get_artifact(artifact_id)
+                        if not artifact:
+                            logger.warning(f"Artifact not found: {artifact_id}")
+                            continue
+
+                        # Check if version actually changed
+                        if artifact.upstream_version == upstream_version:
+                            logger.debug(
+                                f"Upstream version unchanged for {artifact_id}: {upstream_version}"
+                            )
+                            continue
+
+                        # Calculate is_outdated
+                        is_outdated = (
+                            artifact.deployed_version is not None
+                            and upstream_version is not None
+                            and artifact.deployed_version != upstream_version
+                        )
+
+                        # Update artifact
+                        self.repository.update_artifact(
+                            artifact_id,
+                            upstream_version=upstream_version,
+                            is_outdated=is_outdated,
+                        )
+
+                        updated_count += 1
+
+                        logger.debug(
+                            f"Updated upstream version for {artifact_id}: "
+                            f"{artifact.upstream_version} -> {upstream_version}, "
+                            f"outdated={is_outdated}"
+                        )
+
+                    except CacheNotFoundError:
+                        logger.warning(f"Artifact not found: {artifact_id}")
+                        continue
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to update upstream version for {artifact_id}: {e}",
+                            exc_info=True,
+                        )
+                        continue
+
+                logger.info(
+                    f"Batch updated upstream versions: {updated_count}/{len(version_map)} artifacts"
+                )
+                return updated_count
+
+        except Exception as e:
+            logger.error(
+                f"Failed to batch update upstream versions: {e}", exc_info=True
+            )
+            return 0
 
     def mark_project_refreshed(self, project_id: str) -> bool:
         """Mark a project as freshly fetched (update last_fetched).
@@ -1015,6 +1126,149 @@ class CacheManager:
                     return len(stale_projects) > 0
         except Exception as e:
             logger.error(f"Failed to check cache staleness: {e}", exc_info=True)
+            return True  # Treat errors as stale to trigger refresh
+
+    # =========================================================================
+    # Marketplace Operations
+    # =========================================================================
+
+    def get_marketplace_entries(self, entry_type: Optional[str] = None) -> List[Any]:
+        """Get cached marketplace entries with optional type filter.
+
+        Args:
+            entry_type: Optional artifact type filter (skill, command, etc.)
+
+        Returns:
+            List of MarketplaceEntry objects
+
+        Example:
+            >>> # Get all marketplace entries
+            >>> all_entries = manager.get_marketplace_entries()
+            >>>
+            >>> # Get only skills
+            >>> skills = manager.get_marketplace_entries(entry_type="skill")
+        """
+        try:
+            with self._lock:
+                entries = self.repository.list_marketplace_entries(
+                    type_filter=entry_type
+                )
+                logger.debug(
+                    f"Retrieved {len(entries)} marketplace entries (type={entry_type})"
+                )
+                return entries
+        except Exception as e:
+            logger.error(f"Failed to get marketplace entries: {e}", exc_info=True)
+            return []
+
+    def update_marketplace_cache(self, entries: List[Dict[str, Any]]) -> int:
+        """Update marketplace cache with new entries.
+
+        Upserts entries and removes stale ones (older than 24 hours).
+
+        Args:
+            entries: List of marketplace entry dicts with keys:
+                - id (str): Unique entry identifier
+                - name (str): Artifact name
+                - type (str): Artifact type
+                - url (str): URL to artifact
+                - description (str, optional): Entry description
+                - data (dict, optional): Additional data
+
+        Returns:
+            Count of entries updated
+
+        Example:
+            >>> entries = [
+            ...     {
+            ...         "id": "mkt-1",
+            ...         "name": "awesome-skill",
+            ...         "type": "skill",
+            ...         "url": "https://github.com/user/skill",
+            ...         "description": "An awesome skill",
+            ...     }
+            ... ]
+            >>> count = manager.update_marketplace_cache(entries)
+            >>> print(f"Updated {count} marketplace entries")
+        """
+        try:
+            with self._lock:
+                from skillmeat.cache.models import MarketplaceEntry
+                import json
+
+                count = 0
+                for entry_data in entries:
+                    # Create MarketplaceEntry object
+                    entry = MarketplaceEntry(
+                        id=entry_data["id"],
+                        name=entry_data["name"],
+                        type=entry_data["type"],
+                        url=entry_data["url"],
+                        description=entry_data.get("description"),
+                        cached_at=datetime.utcnow(),
+                    )
+
+                    # Store additional data as JSON if provided
+                    if "data" in entry_data and entry_data["data"] is not None:
+                        entry.data = json.dumps(entry_data["data"])
+
+                    # Upsert entry
+                    self.repository.upsert_marketplace_entry(entry)
+                    count += 1
+
+                # Clean up stale entries (older than 24 hours)
+                deleted = self.repository.delete_stale_marketplace_entries(
+                    max_age_hours=24
+                )
+                logger.debug(f"Deleted {deleted} stale marketplace entries")
+
+                logger.info(f"Updated {count} marketplace entries")
+                return count
+        except Exception as e:
+            logger.error(f"Failed to update marketplace cache: {e}", exc_info=True)
+            return 0
+
+    def is_marketplace_cache_stale(self, ttl_hours: int = 24) -> bool:
+        """Check if marketplace cache needs refresh (TTL-based).
+
+        Args:
+            ttl_hours: Time-to-live in hours (default 24 hours)
+
+        Returns:
+            True if marketplace cache is stale or empty, False if fresh
+
+        Example:
+            >>> if manager.is_marketplace_cache_stale():
+            ...     print("Marketplace cache needs refresh")
+        """
+        try:
+            with self._lock:
+                # Get all marketplace entries
+                entries = self.repository.list_marketplace_entries()
+
+                # Empty cache is considered stale
+                if not entries:
+                    logger.debug("Marketplace cache is empty")
+                    return True
+
+                # Check if oldest entry is past TTL
+                # If the oldest entry is stale, entire cache needs refresh
+                threshold = datetime.utcnow() - timedelta(hours=ttl_hours)
+                oldest_entry = min(entries, key=lambda e: e.cached_at)
+
+                if oldest_entry.cached_at < threshold:
+                    logger.debug(
+                        f"Marketplace cache is stale (oldest entry: "
+                        f"{oldest_entry.cached_at}, threshold: {threshold})"
+                    )
+                    return True
+
+                logger.debug("Marketplace cache is fresh")
+                return False
+        except Exception as e:
+            logger.error(
+                f"Failed to check marketplace cache staleness: {e}", exc_info=True
+            )
             return True  # Treat errors as stale to trigger refresh
 
     # =========================================================================
