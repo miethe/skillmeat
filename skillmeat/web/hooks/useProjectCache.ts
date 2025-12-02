@@ -60,7 +60,7 @@ export function useProjectCache(options: UseProjectCacheOptions = {}) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['projects', 'cached'],
+    queryKey: ['projects', 'list'],
     queryFn: async () => {
       const response = await apiRequest<ProjectsResponse>('/projects');
       return response;
@@ -92,7 +92,7 @@ export function useProjectCache(options: UseProjectCacheOptions = {}) {
    */
   const forceRefresh = async () => {
     const response = await apiRequest<ProjectsResponse>('/projects?force_refresh=true');
-    queryClient.setQueryData(['projects', 'cached'], response);
+    queryClient.setQueryData(['projects', 'list'], response);
     return response;
   };
 
