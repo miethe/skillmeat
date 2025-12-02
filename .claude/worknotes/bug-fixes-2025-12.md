@@ -205,7 +205,7 @@
 - **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:726`
 - **Root Cause**: The DiffViewer wrapper div used `overflow-auto` which caused the entire DiffViewer component to scroll as one unit, overriding the internal scroll management in DiffViewer which already has proper `overflow-auto` on its internal panels.
 - **Fix**: Changed wrapper from `<div className="flex-1 overflow-auto">` to `<div className="flex-1 overflow-hidden min-h-0">`. This allows DiffViewer to fill available space while managing its own internal scrolling.
-- **Commit(s)**: (pending)
+- **Commit(s)**: 18831eb
 - **Status**: RESOLVED
 
 ### Projects Page Force Refresh Not Working (Follow-up)
@@ -214,5 +214,5 @@
 - **Location**: `skillmeat/web/hooks/useProjectCache.ts:94`
 - **Root Cause**: Frontend `forceRefresh` function used `?force_refresh=true` query parameter, but the backend endpoint expects `?refresh=true` (defined with `alias="refresh"` at `projects.py:319`).
 - **Fix**: Changed query parameter from `'/projects?force_refresh=true'` to `'/projects?refresh=true'` to match backend's expected parameter name.
-- **Commit(s)**: (pending)
+- **Commit(s)**: 18831eb
 - **Status**: RESOLVED
