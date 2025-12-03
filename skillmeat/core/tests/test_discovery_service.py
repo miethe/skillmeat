@@ -5,11 +5,14 @@ testing all public methods, artifact types, error scenarios, and performance.
 """
 
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 import yaml
 
+from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
+from skillmeat.core.collection import Collection
 from skillmeat.core.discovery import (
     ArtifactDiscoveryService,
     DiscoveredArtifact,
@@ -72,6 +75,7 @@ This is a test skill artifact.
         result = service.discover_artifacts()
 
         assert result.discovered_count == 1
+        assert result.importable_count == 1
         assert len(result.artifacts) == 1
         assert result.artifacts[0].type == "skill"
         assert result.artifacts[0].name == "test-skill"
@@ -90,6 +94,7 @@ This is a test skill artifact.
         result = service.discover_artifacts()
 
         assert result.discovered_count == 0
+        assert result.importable_count == 0
         assert len(result.artifacts) == 0
         assert len(result.errors) == 0
         assert result.scan_duration_ms > 0
@@ -100,6 +105,7 @@ This is a test skill artifact.
         result = service.discover_artifacts()
 
         assert result.discovered_count == 0
+        assert result.importable_count == 0
         assert len(result.artifacts) == 0
         assert len(result.errors) == 1
         assert "not found" in result.errors[0].lower()
@@ -839,12 +845,14 @@ class TestDiscoveryResultModel:
 
         result = DiscoveryResult(
             discovered_count=1,
+            importable_count=1,
             artifacts=[artifact],
             errors=["error1", "error2"],
             scan_duration_ms=123.45,
         )
 
         assert result.discovered_count == 1
+        assert result.importable_count == 1
         assert len(result.artifacts) == 1
         assert result.errors == ["error1", "error2"]
         assert result.scan_duration_ms == 123.45
@@ -852,10 +860,14 @@ class TestDiscoveryResultModel:
     def test_discovery_result_defaults(self):
         """Test DiscoveryResult with default values."""
         result = DiscoveryResult(
-            discovered_count=0, artifacts=[], scan_duration_ms=0.0
+            discovered_count=0,
+            importable_count=0,
+            artifacts=[],
+            scan_duration_ms=0.0
         )
 
         assert result.discovered_count == 0
+        assert result.importable_count == 0
         assert result.artifacts == []
         assert result.errors == []  # Default empty list
         assert result.scan_duration_ms == 0.0
@@ -943,3 +955,385 @@ tags:
 
         assert result.discovered_count == 1
         assert result.artifacts[0].tags == ["simple", "tag"]
+
+
+class TestManifestFiltering:
+    """Test suite for filtering artifacts based on manifest (already-imported)."""
+
+    def test_filter_with_empty_manifest(self, tmp_path):
+        """Test filtering with empty manifest - all artifacts should be importable."""
+        # Create 3 skills
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(3):
+            skill = skills_dir / f"skill-{i}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i}\nsource: github/user/skill-{i}\n---\n"
+            )
+
+        # Create empty manifest
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # All artifacts should be importable
+        assert result.discovered_count == 3
+        assert result.importable_count == 3
+        assert len(result.artifacts) == 3
+
+    def test_filter_with_partial_manifest(self, tmp_path):
+        """Test filtering when some artifacts are already imported."""
+        # Create 5 skills
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(5):
+            skill = skills_dir / f"skill-{i}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i}\nsource: github/user/skill-{i}\n---\n"
+            )
+
+        # Create manifest with 2 already imported (by source)
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name="skill-0",
+                    type=ArtifactType.SKILL,
+                    path="skills/skill-0",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/skill-0",
+                ),
+                Artifact(
+                    name="skill-2",
+                    type=ArtifactType.SKILL,
+                    path="skills/skill-2",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/skill-2",
+                ),
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # 5 discovered, 3 importable (5 - 2 already imported)
+        assert result.discovered_count == 5
+        assert result.importable_count == 3
+        assert len(result.artifacts) == 3
+
+        # Verify the filtered artifacts are the ones NOT in manifest
+        importable_names = {a.name for a in result.artifacts}
+        assert importable_names == {"skill-1", "skill-3", "skill-4"}
+
+    def test_filter_with_full_manifest(self, tmp_path):
+        """Test filtering when all artifacts are already imported."""
+        # Create 3 skills
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(3):
+            skill = skills_dir / f"skill-{i}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i}\nsource: github/user/skill-{i}\n---\n"
+            )
+
+        # Create manifest with all 3 already imported
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name=f"skill-{i}",
+                    type=ArtifactType.SKILL,
+                    path=f"skills/skill-{i}",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream=f"github/user/skill-{i}",
+                )
+                for i in range(3)
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # 3 discovered, 0 importable (all already imported)
+        assert result.discovered_count == 3
+        assert result.importable_count == 0
+        assert len(result.artifacts) == 0
+
+    def test_filter_without_manifest(self, tmp_path):
+        """Test that discovery without manifest returns all artifacts."""
+        # Create 3 skills
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(3):
+            skill = skills_dir / f"skill-{i}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i}\nsource: github/user/skill-{i}\n---\n"
+            )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=None)
+
+        # Without manifest, all artifacts are importable
+        assert result.discovered_count == 3
+        assert result.importable_count == 3
+        assert len(result.artifacts) == 3
+
+    def test_filter_with_synthetic_local_sources(self, tmp_path):
+        """Test filtering works with synthetic local sources (no GitHub source)."""
+        # Create skills with and without explicit sources
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+
+        # Skill with explicit GitHub source
+        skill1 = skills_dir / "skill-github"
+        skill1.mkdir()
+        (skill1 / "SKILL.md").write_text(
+            "---\nname: skill-github\nsource: github/user/repo\n---\n"
+        )
+
+        # Skill without source (will get synthetic local source)
+        skill2 = skills_dir / "skill-local"
+        skill2.mkdir()
+        (skill2 / "SKILL.md").write_text("---\nname: skill-local\n---\n")
+
+        # Create manifest with GitHub skill imported
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name="skill-github",
+                    type=ArtifactType.SKILL,
+                    path="skills/skill-github",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/repo",
+                ),
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # 2 discovered, 1 importable (GitHub one filtered)
+        assert result.discovered_count == 2
+        assert result.importable_count == 1
+        assert len(result.artifacts) == 1
+        assert result.artifacts[0].name == "skill-local"
+
+    def test_filter_by_source_not_name(self, tmp_path):
+        """Test that filtering is done by source field, not artifact name."""
+        # Create 2 skills with same source but different names
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+
+        skill1 = skills_dir / "skill-renamed"
+        skill1.mkdir()
+        (skill1 / "SKILL.md").write_text(
+            "---\nname: skill-renamed\nsource: github/user/original\n---\n"
+        )
+
+        skill2 = skills_dir / "skill-different"
+        skill2.mkdir()
+        (skill2 / "SKILL.md").write_text(
+            "---\nname: skill-different\nsource: github/user/different\n---\n"
+        )
+
+        # Manifest has artifact with different name but same source as skill1
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name="skill-original",  # Different name
+                    type=ArtifactType.SKILL,
+                    path="skills/skill-original",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/original",  # Same source as skill1
+                ),
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # skill1 should be filtered (same source), skill2 should be importable
+        assert result.discovered_count == 2
+        assert result.importable_count == 1
+        assert len(result.artifacts) == 1
+        assert result.artifacts[0].name == "skill-different"
+
+    def test_filter_with_none_sources_in_manifest(self, tmp_path):
+        """Test that artifacts with None source in manifest don't cause issues."""
+        # Create skill with source
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        skill = skills_dir / "skill-1"
+        skill.mkdir()
+        (skill / "SKILL.md").write_text(
+            "---\nname: skill-1\nsource: github/user/skill-1\n---\n"
+        )
+
+        # Manifest has artifact with None source (local artifact)
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name="local-skill",
+                    type=ArtifactType.SKILL,
+                    path="skills/local-skill",
+                    origin="local",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream=None,  # Local artifacts might have None source
+                ),
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # Should not crash, skill-1 should be importable
+        assert result.discovered_count == 1
+        assert result.importable_count == 1
+        assert len(result.artifacts) == 1
+
+    def test_filter_performance_with_large_manifest(self, tmp_path):
+        """Test that filtering performance is acceptable with large manifests."""
+        # Create 50 skills
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(50):
+            skill = skills_dir / f"skill-{i:03d}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i:03d}\nsource: github/user/skill-{i:03d}\n---\n"
+            )
+
+        # Manifest with 25 already imported
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name=f"skill-{i:03d}",
+                    type=ArtifactType.SKILL,
+                    path=f"skills/skill-{i:03d}",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream=f"github/user/skill-{i:03d}",
+                )
+                for i in range(0, 50, 2)  # Every other skill (25 total)
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+
+        start = time.perf_counter()
+        result = service.discover_artifacts(manifest=manifest)
+        duration = time.perf_counter() - start
+
+        # 50 discovered, 25 importable
+        assert result.discovered_count == 50
+        assert result.importable_count == 25
+        assert len(result.artifacts) == 25
+
+        # Performance: should still complete in <2 seconds
+        assert duration < 2.0, f"Discovery with filtering took {duration:.2f}s (expected <2s)"
+
+    def test_filter_multiple_artifact_types(self, tmp_path):
+        """Test filtering works across multiple artifact types."""
+        # Create skills and commands
+        skills_dir = tmp_path / "artifacts" / "skills"
+        skills_dir.mkdir(parents=True)
+        for i in range(2):
+            skill = skills_dir / f"skill-{i}"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                f"---\nname: skill-{i}\nsource: github/user/skill-{i}\n---\n"
+            )
+
+        commands_dir = tmp_path / "artifacts" / "commands"
+        commands_dir.mkdir(parents=True)
+        for i in range(2):
+            cmd = commands_dir / f"cmd-{i}"
+            cmd.mkdir()
+            (cmd / "COMMAND.md").write_text(
+                f"---\nname: cmd-{i}\nsource: github/user/cmd-{i}\n---\n"
+            )
+
+        # Manifest with 1 skill and 1 command imported
+        manifest = Collection(
+            name="test-collection",
+            version="1.0.0",
+            artifacts=[
+                Artifact(
+                    name="skill-0",
+                    type=ArtifactType.SKILL,
+                    path="skills/skill-0",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/skill-0",
+                ),
+                Artifact(
+                    name="cmd-1",
+                    type=ArtifactType.COMMAND,
+                    path="commands/cmd-1",
+                    origin="github",
+                    metadata=ArtifactMetadata(),
+                    added=datetime.utcnow(),
+                    upstream="github/user/cmd-1",
+                ),
+            ],
+            created=datetime.utcnow(),
+            updated=datetime.utcnow(),
+        )
+
+        service = ArtifactDiscoveryService(tmp_path)
+        result = service.discover_artifacts(manifest=manifest)
+
+        # 4 discovered (2 skills + 2 commands), 2 importable (1 skill + 1 command)
+        assert result.discovered_count == 4
+        assert result.importable_count == 2
+        assert len(result.artifacts) == 2
+
+        # Verify correct artifacts filtered
+        importable_names = {a.name for a in result.artifacts}
+        assert importable_names == {"skill-1", "cmd-0"}

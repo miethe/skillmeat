@@ -114,13 +114,19 @@ class DiscoveryResult(BaseModel):
 
     discovered_count: int = Field(
         ...,
-        description="Number of artifacts found",
+        description="Total number of artifacts discovered",
         ge=0,
         examples=[15],
     )
+    importable_count: int = Field(
+        ...,
+        description="Number of artifacts not yet imported (filtered by manifest)",
+        ge=0,
+        examples=[8],
+    )
     artifacts: List[DiscoveredArtifact] = Field(
         default_factory=list,
-        description="List of discovered artifacts",
+        description="List of discovered artifacts (filtered if manifest provided)",
     )
     errors: List[str] = Field(
         default_factory=list,
@@ -143,6 +149,7 @@ class DiscoveryResult(BaseModel):
         "json_schema_extra": {
             "example": {
                 "discovered_count": 15,
+                "importable_count": 8,
                 "artifacts": [
                     {
                         "type": "skill",

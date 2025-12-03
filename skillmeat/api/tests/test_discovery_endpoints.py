@@ -134,6 +134,7 @@ class TestDiscoveryEndpoint:
 
                 mock_discover.return_value = CoreDiscoveryResult(
                     discovered_count=1,
+                    importable_count=1,
                     artifacts=[discovered],
                     errors=[],
                     scan_duration_ms=123.45,
@@ -163,6 +164,7 @@ class TestDiscoveryEndpoint:
 
                 mock_discover.return_value = CoreDiscoveryResult(
                     discovered_count=0,
+                    importable_count=0,
                     artifacts=[],
                     errors=[],
                     scan_duration_ms=50.0,
@@ -208,6 +210,7 @@ class TestDiscoveryEndpoint:
                 # Return result with errors
                 mock_discover.return_value = CoreDiscoveryResult(
                     discovered_count=1,
+                    importable_count=1,
                     artifacts=[
                         CoreDiscoveredArtifact(
                             type="skill",

@@ -26,7 +26,7 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     queryKey: ['artifacts', 'discover', 'project', projectPath],
     queryFn: async (): Promise<DiscoveryResult> => {
       if (!projectPath) {
-        return { discovered_count: 0, artifacts: [], errors: [], scan_duration_ms: 0 };
+        return { discovered_count: 0, importable_count: 0, artifacts: [], errors: [], scan_duration_ms: 0 };
       }
 
       const result = await apiRequest<DiscoveryResult>(
@@ -54,13 +54,13 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
         body: JSON.stringify(request),
       });
     },
-    onSuccess: () => {
-      // Invalidate both project discovery and artifacts list
-      queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover', 'project', projectPath] });
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+    onSuccess: async () => {
+      // AWAIT all invalidations to ensure cache is fresh before mutation completes
+      await queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover', 'project', projectPath] });
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
-        queryClient.invalidateQueries({ queryKey: ['projects', 'list'] });
+        // Only invalidate the specific project detail, not the entire projects list
+        await queryClient.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
       }
     },
   });
@@ -68,6 +68,7 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
   return {
     discoveredArtifacts: discoveryQuery.data?.artifacts || [],
     discoveredCount: discoveryQuery.data?.discovered_count || 0,
+    importableCount: discoveryQuery.data?.importable_count || 0,
     isDiscovering: discoveryQuery.isFetching,
     discoverError: discoveryQuery.error,
     refetchDiscovery: discoveryQuery.refetch,

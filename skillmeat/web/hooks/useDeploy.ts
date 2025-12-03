@@ -68,11 +68,24 @@ export function useDeploy(options: UseDeployOptions = {}) {
       return response;
     },
 
-    onSuccess: (data, variables) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    onSuccess: async (data, variables) => {
+      // AWAIT all invalidations to ensure cache is fresh before mutation completes
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+
+      // Only invalidate the specific project if we have the project path
+      if (variables.projectPath) {
+        // Use predicate to only invalidate queries for the deployed project
+        await queryClient.invalidateQueries({
+          queryKey: ['projects', 'detail'],
+          predicate: (query) => {
+            // Only invalidate if this query is for the deployed project
+            return query.queryKey.some(k =>
+              typeof k === 'string' && k.includes(variables.projectPath || '')
+            );
+          }
+        });
+      }
 
       // Show success toast
       toast.success(data.message || 'Deployment successful');
@@ -138,9 +151,24 @@ export function useUndeploy(options: UseDeployOptions = {}) {
       return response;
     },
 
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-      queryClient.invalidateQueries({ queryKey: ['deployments'] });
+    onSuccess: async (data, variables) => {
+      // AWAIT all invalidations to ensure cache is fresh before mutation completes
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+
+      // Only invalidate the specific project if we have the project path
+      if (variables.projectPath) {
+        // Use predicate to only invalidate queries for the undeployed project
+        await queryClient.invalidateQueries({
+          queryKey: ['projects', 'detail'],
+          predicate: (query) => {
+            // Only invalidate if this query is for the undeployed project
+            return query.queryKey.some(k =>
+              typeof k === 'string' && k.includes(variables.projectPath || '')
+            );
+          }
+        });
+      }
 
       toast.success(data.message || 'Artifact removed successfully');
 
