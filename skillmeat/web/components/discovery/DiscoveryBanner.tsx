@@ -30,8 +30,10 @@ import { Button } from '@/components/ui/button';
 import { useTrackDiscovery } from '@/lib/analytics';
 
 export interface DiscoveryBannerProps {
-  /** Number of artifacts discovered */
-  discoveredCount: number;
+  /** Number of artifacts that can still be imported */
+  importableCount: number;
+  /** Total number of artifacts found (optional, for display) */
+  discoveredCount?: number;
   /** Callback when user clicks Review & Import */
   onReview: () => void;
   /** Whether the banner can be dismissed */
@@ -39,6 +41,7 @@ export interface DiscoveryBannerProps {
 }
 
 export function DiscoveryBanner({
+  importableCount,
   discoveredCount,
   onReview,
   dismissible = true,
@@ -48,26 +51,30 @@ export function DiscoveryBanner({
 
   // Track banner view when it appears
   useEffect(() => {
-    if (discoveredCount > 0 && !dismissed) {
-      tracking.trackBannerView(discoveredCount);
+    if (importableCount > 0 && !dismissed) {
+      tracking.trackBannerView(importableCount);
     }
-  }, [discoveredCount, dismissed, tracking]);
+  }, [importableCount, dismissed, tracking]);
 
-  if (dismissed || discoveredCount === 0) {
+  if (dismissed || importableCount === 0) {
     return null;
   }
-
-  const artifactText = discoveredCount === 1 ? 'Artifact' : 'Artifacts';
 
   return (
     <Alert className="mb-4 relative" role="status" aria-live="polite">
       <Info className="h-4 w-4" aria-hidden="true" />
       <AlertTitle>
-        Found {discoveredCount} {artifactText}
+        {importableCount === 1
+          ? "1 Artifact Ready to Import"
+          : `${importableCount} Artifacts Ready to Import`}
       </AlertTitle>
       <AlertDescription>
-        We discovered existing artifacts in your collection that can be imported.
-        Review and import them to get started quickly.
+        {discoveredCount && discoveredCount !== importableCount && (
+          <p className="text-sm text-muted-foreground mb-2">
+            Found {discoveredCount} total - {importableCount} remaining
+          </p>
+        )}
+        Review and import these artifacts to get started quickly.
       </AlertDescription>
       <div className="mt-3 flex gap-2">
         <Button size="sm" onClick={onReview}>

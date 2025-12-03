@@ -25,6 +25,7 @@ export interface DiscoveredArtifact {
  */
 export interface DiscoveryResult {
   discovered_count: number;
+  importable_count: number;
   artifacts: DiscoveredArtifact[];
   errors: string[];
   scan_duration_ms: number;

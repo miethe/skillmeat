@@ -85,6 +85,40 @@ from skillmeat.utils.filesystem import compute_content_hash
 
 logger = logging.getLogger(__name__)
 
+
+def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
+    """Decode project identifier passed to bulk import.
+
+    Accepts standard base64-encoded project paths (with or without padding) and
+    gracefully falls back to treating the value as a URL-encoded absolute path.
+    """
+    from urllib.parse import unquote
+
+    # Normalize spaces and percent-encoding first (some callers URL-encode the base64)
+    candidate = unquote(raw_project_id.strip().replace(" ", "+"))
+
+    # Try base64 decode (allow missing padding)
+    try:
+        padding = "=" * (-len(candidate) % 4)
+        decoded_path = base64.b64decode(candidate + padding).decode()
+        project_path = PathLib(decoded_path).resolve()
+        if project_path.is_absolute():
+            return project_path
+    except Exception:
+        # Ignore and try fallback decoding
+        pass
+
+    # Fallback: treat as URL-encoded absolute path
+    try:
+        decoded_path = unquote(candidate)
+        project_path = PathLib(decoded_path).resolve()
+        if project_path.is_absolute():
+            return project_path
+    except Exception:
+        pass
+
+    return None
+
 router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
@@ -511,16 +545,26 @@ async def discover_artifacts(
         else:
             scan_path = collection_path
 
+        # Load manifest to filter already-imported artifacts
+        manifest = None
+        try:
+            manifest = collection_mgr.load_collection(collection_name)
+            logger.info(f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection")
+        except Exception as e:
+            logger.warning(f"Could not load manifest for filtering (will return all artifacts as importable): {e}")
+            # Graceful fallback - return all as importable
+
         # Create discovery service
         discovery_service = ArtifactDiscoveryService(scan_path)
 
-        # Perform discovery scan
+        # Perform discovery scan with manifest filtering
         logger.info(f"Starting artifact discovery scan in: {scan_path}")
-        result = discovery_service.discover_artifacts()
+        result = discovery_service.discover_artifacts(manifest=manifest)
 
         # Log results
         logger.info(
-            f"Discovery scan completed: {result.discovered_count} artifacts found "
+            f"Discovery scan completed: {result.discovered_count} total artifacts, "
+            f"{result.importable_count} importable (not yet in collection), "
             f"in {result.scan_duration_ms:.2f}ms, {len(result.errors)} errors"
         )
 
@@ -587,13 +631,19 @@ def resolve_project_path(project_id: str) -> PathLib:
 )
 async def discover_project_artifacts(
     project_id: str = Path(..., description="URL-encoded project path"),
+    collection_mgr: CollectionManagerDep = None,
     _token: TokenDep = None,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
 ) -> DiscoveryResult:
     """Discover artifacts in a specific project's .claude/ directory.
 
     Args:
         project_id: Project ID (URL-encoded path)
+        collection_mgr: Collection manager dependency
         _token: Authentication token
+        collection: Optional collection name for filtering
 
     Returns:
         DiscoveryResult with discovered artifacts from the project
@@ -625,16 +675,28 @@ async def discover_project_artifacts(
                 ErrorCodes.VALIDATION_FAILED
             )
 
+        # Load manifest to filter already-imported artifacts
+        manifest = None
+        if collection_mgr:
+            collection_name = collection or "default"
+            try:
+                manifest = collection_mgr.load_collection(collection_name)
+                logger.info(f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection")
+            except Exception as e:
+                logger.warning(f"Could not load manifest for filtering (will return all artifacts as importable): {e}")
+                # Graceful fallback - return all as importable
+
         # Create discovery service with project scan mode
         discovery_service = ArtifactDiscoveryService(project_path, scan_mode="project")
 
-        # Perform discovery scan
+        # Perform discovery scan with manifest filtering
         logger.info(f"Starting artifact discovery scan in project: {project_path}")
-        result = discovery_service.discover_artifacts()
+        result = discovery_service.discover_artifacts(manifest=manifest)
 
         # Log results
         logger.info(
-            f"Discovery scan completed: {result.discovered_count} artifacts found "
+            f"Discovery scan completed: {result.discovered_count} total artifacts, "
+            f"{result.importable_count} importable (not yet in collection), "
             f"in {result.scan_duration_ms:.2f}ms, {len(result.errors)} errors"
         )
 
@@ -812,17 +874,16 @@ async def bulk_import_artifacts(
 
         # If we know which project initiated the import, record deployments so UI reflects the change
         if project_id:
-            project_path: Optional[PathLib] = None
-            try:
-                decoded_path = base64.b64decode(project_id.encode()).decode()
-                project_path = PathLib(decoded_path).resolve()
-                if not project_path.exists():
-                    logger.warning(
-                        f"Provided project_id path does not exist: {project_path}"
-                    )
-                    project_path = None
-            except Exception as e:
-                logger.warning(f"Invalid project_id provided to bulk import: {e}")
+            project_path = _decode_project_id_param(project_id)
+
+            if project_path is None:
+                logger.warning(
+                    f"Invalid project_id provided to bulk import: {project_id}"
+                )
+            elif not project_path.exists():
+                logger.warning(
+                    f"Provided project_id path does not exist: {project_path}"
+                )
                 project_path = None
 
             if project_path:

@@ -69,6 +69,7 @@ export default function ProjectDetailPage() {
   const {
     discoveredArtifacts,
     discoveredCount,
+    importableCount,
     isDiscovering,
     refetchDiscovery,
     bulkImport,
@@ -248,8 +249,9 @@ export default function ProjectDetailPage() {
     <EntityLifecycleProvider mode="project" projectPath={project?.path}>
       <div className="space-y-6">
         {/* Discovery Banner */}
-        {discoveredCount > 0 && !isDiscovering && (
+        {importableCount > 0 && !isDiscovering && (
           <DiscoveryBanner
+            importableCount={importableCount}
             discoveredCount={discoveredCount}
             onReview={() => setShowImportModal(true)}
             dismissible

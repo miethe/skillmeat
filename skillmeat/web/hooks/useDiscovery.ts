@@ -62,9 +62,11 @@ export function useDiscovery() {
         body: JSON.stringify(request),
       });
     },
-    onSuccess: () => {
-      // Invalidate artifact list queries to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+    onSuccess: async () => {
+      // AWAIT all invalidations to ensure cache is fresh before mutation completes
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      // Also invalidate discovery results to get fresh count
+      await queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover'] });
     },
   });
 
@@ -72,6 +74,7 @@ export function useDiscovery() {
     // Discovery state
     discoveredArtifacts: discoverQuery.data?.artifacts ?? [],
     discoveredCount: discoverQuery.data?.discovered_count ?? 0,
+    importableCount: discoverQuery.data?.importable_count ?? 0,
     scanErrors: discoverQuery.data?.errors ?? [],
     scanDuration: discoverQuery.data?.scan_duration_ms,
     isDiscovering: discoverQuery.isLoading || discoverQuery.isFetching,

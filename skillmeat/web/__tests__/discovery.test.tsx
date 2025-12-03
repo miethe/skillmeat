@@ -22,31 +22,31 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('DiscoveryBanner', () => {
-  it('displays discovered count', () => {
+  it('displays importable count', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} />
+        <DiscoveryBanner importableCount={5} onReview={onReview} />
       </TestWrapper>
     );
-    expect(screen.getByText(/Found 5 Artifacts/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 Artifacts Ready to Import/i)).toBeInTheDocument();
   });
 
   it('displays correct singular form', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={1} onReview={onReview} />
+        <DiscoveryBanner importableCount={1} onReview={onReview} />
       </TestWrapper>
     );
-    expect(screen.getByText(/Found 1 Artifact$/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 Artifact Ready to Import/i)).toBeInTheDocument();
   });
 
   it('calls onReview when button clicked', async () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} />
+        <DiscoveryBanner importableCount={5} onReview={onReview} />
       </TestWrapper>
     );
     const reviewButton = screen.getByRole('button', { name: /Review & Import/i });
@@ -58,17 +58,17 @@ describe('DiscoveryBanner', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} dismissible />
+        <DiscoveryBanner importableCount={5} onReview={onReview} dismissible />
       </TestWrapper>
     );
 
-    expect(screen.getByText(/Found 5 Artifacts/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 Artifacts Ready to Import/i)).toBeInTheDocument();
 
     const dismissButton = screen.getByRole('button', { name: /Dismiss/i });
     await userEvent.click(dismissButton);
 
     await waitFor(() => {
-      expect(screen.queryByText(/Found 5 Artifacts/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/5 Artifacts Ready to Import/i)).not.toBeInTheDocument();
     });
   });
 
@@ -76,7 +76,7 @@ describe('DiscoveryBanner', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} dismissible />
+        <DiscoveryBanner importableCount={5} onReview={onReview} dismissible />
       </TestWrapper>
     );
 
@@ -84,15 +84,15 @@ describe('DiscoveryBanner', () => {
     await userEvent.click(closeButton);
 
     await waitFor(() => {
-      expect(screen.queryByText(/Found 5 Artifacts/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/5 Artifacts Ready to Import/i)).not.toBeInTheDocument();
     });
   });
 
-  it('returns null when discoveredCount is 0', () => {
+  it('returns null when importableCount is 0', () => {
     const onReview = jest.fn();
     const { container } = render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={0} onReview={onReview} />
+        <DiscoveryBanner importableCount={0} onReview={onReview} />
       </TestWrapper>
     );
     expect(container.firstChild).toBeNull();
@@ -102,7 +102,7 @@ describe('DiscoveryBanner', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} dismissible={false} />
+        <DiscoveryBanner importableCount={5} onReview={onReview} dismissible={false} />
       </TestWrapper>
     );
 
@@ -114,12 +114,48 @@ describe('DiscoveryBanner', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} />
+        <DiscoveryBanner importableCount={5} onReview={onReview} />
       </TestWrapper>
     );
 
     const alert = screen.getByRole('status');
     expect(alert).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('shows total count when discoveredCount is provided and different', () => {
+    const onReview = jest.fn();
+    render(
+      <TestWrapper>
+        <DiscoveryBanner importableCount={3} discoveredCount={10} onReview={onReview} />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText(/3 Artifacts Ready to Import/i)).toBeInTheDocument();
+    expect(screen.getByText(/Found 10 total - 3 remaining/i)).toBeInTheDocument();
+  });
+
+  it('does not show total count when discoveredCount equals importableCount', () => {
+    const onReview = jest.fn();
+    render(
+      <TestWrapper>
+        <DiscoveryBanner importableCount={5} discoveredCount={5} onReview={onReview} />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText(/5 Artifacts Ready to Import/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Found 5 total - 5 remaining/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show total count when discoveredCount is not provided', () => {
+    const onReview = jest.fn();
+    render(
+      <TestWrapper>
+        <DiscoveryBanner importableCount={5} onReview={onReview} />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText(/5 Artifacts Ready to Import/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Found.*total.*remaining/i)).not.toBeInTheDocument();
   });
 });
 
@@ -478,7 +514,7 @@ describe('Accessibility Tests', () => {
     const onReview = jest.fn();
     const { container } = render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} />
+        <DiscoveryBanner importableCount={5} onReview={onReview} />
       </TestWrapper>
     );
     const results = await axe(container);
@@ -506,7 +542,7 @@ describe('Accessibility Tests', () => {
     const onReview = jest.fn();
     render(
       <TestWrapper>
-        <DiscoveryBanner discoveredCount={5} onReview={onReview} dismissible />
+        <DiscoveryBanner importableCount={5} onReview={onReview} dismissible />
       </TestWrapper>
     );
 

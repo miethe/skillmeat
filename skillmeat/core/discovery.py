@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +22,9 @@ from skillmeat.core.discovery_metrics import (
     log_performance,
 )
 from skillmeat.utils.metadata import extract_yaml_frontmatter
+
+if TYPE_CHECKING:
+    from skillmeat.core.collection import Collection
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +69,15 @@ class DiscoveryResult(BaseModel):
     """Result of artifact discovery scan.
 
     Attributes:
-        discovered_count: Number of artifacts discovered
-        artifacts: List of discovered artifacts
+        discovered_count: Total number of artifacts discovered
+        importable_count: Number of artifacts not yet imported (filtered by manifest)
+        artifacts: List of discovered artifacts (filtered if manifest provided)
         errors: List of error messages for artifacts that failed discovery
         scan_duration_ms: Time taken to complete scan in milliseconds
     """
 
     discovered_count: int
+    importable_count: int
     artifacts: List[DiscoveredArtifact]
     errors: List[str] = Field(default_factory=list)
     scan_duration_ms: float
@@ -130,7 +135,9 @@ class ArtifactDiscoveryService:
         self.artifacts_path = self.artifacts_base
 
     @log_performance("discovery_scan")
-    def discover_artifacts(self) -> DiscoveryResult:
+    def discover_artifacts(
+        self, manifest: Optional["Collection"] = None
+    ) -> DiscoveryResult:
         """Scan artifacts directory and discover all artifacts.
 
         This method recursively scans the artifacts directory, detects
@@ -139,8 +146,15 @@ class ArtifactDiscoveryService:
         Errors during individual artifact processing are collected but
         do not fail the entire scan.
 
+        Args:
+            manifest: Optional Collection manifest to filter already-imported artifacts.
+                     If provided, only artifacts not in manifest.artifacts are returned.
+
         Returns:
-            DiscoveryResult with discovered artifacts, error list, and metrics
+            DiscoveryResult with discovered artifacts, error list, and metrics.
+            The `discovered_count` field shows total artifacts found.
+            The `importable_count` field shows artifacts not yet imported (filtered).
+            The `artifacts` list contains only importable artifacts if manifest provided.
         """
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []
@@ -167,6 +181,7 @@ class ArtifactDiscoveryService:
 
             return DiscoveryResult(
                 discovered_count=0,
+                importable_count=0,
                 artifacts=[],
                 errors=errors,
                 scan_duration_ms=(time.time() - start_time) * 1000,
@@ -208,6 +223,30 @@ class ArtifactDiscoveryService:
             logger.error(error_msg, exc_info=True)
             errors.append(error_msg)
 
+        # Filter artifacts if manifest provided
+        importable_artifacts = discovered_artifacts
+        if manifest:
+            # Build set of imported sources for efficient lookup
+            # Note: Artifact uses 'upstream' field, DiscoveredArtifact uses 'source'
+            imported_sources = {a.upstream for a in manifest.artifacts if a.upstream}
+
+            # Filter out artifacts that are already imported
+            importable_artifacts = [
+                artifact
+                for artifact in discovered_artifacts
+                if artifact.source not in imported_sources
+            ]
+
+            logger.debug(
+                f"Filtered {len(discovered_artifacts) - len(importable_artifacts)} "
+                f"already-imported artifacts",
+                extra={
+                    "total_discovered": len(discovered_artifacts),
+                    "importable": len(importable_artifacts),
+                    "filtered": len(discovered_artifacts) - len(importable_artifacts),
+                }
+            )
+
         # Calculate scan duration
         scan_duration_ms = (time.time() - start_time) * 1000
         scan_duration_sec = scan_duration_ms / 1000
@@ -221,10 +260,11 @@ class ArtifactDiscoveryService:
         discovery_metrics.record_scan(len(discovered_artifacts), scan_duration_ms)
 
         logger.info(
-            f"Discovery scan completed: {len(discovered_artifacts)} artifacts "
-            f"found in {scan_duration_ms:.2f}ms",
+            f"Discovery scan completed: {len(discovered_artifacts)} artifacts found, "
+            f"{len(importable_artifacts)} importable in {scan_duration_ms:.2f}ms",
             extra={
-                "artifact_count": len(discovered_artifacts),
+                "discovered_count": len(discovered_artifacts),
+                "importable_count": len(importable_artifacts),
                 "error_count": len(errors),
                 "duration_ms": round(scan_duration_ms, 2),
             }
@@ -232,7 +272,8 @@ class ArtifactDiscoveryService:
 
         return DiscoveryResult(
             discovered_count=len(discovered_artifacts),
-            artifacts=discovered_artifacts,
+            importable_count=len(importable_artifacts),
+            artifacts=importable_artifacts,
             errors=errors,
             scan_duration_ms=scan_duration_ms,
         )

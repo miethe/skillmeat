@@ -30,6 +30,7 @@ export interface RefreshResult {
  * invalidates all project and cache-related queries to ensure the UI
  * displays fresh data.
  *
+ * @param projectId - Optional project ID for granular cache refresh
  * @returns Mutation function, loading state, and result data
  *
  * @example
@@ -50,21 +51,29 @@ export interface RefreshResult {
  * </Button>
  * ```
  */
-export function useCacheRefresh() {
+export function useCacheRefresh(projectId?: string) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest<RefreshResult>('/projects/cache/refresh', {
         method: 'POST',
+        headers: projectId ? { 'Content-Type': 'application/json' } : undefined,
+        body: projectId ? JSON.stringify({ project_id: projectId }) : undefined,
       });
       return response;
     },
-    onSuccess: () => {
-      // Invalidate all project-related queries to trigger refetch with fresh data
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      // Invalidate cache status to show updated stats
-      queryClient.invalidateQueries({ queryKey: ['cache'] });
+    onSuccess: async () => {
+      // Granular invalidation based on projectId
+      if (projectId) {
+        // Only invalidate the specific project
+        await queryClient.invalidateQueries({ queryKey: ['projects', 'detail', projectId] });
+        await queryClient.invalidateQueries({ queryKey: ['cache', projectId] });
+      } else {
+        // Invalidate all project-related queries
+        await queryClient.invalidateQueries({ queryKey: ['projects'] });
+        await queryClient.invalidateQueries({ queryKey: ['cache'] });
+      }
     },
   });
 
