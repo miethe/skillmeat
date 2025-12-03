@@ -1,0 +1,141 @@
+/**
+ * Notification Types for SkillMeat Web Interface
+ *
+ * These types represent notifications for imports, syncs, errors, and system events.
+ */
+
+/**
+ * Type of notification event
+ */
+export type NotificationType = 'import' | 'sync' | 'error' | 'info' | 'success';
+
+/**
+ * Read/unread status of a notification
+ */
+export type NotificationStatus = 'read' | 'unread';
+
+/**
+ * Type of artifact being imported or synced
+ */
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
+
+/**
+ * Result of a single artifact import operation
+ */
+export interface ArtifactImportResult {
+  /** Name of the artifact */
+  name: string;
+  /** Type of artifact */
+  type: ArtifactType;
+  /** Whether the import succeeded */
+  success: boolean;
+  /** Error message if the import failed */
+  error?: string;
+}
+
+/**
+ * Detailed results of a batch import operation
+ */
+export interface ImportResultDetails {
+  /** Total number of artifacts in the batch */
+  total: number;
+  /** Number of successful imports */
+  succeeded: number;
+  /** Number of failed imports */
+  failed: number;
+  /** Individual artifact results */
+  artifacts: ArtifactImportResult[];
+}
+
+/**
+ * Complete notification data structure
+ */
+export interface NotificationData {
+  /** Unique identifier */
+  id: string;
+  /** Type of notification */
+  type: NotificationType;
+  /** Notification title */
+  title: string;
+  /** Notification message */
+  message: string;
+  /** When the notification was created */
+  timestamp: Date;
+  /** Read/unread status */
+  status: NotificationStatus;
+  /** Optional detailed results for import/sync operations */
+  details?: ImportResultDetails | null;
+}
+
+/**
+ * Input data for creating a new notification (without id/timestamp)
+ *
+ * Use this type when adding notifications to the store.
+ * The store will automatically generate id and timestamp.
+ */
+export interface NotificationCreateInput {
+  /** Type of notification */
+  type: NotificationType;
+  /** Notification title */
+  title: string;
+  /** Notification message */
+  message: string;
+  /** Read/unread status (defaults to 'unread') */
+  status?: NotificationStatus;
+  /** Optional detailed results for import/sync operations */
+  details?: ImportResultDetails | null;
+}
+
+/**
+ * Notification store state shape
+ *
+ * Represents the complete state managed by the notification store.
+ */
+export interface NotificationStoreState {
+  /** All notifications, newest first */
+  notifications: NotificationData[];
+  /** Count of unread notifications */
+  unreadCount: number;
+}
+
+/**
+ * Notification store actions
+ *
+ * Methods available for managing notifications in the store.
+ */
+export interface NotificationStoreActions {
+  /**
+   * Add a new notification to the store
+   * @param notification - Notification data (id and timestamp will be generated)
+   */
+  addNotification: (notification: NotificationCreateInput) => void;
+
+  /**
+   * Mark a specific notification as read
+   * @param id - Notification ID
+   */
+  markAsRead: (id: string) => void;
+
+  /**
+   * Mark all notifications as read
+   */
+  markAllAsRead: () => void;
+
+  /**
+   * Remove a specific notification
+   * @param id - Notification ID
+   */
+  dismissNotification: (id: string) => void;
+
+  /**
+   * Clear all notifications
+   */
+  clearAll: () => void;
+}
+
+/**
+ * Combined notification store type
+ *
+ * Use this type when defining the Zustand store.
+ */
+export type NotificationStore = NotificationStoreState & NotificationStoreActions;

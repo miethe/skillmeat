@@ -25,37 +25,11 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export type NotificationType = 'import' | 'sync' | 'error' | 'info' | 'success';
-export type NotificationStatus = 'read' | 'unread';
-
-export interface NotificationData {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  timestamp: Date;
-  status: NotificationStatus;
-  details?: ImportResultDetails | null;
-}
-
-export interface ImportResultDetails {
-  total: number;
-  succeeded: number;
-  failed: number;
-  artifacts: ArtifactImportResult[];
-}
-
-export interface ArtifactImportResult {
-  name: string;
-  type: 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
-  success: boolean;
-  error?: string;
-}
+import type {
+  NotificationData,
+  NotificationType,
+  ImportResultDetails,
+} from '@/types/notification';
 
 // ============================================================================
 // NotificationBell Component
@@ -417,74 +391,3 @@ function getNotificationIconColor(type: NotificationType): string {
   }
 }
 
-// ============================================================================
-// Example Usage Hook (for reference)
-// ============================================================================
-
-/**
- * Example hook for managing notifications
- *
- * Usage:
- * ```tsx
- * const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, addNotification, dismissNotification } = useNotifications();
- *
- * return (
- *   <NotificationBell
- *     unreadCount={unreadCount}
- *     notifications={notifications}
- *     onMarkAllRead={markAllAsRead}
- *     onClearAll={clearAll}
- *     onNotificationClick={markAsRead}
- *     onDismiss={dismissNotification}
- *   />
- * );
- * ```
- */
-export function useNotifications() {
-  const [notifications, setNotifications] = React.useState<NotificationData[]>([]);
-
-  const addNotification = React.useCallback((notification: Omit<NotificationData, 'id'>) => {
-    setNotifications((prev) => [
-      {
-        ...notification,
-        id: Math.random().toString(36).substring(7),
-      },
-      ...prev,
-    ].slice(0, 50)); // Keep max 50 notifications
-  }, []);
-
-  const markAsRead = React.useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, status: 'read' as const } : n))
-    );
-  }, []);
-
-  const markAllAsRead = React.useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, status: 'read' as const }))
-    );
-  }, []);
-
-  const clearAll = React.useCallback(() => {
-    setNotifications([]);
-  }, []);
-
-  const dismissNotification = React.useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
-
-  const unreadCount = React.useMemo(
-    () => notifications.filter((n) => n.status === 'unread').length,
-    [notifications]
-  );
-
-  return {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    clearAll,
-    addNotification,
-    dismissNotification,
-  };
-}
