@@ -255,3 +255,21 @@
 - **Fix**: Added optional `project_id` to `/artifacts/discover/import` and record successful imports into the project's `.skillmeat-deployed.toml` (with content hashes). The frontend now passes the project ID, invalidates project queries after import, and shows toast counts from the real `BulkImportResult` instead of always reporting success.
 - **Commit(s)**: pending
 - **Status**: RESOLVED
+
+### Invalid project_id on Discovery Bulk Import
+
+**Issue**: Bulk import from project discovery returned 0/1 imported with warning `Invalid project_id provided to bulk import: Invalid base64-encoded string...` when the project_id query param was slightly malformed.
+- **Location**: `skillmeat/api/routers/artifacts.py:657-759`
+- **Root Cause**: Endpoint assumed strictly padded Base64; malformed/space-substituted values failed decode and aborted deployment recording.
+- **Fix**: Added robust `_decode_project_id_param` helper that normalizes spaces, tolerates missing padding, and falls back to URL-decoded absolute paths before attempting deployment recording. Invalid IDs are logged but no longer break the import flow.
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### project_id percent-encoding breaks deployment recording
+
+**Issue**: Bulk import succeeded but deployment recording was skipped with warning about nonexistent path like `/.../skillmeat/L1Vz...` when `project_id` contained percent-encoded characters (e.g., `%3D`).
+- **Location**: `skillmeat/api/routers/artifacts.py:617-759`
+- **Root Cause**: The decoder attempted Base64 before URL-decoding the parameter; `%` characters caused Base64 to fail, so the value was treated as a relative path under the repo.
+- **Fix**: Normalize with `unquote` before Base64 decoding in `_decode_project_id_param`, ensuring encoded padding/characters are decoded before decode attempt.
+- **Commit(s)**: pending
+- **Status**: RESOLVED
