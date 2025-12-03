@@ -20,9 +20,7 @@ Parse mode from "$ARGUMENTS":
 - `--plan-progress` or `-p`: Plan + Progress tracking artifacts only
 - `--all` or `-a` (default if no flag): Full process - PRD (if complex), Implementation Plan, and tracking artifacts
 
-## Understanding Skills vs Subagents
-
-**CRITICAL**: Skills are NOT subagents. Skills provide instructions and tools.
+## Understanding the Pattern
 
 **The Pattern**:
 1. You invoke a skill → skill expands with instructions/tools
@@ -76,13 +74,13 @@ For all modes:
 skill: "planning"
 [Wait for skill to expand]
 [Read skill's instructions]
-[Follow instructions - they will direct you to delegate to subagents like prd-writer, implementation-planner]
+[Follow instructions - they will direct you to delegate to subagents like ai-artifacts-engineer, prd-writer, implementation-planner]
 
 # Step 2: Tracking (if not --impl-only)
 skill: "artifact-tracking"
 [Wait for skill to expand]
 [Read skill's instructions]
-[Follow instructions to create tracking artifacts]
+[Follow instructions to create tracking artifacts with subagents]
 ```
 
 **Your role**: Read skill instructions → follow them → delegate to subagents as directed.

@@ -32,7 +32,6 @@ track: "Standard"
 7. [Risk Mitigation](#risk-mitigation)
 8. [Testing Strategy](#testing-strategy)
 9. [Acceptance Criteria](#acceptance-criteria)
-10. [Linear Import Data](#linear-import-data)
 
 ---
 
@@ -692,80 +691,6 @@ test('notification center WCAG 2.1 AA compliant', async ({ page }) => {
 - API documentation for NotificationProvider and hooks
 - Code comments in notification-store.ts
 - Code comments on all public components
-
----
-
-## Linear Import Data
-
-### Epics
-
-```yaml
-- name: "Notification System MVP"
-  description: "Persistent notification center with import result details"
-  status: "Backlog"
-  priority: "High"
-  team: "Frontend"
-  cycles: 4-5
-
-- name: "NS-Foundation"
-  parent: "Notification System MVP"
-  description: "Core notification store and infrastructure"
-
-- name: "NS-UI"
-  parent: "Notification System MVP"
-  description: "Notification UI components"
-
-- name: "NS-Integration"
-  parent: "Notification System MVP"
-  description: "Integration with toast system and bulk import"
-
-- name: "NS-Polish"
-  parent: "Notification System MVP"
-  description: "Accessibility, testing, documentation"
-```
-
-### Tasks Format
-
-**Each task includes:**
-```yaml
-- identifier: "NS-P1-01"
-  title: "Define Notification Types"
-  description: "Create types/notification.ts with all notification interfaces"
-  epic: "NS-Foundation"
-  priority: "High"
-  estimate: "2 points"
-  assignee: "ui-engineer-enhanced"
-  depends_on: []
-  acceptance_criteria:
-    - "All notification types exported from types/notification.ts"
-    - "Full TypeScript coverage (no any types)"
-    - "Interfaces match BulkImportResult structure"
-  testing:
-    - "Types compile without errors"
-    - "Usage in components verified"
-```
-
-### Linear Sync Structure
-
-**Project:** SkillMeat / Frontend
-**Cycle:** Sprint N (4-5 weeks)
-**Team:** Frontend Engineering
-**Area:** Notifications
-
-**Workflow States:**
-- Backlog (initial)
-- Ready (spec complete, assigned)
-- In Progress
-- In Review (testing phase)
-- Done (merged, deployed)
-
-**Labels:**
-- `notification-system`
-- `frontend`
-- `ui-component`
-- `accessibility`
-- `testing`
-- `documentation`
 
 ---
 

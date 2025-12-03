@@ -4,8 +4,12 @@ artifact_type = "skill"
 from_collection = "default"
 deployed_at = "2025-11-13T13:49:37.793701"
 artifact_path = "skills/chrome-devtools"
-collection_sha = "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6ddbe"
+content_hash = "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6ddbe"
 local_modifications = false
+version_lineage = [
+    "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6ddbe",
+]
+collection_sha = "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6ddbe"
 
 [[deployed]]
 artifact_name = "notebooklm-skill"
@@ -13,5 +17,69 @@ artifact_type = "skill"
 from_collection = "default"
 deployed_at = "2025-11-15T15:01:24.707340"
 artifact_path = "skills/notebooklm-skill"
-collection_sha = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
+content_hash = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
 local_modifications = false
+version_lineage = [
+    "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7",
+]
+collection_sha = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
+
+[[deployed]]
+artifact_name = "Confidence Check"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.895105"
+artifact_path = "skills/confidence-check"
+content_hash = "2dc376282b95521e6f9229979bc3666e1224ba09e94a3d4b76703f8cab083127"
+local_modifications = false
+collection_sha = "2dc376282b95521e6f9229979bc3666e1224ba09e94a3d4b76703f8cab083127"
+
+[[deployed]]
+artifact_name = "skill-creator"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.895937"
+artifact_path = "skills/skill-creator"
+content_hash = "c6ba1acd589b1171fe00681bea592239e0899b8bd5a3f8128c7fa3e00cd64c25"
+local_modifications = false
+collection_sha = "c6ba1acd589b1171fe00681bea592239e0899b8bd5a3f8128c7fa3e00cd64c25"
+
+[[deployed]]
+artifact_name = "symbols"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.900636"
+artifact_path = "skills/symbols"
+content_hash = "7d0213abbda2a6109c6931bcf5d62d3a39c97f5f4a8770845b0a001a9c7253ef"
+local_modifications = false
+collection_sha = "7d0213abbda2a6109c6931bcf5d62d3a39c97f5f4a8770845b0a001a9c7253ef"
+
+[[deployed]]
+artifact_name = "receiving-code-review"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.900852"
+artifact_path = "skills/receiving-code-review"
+content_hash = "f6fd15778eef9f8344da6791531ce24fc32bc7d807762bf79c2540c2d5a34598"
+local_modifications = false
+collection_sha = "f6fd15778eef9f8344da6791531ce24fc32bc7d807762bf79c2540c2d5a34598"
+
+[[deployed]]
+artifact_name = "artifact-tracking"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.903982"
+artifact_path = "skills/artifact-tracking"
+content_hash = "434a07cfd3734bd9cf3031edc27dce01095e950f5e6e7f78bf33751671ff0f51"
+local_modifications = false
+collection_sha = "434a07cfd3734bd9cf3031edc27dce01095e950f5e6e7f78bf33751671ff0f51"
+
+[[deployed]]
+artifact_name = "meeting-insights-analyzer"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-12-03T11:45:28.904230"
+artifact_path = "skills/meeting-insights-analyzer"
+content_hash = "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656"
+local_modifications = false
+collection_sha = "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656"
