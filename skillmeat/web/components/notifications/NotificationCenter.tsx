@@ -177,7 +177,10 @@ function NotificationDropdown({
   onClose,
 }: NotificationDropdownProps) {
   const hasNotifications = notifications.length > 0;
-  const hasUnread = notifications.some((n) => n.status === 'unread');
+  const hasUnread = React.useMemo(
+    () => notifications.some((n) => n.status === 'unread'),
+    [notifications]
+  );
   const [activeIndex, setActiveIndex] = React.useState(0);
   const listRef = React.useRef<HTMLDivElement>(null);
 
@@ -212,6 +215,24 @@ function NotificationDropdown({
     [hasNotifications, notifications.length, onClose]
   );
 
+  // Memoize mark all read handler
+  const handleMarkAllRead = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onMarkAllRead();
+    },
+    [onMarkAllRead]
+  );
+
+  // Memoize clear all handler
+  const handleClearAll = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onClearAll();
+    },
+    [onClearAll]
+  );
+
   return (
     <div className="flex flex-col" onKeyDown={handleListKeyDown}>
       {/* Header */}
@@ -225,10 +246,7 @@ function NotificationDropdown({
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkAllRead();
-              }}
+              onClick={handleMarkAllRead}
             >
               Mark all read
             </Button>
@@ -238,10 +256,7 @@ function NotificationDropdown({
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground hover:text-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClearAll();
-              }}
+              onClick={handleClearAll}
             >
               Clear all
             </Button>
@@ -260,19 +275,15 @@ function NotificationDropdown({
             aria-live="off"
           >
             {notifications.map((notification, index) => (
-              <NotificationItem
+              <NotificationItemMemo
                 key={notification.id}
                 notification={notification}
-                onClick={() => {
-                  onNotificationClick(notification.id);
-                  onClose();
-                }}
-                onDismiss={(e) => {
-                  e.stopPropagation();
-                  onDismiss(notification.id);
-                }}
+                onNotificationClick={onNotificationClick}
+                onDismiss={onDismiss}
+                onClose={onClose}
                 isActive={index === activeIndex}
-                onFocus={() => setActiveIndex(index)}
+                onSetActiveIndex={setActiveIndex}
+                index={index}
               />
             ))}
           </div>
@@ -302,7 +313,13 @@ interface NotificationItemProps {
   onFocus?: () => void;
 }
 
-function NotificationItem({ notification, onClick, onDismiss, isActive, onFocus }: NotificationItemProps) {
+const NotificationItem = React.memo(function NotificationItem({
+  notification,
+  onClick,
+  onDismiss,
+  isActive,
+  onFocus
+}: NotificationItemProps) {
   const [expanded, setExpanded] = React.useState(false);
   const isUnread = notification.status === 'unread';
   const hasDetails = notification.details != null;
@@ -438,7 +455,9 @@ function NotificationItem({ notification, onClick, onDismiss, isActive, onFocus 
 
               {expanded && notification.details && (
                 <div id={`notification-${notification.id}-details`}>
-                  <NotificationDetailView details={notification.details} />
+                  <React.Suspense fallback={<div className="mt-3 p-3 text-xs text-muted-foreground">Loading details...</div>}>
+                    <NotificationDetailView details={notification.details} />
+                  </React.Suspense>
                 </div>
               )}
             </div>
@@ -447,7 +466,61 @@ function NotificationItem({ notification, onClick, onDismiss, isActive, onFocus 
       </div>
     </div>
   );
+});
+
+// ============================================================================
+// NotificationItemMemo Wrapper - Handles callback memoization
+// ============================================================================
+
+interface NotificationItemMemoProps {
+  notification: NotificationData;
+  onNotificationClick: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onClose: () => void;
+  isActive: boolean;
+  onSetActiveIndex: (index: number) => void;
+  index: number;
 }
+
+const NotificationItemMemo = React.memo(function NotificationItemMemo({
+  notification,
+  onNotificationClick,
+  onDismiss,
+  onClose,
+  isActive,
+  onSetActiveIndex,
+  index,
+}: NotificationItemMemoProps) {
+  // Memoize click handler
+  const handleClick = React.useCallback(() => {
+    onNotificationClick(notification.id);
+    onClose();
+  }, [notification.id, onNotificationClick, onClose]);
+
+  // Memoize dismiss handler
+  const handleDismiss = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDismiss(notification.id);
+    },
+    [notification.id, onDismiss]
+  );
+
+  // Memoize focus handler
+  const handleFocus = React.useCallback(() => {
+    onSetActiveIndex(index);
+  }, [index, onSetActiveIndex]);
+
+  return (
+    <NotificationItem
+      notification={notification}
+      onClick={handleClick}
+      onDismiss={handleDismiss}
+      isActive={isActive}
+      onFocus={handleFocus}
+    />
+  );
+});
 
 // ============================================================================
 // Type Guard Functions
@@ -513,21 +586,23 @@ interface NotificationDetailViewProps {
   details: ImportResultDetails | ErrorDetails | GenericDetails;
 }
 
-function NotificationDetailView({ details }: NotificationDetailViewProps) {
+const NotificationDetailView = React.memo(function NotificationDetailView({
+  details
+}: NotificationDetailViewProps) {
   if (isImportResultDetails(details)) {
-    return <ImportResultDetails details={details} />;
+    return <ImportResultDetailsMemo details={details} />;
   }
 
   if (isErrorDetails(details)) {
-    return <ErrorDetail details={details} />;
+    return <ErrorDetailMemo details={details} />;
   }
 
   if (isGenericDetails(details)) {
-    return <GenericDetail details={details} />;
+    return <GenericDetailMemo details={details} />;
   }
 
   return null;
-}
+});
 
 // ============================================================================
 // ImportResultDetails Component
@@ -537,7 +612,9 @@ interface ImportResultDetailsProps {
   details: ImportResultDetails;
 }
 
-function ImportResultDetails({ details }: ImportResultDetailsProps) {
+const ImportResultDetailsMemo = React.memo(function ImportResultDetailsMemo({
+  details
+}: ImportResultDetailsProps) {
   return (
     <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
       {/* Summary */}
@@ -596,7 +673,7 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // ErrorDetail Component
@@ -607,7 +684,10 @@ interface ErrorDetailProps {
   onRetry?: () => void;
 }
 
-function ErrorDetail({ details, onRetry }: ErrorDetailProps) {
+const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
+  details,
+  onRetry
+}: ErrorDetailProps) {
   const [showStack, setShowStack] = React.useState(false);
 
   return (
@@ -674,7 +754,7 @@ function ErrorDetail({ details, onRetry }: ErrorDetailProps) {
       )}
     </div>
   );
-}
+});
 
 // ============================================================================
 // GenericDetail Component
@@ -684,7 +764,9 @@ interface GenericDetailProps {
   details: GenericDetails;
 }
 
-function GenericDetail({ details }: GenericDetailProps) {
+const GenericDetailMemo = React.memo(function GenericDetailMemo({
+  details
+}: GenericDetailProps) {
   if (!details.metadata || Object.keys(details.metadata).length === 0) {
     return null;
   }
@@ -713,7 +795,7 @@ function GenericDetail({ details }: GenericDetailProps) {
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // Helper Functions
