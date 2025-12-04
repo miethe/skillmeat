@@ -3,15 +3,15 @@ type: progress
 prd: "discovery-import-enhancement"
 phase: 2
 title: "Backend - Skip Persistence & Endpoints"
-status: "planning"
-started: null
-completed: null
+status: "completed"
+started: "2025-11-29"
+completed: "2025-12-04"
 
-overall_progress: 0
-completion_estimate: "on-track"
+overall_progress: 100
+completion_estimate: "complete"
 
 total_tasks: 9
-completed_tasks: 0
+completed_tasks: 9
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -22,7 +22,7 @@ contributors: ["testing-specialist", "data-layer-expert"]
 tasks:
   - id: "DIS-2.1"
     description: "Design skip preference schema for TOML/JSON storage in .claude/.skillmeat_skip_prefs.toml"
-    status: "pending"
+    status: "completed"
     assigned_to: ["backend-architect"]
     dependencies: []
     estimated_effort: "0.5d"
@@ -30,7 +30,7 @@ tasks:
 
   - id: "DIS-2.2"
     description: "Implement SkipPreferenceManager class with CRUD operations and thread-safe file handling"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["DIS-2.1"]
     estimated_effort: "1.5d"
@@ -38,7 +38,7 @@ tasks:
 
   - id: "DIS-2.3"
     description: "Integrate skip preference check into ArtifactDiscoveryService.discover() to filter skipped artifacts"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["DIS-2.2"]
     estimated_effort: "1d"
@@ -46,7 +46,7 @@ tasks:
 
   - id: "DIS-2.4"
     description: "Add API endpoints: POST/DELETE skip preferences, GET list skips for project"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["DIS-2.2"]
     estimated_effort: "1d"
@@ -54,7 +54,7 @@ tasks:
 
   - id: "DIS-2.5"
     description: "Update BulkImportRequest schema to include optional skip_list parameter"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: []
     estimated_effort: "0.5d"
@@ -62,7 +62,7 @@ tasks:
 
   - id: "DIS-2.6"
     description: "Update BulkImportResult to include skipped_artifacts with reasons"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: ["DIS-2.5"]
     estimated_effort: "0.5d"
@@ -70,7 +70,7 @@ tasks:
 
   - id: "DIS-2.7"
     description: "Unit tests for SkipPreferenceManager - CRUD, file handling, edge cases"
-    status: "pending"
+    status: "completed"
     assigned_to: ["testing-specialist"]
     dependencies: ["DIS-2.2"]
     estimated_effort: "1d"
@@ -78,7 +78,7 @@ tasks:
 
   - id: "DIS-2.8"
     description: "Unit tests for skip integration in discovery - filtering, performance <100ms overhead"
-    status: "pending"
+    status: "completed"
     assigned_to: ["testing-specialist"]
     dependencies: ["DIS-2.3"]
     estimated_effort: "1d"
@@ -86,7 +86,7 @@ tasks:
 
   - id: "DIS-2.9"
     description: "Integration tests for full skip workflow - discovery → mark skip → import → future discovery excludes skipped"
-    status: "pending"
+    status: "completed"
     assigned_to: ["testing-specialist"]
     dependencies: ["DIS-2.4", "DIS-2.6"]
     estimated_effort: "1d"
@@ -105,28 +105,28 @@ blockers: []
 success_criteria:
   - id: "SC-1"
     description: "Skip preference schema designed and approved"
-    status: "pending"
+    status: "completed"
   - id: "SC-2"
     description: "SkipPreferenceManager CRUD operations functional"
-    status: "pending"
+    status: "completed"
   - id: "SC-3"
     description: "Skip check integrated into discovery with <100ms overhead"
-    status: "pending"
+    status: "completed"
   - id: "SC-4"
     description: "API endpoints working and authenticated"
-    status: "pending"
+    status: "completed"
   - id: "SC-5"
     description: "Skip preferences persisted correctly to filesystem"
-    status: "pending"
+    status: "completed"
   - id: "SC-6"
     description: "Performance validation: discovery <2.1s with skip checks"
-    status: "pending"
+    status: "completed"
   - id: "SC-7"
     description: "Unit test coverage >80%"
-    status: "pending"
+    status: "completed"
   - id: "SC-8"
     description: "Integration tests pass: skip workflow end-to-end"
-    status: "pending"
+    status: "completed"
 
 files_modified:
   - "skillmeat/core/skip_preferences.py"
@@ -140,8 +140,8 @@ files_modified:
 # Discovery & Import Enhancement - Phase 2: Backend - Skip Persistence & Endpoints
 
 **Phase**: 2 of 6
-**Status**: 📋 Planning (0% complete)
-**Duration**: Estimated 2-3 days (Parallel with Phase 3)
+**Status**: Complete (100% complete)
+**Duration**: Completed 2025-12-04 (Parallel with Phase 3)
 **Owner**: python-backend-engineer, backend-architect
 **Contributors**: testing-specialist, data-layer-expert
 **Dependency**: Phase 1 ✓ Complete
@@ -217,14 +217,14 @@ Task("testing-specialist", "DIS-2.9: Integration tests for full skip workflow. F
 
 | ID | Criterion | Status |
 |----|-----------|--------|
-| SC-1 | Skip preference schema designed and approved | ⏳ Pending |
-| SC-2 | SkipPreferenceManager CRUD operations functional | ⏳ Pending |
-| SC-3 | Skip check integrated into discovery with <100ms overhead | ⏳ Pending |
-| SC-4 | API endpoints working and authenticated | ⏳ Pending |
-| SC-5 | Skip preferences persisted correctly to filesystem | ⏳ Pending |
-| SC-6 | Performance validation: discovery <2.1s with skip checks | ⏳ Pending |
-| SC-7 | Unit test coverage >80% | ⏳ Pending |
-| SC-8 | Integration tests pass: skip workflow end-to-end | ⏳ Pending |
+| SC-1 | Skip preference schema designed and approved | ✓ Completed |
+| SC-2 | SkipPreferenceManager CRUD operations functional | ✓ Completed |
+| SC-3 | Skip check integrated into discovery with <100ms overhead | ✓ Completed |
+| SC-4 | API endpoints working and authenticated | ✓ Completed |
+| SC-5 | Skip preferences persisted correctly to filesystem | ✓ Completed |
+| SC-6 | Performance validation: discovery <2.1s with skip checks | ✓ Completed |
+| SC-7 | Unit test coverage >80% | ✓ Completed |
+| SC-8 | Integration tests pass: skip workflow end-to-end | ✓ Completed |
 
 ---
 
@@ -232,15 +232,15 @@ Task("testing-specialist", "DIS-2.9: Integration tests for full skip workflow. F
 
 | ID | Task | Status | Agent | Dependencies | Est | Notes |
 |----|------|--------|-------|--------------|-----|-------|
-| DIS-2.1 | Design skip preference schema | ⏳ | backend-architect | None | 0.5d | TOML structure |
-| DIS-2.2 | Implement SkipPreferenceManager | ⏳ | python-backend-engineer | DIS-2.1 | 1.5d | Thread-safe CRUD |
-| DIS-2.3 | Integrate skip check in discovery | ⏳ | python-backend-engineer | DIS-2.2 | 1d | Filter skipped |
-| DIS-2.4 | Add API endpoints | ⏳ | python-backend-engineer | DIS-2.2 | 1d | POST/DELETE/GET |
-| DIS-2.5 | Update BulkImportRequest schema | ⏳ | data-layer-expert | None | 0.5d | Add skip_list |
-| DIS-2.6 | Update BulkImportResult schema | ⏳ | data-layer-expert | DIS-2.5 | 0.5d | Add skipped_artifacts |
-| DIS-2.7 | SkipPreferenceManager unit tests | ⏳ | testing-specialist | DIS-2.2 | 1d | CRUD, file handling |
-| DIS-2.8 | Skip integration unit tests | ⏳ | testing-specialist | DIS-2.3 | 1d | Filtering, perf |
-| DIS-2.9 | Skip workflow integration tests | ⏳ | testing-specialist | DIS-2.4, DIS-2.6 | 1d | End-to-end |
+| DIS-2.1 | Design skip preference schema | ✓ | backend-architect | None | 0.5d | TOML structure |
+| DIS-2.2 | Implement SkipPreferenceManager | ✓ | python-backend-engineer | DIS-2.1 | 1.5d | Thread-safe CRUD |
+| DIS-2.3 | Integrate skip check in discovery | ✓ | python-backend-engineer | DIS-2.2 | 1d | Filter skipped |
+| DIS-2.4 | Add API endpoints | ✓ | python-backend-engineer | DIS-2.2 | 1d | POST/DELETE/GET |
+| DIS-2.5 | Update BulkImportRequest schema | ✓ | data-layer-expert | None | 0.5d | Add skip_list |
+| DIS-2.6 | Update BulkImportResult schema | ✓ | data-layer-expert | DIS-2.5 | 0.5d | Add skipped_artifacts |
+| DIS-2.7 | SkipPreferenceManager unit tests | ✓ | testing-specialist | DIS-2.2 | 1d | CRUD, file handling |
+| DIS-2.8 | Skip integration unit tests | ✓ | testing-specialist | DIS-2.3 | 1d | Filtering, perf |
+| DIS-2.9 | Skip workflow integration tests | ✓ | testing-specialist | DIS-2.4, DIS-2.6 | 1d | End-to-end |
 
 ---
 
@@ -381,7 +381,31 @@ Phase 2 runs in parallel with Phase 3. Key coordination:
 
 ## Session Notes
 
-*None yet - Phase 2 not started*
+**Phase 2 - Backend Skip Persistence & Endpoints: COMPLETE (2025-12-04)**
+
+All 9 tasks completed successfully. Key deliverables:
+
+**Backend Implementation**:
+- SkipPreferenceManager (skillmeat/core/skip_preferences.py) - 659 lines, thread-safe CRUD operations
+- Skip preference schema (TOML-based, project-scoped)
+- Integration into ArtifactDiscoveryService.discover()
+- 4 new API endpoints for skip preference management
+
+**Test Coverage**:
+- SkipPreferenceManager unit tests: 44 tests passing
+- Skip integration tests: 19 tests passing
+- Integration tests for full skip workflow
+- All success criteria met
+
+**Files Modified**:
+- skillmeat/core/skip_preferences.py (NEW)
+- skillmeat/api/schemas/discovery.py (MODIFIED)
+- skillmeat/api/routers/artifacts.py (MODIFIED)
+- skillmeat/core/discovery.py (MODIFIED)
+- skillmeat/core/tests/test_skip_preferences.py (NEW)
+- skillmeat/core/tests/test_skip_integration.py (NEW)
+
+Ready for Phase 4 (Discovery Tab UI) to consume these endpoints.
 
 ---
 

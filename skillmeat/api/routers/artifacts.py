@@ -59,6 +59,10 @@ from skillmeat.api.schemas.discovery import (
     MetadataFetchResponse,
     ParameterUpdateRequest,
     ParameterUpdateResponse,
+    SkipClearResponse,
+    SkipPreferenceAddRequest,
+    SkipPreferenceListResponse,
+    SkipPreferenceResponse,
 )
 from skillmeat.api.schemas.errors import ErrorCodes, ErrorDetail
 from skillmeat.api.utils.error_handlers import (
@@ -5199,3 +5203,335 @@ async def discovery_health_check():
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "error": str(e),
         }
+
+
+# ===========================
+# Skip Preference Management
+# ===========================
+
+
+@router.post(
+    "/projects/{project_id:path}/skip-preferences",
+    response_model=SkipPreferenceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add skip preference",
+    description="Add a skip preference for an artifact in the project",
+    responses={
+        201: {"description": "Skip preference added successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        422: {"model": ErrorResponse, "description": "Validation error (duplicate or invalid artifact_key)"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def add_skip_preference(
+    project_id: str = Path(..., description="URL-encoded project path"),
+    request: SkipPreferenceAddRequest = Body(...),
+    _token: TokenDep = None,
+) -> SkipPreferenceResponse:
+    """Add a skip preference for an artifact in a project.
+
+    Args:
+        project_id: Project ID (URL-encoded path)
+        request: Skip preference request with artifact_key and skip_reason
+        _token: Authentication token
+
+    Returns:
+        SkipPreferenceResponse with the created skip preference
+
+    Raises:
+        HTTPException: If project not found, validation fails, or operation fails
+    """
+    from skillmeat.core.skip_preferences import SkipPreferenceManager
+
+    try:
+        # Decode project ID to get project path
+        project_path = _decode_project_id_param(project_id)
+        if not project_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid project_id: unable to decode project path"
+            )
+
+        # Verify project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path}"
+            )
+
+        # Initialize skip preference manager for this project
+        skip_manager = SkipPreferenceManager(project_path)
+
+        # Add the skip preference
+        skip = skip_manager.add_skip(
+            artifact_key=request.artifact_key,
+            reason=request.skip_reason
+        )
+
+        logger.info(
+            f"Added skip preference for '{request.artifact_key}' in project {project_path}"
+        )
+
+        # Return response
+        return SkipPreferenceResponse(
+            artifact_key=skip.artifact_key,
+            skip_reason=skip.skip_reason,
+            added_date=skip.added_date,
+        )
+
+    except ValueError as e:
+        # Validation error (duplicate or invalid artifact_key)
+        logger.warning(f"Validation error adding skip preference: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to add skip preference: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add skip preference: {str(e)}"
+        )
+
+
+@router.delete(
+    "/projects/{project_id:path}/skip-preferences/{artifact_key}",
+    response_model=SkipClearResponse,
+    summary="Remove skip preference",
+    description="Remove a single skip preference by artifact key",
+    responses={
+        200: {"description": "Skip preference removed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project or skip preference not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def remove_skip_preference(
+    project_id: str = Path(..., description="URL-encoded project path"),
+    artifact_key: str = Path(..., description="Artifact key to remove (e.g., 'skill:canvas')"),
+    _token: TokenDep = None,
+) -> SkipClearResponse:
+    """Remove a single skip preference by artifact key.
+
+    Args:
+        project_id: Project ID (URL-encoded path)
+        artifact_key: Artifact key in format "type:name" (URL-encoded if needed)
+        _token: Authentication token
+
+    Returns:
+        SkipClearResponse with success status and message
+
+    Raises:
+        HTTPException: If project not found or operation fails
+    """
+    from skillmeat.core.skip_preferences import SkipPreferenceManager
+
+    try:
+        # Decode project ID to get project path
+        project_path = _decode_project_id_param(project_id)
+        if not project_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid project_id: unable to decode project path"
+            )
+
+        # Verify project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path}"
+            )
+
+        # Initialize skip preference manager for this project
+        skip_manager = SkipPreferenceManager(project_path)
+
+        # Remove the skip preference
+        removed = skip_manager.remove_skip(artifact_key)
+
+        if not removed:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skip preference not found for artifact '{artifact_key}'"
+            )
+
+        logger.info(
+            f"Removed skip preference for '{artifact_key}' from project {project_path}"
+        )
+
+        # Return response
+        return SkipClearResponse(
+            success=True,
+            cleared_count=1,
+            message=f"Removed skip preference for '{artifact_key}'",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to remove skip preference: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove skip preference: {str(e)}"
+        )
+
+
+@router.delete(
+    "/projects/{project_id:path}/skip-preferences",
+    response_model=SkipClearResponse,
+    summary="Clear all skip preferences",
+    description="Clear all skip preferences for a project",
+    responses={
+        200: {"description": "Skip preferences cleared successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def clear_skip_preferences(
+    project_id: str = Path(..., description="URL-encoded project path"),
+    _token: TokenDep = None,
+) -> SkipClearResponse:
+    """Clear all skip preferences for a project.
+
+    Args:
+        project_id: Project ID (URL-encoded path)
+        _token: Authentication token
+
+    Returns:
+        SkipClearResponse with success status, count, and message
+
+    Raises:
+        HTTPException: If project not found or operation fails
+    """
+    from skillmeat.core.skip_preferences import SkipPreferenceManager
+
+    try:
+        # Decode project ID to get project path
+        project_path = _decode_project_id_param(project_id)
+        if not project_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid project_id: unable to decode project path"
+            )
+
+        # Verify project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path}"
+            )
+
+        # Initialize skip preference manager for this project
+        skip_manager = SkipPreferenceManager(project_path)
+
+        # Clear all skip preferences
+        cleared_count = skip_manager.clear_skips()
+
+        logger.info(
+            f"Cleared {cleared_count} skip preference(s) from project {project_path}"
+        )
+
+        # Return response
+        message = (
+            f"Cleared {cleared_count} skip preference(s)"
+            if cleared_count > 0
+            else "No skip preferences to clear"
+        )
+
+        return SkipClearResponse(
+            success=True,
+            cleared_count=cleared_count,
+            message=message,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to clear skip preferences: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear skip preferences: {str(e)}"
+        )
+
+
+@router.get(
+    "/projects/{project_id:path}/skip-preferences",
+    response_model=SkipPreferenceListResponse,
+    summary="List skip preferences",
+    description="List all skip preferences for a project",
+    responses={
+        200: {"description": "Skip preferences retrieved successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_skip_preferences(
+    project_id: str = Path(..., description="URL-encoded project path"),
+    _token: TokenDep = None,
+) -> SkipPreferenceListResponse:
+    """List all skip preferences for a project.
+
+    Args:
+        project_id: Project ID (URL-encoded path)
+        _token: Authentication token
+
+    Returns:
+        SkipPreferenceListResponse with list of skip preferences
+
+    Raises:
+        HTTPException: If project not found or operation fails
+    """
+    from skillmeat.core.skip_preferences import SkipPreferenceManager
+
+    try:
+        # Decode project ID to get project path
+        project_path = _decode_project_id_param(project_id)
+        if not project_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid project_id: unable to decode project path"
+            )
+
+        # Verify project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path}"
+            )
+
+        # Initialize skip preference manager for this project
+        skip_manager = SkipPreferenceManager(project_path)
+
+        # Get all skip preferences
+        skips = skip_manager.get_skipped_list()
+
+        logger.debug(f"Retrieved {len(skips)} skip preference(s) from project {project_path}")
+
+        # Convert to response format
+        skip_responses = [
+            SkipPreferenceResponse(
+                artifact_key=skip.artifact_key,
+                skip_reason=skip.skip_reason,
+                added_date=skip.added_date,
+            )
+            for skip in skips
+        ]
+
+        return SkipPreferenceListResponse(skips=skip_responses)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to list skip preferences: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list skip preferences: {str(e)}"
+        )
