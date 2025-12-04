@@ -758,6 +758,11 @@ async def bulk_import_artifacts(
     3. Import artifacts (skip duplicates if auto_resolve_conflicts=True)
     4. Update collection manifest and lock files
 
+    Response includes per-artifact status:
+    - status: "success" (imported), "skipped" (already exists), "failed" (error)
+    - skip_reason: Explanation when status="skipped"
+    - error: Error message when status="failed"
+
     Args:
         request: BulkImportRequest with list of artifacts to import
         artifact_mgr: Artifact manager dependency
@@ -766,7 +771,7 @@ async def bulk_import_artifacts(
         collection: Optional collection name (defaults to "default")
 
     Returns:
-        BulkImportResult with per-artifact status and summary counts
+        BulkImportResult with per-artifact status, summary counts, and location breakdown
 
     Raises:
         HTTPException: 400 if validation fails, 500 if import fails
@@ -860,14 +865,15 @@ async def bulk_import_artifacts(
         )
 
         # Convert data class results back to Pydantic schemas
-        from skillmeat.api.schemas.discovery import ImportResult
+        from skillmeat.api.schemas.discovery import ImportResult, ImportStatus
 
         results = [
             ImportResult(
                 artifact_id=r.artifact_id,
-                success=r.success,
+                status=r.status if r.status else (ImportStatus.SUCCESS if r.success else ImportStatus.FAILED),
                 message=r.message,
                 error=r.error,
+                skip_reason=r.skip_reason,
             )
             for r in result_data.results
         ]
@@ -963,10 +969,16 @@ async def bulk_import_artifacts(
                         f"Failed to update project deployments for {project_path}: {e}"
                     )
 
+        # Calculate total_skipped from results
+        total_skipped = sum(1 for r in results if r.status == ImportStatus.SKIPPED)
+
         return BulkImportResult(
             total_requested=result_data.total_requested,
             total_imported=result_data.total_imported,
+            total_skipped=total_skipped,
             total_failed=result_data.total_failed,
+            imported_to_collection=result_data.total_imported,  # All successful imports go to collection
+            added_to_project=0,  # TODO: Track project deployments separately
             results=results,
             duration_ms=result_data.duration_ms,
         )

@@ -165,8 +165,8 @@ class ArtifactDiscoveryService:
             extra={
                 "path": str(self.base_path),
                 "scan_mode": self.scan_mode,
-                "artifacts_base": str(self.artifacts_base)
-            }
+                "artifacts_base": str(self.artifacts_base),
+            },
         )
 
         # Validate artifacts directory exists
@@ -223,28 +223,51 @@ class ArtifactDiscoveryService:
             logger.error(error_msg, exc_info=True)
             errors.append(error_msg)
 
-        # Filter artifacts if manifest provided
-        importable_artifacts = discovered_artifacts
-        if manifest:
-            # Build set of imported sources for efficient lookup
-            # Note: Artifact uses 'upstream' field, DiscoveredArtifact uses 'source'
-            imported_sources = {a.upstream for a in manifest.artifacts if a.upstream}
+        # Filter artifacts based on existence check
+        # Strategy: Use pre-scan check to filter out artifacts already in both locations
+        # Fall back to legacy manifest-based filtering if manifest provided
+        importable_artifacts = []
+        filtered_count = 0
 
-            # Filter out artifacts that are already imported
-            importable_artifacts = [
-                artifact
-                for artifact in discovered_artifacts
-                if artifact.source not in imported_sources
-            ]
+        for artifact in discovered_artifacts:
+            artifact_key = f"{artifact.type}:{artifact.name}"
 
-            logger.debug(
-                f"Filtered {len(discovered_artifacts) - len(importable_artifacts)} "
-                f"already-imported artifacts",
+            # Use the new check_artifact_exists for comprehensive filtering
+            existence = self.check_artifact_exists(artifact_key, manifest)
+
+            # Filter logic:
+            # - If in both Collection and Project: exclude (fully installed)
+            # - If in Collection only: include (user might want to deploy to Project)
+            # - If in Project only: include (user might want to add to Collection)
+            # - If in neither: include (new artifact)
+            should_include = existence["location"] != "both"
+
+            # Legacy compatibility: If manifest provided and artifact in collection,
+            # consider it as potentially importable to project
+            if should_include:
+                importable_artifacts.append(artifact)
+            else:
+                filtered_count += 1
+                logger.debug(
+                    f"Filtered out {artifact_key} (exists in both Collection and Project)"
+                )
+
+        # Log filtering summary
+        if filtered_count > 0:
+            logger.info(
+                f"Filtered {filtered_count} artifacts that exist in both Collection and Project",
                 extra={
                     "total_discovered": len(discovered_artifacts),
                     "importable": len(importable_artifacts),
-                    "filtered": len(discovered_artifacts) - len(importable_artifacts),
-                }
+                    "filtered": filtered_count,
+                },
+            )
+
+        # Early return if all artifacts are filtered out
+        if len(importable_artifacts) == 0 and len(discovered_artifacts) > 0:
+            logger.info(
+                f"All {len(discovered_artifacts)} discovered artifacts already exist in "
+                f"Collection and/or Project. Nothing to import."
             )
 
         # Calculate scan duration
@@ -267,7 +290,7 @@ class ArtifactDiscoveryService:
                 "importable_count": len(importable_artifacts),
                 "error_count": len(errors),
                 "duration_ms": round(scan_duration_ms, 2),
-            }
+            },
         )
 
         return DiscoveryResult(
@@ -551,6 +574,134 @@ class ArtifactDiscoveryService:
         except Exception as e:
             logger.debug(f"Frontmatter validation failed for {metadata_file}: {e}")
             return False
+
+    def check_artifact_exists(
+        self,
+        artifact_key: str,  # Format: "type:name" (e.g., "skill:canvas-design")
+        manifest: Optional["Collection"] = None,
+    ) -> dict:
+        """
+        Check if an artifact exists in Collection and/or Project.
+
+        Args:
+            artifact_key: Artifact identifier in "type:name" format
+            manifest: Optional manifest to check against (uses self.manifest if not provided)
+
+        Returns:
+            dict with keys:
+            - exists_in_collection: bool
+            - exists_in_project: bool
+            - collection_path: Optional[str] - path if exists in collection
+            - project_path: Optional[str] - path if exists in project
+            - location: str - "collection", "project", "both", or "none"
+        """
+        # Parse artifact_key
+        try:
+            artifact_type, artifact_name = artifact_key.split(":", 1)
+        except ValueError:
+            logger.warning(
+                f"Invalid artifact_key format: {artifact_key}. Expected 'type:name'"
+            )
+            return {
+                "exists_in_collection": False,
+                "exists_in_project": False,
+                "collection_path": None,
+                "project_path": None,
+                "location": "none",
+            }
+
+        # Initialize result
+        exists_in_collection = False
+        exists_in_project = False
+        collection_path = None
+        project_path = None
+
+        # Check Collection
+        try:
+            # Get collection base path
+            from skillmeat.config import ConfigManager
+
+            config = ConfigManager()
+            collection_name = config.get_active_collection()
+            collection_base = config.get_collection_path(collection_name)
+
+            # Check collection artifacts directory
+            # Format: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/{name}/
+            collection_artifact_dir = (
+                collection_base / "artifacts" / f"{artifact_type}s" / artifact_name
+            )
+
+            if collection_artifact_dir.exists() and collection_artifact_dir.is_dir():
+                exists_in_collection = True
+                collection_path = str(collection_artifact_dir)
+                logger.debug(
+                    f"Artifact {artifact_key} found in collection at {collection_path}"
+                )
+            else:
+                # Fallback: Check manifest if provided
+                if manifest:
+                    try:
+                        artifact_type_enum = ArtifactType(artifact_type)
+                        found = manifest.find_artifact(
+                            artifact_name, artifact_type_enum
+                        )
+                        if found:
+                            exists_in_collection = True
+                            # Construct path from manifest
+                            collection_path = str(collection_base / found.path)
+                            logger.debug(f"Artifact {artifact_key} found in manifest")
+                    except ValueError:
+                        # Invalid artifact type
+                        logger.debug(f"Invalid artifact type in key: {artifact_type}")
+                    except Exception as e:
+                        # Corrupt manifest or other error
+                        logger.warning(
+                            f"Error checking manifest for {artifact_key}: {e}"
+                        )
+        except PermissionError as e:
+            logger.warning(
+                f"Permission denied accessing collection for {artifact_key}: {e}"
+            )
+        except Exception as e:
+            logger.warning(f"Error checking collection for {artifact_key}: {e}")
+
+        # Check Project
+        try:
+            # Format: {self.base_path}/.claude/{type}s/{name}/
+            project_artifact_dir = (
+                self.base_path / ".claude" / f"{artifact_type}s" / artifact_name
+            )
+
+            if project_artifact_dir.exists() and project_artifact_dir.is_dir():
+                exists_in_project = True
+                project_path = str(project_artifact_dir)
+                logger.debug(
+                    f"Artifact {artifact_key} found in project at {project_path}"
+                )
+        except PermissionError as e:
+            logger.warning(
+                f"Permission denied accessing project for {artifact_key}: {e}"
+            )
+        except Exception as e:
+            logger.warning(f"Error checking project for {artifact_key}: {e}")
+
+        # Determine location
+        if exists_in_collection and exists_in_project:
+            location = "both"
+        elif exists_in_collection:
+            location = "collection"
+        elif exists_in_project:
+            location = "project"
+        else:
+            location = "none"
+
+        return {
+            "exists_in_collection": exists_in_collection,
+            "exists_in_project": exists_in_project,
+            "collection_path": collection_path,
+            "project_path": project_path,
+            "location": location,
+        }
 
     def _normalize_type_from_dirname(self, dirname: str) -> str:
         """Normalize directory name to artifact type.
