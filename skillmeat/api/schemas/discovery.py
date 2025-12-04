@@ -8,9 +8,10 @@ Provides Pydantic models for:
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 # ===========================
@@ -446,6 +447,13 @@ class BulkImportRequest(BaseModel):
     }
 
 
+class ImportStatus(str, Enum):
+    """Status of an artifact import operation."""
+    SUCCESS = "success"  # Artifact was successfully imported
+    SKIPPED = "skipped"  # Artifact already exists in Collection/Project
+    FAILED = "failed"    # Import failed due to error
+
+
 class ImportResult(BaseModel):
     """Result for a single imported artifact."""
 
@@ -454,10 +462,10 @@ class ImportResult(BaseModel):
         description="ID of the artifact (type:name)",
         examples=["skill:canvas-design"],
     )
-    success: bool = Field(
+    status: ImportStatus = Field(
         ...,
-        description="Whether import succeeded",
-        examples=[True],
+        description="Import status: success, skipped, or failed",
+        examples=[ImportStatus.SUCCESS],
     )
     message: str = Field(
         ...,
@@ -466,20 +474,33 @@ class ImportResult(BaseModel):
     )
     error: Optional[str] = Field(
         default=None,
-        description="Error message (if failed)",
+        description="Error message (if status=failed)",
         examples=["Artifact already exists and auto_resolve_conflicts is False"],
     )
+    skip_reason: Optional[str] = Field(
+        default=None,
+        description="Reason artifact was skipped (if status=skipped)",
+        examples=["Artifact already exists in collection"],
+    )
 
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
             "example": {
                 "artifact_id": "skill:canvas-design",
-                "success": True,
+                "status": "success",
                 "message": "Artifact 'canvas-design' imported successfully",
                 "error": None,
+                "skip_reason": None,
             }
         }
-    }
+    )
+
+    @computed_field
+    @property
+    def success(self) -> bool:
+        """Backward compatibility: returns True if status is SUCCESS."""
+        return self.status == ImportStatus.SUCCESS
 
 
 class BulkImportResult(BaseModel):
@@ -495,14 +516,35 @@ class BulkImportResult(BaseModel):
         ...,
         description="Number of artifacts successfully imported",
         ge=0,
-        examples=[8],
+        examples=[7],
+    )
+    total_skipped: int = Field(
+        default=0,
+        description="Number of artifacts skipped (already exist)",
+        ge=0,
+        examples=[2],
     )
     total_failed: int = Field(
         ...,
         description="Number of artifacts that failed to import",
         ge=0,
-        examples=[2],
+        examples=[1],
     )
+
+    # Per-location breakdown
+    imported_to_collection: int = Field(
+        default=0,
+        description="Number of artifacts added to Collection",
+        ge=0,
+        examples=[5],
+    )
+    added_to_project: int = Field(
+        default=0,
+        description="Number of artifacts deployed to Project",
+        ge=0,
+        examples=[7],
+    )
+
     results: List[ImportResult] = Field(
         default_factory=list,
         description="Per-artifact import results",
@@ -511,30 +553,49 @@ class BulkImportResult(BaseModel):
         ...,
         description="Total import duration in milliseconds",
         ge=0.0,
-        examples=[1234.56],
+        examples=[1250.5],
     )
+
+    @computed_field
+    @property
+    def summary(self) -> str:
+        """Human-readable summary of import results."""
+        parts = []
+        if self.total_imported > 0:
+            parts.append(f"{self.total_imported} imported")
+        if self.total_skipped > 0:
+            parts.append(f"{self.total_skipped} skipped")
+        if self.total_failed > 0:
+            parts.append(f"{self.total_failed} failed")
+        return ", ".join(parts) if parts else "No artifacts processed"
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "total_requested": 10,
-                "total_imported": 8,
-                "total_failed": 2,
+                "total_imported": 7,
+                "total_skipped": 2,
+                "total_failed": 1,
+                "imported_to_collection": 5,
+                "added_to_project": 7,
                 "results": [
                     {
                         "artifact_id": "skill:canvas-design",
-                        "success": True,
+                        "status": "success",
                         "message": "Artifact 'canvas-design' imported successfully",
                         "error": None,
+                        "skip_reason": None,
                     },
                     {
                         "artifact_id": "skill:existing-skill",
-                        "success": False,
-                        "message": "Import failed",
-                        "error": "Artifact already exists",
+                        "status": "skipped",
+                        "message": "Artifact already exists",
+                        "error": None,
+                        "skip_reason": "Artifact already exists in collection",
                     },
                 ],
-                "duration_ms": 1234.56,
+                "duration_ms": 1250.5,
+                "summary": "7 imported, 2 skipped, 1 failed",
             }
         }
     }
