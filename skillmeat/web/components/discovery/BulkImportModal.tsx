@@ -20,15 +20,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Loader2, Pencil, Package } from 'lucide-react';
 import { useToastNotification } from '@/hooks/use-toast-notification';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
-import type { BulkImportResult } from '@/types/discovery';
+import type { BulkImportResult, ImportStatus } from '@/types/discovery';
 import type { ArtifactImportResult } from '@/types/notification';
 
 /**
- * Discovered artifact from local filesystem
+ * Discovered artifact from local filesystem with import status
  */
 export interface DiscoveredArtifact {
   type: string;
@@ -40,17 +41,47 @@ export interface DiscoveredArtifact {
   description?: string;
   path: string;
   discovered_at: string;
+  status?: ImportStatus;
 }
 
 export interface BulkImportModalProps {
   artifacts: DiscoveredArtifact[];
   open: boolean;
   onClose: () => void;
-  onImport: (selected: DiscoveredArtifact[]) => Promise<BulkImportResult>;
+  onImport: (selected: DiscoveredArtifact[], skipList?: string[]) => Promise<BulkImportResult>;
+}
+
+/**
+ * Get badge variant based on import status
+ */
+function getStatusVariant(status?: ImportStatus): 'default' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'success':
+      return 'default'; // Green for new artifacts
+    case 'skipped':
+      return 'secondary'; // Gray for skipped
+    default:
+      return 'outline'; // Blue for existing in collection
+  }
+}
+
+/**
+ * Get status label text
+ */
+function getStatusLabel(status?: ImportStatus): string {
+  switch (status) {
+    case 'success':
+      return 'Will add to Collection & Project';
+    case 'skipped':
+      return 'Skipped (marked to skip)';
+    default:
+      return 'Already in Collection, will add to Project';
+  }
 }
 
 export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImportModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [skippedArtifacts, setSkippedArtifacts] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const tracking = useTrackDiscovery();
   const { showImportResult, showError } = useToastNotification();
@@ -83,6 +114,19 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     setSelected(newSelected);
   };
 
+  const handleSkipToggle = (artifact: DiscoveredArtifact, checked: boolean) => {
+    setSkippedArtifacts((prev) => {
+      const newSet = new Set(prev);
+      const key = `${artifact.type}:${artifact.name}`;
+      if (checked) {
+        newSet.add(key);
+      } else {
+        newSet.delete(key);
+      }
+      return newSet;
+    });
+  };
+
   const handleImport = async () => {
     if (selected.size === 0) return;
 
@@ -90,7 +134,8 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     const startTime = Date.now();
     try {
       const selectedArtifacts = artifacts.filter((a) => selected.has(a.path));
-      const result = await onImport(selectedArtifacts);
+      const skipList = Array.from(skippedArtifacts);
+      const result = await onImport(selectedArtifacts, skipList);
 
       const duration = Date.now() - startTime;
 
@@ -100,7 +145,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
         return {
           name: artifact?.name || r.artifact_id,
           type: (artifact?.type as ArtifactImportResult['type']) || 'skill',
-          success: r.success,
+          success: r.status === 'success',
           error: r.error,
         };
       });
@@ -143,6 +188,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
   const handleClose = () => {
     if (!isImporting) {
       setSelected(new Set());
+      setSkippedArtifacts(new Set());
       onClose();
     }
   };
@@ -198,68 +244,88 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                   <TableHead>Name</TableHead>
                   <TableHead>Version</TableHead>
                   <TableHead className="min-w-[200px]">Source</TableHead>
-                  <TableHead>Tags</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Skip Future</TableHead>
                   <TableHead className="w-20">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {artifacts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No artifacts discovered
                     </TableCell>
                   </TableRow>
                 ) : (
-                  artifacts.map((artifact) => (
-                  <TableRow
-                    key={artifact.path}
-                    data-state={selected.has(artifact.path) ? 'selected' : undefined}
-                    className="cursor-pointer"
-                    onClick={() => toggleSelect(artifact.path)}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.has(artifact.path)}
-                        onCheckedChange={() => toggleSelect(artifact.path)}
-                        aria-label={`Select ${artifact.name}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{artifact.type}</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{artifact.name}</TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                        {artifact.version || '—'}
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs truncate block max-w-[200px]" title={artifact.source}>
-                        {artifact.source || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {artifact.tags && artifact.tags.length > 0 ? (
-                        <span className="text-xs text-muted-foreground">
-                          {artifact.tags.join(', ')}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(artifact)}
-                        disabled={isImporting}
-                        aria-label={`Edit ${artifact.name}`}
+                  artifacts.map((artifact) => {
+                    const artifactKey = `${artifact.type}:${artifact.name}`;
+                    const isSkipped = artifact.status === 'skipped';
+                    const isMarkedToSkip = skippedArtifacts.has(artifactKey);
+
+                    return (
+                      <TableRow
+                        key={artifact.path}
+                        data-state={selected.has(artifact.path) ? 'selected' : undefined}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(artifact.path)}
                       >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                    </TableRow>
-                  ))
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selected.has(artifact.path)}
+                            onCheckedChange={() => toggleSelect(artifact.path)}
+                            aria-label={`Select ${artifact.name}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{artifact.type}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{artifact.name}</TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                            {artifact.version || '—'}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-xs truncate block max-w-[200px]" title={artifact.source}>
+                            {artifact.source || '—'}
+                          </span>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Badge variant={getStatusVariant(artifact.status)} className="text-xs">
+                            {getStatusLabel(artifact.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`skip-${artifact.path}`}
+                              checked={isMarkedToSkip}
+                              onCheckedChange={(checked) => handleSkipToggle(artifact, checked === true)}
+                              disabled={isSkipped || isImporting}
+                              aria-label={`Don't show ${artifact.name} in future discoveries`}
+                            />
+                            <Label
+                              htmlFor={`skip-${artifact.path}`}
+                              className="text-xs text-muted-foreground cursor-pointer"
+                            >
+                              Skip
+                            </Label>
+                          </div>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(artifact)}
+                            disabled={isImporting}
+                            aria-label={`Edit ${artifact.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

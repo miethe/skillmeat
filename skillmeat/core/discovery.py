@@ -21,6 +21,7 @@ from skillmeat.core.discovery_metrics import (
     discovery_scans_total,
     log_performance,
 )
+from skillmeat.core.skip_preferences import SkipPreferenceManager, build_artifact_key
 from skillmeat.utils.metadata import extract_yaml_frontmatter
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ class DiscoveredArtifact(BaseModel):
         description: Optional description
         path: Full path to artifact directory
         discovered_at: Timestamp when artifact was discovered
+        skip_reason: Optional reason why artifact is skipped (only set when include_skipped=True)
     """
 
     type: str
@@ -63,6 +65,7 @@ class DiscoveredArtifact(BaseModel):
     description: Optional[str] = None
     path: str
     discovered_at: datetime
+    skip_reason: Optional[str] = None
 
 
 class DiscoveryResult(BaseModel):
@@ -72,6 +75,7 @@ class DiscoveryResult(BaseModel):
         discovered_count: Total number of artifacts discovered
         importable_count: Number of artifacts not yet imported (filtered by manifest)
         artifacts: List of discovered artifacts (filtered if manifest provided)
+        skipped_artifacts: List of artifacts that were skipped (only populated when include_skipped=True)
         errors: List of error messages for artifacts that failed discovery
         scan_duration_ms: Time taken to complete scan in milliseconds
     """
@@ -79,6 +83,7 @@ class DiscoveryResult(BaseModel):
     discovered_count: int
     importable_count: int
     artifacts: List[DiscoveredArtifact]
+    skipped_artifacts: List[DiscoveredArtifact] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
     scan_duration_ms: float
 
@@ -136,7 +141,10 @@ class ArtifactDiscoveryService:
 
     @log_performance("discovery_scan")
     def discover_artifacts(
-        self, manifest: Optional["Collection"] = None
+        self,
+        manifest: Optional["Collection"] = None,
+        project_path: Optional[Path] = None,
+        include_skipped: bool = False,
     ) -> DiscoveryResult:
         """Scan artifacts directory and discover all artifacts.
 
@@ -149,12 +157,17 @@ class ArtifactDiscoveryService:
         Args:
             manifest: Optional Collection manifest to filter already-imported artifacts.
                      If provided, only artifacts not in manifest.artifacts are returned.
+            project_path: Optional path to the project root for skip preference filtering.
+                         If provided, artifacts in the skip list will be filtered out.
+            include_skipped: If True and project_path is provided, include skipped artifacts
+                            in a separate list with their skip reasons. Default: False.
 
         Returns:
             DiscoveryResult with discovered artifacts, error list, and metrics.
             The `discovered_count` field shows total artifacts found.
             The `importable_count` field shows artifacts not yet imported (filtered).
             The `artifacts` list contains only importable artifacts if manifest provided.
+            The `skipped_artifacts` list contains skipped artifacts if include_skipped=True.
         """
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []
@@ -183,6 +196,7 @@ class ArtifactDiscoveryService:
                 discovered_count=0,
                 importable_count=0,
                 artifacts=[],
+                skipped_artifacts=[],
                 errors=errors,
                 scan_duration_ms=(time.time() - start_time) * 1000,
             )
@@ -263,11 +277,62 @@ class ArtifactDiscoveryService:
                 },
             )
 
+        # Filter by skip preferences if project_path provided
+        skipped_artifacts = []
+        skip_start_time = time.time()
+
+        if project_path:
+            try:
+                skip_mgr = SkipPreferenceManager(project_path)
+                pre_skip_count = len(importable_artifacts)
+                filtered_importable = []
+
+                for artifact in importable_artifacts:
+                    artifact_key = build_artifact_key(artifact.type, artifact.name)
+
+                    if skip_mgr.is_skipped(artifact_key):
+                        if include_skipped:
+                            # Get skip preference to add reason
+                            skip_pref = skip_mgr.get_skip_by_key(artifact_key)
+                            if skip_pref:
+                                artifact.skip_reason = skip_pref.skip_reason
+                            skipped_artifacts.append(artifact)
+                        logger.debug(f"Filtered skipped artifact: {artifact_key}")
+                    else:
+                        filtered_importable.append(artifact)
+
+                # Update importable_artifacts with filtered list
+                skip_filtered_count = pre_skip_count - len(filtered_importable)
+                importable_artifacts = filtered_importable
+
+                # Log skip filtering performance
+                skip_duration_ms = (time.time() - skip_start_time) * 1000
+
+                if skip_filtered_count > 0:
+                    logger.info(
+                        f"Filtered {skip_filtered_count} skipped artifacts in {skip_duration_ms:.2f}ms",
+                        extra={
+                            "skip_filtered_count": skip_filtered_count,
+                            "remaining_importable": len(importable_artifacts),
+                            "skip_duration_ms": round(skip_duration_ms, 2),
+                        },
+                    )
+                else:
+                    logger.debug(
+                        f"Skip preference check completed in {skip_duration_ms:.2f}ms (no skipped artifacts)"
+                    )
+
+            except Exception as e:
+                error_msg = f"Failed to load skip preferences: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+                # Continue without skip filtering if there's an error
+
         # Early return if all artifacts are filtered out
         if len(importable_artifacts) == 0 and len(discovered_artifacts) > 0:
             logger.info(
                 f"All {len(discovered_artifacts)} discovered artifacts already exist in "
-                f"Collection and/or Project. Nothing to import."
+                f"Collection and/or Project or are skipped. Nothing to import."
             )
 
         # Calculate scan duration
@@ -284,10 +349,11 @@ class ArtifactDiscoveryService:
 
         logger.info(
             f"Discovery scan completed: {len(discovered_artifacts)} artifacts found, "
-            f"{len(importable_artifacts)} importable in {scan_duration_ms:.2f}ms",
+            f"{len(importable_artifacts)} importable, {len(skipped_artifacts)} skipped in {scan_duration_ms:.2f}ms",
             extra={
                 "discovered_count": len(discovered_artifacts),
                 "importable_count": len(importable_artifacts),
+                "skipped_count": len(skipped_artifacts),
                 "error_count": len(errors),
                 "duration_ms": round(scan_duration_ms, 2),
             },
@@ -297,6 +363,7 @@ class ArtifactDiscoveryService:
             discovered_count=len(discovered_artifacts),
             importable_count=len(importable_artifacts),
             artifacts=importable_artifacts,
+            skipped_artifacts=skipped_artifacts,
             errors=errors,
             scan_duration_ms=scan_duration_ms,
         )

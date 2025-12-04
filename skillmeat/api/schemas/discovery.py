@@ -421,6 +421,11 @@ class BulkImportRequest(BaseModel):
         description="Automatically resolve conflicts (overwrite existing artifacts)",
         examples=[False],
     )
+    skip_list: Optional[List[str]] = Field(
+        default=None,
+        description="List of artifact keys to mark as skipped (format: type:name)",
+        examples=[["skill:canvas-design", "command:my-command"]],
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -442,6 +447,7 @@ class BulkImportRequest(BaseModel):
                     },
                 ],
                 "auto_resolve_conflicts": False,
+                "skip_list": ["skill:existing-skill"],
             }
         }
     }
@@ -709,6 +715,126 @@ class ParameterUpdateResponse(BaseModel):
                 "artifact_id": "skill:canvas-design",
                 "updated_fields": ["source", "version", "tags"],
                 "message": "Artifact 'canvas-design' parameters updated successfully",
+            }
+        }
+    }
+
+
+# ===========================
+# Skip Preference Schemas
+# ===========================
+
+
+class SkipPreferenceResponse(BaseModel):
+    """Response containing a skip preference."""
+
+    artifact_key: str = Field(
+        ...,
+        description="Artifact identifier in format 'type:name'",
+        examples=["skill:canvas-design"],
+    )
+    skip_reason: str = Field(
+        ...,
+        description="Human-readable reason for skipping this artifact",
+        examples=["Already in collection"],
+    )
+    added_date: datetime = Field(
+        ...,
+        description="When this skip preference was added (ISO 8601 format)",
+        examples=["2025-12-04T10:00:00Z"],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "artifact_key": "skill:canvas-design",
+                "skip_reason": "Already in collection",
+                "added_date": "2025-12-04T10:00:00Z",
+            }
+        }
+    }
+
+
+class SkipPreferenceListResponse(BaseModel):
+    """Response containing list of skip preferences."""
+
+    skips: List[SkipPreferenceResponse] = Field(
+        default_factory=list,
+        description="List of skip preferences for this project",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "skips": [
+                    {
+                        "artifact_key": "skill:canvas-design",
+                        "skip_reason": "Already in collection",
+                        "added_date": "2025-12-04T10:00:00Z",
+                    },
+                    {
+                        "artifact_key": "command:my-command",
+                        "skip_reason": "Not needed for this project",
+                        "added_date": "2025-12-04T11:00:00Z",
+                    },
+                ]
+            }
+        }
+    }
+
+
+class SkipClearResponse(BaseModel):
+    """Response from clearing skip preferences."""
+
+    success: bool = Field(
+        ...,
+        description="Whether clear operation succeeded",
+        examples=[True],
+    )
+    cleared_count: int = Field(
+        ...,
+        description="Number of skip preferences that were cleared",
+        ge=0,
+        examples=[5],
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable result message",
+        examples=["Cleared 5 skip preferences"],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "success": True,
+                "cleared_count": 5,
+                "message": "Cleared 5 skip preferences",
+            }
+        }
+    }
+
+
+class SkipPreferenceAddRequest(BaseModel):
+    """Request to add a skip preference."""
+
+    artifact_key: str = Field(
+        ...,
+        description="Artifact identifier in format 'type:name'",
+        examples=["skill:canvas-design"],
+        min_length=3,
+    )
+    skip_reason: str = Field(
+        ...,
+        description="Human-readable reason for skipping this artifact",
+        examples=["Already have it"],
+        min_length=1,
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "artifact_key": "skill:canvas-design",
+                "skip_reason": "Already in collection",
             }
         }
     }
