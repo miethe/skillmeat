@@ -21,10 +21,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Pencil, Package } from 'lucide-react';
-import { showImportResultToast, showErrorToast } from '@/lib/toast-utils';
+import { useToastNotification } from '@/hooks/use-toast-notification';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
 import type { BulkImportResult } from '@/types/discovery';
+import type { ArtifactImportResult } from '@/types/notification';
 
 /**
  * Discovered artifact from local filesystem
@@ -52,6 +53,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const tracking = useTrackDiscovery();
+  const { showImportResult, showError } = useToastNotification();
 
   // Track modal open
   useEffect(() => {
@@ -92,10 +94,22 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
 
       const duration = Date.now() - startTime;
 
-      // Show success toast
-      showImportResultToast({
+      // Map import results to notification format
+      const artifactResults: ArtifactImportResult[] = result.results.map((r, idx) => {
+        const artifact = selectedArtifacts[idx];
+        return {
+          name: artifact?.name || r.artifact_id,
+          type: (artifact?.type as ArtifactImportResult['type']) || 'skill',
+          success: r.success,
+          error: r.error,
+        };
+      });
+
+      // Show success toast and create notification with detailed results
+      showImportResult({
         total_imported: result.total_imported,
         total_failed: result.total_failed,
+        artifacts: artifactResults,
       });
 
       // Track import
@@ -111,7 +125,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
       onClose();
     } catch (error) {
       console.error('Import failed:', error);
-      showErrorToast(error, 'Import failed');
+      showError(error, 'Import failed');
 
       // Track failed import
       const duration = Date.now() - startTime;
