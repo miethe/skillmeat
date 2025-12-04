@@ -5,7 +5,6 @@ import {
   Bell,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Info,
   Download,
   RefreshCw,
@@ -22,7 +21,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import type {
@@ -32,6 +30,45 @@ import type {
   ErrorDetails,
   GenericDetails,
 } from '@/types/notification';
+
+// ============================================================================
+// NotificationAnnouncer Component - ARIA Live Region
+// ============================================================================
+
+interface NotificationAnnouncerProps {
+  notifications: NotificationData[];
+}
+
+function NotificationAnnouncer({ notifications }: NotificationAnnouncerProps) {
+  const prevCountRef = React.useRef(notifications.length);
+  const [announcement, setAnnouncement] = React.useState('');
+
+  React.useEffect(() => {
+    const prevCount = prevCountRef.current;
+    if (notifications.length > prevCount) {
+      // New notification added
+      const latest = notifications[0];
+      if (latest) {
+        setAnnouncement(`New ${latest.type} notification: ${latest.title}`);
+        // Clear announcement after screen reader reads it
+        const timer = setTimeout(() => setAnnouncement(''), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevCountRef.current = notifications.length;
+  }, [notifications]);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+    >
+      {announcement}
+    </div>
+  );
+}
 
 // ============================================================================
 // NotificationBell Component
@@ -57,19 +94,29 @@ export function NotificationBell({
   const [open, setOpen] = React.useState(false);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-        >
+    <>
+      {/* Live region announcer for new notifications */}
+      <NotificationAnnouncer notifications={notifications} />
+
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+            aria-haspopup="menu"
+            aria-expanded={open}
+          >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold animate-in fade-in zoom-in"
+              className={cn(
+                "absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                "animate-in fade-in zoom-in animate-notification-pulse",
+                "motion-reduce:animate-none"
+              )}
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -82,7 +129,15 @@ export function NotificationBell({
 
       <DropdownMenuContent
         align="end"
-        className="w-[420px] p-0"
+        className={cn(
+          "w-full sm:w-[380px] p-0",
+          "max-h-[80vh] sm:max-h-[500px]",
+          "transform transition-all duration-200 ease-out",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2",
+          "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2",
+          "motion-reduce:transition-none motion-reduce:animate-none"
+        )}
         sideOffset={8}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -96,6 +151,7 @@ export function NotificationBell({
         />
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
 
@@ -122,9 +178,42 @@ function NotificationDropdown({
 }: NotificationDropdownProps) {
   const hasNotifications = notifications.length > 0;
   const hasUnread = notifications.some((n) => n.status === 'unread');
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation handler for arrow keys, Home, and End
+  const handleListKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!hasNotifications) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setActiveIndex((prev) => Math.min(prev + 1, notifications.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setActiveIndex((prev) => Math.max(prev - 1, 0));
+          break;
+        case 'Home':
+          e.preventDefault();
+          setActiveIndex(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          setActiveIndex(notifications.length - 1);
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    },
+    [hasNotifications, notifications.length, onClose]
+  );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" onKeyDown={handleListKeyDown}>
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <DropdownMenuLabel className="p-0 text-base font-semibold">
@@ -162,9 +251,15 @@ function NotificationDropdown({
 
       {/* Notification List */}
       {hasNotifications ? (
-        <ScrollArea className="max-h-[500px]">
-          <div className="divide-y">
-            {notifications.map((notification) => (
+        <ScrollArea className="max-h-[80vh] sm:max-h-[500px]">
+          <div
+            ref={listRef}
+            className="divide-y"
+            role="log"
+            aria-label="Notification history"
+            aria-live="off"
+          >
+            {notifications.map((notification, index) => (
               <NotificationItem
                 key={notification.id}
                 notification={notification}
@@ -176,16 +271,18 @@ function NotificationDropdown({
                   e.stopPropagation();
                   onDismiss(notification.id);
                 }}
+                isActive={index === activeIndex}
+                onFocus={() => setActiveIndex(index)}
               />
             ))}
           </div>
         </ScrollArea>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <Bell className="h-12 w-12 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No notifications</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            You'll see updates about imports, syncs, and errors here
+          <Bell className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
+          <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-[280px]">
+            You'll see updates about imports, syncs, and system events here
           </p>
         </div>
       )}
@@ -201,28 +298,70 @@ interface NotificationItemProps {
   notification: NotificationData;
   onClick: () => void;
   onDismiss: (e: React.MouseEvent) => void;
+  isActive?: boolean;
+  onFocus?: () => void;
 }
 
-function NotificationItem({ notification, onClick, onDismiss }: NotificationItemProps) {
+function NotificationItem({ notification, onClick, onDismiss, isActive, onFocus }: NotificationItemProps) {
   const [expanded, setExpanded] = React.useState(false);
   const isUnread = notification.status === 'unread';
   const hasDetails = notification.details != null;
+  const itemRef = React.useRef<HTMLDivElement>(null);
 
   const icon = getNotificationIcon(notification.type);
   const iconColor = getNotificationIconColor(notification.type);
 
-  const handleToggleExpand = (e: React.MouseEvent) => {
+  // Focus this item when it becomes active via keyboard navigation
+  React.useEffect(() => {
+    if (isActive && itemRef.current) {
+      itemRef.current.focus();
+    }
+  }, [isActive]);
+
+  const handleToggleExpand = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     setExpanded(!expanded);
   };
 
+  const handleItemKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Enter or Space on the item itself activates it (marks as read/closes)
+    if (e.key === 'Enter' || e.key === ' ') {
+      // Only if the target is the item div itself, not a button inside
+      if (e.target === itemRef.current) {
+        e.preventDefault();
+        onClick();
+      }
+    }
+  };
+
+  const handleDetailsKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Enter or Space on details button toggles expansion
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleToggleExpand(e);
+    }
+  };
+
   return (
     <div
+      ref={itemRef}
       className={cn(
-        'relative px-4 py-3 transition-colors cursor-pointer hover:bg-accent/50',
+        'group relative px-4 py-3 cursor-pointer',
+        'transition-all duration-150',
+        'hover:bg-accent/50 hover:shadow-sm',
+        'focus-within:bg-accent/50 focus-within:ring-2 focus-within:ring-ring',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
+        'motion-reduce:transition-none',
         isUnread && 'bg-accent/30'
       )}
       onClick={onClick}
+      onKeyDown={handleItemKeyDown}
+      onFocus={onFocus}
+      tabIndex={isActive ? 0 : -1}
+      role="article"
+      aria-labelledby={`notification-${notification.id}-title`}
+      aria-describedby={`notification-${notification.id}-message`}
     >
       {/* Unread indicator */}
       {isUnread && (
@@ -237,8 +376,16 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium leading-tight">{notification.title}</p>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+              <p
+                id={`notification-${notification.id}-title`}
+                className="text-sm font-medium leading-tight"
+              >
+                {notification.title}
+              </p>
+              <p
+                id={`notification-${notification.id}-message`}
+                className="text-xs text-muted-foreground mt-1 line-clamp-2"
+              >
                 {notification.message}
               </p>
               <p className="text-xs text-muted-foreground/70 mt-1.5">
@@ -250,7 +397,13 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-background/80"
+              className={cn(
+                "h-6 w-6 flex-shrink-0",
+                "opacity-60 hover:opacity-100 focus-visible:opacity-100",
+                "transition-opacity duration-150",
+                "hover:bg-background/80",
+                "motion-reduce:transition-none"
+              )}
               onClick={onDismiss}
               aria-label="Dismiss notification"
             >
@@ -266,6 +419,9 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
                 size="sm"
                 className="h-7 px-2 text-xs"
                 onClick={handleToggleExpand}
+                onKeyDown={handleDetailsKeyDown}
+                aria-expanded={expanded}
+                aria-controls={`notification-${notification.id}-details`}
               >
                 {expanded ? (
                   <>
@@ -281,7 +437,9 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
               </Button>
 
               {expanded && notification.details && (
-                <NotificationDetailView details={notification.details} />
+                <div id={`notification-${notification.id}-details`}>
+                  <NotificationDetailView details={notification.details} />
+                </div>
               )}
             </div>
           )}
@@ -403,8 +561,10 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
           <div
             key={`${artifact.name}-${index}`}
             className={cn(
-              'flex items-start gap-2 rounded px-2 py-1.5 text-xs transition-colors',
-              'hover:bg-background/80 dark:hover:bg-background/40'
+              'flex items-start gap-2 rounded px-2 py-1.5 text-xs',
+              'transition-colors duration-150',
+              'hover:bg-background/80 dark:hover:bg-background/40',
+              'motion-reduce:transition-none'
             )}
           >
             {/* Status icon */}
@@ -474,6 +634,8 @@ function ErrorDetail({ details, onRetry }: ErrorDetailProps) {
             size="sm"
             className="h-6 px-2 text-xs text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
             onClick={() => setShowStack(!showStack)}
+            aria-expanded={showStack}
+            aria-controls="error-stack-trace"
           >
             {showStack ? (
               <>
@@ -488,7 +650,10 @@ function ErrorDetail({ details, onRetry }: ErrorDetailProps) {
             )}
           </Button>
           {showStack && (
-            <pre className="mt-2 rounded bg-red-100/50 dark:bg-red-950/50 p-2 text-[10px] font-mono text-red-900 dark:text-red-200 overflow-x-auto max-h-32 overflow-y-auto">
+            <pre
+              id="error-stack-trace"
+              className="mt-2 rounded bg-red-100/50 dark:bg-red-950/50 p-2 text-[10px] font-mono text-red-900 dark:text-red-200 overflow-x-auto max-h-32 overflow-y-auto"
+            >
               {details.stack}
             </pre>
           )}
@@ -530,7 +695,12 @@ function GenericDetail({ details }: GenericDetailProps) {
         {Object.entries(details.metadata).map(([key, value]) => (
           <div
             key={key}
-            className="flex items-start gap-2 text-xs rounded px-2 py-1.5 hover:bg-background/60 dark:hover:bg-background/40 transition-colors"
+            className={cn(
+              "flex items-start gap-2 text-xs rounded px-2 py-1.5",
+              "transition-colors duration-150",
+              "hover:bg-background/60 dark:hover:bg-background/40",
+              "motion-reduce:transition-none"
+            )}
           >
             <span className="font-medium text-muted-foreground min-w-[80px]">
               {key}:
