@@ -29,6 +29,8 @@ import type {
   NotificationData,
   NotificationType,
   ImportResultDetails,
+  ErrorDetails,
+  GenericDetails,
 } from '@/types/notification';
 
 // ============================================================================
@@ -279,7 +281,7 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
               </Button>
 
               {expanded && notification.details && (
-                <ImportResultDetails details={notification.details} />
+                <NotificationDetailView details={notification.details} />
               )}
             </div>
           )}
@@ -287,6 +289,86 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// Type Guard Functions
+// ============================================================================
+
+function isImportResultDetails(details: unknown): details is ImportResultDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'artifacts' in details &&
+    'total' in details &&
+    'succeeded' in details &&
+    'failed' in details
+  );
+}
+
+function isErrorDetails(details: unknown): details is ErrorDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'message' in details &&
+    !('artifacts' in details)
+  );
+}
+
+function isGenericDetails(details: unknown): details is GenericDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'metadata' in details
+  );
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Sanitize error messages to prevent XSS and improve readability
+ * - Removes/escapes HTML tags
+ * - Truncates to max 200 characters
+ * - Handles null/undefined gracefully
+ */
+function sanitizeErrorMessage(message: string | null | undefined): string {
+  if (!message) return 'Unknown error';
+
+  // Remove HTML tags
+  const stripped = message.replace(/<[^>]*>/g, '');
+
+  // Truncate if too long
+  if (stripped.length > 200) {
+    return stripped.substring(0, 197) + '...';
+  }
+
+  return stripped;
+}
+
+// ============================================================================
+// NotificationDetailView Component (Router)
+// ============================================================================
+
+interface NotificationDetailViewProps {
+  details: ImportResultDetails | ErrorDetails | GenericDetails;
+}
+
+function NotificationDetailView({ details }: NotificationDetailViewProps) {
+  if (isImportResultDetails(details)) {
+    return <ImportResultDetails details={details} />;
+  }
+
+  if (isErrorDetails(details)) {
+    return <ErrorDetail details={details} />;
+  }
+
+  if (isGenericDetails(details)) {
+    return <GenericDetail details={details} />;
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -320,7 +402,10 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
         {details.artifacts.map((artifact, index) => (
           <div
             key={`${artifact.name}-${index}`}
-            className="flex items-start gap-2 rounded px-2 py-1.5 text-xs hover:bg-background/60"
+            className={cn(
+              'flex items-start gap-2 rounded px-2 py-1.5 text-xs transition-colors',
+              'hover:bg-background/80 dark:hover:bg-background/40'
+            )}
           >
             {/* Status icon */}
             {artifact.success ? (
@@ -331,7 +416,7 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
 
             {/* Artifact info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge
                   variant="outline"
                   className="h-4 px-1 text-[10px] font-medium"
@@ -342,10 +427,117 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
               </div>
               {!artifact.success && artifact.error && (
                 <p className="text-muted-foreground mt-0.5 line-clamp-2">
-                  {artifact.error}
+                  {sanitizeErrorMessage(artifact.error)}
                 </p>
               )}
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ErrorDetail Component
+// ============================================================================
+
+interface ErrorDetailProps {
+  details: ErrorDetails;
+  onRetry?: () => void;
+}
+
+function ErrorDetail({ details, onRetry }: ErrorDetailProps) {
+  const [showStack, setShowStack] = React.useState(false);
+
+  return (
+    <div className="mt-3 space-y-3 rounded-md border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-3">
+      {/* Error code and message */}
+      <div className="space-y-2">
+        {details.code && (
+          <div className="flex items-center gap-2">
+            <Badge variant="destructive" className="h-5 px-2 text-xs font-mono">
+              {details.code}
+            </Badge>
+          </div>
+        )}
+        <p className="text-sm font-medium text-red-900 dark:text-red-200">
+          {sanitizeErrorMessage(details.message)}
+        </p>
+      </div>
+
+      {/* Stack trace (collapsible) */}
+      {details.stack && (
+        <div className="space-y-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
+            onClick={() => setShowStack(!showStack)}
+          >
+            {showStack ? (
+              <>
+                <ChevronUp className="h-3 w-3 mr-1" />
+                Hide stack trace
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3 w-3 mr-1" />
+                Show stack trace
+              </>
+            )}
+          </Button>
+          {showStack && (
+            <pre className="mt-2 rounded bg-red-100/50 dark:bg-red-950/50 p-2 text-[10px] font-mono text-red-900 dark:text-red-200 overflow-x-auto max-h-32 overflow-y-auto">
+              {details.stack}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Retry button */}
+      {details.retryable && onRetry && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/40"
+          onClick={onRetry}
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Retry
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// GenericDetail Component
+// ============================================================================
+
+interface GenericDetailProps {
+  details: GenericDetails;
+}
+
+function GenericDetail({ details }: GenericDetailProps) {
+  if (!details.metadata || Object.keys(details.metadata).length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-md border bg-muted/30 p-3">
+      <div className="space-y-1.5">
+        {Object.entries(details.metadata).map(([key, value]) => (
+          <div
+            key={key}
+            className="flex items-start gap-2 text-xs rounded px-2 py-1.5 hover:bg-background/60 dark:hover:bg-background/40 transition-colors"
+          >
+            <span className="font-medium text-muted-foreground min-w-[80px]">
+              {key}:
+            </span>
+            <span className="flex-1 break-words">
+              {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+            </span>
           </div>
         ))}
       </div>

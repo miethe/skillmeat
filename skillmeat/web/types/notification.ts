@@ -48,6 +48,33 @@ export interface ImportResultDetails {
 }
 
 /**
+ * Error notification details
+ */
+export interface ErrorDetails {
+  /** Error code if available */
+  code?: string;
+  /** Error message */
+  message: string;
+  /** Optional stack trace */
+  stack?: string;
+  /** Whether the error is retryable */
+  retryable?: boolean;
+}
+
+/**
+ * Generic notification details for info/success/warning notifications
+ */
+export interface GenericDetails {
+  /** Metadata key-value pairs */
+  metadata?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Union type for all notification detail types
+ */
+export type NotificationDetails = ImportResultDetails | ErrorDetails | GenericDetails;
+
+/**
  * Complete notification data structure
  */
 export interface NotificationData {
@@ -63,8 +90,8 @@ export interface NotificationData {
   timestamp: Date;
   /** Read/unread status */
   status: NotificationStatus;
-  /** Optional detailed results for import/sync operations */
-  details?: ImportResultDetails | null;
+  /** Optional detailed results for import/sync/error operations */
+  details?: NotificationDetails | null;
 }
 
 /**
@@ -82,8 +109,8 @@ export interface NotificationCreateInput {
   message: string;
   /** Read/unread status (defaults to 'unread') */
   status?: NotificationStatus;
-  /** Optional detailed results for import/sync operations */
-  details?: ImportResultDetails | null;
+  /** Optional detailed results for import/sync/error operations */
+  details?: NotificationDetails | null;
 }
 
 /**
