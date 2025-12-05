@@ -281,7 +281,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       }
 
       return await apiRequest<FileListResponse>(
-        `/artifacts/${entity.id}/files?${params.toString()}`
+        `/artifacts/${encodeURIComponent(entity.id)}/files?${params.toString()}`
       );
     },
     enabled: !!entity?.id && activeTab === 'contents',
@@ -356,7 +356,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
       try {
         const response = await apiRequest<ArtifactDiffResponse>(
-          `/artifacts/${entity.id}/diff?${params.toString()}`
+          `/artifacts/${encodeURIComponent(entity.id)}/diff?${params.toString()}`
         );
 
         // Validate response structure
@@ -399,7 +399,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
       try {
         const response = await apiRequest<ArtifactUpstreamDiffResponse>(
-          `/artifacts/${entity.id}/upstream-diff?${params.toString()}`
+          `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff?${params.toString()}`
         );
 
         // Validate response structure
@@ -536,7 +536,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         force: true, // Force overwrite local changes
       };
 
-      await apiRequest(`/artifacts/${entity.id}/sync`, {
+      await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),

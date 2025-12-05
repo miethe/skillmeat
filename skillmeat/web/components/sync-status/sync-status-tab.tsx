@@ -316,7 +316,7 @@ export function SyncStatusTab({
   } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity.id],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${entity.id}/upstream-diff`);
+      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/upstream-diff`);
       if (!response.ok) throw new Error('Failed to fetch upstream diff');
       return response.json();
     },
@@ -332,7 +332,7 @@ export function SyncStatusTab({
     queryKey: ['project-diff', entity.id, projectPath],
     queryFn: async () => {
       const params = new URLSearchParams({ project_path: projectPath! });
-      const response = await fetch(`/api/v1/artifacts/${entity.id}/diff?${params}`);
+      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`);
       if (!response.ok) throw new Error('Failed to fetch project diff');
       return response.json();
     },
@@ -382,7 +382,7 @@ export function SyncStatusTab({
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${entity.id}/sync`, {
+      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -417,7 +417,7 @@ export function SyncStatusTab({
   // Deploy mutation (deploy to project)
   const deployMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${entity.id}/deploy`, {
+      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -459,7 +459,7 @@ export function SyncStatusTab({
         return syncMutation.mutateAsync();
       } else {
         // Deploy from collection to project (overwrite)
-        const response = await fetch(`/api/v1/artifacts/${entity.id}/deploy`, {
+        const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
