@@ -147,3 +147,17 @@ export function isSkipped(projectId: string, artifactKey: string): boolean {
 export function buildArtifactKey(type: string, name: string): string {
   return `${type}:${name}`;
 }
+
+/**
+ * Parse artifact key into type and name components
+ *
+ * @param artifactKey - Formatted artifact key "type:name"
+ * @returns Object with type and name, or null if invalid format
+ */
+export function parseArtifactKey(artifactKey: string): { type: string; name: string } | null {
+  const parts = artifactKey.split(':');
+  if (parts.length !== 2) return null;
+  const [type, name] = parts;
+  if (!type || !name) return null;
+  return { type, name };
+}
