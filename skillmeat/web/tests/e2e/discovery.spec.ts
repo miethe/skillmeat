@@ -694,4 +694,370 @@ test.describe('Discovery Flow E2E', () => {
       await expect(page.getByText('local-skill')).toBeVisible();
     });
   });
+
+  test.describe('Discovery Tab Navigation', () => {
+    test.beforeEach(async ({ page }) => {
+      // Mock project data
+      await page.route('**/api/v1/projects/*', async (route) => {
+        if (!route.request().url().includes('/discover')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              id: 'test-project-1',
+              name: 'Test Project',
+              path: '/path/to/project',
+              deployment_count: 5,
+              last_deployment: new Date().toISOString(),
+              stats: {
+                modified_count: 1,
+                by_type: { skill: 3, command: 2 },
+                by_collection: { user: 5 },
+              },
+              deployments: [],
+            }),
+          });
+        }
+      });
+
+      // Navigate to a project detail page
+      await page.goto('/projects/test-project-1');
+      await waitForPageReady(page);
+    });
+
+    test('shows Deployed and Discovery tabs on project detail page', async ({ page }) => {
+      // Verify both tabs are visible
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toBeVisible();
+      await expect(page.getByRole('tab', { name: /Discovery/i })).toBeVisible();
+
+      // "Deployed" tab should be active by default
+      const deployedTab = page.getByRole('tab', { name: /Deployed/i });
+      await expect(deployedTab).toHaveAttribute('data-state', 'active');
+    });
+
+    test('clicking Discovery tab switches view and updates URL', async ({ page }) => {
+      // Mock discovery data
+      await page.route('**/api/v1/projects/*/discover', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            discovered_count: 2,
+            artifacts: [
+              {
+                type: 'skill',
+                name: 'discovered-skill',
+                path: '/path/skill',
+                discovered_at: new Date().toISOString(),
+              },
+              {
+                type: 'agent',
+                name: 'discovered-agent',
+                path: '/path/agent',
+                discovered_at: new Date().toISOString(),
+              },
+            ],
+            errors: [],
+            scan_duration_ms: 100,
+          }),
+        });
+      });
+
+      // Click Discovery tab
+      const discoveryTab = page.getByRole('tab', { name: /Discovery/i });
+      await discoveryTab.click();
+
+      // Verify URL changes to ?tab=discovery
+      await expect(page).toHaveURL(/tab=discovery/);
+
+      // Verify Discovery tab is active
+      await expect(discoveryTab).toHaveAttribute('data-state', 'active');
+
+      // Verify Discovery content is visible
+      await expect(page.getByText('discovered-skill')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('tab state persists on page reload via URL', async ({ page }) => {
+      // Mock discovery data
+      await page.route('**/api/v1/projects/*/discover', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            discovered_count: 1,
+            artifacts: [
+              {
+                type: 'skill',
+                name: 'persistent-skill',
+                path: '/path/skill',
+                discovered_at: new Date().toISOString(),
+              },
+            ],
+            errors: [],
+            scan_duration_ms: 50,
+          }),
+        });
+      });
+
+      // Navigate directly to ?tab=discovery
+      await page.goto('/projects/test-project-1?tab=discovery');
+      await waitForPageReady(page);
+
+      // Verify Discovery tab is active after reload
+      const discoveryTab = page.getByRole('tab', { name: /Discovery/i });
+      await expect(discoveryTab).toHaveAttribute('data-state', 'active');
+
+      // Content matches Discovery tab
+      await expect(page.getByText('persistent-skill')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('browser back/forward navigation works with tabs', async ({ page }) => {
+      // Mock discovery data
+      await page.route('**/api/v1/projects/*/discover', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            discovered_count: 1,
+            artifacts: [
+              {
+                type: 'skill',
+                name: 'nav-test-skill',
+                path: '/path/skill',
+                discovered_at: new Date().toISOString(),
+              },
+            ],
+            errors: [],
+            scan_duration_ms: 50,
+          }),
+        });
+      });
+
+      // Start on Deployed tab
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+
+      // Click Discovery tab (URL changes)
+      await page.getByRole('tab', { name: /Discovery/i }).click();
+      await expect(page).toHaveURL(/tab=discovery/);
+
+      // Click browser back
+      await page.goBack();
+
+      // Verify Deployed tab is active again
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+      await expect(page).not.toHaveURL(/tab=discovery/);
+    });
+
+    test('Discovery tab shows artifact count badge when artifacts available', async ({ page }) => {
+      // Mock discovery with 3 artifacts
+      await page.route('**/api/v1/projects/*/discover', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            discovered_count: 3,
+            artifacts: [
+              {
+                type: 'skill',
+                name: 'skill-1',
+                path: '/path/1',
+                discovered_at: new Date().toISOString(),
+              },
+              {
+                type: 'skill',
+                name: 'skill-2',
+                path: '/path/2',
+                discovered_at: new Date().toISOString(),
+              },
+              {
+                type: 'agent',
+                name: 'agent-1',
+                path: '/path/3',
+                discovered_at: new Date().toISOString(),
+              },
+            ],
+            errors: [],
+            scan_duration_ms: 100,
+          }),
+        });
+      });
+
+      // Wait for discovery to complete
+      await page.reload();
+      await waitForPageReady(page);
+
+      // Verify Discovery tab shows badge with count
+      const discoveryTab = page.getByRole('tab', { name: /Discovery/i });
+      await expect(discoveryTab).toContainText('3');
+    });
+  });
+
+  test.describe('Skip Management in Discovery Tab', () => {
+    test.beforeEach(async ({ page }) => {
+      // Mock project data
+      await page.route('**/api/v1/projects/*', async (route) => {
+        if (!route.request().url().includes('/discover')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              id: 'test-project-2',
+              name: 'Skip Test Project',
+              path: '/path/to/skip-project',
+              deployment_count: 2,
+              last_deployment: new Date().toISOString(),
+              stats: {
+                modified_count: 0,
+                by_type: { skill: 2 },
+                by_collection: { user: 2 },
+              },
+              deployments: [],
+            }),
+          });
+        }
+      });
+
+      // Mock discovery data with artifacts
+      await page.route('**/api/v1/projects/*/discover', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            discovered_count: 3,
+            artifacts: [
+              {
+                type: 'skill',
+                name: 'skippable-skill-1',
+                path: '/path/skill1',
+                discovered_at: new Date().toISOString(),
+              },
+              {
+                type: 'skill',
+                name: 'skippable-skill-2',
+                path: '/path/skill2',
+                discovered_at: new Date().toISOString(),
+              },
+              {
+                type: 'agent',
+                name: 'skippable-agent',
+                path: '/path/agent',
+                discovered_at: new Date().toISOString(),
+              },
+            ],
+            errors: [],
+            scan_duration_ms: 100,
+          }),
+        });
+      });
+
+      // Navigate to Discovery tab
+      await page.goto('/projects/test-project-2?tab=discovery');
+      await waitForPageReady(page);
+    });
+
+    test('can mark artifact as skipped via context menu', async ({ page }) => {
+      // Find an artifact row
+      const artifactRow = page.getByText('skippable-skill-1').locator('..');
+
+      // Open context menu (right-click or click menu button)
+      const menuButton = artifactRow.getByRole('button', { name: /more|menu|options/i });
+      await menuButton.click();
+
+      // Click "Skip for future"
+      await page.getByRole('menuitem', { name: /Skip|Skip for future/i }).click();
+
+      // Verify artifact shows "Skipped" status
+      await expect(artifactRow).toContainText(/Skipped/i);
+    });
+
+    test('skipped artifacts appear in Skip Preferences list', async ({ page }) => {
+      // Skip an artifact first
+      const artifactRow = page.getByText('skippable-skill-2').locator('..');
+      const menuButton = artifactRow.getByRole('button', { name: /more|menu|options/i });
+      await menuButton.click();
+      await page.getByRole('menuitem', { name: /Skip|Skip for future/i }).click();
+
+      // Expand Skip Preferences accordion
+      const skipPrefsButton = page.getByRole('button', { name: /Skip Preferences/i });
+      await skipPrefsButton.click();
+
+      // Verify artifact is listed
+      await expect(page.getByText('skippable-skill-2')).toBeVisible();
+    });
+
+    test('can un-skip artifact from Skip Preferences list', async ({ page }) => {
+      // Skip an artifact first
+      const artifactRow = page.getByText('skippable-agent').locator('..');
+      const menuButton = artifactRow.getByRole('button', { name: /more|menu|options/i });
+      await menuButton.click();
+      await page.getByRole('menuitem', { name: /Skip|Skip for future/i }).click();
+
+      // Expand Skip Preferences
+      await page.getByRole('button', { name: /Skip Preferences/i }).click();
+
+      // Click "Un-skip" button
+      const unskipButton = page.getByRole('button', { name: /Un-skip|Remove/i }).first();
+      await unskipButton.click();
+
+      // Verify artifact no longer has Skipped status
+      const updatedRow = page.getByText('skippable-agent').locator('..');
+      await expect(updatedRow).not.toContainText(/Skipped/i);
+      await expect(updatedRow).toContainText(/New/i);
+    });
+
+    test('skip preference persists across page reloads', async ({ page }) => {
+      // Skip an artifact
+      const artifactRow = page.getByText('skippable-skill-1').locator('..');
+      const menuButton = artifactRow.getByRole('button', { name: /more|menu|options/i });
+      await menuButton.click();
+      await page.getByRole('menuitem', { name: /Skip|Skip for future/i }).click();
+
+      // Wait for skip to be saved
+      await page.waitForTimeout(500);
+
+      // Reload page
+      await page.reload();
+      await waitForPageReady(page);
+
+      // Navigate to Discovery tab (in case default tab changed)
+      const discoveryTab = page.getByRole('tab', { name: /Discovery/i });
+      const isActive = await discoveryTab.getAttribute('data-state');
+      if (isActive !== 'active') {
+        await discoveryTab.click();
+      }
+
+      // Verify artifact still shows as skipped
+      const reloadedRow = page.getByText('skippable-skill-1').locator('..');
+      await expect(reloadedRow).toContainText(/Skipped/i);
+    });
+
+    test('can clear all skip preferences with confirmation', async ({ page }) => {
+      // Skip multiple artifacts
+      for (const skillName of ['skippable-skill-1', 'skippable-skill-2']) {
+        const artifactRow = page.getByText(skillName).locator('..');
+        const menuButton = artifactRow.getByRole('button', { name: /more|menu|options/i });
+        await menuButton.click();
+        await page.getByRole('menuitem', { name: /Skip|Skip for future/i }).click();
+        await page.waitForTimeout(200);
+      }
+
+      // Expand Skip Preferences
+      await page.getByRole('button', { name: /Skip Preferences/i }).click();
+
+      // Click "Clear All Skips"
+      await page.getByRole('button', { name: /Clear All|Clear All Skips/i }).click();
+
+      // Confirm in dialog
+      const confirmButton = page.getByRole('button', { name: /Confirm|Yes|Clear/i });
+      await confirmButton.click();
+
+      // Verify all artifacts now show as "New"
+      const skill1Row = page.getByText('skippable-skill-1').locator('..');
+      const skill2Row = page.getByText('skippable-skill-2').locator('..');
+      await expect(skill1Row).toContainText(/New/i);
+      await expect(skill2Row).toContainText(/New/i);
+      await expect(skill1Row).not.toContainText(/Skipped/i);
+      await expect(skill2Row).not.toContainText(/Skipped/i);
+    });
+  });
 });

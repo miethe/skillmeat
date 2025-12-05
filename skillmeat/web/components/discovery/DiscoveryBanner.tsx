@@ -56,7 +56,14 @@ export function DiscoveryBanner({
     }
   }, [importableCount, dismissed, tracking]);
 
-  if (dismissed || importableCount === 0) {
+  // Early returns - check importableCount first, then dismissed state
+  // 1. If importableCount <= 0, return null (no new artifacts)
+  if (importableCount <= 0) {
+    return null;
+  }
+
+  // 2. If dismissed state is true, return null
+  if (dismissed) {
     return null;
   }
 
