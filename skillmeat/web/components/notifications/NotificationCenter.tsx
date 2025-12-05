@@ -29,6 +29,9 @@ import type {
   ImportResultDetails,
   ErrorDetails,
   GenericDetails,
+  BulkImportResultDetails,
+  BulkImportArtifactResult,
+  ImportStatus,
 } from '@/types/notification';
 
 // ============================================================================
@@ -550,7 +553,19 @@ function isGenericDetails(details: unknown): details is GenericDetails {
   return (
     details !== null &&
     typeof details === 'object' &&
-    'metadata' in details
+    'metadata' in details &&
+    !('results' in details) // Exclude BulkImportResultDetails
+  );
+}
+
+function isBulkImportResultDetails(details: unknown): details is BulkImportResultDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'total_requested' in details &&
+    'total_imported' in details &&
+    'results' in details &&
+    Array.isArray((details as BulkImportResultDetails).results)
   );
 }
 
@@ -583,12 +598,16 @@ function sanitizeErrorMessage(message: string | null | undefined): string {
 // ============================================================================
 
 interface NotificationDetailViewProps {
-  details: ImportResultDetails | ErrorDetails | GenericDetails;
+  details: ImportResultDetails | ErrorDetails | GenericDetails | BulkImportResultDetails;
 }
 
 const NotificationDetailView = React.memo(function NotificationDetailView({
   details
 }: NotificationDetailViewProps) {
+  if (isBulkImportResultDetails(details)) {
+    return <BulkImportResultDetailsMemo details={details} />;
+  }
+
   if (isImportResultDetails(details)) {
     return <ImportResultDetailsMemo details={details} />;
   }
@@ -602,6 +621,165 @@ const NotificationDetailView = React.memo(function NotificationDetailView({
   }
 
   return null;
+});
+
+// ============================================================================
+// BulkImportResultDetails Component
+// ============================================================================
+
+interface BulkImportResultDetailsProps {
+  details: BulkImportResultDetails;
+}
+
+/**
+ * Helper function to extract artifact name and type from artifact_id
+ * Format: "type:name" e.g., "skill:canvas-design"
+ */
+function parseArtifactId(artifactId: string): { type: string; name: string } {
+  const parts = artifactId.split(':');
+  if (parts.length >= 2 && parts[0]) {
+    return { type: parts[0], name: parts.slice(1).join(':') };
+  }
+  return { type: 'unknown', name: artifactId };
+}
+
+/**
+ * Get icon for import status
+ */
+function getStatusIcon(status: ImportStatus): React.ReactNode {
+  switch (status) {
+    case 'success':
+      return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />;
+    case 'skipped':
+      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+    case 'failed':
+      return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />;
+    default:
+      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+  }
+}
+
+const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsMemo({
+  details
+}: BulkImportResultDetailsProps) {
+  return (
+    <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
+      {/* Summary breakdown */}
+      <div className="space-y-2">
+        {/* Imported breakdown */}
+        {details.total_imported > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              <span className="font-medium text-green-700 dark:text-green-400">
+                Imported: {details.total_imported}
+              </span>
+            </div>
+            {details.imported_to_collection > 0 && (
+              <div className="ml-5 text-xs text-muted-foreground">
+                → Collection: {details.imported_to_collection}
+              </div>
+            )}
+            {details.added_to_project > 0 && (
+              <div className="ml-5 text-xs text-muted-foreground">
+                → Project: {details.added_to_project}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Skipped */}
+        {details.total_skipped > 0 && (
+          <div className="flex items-center gap-1.5 text-xs">
+            <Info className="h-3.5 w-3.5 text-gray-500" />
+            <span className="font-medium text-gray-700 dark:text-gray-400">
+              Skipped: {details.total_skipped}
+            </span>
+          </div>
+        )}
+
+        {/* Failed */}
+        {details.total_failed > 0 && (
+          <div className="flex items-center gap-1.5 text-xs">
+            <XCircle className="h-3.5 w-3.5 text-red-500" />
+            <span className="font-medium text-red-700 dark:text-red-400">
+              Failed: {details.total_failed}
+            </span>
+          </div>
+        )}
+
+        {/* Total */}
+        <div className="pt-1 border-t text-xs text-muted-foreground">
+          Total requested: {details.total_requested}
+        </div>
+      </div>
+
+      {/* Per-artifact details */}
+      {details.results && details.results.length > 0 && (
+        <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+          <div className="text-xs font-medium text-muted-foreground">Artifact Details:</div>
+          {details.results.map((result: BulkImportArtifactResult, index: number) => {
+            const { type, name } = parseArtifactId(result.artifact_id);
+            return (
+              <div
+                key={`${result.artifact_id}-${index}`}
+                className={cn(
+                  'flex items-start gap-2 rounded px-2 py-1.5 text-xs',
+                  'transition-colors duration-150',
+                  'hover:bg-background/80 dark:hover:bg-background/40',
+                  'motion-reduce:transition-none'
+                )}
+              >
+                {/* Status icon */}
+                {getStatusIcon(result.status)}
+
+                {/* Artifact info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[10px] font-medium"
+                    >
+                      {type}
+                    </Badge>
+                    <span className="font-medium truncate">{name}</span>
+                  </div>
+
+                  {/* Skip reason */}
+                  {result.status === 'skipped' && result.skip_reason && (
+                    <p className="text-muted-foreground mt-0.5 line-clamp-2">
+                      {result.skip_reason}
+                    </p>
+                  )}
+
+                  {/* Error message */}
+                  {result.status === 'failed' && result.error && (
+                    <p className="text-red-600 dark:text-red-400 mt-0.5 line-clamp-2">
+                      {sanitizeErrorMessage(result.error)}
+                    </p>
+                  )}
+
+                  {/* Success message */}
+                  {result.status === 'success' && result.message && (
+                    <p className="text-muted-foreground mt-0.5 text-[10px]">
+                      {result.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Duration (if available) */}
+      {details.duration_ms !== undefined && (
+        <div className="pt-2 border-t text-[10px] text-muted-foreground">
+          Completed in {(details.duration_ms / 1000).toFixed(2)}s
+        </div>
+      )}
+    </div>
+  );
 });
 
 // ============================================================================

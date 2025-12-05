@@ -11,9 +11,14 @@ Complete API reference for SkillMeat's Smart Import & Discovery feature endpoint
   - [POST /api/v1/artifacts/discover/import](#post-apiv1artifactsdiscover-import)
   - [GET /api/v1/artifacts/metadata/github](#get-apiv1artifactsmetadatagithub)
   - [PUT /api/v1/artifacts/{artifact_id}/parameters](#put-apiv1artifactsartifact_idparameters)
+  - [POST /api/v1/projects/{project_id}/skip-preferences](#post-apiv1projectsproject_idskip-preferences)
+  - [DELETE /api/v1/projects/{project_id}/skip-preferences/{artifact_key}](#delete-apiv1projectsproject_idskip-preferencesartifact_key)
+  - [DELETE /api/v1/projects/{project_id}/skip-preferences](#delete-apiv1projectsproject_idskip-preferences)
+  - [GET /api/v1/projects/{project_id}/skip-preferences](#get-apiv1projectsproject_idskip-preferences)
 - [Status Codes](#status-codes)
 - [Error Handling](#error-handling)
 - [Rate Limiting](#rate-limiting)
+- [Import Result Status Enum](#import-result-status-enum)
 - [Examples](#examples)
 
 ## Overview
@@ -169,8 +174,9 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `discovered_count` | integer | Number of artifacts successfully discovered |
-| `artifacts` | array | List of discovered artifacts with metadata |
+| `discovered_count` | integer | Total number of artifacts found in scan (before any filtering) |
+| `importable_count` | integer | Number of artifacts not yet in collection (post-scan filtered results) |
+| `artifacts` | array | List of discovered artifacts (filtered by manifest if provided) |
 | `artifacts[].type` | string | Artifact type: skill, command, agent, hook, mcp |
 | `artifacts[].name` | string | Artifact identifier/name |
 | `artifacts[].source` | string or null | GitHub source if known (user/repo/path[@version]) |
@@ -182,6 +188,13 @@ Content-Type: application/json
 | `artifacts[].discovered_at` | string | ISO 8601 timestamp when discovered |
 | `errors` | array | Non-fatal errors encountered during scan |
 | `scan_duration_ms` | number | Total scan duration in milliseconds |
+
+**Discovery Filtering:**
+
+The discovery endpoint filters results based on:
+- **importable_count**: Reflects artifacts not yet imported to the collection
+- **artifacts array**: Contains only artifacts that are new or can be imported
+- **discovered_count vs importable_count**: Difference indicates artifacts already in collection
 
 #### Status Codes
 
@@ -305,24 +318,40 @@ Content-Type: application/json
 
 ```json
 {
-  "total_requested": 2,
+  "total_requested": 3,
   "total_imported": 1,
+  "total_skipped": 1,
   "total_failed": 1,
+  "imported_to_collection": 1,
+  "added_to_project": 1,
   "results": [
     {
       "artifact_id": "skill:canvas-design",
-      "success": true,
+      "status": "success",
       "message": "Artifact 'canvas-design' imported successfully",
-      "error": null
+      "error": null,
+      "skip_reason": null,
+      "success": true
+    },
+    {
+      "artifact_id": "skill:existing-skill",
+      "status": "skipped",
+      "message": "Artifact already exists",
+      "error": null,
+      "skip_reason": "Artifact already exists in collection",
+      "success": false
     },
     {
       "artifact_id": "agent:research",
-      "success": false,
+      "status": "failed",
       "message": "Import failed",
-      "error": "Artifact already exists and auto_resolve_conflicts is false"
+      "error": "Artifact already exists and auto_resolve_conflicts is false",
+      "skip_reason": null,
+      "success": false
     }
   ],
-  "duration_ms": 1234.56
+  "duration_ms": 1234.56,
+  "summary": "1 imported, 1 skipped, 1 failed"
 }
 ```
 
@@ -332,13 +361,19 @@ Content-Type: application/json
 |-------|------|-------------|
 | `total_requested` | integer | Number of artifacts requested for import |
 | `total_imported` | integer | Number successfully imported |
+| `total_skipped` | integer | Number skipped (already exist) |
 | `total_failed` | integer | Number that failed |
+| `imported_to_collection` | integer | Number added to the Collection |
+| `added_to_project` | integer | Number deployed to the Project |
 | `results` | array | Per-artifact import results |
 | `results[].artifact_id` | string | Artifact identifier (type:name) |
-| `results[].success` | boolean | Whether import succeeded |
+| `results[].status` | string | Import status: "success", "skipped", or "failed" |
 | `results[].message` | string | Human-readable status message |
-| `results[].error` | string or null | Error message if failed |
+| `results[].error` | string or null | Error message if status=failed |
+| `results[].skip_reason` | string or null | Reason for skip if status=skipped |
+| `results[].success` | boolean | Backward compatibility: true if status=success |
 | `duration_ms` | number | Total import duration in milliseconds |
+| `summary` | string | Human-readable summary of import results |
 
 #### Status Codes
 
@@ -727,6 +762,345 @@ if result['success']:
     print(f"Fields changed: {', '.join(result['updated_fields'])}")
 else:
     print(f"Error: {result.get('error', 'Unknown error')}")
+```
+
+---
+
+### POST /api/v1/projects/{project_id}/skip-preferences
+
+**Description:** Add a skip preference for an artifact in a specific project.
+
+**Purpose:** Mark artifacts to skip during discovery and import operations within a project scope.
+
+#### Request
+
+```http
+POST /api/v1/projects/my-project/skip-preferences
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_id` | string | Yes | Project identifier (path-based, e.g., /path/to/project) |
+
+**Request Body:**
+
+```json
+{
+  "artifact_key": "skill:canvas-design",
+  "skip_reason": "Already have a newer version in use"
+}
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `artifact_key` | string | Yes | Artifact identifier (format: type:name) |
+| `skip_reason` | string | Yes | Human-readable reason for skipping |
+
+#### Response
+
+**Status Code:** `201 Created`
+
+**Response Body:**
+
+```json
+{
+  "artifact_key": "skill:canvas-design",
+  "skip_reason": "Already have a newer version in use",
+  "added_date": "2025-12-04T10:00:00Z"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 201 | Created | Skip preference added successfully |
+| 400 | Bad Request | Invalid artifact_key or skip_reason format |
+| 401 | Unauthorized | Missing or invalid authentication token |
+| 404 | Not Found | Project not found |
+| 422 | Unprocessable Entity | Validation error in request body |
+| 500 | Internal Server Error | Server error during operation |
+
+#### Examples
+
+```bash
+curl -X POST http://localhost:8000/api/v1/projects/my-project/skip-preferences \
+  -H "Authorization: Bearer sk_test_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artifact_key": "skill:canvas-design",
+    "skip_reason": "Already have it installed"
+  }'
+```
+
+---
+
+### DELETE /api/v1/projects/{project_id}/skip-preferences/{artifact_key}
+
+**Description:** Remove a single skip preference by artifact key.
+
+**Purpose:** Unmark an artifact that was previously skipped.
+
+#### Request
+
+```http
+DELETE /api/v1/projects/my-project/skip-preferences/skill:canvas-design
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_id` | string | Yes | Project identifier |
+| `artifact_key` | string | Yes | Artifact identifier (format: type:name) |
+
+#### Response
+
+**Status Code:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "artifact_key": "skill:canvas-design",
+  "message": "Removed skip preference for 'skill:canvas-design'"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 200 | OK | Skip preference removed successfully |
+| 401 | Unauthorized | Missing or invalid authentication token |
+| 404 | Not Found | Project or skip preference not found |
+| 500 | Internal Server Error | Server error during operation |
+
+#### Examples
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/projects/my-project/skip-preferences/skill:canvas-design \
+  -H "Authorization: Bearer sk_test_abc123"
+```
+
+---
+
+### DELETE /api/v1/projects/{project_id}/skip-preferences
+
+**Description:** Clear all skip preferences for a project.
+
+**Purpose:** Remove all skip preferences at once for a project.
+
+#### Request
+
+```http
+DELETE /api/v1/projects/my-project/skip-preferences
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_id` | string | Yes | Project identifier |
+
+#### Response
+
+**Status Code:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "success": true,
+  "cleared_count": 5,
+  "message": "Cleared 5 skip preferences"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Whether operation succeeded |
+| `cleared_count` | integer | Number of skip preferences removed |
+| `message` | string | Human-readable status message |
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 200 | OK | Skip preferences cleared successfully |
+| 401 | Unauthorized | Missing or invalid authentication token |
+| 404 | Not Found | Project not found |
+| 500 | Internal Server Error | Server error during operation |
+
+#### Examples
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/projects/my-project/skip-preferences \
+  -H "Authorization: Bearer sk_test_abc123"
+```
+
+---
+
+### GET /api/v1/projects/{project_id}/skip-preferences
+
+**Description:** List all skip preferences for a project.
+
+**Purpose:** View artifacts that are marked to skip in a project.
+
+#### Request
+
+```http
+GET /api/v1/projects/my-project/skip-preferences
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `project_id` | string | Yes | Project identifier |
+
+#### Response
+
+**Status Code:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "skips": [
+    {
+      "artifact_key": "skill:canvas-design",
+      "skip_reason": "Already have a newer version",
+      "added_date": "2025-12-04T10:00:00Z"
+    },
+    {
+      "artifact_key": "command:my-command",
+      "skip_reason": "Not needed for this project",
+      "added_date": "2025-12-04T11:00:00Z"
+    }
+  ]
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skips` | array | List of skip preferences |
+| `skips[].artifact_key` | string | Artifact identifier (type:name) |
+| `skips[].skip_reason` | string | Reason for skipping |
+| `skips[].added_date` | string | ISO 8601 timestamp when added |
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 200 | OK | Skip preferences retrieved successfully |
+| 401 | Unauthorized | Missing or invalid authentication token |
+| 404 | Not Found | Project not found |
+| 500 | Internal Server Error | Server error during operation |
+
+#### Examples
+
+```bash
+curl http://localhost:8000/api/v1/projects/my-project/skip-preferences \
+  -H "Authorization: Bearer sk_test_abc123" | jq '.skips'
+```
+
+---
+
+## Import Result Status Enum
+
+The `ImportResult.status` field can have one of three values:
+
+### success
+
+**When:** Artifact was successfully imported into the collection or project.
+
+**Behavior:**
+- Artifact is now available for use
+- No `error` field is populated
+- No `skip_reason` field is populated
+- `success` backward-compatibility field is `true`
+
+**Example:**
+```json
+{
+  "artifact_id": "skill:canvas-design",
+  "status": "success",
+  "message": "Artifact 'canvas-design' imported successfully",
+  "error": null,
+  "skip_reason": null,
+  "success": true
+}
+```
+
+### skipped
+
+**When:** Artifact was not imported because it already exists.
+
+**Behavior:**
+- Artifact import is skipped to avoid duplicates
+- `skip_reason` field explains why (e.g., "Artifact already exists in collection")
+- No `error` field is populated (not a failure)
+- `success` backward-compatibility field is `false`
+
+**Reasons for Skip:**
+- Artifact already exists in collection
+- Artifact already exists in project
+- Artifact marked in skip preferences
+- Auto-resolve conflicts disabled
+
+**Example:**
+```json
+{
+  "artifact_id": "skill:existing-skill",
+  "status": "skipped",
+  "message": "Artifact already exists",
+  "error": null,
+  "skip_reason": "Artifact already exists in collection",
+  "success": false
+}
+```
+
+### failed
+
+**When:** Artifact import failed due to an error.
+
+**Behavior:**
+- Artifact was not imported due to an error condition
+- `error` field contains the error message
+- No `skip_reason` field is populated
+- `success` backward-compatibility field is `false`
+
+**Common Failure Reasons:**
+- Network error fetching artifact source
+- Invalid artifact format or metadata
+- Permission denied accessing artifact path
+- Corrupted or incomplete artifact
+- Dependency resolution failed
+
+**Example:**
+```json
+{
+  "artifact_id": "agent:research",
+  "status": "failed",
+  "message": "Import failed",
+  "error": "Failed to parse artifact metadata: invalid YAML",
+  "skip_reason": null,
+  "success": false
+}
 ```
 
 ---

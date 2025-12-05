@@ -819,9 +819,9 @@ describe('End-to-End Notification Flow', () => {
     });
 
     // Verify empty state shown
-    expect(screen.getByText('No notifications')).toBeInTheDocument();
+    expect(screen.getByText('No notifications yet')).toBeInTheDocument();
     expect(
-      screen.getByText("You'll see updates about imports, syncs, and errors here")
+      screen.getByText("You'll see updates about imports, syncs, and system events here")
     ).toBeInTheDocument();
   });
 
