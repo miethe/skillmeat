@@ -70,9 +70,55 @@ export interface GenericDetails {
 }
 
 /**
+ * Import status for individual artifact in bulk import
+ */
+export type ImportStatus = 'success' | 'skipped' | 'failed';
+
+/**
+ * Single artifact result in bulk import
+ */
+export interface BulkImportArtifactResult {
+  /** Artifact ID (format: type:name) */
+  artifact_id: string;
+  /** Import status */
+  status: ImportStatus;
+  /** Status message */
+  message: string;
+  /** Error message if failed */
+  error?: string;
+  /** Skip reason if skipped */
+  skip_reason?: string;
+}
+
+/**
+ * Detailed results of a bulk import operation
+ * Matches backend BulkImportResult schema
+ */
+export interface BulkImportResultDetails {
+  /** Total number of artifacts requested */
+  total_requested: number;
+  /** Total successfully imported */
+  total_imported: number;
+  /** Total skipped */
+  total_skipped: number;
+  /** Total failed */
+  total_failed: number;
+  /** Imported to collection (new artifacts) */
+  imported_to_collection: number;
+  /** Added to project (deployed artifacts) */
+  added_to_project: number;
+  /** Individual artifact results */
+  results: BulkImportArtifactResult[];
+  /** Operation duration in milliseconds */
+  duration_ms?: number;
+  /** Summary message */
+  summary?: string;
+}
+
+/**
  * Union type for all notification detail types
  */
-export type NotificationDetails = ImportResultDetails | ErrorDetails | GenericDetails;
+export type NotificationDetails = ImportResultDetails | ErrorDetails | GenericDetails | BulkImportResultDetails;
 
 /**
  * Complete notification data structure

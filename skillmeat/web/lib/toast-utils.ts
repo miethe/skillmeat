@@ -216,15 +216,15 @@ export function showBulkImportResultToast(
       title,
       message: result.summary || `Processed ${result.total_requested} artifact(s)`,
       details: {
-        metadata: {
-          total_requested: result.total_requested,
-          total_imported: result.total_imported,
-          total_skipped: result.total_skipped,
-          total_failed: result.total_failed,
-          imported_to_collection: result.imported_to_collection,
-          added_to_project: result.added_to_project,
-          duration_ms: result.duration_ms,
-        },
+        total_requested: result.total_requested,
+        total_imported: result.total_imported,
+        total_skipped: result.total_skipped,
+        total_failed: result.total_failed,
+        imported_to_collection: result.imported_to_collection,
+        added_to_project: result.added_to_project,
+        results: result.results,
+        duration_ms: result.duration_ms,
+        summary: result.summary,
       },
     });
   }
