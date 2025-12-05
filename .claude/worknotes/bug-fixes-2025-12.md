@@ -273,3 +273,16 @@
 - **Fix**: Normalize with `unquote` before Base64 decoding in `_decode_project_id_param`, ensuring encoded padding/characters are decoded before decode attempt.
 - **Commit(s)**: pending
 - **Status**: RESOLVED
+
+## 2025-12-05
+
+### Sync Status Tab 404 Error for Artifacts with Special Characters
+
+**Issue**: Opening Sync Status tab for Project-level artifacts like "skill:Confidence Check" returns 404 error: `GET /api/v1/artifacts/skill:Confidence Check/upstream-diff - 404`
+- **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:319,335,385,420,462`, `skillmeat/web/components/entity/unified-entity-modal.tsx:284,359,402,539`
+- **Root Cause**: Frontend components used raw `fetch()` and `apiRequest()` with unencoded artifact IDs in URL paths. Artifact IDs like `skill:Confidence Check` contain colons and spaces that must be URL-encoded.
+- **Fix**: Added `encodeURIComponent(entity.id)` to all 9 API call locations in both components:
+  - `sync-status-tab.tsx`: upstream-diff, project-diff, sync mutation, deploy mutation, take-upstream mutation
+  - `unified-entity-modal.tsx`: file list, diff, upstream-diff, rollback-sync
+- **Commit(s)**: afe270b
+- **Status**: RESOLVED
