@@ -21,10 +21,12 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, X, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseArtifactKey } from '@/lib/skip-preferences';
+import { useTrackDiscovery } from '@/lib/analytics';
 import type { SkipPreference } from '@/types/discovery';
 
 export interface SkipPreferencesListProps {
   skipPrefs: SkipPreference[];
+  projectId?: string;
   onRemoveSkip: (artifactKey: string) => void;
   onClearAll: () => void;
   isLoading?: boolean;
@@ -48,6 +50,7 @@ export interface SkipPreferencesListProps {
  * ```tsx
  * <SkipPreferencesList
  *   skipPrefs={skipPreferences}
+ *   projectId="project-123"
  *   onRemoveSkip={(key) => removeSkipPref(projectId, key)}
  *   onClearAll={() => clearSkipPrefs(projectId)}
  * />
@@ -55,6 +58,7 @@ export interface SkipPreferencesListProps {
  */
 export function SkipPreferencesList({
   skipPrefs,
+  projectId = 'unknown',
   onRemoveSkip,
   onClearAll,
   isLoading = false,
@@ -62,6 +66,7 @@ export function SkipPreferencesList({
   const [isOpen, setIsOpen] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
 
+  const tracking = useTrackDiscovery();
   const count = skipPrefs.length;
   const isEmpty = count === 0;
 
@@ -69,10 +74,12 @@ export function SkipPreferencesList({
   const shouldBeOpen = isOpen && !isEmpty;
 
   const handleRemoveSkip = (artifactKey: string) => {
+    tracking.trackSkipToggle(artifactKey, false);
     onRemoveSkip(artifactKey);
   };
 
   const handleClearAll = () => {
+    tracking.trackSkipCleared(projectId, count);
     onClearAll();
     setShowClearDialog(false);
   };

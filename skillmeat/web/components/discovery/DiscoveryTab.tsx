@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildArtifactKey } from '@/lib/skip-preferences';
+import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
 import { ArtifactActions } from './ArtifactActions';
 import type { DiscoveredArtifact, SkipPreference } from '@/types/discovery';
@@ -52,6 +53,7 @@ export interface DiscoveryTabProps {
   artifacts: DiscoveredArtifact[];
   isLoading?: boolean;
   skipPrefs?: SkipPreference[];
+  projectId?: string;
   onImport?: (artifact: DiscoveredArtifact) => void;
   onToggleSkip?: (artifactKey: string, skip: boolean) => void;
   onViewDetails?: (artifact: DiscoveredArtifact) => void;
@@ -192,6 +194,7 @@ export function DiscoveryTab({
   artifacts,
   isLoading = false,
   skipPrefs = [],
+  projectId = 'unknown',
   onImport,
   onToggleSkip,
   onViewDetails,
@@ -210,6 +213,15 @@ export function DiscoveryTab({
 
   // Debounced search state
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const tracking = useTrackDiscovery();
+
+  // Track tab view on mount
+  useEffect(() => {
+    if (artifacts.length > 0) {
+      tracking.trackTabView(projectId, artifacts.length);
+    }
+  }, [projectId, artifacts.length, tracking]);
 
   // Debounce search input (300ms)
   useEffect(() => {
@@ -280,6 +292,42 @@ export function DiscoveryTab({
     });
   };
 
+  // Handle status filter change with tracking
+  const handleStatusFilterChange = (value: StatusFilter) => {
+    setFilters({ ...filters, status: value });
+    if (value !== 'all') {
+      tracking.trackFilterApplied('status', value);
+    }
+  };
+
+  // Handle type filter change with tracking
+  const handleTypeFilterChange = (value: TypeFilter) => {
+    setFilters({ ...filters, type: value });
+    if (value !== 'all') {
+      tracking.trackFilterApplied('type', value);
+    }
+  };
+
+  // Handle sort field change with tracking
+  const handleSortFieldChange = (value: SortField) => {
+    setSort({ ...sort, field: value });
+    tracking.trackSortApplied(value, sort.order);
+  };
+
+  // Handle sort order change with tracking
+  const handleSortOrderChange = (value: SortOrder) => {
+    setSort({ ...sort, order: value });
+    tracking.trackSortApplied(sort.field, value);
+  };
+
+  // Handle search with tracking
+  const handleSearchChange = (value: string) => {
+    setFilters({ ...filters, search: value });
+    if (value && value.length > 0) {
+      tracking.trackFilterApplied('search', value);
+    }
+  };
+
   // Check if any filters are active
   const hasActiveFilters = filters.search !== '' || filters.status !== 'all' || filters.type !== 'all' || sort.field !== 'name' || sort.order !== 'asc';
 
@@ -317,7 +365,7 @@ export function DiscoveryTab({
           <Input
             placeholder="Search artifacts by name..."
             value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -331,7 +379,7 @@ export function DiscoveryTab({
             </label>
             <Select
               value={filters.status}
-              onValueChange={(value) => setFilters({ ...filters, status: value as StatusFilter })}
+              onValueChange={(value) => handleStatusFilterChange(value as StatusFilter)}
             >
               <SelectTrigger id="status-filter">
                 <SelectValue placeholder="All Statuses" />
@@ -353,7 +401,7 @@ export function DiscoveryTab({
             </label>
             <Select
               value={filters.type}
-              onValueChange={(value) => setFilters({ ...filters, type: value as TypeFilter })}
+              onValueChange={(value) => handleTypeFilterChange(value as TypeFilter)}
             >
               <SelectTrigger id="type-filter">
                 <SelectValue placeholder="All Types" />
@@ -376,7 +424,7 @@ export function DiscoveryTab({
             </label>
             <Select
               value={sort.field}
-              onValueChange={(value) => setSort({ ...sort, field: value as SortField })}
+              onValueChange={(value) => handleSortFieldChange(value as SortField)}
             >
               <SelectTrigger id="sort-field">
                 <SelectValue placeholder="Name" />
@@ -397,7 +445,7 @@ export function DiscoveryTab({
             <div className="flex gap-2">
               <Select
                 value={sort.order}
-                onValueChange={(value) => setSort({ ...sort, order: value as SortOrder })}
+                onValueChange={(value) => handleSortOrderChange(value as SortOrder)}
               >
                 <SelectTrigger id="sort-order" className="flex-1">
                   <SelectValue placeholder="Ascending" />
@@ -410,7 +458,7 @@ export function DiscoveryTab({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setSort({ ...sort, order: sort.order === 'asc' ? 'desc' : 'asc' })}
+                onClick={() => handleSortOrderChange(sort.order === 'asc' ? 'desc' : 'asc')}
                 title="Toggle sort order"
               >
                 <ArrowUpDown className="h-4 w-4" />
