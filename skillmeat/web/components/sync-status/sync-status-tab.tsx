@@ -320,7 +320,7 @@ export function SyncStatusTab({
       if (!response.ok) throw new Error('Failed to fetch upstream diff');
       return response.json();
     },
-    enabled: !!entity.id && !!entity.source && entity.source !== 'local',
+    enabled: !!entity.id && !!entity.source && entity.source !== 'local' && entity.collection !== 'discovered',
   });
 
   // Project diff (collection vs project)
@@ -336,7 +336,7 @@ export function SyncStatusTab({
       if (!response.ok) throw new Error('Failed to fetch project diff');
       return response.json();
     },
-    enabled: !!entity.id && !!projectPath && mode === 'project',
+    enabled: !!entity.id && !!projectPath && mode === 'project' && entity.collection !== 'discovered',
   });
 
   // File content for preview
@@ -354,6 +354,24 @@ export function SyncStatusTab({
     },
     enabled: !!entity.id && !!selectedFile,
   });
+
+  // ============================================================================
+  // Early Return: Discovered Artifacts
+  // ============================================================================
+
+  // Discovered artifacts are not in any collection yet - they need to be imported first
+  if (entity.collection === 'discovered') {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Sync status is not available for discovered artifacts. Import this artifact to your collection to enable sync tracking.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   // ============================================================================
   // Early Return: Local-Only Artifacts with Source Comparison

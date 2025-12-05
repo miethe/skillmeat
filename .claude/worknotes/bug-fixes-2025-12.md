@@ -286,3 +286,14 @@
   - `unified-entity-modal.tsx`: file list, diff, upstream-diff, rollback-sync
 - **Commit(s)**: afe270b
 - **Status**: RESOLVED
+
+### Sync Status Tab 404 Error for Discovered Artifacts
+
+**Issue**: Sync Status tab makes API calls for "discovered" artifacts (not yet imported), causing 404 errors because `collection=discovered` is not a real collection.
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx:331,418`, `skillmeat/web/components/sync-status/sync-status-tab.tsx:323,339,359-374`
+- **Root Cause**: Query `enabled` conditions only checked for `entity.id`, not whether the collection was a real collection. Discovered artifacts have `collection: 'discovered'` as a placeholder, not an actual collection name.
+- **Fix**:
+  1. Added `entity?.collection !== 'discovered'` check to all `enabled` conditions in both components
+  2. Added early return in SyncStatusTab with helpful message: "Sync status is not available for discovered artifacts. Import to your collection to enable sync tracking."
+- **Commit(s)**: 21de2c9
+- **Status**: RESOLVED

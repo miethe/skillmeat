@@ -327,7 +327,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Fetch diff data when sync tab is active and we have a project path to compare against
   // Allow diff fetching for ALL statuses (synced, modified, outdated, conflict)
   // Key requirement: must have a valid entity ID and effectiveProjectPath
-  const shouldFetchDiff = !!(activeTab === 'sync' && entity?.id && effectiveProjectPath);
+  // Skip discovered artifacts (they don't exist in any collection yet)
+  const shouldFetchDiff = !!(activeTab === 'sync' && entity?.id && effectiveProjectPath && entity?.collection !== 'discovered');
 
   const {
     data: diffData,
@@ -414,7 +415,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         throw error;
       }
     },
-    enabled: activeTab === 'sync' && !!entity?.id,
+    enabled: activeTab === 'sync' && !!entity?.id && entity?.collection !== 'discovered',
     staleTime: 60 * 1000, // Cache for 1 minute (upstream changes less frequently)
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     retry: 2, // Retry failed requests up to 2 times
