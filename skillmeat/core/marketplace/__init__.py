@@ -38,6 +38,21 @@ from .link_harvester import (
     ReadmeLinkHarvester,
     harvest_readme_links,
 )
+from .observability import (
+    DetectionError,
+    ErrorResponse,
+    ImportError,
+    log_error,
+    log_operation_end,
+    log_operation_start,
+    MarketplaceError,
+    MarketplaceOperation,
+    operation_context,
+    OperationContext,
+    ScanError,
+    track_operation,
+    ValidationError,
+)
 
 __all__ = [
     "GitHubScanner",
@@ -64,4 +79,18 @@ __all__ = [
     "ImportStatus",
     "ConflictStrategy",
     "import_from_catalog",
+    # Observability
+    "MarketplaceOperation",
+    "MarketplaceError",
+    "ScanError",
+    "DetectionError",
+    "ImportError",
+    "ValidationError",
+    "OperationContext",
+    "log_operation_start",
+    "log_operation_end",
+    "log_error",
+    "track_operation",
+    "operation_context",
+    "ErrorResponse",
 ]
