@@ -37,6 +37,8 @@ def get_schema_sql() -> str:
         - artifacts: Artifact metadata per project
         - artifact_metadata: Extended artifact metadata (YAML frontmatter)
         - marketplace: Cached marketplace artifact listings
+        - marketplace_sources: GitHub repository sources for marketplace artifacts
+        - marketplace_catalog_entries: Detected artifacts from marketplace sources
         - cache_metadata: Cache system metadata (version, TTL, etc.)
 
     Performance Considerations:
@@ -44,6 +46,7 @@ def get_schema_sql() -> str:
         - Composite indexes for multi-column queries
         - UNIQUE constraints for data integrity
         - CASCADE delete for automatic cleanup
+        - Run ANALYZE after bulk inserts (>100 rows) to update query planner stats
     """
     return """
 -- =============================================================================
@@ -166,6 +169,109 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_type ON marketplace(type);
 CREATE INDEX IF NOT EXISTS idx_marketplace_name ON marketplace(name);
 
 -- =============================================================================
+-- Marketplace Sources Table
+-- =============================================================================
+-- GitHub repository sources for marketplace artifacts
+--
+-- Key Indexes:
+--   - idx_marketplace_sources_repo_url (UNIQUE): One entry per repo URL
+--   - idx_marketplace_sources_last_sync: TTL-based refresh queries
+--   - idx_marketplace_sources_scan_status: Filter by scan status
+--   - idx_marketplace_sources_owner_repo: Lookup by owner/repo combination
+--
+-- Trust Levels:
+--   - untrusted: User-added repositories, not verified
+--   - basic: Basic verification performed
+--   - verified: Manually verified by maintainers
+--   - official: Official Anthropic/Claude repositories
+--
+-- Visibility:
+--   - private: Requires authentication, not publicly listed
+--   - internal: Authenticated users only
+--   - public: Publicly accessible repositories
+--
+-- Scan Status:
+--   - pending: Awaiting first scan
+--   - scanning: Currently being scanned
+--   - success: Last scan completed successfully
+--   - error: Last scan failed (see last_error)
+
+CREATE TABLE IF NOT EXISTS marketplace_sources (
+    id TEXT PRIMARY KEY,
+    repo_url TEXT NOT NULL UNIQUE,
+    owner TEXT NOT NULL,
+    repo_name TEXT NOT NULL,
+    ref TEXT NOT NULL DEFAULT 'main',
+    root_hint TEXT,
+    manual_map TEXT,
+    access_token_id TEXT,
+    trust_level TEXT NOT NULL DEFAULT 'basic' CHECK(trust_level IN ('untrusted', 'basic', 'verified', 'official')),
+    visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('private', 'internal', 'public')),
+    last_sync_at TIMESTAMP,
+    last_error TEXT,
+    scan_status TEXT NOT NULL DEFAULT 'pending' CHECK(scan_status IN ('pending', 'scanning', 'success', 'error')),
+    artifact_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_marketplace_sources_repo_url ON marketplace_sources(repo_url);
+CREATE INDEX IF NOT EXISTS idx_marketplace_sources_last_sync ON marketplace_sources(last_sync_at);
+CREATE INDEX IF NOT EXISTS idx_marketplace_sources_scan_status ON marketplace_sources(scan_status);
+CREATE INDEX IF NOT EXISTS idx_marketplace_sources_owner_repo ON marketplace_sources(owner, repo_name);
+
+-- =============================================================================
+-- Marketplace Catalog Entries Table
+-- =============================================================================
+-- Detected artifacts from marketplace source repositories
+--
+-- Key Indexes:
+--   - idx_catalog_entries_source_id: Query by source repository
+--   - idx_catalog_entries_status: Filter by import status
+--   - idx_catalog_entries_type: Filter by artifact type
+--   - idx_catalog_entries_upstream_url: Deduplication on upstream URL
+--   - idx_catalog_entries_source_status: Composite for filtered queries by source+status
+--   - idx_catalog_entries_source_type: Composite for queries by source+artifact_type
+--   - idx_catalog_entries_confidence: Filter by confidence score threshold
+--
+-- Status Values:
+--   - new: Newly detected artifact, not yet imported
+--   - updated: Existing artifact with upstream changes detected
+--   - removed: Previously detected artifact no longer found
+--   - imported: Artifact successfully imported to user collection
+--
+-- Foreign Keys:
+--   - source_id → marketplace_sources.id (CASCADE delete)
+
+CREATE TABLE IF NOT EXISTS marketplace_catalog_entries (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    artifact_type TEXT NOT NULL CHECK(artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')),
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    upstream_url TEXT NOT NULL,
+    detected_version TEXT,
+    detected_sha TEXT,
+    detected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    confidence_score INTEGER NOT NULL CHECK(confidence_score >= 0 AND confidence_score <= 100),
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'updated', 'removed', 'imported')),
+    import_date TIMESTAMP,
+    import_id TEXT,
+    metadata_json TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_id) REFERENCES marketplace_sources(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_source_id ON marketplace_catalog_entries(source_id);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_status ON marketplace_catalog_entries(status);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_type ON marketplace_catalog_entries(artifact_type);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_upstream_url ON marketplace_catalog_entries(upstream_url);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_source_status ON marketplace_catalog_entries(source_id, status);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_source_type ON marketplace_catalog_entries(source_id, artifact_type);
+CREATE INDEX IF NOT EXISTS idx_catalog_entries_confidence ON marketplace_catalog_entries(confidence_score);
+
+-- =============================================================================
 -- Cache Metadata Table
 -- =============================================================================
 -- System metadata for cache management
@@ -206,6 +312,20 @@ AFTER UPDATE ON cache_metadata
 FOR EACH ROW
 BEGIN
     UPDATE cache_metadata SET updated_at = CURRENT_TIMESTAMP WHERE key = NEW.key;
+END;
+
+CREATE TRIGGER IF NOT EXISTS marketplace_sources_updated_at
+AFTER UPDATE ON marketplace_sources
+FOR EACH ROW
+BEGIN
+    UPDATE marketplace_sources SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS marketplace_catalog_entries_updated_at
+AFTER UPDATE ON marketplace_catalog_entries
+FOR EACH ROW
+BEGIN
+    UPDATE marketplace_catalog_entries SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 """
 
