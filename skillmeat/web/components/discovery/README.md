@@ -75,13 +75,117 @@ export function ManagePage() {
 />
 ```
 
+### SkipPreferencesList
+
+A collapsible component that displays and manages artifacts marked to skip during discovery/import.
+
+#### Props
+
+| Prop | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `skipPrefs` | `SkipPreference[]` | Yes | - | Array of skip preferences to display |
+| `onRemoveSkip` | `(artifactKey: string) => void` | Yes | - | Callback when user un-skips an artifact |
+| `onClearAll` | `() => void` | Yes | - | Callback when user clears all skips |
+| `isLoading` | `boolean` | No | `false` | Whether actions are in progress |
+
+#### Features
+
+- **Collapsible Accordion**: Shows/hides skip list with count badge
+- **Per-Artifact Details**: Displays name, type badge, skip reason, and date
+- **Un-skip Individual**: Remove single skip preference
+- **Clear All**: Bulk clear with confirmation dialog
+- **Empty State**: Message when no artifacts are skipped
+- **Accessibility**:
+  - Full keyboard navigation
+  - ARIA attributes (aria-expanded, aria-controls, aria-label)
+  - Screen reader support
+- **Auto-collapse**: Collapses when empty
+- **shadcn/ui Components**: Uses Collapsible, AlertDialog, Badge, Button
+
+#### Usage
+
+```tsx
+import { SkipPreferencesList } from '@/components/discovery';
+import { loadSkipPrefs, removeSkipPref, clearSkipPrefs } from '@/lib/skip-preferences';
+
+export function DiscoveryTab() {
+  const [skipPrefs, setSkipPrefs] = useState<SkipPreference[]>([]);
+  const projectId = 'my-project-123';
+
+  useEffect(() => {
+    const prefs = loadSkipPrefs(projectId);
+    setSkipPrefs(prefs);
+  }, [projectId]);
+
+  const handleRemoveSkip = (artifactKey: string) => {
+    removeSkipPref(projectId, artifactKey);
+    setSkipPrefs(loadSkipPrefs(projectId));
+  };
+
+  const handleClearAll = () => {
+    clearSkipPrefs(projectId);
+    setSkipPrefs([]);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Other discovery content */}
+      <SkipPreferencesList
+        skipPrefs={skipPrefs}
+        onRemoveSkip={handleRemoveSkip}
+        onClearAll={handleClearAll}
+      />
+    </div>
+  );
+}
+```
+
+#### Example: With Loading State
+
+```tsx
+<SkipPreferencesList
+  skipPrefs={skipPrefs}
+  onRemoveSkip={handleRemoveSkip}
+  onClearAll={handleClearAll}
+  isLoading={true}
+/>
+```
+
+#### Example: With Toast Notifications
+
+```tsx
+const handleRemoveSkip = async (artifactKey: string) => {
+  const success = removeSkipPref(projectId, artifactKey);
+  if (success) {
+    setSkipPrefs(loadSkipPrefs(projectId));
+    toast.success('Artifact un-skipped successfully');
+  }
+};
+
+const handleClearAll = () => {
+  const count = skipPrefs.length;
+  clearSkipPrefs(projectId);
+  setSkipPrefs([]);
+  toast.success(`Cleared ${count} skip preferences`);
+};
+```
+
 ## Directory Structure
 
 ```
 components/discovery/
-├── DiscoveryBanner.tsx  # Main banner component
-├── index.ts             # Module exports
-└── README.md            # This file
+├── DiscoveryBanner.tsx               # Discovery alert banner
+├── SkipPreferencesList.tsx           # Skip management component
+├── SkipPreferencesList.example.tsx   # Usage examples
+├── BulkImportModal.tsx               # Bulk import modal
+├── AutoPopulationForm.tsx            # GitHub metadata form
+├── ParameterEditorModal.tsx          # Parameter editing modal
+├── DiscoveryTab.tsx                  # Main discovery tab
+├── ArtifactActions.tsx               # Artifact action buttons
+├── skeletons.tsx                     # Loading skeletons
+├── index.ts                          # Module exports
+├── USAGE_EXAMPLE.md                  # Usage documentation
+└── README.md                         # This file
 ```
 
 ## Testing

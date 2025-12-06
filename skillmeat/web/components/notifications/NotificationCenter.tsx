@@ -5,7 +5,6 @@ import {
   Bell,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Info,
   Download,
   RefreshCw,
@@ -22,39 +21,56 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
+import type {
+  NotificationData,
+  NotificationType,
+  ImportResultDetails,
+  ErrorDetails,
+  GenericDetails,
+  BulkImportResultDetails,
+  BulkImportArtifactResult,
+  ImportStatus,
+} from '@/types/notification';
 
 // ============================================================================
-// Types
+// NotificationAnnouncer Component - ARIA Live Region
 // ============================================================================
 
-export type NotificationType = 'import' | 'sync' | 'error' | 'info' | 'success';
-export type NotificationStatus = 'read' | 'unread';
-
-export interface NotificationData {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  timestamp: Date;
-  status: NotificationStatus;
-  details?: ImportResultDetails | null;
+interface NotificationAnnouncerProps {
+  notifications: NotificationData[];
 }
 
-export interface ImportResultDetails {
-  total: number;
-  succeeded: number;
-  failed: number;
-  artifacts: ArtifactImportResult[];
-}
+function NotificationAnnouncer({ notifications }: NotificationAnnouncerProps) {
+  const prevCountRef = React.useRef(notifications.length);
+  const [announcement, setAnnouncement] = React.useState('');
 
-export interface ArtifactImportResult {
-  name: string;
-  type: 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
-  success: boolean;
-  error?: string;
+  React.useEffect(() => {
+    const prevCount = prevCountRef.current;
+    if (notifications.length > prevCount) {
+      // New notification added
+      const latest = notifications[0];
+      if (latest) {
+        setAnnouncement(`New ${latest.type} notification: ${latest.title}`);
+        // Clear announcement after screen reader reads it
+        const timer = setTimeout(() => setAnnouncement(''), 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevCountRef.current = notifications.length;
+  }, [notifications]);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+    >
+      {announcement}
+    </div>
+  );
 }
 
 // ============================================================================
@@ -81,19 +97,29 @@ export function NotificationBell({
   const [open, setOpen] = React.useState(false);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-        >
+    <>
+      {/* Live region announcer for new notifications */}
+      <NotificationAnnouncer notifications={notifications} />
+
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+            aria-haspopup="menu"
+            aria-expanded={open}
+          >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold animate-in fade-in zoom-in"
+              className={cn(
+                "absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                "animate-in fade-in zoom-in animate-notification-pulse",
+                "motion-reduce:animate-none"
+              )}
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -106,7 +132,15 @@ export function NotificationBell({
 
       <DropdownMenuContent
         align="end"
-        className="w-[420px] p-0"
+        className={cn(
+          "w-full sm:w-[380px] p-0",
+          "max-h-[80vh] sm:max-h-[500px]",
+          "transform transition-all duration-200 ease-out",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2",
+          "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2",
+          "motion-reduce:transition-none motion-reduce:animate-none"
+        )}
         sideOffset={8}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -120,6 +154,7 @@ export function NotificationBell({
         />
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
 
@@ -145,10 +180,64 @@ function NotificationDropdown({
   onClose,
 }: NotificationDropdownProps) {
   const hasNotifications = notifications.length > 0;
-  const hasUnread = notifications.some((n) => n.status === 'unread');
+  const hasUnread = React.useMemo(
+    () => notifications.some((n) => n.status === 'unread'),
+    [notifications]
+  );
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation handler for arrow keys, Home, and End
+  const handleListKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!hasNotifications) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setActiveIndex((prev) => Math.min(prev + 1, notifications.length - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setActiveIndex((prev) => Math.max(prev - 1, 0));
+          break;
+        case 'Home':
+          e.preventDefault();
+          setActiveIndex(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          setActiveIndex(notifications.length - 1);
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    },
+    [hasNotifications, notifications.length, onClose]
+  );
+
+  // Memoize mark all read handler
+  const handleMarkAllRead = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onMarkAllRead();
+    },
+    [onMarkAllRead]
+  );
+
+  // Memoize clear all handler
+  const handleClearAll = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onClearAll();
+    },
+    [onClearAll]
+  );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" onKeyDown={handleListKeyDown}>
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <DropdownMenuLabel className="p-0 text-base font-semibold">
@@ -160,10 +249,7 @@ function NotificationDropdown({
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkAllRead();
-              }}
+              onClick={handleMarkAllRead}
             >
               Mark all read
             </Button>
@@ -173,10 +259,7 @@ function NotificationDropdown({
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground hover:text-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClearAll();
-              }}
+              onClick={handleClearAll}
             >
               Clear all
             </Button>
@@ -186,30 +269,34 @@ function NotificationDropdown({
 
       {/* Notification List */}
       {hasNotifications ? (
-        <ScrollArea className="max-h-[500px]">
-          <div className="divide-y">
-            {notifications.map((notification) => (
-              <NotificationItem
+        <ScrollArea className="max-h-[80vh] sm:max-h-[500px]">
+          <div
+            ref={listRef}
+            className="divide-y"
+            role="log"
+            aria-label="Notification history"
+            aria-live="off"
+          >
+            {notifications.map((notification, index) => (
+              <NotificationItemMemo
                 key={notification.id}
                 notification={notification}
-                onClick={() => {
-                  onNotificationClick(notification.id);
-                  onClose();
-                }}
-                onDismiss={(e) => {
-                  e.stopPropagation();
-                  onDismiss(notification.id);
-                }}
+                onNotificationClick={onNotificationClick}
+                onDismiss={onDismiss}
+                onClose={onClose}
+                isActive={index === activeIndex}
+                onSetActiveIndex={setActiveIndex}
+                index={index}
               />
             ))}
           </div>
         </ScrollArea>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <Bell className="h-12 w-12 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No notifications</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            You'll see updates about imports, syncs, and errors here
+          <Bell className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
+          <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-[280px]">
+            You'll see updates about imports, syncs, and system events here
           </p>
         </div>
       )}
@@ -225,28 +312,76 @@ interface NotificationItemProps {
   notification: NotificationData;
   onClick: () => void;
   onDismiss: (e: React.MouseEvent) => void;
+  isActive?: boolean;
+  onFocus?: () => void;
 }
 
-function NotificationItem({ notification, onClick, onDismiss }: NotificationItemProps) {
+const NotificationItem = React.memo(function NotificationItem({
+  notification,
+  onClick,
+  onDismiss,
+  isActive,
+  onFocus
+}: NotificationItemProps) {
   const [expanded, setExpanded] = React.useState(false);
   const isUnread = notification.status === 'unread';
   const hasDetails = notification.details != null;
+  const itemRef = React.useRef<HTMLDivElement>(null);
 
   const icon = getNotificationIcon(notification.type);
   const iconColor = getNotificationIconColor(notification.type);
 
-  const handleToggleExpand = (e: React.MouseEvent) => {
+  // Focus this item when it becomes active via keyboard navigation
+  React.useEffect(() => {
+    if (isActive && itemRef.current) {
+      itemRef.current.focus();
+    }
+  }, [isActive]);
+
+  const handleToggleExpand = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     setExpanded(!expanded);
   };
 
+  const handleItemKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Enter or Space on the item itself activates it (marks as read/closes)
+    if (e.key === 'Enter' || e.key === ' ') {
+      // Only if the target is the item div itself, not a button inside
+      if (e.target === itemRef.current) {
+        e.preventDefault();
+        onClick();
+      }
+    }
+  };
+
+  const handleDetailsKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Enter or Space on details button toggles expansion
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleToggleExpand(e);
+    }
+  };
+
   return (
     <div
+      ref={itemRef}
       className={cn(
-        'relative px-4 py-3 transition-colors cursor-pointer hover:bg-accent/50',
+        'group relative px-4 py-3 cursor-pointer',
+        'transition-all duration-150',
+        'hover:bg-accent/50 hover:shadow-sm',
+        'focus-within:bg-accent/50 focus-within:ring-2 focus-within:ring-ring',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
+        'motion-reduce:transition-none',
         isUnread && 'bg-accent/30'
       )}
       onClick={onClick}
+      onKeyDown={handleItemKeyDown}
+      onFocus={onFocus}
+      tabIndex={isActive ? 0 : -1}
+      role="article"
+      aria-labelledby={`notification-${notification.id}-title`}
+      aria-describedby={`notification-${notification.id}-message`}
     >
       {/* Unread indicator */}
       {isUnread && (
@@ -261,8 +396,16 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium leading-tight">{notification.title}</p>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+              <p
+                id={`notification-${notification.id}-title`}
+                className="text-sm font-medium leading-tight"
+              >
+                {notification.title}
+              </p>
+              <p
+                id={`notification-${notification.id}-message`}
+                className="text-xs text-muted-foreground mt-1 line-clamp-2"
+              >
                 {notification.message}
               </p>
               <p className="text-xs text-muted-foreground/70 mt-1.5">
@@ -274,7 +417,13 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-background/80"
+              className={cn(
+                "h-6 w-6 flex-shrink-0",
+                "opacity-60 hover:opacity-100 focus-visible:opacity-100",
+                "transition-opacity duration-150",
+                "hover:bg-background/80",
+                "motion-reduce:transition-none"
+              )}
               onClick={onDismiss}
               aria-label="Dismiss notification"
             >
@@ -290,6 +439,9 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
                 size="sm"
                 className="h-7 px-2 text-xs"
                 onClick={handleToggleExpand}
+                onKeyDown={handleDetailsKeyDown}
+                aria-expanded={expanded}
+                aria-controls={`notification-${notification.id}-details`}
               >
                 {expanded ? (
                   <>
@@ -305,7 +457,11 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
               </Button>
 
               {expanded && notification.details && (
-                <ImportResultDetails details={notification.details} />
+                <div id={`notification-${notification.id}-details`}>
+                  <React.Suspense fallback={<div className="mt-3 p-3 text-xs text-muted-foreground">Loading details...</div>}>
+                    <NotificationDetailView details={notification.details} />
+                  </React.Suspense>
+                </div>
               )}
             </div>
           )}
@@ -313,7 +469,318 @@ function NotificationItem({ notification, onClick, onDismiss }: NotificationItem
       </div>
     </div>
   );
+});
+
+// ============================================================================
+// NotificationItemMemo Wrapper - Handles callback memoization
+// ============================================================================
+
+interface NotificationItemMemoProps {
+  notification: NotificationData;
+  onNotificationClick: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onClose: () => void;
+  isActive: boolean;
+  onSetActiveIndex: (index: number) => void;
+  index: number;
 }
+
+const NotificationItemMemo = React.memo(function NotificationItemMemo({
+  notification,
+  onNotificationClick,
+  onDismiss,
+  onClose,
+  isActive,
+  onSetActiveIndex,
+  index,
+}: NotificationItemMemoProps) {
+  // Memoize click handler
+  const handleClick = React.useCallback(() => {
+    onNotificationClick(notification.id);
+    onClose();
+  }, [notification.id, onNotificationClick, onClose]);
+
+  // Memoize dismiss handler
+  const handleDismiss = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDismiss(notification.id);
+    },
+    [notification.id, onDismiss]
+  );
+
+  // Memoize focus handler
+  const handleFocus = React.useCallback(() => {
+    onSetActiveIndex(index);
+  }, [index, onSetActiveIndex]);
+
+  return (
+    <NotificationItem
+      notification={notification}
+      onClick={handleClick}
+      onDismiss={handleDismiss}
+      isActive={isActive}
+      onFocus={handleFocus}
+    />
+  );
+});
+
+// ============================================================================
+// Type Guard Functions
+// ============================================================================
+
+function isImportResultDetails(details: unknown): details is ImportResultDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'artifacts' in details &&
+    'total' in details &&
+    'succeeded' in details &&
+    'failed' in details
+  );
+}
+
+function isErrorDetails(details: unknown): details is ErrorDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'message' in details &&
+    !('artifacts' in details)
+  );
+}
+
+function isGenericDetails(details: unknown): details is GenericDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'metadata' in details &&
+    !('results' in details) // Exclude BulkImportResultDetails
+  );
+}
+
+function isBulkImportResultDetails(details: unknown): details is BulkImportResultDetails {
+  return (
+    details !== null &&
+    typeof details === 'object' &&
+    'total_requested' in details &&
+    'total_imported' in details &&
+    'results' in details &&
+    Array.isArray((details as BulkImportResultDetails).results)
+  );
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Sanitize error messages to prevent XSS and improve readability
+ * - Removes/escapes HTML tags
+ * - Truncates to max 200 characters
+ * - Handles null/undefined gracefully
+ */
+function sanitizeErrorMessage(message: string | null | undefined): string {
+  if (!message) return 'Unknown error';
+
+  // Remove HTML tags
+  const stripped = message.replace(/<[^>]*>/g, '');
+
+  // Truncate if too long
+  if (stripped.length > 200) {
+    return stripped.substring(0, 197) + '...';
+  }
+
+  return stripped;
+}
+
+// ============================================================================
+// NotificationDetailView Component (Router)
+// ============================================================================
+
+interface NotificationDetailViewProps {
+  details: ImportResultDetails | ErrorDetails | GenericDetails | BulkImportResultDetails;
+}
+
+const NotificationDetailView = React.memo(function NotificationDetailView({
+  details
+}: NotificationDetailViewProps) {
+  if (isBulkImportResultDetails(details)) {
+    return <BulkImportResultDetailsMemo details={details} />;
+  }
+
+  if (isImportResultDetails(details)) {
+    return <ImportResultDetailsMemo details={details} />;
+  }
+
+  if (isErrorDetails(details)) {
+    return <ErrorDetailMemo details={details} />;
+  }
+
+  if (isGenericDetails(details)) {
+    return <GenericDetailMemo details={details} />;
+  }
+
+  return null;
+});
+
+// ============================================================================
+// BulkImportResultDetails Component
+// ============================================================================
+
+interface BulkImportResultDetailsProps {
+  details: BulkImportResultDetails;
+}
+
+/**
+ * Helper function to extract artifact name and type from artifact_id
+ * Format: "type:name" e.g., "skill:canvas-design"
+ */
+function parseArtifactId(artifactId: string): { type: string; name: string } {
+  const parts = artifactId.split(':');
+  if (parts.length >= 2 && parts[0]) {
+    return { type: parts[0], name: parts.slice(1).join(':') };
+  }
+  return { type: 'unknown', name: artifactId };
+}
+
+/**
+ * Get icon for import status
+ */
+function getStatusIcon(status: ImportStatus): React.ReactNode {
+  switch (status) {
+    case 'success':
+      return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />;
+    case 'skipped':
+      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+    case 'failed':
+      return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />;
+    default:
+      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+  }
+}
+
+const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsMemo({
+  details
+}: BulkImportResultDetailsProps) {
+  return (
+    <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
+      {/* Summary breakdown */}
+      <div className="space-y-2">
+        {/* Imported breakdown */}
+        {details.total_imported > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              <span className="font-medium text-green-700 dark:text-green-400">
+                Imported: {details.total_imported}
+              </span>
+            </div>
+            {details.imported_to_collection > 0 && (
+              <div className="ml-5 text-xs text-muted-foreground">
+                → Collection: {details.imported_to_collection}
+              </div>
+            )}
+            {details.added_to_project > 0 && (
+              <div className="ml-5 text-xs text-muted-foreground">
+                → Project: {details.added_to_project}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Skipped */}
+        {details.total_skipped > 0 && (
+          <div className="flex items-center gap-1.5 text-xs">
+            <Info className="h-3.5 w-3.5 text-gray-500" />
+            <span className="font-medium text-gray-700 dark:text-gray-400">
+              Skipped: {details.total_skipped}
+            </span>
+          </div>
+        )}
+
+        {/* Failed */}
+        {details.total_failed > 0 && (
+          <div className="flex items-center gap-1.5 text-xs">
+            <XCircle className="h-3.5 w-3.5 text-red-500" />
+            <span className="font-medium text-red-700 dark:text-red-400">
+              Failed: {details.total_failed}
+            </span>
+          </div>
+        )}
+
+        {/* Total */}
+        <div className="pt-1 border-t text-xs text-muted-foreground">
+          Total requested: {details.total_requested}
+        </div>
+      </div>
+
+      {/* Per-artifact details */}
+      {details.results && details.results.length > 0 && (
+        <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+          <div className="text-xs font-medium text-muted-foreground">Artifact Details:</div>
+          {details.results.map((result: BulkImportArtifactResult, index: number) => {
+            const { type, name } = parseArtifactId(result.artifact_id);
+            return (
+              <div
+                key={`${result.artifact_id}-${index}`}
+                className={cn(
+                  'flex items-start gap-2 rounded px-2 py-1.5 text-xs',
+                  'transition-colors duration-150',
+                  'hover:bg-background/80 dark:hover:bg-background/40',
+                  'motion-reduce:transition-none'
+                )}
+              >
+                {/* Status icon */}
+                {getStatusIcon(result.status)}
+
+                {/* Artifact info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1 text-[10px] font-medium"
+                    >
+                      {type}
+                    </Badge>
+                    <span className="font-medium truncate">{name}</span>
+                  </div>
+
+                  {/* Skip reason */}
+                  {result.status === 'skipped' && result.skip_reason && (
+                    <p className="text-muted-foreground mt-0.5 line-clamp-2">
+                      {result.skip_reason}
+                    </p>
+                  )}
+
+                  {/* Error message */}
+                  {result.status === 'failed' && result.error && (
+                    <p className="text-red-600 dark:text-red-400 mt-0.5 line-clamp-2">
+                      {sanitizeErrorMessage(result.error)}
+                    </p>
+                  )}
+
+                  {/* Success message */}
+                  {result.status === 'success' && result.message && (
+                    <p className="text-muted-foreground mt-0.5 text-[10px]">
+                      {result.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Duration (if available) */}
+      {details.duration_ms !== undefined && (
+        <div className="pt-2 border-t text-[10px] text-muted-foreground">
+          Completed in {(details.duration_ms / 1000).toFixed(2)}s
+        </div>
+      )}
+    </div>
+  );
+});
 
 // ============================================================================
 // ImportResultDetails Component
@@ -323,7 +790,9 @@ interface ImportResultDetailsProps {
   details: ImportResultDetails;
 }
 
-function ImportResultDetails({ details }: ImportResultDetailsProps) {
+const ImportResultDetailsMemo = React.memo(function ImportResultDetailsMemo({
+  details
+}: ImportResultDetailsProps) {
   return (
     <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
       {/* Summary */}
@@ -346,7 +815,12 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
         {details.artifacts.map((artifact, index) => (
           <div
             key={`${artifact.name}-${index}`}
-            className="flex items-start gap-2 rounded px-2 py-1.5 text-xs hover:bg-background/60"
+            className={cn(
+              'flex items-start gap-2 rounded px-2 py-1.5 text-xs',
+              'transition-colors duration-150',
+              'hover:bg-background/80 dark:hover:bg-background/40',
+              'motion-reduce:transition-none'
+            )}
           >
             {/* Status icon */}
             {artifact.success ? (
@@ -357,7 +831,7 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
 
             {/* Artifact info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge
                   variant="outline"
                   className="h-4 px-1 text-[10px] font-medium"
@@ -368,7 +842,7 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
               </div>
               {!artifact.success && artifact.error && (
                 <p className="text-muted-foreground mt-0.5 line-clamp-2">
-                  {artifact.error}
+                  {sanitizeErrorMessage(artifact.error)}
                 </p>
               )}
             </div>
@@ -377,7 +851,129 @@ function ImportResultDetails({ details }: ImportResultDetailsProps) {
       </div>
     </div>
   );
+});
+
+// ============================================================================
+// ErrorDetail Component
+// ============================================================================
+
+interface ErrorDetailProps {
+  details: ErrorDetails;
+  onRetry?: () => void;
 }
+
+const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
+  details,
+  onRetry
+}: ErrorDetailProps) {
+  const [showStack, setShowStack] = React.useState(false);
+
+  return (
+    <div className="mt-3 space-y-3 rounded-md border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-3">
+      {/* Error code and message */}
+      <div className="space-y-2">
+        {details.code && (
+          <div className="flex items-center gap-2">
+            <Badge variant="destructive" className="h-5 px-2 text-xs font-mono">
+              {details.code}
+            </Badge>
+          </div>
+        )}
+        <p className="text-sm font-medium text-red-900 dark:text-red-200">
+          {sanitizeErrorMessage(details.message)}
+        </p>
+      </div>
+
+      {/* Stack trace (collapsible) */}
+      {details.stack && (
+        <div className="space-y-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
+            onClick={() => setShowStack(!showStack)}
+            aria-expanded={showStack}
+            aria-controls="error-stack-trace"
+          >
+            {showStack ? (
+              <>
+                <ChevronUp className="h-3 w-3 mr-1" />
+                Hide stack trace
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3 w-3 mr-1" />
+                Show stack trace
+              </>
+            )}
+          </Button>
+          {showStack && (
+            <pre
+              id="error-stack-trace"
+              className="mt-2 rounded bg-red-100/50 dark:bg-red-950/50 p-2 text-[10px] font-mono text-red-900 dark:text-red-200 overflow-x-auto max-h-32 overflow-y-auto"
+            >
+              {details.stack}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Retry button */}
+      {details.retryable && onRetry && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/40"
+          onClick={onRetry}
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Retry
+        </Button>
+      )}
+    </div>
+  );
+});
+
+// ============================================================================
+// GenericDetail Component
+// ============================================================================
+
+interface GenericDetailProps {
+  details: GenericDetails;
+}
+
+const GenericDetailMemo = React.memo(function GenericDetailMemo({
+  details
+}: GenericDetailProps) {
+  if (!details.metadata || Object.keys(details.metadata).length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-md border bg-muted/30 p-3">
+      <div className="space-y-1.5">
+        {Object.entries(details.metadata).map(([key, value]) => (
+          <div
+            key={key}
+            className={cn(
+              "flex items-start gap-2 text-xs rounded px-2 py-1.5",
+              "transition-colors duration-150",
+              "hover:bg-background/60 dark:hover:bg-background/40",
+              "motion-reduce:transition-none"
+            )}
+          >
+            <span className="font-medium text-muted-foreground min-w-[80px]">
+              {key}:
+            </span>
+            <span className="flex-1 break-words">
+              {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
 
 // ============================================================================
 // Helper Functions
@@ -417,74 +1013,3 @@ function getNotificationIconColor(type: NotificationType): string {
   }
 }
 
-// ============================================================================
-// Example Usage Hook (for reference)
-// ============================================================================
-
-/**
- * Example hook for managing notifications
- *
- * Usage:
- * ```tsx
- * const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, addNotification, dismissNotification } = useNotifications();
- *
- * return (
- *   <NotificationBell
- *     unreadCount={unreadCount}
- *     notifications={notifications}
- *     onMarkAllRead={markAllAsRead}
- *     onClearAll={clearAll}
- *     onNotificationClick={markAsRead}
- *     onDismiss={dismissNotification}
- *   />
- * );
- * ```
- */
-export function useNotifications() {
-  const [notifications, setNotifications] = React.useState<NotificationData[]>([]);
-
-  const addNotification = React.useCallback((notification: Omit<NotificationData, 'id'>) => {
-    setNotifications((prev) => [
-      {
-        ...notification,
-        id: Math.random().toString(36).substring(7),
-      },
-      ...prev,
-    ].slice(0, 50)); // Keep max 50 notifications
-  }, []);
-
-  const markAsRead = React.useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, status: 'read' as const } : n))
-    );
-  }, []);
-
-  const markAllAsRead = React.useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, status: 'read' as const }))
-    );
-  }, []);
-
-  const clearAll = React.useCallback(() => {
-    setNotifications([]);
-  }, []);
-
-  const dismissNotification = React.useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
-
-  const unreadCount = React.useMemo(
-    () => notifications.filter((n) => n.status === 'unread').length,
-    [notifications]
-  );
-
-  return {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    clearAll,
-    addNotification,
-    dismissNotification,
-  };
-}

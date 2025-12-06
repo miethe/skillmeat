@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   GitBranch,
   ArrowLeft,
@@ -19,17 +19,18 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { EntityLifecycleProvider } from '@/components/entity/EntityLifecycleProvider';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { useProject } from '@/hooks/useProjects';
 import { useArtifacts } from '@/hooks/useArtifacts';
 import { useProjectDiscovery } from '@/hooks/useProjectDiscovery';
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
+import { DiscoveryTab } from '@/components/discovery/DiscoveryTab';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
 import { useToast } from '@/hooks/use-toast';
 import type { DeployedArtifact } from '@/types/project';
-import type { Artifact } from '@/types/artifact';
-import type { Entity } from '@/types/entity';
+import type { Entity, EntityType } from '@/types/entity';
 import type { DiscoveredArtifact } from '@/types/discovery';
 
 const artifactTypeIcons = {
@@ -51,15 +52,19 @@ const artifactTypeColors = {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
   const { toast } = useToast();
+
+  // Tab state from URL
+  const activeTab = searchParams.get('tab') || 'deployed';
 
   const { data: project, isLoading, error } = useProject(projectId);
 
   // Modal state for entity detail
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isFetchingEntity, setIsFetchingEntity] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
   // Fetch all artifacts to match by name
@@ -73,8 +78,15 @@ export default function ProjectDetailPage() {
     isDiscovering,
     refetchDiscovery,
     bulkImport,
-    isImporting,
+    skipPrefs,
   } = useProjectDiscovery(project?.path, projectId);
+
+  // Tab change handler
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', value);
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   // Trigger discovery when project loads
   useEffect(() => {
@@ -121,8 +133,6 @@ export default function ProjectDetailPage() {
   };
 
   const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
-    setIsFetchingEntity(true);
-
     // Try to find matching artifact from collection by name
     const matchingArtifact = artifactsData?.artifacts.find(
       (artifact) => artifact.name === deployedArtifact.artifact_name
@@ -152,8 +162,6 @@ export default function ProjectDetailPage() {
       // If not found in collection, show a notification or error
       console.warn(`Artifact ${deployedArtifact.artifact_name} not found in collection`);
     }
-
-    setIsFetchingEntity(false);
   };
 
   const handleDetailClose = () => {
@@ -202,6 +210,32 @@ export default function ProjectDetailPage() {
       });
       throw error;
     }
+  };
+
+  // Handle single artifact import from DiscoveryTab
+  const handleSingleImport = (_artifact: DiscoveredArtifact) => {
+    // Open BulkImportModal with just this artifact
+    setShowImportModal(true);
+    // Note: BulkImportModal will need to be filtered to show only this artifact
+    // For now, it will show all artifacts - filtering can be added in DIS-4.7
+  };
+
+  // Handle artifact detail view from DiscoveryTab
+  const handleViewArtifactDetails = (artifact: DiscoveredArtifact) => {
+    // Convert DiscoveredArtifact to Entity for modal
+    const entity: Entity = {
+      id: `${artifact.type}:${artifact.name}`,
+      name: artifact.name,
+      type: artifact.type as EntityType,
+      description: artifact.description,
+      source: artifact.source,
+      tags: artifact.tags,
+      status: 'synced', // Default status for discovered artifacts
+      collection: 'discovered',
+      projectPath: project?.path,
+    };
+    setSelectedEntity(entity);
+    setIsDetailOpen(true);
   };
 
   if (isLoading) {
@@ -293,154 +327,187 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Deployments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{project.deployment_count}</div>
-            </CardContent>
-          </Card>
+        {/* Tabs: Deployed vs Discovery */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="deployed" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Deployed
+            </TabsTrigger>
+            <TabsTrigger value="discovery" className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Discovery
+              {importableCount > 0 && (
+                <Badge variant="default" className="ml-1 bg-green-500">
+                  {importableCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Last Deployed
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
-                {project.last_deployment ? formatDate(project.last_deployment) : 'Never'}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Deployed Tab Content */}
+          <TabsContent value="deployed" className="mt-6 space-y-6">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Deployments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{project.deployment_count}</div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Modified Locally
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{project.stats.modified_count}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Deployment Statistics</CardTitle>
-            <CardDescription>Breakdown of deployed artifacts</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="mb-3 text-sm font-medium">By Type</h3>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(project.stats.by_type).map(([type, count]) => {
-                  const Icon = getArtifactIcon(type);
-                  return (
-                    <Badge key={type} variant="outline" className="px-3 py-1.5">
-                      <Icon className="mr-1.5 h-3 w-3" />
-                      {type}: {count}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="my-4 border-t" />
-
-            <div>
-              <h3 className="mb-3 text-sm font-medium">By Collection</h3>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(project.stats.by_collection).map(([collection, count]) => (
-                  <Badge key={collection} variant="secondary" className="px-3 py-1.5">
-                    {collection}: {count}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Deployed Artifacts Tree */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Deployed Artifacts</CardTitle>
-            <CardDescription>Complete list of artifacts deployed to this project</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {Object.entries(groupedArtifacts).map(([type, artifacts]) => {
-                const Icon = getArtifactIcon(type);
-                const colorClass = getArtifactColorClass(type);
-
-                return (
-                  <div key={type}>
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className={`rounded-md border p-2 ${colorClass}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <h3 className="font-semibold capitalize">
-                        {type}s ({artifacts.length})
-                      </h3>
-                    </div>
-
-                    <div className="ml-6 space-y-2">
-                      {artifacts.map((artifact) => (
-                        <div
-                          key={`${artifact.artifact_type}-${artifact.artifact_name}`}
-                          className="flex cursor-pointer items-start justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
-                          onClick={() => handleArtifactClick(artifact)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleArtifactClick(artifact);
-                            }
-                          }}
-                        >
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{artifact.artifact_name}</p>
-                              {artifact.local_modifications && (
-                                <Badge variant="outline" className="text-xs">
-                                  <AlertCircle className="mr-1 h-3 w-3" />
-                                  Modified
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span className="font-mono">{artifact.artifact_path}</span>
-                              <span>•</span>
-                              <span>from {artifact.from_collection}</span>
-                              {artifact.version && (
-                                <>
-                                  <span>•</span>
-                                  <span>{artifact.version}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(artifact.deployed_at)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Last Deployed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold">
+                    {project.last_deployment ? formatDate(project.last_deployment) : 'Never'}
                   </div>
-                );
-              })}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Modified Locally
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{project.stats.modified_count}</div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Deployment Statistics</CardTitle>
+                <CardDescription>Breakdown of deployed artifacts</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="mb-3 text-sm font-medium">By Type</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(project.stats.by_type).map(([type, count]) => {
+                      const Icon = getArtifactIcon(type);
+                      return (
+                        <Badge key={type} variant="outline" className="px-3 py-1.5">
+                          <Icon className="mr-1.5 h-3 w-3" />
+                          {type}: {count}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="my-4 border-t" />
+
+                <div>
+                  <h3 className="mb-3 text-sm font-medium">By Collection</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(project.stats.by_collection).map(([collection, count]) => (
+                      <Badge key={collection} variant="secondary" className="px-3 py-1.5">
+                        {collection}: {count}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Deployed Artifacts Tree */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Deployed Artifacts</CardTitle>
+                <CardDescription>Complete list of artifacts deployed to this project</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {Object.entries(groupedArtifacts).map(([type, artifacts]) => {
+                    const Icon = getArtifactIcon(type);
+                    const colorClass = getArtifactColorClass(type);
+
+                    return (
+                      <div key={type}>
+                        <div className="mb-3 flex items-center gap-2">
+                          <div className={`rounded-md border p-2 ${colorClass}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <h3 className="font-semibold capitalize">
+                            {type}s ({artifacts.length})
+                          </h3>
+                        </div>
+
+                        <div className="ml-6 space-y-2">
+                          {artifacts.map((artifact) => (
+                            <div
+                              key={`${artifact.artifact_type}-${artifact.artifact_name}`}
+                              className="flex cursor-pointer items-start justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50"
+                              onClick={() => handleArtifactClick(artifact)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleArtifactClick(artifact);
+                                }
+                              }}
+                            >
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{artifact.artifact_name}</p>
+                                  {artifact.local_modifications && (
+                                    <Badge variant="outline" className="text-xs">
+                                      <AlertCircle className="mr-1 h-3 w-3" />
+                                      Modified
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                  <span className="font-mono">{artifact.artifact_path}</span>
+                                  <span>•</span>
+                                  <span>from {artifact.from_collection}</span>
+                                  {artifact.version && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{artifact.version}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {formatDate(artifact.deployed_at)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Discovery Tab Content */}
+          <TabsContent value="discovery" className="mt-6 space-y-6">
+            <DiscoveryTab
+              artifacts={discoveredArtifacts}
+              isLoading={isDiscovering}
+              skipPrefs={skipPrefs}
+              onImport={handleSingleImport}
+              onViewDetails={handleViewArtifactDetails}
+            />
+          </TabsContent>
+        </Tabs>
 
         {/* Entity Detail Modal - Project Mode */}
         <UnifiedEntityModal
