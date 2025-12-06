@@ -8,9 +8,10 @@ Provides Pydantic models for:
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 # ===========================
@@ -420,6 +421,11 @@ class BulkImportRequest(BaseModel):
         description="Automatically resolve conflicts (overwrite existing artifacts)",
         examples=[False],
     )
+    skip_list: Optional[List[str]] = Field(
+        default=None,
+        description="List of artifact keys to mark as skipped (format: type:name)",
+        examples=[["skill:canvas-design", "command:my-command"]],
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -441,9 +447,17 @@ class BulkImportRequest(BaseModel):
                     },
                 ],
                 "auto_resolve_conflicts": False,
+                "skip_list": ["skill:existing-skill"],
             }
         }
     }
+
+
+class ImportStatus(str, Enum):
+    """Status of an artifact import operation."""
+    SUCCESS = "success"  # Artifact was successfully imported
+    SKIPPED = "skipped"  # Artifact already exists in Collection/Project
+    FAILED = "failed"    # Import failed due to error
 
 
 class ImportResult(BaseModel):
@@ -454,10 +468,10 @@ class ImportResult(BaseModel):
         description="ID of the artifact (type:name)",
         examples=["skill:canvas-design"],
     )
-    success: bool = Field(
+    status: ImportStatus = Field(
         ...,
-        description="Whether import succeeded",
-        examples=[True],
+        description="Import status: success, skipped, or failed",
+        examples=[ImportStatus.SUCCESS],
     )
     message: str = Field(
         ...,
@@ -466,20 +480,33 @@ class ImportResult(BaseModel):
     )
     error: Optional[str] = Field(
         default=None,
-        description="Error message (if failed)",
+        description="Error message (if status=failed)",
         examples=["Artifact already exists and auto_resolve_conflicts is False"],
     )
+    skip_reason: Optional[str] = Field(
+        default=None,
+        description="Reason artifact was skipped (if status=skipped)",
+        examples=["Artifact already exists in collection"],
+    )
 
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
             "example": {
                 "artifact_id": "skill:canvas-design",
-                "success": True,
+                "status": "success",
                 "message": "Artifact 'canvas-design' imported successfully",
                 "error": None,
+                "skip_reason": None,
             }
         }
-    }
+    )
+
+    @computed_field
+    @property
+    def success(self) -> bool:
+        """Backward compatibility: returns True if status is SUCCESS."""
+        return self.status == ImportStatus.SUCCESS
 
 
 class BulkImportResult(BaseModel):
@@ -495,14 +522,35 @@ class BulkImportResult(BaseModel):
         ...,
         description="Number of artifacts successfully imported",
         ge=0,
-        examples=[8],
+        examples=[7],
+    )
+    total_skipped: int = Field(
+        default=0,
+        description="Number of artifacts skipped (already exist)",
+        ge=0,
+        examples=[2],
     )
     total_failed: int = Field(
         ...,
         description="Number of artifacts that failed to import",
         ge=0,
-        examples=[2],
+        examples=[1],
     )
+
+    # Per-location breakdown
+    imported_to_collection: int = Field(
+        default=0,
+        description="Number of artifacts added to Collection",
+        ge=0,
+        examples=[5],
+    )
+    added_to_project: int = Field(
+        default=0,
+        description="Number of artifacts deployed to Project",
+        ge=0,
+        examples=[7],
+    )
+
     results: List[ImportResult] = Field(
         default_factory=list,
         description="Per-artifact import results",
@@ -511,30 +559,49 @@ class BulkImportResult(BaseModel):
         ...,
         description="Total import duration in milliseconds",
         ge=0.0,
-        examples=[1234.56],
+        examples=[1250.5],
     )
+
+    @computed_field
+    @property
+    def summary(self) -> str:
+        """Human-readable summary of import results."""
+        parts = []
+        if self.total_imported > 0:
+            parts.append(f"{self.total_imported} imported")
+        if self.total_skipped > 0:
+            parts.append(f"{self.total_skipped} skipped")
+        if self.total_failed > 0:
+            parts.append(f"{self.total_failed} failed")
+        return ", ".join(parts) if parts else "No artifacts processed"
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "total_requested": 10,
-                "total_imported": 8,
-                "total_failed": 2,
+                "total_imported": 7,
+                "total_skipped": 2,
+                "total_failed": 1,
+                "imported_to_collection": 5,
+                "added_to_project": 7,
                 "results": [
                     {
                         "artifact_id": "skill:canvas-design",
-                        "success": True,
+                        "status": "success",
                         "message": "Artifact 'canvas-design' imported successfully",
                         "error": None,
+                        "skip_reason": None,
                     },
                     {
                         "artifact_id": "skill:existing-skill",
-                        "success": False,
-                        "message": "Import failed",
-                        "error": "Artifact already exists",
+                        "status": "skipped",
+                        "message": "Artifact already exists",
+                        "error": None,
+                        "skip_reason": "Artifact already exists in collection",
                     },
                 ],
-                "duration_ms": 1234.56,
+                "duration_ms": 1250.5,
+                "summary": "7 imported, 2 skipped, 1 failed",
             }
         }
     }
@@ -648,6 +715,126 @@ class ParameterUpdateResponse(BaseModel):
                 "artifact_id": "skill:canvas-design",
                 "updated_fields": ["source", "version", "tags"],
                 "message": "Artifact 'canvas-design' parameters updated successfully",
+            }
+        }
+    }
+
+
+# ===========================
+# Skip Preference Schemas
+# ===========================
+
+
+class SkipPreferenceResponse(BaseModel):
+    """Response containing a skip preference."""
+
+    artifact_key: str = Field(
+        ...,
+        description="Artifact identifier in format 'type:name'",
+        examples=["skill:canvas-design"],
+    )
+    skip_reason: str = Field(
+        ...,
+        description="Human-readable reason for skipping this artifact",
+        examples=["Already in collection"],
+    )
+    added_date: datetime = Field(
+        ...,
+        description="When this skip preference was added (ISO 8601 format)",
+        examples=["2025-12-04T10:00:00Z"],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "artifact_key": "skill:canvas-design",
+                "skip_reason": "Already in collection",
+                "added_date": "2025-12-04T10:00:00Z",
+            }
+        }
+    }
+
+
+class SkipPreferenceListResponse(BaseModel):
+    """Response containing list of skip preferences."""
+
+    skips: List[SkipPreferenceResponse] = Field(
+        default_factory=list,
+        description="List of skip preferences for this project",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "skips": [
+                    {
+                        "artifact_key": "skill:canvas-design",
+                        "skip_reason": "Already in collection",
+                        "added_date": "2025-12-04T10:00:00Z",
+                    },
+                    {
+                        "artifact_key": "command:my-command",
+                        "skip_reason": "Not needed for this project",
+                        "added_date": "2025-12-04T11:00:00Z",
+                    },
+                ]
+            }
+        }
+    }
+
+
+class SkipClearResponse(BaseModel):
+    """Response from clearing skip preferences."""
+
+    success: bool = Field(
+        ...,
+        description="Whether clear operation succeeded",
+        examples=[True],
+    )
+    cleared_count: int = Field(
+        ...,
+        description="Number of skip preferences that were cleared",
+        ge=0,
+        examples=[5],
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable result message",
+        examples=["Cleared 5 skip preferences"],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "success": True,
+                "cleared_count": 5,
+                "message": "Cleared 5 skip preferences",
+            }
+        }
+    }
+
+
+class SkipPreferenceAddRequest(BaseModel):
+    """Request to add a skip preference."""
+
+    artifact_key: str = Field(
+        ...,
+        description="Artifact identifier in format 'type:name'",
+        examples=["skill:canvas-design"],
+        min_length=3,
+    )
+    skip_reason: str = Field(
+        ...,
+        description="Human-readable reason for skipping this artifact",
+        examples=["Already have it"],
+        min_length=1,
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "artifact_key": "skill:canvas-design",
+                "skip_reason": "Already in collection",
             }
         }
     }

@@ -1,0 +1,218 @@
+{
+    "machine_info": {
+        "node": "NicksMacStudio.home.meaty.cloud",
+        "processor": "arm",
+        "machine": "arm64",
+        "python_compiler": "Clang 17.0.0 (clang-1700.0.13.5)",
+        "python_implementation": "CPython",
+        "python_implementation_version": "3.12.0",
+        "python_version": "3.12.0",
+        "python_build": [
+            "main",
+            "Jun 19 2025 11:35:44"
+        ],
+        "release": "25.0.0",
+        "system": "Darwin",
+        "cpu": {
+            "python_version": "3.12.0.final.0 (64 bit)",
+            "cpuinfo_version": [
+                9,
+                0,
+                0
+            ],
+            "cpuinfo_version_string": "9.0.0",
+            "arch": "ARM_8",
+            "bits": 64,
+            "count": 12,
+            "arch_string_raw": "arm64",
+            "brand_raw": "Apple M2 Max"
+        }
+    },
+    "commit_info": {
+        "id": "955ab929df7b96c44340f5729377c01436a03d7b",
+        "time": "2025-12-04T20:48:21-05:00",
+        "author_time": "2025-12-04T20:48:21-05:00",
+        "dirty": true,
+        "project": "skillmeat",
+        "branch": "feat/notification-system"
+    },
+    "benchmarks": [
+        {
+            "group": null,
+            "name": "test_benchmark_empty_project",
+            "fullname": "skillmeat/api/tests/test_discovery_performance.py::TestDiscoveryPerformance::test_benchmark_empty_project",
+            "params": null,
+            "param": null,
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.00014762498904019594,
+                "max": 0.004767124977661297,
+                "mean": 0.00019429750526072767,
+                "stddev": 0.00015457498966877357,
+                "rounds": 2021,
+                "median": 0.0001680839923210442,
+                "iqr": 1.7635247786529362e-05,
+                "q1": 0.00016062500071711838,
+                "q3": 0.00017826024850364774,
+                "iqr_outliers": 197,
+                "stddev_outliers": 80,
+                "outliers": "80;197",
+                "ld15iqr": 0.00014762498904019594,
+                "hd15iqr": 0.00020504099666140974,
+                "ops": 5146.746473445971,
+                "total": 0.3926752581319306,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_large_collection",
+            "fullname": "skillmeat/api/tests/test_discovery_performance.py::TestDiscoveryPerformance::test_benchmark_large_collection",
+            "params": null,
+            "param": null,
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.2769194169959519,
+                "max": 0.2887350830133073,
+                "mean": 0.28285394980339335,
+                "stddev": 0.004634091750202588,
+                "rounds": 5,
+                "median": 0.28434020798886195,
+                "iqr": 0.006757135764928535,
+                "q1": 0.2789313850007602,
+                "q3": 0.28568852076568874,
+                "iqr_outliers": 0,
+                "stddev_outliers": 2,
+                "outliers": "2;0",
+                "ld15iqr": 0.2769194169959519,
+                "hd15iqr": 0.2887350830133073,
+                "ops": 3.535393444903569,
+                "total": 1.4142697490169667,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_large_project",
+            "fullname": "skillmeat/api/tests/test_discovery_performance.py::TestDiscoveryPerformance::test_benchmark_large_project",
+            "params": null,
+            "param": null,
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.07387133300653659,
+                "max": 0.08438179199583828,
+                "mean": 0.07918281746186459,
+                "stddev": 0.0033913485355589693,
+                "rounds": 13,
+                "median": 0.07953854199149646,
+                "iqr": 0.004742135002743453,
+                "q1": 0.07702500050072558,
+                "q3": 0.08176713550346904,
+                "iqr_outliers": 0,
+                "stddev_outliers": 4,
+                "outliers": "4;0",
+                "ld15iqr": 0.07387133300653659,
+                "hd15iqr": 0.08438179199583828,
+                "ops": 12.629002504004257,
+                "total": 1.0293766270042397,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_combined_collection_and_project",
+            "fullname": "skillmeat/api/tests/test_discovery_performance.py::TestDiscoveryPerformance::test_benchmark_combined_collection_and_project",
+            "params": null,
+            "param": null,
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.20385666599031538,
+                "max": 0.2082221249875147,
+                "mean": 0.20654329979442992,
+                "stddev": 0.0018063570577402269,
+                "rounds": 5,
+                "median": 0.2070490839832928,
+                "iqr": 0.002812583261402324,
+                "q1": 0.2051992912456626,
+                "q3": 0.20801187450706493,
+                "iqr_outliers": 0,
+                "stddev_outliers": 1,
+                "outliers": "1;0",
+                "ld15iqr": 0.20385666599031538,
+                "hd15iqr": 0.2082221249875147,
+                "ops": 4.841599804957547,
+                "total": 1.0327164989721496,
+                "iterations": 1
+            }
+        },
+        {
+            "group": null,
+            "name": "test_benchmark_skip_preference_overhead",
+            "fullname": "skillmeat/api/tests/test_discovery_performance.py::TestDiscoveryPerformance::test_benchmark_skip_preference_overhead",
+            "params": null,
+            "param": null,
+            "extra_info": {},
+            "options": {
+                "disable_gc": false,
+                "timer": "perf_counter",
+                "min_rounds": 5,
+                "max_time": 1.0,
+                "min_time": 5e-06,
+                "warmup": false
+            },
+            "stats": {
+                "min": 0.12467550000292249,
+                "max": 0.1377639169804752,
+                "mean": 0.12738235655383,
+                "stddev": 0.004058596506781275,
+                "rounds": 9,
+                "median": 0.12574074999429286,
+                "iqr": 0.00199482301104581,
+                "q1": 0.12535522924008546,
+                "q3": 0.12735005225113127,
+                "iqr_outliers": 1,
+                "stddev_outliers": 1,
+                "outliers": "1;1",
+                "ld15iqr": 0.12467550000292249,
+                "hd15iqr": 0.1377639169804752,
+                "ops": 7.85038075172847,
+                "total": 1.14644120898447,
+                "iterations": 1
+            }
+        }
+    ],
+    "datetime": "2025-12-05T02:10:31.707158+00:00",
+    "version": "5.2.3"
+}

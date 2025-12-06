@@ -21,6 +21,7 @@ from skillmeat.core.discovery_metrics import (
     discovery_scans_total,
     log_performance,
 )
+from skillmeat.core.skip_preferences import SkipPreferenceManager, build_artifact_key
 from skillmeat.utils.metadata import extract_yaml_frontmatter
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ class DiscoveredArtifact(BaseModel):
         description: Optional description
         path: Full path to artifact directory
         discovered_at: Timestamp when artifact was discovered
+        skip_reason: Optional reason why artifact is skipped (only set when include_skipped=True)
     """
 
     type: str
@@ -63,6 +65,7 @@ class DiscoveredArtifact(BaseModel):
     description: Optional[str] = None
     path: str
     discovered_at: datetime
+    skip_reason: Optional[str] = None
 
 
 class DiscoveryResult(BaseModel):
@@ -72,6 +75,7 @@ class DiscoveryResult(BaseModel):
         discovered_count: Total number of artifacts discovered
         importable_count: Number of artifacts not yet imported (filtered by manifest)
         artifacts: List of discovered artifacts (filtered if manifest provided)
+        skipped_artifacts: List of artifacts that were skipped (only populated when include_skipped=True)
         errors: List of error messages for artifacts that failed discovery
         scan_duration_ms: Time taken to complete scan in milliseconds
     """
@@ -79,6 +83,7 @@ class DiscoveryResult(BaseModel):
     discovered_count: int
     importable_count: int
     artifacts: List[DiscoveredArtifact]
+    skipped_artifacts: List[DiscoveredArtifact] = Field(default_factory=list)
     errors: List[str] = Field(default_factory=list)
     scan_duration_ms: float
 
@@ -136,7 +141,10 @@ class ArtifactDiscoveryService:
 
     @log_performance("discovery_scan")
     def discover_artifacts(
-        self, manifest: Optional["Collection"] = None
+        self,
+        manifest: Optional["Collection"] = None,
+        project_path: Optional[Path] = None,
+        include_skipped: bool = False,
     ) -> DiscoveryResult:
         """Scan artifacts directory and discover all artifacts.
 
@@ -149,12 +157,17 @@ class ArtifactDiscoveryService:
         Args:
             manifest: Optional Collection manifest to filter already-imported artifacts.
                      If provided, only artifacts not in manifest.artifacts are returned.
+            project_path: Optional path to the project root for skip preference filtering.
+                         If provided, artifacts in the skip list will be filtered out.
+            include_skipped: If True and project_path is provided, include skipped artifacts
+                            in a separate list with their skip reasons. Default: False.
 
         Returns:
             DiscoveryResult with discovered artifacts, error list, and metrics.
             The `discovered_count` field shows total artifacts found.
             The `importable_count` field shows artifacts not yet imported (filtered).
             The `artifacts` list contains only importable artifacts if manifest provided.
+            The `skipped_artifacts` list contains skipped artifacts if include_skipped=True.
         """
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []
@@ -165,8 +178,8 @@ class ArtifactDiscoveryService:
             extra={
                 "path": str(self.base_path),
                 "scan_mode": self.scan_mode,
-                "artifacts_base": str(self.artifacts_base)
-            }
+                "artifacts_base": str(self.artifacts_base),
+            },
         )
 
         # Validate artifacts directory exists
@@ -183,6 +196,7 @@ class ArtifactDiscoveryService:
                 discovered_count=0,
                 importable_count=0,
                 artifacts=[],
+                skipped_artifacts=[],
                 errors=errors,
                 scan_duration_ms=(time.time() - start_time) * 1000,
             )
@@ -223,28 +237,102 @@ class ArtifactDiscoveryService:
             logger.error(error_msg, exc_info=True)
             errors.append(error_msg)
 
-        # Filter artifacts if manifest provided
-        importable_artifacts = discovered_artifacts
-        if manifest:
-            # Build set of imported sources for efficient lookup
-            # Note: Artifact uses 'upstream' field, DiscoveredArtifact uses 'source'
-            imported_sources = {a.upstream for a in manifest.artifacts if a.upstream}
+        # Filter artifacts based on existence check
+        # Strategy: Use pre-scan check to filter out artifacts already in both locations
+        # Fall back to legacy manifest-based filtering if manifest provided
+        importable_artifacts = []
+        filtered_count = 0
 
-            # Filter out artifacts that are already imported
-            importable_artifacts = [
-                artifact
-                for artifact in discovered_artifacts
-                if artifact.source not in imported_sources
-            ]
+        for artifact in discovered_artifacts:
+            artifact_key = f"{artifact.type}:{artifact.name}"
 
-            logger.debug(
-                f"Filtered {len(discovered_artifacts) - len(importable_artifacts)} "
-                f"already-imported artifacts",
+            # Use the new check_artifact_exists for comprehensive filtering
+            existence = self.check_artifact_exists(artifact_key, manifest)
+
+            # Filter logic:
+            # - If in both Collection and Project: exclude (fully installed)
+            # - If in Collection only: include (user might want to deploy to Project)
+            # - If in Project only: include (user might want to add to Collection)
+            # - If in neither: include (new artifact)
+            should_include = existence["location"] != "both"
+
+            # Legacy compatibility: If manifest provided and artifact in collection,
+            # consider it as potentially importable to project
+            if should_include:
+                importable_artifacts.append(artifact)
+            else:
+                filtered_count += 1
+                logger.debug(
+                    f"Filtered out {artifact_key} (exists in both Collection and Project)"
+                )
+
+        # Log filtering summary
+        if filtered_count > 0:
+            logger.info(
+                f"Filtered {filtered_count} artifacts that exist in both Collection and Project",
                 extra={
                     "total_discovered": len(discovered_artifacts),
                     "importable": len(importable_artifacts),
-                    "filtered": len(discovered_artifacts) - len(importable_artifacts),
-                }
+                    "filtered": filtered_count,
+                },
+            )
+
+        # Filter by skip preferences if project_path provided
+        skipped_artifacts = []
+        skip_start_time = time.time()
+
+        if project_path:
+            try:
+                skip_mgr = SkipPreferenceManager(project_path)
+                pre_skip_count = len(importable_artifacts)
+                filtered_importable = []
+
+                for artifact in importable_artifacts:
+                    artifact_key = build_artifact_key(artifact.type, artifact.name)
+
+                    if skip_mgr.is_skipped(artifact_key):
+                        if include_skipped:
+                            # Get skip preference to add reason
+                            skip_pref = skip_mgr.get_skip_by_key(artifact_key)
+                            if skip_pref:
+                                artifact.skip_reason = skip_pref.skip_reason
+                            skipped_artifacts.append(artifact)
+                        logger.debug(f"Filtered skipped artifact: {artifact_key}")
+                    else:
+                        filtered_importable.append(artifact)
+
+                # Update importable_artifacts with filtered list
+                skip_filtered_count = pre_skip_count - len(filtered_importable)
+                importable_artifacts = filtered_importable
+
+                # Log skip filtering performance
+                skip_duration_ms = (time.time() - skip_start_time) * 1000
+
+                if skip_filtered_count > 0:
+                    logger.info(
+                        f"Filtered {skip_filtered_count} skipped artifacts in {skip_duration_ms:.2f}ms",
+                        extra={
+                            "skip_filtered_count": skip_filtered_count,
+                            "remaining_importable": len(importable_artifacts),
+                            "skip_duration_ms": round(skip_duration_ms, 2),
+                        },
+                    )
+                else:
+                    logger.debug(
+                        f"Skip preference check completed in {skip_duration_ms:.2f}ms (no skipped artifacts)"
+                    )
+
+            except Exception as e:
+                error_msg = f"Failed to load skip preferences: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+                # Continue without skip filtering if there's an error
+
+        # Early return if all artifacts are filtered out
+        if len(importable_artifacts) == 0 and len(discovered_artifacts) > 0:
+            logger.info(
+                f"All {len(discovered_artifacts)} discovered artifacts already exist in "
+                f"Collection and/or Project or are skipped. Nothing to import."
             )
 
         # Calculate scan duration
@@ -261,19 +349,21 @@ class ArtifactDiscoveryService:
 
         logger.info(
             f"Discovery scan completed: {len(discovered_artifacts)} artifacts found, "
-            f"{len(importable_artifacts)} importable in {scan_duration_ms:.2f}ms",
+            f"{len(importable_artifacts)} importable, {len(skipped_artifacts)} skipped in {scan_duration_ms:.2f}ms",
             extra={
                 "discovered_count": len(discovered_artifacts),
                 "importable_count": len(importable_artifacts),
+                "skipped_count": len(skipped_artifacts),
                 "error_count": len(errors),
                 "duration_ms": round(scan_duration_ms, 2),
-            }
+            },
         )
 
         return DiscoveryResult(
             discovered_count=len(discovered_artifacts),
             importable_count=len(importable_artifacts),
             artifacts=importable_artifacts,
+            skipped_artifacts=skipped_artifacts,
             errors=errors,
             scan_duration_ms=scan_duration_ms,
         )
@@ -551,6 +641,134 @@ class ArtifactDiscoveryService:
         except Exception as e:
             logger.debug(f"Frontmatter validation failed for {metadata_file}: {e}")
             return False
+
+    def check_artifact_exists(
+        self,
+        artifact_key: str,  # Format: "type:name" (e.g., "skill:canvas-design")
+        manifest: Optional["Collection"] = None,
+    ) -> dict:
+        """
+        Check if an artifact exists in Collection and/or Project.
+
+        Args:
+            artifact_key: Artifact identifier in "type:name" format
+            manifest: Optional manifest to check against (uses self.manifest if not provided)
+
+        Returns:
+            dict with keys:
+            - exists_in_collection: bool
+            - exists_in_project: bool
+            - collection_path: Optional[str] - path if exists in collection
+            - project_path: Optional[str] - path if exists in project
+            - location: str - "collection", "project", "both", or "none"
+        """
+        # Parse artifact_key
+        try:
+            artifact_type, artifact_name = artifact_key.split(":", 1)
+        except ValueError:
+            logger.warning(
+                f"Invalid artifact_key format: {artifact_key}. Expected 'type:name'"
+            )
+            return {
+                "exists_in_collection": False,
+                "exists_in_project": False,
+                "collection_path": None,
+                "project_path": None,
+                "location": "none",
+            }
+
+        # Initialize result
+        exists_in_collection = False
+        exists_in_project = False
+        collection_path = None
+        project_path = None
+
+        # Check Collection
+        try:
+            # Get collection base path
+            from skillmeat.config import ConfigManager
+
+            config = ConfigManager()
+            collection_name = config.get_active_collection()
+            collection_base = config.get_collection_path(collection_name)
+
+            # Check collection artifacts directory
+            # Format: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/{name}/
+            collection_artifact_dir = (
+                collection_base / "artifacts" / f"{artifact_type}s" / artifact_name
+            )
+
+            if collection_artifact_dir.exists() and collection_artifact_dir.is_dir():
+                exists_in_collection = True
+                collection_path = str(collection_artifact_dir)
+                logger.debug(
+                    f"Artifact {artifact_key} found in collection at {collection_path}"
+                )
+            else:
+                # Fallback: Check manifest if provided
+                if manifest:
+                    try:
+                        artifact_type_enum = ArtifactType(artifact_type)
+                        found = manifest.find_artifact(
+                            artifact_name, artifact_type_enum
+                        )
+                        if found:
+                            exists_in_collection = True
+                            # Construct path from manifest
+                            collection_path = str(collection_base / found.path)
+                            logger.debug(f"Artifact {artifact_key} found in manifest")
+                    except ValueError:
+                        # Invalid artifact type
+                        logger.debug(f"Invalid artifact type in key: {artifact_type}")
+                    except Exception as e:
+                        # Corrupt manifest or other error
+                        logger.warning(
+                            f"Error checking manifest for {artifact_key}: {e}"
+                        )
+        except PermissionError as e:
+            logger.warning(
+                f"Permission denied accessing collection for {artifact_key}: {e}"
+            )
+        except Exception as e:
+            logger.warning(f"Error checking collection for {artifact_key}: {e}")
+
+        # Check Project
+        try:
+            # Format: {self.base_path}/.claude/{type}s/{name}/
+            project_artifact_dir = (
+                self.base_path / ".claude" / f"{artifact_type}s" / artifact_name
+            )
+
+            if project_artifact_dir.exists() and project_artifact_dir.is_dir():
+                exists_in_project = True
+                project_path = str(project_artifact_dir)
+                logger.debug(
+                    f"Artifact {artifact_key} found in project at {project_path}"
+                )
+        except PermissionError as e:
+            logger.warning(
+                f"Permission denied accessing project for {artifact_key}: {e}"
+            )
+        except Exception as e:
+            logger.warning(f"Error checking project for {artifact_key}: {e}")
+
+        # Determine location
+        if exists_in_collection and exists_in_project:
+            location = "both"
+        elif exists_in_collection:
+            location = "collection"
+        elif exists_in_project:
+            location = "project"
+        else:
+            location = "none"
+
+        return {
+            "exists_in_collection": exists_in_collection,
+            "exists_in_project": exists_in_project,
+            "collection_path": collection_path,
+            "project_path": project_path,
+            "location": location,
+        }
 
     def _normalize_type_from_dirname(self, dirname: str) -> str:
         """Normalize directory name to artifact type.
