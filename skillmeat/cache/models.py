@@ -9,6 +9,8 @@ Models:
     - Artifact: Artifact metadata per project
     - ArtifactMetadata: Extended artifact metadata (YAML frontmatter)
     - MarketplaceEntry: Cached marketplace artifact listings
+    - MarketplaceSource: GitHub repository sources for marketplace artifacts
+    - MarketplaceCatalogEntry: Detected artifacts from marketplace sources
     - CacheMetadata: Cache system metadata
 
 Usage:
@@ -41,6 +43,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     create_engine,
@@ -513,6 +516,331 @@ class MarketplaceEntry(Base):
             data_dict: Dictionary to serialize as JSON
         """
         self.data = json.dumps(data_dict)
+
+
+class MarketplaceSource(Base):
+    """GitHub repository source for marketplace artifacts.
+
+    Represents a GitHub repository that can be scanned for Claude Code artifacts.
+    Supports authentication, trust levels, and visibility controls.
+
+    Attributes:
+        id: Unique marketplace source identifier (primary key)
+        repo_url: Full GitHub repository URL
+        owner: Repository owner/organization name
+        repo_name: Repository name
+        ref: Branch, tag, or SHA to scan (default: "main")
+        root_hint: Optional subdirectory path within repository
+        manual_map: JSON string for manual override catalog
+        access_token_id: Optional encrypted PAT reference
+        trust_level: Trust level ("untrusted", "basic", "verified", "official")
+        visibility: Visibility level ("private", "internal", "public")
+        last_sync_at: Timestamp of last successful scan
+        last_error: Last error message if scan failed
+        scan_status: Current scan status ("pending", "scanning", "success", "error")
+        artifact_count: Cached count of discovered artifacts
+        created_at: Timestamp when source was added
+        updated_at: Timestamp when source was last updated
+        entries: List of catalog entries discovered from this source
+
+    Indexes:
+        - idx_marketplace_sources_repo_url (UNIQUE): One entry per repo URL
+        - idx_marketplace_sources_last_sync: TTL-based refresh queries
+        - idx_marketplace_sources_scan_status: Filter by scan status
+    """
+
+    __tablename__ = "marketplace_sources"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Core fields
+    repo_url: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    owner: Mapped[str] = mapped_column(String, nullable=False)
+    repo_name: Mapped[str] = mapped_column(String, nullable=False)
+    ref: Mapped[str] = mapped_column(
+        String, nullable=False, default="main", server_default="main"
+    )
+    root_hint: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Extended configuration
+    manual_map: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    access_token_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Security and visibility
+    trust_level: Mapped[str] = mapped_column(
+        String, nullable=False, default="basic", server_default="basic"
+    )
+    visibility: Mapped[str] = mapped_column(
+        String, nullable=False, default="public", server_default="public"
+    )
+
+    # Sync status
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scan_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending", server_default="pending"
+    )
+    artifact_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    entries: Mapped[List["MarketplaceCatalogEntry"]] = relationship(
+        "MarketplaceCatalogEntry",
+        back_populates="source",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "trust_level IN ('untrusted', 'basic', 'verified', 'official')",
+            name="check_trust_level",
+        ),
+        CheckConstraint(
+            "visibility IN ('private', 'internal', 'public')",
+            name="check_visibility",
+        ),
+        CheckConstraint(
+            "scan_status IN ('pending', 'scanning', 'success', 'error')",
+            name="check_scan_status",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of MarketplaceSource."""
+        return (
+            f"<MarketplaceSource(id={self.id!r}, repo_url={self.repo_url!r}, "
+            f"scan_status={self.scan_status!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert MarketplaceSource to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the marketplace source
+        """
+        # Parse manual_map JSON if present
+        manual_map_dict = None
+        if self.manual_map:
+            try:
+                manual_map_dict = json.loads(self.manual_map)
+            except json.JSONDecodeError:
+                manual_map_dict = None
+
+        return {
+            "id": self.id,
+            "repo_url": self.repo_url,
+            "owner": self.owner,
+            "repo_name": self.repo_name,
+            "ref": self.ref,
+            "root_hint": self.root_hint,
+            "manual_map": manual_map_dict,
+            "access_token_id": self.access_token_id,
+            "trust_level": self.trust_level,
+            "visibility": self.visibility,
+            "last_sync_at": (
+                self.last_sync_at.isoformat() if self.last_sync_at else None
+            ),
+            "last_error": self.last_error,
+            "scan_status": self.scan_status,
+            "artifact_count": self.artifact_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def get_manual_map_dict(self) -> Optional[Dict[str, Any]]:
+        """Parse and return manual_map as dictionary.
+
+        Returns:
+            Parsed manual_map dictionary or None if invalid/missing
+        """
+        if not self.manual_map:
+            return None
+
+        try:
+            return json.loads(self.manual_map)
+        except json.JSONDecodeError:
+            return None
+
+    def set_manual_map_dict(self, manual_map_dict: Dict[str, Any]) -> None:
+        """Set manual_map from dictionary.
+
+        Args:
+            manual_map_dict: Dictionary to serialize as JSON
+        """
+        self.manual_map = json.dumps(manual_map_dict)
+
+
+class MarketplaceCatalogEntry(Base):
+    """Detected artifact from marketplace source repository.
+
+    Represents an artifact discovered during GitHub repository scanning.
+    Tracks detection metadata, import status, and relationship to source.
+
+    Attributes:
+        id: Unique catalog entry identifier (primary key)
+        source_id: Foreign key to marketplace_sources.id
+        artifact_type: Type of artifact ("skill", "command", "agent", "mcp_server", "hook")
+        name: Artifact name from detection
+        path: Path within repository
+        upstream_url: Full URL to artifact in repository
+        detected_version: Extracted version if available
+        detected_sha: Git commit SHA at detection time
+        detected_at: Timestamp when artifact was detected
+        confidence_score: Heuristic confidence 0-100
+        status: Import status ("new", "updated", "removed", "imported")
+        import_date: When artifact was imported to collection
+        import_id: Reference to imported artifact ID
+        metadata_json: Additional detection metadata as JSON
+        created_at: Timestamp when entry was created
+        updated_at: Timestamp when entry was last updated
+        source: Related MarketplaceSource object
+
+    Indexes:
+        - idx_catalog_entries_source_id: Query by source
+        - idx_catalog_entries_status: Filter by status
+        - idx_catalog_entries_type: Filter by artifact type
+        - idx_catalog_entries_upstream_url: Deduplication on URL
+        - idx_catalog_entries_source_status: Composite for filtered queries
+    """
+
+    __tablename__ = "marketplace_catalog_entries"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Foreign key
+    source_id: Mapped[str] = mapped_column(
+        String, ForeignKey("marketplace_sources.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Core fields
+    artifact_type: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    upstream_url: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Version tracking
+    detected_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    detected_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Detection quality
+    confidence_score: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Import tracking
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="new", server_default="new"
+    )
+    import_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    import_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Additional metadata
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    source: Mapped["MarketplaceSource"] = relationship(
+        "MarketplaceSource", back_populates="entries"
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            name="check_catalog_artifact_type",
+        ),
+        CheckConstraint(
+            "status IN ('new', 'updated', 'removed', 'imported')",
+            name="check_catalog_status",
+        ),
+        CheckConstraint(
+            "confidence_score >= 0 AND confidence_score <= 100",
+            name="check_confidence_score",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of MarketplaceCatalogEntry."""
+        return (
+            f"<MarketplaceCatalogEntry(id={self.id!r}, name={self.name!r}, "
+            f"type={self.artifact_type!r}, status={self.status!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert MarketplaceCatalogEntry to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the catalog entry
+        """
+        # Parse metadata_json if present
+        metadata_dict = None
+        if self.metadata_json:
+            try:
+                metadata_dict = json.loads(self.metadata_json)
+            except json.JSONDecodeError:
+                metadata_dict = None
+
+        return {
+            "id": self.id,
+            "source_id": self.source_id,
+            "artifact_type": self.artifact_type,
+            "name": self.name,
+            "path": self.path,
+            "upstream_url": self.upstream_url,
+            "detected_version": self.detected_version,
+            "detected_sha": self.detected_sha,
+            "detected_at": self.detected_at.isoformat() if self.detected_at else None,
+            "confidence_score": self.confidence_score,
+            "status": self.status,
+            "import_date": self.import_date.isoformat() if self.import_date else None,
+            "import_id": self.import_id,
+            "metadata": metadata_dict,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def get_metadata_dict(self) -> Optional[Dict[str, Any]]:
+        """Parse and return metadata as dictionary.
+
+        Returns:
+            Parsed metadata dictionary or None if invalid/missing
+        """
+        if not self.metadata_json:
+            return None
+
+        try:
+            return json.loads(self.metadata_json)
+        except json.JSONDecodeError:
+            return None
+
+    def set_metadata_dict(self, metadata_dict: Dict[str, Any]) -> None:
+        """Set metadata from dictionary.
+
+        Args:
+            metadata_dict: Dictionary to serialize as JSON
+        """
+        self.metadata_json = json.dumps(metadata_dict)
 
 
 class CacheMetadata(Base):
