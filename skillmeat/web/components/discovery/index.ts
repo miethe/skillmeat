@@ -52,3 +52,12 @@ export type { AutoPopulationFormProps } from './AutoPopulationForm';
 
 export { ParameterEditorModal } from './ParameterEditorModal';
 export type { ParameterEditorModalProps, ArtifactParameters } from './ParameterEditorModal';
+
+export { DiscoveryTab } from './DiscoveryTab';
+export type { DiscoveryTabProps } from './DiscoveryTab';
+
+export { ArtifactActions } from './ArtifactActions';
+export type { ArtifactActionsProps } from './ArtifactActions';
+
+export { SkipPreferencesList } from './SkipPreferencesList';
+export type { SkipPreferencesListProps } from './SkipPreferencesList';

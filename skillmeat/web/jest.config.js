@@ -61,8 +61,8 @@ const customJestConfig = {
     '!app/**/template.tsx',
   ],
 
-  // Coverage thresholds
-  coverageThresholds: {
+  // Coverage thresholds (note: singular "coverageThreshold", not "coverageThresholds")
+  coverageThreshold: {
     global: {
       branches: 70,
       functions: 70,

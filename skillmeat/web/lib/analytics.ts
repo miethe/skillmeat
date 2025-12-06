@@ -10,6 +10,26 @@ type AnalyticsEvent = {
   discovery_modal_open: {
     discovered_count: number;
   };
+  discovery_tab_view: {
+    project_id: string;
+    artifact_count: number;
+  };
+  discovery_filter_applied: {
+    filter_type: 'status' | 'type' | 'search';
+    filter_value: string;
+  };
+  discovery_sort_applied: {
+    sort_field: 'name' | 'type' | 'discovered_at';
+    sort_direction: 'asc' | 'desc';
+  };
+  skip_checkbox_toggle: {
+    artifact_key: string;
+    skipped: boolean;
+  };
+  skip_preference_cleared: {
+    project_id: string;
+    cleared_count: number;
+  };
   bulk_import: {
     requested_count: number;
     imported_count: number;
@@ -61,6 +81,33 @@ export function useTrackDiscovery() {
     },
     trackModalOpen: (count: number) => {
       trackEvent('discovery_modal_open', { discovered_count: count });
+    },
+    trackTabView: (projectId: string, count: number) => {
+      trackEvent('discovery_tab_view', { project_id: projectId, artifact_count: count });
+    },
+    trackFilterApplied: (type: string, value: string) => {
+      trackEvent('discovery_filter_applied', {
+        filter_type: type as 'status' | 'type' | 'search',
+        filter_value: value,
+      });
+    },
+    trackSortApplied: (field: string, direction: string) => {
+      trackEvent('discovery_sort_applied', {
+        sort_field: field as 'name' | 'type' | 'discovered_at',
+        sort_direction: direction as 'asc' | 'desc',
+      });
+    },
+    trackSkipToggle: (artifactKey: string, skipped: boolean) => {
+      trackEvent('skip_checkbox_toggle', {
+        artifact_key: artifactKey,
+        skipped,
+      });
+    },
+    trackSkipCleared: (projectId: string, count: number) => {
+      trackEvent('skip_preference_cleared', {
+        project_id: projectId,
+        cleared_count: count,
+      });
     },
     trackImport: (result: { total_requested: number; total_imported: number; total_failed: number; duration_ms: number }) => {
       trackEvent('bulk_import', {

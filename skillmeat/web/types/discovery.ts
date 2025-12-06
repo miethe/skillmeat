@@ -51,27 +51,50 @@ export interface BulkImportArtifact {
 export interface BulkImportRequest {
   artifacts: BulkImportArtifact[];
   auto_resolve_conflicts?: boolean;
+  skip_list?: string[];
 }
 
 /**
+ * Import status enum matching backend
+ */
+export type ImportStatus = "success" | "skipped" | "failed";
+
+/**
  * Result for a single import operation
+ * Updated to match backend schema with status-based approach
  */
 export interface ImportResult {
   artifact_id: string;
-  success: boolean;
+  status: ImportStatus;
   message: string;
   error?: string;
+  skip_reason?: string;
 }
 
 /**
  * Response from bulk import operation
+ * Updated to match backend schema with detailed counters
  */
 export interface BulkImportResult {
   total_requested: number;
   total_imported: number;
+  total_skipped: number;
   total_failed: number;
+  imported_to_collection: number;
+  added_to_project: number;
   results: ImportResult[];
   duration_ms: number;
+  summary?: string;
+}
+
+/**
+ * Skip preference for artifacts that should not be imported
+ * Used to persist user's decision to skip certain artifacts
+ */
+export interface SkipPreference {
+  artifact_key: string;  // Format: "type:name" e.g., "skill:canvas-design"
+  skip_reason: string;
+  added_date: string;  // ISO 8601 datetime string
 }
 
 /**

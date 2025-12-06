@@ -5,18 +5,44 @@
  * as opposed to the collection-wide discovery hook.
  */
 
+import { useState, useEffect, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api';
-import type { DiscoveryResult, BulkImportRequest, BulkImportResult } from '@/types/discovery';
+import {
+  loadSkipPrefs,
+  saveSkipPrefs,
+  clearSkipPrefs,
+  buildArtifactKey,
+} from '@/lib/skip-preferences';
+import type {
+  DiscoveryResult,
+  BulkImportRequest,
+  BulkImportResult,
+  SkipPreference,
+} from '@/types/discovery';
 
 /**
  * Hook for discovering artifacts in a specific project's .claude/ directory.
  *
  * @param projectPath - The filesystem path to the project
+ * @param projectId - The unique project identifier (used for skip preferences)
  * @returns Discovery state and functions
  */
 export function useProjectDiscovery(projectPath: string | undefined, projectId?: string) {
   const queryClient = useQueryClient();
+
+  // Skip preferences state
+  const [skipPrefs, setSkipPrefs] = useState<SkipPreference[]>([]);
+
+  // Load skip preferences when project changes
+  useEffect(() => {
+    if (projectId) {
+      const prefs = loadSkipPrefs(projectId);
+      setSkipPrefs(prefs);
+    } else {
+      setSkipPrefs([]);
+    }
+  }, [projectId]);
 
   // Encode the project path for URL
   const encodedPath = projectPath ? encodeURIComponent(projectPath) : '';
@@ -43,7 +69,7 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     retry: 1,
   });
 
-  // Bulk import mutation
+  // Bulk import mutation with skip list integration
   const bulkImportMutation = useMutation({
     mutationFn: async (request: BulkImportRequest): Promise<BulkImportResult> => {
       const params = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
@@ -54,7 +80,27 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
         body: JSON.stringify(request),
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (_result, request) => {
+      // Save new skip preferences to LocalStorage after successful import
+      if (projectId && request.skip_list && request.skip_list.length > 0) {
+        const newPrefs = request.skip_list.map((key) => ({
+          artifact_key: key,
+          skip_reason: 'Skipped during import',
+          added_date: new Date().toISOString(),
+        }));
+
+        // Merge with existing preferences, avoiding duplicates
+        const combined = [...skipPrefs];
+        for (const newPref of newPrefs) {
+          if (!combined.some((p) => p.artifact_key === newPref.artifact_key)) {
+            combined.push(newPref);
+          }
+        }
+
+        saveSkipPrefs(projectId, combined);
+        setSkipPrefs(combined);
+      }
+
       // AWAIT all invalidations to ensure cache is fresh before mutation completes
       await queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover', 'project', projectPath] });
       await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
@@ -65,6 +111,23 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     },
   });
 
+  // Check if an artifact is marked as skipped
+  const isArtifactSkipped = useCallback(
+    (artifactType: string, artifactName: string): boolean => {
+      const key = buildArtifactKey(artifactType, artifactName);
+      return skipPrefs.some((p) => p.artifact_key === key);
+    },
+    [skipPrefs]
+  );
+
+  // Clear all skip preferences for this project
+  const clearSkips = useCallback(() => {
+    if (projectId) {
+      clearSkipPrefs(projectId);
+      setSkipPrefs([]);
+    }
+  }, [projectId]);
+
   return {
     discoveredArtifacts: discoveryQuery.data?.artifacts || [],
     discoveredCount: discoveryQuery.data?.discovered_count || 0,
@@ -74,5 +137,9 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     refetchDiscovery: discoveryQuery.refetch,
     bulkImport: bulkImportMutation.mutateAsync,
     isImporting: bulkImportMutation.isPending,
+    // Skip preference integration (DIS-3.6)
+    skipPrefs,
+    isArtifactSkipped,
+    clearSkips,
   };
 }

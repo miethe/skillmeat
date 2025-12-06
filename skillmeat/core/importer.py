@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from skillmeat.api.schemas.discovery import ImportStatus
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.discovery_metrics import (
@@ -45,6 +46,8 @@ class ImportResultData:
     success: bool
     message: str
     error: Optional[str] = None
+    status: Optional[ImportStatus] = None
+    skip_reason: Optional[str] = None
 
 
 @dataclass
@@ -79,6 +82,43 @@ class ArtifactImporter:
         """
         self.artifact_manager = artifact_manager
         self.collection_manager = collection_manager
+
+    def determine_import_status(
+        self,
+        artifact_key: str,
+        import_success: bool,
+        error: Optional[str] = None,
+        already_exists: bool = False,
+        exists_location: Optional[str] = None,  # "collection", "project", "both"
+    ) -> tuple[ImportStatus, Optional[str]]:
+        """
+        Determine the import status and skip reason for an artifact.
+
+        Args:
+            artifact_key: Identifier for the artifact
+            import_success: Whether the import operation succeeded
+            error: Error message if import failed
+            already_exists: Whether the artifact already exists
+            exists_location: Where the artifact exists ("collection", "project", "both")
+
+        Returns:
+            tuple of (ImportStatus, skip_reason or None)
+        """
+        if already_exists:
+            if exists_location == "both":
+                return ImportStatus.SKIPPED, "Already exists in both Collection and Project"
+            elif exists_location == "collection":
+                return ImportStatus.SKIPPED, "Already exists in Collection"
+            elif exists_location == "project":
+                return ImportStatus.SKIPPED, "Already exists in Project"
+            else:
+                return ImportStatus.SKIPPED, "Already exists"
+
+        if import_success:
+            return ImportStatus.SUCCESS, None
+
+        # Failed case
+        return ImportStatus.FAILED, None
 
     @log_performance("bulk_import")
     def bulk_import(
@@ -124,12 +164,18 @@ class ArtifactImporter:
             # Return all validation errors
             for artifact, error in validation_errors:
                 artifact_id = self._get_artifact_id(artifact)
+                status, skip_reason = self.determine_import_status(
+                    artifact_key=artifact_id,
+                    import_success=False,
+                    error=error
+                )
                 results.append(
                     ImportResultData(
                         artifact_id=artifact_id,
                         success=False,
                         message="Validation failed",
                         error=error,
+                        status=status,
                     )
                 )
                 failed_count += 1
@@ -146,24 +192,41 @@ class ArtifactImporter:
         for artifact in artifacts:
             try:
                 # Check for duplicate
-                if self._check_duplicate(artifact, collection_name):
+                is_duplicate, location = self._check_duplicate(artifact, collection_name)
+                if is_duplicate:
+                    artifact_id = self._get_artifact_id(artifact)
                     if auto_resolve_conflicts:
+                        status, skip_reason = self.determine_import_status(
+                            artifact_key=artifact_id,
+                            import_success=False,
+                            already_exists=True,
+                            exists_location=location
+                        )
                         results.append(
                             ImportResultData(
-                                artifact_id=self._get_artifact_id(artifact),
-                                success=True,
-                                message="Skipped (already exists)",
+                                artifact_id=artifact_id,
+                                success=True,  # Count as success for backward compatibility
+                                message=f"Skipped: {skip_reason}",
+                                status=status,
+                                skip_reason=skip_reason,
                             )
                         )
                         imported_count += 1  # Count as success since it exists
                         continue
                     else:
+                        status, skip_reason = self.determine_import_status(
+                            artifact_key=artifact_id,
+                            import_success=False,
+                            already_exists=True,
+                            exists_location=location
+                        )
                         results.append(
                             ImportResultData(
-                                artifact_id=self._get_artifact_id(artifact),
+                                artifact_id=artifact_id,
                                 success=False,
                                 message="Import failed",
-                                error="Artifact already exists in collection",
+                                error=f"Artifact already exists in {location}",
+                                status=ImportStatus.FAILED,
                             )
                         )
                         failed_count += 1
@@ -179,12 +242,19 @@ class ArtifactImporter:
 
             except Exception as e:
                 logger.exception(f"Failed to import {artifact.name}: {e}")
+                artifact_id = self._get_artifact_id(artifact)
+                status, skip_reason = self.determine_import_status(
+                    artifact_key=artifact_id,
+                    import_success=False,
+                    error=str(e)
+                )
                 results.append(
                     ImportResultData(
-                        artifact_id=self._get_artifact_id(artifact),
+                        artifact_id=artifact_id,
                         success=False,
                         message="Import failed",
                         error=str(e),
+                        status=status,
                     )
                 )
                 failed_count += 1
@@ -274,7 +344,7 @@ class ArtifactImporter:
 
     def _check_duplicate(
         self, artifact: BulkImportArtifactData, collection_name: str
-    ) -> bool:
+    ) -> tuple[bool, Optional[str]]:
         """Check if artifact already exists in collection.
 
         Args:
@@ -282,7 +352,7 @@ class ArtifactImporter:
             collection_name: Collection to check in
 
         Returns:
-            True if artifact exists, False otherwise
+            tuple of (is_duplicate, location) where location is "collection", "project", "both", or None
         """
         try:
             # Load collection
@@ -296,10 +366,14 @@ class ArtifactImporter:
 
             # Check if artifact exists
             existing = collection.find_artifact(name, artifact_type)
-            return existing is not None
+            if existing is not None:
+                # For now, we only check collection existence
+                # Future: check project-level deployments for "project" or "both"
+                return (True, "collection")
+            return (False, None)
         except Exception as e:
             logger.warning(f"Error checking duplicate for {artifact.name}: {e}")
-            return False
+            return (False, None)
 
     def _import_single(
         self, artifact: BulkImportArtifactData, collection_name: str
@@ -344,15 +418,32 @@ class ArtifactImporter:
                     force=False,
                 )
 
+            artifact_id = f"{artifact.artifact_type}:{added_artifact.name}"
+            status, skip_reason = self.determine_import_status(
+                artifact_key=artifact_id,
+                import_success=True,
+                already_exists=False
+            )
             return ImportResultData(
-                artifact_id=f"{artifact.artifact_type}:{added_artifact.name}",
+                artifact_id=artifact_id,
                 success=True,
                 message="Imported successfully",
+                status=status,
+                skip_reason=skip_reason,
             )
         except Exception as e:
             logger.error(f"Failed to import artifact: {e}")
+            artifact_id = f"{artifact.artifact_type}:{artifact.name or 'unknown'}"
+            status, skip_reason = self.determine_import_status(
+                artifact_key=artifact_id,
+                import_success=False,
+                error=str(e)
+            )
             return ImportResultData(
-                artifact_id=f"{artifact.artifact_type}:{artifact.name or 'unknown'}",
+                artifact_id=artifact_id,
                 success=False,
+                message="Import failed",
                 error=str(e),
+                status=status,
+                skip_reason=skip_reason,
             )

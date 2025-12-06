@@ -68,6 +68,16 @@ describe('DiscoveryBanner', () => {
       expect(container.firstChild).toBeNull();
     });
 
+    it('hides when importable count is negative (edge case)', () => {
+      const { container } = render(
+        <TestWrapper>
+          <DiscoveryBanner importableCount={-1} onReview={jest.fn()} />
+        </TestWrapper>
+      );
+
+      expect(container.firstChild).toBeNull();
+    });
+
     it('shows singular "Artifact" when count is 1', () => {
       render(
         <TestWrapper>

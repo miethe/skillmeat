@@ -5,6 +5,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { axe, toHaveNoViolations } from 'jest-axe';
+import { NotificationProvider } from '@/lib/notification-store';
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
 import type { DiscoveredArtifact } from '@/types/discovery';
@@ -17,7 +18,9 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
     defaultOptions: { queries: { retry: false } },
   });
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <NotificationProvider>{children}</NotificationProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -305,7 +308,7 @@ describe('BulkImportModal', () => {
     await userEvent.click(importButton);
 
     await waitFor(() => {
-      expect(onImport).toHaveBeenCalledWith([mockArtifacts[0]]);
+      expect(onImport).toHaveBeenCalledWith([mockArtifacts[0]], expect.any(Array));
     });
   });
 
@@ -495,6 +498,247 @@ describe('BulkImportModal', () => {
     );
 
     expect(screen.queryByText('Review Discovered Artifacts')).not.toBeInTheDocument();
+  });
+
+  describe('Skip Functionality', () => {
+    it('renders skip checkboxes for each artifact', () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Should have skip checkboxes (2 artifacts + 1 select-all = 3 total, then 2 skip checkboxes)
+      const skipLabels = screen.getAllByText('Skip');
+      expect(skipLabels).toHaveLength(2);
+    });
+
+    it('skip checkbox toggles correctly', async () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Find skip checkbox for first artifact
+      const skipCheckbox = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      expect(skipCheckbox).not.toBeChecked();
+
+      // Toggle skip
+      await userEvent.click(skipCheckbox);
+      expect(skipCheckbox).toBeChecked();
+
+      // Toggle back
+      await userEvent.click(skipCheckbox);
+      expect(skipCheckbox).not.toBeChecked();
+    });
+
+    it('skip checkboxes exist and can be toggled independently', async () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Skip checkboxes should exist
+      const skipCheckbox1 = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      const skipCheckbox2 = screen.getByLabelText(/Don't show test-command in future discoveries/i);
+
+      // Toggle one without affecting the other
+      await userEvent.click(skipCheckbox1);
+      expect(skipCheckbox1).toBeChecked();
+      expect(skipCheckbox2).not.toBeChecked();
+    });
+
+
+    it('passes skip list to onImport', async () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn().mockResolvedValue({
+        total_requested: 1,
+        total_imported: 1,
+        total_skipped: 0,
+        total_failed: 0,
+        imported_to_collection: 1,
+        added_to_project: 1,
+        results: [],
+        duration_ms: 100,
+      });
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Toggle skip for first artifact
+      const skipCheckbox = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      await userEvent.click(skipCheckbox);
+
+      // Select first artifact
+      const selectCheckboxes = screen.getAllByRole('checkbox');
+      await userEvent.click(selectCheckboxes[1]);
+
+      // Click import
+      const importButton = screen.getByRole('button', { name: /Import \(1\)/i });
+      await userEvent.click(importButton);
+
+      await waitFor(() => {
+        expect(onImport).toHaveBeenCalledWith(
+          [mockArtifacts[0]],
+          ['skill:test-skill'] // Skip list should contain the skipped artifact key
+        );
+      });
+    });
+
+    it('skip checkbox has proper aria-label', () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      const skipCheckbox1 = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      const skipCheckbox2 = screen.getByLabelText(/Don't show test-command in future discoveries/i);
+
+      expect(skipCheckbox1).toBeInTheDocument();
+      expect(skipCheckbox2).toBeInTheDocument();
+    });
+
+    it('skip state is cleared when modal closes', async () => {
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      const { rerender } = render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Toggle skip
+      const skipCheckbox = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      await userEvent.click(skipCheckbox);
+      expect(skipCheckbox).toBeChecked();
+
+      // Close modal
+      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      await userEvent.click(cancelButton);
+
+      expect(onClose).toHaveBeenCalled();
+
+      // Reopen modal (simulate)
+      rerender(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={mockArtifacts}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      // Skip state should be reset
+      const newSkipCheckbox = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      expect(newSkipCheckbox).not.toBeChecked();
+    });
+
+    it('displays status labels for artifacts', () => {
+      const artifactsWithStatus: DiscoveredArtifact[] = [
+        {
+          ...mockArtifacts[0],
+          status: 'success',
+        },
+        {
+          ...mockArtifacts[1],
+          status: 'skipped',
+        },
+      ];
+
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={artifactsWithStatus}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      expect(screen.getByText(/Will add to Collection & Project/i)).toBeInTheDocument();
+      expect(screen.getByText(/Skipped \(marked to skip\)/i)).toBeInTheDocument();
+    });
+
+    it('skip checkbox is disabled for already skipped artifacts', () => {
+      const artifactsWithStatus: DiscoveredArtifact[] = [
+        {
+          ...mockArtifacts[0],
+          status: 'skipped',
+        },
+      ];
+
+      const onClose = jest.fn();
+      const onImport = jest.fn();
+
+      render(
+        <TestWrapper>
+          <BulkImportModal
+            artifacts={artifactsWithStatus}
+            open={true}
+            onClose={onClose}
+            onImport={onImport}
+          />
+        </TestWrapper>
+      );
+
+      const skipCheckbox = screen.getByLabelText(/Don't show test-skill in future discoveries/i);
+      expect(skipCheckbox).toBeDisabled();
+    });
   });
 });
 
