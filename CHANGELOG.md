@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### GitHub Marketplace Ingestion (Phase 7)
+- **GitHub Source Management**: Add GitHub repositories as marketplace sources with automatic artifact detection
+  - Create, list, update, and delete GitHub sources via API and UI
+  - Heuristic-based artifact detection with confidence scoring (0-100%)
+  - Auto-scan for Claude artifacts: skills, commands, agents, MCP servers, hooks
+  - Manual catalog override for non-standard repository structures
+  - Source-level status tracking: New, Updated, Imported, Removed
+
+- **Bulk Import Engine**: Import artifacts from GitHub sources with intelligent conflict handling
+  - Cursor-based pagination for efficient artifact listing
+  - Conflict resolution modes: skip, overwrite, or rename duplicates
+  - Import history tracking with success/failure reporting
+  - Artifact deduplication with SHA-256 hash verification
+
+- **Detection Services**:
+  - `HeuristicDetector`: Multi-criteria analysis (README patterns, directory structure, code structure)
+  - `GitHubScanner`: Async GitHub API integration with rate limit handling and exponential backoff
+  - `CatalogDiffEngine`: Efficient catalog change detection via hashing
+  - `LinkHarvester`: Extract GitHub links from artifact metadata
+  - `ImportCoordinator`: Orchestrate multi-artifact imports with transaction-like semantics
+
+- **API Endpoints** (8 new endpoints):
+  - `POST /api/v1/marketplace/sources` - Create GitHub source
+  - `GET /api/v1/marketplace/sources` - List sources with pagination
+  - `GET /api/v1/marketplace/sources/{source_id}` - Get source details
+  - `PATCH /api/v1/marketplace/sources/{source_id}` - Update source
+  - `DELETE /api/v1/marketplace/sources/{source_id}` - Delete source
+  - `POST /api/v1/marketplace/sources/{source_id}/rescan` - Trigger artifact rescan
+  - `GET /api/v1/marketplace/sources/{source_id}/artifacts` - List detected artifacts
+  - `POST /api/v1/marketplace/sources/{source_id}/import` - Bulk import artifacts
+
+- **React UI Components**:
+  - Add Source wizard with GitHub repository validation
+  - Source detail page with artifact filtering, sorting, and search
+  - Artifact cards with status chips (New, Updated, Imported, Removed)
+  - Bulk import dialog with conflict resolution UI
+  - Rescan progress indicator with real-time feedback
+  - Integration with existing marketplace view
+
+- **Database Schema**:
+  - `marketplace_sources` table: GitHub repository metadata, source type, configuration
+  - `marketplace_catalog_entries` table: Detected artifacts with heuristic scores, metadata
+  - Indexes on source_id, repository_url, and artifact type for fast queries
+  - Audit trail for source modifications and import operations
+
+- **Observability & Error Handling**:
+  - OpenTelemetry instrumentation for scan operations and imports
+  - Distributed tracing with GitHub API request spans
+  - Comprehensive error handling for network failures and API rate limiting
+  - Structured logging for troubleshooting artifact detection
+  - User-friendly error messages for common failure scenarios
+
+### Changed
+- Marketplace page redesigned to include GitHub sources alongside existing marketplace listings
+- Source management UI now accessible from main marketplace view
+- Artifact import workflow streamlined with bulk operations support
+
+### Technical Details
+- New services in `marketplace/services/`: `heuristic_detector.py`, `github_scanner.py`, `catalog_diff_engine.py`, `link_harvester.py`, `import_coordinator.py`
+- New database models in `marketplace/models/`: `MarketplaceSource`, `MarketplaceCatalogEntry`
+- API endpoints defined in `api/routers/marketplace_sources.py` and `api/routers/marketplace_imports.py`
+- Frontend components in `skillmeat/web/components/marketplace/`: `add-source-wizard.tsx`, `source-detail.tsx`, `source-card.tsx`, `artifact-card.tsx`
+- Configuration schema with heuristic weights (5 criteria, configurable thresholds)
+
+### Performance
+- Async GitHub API scanning with concurrent requests (configurable, default 5)
+- Efficient catalog diffing using SHA-256 hashing
+- Pagination support for repositories with 1000+ artifacts
+- Cache-aware detection to skip rescans within configurable time window
+
 ## [0.3.0-beta] - 2025-11-17
 
 ### Added

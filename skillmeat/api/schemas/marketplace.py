@@ -4,6 +4,8 @@ Provides Pydantic models for marketplace listing feeds, installation requests,
 publish operations, and broker information.
 """
 
+import re
+import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
@@ -511,6 +513,47 @@ class CreateSourceRequest(BaseModel):
         default="basic",
         description="Trust level for artifacts from this source",
     )
+
+    @field_validator("root_hint")
+    @classmethod
+    def validate_root_hint(cls, v: str | None) -> str | None:
+        """Validate root_hint to prevent path traversal attacks.
+
+        Args:
+            v: Root hint value to validate
+
+        Returns:
+            Validated and stripped root hint
+
+        Raises:
+            ValueError: If path contains traversal sequences, absolute paths,
+                       null bytes, or invalid characters
+        """
+        if v is None:
+            return v
+
+        # URL decode first to catch encoded attacks
+        decoded = urllib.parse.unquote(v)
+
+        # Block path traversal sequences
+        if ".." in decoded:
+            raise ValueError(
+                "root_hint cannot contain parent directory references (..)"
+            )
+
+        # Block absolute paths (Unix and Windows)
+        if decoded.startswith("/") or (len(decoded) > 1 and decoded[1] == ":"):
+            raise ValueError("root_hint must be a relative path")
+
+        # Block null bytes
+        if "\x00" in decoded:
+            raise ValueError("root_hint cannot contain null bytes")
+
+        # Block other dangerous patterns
+        if re.search(r'[<>"|?*]', decoded):
+            raise ValueError("root_hint contains invalid characters")
+
+        return v.strip()
 
     class Config:
         """Pydantic model configuration."""
