@@ -14,6 +14,18 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import requests
 
 from skillmeat.api.schemas.marketplace import DetectedArtifact, ScanResultDTO
+from skillmeat.core.marketplace.observability import (
+    MarketplaceOperation,
+    operation_context,
+    log_error,
+)
+from skillmeat.observability.metrics import (
+    marketplace_scan_duration_seconds,
+    marketplace_scan_artifacts_total,
+    marketplace_scan_errors_total,
+    github_requests_total,
+    github_rate_limit_remaining,
+)
 
 # Note: This import will be available once SVC-002 (heuristic detector) is implemented
 # from skillmeat.core.marketplace.heuristic_detector import (
@@ -94,6 +106,7 @@ class GitHubScanner:
         repo: str,
         ref: str = "main",
         root_hint: Optional[str] = None,
+        source_id: Optional[str] = None,
     ) -> ScanResultDTO:
         """Scan a GitHub repository for artifacts.
 
@@ -102,6 +115,7 @@ class GitHubScanner:
             repo: Repository name
             ref: Branch, tag, or SHA to scan
             root_hint: Optional subdirectory to focus on
+            source_id: Optional source ID for metrics tracking
 
         Returns:
             ScanResultDTO with scan results and statistics
@@ -110,70 +124,113 @@ class GitHubScanner:
             GitHubAPIError: If API call fails
             RateLimitError: If rate limited and retries exhausted
         """
-        start_time = time.time()
-        errors: List[str] = []
+        repo_full_name = f"{owner}/{repo}"
+        source_id = source_id or repo_full_name
 
-        try:
-            # 1. Fetch repository tree
-            tree = self._fetch_tree(owner, repo, ref)
+        # Create operation context with tracing and logging
+        with operation_context(
+            MarketplaceOperation.SCAN,
+            source_id=source_id,
+            owner=owner,
+            repo=repo,
+            ref=ref,
+        ) as ctx:
+            start_time = time.time()
+            errors: List[str] = []
 
-            # 2. Filter to relevant paths
-            file_paths = self._extract_file_paths(tree, root_hint)
+            try:
+                # 1. Fetch repository tree
+                ctx.metadata["phase"] = "fetch_tree"
+                tree = self._fetch_tree(owner, repo, ref)
+                ctx.metadata["tree_size"] = len(tree)
 
-            # 3. Get commit SHA for versioning
-            commit_sha = self._get_ref_sha(owner, repo, ref)
+                # 2. Filter to relevant paths
+                ctx.metadata["phase"] = "extract_paths"
+                file_paths = self._extract_file_paths(tree, root_hint)
+                ctx.metadata["file_count"] = len(file_paths)
 
-            # 4. Apply heuristic detection
-            # NOTE: This will be uncommented once SVC-002 (heuristic detector) is implemented
-            # base_url = f"https://github.com/{owner}/{repo}"
-            # artifacts = detect_artifacts_in_tree(
-            #     file_paths,
-            #     repo_url=base_url,
-            #     ref=ref,
-            #     root_hint=root_hint,
-            #     detected_sha=commit_sha,
-            # )
+                # 3. Get commit SHA for versioning
+                ctx.metadata["phase"] = "get_sha"
+                commit_sha = self._get_ref_sha(owner, repo, ref)
+                ctx.metadata["commit_sha"] = commit_sha
 
-            # Placeholder until heuristic detector is implemented
-            artifacts = []
-            logger.warning(
-                "Heuristic detector not yet implemented (SVC-002). "
-                "Returning empty artifact list."
-            )
+                # 4. Apply heuristic detection
+                ctx.metadata["phase"] = "detect_artifacts"
+                # NOTE: This will be uncommented once SVC-002 (heuristic detector) is implemented
+                # base_url = f"https://github.com/{owner}/{repo}"
+                # artifacts = detect_artifacts_in_tree(
+                #     file_paths,
+                #     repo_url=base_url,
+                #     ref=ref,
+                #     root_hint=root_hint,
+                #     detected_sha=commit_sha,
+                # )
 
-            # 5. Build result
-            duration_ms = (time.time() - start_time) * 1000
+                # Placeholder until heuristic detector is implemented
+                artifacts = []
+                logger.warning(
+                    "Heuristic detector not yet implemented (SVC-002). "
+                    "Returning empty artifact list."
+                )
 
-            return ScanResultDTO(
-                source_id="",  # Set by caller
-                status="success",
-                artifacts_found=len(artifacts),
-                new_count=len(artifacts),  # All new on first scan
-                updated_count=0,
-                removed_count=0,
-                unchanged_count=0,
-                scan_duration_ms=duration_ms,
-                errors=errors,
-                scanned_at=datetime.utcnow(),
-            )
+                # 5. Build result
+                duration_ms = (time.time() - start_time) * 1000
+                duration_seconds = duration_ms / 1000
 
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            logger.error(f"Scan failed for {owner}/{repo}: {e}", exc_info=True)
-            errors.append(str(e))
+                # Record metrics
+                marketplace_scan_duration_seconds.labels(source_id=source_id).observe(duration_seconds)
 
-            return ScanResultDTO(
-                source_id="",
-                status="error",
-                artifacts_found=0,
-                new_count=0,
-                updated_count=0,
-                removed_count=0,
-                unchanged_count=0,
-                scan_duration_ms=duration_ms,
-                errors=errors,
-                scanned_at=datetime.utcnow(),
-            )
+                # Count artifacts by type
+                artifact_counts = {}
+                for artifact in artifacts:
+                    artifact_type = artifact.get("artifact_type", "unknown")
+                    artifact_counts[artifact_type] = artifact_counts.get(artifact_type, 0) + 1
+                    marketplace_scan_artifacts_total.labels(
+                        source_id=source_id,
+                        artifact_type=artifact_type
+                    ).inc()
+
+                ctx.metadata["artifact_counts"] = artifact_counts
+                ctx.metadata["artifacts_found"] = len(artifacts)
+
+                return ScanResultDTO(
+                    source_id="",  # Set by caller
+                    status="success",
+                    artifacts_found=len(artifacts),
+                    new_count=len(artifacts),  # All new on first scan
+                    updated_count=0,
+                    removed_count=0,
+                    unchanged_count=0,
+                    scan_duration_ms=duration_ms,
+                    errors=errors,
+                    scanned_at=datetime.utcnow(),
+                )
+
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                error_type = type(e).__name__
+
+                # Record error metrics
+                marketplace_scan_errors_total.labels(
+                    source_id=source_id,
+                    error_type=error_type
+                ).inc()
+
+                log_error(e, MarketplaceOperation.SCAN, source_id=source_id)
+                errors.append(str(e))
+
+                return ScanResultDTO(
+                    source_id="",
+                    status="error",
+                    artifacts_found=0,
+                    new_count=0,
+                    updated_count=0,
+                    removed_count=0,
+                    unchanged_count=0,
+                    scan_duration_ms=duration_ms,
+                    errors=errors,
+                    scanned_at=datetime.utcnow(),
+                )
 
     def _fetch_tree(
         self,
