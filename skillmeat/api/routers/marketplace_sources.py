@@ -34,6 +34,7 @@ from skillmeat.api.schemas.marketplace import (
     ScanResultDTO,
     SourceListResponse,
     SourceResponse,
+    UpdateSourceRequest,
 )
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
 from skillmeat.cache.repositories import (
@@ -111,6 +112,8 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         last_error=source.last_error,
         created_at=source.created_at,
         updated_at=source.updated_at,
+        description=source.description,
+        notes=source.notes,
     )
 
 
@@ -208,6 +211,8 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
         visibility="public",  # TODO: Detect from GitHub API
         scan_status="pending",
         artifact_count=0,
+        description=request.description,
+        notes=request.notes,
     )
 
     # Store manual_map if provided
@@ -336,7 +341,7 @@ async def get_source(source_id: str) -> SourceResponse:
     description="""
     Update a GitHub repository source configuration.
 
-    Allows updating ref (branch/tag/SHA), root_hint, trust_level, and other metadata.
+    Allows updating ref (branch/tag/SHA), root_hint, trust_level, description, and notes.
     Changes take effect on the next scan.
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
@@ -344,19 +349,13 @@ async def get_source(source_id: str) -> SourceResponse:
 )
 async def update_source(
     source_id: str,
-    ref: Optional[str] = Query(None, description="Branch, tag, or SHA to scan"),
-    root_hint: Optional[str] = Query(None, description="Subdirectory path hint"),
-    trust_level: Optional[
-        Literal["untrusted", "basic", "verified", "official"]
-    ] = Query(None, description="Trust level for artifacts"),
+    request: UpdateSourceRequest,
 ) -> SourceResponse:
     """Update a marketplace source.
 
     Args:
         source_id: Unique source identifier
-        ref: New branch/tag/SHA (optional)
-        root_hint: New root hint (optional)
-        trust_level: New trust level (optional)
+        request: Update request with fields to modify
 
     Returns:
         Updated source details
@@ -367,7 +366,7 @@ async def update_source(
         HTTPException 500: If database operation fails
     """
     # Check if any update parameters provided
-    if ref is None and root_hint is None and trust_level is None:
+    if all(v is None for v in [request.ref, request.root_hint, request.trust_level, request.description, request.notes]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one update parameter must be provided",
@@ -386,12 +385,16 @@ async def update_source(
             )
 
         # Apply updates
-        if ref is not None:
-            source.ref = ref
-        if root_hint is not None:
-            source.root_hint = root_hint
-        if trust_level is not None:
-            source.trust_level = trust_level
+        if request.ref is not None:
+            source.ref = request.ref
+        if request.root_hint is not None:
+            source.root_hint = request.root_hint
+        if request.trust_level is not None:
+            source.trust_level = request.trust_level
+        if request.description is not None:
+            source.description = request.description
+        if request.notes is not None:
+            source.notes = request.notes
 
         # Save updates
         updated = source_repo.update(source)
