@@ -7,6 +7,7 @@ import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
+import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
@@ -83,6 +84,7 @@ function CollectionPageContent() {
     selectedCollectionId,
     currentCollection,
     isLoadingCollection,
+    setSelectedCollectionId,
   } = useCollectionContext();
 
   // View mode with localStorage persistence
@@ -108,6 +110,7 @@ function CollectionPageContent() {
   // Modal state
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   // Fetch artifacts using existing hook
   // Note: For now using useArtifacts since it returns full Artifact objects
@@ -153,6 +156,10 @@ function CollectionPageContent() {
     setSortOrder(order);
   };
 
+  const handleCollectionClick = (collectionId: string) => {
+    setSelectedCollectionId(collectionId);
+  };
+
   // Loading state
   if (isLoadingCollection) {
     return <CollectionPageSkeleton />;
@@ -167,9 +174,8 @@ function CollectionPageContent() {
         collection={currentCollection}
         artifactCount={filteredArtifacts.length}
         isAllCollections={isAllCollections}
-        // TODO: Wire up edit/delete handlers when collection management is implemented
-        onEdit={undefined}
-        onDelete={undefined}
+        onEdit={currentCollection ? () => setShowEditDialog(true) : undefined}
+        onDelete={currentCollection ? () => setShowEditDialog(true) : undefined}
       />
 
       <CollectionToolbar
@@ -224,12 +230,16 @@ function CollectionPageContent() {
                 artifacts={filteredArtifacts}
                 isLoading={false}
                 onArtifactClick={handleArtifactClick}
+                showCollectionBadge={isAllCollections}
+                onCollectionClick={handleCollectionClick}
               />
             ) : viewMode === 'list' ? (
               <ArtifactList
                 artifacts={filteredArtifacts}
                 isLoading={false}
                 onArtifactClick={handleArtifactClick}
+                showCollectionColumn={isAllCollections}
+                onCollectionClick={handleCollectionClick}
               />
             ) : (
               // Grouped view placeholder for Phase 5
@@ -238,6 +248,8 @@ function CollectionPageContent() {
                 artifacts={filteredArtifacts}
                 isLoading={false}
                 onArtifactClick={handleArtifactClick}
+                showCollectionBadge={isAllCollections}
+                onCollectionClick={handleCollectionClick}
               />
             )}
           </>
@@ -250,6 +262,17 @@ function CollectionPageContent() {
         open={isDetailOpen}
         onClose={handleDetailClose}
       />
+
+      {/* Edit Collection Dialog */}
+      {currentCollection && (
+        <EditCollectionDialog
+          collection={currentCollection}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onSuccess={() => refetch()}
+          onDelete={() => refetch()}
+        />
+      )}
     </div>
   );
 }
