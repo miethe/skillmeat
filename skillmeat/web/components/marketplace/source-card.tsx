@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   Star,
   Loader2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -196,6 +198,10 @@ export interface SourceCardProps {
   isRescanning?: boolean;
   /** Custom click handler (default: navigate to detail page) */
   onClick?: () => void;
+  /** Callback when edit button is clicked */
+  onEdit?: (source: GitHubSource) => void;
+  /** Callback when delete button is clicked */
+  onDelete?: (source: GitHubSource) => void;
 }
 
 export function SourceCard({
@@ -203,6 +209,8 @@ export function SourceCard({
   onRescan,
   isRescanning = false,
   onClick,
+  onEdit,
+  onDelete,
 }: SourceCardProps) {
   const router = useRouter();
 
@@ -217,6 +225,16 @@ export function SourceCard({
   const handleRescan = (e: React.MouseEvent) => {
     e.stopPropagation();
     onRescan?.(source.id);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(source);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(source);
   };
 
   // Parse artifact counts from the single artifact_count field
@@ -272,6 +290,41 @@ export function SourceCard({
             <TrustBadge level={source.trust_level} />
           </div>
         </div>
+
+        {/* Hover Actions */}
+        {(onEdit || onDelete) && (
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleEdit}
+                aria-label="Edit source"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={handleDelete}
+                aria-label="Delete source"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Description (truncated) */}
+        {source.description && (
+          <p className="text-sm text-muted-foreground line-clamp-2">
+            {source.description}
+          </p>
+        )}
 
         {/* Artifact counts */}
         <ArtifactCounts counts={artifactCounts} />

@@ -13,11 +13,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-card';
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
+import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
+import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { useSources, useRescanSource } from '@/hooks/useMarketplaceSources';
+import type { GitHubSource } from '@/types/marketplace';
 
 export default function MarketplaceSourcesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<GitHubSource | null>(null);
 
   // Fetch sources
   const {
@@ -45,6 +51,17 @@ export default function MarketplaceSourcesPage() {
         source.repo_name.toLowerCase().includes(query)
     );
   }, [allSources, searchQuery]);
+
+  // Handler functions
+  const handleEdit = (source: GitHubSource) => {
+    setSelectedSource(source);
+    setEditModalOpen(true);
+  };
+
+  const handleDelete = (source: GitHubSource) => {
+    setSelectedSource(source);
+    setDeleteDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -161,6 +178,8 @@ export default function MarketplaceSourcesPage() {
               <SourceCard
                 key={source.id}
                 source={source}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -193,6 +212,30 @@ export default function MarketplaceSourcesPage() {
         onOpenChange={setAddModalOpen}
         onSuccess={() => {
           setAddModalOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Edit Source Modal */}
+      <EditSourceModal
+        source={selectedSource}
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        onSuccess={() => {
+          setEditModalOpen(false);
+          setSelectedSource(null);
+          refetch();
+        }}
+      />
+
+      {/* Delete Source Dialog */}
+      <DeleteSourceDialog
+        source={selectedSource}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onSuccess={() => {
+          setDeleteDialogOpen(false);
+          setSelectedSource(null);
           refetch();
         }}
       />
