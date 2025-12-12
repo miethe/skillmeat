@@ -48,6 +48,13 @@ from skillmeat.cache.refresh import (
     RefreshJob,
     RefreshResult,
 )
+from skillmeat.cache.repositories import (
+    ImportContext,
+    MarketplaceCatalogRepository,
+    MarketplaceSourceRepository,
+    MarketplaceTransactionHandler,
+    ScanUpdateContext,
+)
 from skillmeat.cache.repository import CacheRepository
 from skillmeat.cache.watcher import FileWatcher
 
@@ -59,4 +66,9 @@ __all__ = [
     "RefreshEvent",
     "RefreshEventType",
     "RefreshResult",
+    "MarketplaceSourceRepository",
+    "MarketplaceCatalogRepository",
+    "MarketplaceTransactionHandler",
+    "ScanUpdateContext",
+    "ImportContext",
 ]

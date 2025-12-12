@@ -39,7 +39,10 @@ function trace(event: string, detail: Record<string, unknown>) {
 }
 
 export function buildApiHeaders(extra?: HeadersInit): HeadersInit {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
 
   const extraEntries =
     extra instanceof Headers

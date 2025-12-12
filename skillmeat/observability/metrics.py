@@ -88,6 +88,32 @@ marketplace_errors_total = Counter(
     ['broker', 'operation', 'error_type']
 )
 
+# GitHub source-specific metrics
+marketplace_scan_duration_seconds = Histogram(
+    'skillmeat_marketplace_scan_duration_seconds',
+    'Duration of marketplace repository scans',
+    ['source_id'],
+    buckets=[.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0]
+)
+
+marketplace_scan_artifacts_total = Counter(
+    'skillmeat_marketplace_scan_artifacts_total',
+    'Total artifacts detected during scans',
+    ['source_id', 'artifact_type']
+)
+
+marketplace_import_total = Counter(
+    'skillmeat_marketplace_import_total',
+    'Total artifact imports from marketplace',
+    ['source_id', 'status']
+)
+
+marketplace_scan_errors_total = Counter(
+    'skillmeat_marketplace_scan_errors_total',
+    'Total errors during marketplace scans',
+    ['source_id', 'error_type']
+)
+
 # =============================================================================
 # Bundle Metrics
 # =============================================================================

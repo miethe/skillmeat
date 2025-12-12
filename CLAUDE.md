@@ -86,6 +86,28 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 | Complex docs | documentation-complex | Sonnet | Multi-system integration |
 | AI artifacts | ai-artifacts-engineer | Sonnet | Skills, agents, commands |
 
+### Background Execution
+
+Subagents can run in the background, allowing parallel work:
+
+| Parameter | Purpose |
+|-----------|---------|
+| `run_in_background: true` | Launch agent without blocking |
+| `TaskOutput(task_id)` | Retrieve results (blocking by default) |
+| `TaskOutput(task_id, block: false)` | Check status without waiting |
+
+**When to Use Background Execution**:
+
+- Large batch parallelization (5+ independent tasks)
+- When Opus needs to do work between launching and collecting results
+- Long-running tasks where Opus can productively continue
+
+**When NOT to Use**:
+
+- Small batches (2-3 tasks) - standard parallel is simpler
+- When results are immediately needed
+- When tasks have dependencies requiring sequential execution
+
 ### Example Delegation
 
 ```text

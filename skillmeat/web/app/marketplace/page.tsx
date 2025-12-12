@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, Search as SearchIcon } from 'lucide-react';
+import { Loader2, Search as SearchIcon, Github } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { MarketplaceListingCard } from '@/components/marketplace/MarketplaceListingCard';
 import { MarketplaceFilters } from '@/components/marketplace/MarketplaceFilters';
 import { MarketplaceStats } from '@/components/marketplace/MarketplaceStats';
@@ -65,7 +66,15 @@ export default function MarketplacePage() {
             Browse and install bundles from marketplace brokers
           </p>
         </div>
-        <Button onClick={() => router.push('/marketplace/publish')}>Publish Bundle</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/marketplace/sources">
+              <Github className="mr-2 h-4 w-4" />
+              GitHub Sources
+            </Link>
+          </Button>
+          <Button onClick={() => router.push('/marketplace/publish')}>Publish Bundle</Button>
+        </div>
       </div>
 
       {/* Stats */}

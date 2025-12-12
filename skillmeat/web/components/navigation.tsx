@@ -7,6 +7,7 @@ import {
   Database,
   FolderCog,
   GitBranch,
+  Github,
   Home,
   Package,
   Settings,
@@ -14,7 +15,14 @@ import {
   Users,
 } from 'lucide-react';
 
-const navItems = [
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ElementType;
+  subItems?: NavItem[];
+}
+
+const navItems: NavItem[] = [
   {
     title: 'Dashboard',
     href: '/',
@@ -39,6 +47,13 @@ const navItems = [
     title: 'Marketplace',
     href: '/marketplace',
     icon: ShoppingBag,
+    subItems: [
+      {
+        title: 'Sources',
+        href: '/marketplace/sources',
+        icon: Github,
+      },
+    ],
   },
   {
     title: 'Sharing',
@@ -68,19 +83,44 @@ export function Navigation() {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-secondary text-secondary-foreground'
-                  : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-secondary text-secondary-foreground'
+                    : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.title}
+              </Link>
+              {item.subItems && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {item.subItems.map((subItem) => {
+                    const SubIcon = subItem.icon;
+                    const isSubActive = pathname === subItem.href || pathname.startsWith(`${subItem.href}/`);
+
+                    return (
+                      <Link
+                        key={subItem.href}
+                        href={subItem.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                          isSubActive
+                            ? 'bg-secondary text-secondary-foreground'
+                            : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                        )}
+                      >
+                        <SubIcon className="h-4 w-4" />
+                        {subItem.title}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.title}
-            </Link>
+            </div>
           );
         })}
       </nav>
