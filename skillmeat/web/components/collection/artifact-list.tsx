@@ -17,6 +17,8 @@ interface ArtifactListProps {
   artifacts: Artifact[];
   isLoading?: boolean;
   onArtifactClick: (artifact: Artifact) => void;
+  showCollectionColumn?: boolean;
+  onCollectionClick?: (collectionId: string) => void;
 }
 
 const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: string }>> = {
@@ -69,12 +71,13 @@ const statusColors: Record<string, string> = {
   error: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
 
-function ArtifactListSkeleton() {
+function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?: boolean }) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
+          {showCollectionColumn && <TableHead>Collection</TableHead>}
           <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Version</TableHead>
@@ -92,6 +95,11 @@ function ArtifactListSkeleton() {
                 <Skeleton className="h-3 w-48" />
               </div>
             </TableCell>
+            {showCollectionColumn && (
+              <TableCell>
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </TableCell>
+            )}
             <TableCell>
               <Skeleton className="h-4 w-16" />
             </TableCell>
@@ -132,9 +140,15 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-export function ArtifactList({ artifacts, isLoading, onArtifactClick }: ArtifactListProps) {
+export function ArtifactList({
+  artifacts,
+  isLoading,
+  onArtifactClick,
+  showCollectionColumn,
+  onCollectionClick,
+}: ArtifactListProps) {
   if (isLoading) {
-    return <ArtifactListSkeleton />;
+    return <ArtifactListSkeleton showCollectionColumn={showCollectionColumn} />;
   }
 
   if (artifacts.length === 0) {
@@ -155,6 +169,7 @@ export function ArtifactList({ artifacts, isLoading, onArtifactClick }: Artifact
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showCollectionColumn && <TableHead>Collection</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Version</TableHead>
@@ -198,6 +213,24 @@ export function ArtifactList({ artifacts, isLoading, onArtifactClick }: Artifact
                     </div>
                   </div>
                 </TableCell>
+                {showCollectionColumn && (
+                  <TableCell>
+                    {artifact.collection ? (
+                      <Badge
+                        variant="outline"
+                        className="cursor-pointer hover:bg-accent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCollectionClick?.(artifact.collection!.id);
+                        }}
+                      >
+                        {artifact.collection.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex items-center gap-2" data-testid="type-badge">
                     <Icon

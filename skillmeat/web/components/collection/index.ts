@@ -9,8 +9,8 @@ export { CollectionSwitcherWithDialogs } from './collection-switcher-with-dialog
 export { CreateCollectionDialog } from './create-collection-dialog';
 export { EditCollectionDialog } from './edit-collection-dialog';
 export { default as ArtifactDetail } from './artifact-detail';
-export { default as ArtifactGrid } from './artifact-grid';
-export { default as ArtifactList } from './artifact-list';
+export { ArtifactGrid } from './artifact-grid';
+export { ArtifactList } from './artifact-list';
 export { default as ConflictResolver } from './conflict-resolver';
 export { default as DeployDialog } from './deploy-dialog';
 export { default as Filters } from './filters';
