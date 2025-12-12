@@ -513,6 +513,54 @@ class CreateSourceRequest(BaseModel):
         default="basic",
         description="Trust level for artifacts from this source",
     )
+    description: Optional[str] = Field(
+        default=None,
+        description="User-provided description for this source (max 500 chars)",
+        max_length=500,
+        examples=["My company's internal skills repository"],
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Internal notes/documentation for this source (max 2000 chars)",
+        max_length=2000,
+        examples=["Contact: team@example.com for access issues"],
+    )
+
+    @field_validator("description")
+    @classmethod
+    def validate_description_length(cls, v: str | None) -> str | None:
+        """Validate description length.
+
+        Args:
+            v: Description value to validate
+
+        Returns:
+            Validated description
+
+        Raises:
+            ValueError: If description exceeds 500 characters
+        """
+        if v is not None and len(v) > 500:
+            raise ValueError("Description must be 500 characters or less")
+        return v
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes_length(cls, v: str | None) -> str | None:
+        """Validate notes length.
+
+        Args:
+            v: Notes value to validate
+
+        Returns:
+            Validated notes
+
+        Raises:
+            ValueError: If notes exceed 2000 characters
+        """
+        if v is not None and len(v) > 2000:
+            raise ValueError("Notes must be 2000 characters or less")
+        return v
 
     @field_validator("root_hint")
     @classmethod
@@ -564,9 +612,135 @@ class CreateSourceRequest(BaseModel):
                 "ref": "main",
                 "root_hint": "skills",
                 "trust_level": "verified",
+                "description": "Anthropic's official quickstart examples",
+                "notes": "Contains high-quality reference implementations",
             }
         }
 
+
+
+
+class UpdateSourceRequest(BaseModel):
+    """Request to update a GitHub repository source.
+    
+    All fields are optional - only provided fields will be updated.
+    Uses PATCH semantics for partial updates.
+    """
+    
+    ref: Optional[str] = Field(
+        default=None,
+        description="Branch, tag, or SHA to scan",
+        examples=["main", "v1.0.0", "abc123"],
+    )
+    root_hint: Optional[str] = Field(
+        default=None,
+        description="Subdirectory path within repository to start scanning",
+        examples=["skills", "src/artifacts"],
+    )
+    trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = Field(
+        default=None,
+        description="Trust level for artifacts from this source",
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="User-provided description for this source (max 500 chars)",
+        max_length=500,
+        examples=["Official Anthropic skills repository"],
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Internal notes/documentation for this source (max 2000 chars)",
+        max_length=2000,
+        examples=["Contains verified skills. Contact: team@example.com"],
+    )
+    
+    @field_validator("root_hint")
+    @classmethod
+    def validate_root_hint(cls, v: str | None) -> str | None:
+        """Validate root_hint to prevent path traversal attacks.
+
+        Args:
+            v: Root hint value to validate
+
+        Returns:
+            Validated and stripped root hint
+
+        Raises:
+            ValueError: If path contains traversal sequences, absolute paths,
+                       null bytes, or invalid characters
+        """
+        if v is None:
+            return v
+
+        # URL decode first to catch encoded attacks
+        decoded = urllib.parse.unquote(v)
+
+        # Block path traversal sequences
+        if ".." in decoded:
+            raise ValueError(
+                "root_hint cannot contain parent directory references (..)"
+            )
+
+        # Block absolute paths (Unix and Windows)
+        if decoded.startswith("/") or (len(decoded) > 1 and decoded[1] == ":"):
+            raise ValueError("root_hint must be a relative path")
+
+        # Block null bytes
+        if "\x00" in decoded:
+            raise ValueError("root_hint cannot contain null bytes")
+
+        # Block other dangerous patterns
+        if re.search(r'[<>"|?*]', decoded):
+            raise ValueError("root_hint contains invalid characters")
+
+        return v.strip()
+    
+    @field_validator("description")
+    @classmethod
+    def validate_description_length(cls, v: str | None) -> str | None:
+        """Validate description does not exceed maximum length.
+        
+        Args:
+            v: Description value to validate
+            
+        Returns:
+            Validated description
+            
+        Raises:
+            ValueError: If description exceeds 500 characters
+        """
+        if v is not None and len(v) > 500:
+            raise ValueError("Description must be 500 characters or less")
+        return v
+    
+    @field_validator("notes")
+    @classmethod
+    def validate_notes_length(cls, v: str | None) -> str | None:
+        """Validate notes do not exceed maximum length.
+        
+        Args:
+            v: Notes value to validate
+            
+        Returns:
+            Validated notes
+            
+        Raises:
+            ValueError: If notes exceed 2000 characters
+        """
+        if v is not None and len(v) > 2000:
+            raise ValueError("Notes must be 2000 characters or less")
+        return v
+
+    class Config:
+        """Pydantic model configuration."""
+        
+        json_schema_extra = {
+            "example": {
+                "ref": "v2.0.0",
+                "description": "Updated description for repository",
+                "notes": "Updated internal notes about this source",
+            }
+        }
 
 class SourceResponse(BaseModel):
     """Response model for a GitHub repository source.
@@ -633,6 +807,18 @@ class SourceResponse(BaseModel):
         description="Timestamp when source was last modified",
         examples=["2025-12-06T10:30:00Z"],
     )
+    description: Optional[str] = Field(
+        default=None,
+        description="User-provided description for this source",
+        max_length=500,
+        examples=["Official Anthropic skills repository"],
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Internal notes/documentation for this source",
+        max_length=2000,
+        examples=["Contains verified skills from Anthropic team. Updated weekly."],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -654,6 +840,8 @@ class SourceResponse(BaseModel):
                 "last_error": None,
                 "created_at": "2025-12-05T09:00:00Z",
                 "updated_at": "2025-12-06T10:30:00Z",
+                "description": "Official skills repository",
+                "notes": "Contains verified skills from Anthropic",
             }
         }
 
