@@ -129,6 +129,8 @@ export interface GitHubSource {
   last_error?: string;
   created_at: string;
   updated_at: string;
+  description?: string;
+  notes?: string;
 }
 
 export interface GitHubSourceListResponse {
@@ -143,6 +145,8 @@ export interface CreateSourceRequest {
   access_token?: string;
   manual_map?: Record<string, string[]>;
   trust_level?: TrustLevel;
+  description?: string;
+  notes?: string;
 }
 
 export interface UpdateSourceRequest {
@@ -150,6 +154,8 @@ export interface UpdateSourceRequest {
   root_hint?: string;
   trust_level?: TrustLevel;
   manual_map?: Record<string, string[]>;
+  description?: string;
+  notes?: string;
 }
 
 export interface CatalogEntry {
