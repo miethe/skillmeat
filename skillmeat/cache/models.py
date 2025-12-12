@@ -531,6 +531,8 @@ class MarketplaceSource(Base):
         repo_name: Repository name
         ref: Branch, tag, or SHA to scan (default: "main")
         root_hint: Optional subdirectory path within repository
+        description: User-provided description for this source (max 500 chars)
+        notes: Internal notes/documentation for this source (max 2000 chars)
         manual_map: JSON string for manual override catalog
         access_token_id: Optional encrypted PAT reference
         trust_level: Trust level ("untrusted", "basic", "verified", "official")
@@ -562,6 +564,18 @@ class MarketplaceSource(Base):
         String, nullable=False, default="main", server_default="main"
     )
     root_hint: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # User-provided metadata
+    description: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="User-provided description for this source",
+    )
+    notes: Mapped[Optional[str]] = mapped_column(
+        String(2000),
+        nullable=True,
+        comment="Internal notes/documentation for this source",
+    )
 
     # Extended configuration
     manual_map: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -645,6 +659,8 @@ class MarketplaceSource(Base):
             "repo_name": self.repo_name,
             "ref": self.ref,
             "root_hint": self.root_hint,
+            "description": self.description,
+            "notes": self.notes,
             "manual_map": manual_map_dict,
             "access_token_id": self.access_token_id,
             "trust_level": self.trust_level,

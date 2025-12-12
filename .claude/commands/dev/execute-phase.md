@@ -83,6 +83,27 @@ Instead of manually constructing delegation, scroll to the "Orchestration Quick 
    Task("artifact-tracker", "Update ${PRD_NAME} phase ${phase_num}: Mark TASK-1.1 as completed with commit abc1234")
    ```
 
+#### 2.2.1 Background Execution (Large Batches)
+
+For large batches, use **background execution** to maximize parallelism:
+
+**Continue productive work while agents run:**
+
+- Read progress YAML for next batch planning
+- Prepare commit messages
+- Review dependencies for upcoming batches
+
+**When to use background execution:**
+
+| Scenario | Use Background? |
+|----------|----------------|
+| 5+ independent tasks in batch | Yes |
+| Long-running implementations | Yes |
+| Need to do Opus work between launch and results | Yes |
+| Small batches (2-3 tasks) | No - standard parallel simpler |
+| Results needed immediately | No |
+| Sequential dependencies | No |
+
 **Task Delegation Template:**
 
 ```
@@ -190,12 +211,15 @@ The artifact-tracker will:
 - Copy Task() commands from "Orchestration Quick Reference"
 - Use artifact-tracker for status updates
 - Execute batches in parallel (single message with multiple Task calls)
+- Use `run_in_background=true` for large batches (5+ tasks)
+- Use `TaskOutput(agent_id)` to collect background results
 
 **DO NOT:**
 - Read entire progress file for delegation (~25KB)
 - Re-analyze task dependencies (already computed by lead-architect)
 - Manually construct Task() commands (use Quick Reference)
 - Execute parallel tasks sequentially (wastes time)
+- Use background execution for small batches (adds complexity)
 
 ### Parallelization Strategy
 
@@ -212,9 +236,20 @@ parallelization:
 
 **Execution Pattern:**
 1. Execute all tasks in `batch_1` in **parallel** (single message)
+   - For 5+ tasks: use `run_in_background=true` and `TaskOutput()` to collect
+   - For 2-4 tasks: standard parallel execution (simpler)
 2. **Wait** for batch to complete
 3. Execute all tasks in `batch_2` in **parallel**
 4. Continue sequentially through batches, tasks within batches in parallel
+
+**Background Execution Workflow (Large Batches):**
+```
+1. Launch all batch tasks with run_in_background=true  → get agent_ids
+2. Continue with Opus-level work (read next batch YAML, prepare commits)
+3. Collect results with TaskOutput(agent_id) when ready
+4. Update progress tracker for completed tasks
+5. Move to next batch
+```
 
 ### Required Task Fields
 
