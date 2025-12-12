@@ -21,6 +21,15 @@ from .collections import (
     CollectionListResponse,
     CollectionArtifactsResponse,
 )
+from .user_collections import (
+    UserCollectionCreateRequest,
+    UserCollectionResponse,
+    UserCollectionUpdateRequest,
+    UserCollectionListResponse,
+    UserCollectionWithGroupsResponse,
+    AddArtifactsRequest,
+    GroupSummary,
+)
 from .artifacts import (
     ArtifactResponse,
     ArtifactListResponse,
@@ -61,6 +70,14 @@ __all__ = [
     "CollectionUpdateRequest",
     "CollectionListResponse",
     "CollectionArtifactsResponse",
+    # User Collections
+    "UserCollectionCreateRequest",
+    "UserCollectionResponse",
+    "UserCollectionUpdateRequest",
+    "UserCollectionListResponse",
+    "UserCollectionWithGroupsResponse",
+    "AddArtifactsRequest",
+    "GroupSummary",
     # Artifacts
     "ArtifactResponse",
     "ArtifactListResponse",

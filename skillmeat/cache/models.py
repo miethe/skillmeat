@@ -8,6 +8,9 @@ Models:
     - Project: Project metadata and status
     - Artifact: Artifact metadata per project
     - ArtifactMetadata: Extended artifact metadata (YAML frontmatter)
+    - Collection: User-defined artifact collections
+    - Group: Custom grouping of artifacts within collections
+    - GroupArtifact: Association between groups and artifacts with ordering
     - MarketplaceEntry: Cached marketplace artifact listings
     - MarketplaceSource: GitHub repository sources for marketplace artifacts
     - MarketplaceCatalogEntry: Detected artifacts from marketplace sources
@@ -33,6 +36,7 @@ Note:
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -43,9 +47,11 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     event,
 )
@@ -249,6 +255,14 @@ class Artifact(Base):
         uselist=False,
         lazy="selectin",
     )
+    collections: Mapped[List["Collection"]] = relationship(
+        "Collection",
+        secondary="collection_artifacts",
+        primaryjoin="foreign(CollectionArtifact.artifact_id) == Artifact.id",
+        secondaryjoin="foreign(CollectionArtifact.collection_id) == Collection.id",
+        viewonly=True,
+        lazy="selectin",
+    )
 
     # Constraints
     __table_args__ = (
@@ -415,6 +429,301 @@ class ArtifactMetadata(Base):
             aliases: List of alias strings
         """
         self.aliases = ",".join(aliases) if aliases else None
+
+
+class Collection(Base):
+    """User-defined collection of artifacts.
+
+    Collections allow users to organize artifacts into logical groups
+    for easier management and deployment. Each collection can contain
+    multiple artifacts and support nested organization through groups.
+
+    Attributes:
+        id: Unique collection identifier (primary key, UUID hex)
+        name: Collection name (1-255 characters)
+        description: Optional detailed description
+        created_by: User identifier for future multi-user support
+        created_at: Timestamp when collection was created
+        updated_at: Timestamp when collection was last modified
+        groups: List of artifact groups within this collection
+        artifacts: List of artifacts in this collection (via association)
+
+    Indexes:
+        - idx_collections_name: Fast lookup by name
+        - idx_collections_created_by: Filter by creator
+        - idx_collections_created_at: Sort by creation date
+    """
+
+    __tablename__ = "collections"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    groups: Mapped[List["Group"]] = relationship(
+        "Group",
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    collection_artifacts: Mapped[List["CollectionArtifact"]] = relationship(
+        "CollectionArtifact",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "length(name) > 0 AND length(name) <= 255",
+            name="check_collection_name_length",
+        ),
+        Index("idx_collections_name", "name"),
+        Index("idx_collections_created_by", "created_by"),
+        Index("idx_collections_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of Collection."""
+        return (
+            f"<Collection(id={self.id!r}, name={self.name!r}, "
+            f"created_by={self.created_by!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert Collection to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the collection
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_by": self.created_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Group(Base):
+    """Custom grouping of artifacts within a collection.
+
+    Groups provide a way to organize artifacts within a collection into
+    logical categories. Each group belongs to exactly one collection and
+    can contain multiple artifacts with custom ordering.
+
+    Attributes:
+        id: Unique group identifier (primary key, UUID hex)
+        collection_id: Foreign key to collections.id (NOT NULL)
+        name: Group name (1-255 characters, unique per collection)
+        description: Optional detailed description
+        position: Display order within collection (0-based, default 0)
+        created_at: Timestamp when group was created
+        updated_at: Timestamp when group was last modified
+        collection: Parent collection object
+        artifacts: List of artifacts in this group (via association)
+
+    Indexes:
+        - idx_groups_collection_id: Fast lookup by collection
+        - idx_groups_collection_position: Ordered queries within collection
+        - Unique constraint on (collection_id, name)
+    """
+
+    __tablename__ = "groups"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    collection_id: Mapped[str] = mapped_column(
+        String, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    position: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    collection: Mapped["Collection"] = relationship(
+        "Collection", back_populates="groups"
+    )
+    group_artifacts: Mapped[List["GroupArtifact"]] = relationship(
+        "GroupArtifact",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("collection_id", "name", name="uq_group_collection_name"),
+        CheckConstraint(
+            "length(name) > 0 AND length(name) <= 255",
+            name="check_group_name_length",
+        ),
+        CheckConstraint("position >= 0", name="check_group_position"),
+        Index("idx_groups_collection_id", "collection_id"),
+        Index("idx_groups_collection_position", "collection_id", "position"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of Group."""
+        return (
+            f"<Group(id={self.id!r}, name={self.name!r}, "
+            f"collection_id={self.collection_id!r}, position={self.position})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert Group to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the group
+        """
+        return {
+            "id": self.id,
+            "collection_id": self.collection_id,
+            "name": self.name,
+            "description": self.description,
+            "position": self.position,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "artifact_count": 0,  # Will be populated when artifacts relationship exists
+        }
+
+
+class GroupArtifact(Base):
+    """Association between Group and Artifact with position for ordering.
+
+    Represents the many-to-many relationship between groups and artifacts,
+    allowing artifacts to be organized within groups with custom ordering.
+    Note that artifact_id has no foreign key constraint as artifacts may
+    reference external sources not yet in the local cache.
+
+    Attributes:
+        group_id: Foreign key to groups.id (part of composite primary key)
+        artifact_id: Artifact identifier (part of composite primary key, no FK)
+        position: Display order within group (0-based, default 0)
+        added_at: Timestamp when artifact was added to group
+
+    Indexes:
+        - idx_group_artifacts_group_id: Fast lookup by group
+        - idx_group_artifacts_artifact_id: Fast lookup by artifact
+        - idx_group_artifacts_group_position: Ordered queries within group
+        - idx_group_artifacts_added_at: Sort by membership date
+    """
+
+    __tablename__ = "group_artifacts"
+
+    # Composite primary key
+    group_id: Mapped[str] = mapped_column(
+        String, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Ordering and metadata
+    position: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("position >= 0", name="check_group_artifact_position"),
+        Index("idx_group_artifacts_group_id", "group_id"),
+        Index("idx_group_artifacts_artifact_id", "artifact_id"),
+        Index("idx_group_artifacts_group_position", "group_id", "position"),
+        Index("idx_group_artifacts_added_at", "added_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of GroupArtifact."""
+        return (
+            f"<GroupArtifact(group_id={self.group_id!r}, "
+            f"artifact_id={self.artifact_id!r}, position={self.position})>"
+        )
+
+
+class CollectionArtifact(Base):
+    """Association between Collection and Artifact (many-to-many).
+
+    Links artifacts to collections with tracking of when they were added.
+    This is a pure association table with composite primary key.
+
+    Attributes:
+        collection_id: Foreign key to collections.id (part of composite PK)
+        artifact_id: Reference to artifacts.id (part of composite PK, NO FK constraint)
+        added_at: Timestamp when artifact was added to collection
+
+    Indexes:
+        - idx_collection_artifacts_collection_id: Fast lookup by collection
+        - idx_collection_artifacts_artifact_id: Fast lookup by artifact
+        - idx_collection_artifacts_added_at: Sort by addition date
+
+    Note:
+        artifact_id intentionally has NO foreign key constraint because artifacts
+        may come from external sources (marketplace, GitHub) that aren't in cache.
+    """
+
+    __tablename__ = "collection_artifacts"
+
+    # Composite primary key
+    collection_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("collections.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    artifact_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Timestamp
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_collection_artifacts_collection_id", "collection_id"),
+        Index("idx_collection_artifacts_artifact_id", "artifact_id"),
+        Index("idx_collection_artifacts_added_at", "added_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CollectionArtifact."""
+        return (
+            f"<CollectionArtifact("
+            f"collection_id={self.collection_id!r}, "
+            f"artifact_id={self.artifact_id!r}, "
+            f"added_at={self.added_at!r})>"
+        )
 
 
 class MarketplaceEntry(Base):

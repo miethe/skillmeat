@@ -10,11 +10,13 @@ from . import (
     cache,
     collections,
     deployments,
+    groups,
     health,
     marketplace,
     marketplace_sources,
     mcp,
     projects,
+    user_collections,
 )
 
 __all__ = [
@@ -24,9 +26,11 @@ __all__ = [
     "cache",
     "collections",
     "deployments",
+    "groups",
     "health",
     "marketplace",
     "marketplace_sources",
     "mcp",
     "projects",
+    "user_collections",
 ]
