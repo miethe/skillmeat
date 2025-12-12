@@ -3,14 +3,30 @@
 This package contains all API route handlers organized by domain.
 """
 
-from . import analytics, artifacts, bundles, collections, deployments, health, marketplace
+from . import (
+    analytics,
+    artifacts,
+    bundles,
+    cache,
+    collections,
+    deployments,
+    health,
+    marketplace,
+    marketplace_sources,
+    mcp,
+    projects,
+)
 
 __all__ = [
-    "health",
-    "collections",
-    "artifacts",
     "analytics",
+    "artifacts",
     "bundles",
+    "cache",
+    "collections",
     "deployments",
+    "health",
     "marketplace",
+    "marketplace_sources",
+    "mcp",
+    "projects",
 ]

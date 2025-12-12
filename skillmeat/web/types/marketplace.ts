@@ -104,3 +104,117 @@ export interface PublishFormData {
   homepage?: string;
   repository?: string;
 }
+
+// ============================================================================
+// GitHub Source Management Types
+// ============================================================================
+
+export type TrustLevel = 'untrusted' | 'basic' | 'verified' | 'official';
+export type ScanStatus = 'pending' | 'scanning' | 'success' | 'error';
+export type CatalogStatus = 'new' | 'updated' | 'removed' | 'imported';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook';
+
+export interface GitHubSource {
+  id: string;
+  repo_url: string;
+  owner: string;
+  repo_name: string;
+  ref: string;
+  root_hint?: string;
+  trust_level: TrustLevel;
+  visibility: 'public' | 'private';
+  scan_status: ScanStatus;
+  artifact_count: number;
+  last_sync_at?: string;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+  description?: string;
+  notes?: string;
+}
+
+export interface GitHubSourceListResponse {
+  items: GitHubSource[];
+  page_info: PageInfo;
+}
+
+export interface CreateSourceRequest {
+  repo_url: string;
+  ref?: string;
+  root_hint?: string;
+  access_token?: string;
+  manual_map?: Record<string, string[]>;
+  trust_level?: TrustLevel;
+  description?: string;
+  notes?: string;
+}
+
+export interface UpdateSourceRequest {
+  ref?: string;
+  root_hint?: string;
+  trust_level?: TrustLevel;
+  manual_map?: Record<string, string[]>;
+  description?: string;
+  notes?: string;
+}
+
+export interface CatalogEntry {
+  id: string;
+  source_id: string;
+  artifact_type: ArtifactType;
+  name: string;
+  path: string;
+  upstream_url: string;
+  detected_version?: string;
+  detected_sha?: string;
+  detected_at: string;
+  confidence_score: number;
+  status: CatalogStatus;
+  import_date?: string;
+  import_id?: string;
+}
+
+export interface CatalogListResponse {
+  items: CatalogEntry[];
+  page_info: PageInfo;
+  counts_by_status: Record<string, number>;
+  counts_by_type: Record<string, number>;
+}
+
+export interface CatalogFilters {
+  artifact_type?: ArtifactType;
+  status?: CatalogStatus;
+  min_confidence?: number;
+  search?: string;
+}
+
+export interface ScanRequest {
+  force?: boolean;
+}
+
+export interface ScanResult {
+  source_id: string;
+  status: 'success' | 'error' | 'partial';
+  artifacts_found: number;
+  new_count: number;
+  updated_count: number;
+  removed_count: number;
+  unchanged_count: number;
+  scan_duration_ms: number;
+  errors: string[];
+  scanned_at: string;
+}
+
+export interface ImportRequest {
+  entry_ids: string[];
+  conflict_strategy: 'skip' | 'overwrite' | 'rename';
+}
+
+export interface ImportResult {
+  imported_count: number;
+  skipped_count: number;
+  error_count: number;
+  imported_ids: string[];
+  skipped_ids: string[];
+  errors: Array<{ entry_id: string; error: string }>;
+}

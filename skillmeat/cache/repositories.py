@@ -1,0 +1,1933 @@
+"""Repository pattern implementation for marketplace entities.
+
+This module provides repository classes for marketplace data access following
+the Repository pattern. These repositories abstract SQLAlchemy session management
+and provide type-safe CRUD operations for marketplace-related entities.
+
+Single-User Architecture Decision:
+    SkillMeat is designed as a PERSONAL COLLECTION MANAGER - single user only.
+    SQLite does not support PostgreSQL Row-Level Security (RLS) natively.
+
+    Current Implementation:
+        - No user_id scoping (single user assumed)
+        - Repository methods operate on all data
+        - Session management per-operation pattern
+
+    Future Multi-Tenancy Extension Path:
+        If multi-user support is needed in the future:
+        1. Add user_id column to MarketplaceSource and MarketplaceCatalogEntry models
+        2. Add user_id parameter to all repository methods
+        3. Filter queries by user_id in BaseRepository._apply_user_scope()
+        4. Migrate to PostgreSQL for proper RLS support
+
+        Example extension pattern:
+            class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
+                def list_all(self, user_id: Optional[str] = None) -> List[MarketplaceSource]:
+                    session = self._get_session()
+                    try:
+                        query = session.query(MarketplaceSource)
+                        if user_id:  # Apply scoping if multi-tenant
+                            query = query.filter(MarketplaceSource.user_id == user_id)
+                        return query.all()
+                    finally:
+                        session.close()
+
+Repositories:
+    - BaseRepository: Common CRUD patterns and session management
+    - MarketplaceSourceRepository: GitHub repository source management
+    - MarketplaceCatalogRepository: Discovered artifact management
+
+Usage:
+    >>> from skillmeat.cache.repositories import (
+    ...     MarketplaceSourceRepository,
+    ...     MarketplaceCatalogRepository
+    ... )
+    >>>
+    >>> # Create repositories
+    >>> source_repo = MarketplaceSourceRepository()
+    >>> catalog_repo = MarketplaceCatalogRepository()
+    >>>
+    >>> # CRUD operations
+    >>> source = source_repo.get_by_repo_url("https://github.com/user/repo")
+    >>> entries = catalog_repo.list_by_source(source.id)
+    >>>
+    >>> # Bulk operations
+    >>> new_entries = [entry1, entry2, entry3]
+    >>> created = catalog_repo.bulk_create(new_entries)
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Generator, Generic, List, Optional, Type, TypeVar
+
+from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session
+
+from skillmeat.cache.models import (
+    Base,
+    MarketplaceCatalogEntry,
+    MarketplaceSource,
+    create_db_engine,
+    create_tables,
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Generic type for ORM models
+T = TypeVar("T", bound=Base)
+
+
+# =============================================================================
+# Pagination Result
+# =============================================================================
+
+
+@dataclass
+class PaginatedResult(Generic[T]):
+    """Paginated query result container.
+
+    Provides cursor-based pagination for efficient querying of large datasets
+    without the offset/limit performance penalty.
+
+    Attributes:
+        items: List of items for the current page
+        next_cursor: Cursor value for fetching next page (None if no more)
+        has_more: True if more items exist after this page
+        total: Optional total count of items (expensive to compute)
+
+    Example:
+        >>> # First page
+        >>> result = repo.list_paginated(limit=50)
+        >>> for item in result.items:
+        ...     print(item.name)
+        >>>
+        >>> # Next page
+        >>> if result.has_more:
+        ...     next_result = repo.list_paginated(limit=50, cursor=result.next_cursor)
+    """
+
+    items: List[T]
+    next_cursor: Optional[str]
+    has_more: bool
+    total: Optional[int] = None  # Optional total count
+
+
+@dataclass
+class CatalogDiff:
+    """Result of comparing old and new catalog entries.
+
+    Used to identify changes when scanning a marketplace source and comparing
+    against existing catalog entries. Enables efficient bulk updates.
+
+    Attributes:
+        new: Entries to create (in new_entries but not in DB)
+        updated: Entries to update as (existing_id, new_data) pairs
+        removed: Entry IDs to mark as removed (in DB but not in new_entries)
+        unchanged: Entry IDs that haven't changed (matching URL and SHA)
+
+    Example:
+        >>> diff = repo.compare_catalogs("source-123", new_entries)
+        >>> print(f"New: {len(diff.new)}, Updated: {len(diff.updated)}")
+        >>> for entry_data in diff.new:
+        ...     # Create new catalog entry
+        ...     pass
+    """
+
+    new: List[Dict[str, Any]]  # Entries to create
+    updated: List[tuple[str, Dict[str, Any]]]  # (existing_id, new_data) pairs
+    removed: List[str]  # Entry IDs to mark as removed
+    unchanged: List[str]  # Entry IDs that haven't changed
+
+
+# =============================================================================
+# Custom Exceptions
+# =============================================================================
+
+
+class RepositoryError(Exception):
+    """Base exception for repository errors."""
+
+    pass
+
+
+class NotFoundError(RepositoryError):
+    """Raised when a requested entity is not found."""
+
+    pass
+
+
+class ConstraintError(RepositoryError):
+    """Raised when a database constraint is violated."""
+
+    pass
+
+
+# =============================================================================
+# Base Repository
+# =============================================================================
+
+
+class BaseRepository(Generic[T]):
+    """Base repository with common CRUD patterns and session management.
+
+    Provides reusable patterns for data access operations that can be
+    inherited by specific repository implementations. Handles session
+    lifecycle, transaction management, and error handling.
+
+    Type Parameters:
+        T: SQLAlchemy ORM model type
+
+    Attributes:
+        db_path: Path to SQLite database file
+        engine: SQLAlchemy engine for database connections
+        model_class: ORM model class for type-safe operations
+
+    Example:
+        >>> class UserRepository(BaseRepository[User]):
+        ...     def __init__(self, db_path: Optional[str] = None):
+        ...         super().__init__(db_path, User)
+        ...
+        ...     def get_by_email(self, email: str) -> Optional[User]:
+        ...         session = self._get_session()
+        ...         try:
+        ...             return session.query(User).filter_by(email=email).first()
+        ...         finally:
+        ...             session.close()
+    """
+
+    # Retry configuration for transient SQLite errors
+    MAX_RETRIES = 3
+    RETRY_DELAY_MS = 100
+
+    def __init__(
+        self, db_path: Optional[str | Path] = None, model_class: Type[T] = None
+    ):
+        """Initialize repository with database path and model class.
+
+        Args:
+            db_path: Optional path to database file (uses default if None)
+            model_class: SQLAlchemy ORM model class
+        """
+        # Resolve database path
+        if db_path is None:
+            self.db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
+        else:
+            self.db_path = Path(db_path)
+
+        # Ensure parent directory exists
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create engine
+        self.engine = create_db_engine(self.db_path)
+
+        # Create tables if they don't exist
+        create_tables(self.db_path)
+
+        # Store model class for type-safe operations
+        self.model_class = model_class
+
+        logger.debug(
+            f"Initialized {self.__class__.__name__} with database: {self.db_path}"
+        )
+
+    def _get_session(self) -> Session:
+        """Create a new database session.
+
+        Returns:
+            SQLAlchemy Session instance
+
+        Note:
+            Sessions should be closed after use. Prefer using the
+            transaction() context manager for automatic cleanup.
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        SessionLocal = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine,
+        )
+        return SessionLocal()
+
+    @contextmanager
+    def transaction(self) -> Generator[Session, None, None]:
+        """Context manager for transactional operations.
+
+        Automatically commits on success, rolls back on error, and closes
+        the session. Provides automatic cleanup and error handling.
+
+        Yields:
+            SQLAlchemy Session instance
+
+        Raises:
+            RepositoryError: If operation fails
+
+        Example:
+            >>> with repo.transaction() as session:
+            ...     entity = MyModel(id="123", name="Test")
+            ...     session.add(entity)
+            ...     # Automatic commit on success
+        """
+        session = self._get_session()
+        try:
+            yield session
+            session.commit()
+            logger.debug(f"Transaction committed successfully")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Transaction rolled back due to error: {e}")
+            raise RepositoryError(f"Transaction failed: {e}") from e
+        finally:
+            session.close()
+
+
+# =============================================================================
+# Transaction Contexts
+# =============================================================================
+
+
+class ScanUpdateContext:
+    """Context for scan update operations within a transaction.
+
+    Provides helper methods for atomically updating both MarketplaceSource
+    and MarketplaceCatalogEntry records during a scan completion.
+
+    The session is managed by MarketplaceTransactionHandler - do not close it
+    within this context.
+
+    Attributes:
+        session: Active SQLAlchemy session
+        source_id: ID of the marketplace source being updated
+
+    Example:
+        >>> # Used within scan_update_transaction context manager
+        >>> with handler.scan_update_transaction(source_id) as ctx:
+        ...     ctx.update_source_status("success", artifact_count=5)
+        ...     ctx.replace_catalog_entries(new_entries)
+    """
+
+    def __init__(self, session: Session, source_id: str):
+        """Initialize scan update context.
+
+        Args:
+            session: Active SQLAlchemy session
+            source_id: ID of the marketplace source being updated
+        """
+        self.session = session
+        self.source_id = source_id
+
+    def update_source_status(
+        self,
+        status: str,
+        artifact_count: Optional[int] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Update source scan status and metadata.
+
+        Updates scan_status, last_sync_at, artifact_count, and optionally
+        last_error for a marketplace source.
+
+        Args:
+            status: New scan status ("pending", "scanning", "success", "error")
+            artifact_count: Number of artifacts discovered (None to leave unchanged)
+            error_message: Error message if status is "error" (None clears error)
+
+        Raises:
+            NotFoundError: If source does not exist
+
+        Example:
+            >>> # Mark scan as successful
+            >>> ctx.update_source_status("success", artifact_count=10)
+            >>>
+            >>> # Mark scan as failed
+            >>> ctx.update_source_status("error", error_message="API rate limit")
+        """
+        source = (
+            self.session.query(MarketplaceSource).filter_by(id=self.source_id).first()
+        )
+        if not source:
+            raise NotFoundError(f"Source not found: {self.source_id}")
+
+        # Update scan status
+        source.scan_status = status
+        source.last_sync_at = datetime.utcnow()
+
+        # Update artifact count if provided
+        if artifact_count is not None:
+            source.artifact_count = artifact_count
+
+        # Update error message (None clears it)
+        source.last_error = error_message
+
+        logger.info(
+            f"Updated source {self.source_id}: status={status}, "
+            f"count={artifact_count}, error={error_message}"
+        )
+
+    def replace_catalog_entries(self, entries: List[MarketplaceCatalogEntry]) -> int:
+        """Delete existing entries and insert new ones atomically.
+
+        Removes all existing catalog entries for this source and replaces
+        them with the provided list. This is the typical pattern after
+        a full repository scan.
+
+        Args:
+            entries: List of new MarketplaceCatalogEntry instances
+
+        Returns:
+            Number of entries inserted
+
+        Example:
+            >>> new_entries = [entry1, entry2, entry3]
+            >>> count = ctx.replace_catalog_entries(new_entries)
+            >>> print(f"Replaced with {count} new entries")
+        """
+        # Delete existing entries for this source
+        deleted_count = (
+            self.session.query(MarketplaceCatalogEntry)
+            .filter_by(source_id=self.source_id)
+            .delete(synchronize_session=False)
+        )
+        logger.debug(
+            f"Deleted {deleted_count} existing entries for source {self.source_id}"
+        )
+
+        # Insert new entries
+        if entries:
+            self.session.bulk_save_objects(entries)
+            logger.info(
+                f"Inserted {len(entries)} new entries for source {self.source_id}"
+            )
+
+        return len(entries)
+
+    def update_entry_statuses(self, status_updates: Dict[str, str]) -> int:
+        """Bulk update entry statuses.
+
+        Updates status for multiple catalog entries efficiently. Useful for
+        marking specific entries as updated, removed, etc.
+
+        Args:
+            status_updates: Dictionary mapping entry_id -> new_status
+
+        Returns:
+            Number of entries updated
+
+        Example:
+            >>> status_updates = {
+            ...     "entry-1": "updated",
+            ...     "entry-2": "removed",
+            ...     "entry-3": "updated"
+            ... }
+            >>> count = ctx.update_entry_statuses(status_updates)
+        """
+        if not status_updates:
+            return 0
+
+        updated_count = 0
+        for entry_id, new_status in status_updates.items():
+            result = (
+                self.session.query(MarketplaceCatalogEntry)
+                .filter_by(id=entry_id, source_id=self.source_id)
+                .update(
+                    {"status": new_status, "updated_at": datetime.utcnow()},
+                    synchronize_session=False,
+                )
+            )
+            updated_count += result
+
+        logger.info(
+            f"Updated {updated_count} entry statuses for source {self.source_id}"
+        )
+        return updated_count
+
+
+class ImportContext:
+    """Context for import operations within a transaction.
+
+    Provides helper methods for tracking artifact imports from catalog
+    to collection, including status updates and error tracking.
+
+    The session is managed by MarketplaceTransactionHandler - do not close it
+    within this context.
+
+    Attributes:
+        session: Active SQLAlchemy session
+        source_id: ID of the marketplace source (for validation)
+
+    Example:
+        >>> # Used within import_transaction context manager
+        >>> with handler.import_transaction(source_id) as ctx:
+        ...     ctx.mark_imported(["entry-1", "entry-2"], import_id="imp-123")
+        ...     ctx.mark_failed(["entry-3"], error="Validation failed")
+    """
+
+    def __init__(self, session: Session, source_id: str):
+        """Initialize import context.
+
+        Args:
+            session: Active SQLAlchemy session
+            source_id: ID of the marketplace source
+        """
+        self.session = session
+        self.source_id = source_id
+
+    def mark_imported(self, entry_ids: List[str], import_id: str) -> int:
+        """Mark entries as imported with timestamp and import reference.
+
+        Updates status to "imported", sets import_date, and stores the
+        import_id in metadata for traceability.
+
+        Args:
+            entry_ids: List of catalog entry IDs to mark as imported
+            import_id: Unique identifier for this import operation
+
+        Returns:
+            Number of entries updated
+
+        Example:
+            >>> import_id = str(uuid.uuid4())
+            >>> count = ctx.mark_imported(["entry-1", "entry-2"], import_id)
+        """
+        if not entry_ids:
+            return 0
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id in entry_ids:
+            entry = (
+                self.session.query(MarketplaceCatalogEntry)
+                .filter_by(id=entry_id, source_id=self.source_id)
+                .first()
+            )
+            if entry:
+                entry.status = "imported"
+                entry.import_date = now
+                entry.updated_at = now
+
+                # Store import_id in metadata using the model's helper method
+                metadata = entry.get_metadata_dict() or {}
+                metadata["import_id"] = import_id
+                entry.set_metadata_dict(metadata)
+
+                updated_count += 1
+
+        logger.info(
+            f"Marked {updated_count} entries as imported (import_id={import_id})"
+        )
+        return updated_count
+
+    def mark_failed(self, entry_ids: List[str], error: str) -> int:
+        """Mark entries as failed import with error message.
+
+        Stores error information in metadata_json while leaving status
+        unchanged. This allows retrying imports without losing the
+        original detection status.
+
+        Args:
+            entry_ids: List of catalog entry IDs that failed to import
+            error: Error message describing the failure
+
+        Returns:
+            Number of entries updated
+
+        Example:
+            >>> count = ctx.mark_failed(
+            ...     ["entry-1"],
+            ...     error="Schema validation failed: missing required field"
+            ... )
+        """
+        if not entry_ids:
+            return 0
+
+        updated_count = 0
+        now = datetime.utcnow()
+
+        for entry_id in entry_ids:
+            entry = (
+                self.session.query(MarketplaceCatalogEntry)
+                .filter_by(id=entry_id, source_id=self.source_id)
+                .first()
+            )
+            if entry:
+                # Store error in metadata without changing status using the model's helper method
+                metadata = entry.get_metadata_dict() or {}
+                metadata["import_error"] = error
+                metadata["import_error_at"] = now.isoformat()
+                entry.set_metadata_dict(metadata)
+
+                entry.updated_at = now
+                updated_count += 1
+
+        logger.warning(f"Marked {updated_count} entries as failed import: {error}")
+        return updated_count
+
+
+# =============================================================================
+# Transaction Handler
+# =============================================================================
+
+
+class MarketplaceTransactionHandler:
+    """Coordinates transactional operations across marketplace repositories.
+
+    Use this for operations that need to update both MarketplaceSource and
+    MarketplaceCatalogEntry atomically (e.g., after a scan completes).
+
+    This handler ensures that complex multi-table operations either fully
+    succeed or fully rollback on error, maintaining database consistency.
+
+    Attributes:
+        db_path: Path to SQLite database file
+        engine: SQLAlchemy engine for database connections
+
+    Example:
+        >>> handler = MarketplaceTransactionHandler()
+        >>> with handler.scan_update_transaction(source_id) as ctx:
+        ...     ctx.update_source_status("success", artifact_count=5)
+        ...     ctx.replace_catalog_entries(new_entries)
+        ...     # Automatic commit on success, rollback on error
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize transaction handler with database path.
+
+        Args:
+            db_path: Optional path to database file (uses default if None)
+        """
+        # Resolve database path
+        if db_path is None:
+            self.db_path = Path.home() / ".skillmeat" / "cache" / "cache.db"
+        else:
+            self.db_path = Path(db_path)
+
+        # Ensure parent directory exists
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create engine
+        self.engine = create_db_engine(self.db_path)
+
+        # Create tables if they don't exist
+        create_tables(self.db_path)
+
+        logger.debug(f"Initialized MarketplaceTransactionHandler: {self.db_path}")
+
+    def _get_session(self) -> Session:
+        """Create a new database session.
+
+        Returns:
+            SQLAlchemy Session instance
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        SessionLocal = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine,
+        )
+        return SessionLocal()
+
+    @contextmanager
+    def scan_update_transaction(
+        self, source_id: str
+    ) -> Generator[ScanUpdateContext, None, None]:
+        """Context manager for updating source and catalog after a scan.
+
+        Provides atomic update of:
+        - MarketplaceSource.scan_status, last_sync_at, artifact_count, last_error
+        - MarketplaceCatalogEntry bulk delete and recreate
+
+        On error, rolls back all changes. On success, commits all changes.
+
+        Args:
+            source_id: The marketplace source being updated
+
+        Yields:
+            ScanUpdateContext with helper methods
+
+        Raises:
+            RepositoryError: If transaction fails
+
+        Example:
+            >>> handler = MarketplaceTransactionHandler()
+            >>> with handler.scan_update_transaction("source-123") as ctx:
+            ...     # Update source metadata
+            ...     ctx.update_source_status("success", artifact_count=10)
+            ...
+            ...     # Replace catalog entries atomically
+            ...     new_entries = scan_repository(source)
+            ...     ctx.replace_catalog_entries(new_entries)
+            ...
+            ...     # Transaction commits automatically on success
+        """
+        session = self._get_session()
+        try:
+            logger.debug(f"Starting scan update transaction for source {source_id}")
+
+            # Yield context for operation
+            context = ScanUpdateContext(session, source_id)
+            yield context
+
+            # Commit on success
+            session.commit()
+            logger.info(f"Scan update transaction committed for source {source_id}")
+
+        except IntegrityError as e:
+            session.rollback()
+            logger.error(f"Scan update transaction failed (integrity): {e}")
+            raise RepositoryError(
+                f"Scan update failed due to integrity constraint: {e}"
+            ) from e
+
+        except OperationalError as e:
+            session.rollback()
+            logger.error(f"Scan update transaction failed (operational): {e}")
+            raise RepositoryError(
+                f"Scan update failed due to database error: {e}"
+            ) from e
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Scan update transaction failed: {e}")
+            raise RepositoryError(f"Scan update transaction failed: {e}") from e
+
+        finally:
+            session.close()
+
+    @contextmanager
+    def import_transaction(
+        self, source_id: str
+    ) -> Generator[ImportContext, None, None]:
+        """Context manager for importing artifacts from catalog to collection.
+
+        Tracks which entries are being imported and updates their status
+        atomically. Use this when processing multiple catalog entries
+        in a single import operation.
+
+        Args:
+            source_id: The marketplace source being imported from
+
+        Yields:
+            ImportContext with helper methods
+
+        Raises:
+            RepositoryError: If transaction fails
+
+        Example:
+            >>> handler = MarketplaceTransactionHandler()
+            >>> with handler.import_transaction("source-123") as ctx:
+            ...     import_id = str(uuid.uuid4())
+            ...
+            ...     # Try to import entries
+            ...     for entry_id in entries_to_import:
+            ...         try:
+            ...             import_artifact(entry_id)
+            ...             successful_ids.append(entry_id)
+            ...         except Exception as e:
+            ...             failed_ids.append(entry_id)
+            ...
+            ...     # Update statuses atomically
+            ...     ctx.mark_imported(successful_ids, import_id)
+            ...     ctx.mark_failed(failed_ids, str(e))
+            ...
+            ...     # Transaction commits automatically
+        """
+        session = self._get_session()
+        try:
+            logger.debug(f"Starting import transaction for source {source_id}")
+
+            # Yield context for operation
+            context = ImportContext(session, source_id)
+            yield context
+
+            # Commit on success
+            session.commit()
+            logger.info(f"Import transaction committed for source {source_id}")
+
+        except IntegrityError as e:
+            session.rollback()
+            logger.error(f"Import transaction failed (integrity): {e}")
+            raise RepositoryError(
+                f"Import failed due to integrity constraint: {e}"
+            ) from e
+
+        except OperationalError as e:
+            session.rollback()
+            logger.error(f"Import transaction failed (operational): {e}")
+            raise RepositoryError(f"Import failed due to database error: {e}") from e
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Import transaction failed: {e}")
+            raise RepositoryError(f"Import transaction failed: {e}") from e
+
+        finally:
+            session.close()
+
+
+# =============================================================================
+# MarketplaceSource Repository
+# =============================================================================
+
+
+class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
+    """Repository for GitHub repository source management.
+
+    Provides CRUD operations for MarketplaceSource entities, which represent
+    GitHub repositories that can be scanned for Claude Code artifacts.
+
+    Methods:
+        - get_by_id: Retrieve source by ID
+        - get_by_repo_url: Retrieve source by repository URL (unique)
+        - list_all: List all sources
+        - create: Create new source
+        - update: Update existing source
+        - delete: Delete source (cascade deletes catalog entries)
+
+    Example:
+        >>> repo = MarketplaceSourceRepository()
+        >>>
+        >>> # Create a new source
+        >>> source = MarketplaceSource(
+        ...     id=str(uuid.uuid4()),
+        ...     repo_url="https://github.com/anthropics/anthropic-quickstarts",
+        ...     owner="anthropics",
+        ...     repo_name="anthropic-quickstarts",
+        ...     ref="main",
+        ...     trust_level="official",
+        ... )
+        >>> created = repo.create(source)
+        >>>
+        >>> # Find by URL
+        >>> found = repo.get_by_repo_url("https://github.com/anthropics/anthropic-quickstarts")
+        >>>
+        >>> # Update scan status
+        >>> found.scan_status = "success"
+        >>> found.last_sync_at = datetime.utcnow()
+        >>> updated = repo.update(found)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize MarketplaceSource repository.
+
+        Args:
+            db_path: Optional path to database file
+        """
+        super().__init__(db_path, MarketplaceSource)
+
+    def get_by_id(self, source_id: str) -> Optional[MarketplaceSource]:
+        """Retrieve marketplace source by ID.
+
+        Args:
+            source_id: Unique source identifier
+
+        Returns:
+            MarketplaceSource instance or None if not found
+        """
+        session = self._get_session()
+        try:
+            return session.query(MarketplaceSource).filter_by(id=source_id).first()
+        finally:
+            session.close()
+
+    def get_by_repo_url(self, repo_url: str) -> Optional[MarketplaceSource]:
+        """Retrieve marketplace source by repository URL.
+
+        Repository URLs are unique per source. This is the primary lookup
+        method for checking if a source already exists.
+
+        Args:
+            repo_url: Full GitHub repository URL
+
+        Returns:
+            MarketplaceSource instance or None if not found
+
+        Example:
+            >>> source = repo.get_by_repo_url("https://github.com/user/repo")
+        """
+        session = self._get_session()
+        try:
+            return session.query(MarketplaceSource).filter_by(repo_url=repo_url).first()
+        finally:
+            session.close()
+
+    def list_all(self) -> List[MarketplaceSource]:
+        """List all marketplace sources.
+
+        Returns:
+            List of all MarketplaceSource instances
+
+        Note:
+            Single-user architecture - no scoping applied.
+            For multi-tenancy, add user_id parameter and filter.
+        """
+        session = self._get_session()
+        try:
+            return session.query(MarketplaceSource).all()
+        finally:
+            session.close()
+
+    def create(self, source: MarketplaceSource) -> MarketplaceSource:
+        """Create a new marketplace source.
+
+        Args:
+            source: MarketplaceSource instance to create
+
+        Returns:
+            Created MarketplaceSource instance
+
+        Raises:
+            ConstraintError: If repo_url already exists (unique constraint)
+
+        Example:
+            >>> source = MarketplaceSource(
+            ...     id=str(uuid.uuid4()),
+            ...     repo_url="https://github.com/user/repo",
+            ...     owner="user",
+            ...     repo_name="repo",
+            ... )
+            >>> created = repo.create(source)
+        """
+        session = self._get_session()
+        try:
+            session.add(source)
+            session.commit()
+            session.refresh(source)
+            logger.info(f"Created marketplace source: {source.id} ({source.repo_url})")
+            return source
+        except IntegrityError as e:
+            session.rollback()
+            raise ConstraintError(f"Source with repo_url already exists: {e}") from e
+        finally:
+            session.close()
+
+    def update(self, source: MarketplaceSource) -> MarketplaceSource:
+        """Update an existing marketplace source.
+
+        Args:
+            source: MarketplaceSource instance with updated values
+
+        Returns:
+            Updated MarketplaceSource instance
+
+        Raises:
+            NotFoundError: If source does not exist
+
+        Example:
+            >>> source = repo.get_by_id("source-123")
+            >>> source.scan_status = "success"
+            >>> source.artifact_count = 5
+            >>> updated = repo.update(source)
+        """
+        session = self._get_session()
+        try:
+            # Ensure entity exists
+            existing = session.query(MarketplaceSource).filter_by(id=source.id).first()
+            if not existing:
+                raise NotFoundError(f"Source not found: {source.id}")
+
+            # Merge changes and get the merged instance
+            merged = session.merge(source)
+            session.commit()
+            session.refresh(merged)
+            logger.info(f"Updated marketplace source: {source.id}")
+            return merged
+        finally:
+            session.close()
+
+    def delete(self, source_id: str) -> bool:
+        """Delete a marketplace source.
+
+        This performs a hard delete (actually removes from database).
+        Cascade deletes all associated catalog entries.
+
+        Args:
+            source_id: Unique source identifier
+
+        Returns:
+            True if deleted, False if not found
+
+        Example:
+            >>> deleted = repo.delete("source-123")
+        """
+        session = self._get_session()
+        try:
+            source = session.query(MarketplaceSource).filter_by(id=source_id).first()
+            if not source:
+                return False
+
+            session.delete(source)
+            session.commit()
+            logger.info(f"Deleted marketplace source: {source_id}")
+            return True
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-001: Enhanced Query Methods
+    # =========================================================================
+
+    def list_paginated(
+        self, limit: int = 50, cursor: Optional[str] = None
+    ) -> PaginatedResult[MarketplaceSource]:
+        """List marketplace sources with cursor-based pagination.
+
+        Uses ID-based cursor pagination for stable, efficient paging through
+        large result sets without the performance penalty of OFFSET.
+
+        Args:
+            limit: Maximum number of items per page (default: 50)
+            cursor: Cursor from previous page (None for first page)
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag
+
+        Example:
+            >>> # First page
+            >>> result = repo.list_paginated(limit=50)
+            >>> for source in result.items:
+            ...     print(source.repo_url)
+            >>>
+            >>> # Next page
+            >>> if result.has_more:
+            ...     next_result = repo.list_paginated(limit=50, cursor=result.next_cursor)
+        """
+        session = self._get_session()
+        try:
+            query = session.query(MarketplaceSource)
+
+            # Apply cursor filter if provided
+            if cursor:
+                query = query.filter(MarketplaceSource.id > cursor)
+
+            # Order by ID for stable pagination
+            query = query.order_by(MarketplaceSource.id)
+
+            # Fetch limit + 1 to check if more items exist
+            items = query.limit(limit + 1).all()
+
+            # Determine if more items exist
+            has_more = len(items) > limit
+            if has_more:
+                items = items[:limit]
+
+            # Generate next cursor from last item's ID
+            next_cursor = items[-1].id if items and has_more else None
+
+            logger.debug(
+                f"Listed {len(items)} sources (cursor={cursor}, has_more={has_more})"
+            )
+
+            return PaginatedResult(
+                items=items,
+                next_cursor=next_cursor,
+                has_more=has_more,
+            )
+        finally:
+            session.close()
+
+    def list_by_scan_status(self, status: str) -> List[MarketplaceSource]:
+        """List marketplace sources by scan status.
+
+        Args:
+            status: Scan status filter ("pending", "scanning", "success", "error")
+
+        Returns:
+            List of MarketplaceSource instances with matching status
+
+        Example:
+            >>> # Find all sources that failed to scan
+            >>> failed = repo.list_by_scan_status("error")
+            >>> for source in failed:
+            ...     print(f"{source.repo_url}: {source.last_error}")
+        """
+        session = self._get_session()
+        try:
+            sources = (
+                session.query(MarketplaceSource)
+                .filter_by(scan_status=status)
+                .order_by(MarketplaceSource.updated_at.desc())
+                .all()
+            )
+            logger.debug(f"Found {len(sources)} sources with status '{status}'")
+            return sources
+        finally:
+            session.close()
+
+    def list_needs_rescan(self, hours: int = 24) -> List[MarketplaceSource]:
+        """List marketplace sources that need rescanning.
+
+        Identifies sources that haven't been successfully scanned in the
+        specified time period, useful for periodic refresh jobs.
+
+        Args:
+            hours: Time threshold in hours (default: 24)
+
+        Returns:
+            List of MarketplaceSource instances needing rescan
+
+        Example:
+            >>> # Find sources not scanned in 48 hours
+            >>> stale = repo.list_needs_rescan(hours=48)
+            >>> for source in stale:
+            ...     print(f"Rescan needed: {source.repo_url}")
+        """
+        session = self._get_session()
+        try:
+            threshold = datetime.utcnow() - timedelta(hours=hours)
+
+            # Sources that need rescanning are those where:
+            # 1. Never synced (last_sync_at is NULL), OR
+            # 2. Last sync older than threshold, OR
+            # 3. Last scan resulted in error
+            sources = (
+                session.query(MarketplaceSource)
+                .filter(
+                    or_(
+                        MarketplaceSource.last_sync_at.is_(None),
+                        MarketplaceSource.last_sync_at < threshold,
+                        MarketplaceSource.scan_status == "error",
+                    )
+                )
+                .order_by(
+                    MarketplaceSource.last_sync_at.asc().nullsfirst()
+                )  # Never-scanned first
+                .all()
+            )
+
+            logger.debug(
+                f"Found {len(sources)} sources needing rescan "
+                f"(threshold: {hours} hours)"
+            )
+            return sources
+        finally:
+            session.close()
+
+    def upsert(self, source: MarketplaceSource) -> MarketplaceSource:
+        """Create or update a marketplace source by repo_url.
+
+        Performs an upsert operation: creates if doesn't exist, updates if it does.
+        Uses repo_url as the unique identifier for matching.
+
+        Args:
+            source: MarketplaceSource instance to create or update
+
+        Returns:
+            Created or updated MarketplaceSource instance
+
+        Example:
+            >>> source = MarketplaceSource(
+            ...     id=str(uuid.uuid4()),
+            ...     repo_url="https://github.com/user/repo",
+            ...     owner="user",
+            ...     repo_name="repo",
+            ...     trust_level="basic",
+            ... )
+            >>> result = repo.upsert(source)
+            >>> # If exists, updates; if new, creates
+        """
+        session = self._get_session()
+        try:
+            # Check if source exists by repo_url
+            existing = (
+                session.query(MarketplaceSource)
+                .filter_by(repo_url=source.repo_url)
+                .first()
+            )
+
+            if existing:
+                # Update existing source (preserve ID)
+                source.id = existing.id
+                merged = session.merge(source)
+                session.commit()
+                session.refresh(merged)
+                logger.info(
+                    f"Updated marketplace source: {merged.id} ({merged.repo_url})"
+                )
+                return merged
+            else:
+                # Create new source
+                session.add(source)
+                session.commit()
+                session.refresh(source)
+                logger.info(
+                    f"Created marketplace source: {source.id} ({source.repo_url})"
+                )
+                return source
+        except IntegrityError as e:
+            session.rollback()
+            raise ConstraintError(f"Upsert failed due to constraint: {e}") from e
+        finally:
+            session.close()
+
+
+# =============================================================================
+# MarketplaceCatalog Repository
+# =============================================================================
+
+
+class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
+    """Repository for discovered artifact management.
+
+    Provides CRUD and query operations for MarketplaceCatalogEntry entities,
+    which represent artifacts detected during GitHub repository scanning.
+
+    Methods:
+        - get_by_id: Retrieve entry by ID
+        - list_by_source: List entries from a specific source
+        - list_by_status: List entries with a specific status
+        - find_by_upstream_url: Find entry by upstream URL (deduplication)
+        - bulk_create: Efficiently create multiple entries
+        - update_status: Update entry import status
+
+    Example:
+        >>> repo = MarketplaceCatalogRepository()
+        >>>
+        >>> # List all new artifacts from a source
+        >>> new_artifacts = repo.list_by_source("source-123")
+        >>>
+        >>> # Bulk create entries
+        >>> entries = [entry1, entry2, entry3]
+        >>> created = repo.bulk_create(entries)
+        >>>
+        >>> # Mark as imported
+        >>> repo.update_status(entry.id, "imported")
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize MarketplaceCatalog repository.
+
+        Args:
+            db_path: Optional path to database file
+        """
+        super().__init__(db_path, MarketplaceCatalogEntry)
+
+    def get_by_id(self, entry_id: str) -> Optional[MarketplaceCatalogEntry]:
+        """Retrieve catalog entry by ID.
+
+        Args:
+            entry_id: Unique catalog entry identifier
+
+        Returns:
+            MarketplaceCatalogEntry instance or None if not found
+        """
+        session = self._get_session()
+        try:
+            return session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+        finally:
+            session.close()
+
+    def list_by_source(self, source_id: str) -> List[MarketplaceCatalogEntry]:
+        """List all catalog entries from a specific source.
+
+        Args:
+            source_id: Marketplace source identifier
+
+        Returns:
+            List of MarketplaceCatalogEntry instances
+
+        Example:
+            >>> entries = repo.list_by_source("source-123")
+            >>> for entry in entries:
+            ...     print(f"{entry.name} ({entry.artifact_type}): {entry.status}")
+        """
+        session = self._get_session()
+        try:
+            return (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(source_id=source_id)
+                .all()
+            )
+        finally:
+            session.close()
+
+    def list_by_status(self, status: str) -> List[MarketplaceCatalogEntry]:
+        """List all catalog entries with a specific status.
+
+        Args:
+            status: Import status ("new", "updated", "removed", "imported")
+
+        Returns:
+            List of MarketplaceCatalogEntry instances
+
+        Example:
+            >>> # Find all new artifacts not yet imported
+            >>> new_entries = repo.list_by_status("new")
+        """
+        session = self._get_session()
+        try:
+            return session.query(MarketplaceCatalogEntry).filter_by(status=status).all()
+        finally:
+            session.close()
+
+    def find_by_upstream_url(self, url: str) -> Optional[MarketplaceCatalogEntry]:
+        """Find catalog entry by upstream URL.
+
+        Used for deduplication - check if an artifact URL has already been
+        discovered before creating a new catalog entry.
+
+        Args:
+            url: Full URL to artifact in repository
+
+        Returns:
+            MarketplaceCatalogEntry instance or None if not found
+
+        Example:
+            >>> existing = repo.find_by_upstream_url(
+            ...     "https://github.com/user/repo/blob/main/skills/my-skill"
+            ... )
+            >>> if existing:
+            ...     print("Already cataloged!")
+        """
+        session = self._get_session()
+        try:
+            return (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(upstream_url=url)
+                .first()
+            )
+        finally:
+            session.close()
+
+    def bulk_create(
+        self, entries: List[MarketplaceCatalogEntry]
+    ) -> List[MarketplaceCatalogEntry]:
+        """Create multiple catalog entries efficiently.
+
+        Uses bulk insert for performance when creating many entries at once
+        (e.g., after scanning a large repository).
+
+        Args:
+            entries: List of MarketplaceCatalogEntry instances to create
+
+        Returns:
+            List of created MarketplaceCatalogEntry instances
+
+        Raises:
+            RepositoryError: If bulk insert fails
+
+        Example:
+            >>> entries = [
+            ...     MarketplaceCatalogEntry(id=str(uuid.uuid4()), ...),
+            ...     MarketplaceCatalogEntry(id=str(uuid.uuid4()), ...),
+            ... ]
+            >>> created = repo.bulk_create(entries)
+        """
+        if not entries:
+            return []
+
+        session = self._get_session()
+        try:
+            session.bulk_save_objects(entries)
+            session.commit()
+            logger.info(f"Bulk created {len(entries)} catalog entries")
+            return entries
+        except Exception as e:
+            session.rollback()
+            raise RepositoryError(f"Bulk create failed: {e}") from e
+        finally:
+            session.close()
+
+    def update_status(self, entry_id: str, status: str) -> bool:
+        """Update catalog entry import status.
+
+        Args:
+            entry_id: Unique catalog entry identifier
+            status: New status ("new", "updated", "removed", "imported")
+
+        Returns:
+            True if updated, False if not found
+
+        Example:
+            >>> # Mark entry as imported
+            >>> repo.update_status("entry-123", "imported")
+        """
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                return False
+
+            entry.status = status
+            if status == "imported":
+                entry.import_date = datetime.utcnow()
+
+            session.commit()
+            logger.info(f"Updated catalog entry status: {entry_id} -> {status}")
+            return True
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-002: Enhanced Query Methods
+    # =========================================================================
+
+    def list_paginated(
+        self,
+        source_id: Optional[str] = None,
+        status: Optional[str] = None,
+        artifact_type: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> PaginatedResult[MarketplaceCatalogEntry]:
+        """List catalog entries with cursor-based pagination and filtering.
+
+        Uses ID-based cursor pagination for efficient querying. Supports
+        optional filtering by source, status, and artifact type.
+
+        Args:
+            source_id: Optional source ID filter
+            status: Optional status filter ("new", "updated", "removed", "imported")
+            artifact_type: Optional artifact type filter
+            limit: Maximum number of items per page (default: 50)
+            cursor: Cursor from previous page (None for first page)
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag
+
+        Example:
+            >>> # List all new skills
+            >>> result = repo.list_paginated(
+            ...     status="new",
+            ...     artifact_type="skill",
+            ...     limit=50
+            ... )
+            >>>
+            >>> # Next page
+            >>> if result.has_more:
+            ...     next_result = repo.list_paginated(
+            ...         status="new",
+            ...         artifact_type="skill",
+            ...         limit=50,
+            ...         cursor=result.next_cursor
+            ...     )
+        """
+        session = self._get_session()
+        try:
+            query = session.query(MarketplaceCatalogEntry)
+
+            # Apply filters
+            if source_id:
+                query = query.filter_by(source_id=source_id)
+            if status:
+                query = query.filter_by(status=status)
+            if artifact_type:
+                query = query.filter_by(artifact_type=artifact_type)
+
+            # Apply cursor filter if provided
+            if cursor:
+                query = query.filter(MarketplaceCatalogEntry.id > cursor)
+
+            # Order by ID for stable pagination
+            query = query.order_by(MarketplaceCatalogEntry.id)
+
+            # Fetch limit + 1 to check if more items exist
+            items = query.limit(limit + 1).all()
+
+            # Determine if more items exist
+            has_more = len(items) > limit
+            if has_more:
+                items = items[:limit]
+
+            # Generate next cursor from last item's ID
+            next_cursor = items[-1].id if items and has_more else None
+
+            logger.debug(
+                f"Listed {len(items)} catalog entries "
+                f"(source_id={source_id}, status={status}, "
+                f"type={artifact_type}, cursor={cursor}, has_more={has_more})"
+            )
+
+            return PaginatedResult(
+                items=items,
+                next_cursor=next_cursor,
+                has_more=has_more,
+            )
+        finally:
+            session.close()
+
+    def list_by_source_and_status(
+        self, source_id: str, status: str
+    ) -> List[MarketplaceCatalogEntry]:
+        """List catalog entries by source and status.
+
+        Args:
+            source_id: Marketplace source identifier
+            status: Import status filter
+
+        Returns:
+            List of MarketplaceCatalogEntry instances
+
+        Example:
+            >>> # Find all new artifacts from a specific source
+            >>> new_entries = repo.list_by_source_and_status("source-123", "new")
+        """
+        session = self._get_session()
+        try:
+            entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(source_id=source_id, status=status)
+                .order_by(MarketplaceCatalogEntry.detected_at.desc())
+                .all()
+            )
+            logger.debug(
+                f"Found {len(entries)} entries for source {source_id} "
+                f"with status '{status}'"
+            )
+            return entries
+        finally:
+            session.close()
+
+    def list_by_type(self, artifact_type: str) -> List[MarketplaceCatalogEntry]:
+        """List catalog entries by artifact type.
+
+        Args:
+            artifact_type: Artifact type filter ("skill", "command", etc.)
+
+        Returns:
+            List of MarketplaceCatalogEntry instances
+
+        Example:
+            >>> # Find all detected skills
+            >>> skills = repo.list_by_type("skill")
+        """
+        session = self._get_session()
+        try:
+            entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(artifact_type=artifact_type)
+                .order_by(MarketplaceCatalogEntry.detected_at.desc())
+                .all()
+            )
+            logger.debug(f"Found {len(entries)} entries of type '{artifact_type}'")
+            return entries
+        finally:
+            session.close()
+
+    def filter_by_confidence_range(
+        self, min_score: int, max_score: int = 100
+    ) -> List[MarketplaceCatalogEntry]:
+        """Filter catalog entries by confidence score range.
+
+        Args:
+            min_score: Minimum confidence score (inclusive, 0-100)
+            max_score: Maximum confidence score (inclusive, 0-100, default: 100)
+
+        Returns:
+            List of MarketplaceCatalogEntry instances within score range
+
+        Example:
+            >>> # Find high-confidence detections only
+            >>> high_confidence = repo.filter_by_confidence_range(min_score=80)
+            >>>
+            >>> # Find medium-confidence detections
+            >>> medium = repo.filter_by_confidence_range(min_score=50, max_score=79)
+        """
+        session = self._get_session()
+        try:
+            entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    and_(
+                        MarketplaceCatalogEntry.confidence_score >= min_score,
+                        MarketplaceCatalogEntry.confidence_score <= max_score,
+                    )
+                )
+                .order_by(
+                    MarketplaceCatalogEntry.confidence_score.desc(),
+                    MarketplaceCatalogEntry.detected_at.desc(),
+                )
+                .all()
+            )
+            logger.debug(
+                f"Found {len(entries)} entries with confidence "
+                f"between {min_score} and {max_score}"
+            )
+            return entries
+        finally:
+            session.close()
+
+    def find_duplicates_by_type_and_name(
+        self, artifact_type: str, name: str
+    ) -> List[MarketplaceCatalogEntry]:
+        """Find duplicate catalog entries by type and name.
+
+        Useful for deduplication - identifies multiple detections of the
+        same artifact across different sources or paths.
+
+        Args:
+            artifact_type: Artifact type to search
+            name: Artifact name to search
+
+        Returns:
+            List of MarketplaceCatalogEntry instances with matching type and name
+
+        Example:
+            >>> # Check for duplicates before adding
+            >>> duplicates = repo.find_duplicates_by_type_and_name("skill", "canvas")
+            >>> if len(duplicates) > 1:
+            ...     print(f"Found {len(duplicates)} versions of canvas skill")
+        """
+        session = self._get_session()
+        try:
+            entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(artifact_type=artifact_type, name=name)
+                .order_by(
+                    MarketplaceCatalogEntry.confidence_score.desc(),
+                    MarketplaceCatalogEntry.detected_at.desc(),
+                )
+                .all()
+            )
+            logger.debug(
+                f"Found {len(entries)} entries matching "
+                f"type='{artifact_type}', name='{name}'"
+            )
+            return entries
+        finally:
+            session.close()
+
+    def bulk_update_status(self, entry_ids: List[str], status: str) -> int:
+        """Bulk update status for multiple catalog entries.
+
+        Uses efficient SQL UPDATE to modify multiple entries in one query.
+        Sets import_date if status is "imported".
+
+        Args:
+            entry_ids: List of catalog entry IDs to update
+            status: New status to set
+
+        Returns:
+            Number of entries updated
+
+        Example:
+            >>> # Mark multiple entries as imported
+            >>> entry_ids = ["entry-1", "entry-2", "entry-3"]
+            >>> count = repo.bulk_update_status(entry_ids, "imported")
+            >>> print(f"Updated {count} entries")
+        """
+        if not entry_ids:
+            return 0
+
+        session = self._get_session()
+        try:
+            # Build update values
+            update_values = {"status": status, "updated_at": datetime.utcnow()}
+            if status == "imported":
+                update_values["import_date"] = datetime.utcnow()
+
+            # Execute bulk update
+            result = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(MarketplaceCatalogEntry.id.in_(entry_ids))
+                .update(update_values, synchronize_session=False)
+            )
+
+            session.commit()
+            logger.info(f"Bulk updated {result} catalog entries to status '{status}'")
+            return result
+        except Exception as e:
+            session.rollback()
+            raise RepositoryError(f"Bulk update failed: {e}") from e
+        finally:
+            session.close()
+
+    def delete_by_source(self, source_id: str) -> int:
+        """Delete all catalog entries for a specific source.
+
+        Args:
+            source_id: Marketplace source identifier
+
+        Returns:
+            Number of entries deleted
+
+        Example:
+            >>> # Clean up entries when removing a source
+            >>> count = repo.delete_by_source("source-123")
+            >>> print(f"Deleted {count} entries")
+        """
+        session = self._get_session()
+        try:
+            result = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(source_id=source_id)
+                .delete(synchronize_session=False)
+            )
+
+            session.commit()
+            logger.info(f"Deleted {result} catalog entries for source {source_id}")
+            return result
+        except Exception as e:
+            session.rollback()
+            raise RepositoryError(f"Bulk delete failed: {e}") from e
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-003: Complex Filtering and Joins
+    # =========================================================================
+
+    def get_source_catalog(
+        self,
+        source_id: str,
+        artifact_types: Optional[List[str]] = None,
+        statuses: Optional[List[str]] = None,
+        min_confidence: Optional[int] = None,
+        max_confidence: Optional[int] = None,
+    ) -> List[MarketplaceCatalogEntry]:
+        """Get catalog entries for a source with optional filtering.
+
+        Provides flexible filtering for querying a source's catalog with
+        multiple criteria applied simultaneously.
+
+        Args:
+            source_id: Marketplace source ID
+            artifact_types: Filter by types (e.g., ["skill", "command"])
+            statuses: Filter by statuses (e.g., ["new", "updated"])
+            min_confidence: Minimum confidence score (0-100)
+            max_confidence: Maximum confidence score (0-100)
+
+        Returns:
+            List of matching catalog entries ordered by detection date
+
+        Example:
+            >>> # Get all high-confidence skills that are new or updated
+            >>> entries = repo.get_source_catalog(
+            ...     source_id="source-123",
+            ...     artifact_types=["skill"],
+            ...     statuses=["new", "updated"],
+            ...     min_confidence=80
+            ... )
+            >>> for entry in entries:
+            ...     print(f"{entry.name}: {entry.confidence_score}%")
+        """
+        session = self._get_session()
+        try:
+            query = session.query(MarketplaceCatalogEntry).filter_by(
+                source_id=source_id
+            )
+
+            # Apply artifact type filter
+            if artifact_types:
+                query = query.filter(
+                    MarketplaceCatalogEntry.artifact_type.in_(artifact_types)
+                )
+
+            # Apply status filter
+            if statuses:
+                query = query.filter(MarketplaceCatalogEntry.status.in_(statuses))
+
+            # Apply confidence range filters
+            if min_confidence is not None:
+                query = query.filter(
+                    MarketplaceCatalogEntry.confidence_score >= min_confidence
+                )
+            if max_confidence is not None:
+                query = query.filter(
+                    MarketplaceCatalogEntry.confidence_score <= max_confidence
+                )
+
+            # Order by detection date (most recent first)
+            entries = query.order_by(MarketplaceCatalogEntry.detected_at.desc()).all()
+
+            logger.debug(
+                f"Found {len(entries)} catalog entries for source {source_id} "
+                f"with filters (types={artifact_types}, statuses={statuses}, "
+                f"confidence={min_confidence}-{max_confidence})"
+            )
+            return entries
+        finally:
+            session.close()
+
+    def compare_catalogs(
+        self,
+        source_id: str,
+        new_entries: List[Dict[str, Any]],
+    ) -> CatalogDiff:
+        """Compare existing catalog with new scan results.
+
+        Identifies changes between current catalog and new scan results by
+        comparing upstream URLs and detected SHAs. This enables efficient
+        incremental updates when rescanning a source.
+
+        Comparison logic:
+        - new: entries in new_entries but not in DB (by upstream_url)
+        - updated: entries with same upstream_url but different detected_sha
+        - removed: entries in DB but not in new_entries
+        - unchanged: entries with matching upstream_url and detected_sha
+
+        Args:
+            source_id: Marketplace source ID
+            new_entries: List of dicts with keys:
+                - upstream_url (str): Full URL to artifact
+                - artifact_type (str): Type of artifact
+                - name (str): Artifact name
+                - detected_sha (str): Git SHA of detected artifact
+
+        Returns:
+            CatalogDiff with categorized changes
+
+        Example:
+            >>> # After scanning a repository
+            >>> new_entries = [
+            ...     {
+            ...         "upstream_url": "https://github.com/user/repo/blob/main/skills/skill1",
+            ...         "artifact_type": "skill",
+            ...         "name": "skill1",
+            ...         "detected_sha": "abc123"
+            ...     },
+            ... ]
+            >>> diff = repo.compare_catalogs("source-123", new_entries)
+            >>> print(f"New: {len(diff.new)}, Updated: {len(diff.updated)}, "
+            ...       f"Removed: {len(diff.removed)}")
+        """
+        session = self._get_session()
+        try:
+            # Fetch all existing entries for this source
+            existing_entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(source_id=source_id)
+                .all()
+            )
+
+            # Build lookup maps
+            existing_by_url: Dict[str, MarketplaceCatalogEntry] = {
+                entry.upstream_url: entry for entry in existing_entries
+            }
+            new_urls = {entry["upstream_url"] for entry in new_entries}
+
+            # Categorize changes
+            new: List[Dict[str, Any]] = []
+            updated: List[tuple[str, Dict[str, Any]]] = []
+            removed: List[str] = []
+            unchanged: List[str] = []
+
+            # Check each new entry
+            for new_entry in new_entries:
+                url = new_entry["upstream_url"]
+                existing = existing_by_url.get(url)
+
+                if not existing:
+                    # Entry doesn't exist in DB - mark as new
+                    new.append(new_entry)
+                elif existing.detected_sha != new_entry.get("detected_sha"):
+                    # Entry exists but SHA changed - mark as updated
+                    updated.append((existing.id, new_entry))
+                else:
+                    # Entry exists with same SHA - mark as unchanged
+                    unchanged.append(existing.id)
+
+            # Find removed entries (in DB but not in new scan)
+            for existing_entry in existing_entries:
+                if existing_entry.upstream_url not in new_urls:
+                    removed.append(existing_entry.id)
+
+            logger.info(
+                f"Catalog comparison for source {source_id}: "
+                f"new={len(new)}, updated={len(updated)}, "
+                f"removed={len(removed)}, unchanged={len(unchanged)}"
+            )
+
+            return CatalogDiff(
+                new=new,
+                updated=updated,
+                removed=removed,
+                unchanged=unchanged,
+            )
+        finally:
+            session.close()
+
+    def count_by_status(self, source_id: Optional[str] = None) -> Dict[str, int]:
+        """Count catalog entries grouped by status.
+
+        Uses efficient SQL aggregation to count entries by status. Useful for
+        dashboard statistics and progress tracking.
+
+        Args:
+            source_id: Optional filter by source ID
+
+        Returns:
+            Dict mapping status -> count (e.g., {"new": 5, "imported": 3})
+
+        Example:
+            >>> # Count all entries by status
+            >>> counts = repo.count_by_status()
+            >>> print(f"New artifacts: {counts.get('new', 0)}")
+            >>>
+            >>> # Count entries for specific source
+            >>> source_counts = repo.count_by_status(source_id="source-123")
+        """
+        session = self._get_session()
+        try:
+            query = session.query(
+                MarketplaceCatalogEntry.status,
+                func.count(MarketplaceCatalogEntry.id).label("count"),
+            )
+
+            # Apply source filter if provided
+            if source_id:
+                query = query.filter_by(source_id=source_id)
+
+            # Group by status and execute
+            results = query.group_by(MarketplaceCatalogEntry.status).all()
+
+            # Convert to dict
+            counts = {status: count for status, count in results}
+
+            logger.debug(f"Status counts for source {source_id or 'all'}: {counts}")
+            return counts
+        finally:
+            session.close()
+
+    def count_by_type(self, source_id: Optional[str] = None) -> Dict[str, int]:
+        """Count catalog entries grouped by artifact type.
+
+        Uses efficient SQL aggregation to count entries by type. Useful for
+        understanding the composition of discovered artifacts.
+
+        Args:
+            source_id: Optional filter by source ID
+
+        Returns:
+            Dict mapping artifact_type -> count (e.g., {"skill": 10, "command": 3})
+
+        Example:
+            >>> # Count all entries by type
+            >>> counts = repo.count_by_type()
+            >>> print(f"Total skills: {counts.get('skill', 0)}")
+            >>>
+            >>> # Count entries for specific source
+            >>> source_counts = repo.count_by_type(source_id="source-123")
+        """
+        session = self._get_session()
+        try:
+            query = session.query(
+                MarketplaceCatalogEntry.artifact_type,
+                func.count(MarketplaceCatalogEntry.id).label("count"),
+            )
+
+            # Apply source filter if provided
+            if source_id:
+                query = query.filter_by(source_id=source_id)
+
+            # Group by artifact type and execute
+            results = query.group_by(MarketplaceCatalogEntry.artifact_type).all()
+
+            # Convert to dict
+            counts = {artifact_type: count for artifact_type, count in results}
+
+            logger.debug(f"Type counts for source {source_id or 'all'}: {counts}")
+            return counts
+        finally:
+            session.close()
