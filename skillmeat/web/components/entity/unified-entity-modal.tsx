@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  FolderOpen,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -49,7 +50,12 @@ import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModa
 import { useEditArtifactParameters } from '@/hooks/useDiscovery';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
-import type { ArtifactDiffResponse, ArtifactUpstreamDiffResponse, ArtifactSyncRequest } from '@/sdk';
+import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import type {
+  ArtifactDiffResponse,
+  ArtifactUpstreamDiffResponse,
+  ArtifactSyncRequest,
+} from '@/sdk';
 import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
 import type { ArtifactParameters } from '@/types/discovery';
 
@@ -328,7 +334,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Allow diff fetching for ALL statuses (synced, modified, outdated, conflict)
   // Key requirement: must have a valid entity ID and effectiveProjectPath
   // Skip discovered artifacts (they don't exist in any collection yet)
-  const shouldFetchDiff = !!(activeTab === 'sync' && entity?.id && effectiveProjectPath && entity?.collection !== 'discovered');
+  const shouldFetchDiff = !!(
+    activeTab === 'sync' &&
+    entity?.id &&
+    effectiveProjectPath &&
+    entity?.collection !== 'discovered'
+  );
 
   const {
     data: diffData,
@@ -1155,7 +1166,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl min-h-0">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
@@ -1205,6 +1216,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               >
                 History
               </TabsTrigger>
+              <TabsTrigger
+                value="collections"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                Collections
+              </TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -1218,7 +1236,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       size="sm"
                       onClick={() => setShowParameterEditor(true)}
                     >
-                      <Pencil className="h-4 w-4 mr-2" />
+                      <Pencil className="mr-2 h-4 w-4" />
                       Edit Parameters
                     </Button>
                   </div>
@@ -1345,10 +1363,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
               <div className="flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
-                <div className={cn(
-                  "flex-shrink-0 overflow-hidden border-r transition-all duration-200",
-                  isEditing ? "w-48" : "w-64 lg:w-72"
-                )}>
+                <div
+                  className={cn(
+                    'flex-shrink-0 overflow-hidden border-r transition-all duration-200',
+                    isEditing ? 'w-48' : 'w-64 lg:w-72'
+                  )}
+                >
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
@@ -1382,7 +1402,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Sync Status Tab */}
-            <TabsContent value="sync" className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <TabsContent
+              value="sync"
+              className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
               <SyncStatusTab
                 entity={entity}
                 mode={entity.projectPath ? 'project' : 'collection'}
@@ -1500,6 +1523,15 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       </p>
                     </div>
                   )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Collections Tab */}
+            <TabsContent value="collections" className="mt-0 flex-1">
+              <ScrollArea className="h-[calc(90vh-12rem)]">
+                <div className="py-4">
+                  <ModalCollectionsTab entity={entity} />
                 </div>
               </ScrollArea>
             </TabsContent>
