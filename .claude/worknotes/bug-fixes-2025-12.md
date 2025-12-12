@@ -297,3 +297,25 @@
   2. Added early return in SyncStatusTab with helpful message: "Sync status is not available for discovered artifacts. Import to your collection to enable sync tracking."
 - **Commit(s)**: 21de2c9
 - **Status**: RESOLVED
+
+## 2025-12-12
+
+### GitHub Sources Page Not Accessible from UI
+
+**Issue**: The GitHub marketplace ingestion feature at `/marketplace/sources` was fully implemented but inaccessible from the UI - users had no way to navigate to it.
+- **Location**: `skillmeat/web/components/navigation.tsx`, `skillmeat/web/app/marketplace/page.tsx`
+- **Root Cause**: The feature implementation (PRD marketplace-github-ingestion-v1) created the sources page and all components, but navigation links were never added to connect it to the main UI.
+- **Fix**:
+  1. Added "Sources" sub-item under Marketplace in sidebar navigation with Github icon
+  2. Added "GitHub Sources" button in marketplace page header linking to `/marketplace/sources`
+- **Commit(s)**: 3c6ad87
+- **Status**: RESOLVED
+
+### Add GitHub Source Fails with 422 Validation Error
+
+**Issue**: Adding a new GitHub source via the modal fails with 422 error: "Input should be a valid dictionary or object to extract fields from" with raw bytes input.
+- **Location**: `skillmeat/web/lib/api.ts:42`
+- **Root Cause**: The `buildApiHeaders()` function only set `Accept: application/json` but not `Content-Type: application/json`. POST/PATCH requests with JSON bodies were sent without the Content-Type header, so FastAPI received raw bytes instead of parsed JSON.
+- **Fix**: Added `'Content-Type': 'application/json'` to the default headers in `buildApiHeaders()`
+- **Commit(s)**: 6fb51ab
+- **Status**: RESOLVED
