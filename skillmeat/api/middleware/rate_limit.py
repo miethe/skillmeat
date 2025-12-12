@@ -470,4 +470,11 @@ def get_rate_limiter() -> RateLimiter:
             window_seconds=3600,  # 10 per hour
         )
 
+        # Analytics endpoints - higher limits (read-only, low cost)
+        _global_rate_limiter.add_endpoint_limit(
+            path_pattern="/api/v1/analytics*",
+            max_requests=1000,
+            window_seconds=3600,  # 1000 per hour
+        )
+
     return _global_rate_limiter
