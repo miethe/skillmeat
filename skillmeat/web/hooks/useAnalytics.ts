@@ -202,7 +202,7 @@ export function useUsageTrends(period: TimePeriod = 'day', days = 30) {
   return useQuery({
     queryKey: analyticsKeys.trends(period, days),
     queryFn: () => fetchUsageTrends(period, days),
-    staleTime: 60000, // Consider data fresh for 1 minute
-    refetchInterval: 120000, // Refetch every 2 minutes
+    staleTime: 300000, // Consider data fresh for 5 minutes
+    refetchInterval: 600000, // Refetch every 10 minutes (trends don't change rapidly)
   });
 }
