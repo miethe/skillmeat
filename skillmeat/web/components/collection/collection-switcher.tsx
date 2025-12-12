@@ -19,7 +19,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useCollectionContext } from '@/hooks/use-collection-context';
-import type { Collection } from '@/types/collections';
 
 interface CollectionSwitcherProps {
   /** Callback triggered when "Add Collection" is clicked */
