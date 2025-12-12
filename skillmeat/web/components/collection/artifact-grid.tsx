@@ -3,17 +3,44 @@
 import { Package } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 interface ArtifactGridProps {
   artifacts: Artifact[];
   isLoading?: boolean;
   onArtifactClick: (artifact: Artifact) => void;
+  showCollectionBadge?: boolean;
+  onCollectionClick?: (collectionId: string) => void;
 }
 
-function ArtifactCard({ artifact, onClick }: { artifact: Artifact; onClick: () => void }) {
-  return <UnifiedCard item={artifact} onClick={onClick} />;
+function ArtifactCard({
+  artifact,
+  onClick,
+  showCollectionBadge,
+  onCollectionClick,
+}: {
+  artifact: Artifact;
+  onClick: () => void;
+  showCollectionBadge?: boolean;
+  onCollectionClick?: (collectionId: string) => void;
+}) {
+  return (
+    <div className="relative">
+      <UnifiedCard item={artifact} onClick={onClick} />
+      {showCollectionBadge && artifact.collection && (
+        <Badge
+          variant="outline"
+          className="absolute top-2 right-2 cursor-pointer bg-background/95 backdrop-blur text-xs hover:bg-accent"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCollectionClick?.(artifact.collection!.id);
+          }}
+        >
+          {artifact.collection.name}
+        </Badge>
+      )}
+    </div>
+  );
 }
 
 function ArtifactGridSkeleton() {
@@ -29,7 +56,13 @@ function ArtifactGridSkeleton() {
   );
 }
 
-export function ArtifactGrid({ artifacts, isLoading, onArtifactClick }: ArtifactGridProps) {
+export function ArtifactGrid({
+  artifacts,
+  isLoading,
+  onArtifactClick,
+  showCollectionBadge,
+  onCollectionClick,
+}: ArtifactGridProps) {
   if (isLoading) {
     return <ArtifactGridSkeleton />;
   }
@@ -58,6 +91,8 @@ export function ArtifactGrid({ artifacts, isLoading, onArtifactClick }: Artifact
           key={artifact.id}
           artifact={artifact}
           onClick={() => onArtifactClick(artifact)}
+          showCollectionBadge={showCollectionBadge}
+          onCollectionClick={onCollectionClick}
         />
       ))}
     </div>
