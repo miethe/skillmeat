@@ -20,6 +20,9 @@ import {
   Loader2,
   AlertTriangle,
   Search as SearchIcon,
+  Pencil,
+  Trash2,
+  StickyNote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +50,8 @@ import {
   useRescanSource,
   useImportArtifacts,
 } from '@/hooks/useMarketplaceSources';
+import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
+import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
 
 // ============================================================================
@@ -226,6 +231,8 @@ export default function SourceDetailPage() {
   const [filters, setFilters] = useState<CatalogFilters>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -365,6 +372,12 @@ export default function SourceDetailPage() {
                 {source.ref}
                 {source.root_hint && ` • ${source.root_hint}`}
               </p>
+              {/* Description */}
+              {source.description && (
+                <p className="mt-2 text-muted-foreground">
+                  {source.description}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -388,6 +401,21 @@ export default function SourceDetailPage() {
               View Repo
             </Button>
           </a>
+          <Button
+            variant="outline"
+            onClick={() => setEditModalOpen(true)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -495,6 +523,21 @@ export default function SourceDetailPage() {
         </div>
       </div>
 
+      {/* Notes Section */}
+      {source.notes && (
+        <Card className="p-4">
+          <div className="flex items-start gap-2">
+            <StickyNote className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium mb-1">Notes</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {source.notes}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Catalog Grid */}
       {catalogLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -514,17 +557,19 @@ export default function SourceDetailPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredEntries.map((entry) => (
-              <CatalogCard
-                key={entry.id}
-                entry={entry}
-                selected={selectedEntries.has(entry.id)}
-                onSelect={(selected) => handleSelectEntry(entry.id, selected)}
-                onImport={() => handleImportSingle(entry.id)}
-                isImporting={importMutation.isPending}
-              />
-            ))}
+          <div className="max-h-[600px] overflow-y-auto">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredEntries.map((entry) => (
+                <CatalogCard
+                  key={entry.id}
+                  entry={entry}
+                  selected={selectedEntries.has(entry.id)}
+                  onSelect={(selected) => handleSelectEntry(entry.id, selected)}
+                  onImport={() => handleImportSingle(entry.id)}
+                  isImporting={importMutation.isPending}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Load More */}
@@ -548,6 +593,21 @@ export default function SourceDetailPage() {
           )}
         </>
       )}
+
+      {/* Edit Modal */}
+      <EditSourceModal
+        source={source}
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+      />
+
+      {/* Delete Dialog */}
+      <DeleteSourceDialog
+        source={source}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onSuccess={() => router.push('/marketplace/sources')}
+      />
     </div>
   );
 }
