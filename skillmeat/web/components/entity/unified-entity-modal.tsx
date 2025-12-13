@@ -15,7 +15,6 @@ import {
   ArrowDown,
   FileText,
   User,
-  GitMerge,
   RefreshCw,
   Github,
   ChevronDown,
@@ -181,7 +180,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
 // Loading Skeleton
 // ============================================================================
 
-function EntityModalSkeleton() {
+function _EntityModalSkeleton() {
   return (
     <div className="space-y-6 p-6">
       <div className="space-y-4">
@@ -241,8 +240,8 @@ function EntityModalSkeleton() {
 export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [_isDeploying, _setIsDeploying] = useState(false);
+  const [_isSyncing, _setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
@@ -475,10 +474,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     });
   }, [deploymentsData, entity]);
 
-  // Count unique projects
+  // Count unique collections (projects are determined by the parent query)
   const deploymentProjectCount = useMemo(() => {
-    const projectPaths = new Set(artifactDeployments.map((d) => d.project_path));
-    return projectPaths.size;
+    const collections = new Set(artifactDeployments.map((d) => d.from_collection));
+    return collections.size;
   }, [artifactDeployments]);
 
   // Track if we've shown the error toast to prevent spam
@@ -515,7 +514,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Event Handlers
   // ============================================================================
 
-  const handleDeploy = async () => {
+  const _handleDeploy = async () => {
     if (!entity.projectPath) {
       toast({
         title: 'Deploy Failed',
@@ -525,7 +524,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       return;
     }
 
-    setIsDeploying(true);
+    _setIsDeploying(true);
     try {
       await deployEntity(entity.id, entity.projectPath);
       toast({
@@ -542,11 +541,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         variant: 'destructive',
       });
     } finally {
-      setIsDeploying(false);
+      _setIsDeploying(false);
     }
   };
 
-  const handleSync = async () => {
+  const _handleSync = async () => {
     if (!entity.projectPath) {
       toast({
         title: 'Sync Failed',
@@ -556,7 +555,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       return;
     }
 
-    setIsSyncing(true);
+    _setIsSyncing(true);
     try {
       await syncEntity(entity.id, entity.projectPath);
       toast({
@@ -573,7 +572,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         variant: 'destructive',
       });
     } finally {
-      setIsSyncing(false);
+      _setIsSyncing(false);
     }
   };
 
@@ -933,7 +932,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Render Upstream Status Section
   // ============================================================================
 
-  const renderUpstreamSection = () => {
+  const _renderUpstreamSection = () => {
     // Check if artifact has a GitHub source (not local-only)
     const hasUpstreamSource = entity?.source && !entity.source.startsWith('local:');
 
@@ -1080,7 +1079,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Render Diff Section
   // ============================================================================
 
-  const renderDiffSection = () => {
+  const _renderDiffSection = () => {
     // Show project selector for collection-mode entities (no projectPath)
     // This allows users to select which project to compare against
     if (!entity.projectPath && entity.collection) {

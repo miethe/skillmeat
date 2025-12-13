@@ -118,12 +118,13 @@ const syncStatusLabels: Record<ArtifactSyncStatus, string> = {
  */
 export function DeploymentCard({
   deployment,
-  projectPath,
+  projectPath: _projectPath,
   onUpdate,
   onRemove,
   onViewSource,
   onViewDiff,
 }: DeploymentCardProps) {
+  void _projectPath; // Reserved for future use
   const config = getEntityTypeConfig(deployment.artifact_type as ArtifactType);
 
   // Type-safe icon lookup with fallback
