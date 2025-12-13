@@ -43,13 +43,14 @@ export async function fetchCollection(id: string): Promise<Collection> {
  * Create new collection
  */
 export async function createCollection(data: CreateCollectionRequest): Promise<Collection> {
-  const response = await fetch(buildUrl('/collections'), {
+  const response = await fetch(buildUrl('/user-collections'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to create collection: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to create collection: ${response.statusText}`);
   }
   return response.json();
 }

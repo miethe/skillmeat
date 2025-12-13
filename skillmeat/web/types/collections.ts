@@ -20,8 +20,10 @@ export interface Collection {
 
 /** Request to create a new collection */
 export interface CreateCollectionRequest {
-  /** Collection name (1-100 characters, must be unique) */
+  /** Collection name (1-255 characters, must be unique) */
   name: string;
+  /** Optional collection description (max 1000 characters) */
+  description?: string;
 }
 
 /** Request to update an existing collection */

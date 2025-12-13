@@ -7,6 +7,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/api';
+import { createCollection } from '@/lib/api/collections';
 import type {
   Collection,
   CreateCollectionRequest,
@@ -213,24 +214,20 @@ export function useCollectionArtifacts(
 /**
  * Create new collection mutation
  *
- * Note: This endpoint is not yet implemented in the backend.
- * This hook is prepared for future implementation.
- *
  * @returns Mutation function for creating collections
  *
  * @example
  * ```tsx
  * const createCollection = useCreateCollection();
- * await createCollection.mutateAsync({ name: 'My Collection' });
+ * await createCollection.mutateAsync({ name: 'My Collection', description: 'Optional description' });
  * ```
  */
 export function useCreateCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_data: CreateCollectionRequest): Promise<Collection> => {
-      // TODO: Backend endpoint not yet implemented (Phase 4)
-      throw new ApiError('Collection creation not yet implemented', 501);
+    mutationFn: async (data: CreateCollectionRequest): Promise<Collection> => {
+      return createCollection(data);
     },
     onSuccess: () => {
       // Invalidate collections list to trigger refetch
