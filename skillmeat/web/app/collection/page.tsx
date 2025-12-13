@@ -8,6 +8,7 @@ import { ArtifactGrid } from '@/components/collection/artifact-grid';
 import { ArtifactList } from '@/components/collection/artifact-list';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
+import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
@@ -118,6 +119,7 @@ function CollectionPageContent() {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Fetch artifacts using existing hook
   // Note: For now using useArtifacts since it returns full Artifact objects
@@ -210,6 +212,7 @@ function CollectionPageContent() {
         isAllCollections={isAllCollections}
         onEdit={currentCollection ? () => setShowEditDialog(true) : undefined}
         onDelete={currentCollection ? () => setShowEditDialog(true) : undefined}
+        onCreate={() => setShowCreateDialog(true)}
       />
 
       <CollectionToolbar
@@ -309,6 +312,12 @@ function CollectionPageContent() {
           onDelete={() => refetch()}
         />
       )}
+
+      {/* Create Collection Dialog */}
+      <CreateCollectionDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
     </div>
   );
 }

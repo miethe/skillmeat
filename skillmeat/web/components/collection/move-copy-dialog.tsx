@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, MoveRight, FolderOpen } from 'lucide-react';
+import { Copy, MoveRight, FolderOpen, FolderPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useAddArtifactToCollection, useRemoveArtifactFromCollection } from '@/hooks/use-collections';
 import { useToast } from '@/hooks/use-toast';
 import type { Artifact } from '@/types/artifact';
+import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 
 type OperationType = 'move' | 'copy';
 
@@ -68,6 +69,7 @@ export function MoveCopyDialog({
 }: MoveCopyDialogProps) {
   const [operation, setOperation] = useState<OperationType>('copy');
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const { collections } = useCollectionContext();
   const addArtifact = useAddArtifactToCollection();
@@ -176,9 +178,20 @@ export function MoveCopyDialog({
               disabled={isPending}
             >
               {availableCollections.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-4 text-center">
-                  No other collections available.
-                </p>
+                <div className="p-4 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    No other collections available.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCreateDialog(true)}
+                    className="text-primary hover:text-primary/90"
+                  >
+                    <FolderPlus className="mr-2 h-4 w-4" />
+                    Create one now
+                  </Button>
+                </div>
               ) : (
                 availableCollections.map((collection) => (
                   <div
@@ -234,6 +247,11 @@ export function MoveCopyDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <CreateCollectionDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
     </Dialog>
   );
 }

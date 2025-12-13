@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderOpen, Plus, X, MoreHorizontal } from 'lucide-react';
+import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useRemoveArtifactFromCollection } from '@/hooks/use-collections';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
+import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Entity } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
@@ -44,6 +45,7 @@ interface ModalCollectionsTabProps {
  */
 export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { collections, isLoadingCollections } = useCollectionContext();
   const removeFromCollection = useRemoveArtifactFromCollection();
   const { toast } = useToast();
@@ -119,10 +121,16 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
       {/* Header with Add button */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Collections & Groups</h3>
-        <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add to Collection
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowCreateDialog(true)}>
+            <FolderPlus className="mr-2 h-4 w-4" />
+            New
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add to Collection
+          </Button>
+        </div>
       </div>
 
       {/* Collections list */}
@@ -133,15 +141,22 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
             <p className="mt-4 text-sm text-muted-foreground">
               This artifact is not in any collection.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => setShowAddDialog(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add to Collection
-            </Button>
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddDialog(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add to Collection
+              </Button>
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                or create a new one
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -196,6 +211,12 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
             description: `${entity.name} has been added to the collection.`,
           });
         }}
+      />
+
+      {/* Create Collection dialog */}
+      <CreateCollectionDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
       />
     </div>
   );
