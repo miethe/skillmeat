@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, FolderPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,7 @@ interface CollectionHeaderProps {
   isAllCollections: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onCreate?: () => void;
 }
 
 export function CollectionHeader({
@@ -25,6 +26,7 @@ export function CollectionHeader({
   isAllCollections,
   onEdit,
   onDelete,
+  onCreate,
 }: CollectionHeaderProps) {
   const title = isAllCollections ? 'All Collections' : collection?.name || 'Collection';
   const description = isAllCollections
@@ -42,6 +44,13 @@ export function CollectionHeader({
             <Badge variant="secondary" className="text-sm">
               {artifactCount} {artifactCount === 1 ? 'artifact' : 'artifacts'}
             </Badge>
+            {/* New Collection button - only show in All Collections view */}
+            {isAllCollections && onCreate && (
+              <Button variant="outline" size="sm" onClick={onCreate}>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                New Collection
+              </Button>
+            )}
           </div>
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
         </div>
