@@ -11,6 +11,7 @@ import { EditCollectionDialog } from '@/components/collection/edit-collection-di
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
+import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { Entity } from '@/types/entity';
@@ -87,6 +88,8 @@ function CollectionPageContent() {
     setSelectedCollectionId,
   } = useCollectionContext();
 
+  const { toast } = useToast();
+
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === 'undefined') return 'grid';
@@ -107,6 +110,10 @@ function CollectionPageContent() {
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   // Modal state
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -119,6 +126,13 @@ function CollectionPageContent() {
     filters,
     { field: sortField as any, order: sortOrder }
   );
+
+  // Initialize lastUpdated on first load
+  useEffect(() => {
+    if (data && !lastUpdated) {
+      setLastUpdated(new Date());
+    }
+  }, [data, lastUpdated]);
 
   // Apply client-side search and sort
   const filteredArtifacts = useMemo(() => {
@@ -160,6 +174,26 @@ function CollectionPageContent() {
     setSelectedCollectionId(collectionId);
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastUpdated(new Date());
+      toast({
+        title: 'Collection refreshed',
+        description: 'Successfully updated artifact collection',
+      });
+    } catch (err) {
+      toast({
+        title: 'Refresh failed',
+        description: 'Could not refresh collection. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Loading state
   if (isLoadingCollection) {
     return <CollectionPageSkeleton />;
@@ -188,7 +222,9 @@ function CollectionPageContent() {
         sortField={sortField}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
-        onRefresh={() => refetch()}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        lastUpdated={lastUpdated}
       />
 
       <div className="flex-1 overflow-auto p-6">
