@@ -366,6 +366,24 @@ locked_at = "2024-11-29T10:00:00Z"
 
 ---
 
+## Progressive Disclosure Context
+
+**Path-Specific Guidance** (auto-loaded by Claude Code):
+- `.claude/rules/debugging.md` - Universal debugging methodology (symbol-first)
+- `.claude/rules/web/` - Auto-loaded when editing `skillmeat/web/**`
+- `.claude/rules/api/` - Auto-loaded when editing `skillmeat/api/**`
+
+**Deep Context** (load as needed):
+- `.claude/context/api-endpoint-mapping.md` - Full API reference
+- `.claude/context/symbol-usage-guide.md` - Symbol query patterns
+- `.claude/context/stub-patterns.md` - Frontend stubs catalog
+
+**Staleness Hook**: `.claude/hooks/check-context-staleness.sh` (pre-commit warning)
+
+See `.claude/specs/progressive-disclosure-spec.md` for architecture details.
+
+---
+
 ## Important Notes
 
 - **Scopes**: `user` scope (~/.claude/skills/user/) is global; `local` scope (./.claude/skills/) is per-project

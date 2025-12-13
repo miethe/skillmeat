@@ -717,6 +717,27 @@ export function ErrorBoundary({ children }: { children: React.ReactNode }) {
 
 ---
 
+## Path-Specific Rules
+
+Rules in `.claude/rules/web/` auto-load when editing this directory:
+
+| Rule File | Applies To | Contains |
+|-----------|-----------|----------|
+| hooks.md | `hooks/**/*.ts` | Stub detection, API client integration, TanStack Query patterns |
+| api-client.md | `lib/api/**/*.ts` | Endpoint mappings, error handling, URL building |
+| pages.md | `app/**/*.tsx` | Server/client patterns, data fetching (Phase 3) |
+| components.md | `components/**/*.tsx` | Radix UI, composition, accessibility (Phase 3) |
+
+## Context Files (Load When Needed)
+
+| File | Load When |
+|------|-----------|
+| `.claude/context/api-endpoint-mapping.md` | API mismatch bugs, endpoint questions |
+| `.claude/context/stub-patterns.md` | "Not implemented" errors |
+| `.claude/context/symbol-usage-guide.md` | Bug investigation, unfamiliar code |
+
+---
+
 ## Important Notes
 
 - **App Router**: Use Next.js 15 App Router patterns (not Pages Router)
