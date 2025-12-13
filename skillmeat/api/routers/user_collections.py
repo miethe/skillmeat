@@ -17,6 +17,8 @@ from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
+    ArtifactSummary,
+    CollectionArtifactsResponse,
     GroupSummary,
     UserCollectionCreateRequest,
     UserCollectionListResponse,
@@ -24,7 +26,13 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionUpdateRequest,
     UserCollectionWithGroupsResponse,
 )
-from skillmeat.cache.models import Collection, CollectionArtifact, Group, get_session
+from skillmeat.cache.models import (
+    Artifact,
+    Collection,
+    CollectionArtifact,
+    Group,
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -548,6 +556,146 @@ async def delete_user_collection(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete user collection: {str(e)}",
+        )
+
+
+@router.get(
+    "/{collection_id}/artifacts",
+    response_model=CollectionArtifactsResponse,
+    summary="List artifacts in collection",
+    description="Retrieve paginated list of artifacts in a collection with optional type filtering",
+    responses={
+        200: {"description": "Successfully retrieved artifacts"},
+        404: {"model": ErrorResponse, "description": "Collection not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_collection_artifacts(
+    collection_id: str,
+    session: DbSessionDep,
+    token: TokenDep,
+    limit: int = Query(default=20, ge=1, le=100),
+    after: Optional[str] = Query(default=None),
+    artifact_type: Optional[str] = Query(default=None, description="Filter by artifact type"),
+) -> CollectionArtifactsResponse:
+    """List artifacts in a collection with pagination.
+
+    Args:
+        collection_id: Collection identifier
+        session: Database session
+        token: Authentication token
+        limit: Number of items per page
+        after: Cursor for next page
+        artifact_type: Optional artifact type filter
+
+    Returns:
+        Paginated list of artifacts
+
+    Raises:
+        HTTPException: If collection not found or on error
+    """
+    try:
+        logger.info(
+            f"Listing artifacts for collection '{collection_id}' "
+            f"(limit={limit}, after={after}, type={artifact_type})"
+        )
+
+        # Verify collection exists
+        collection = session.query(Collection).filter_by(id=collection_id).first()
+        if not collection:
+            logger.warning(f"User collection not found: {collection_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            )
+
+        # Build query for collection artifacts
+        query = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id)
+            .order_by(CollectionArtifact.artifact_id)
+        )
+
+        # Get all matching artifact associations
+        all_associations = query.all()
+
+        # Decode cursor if provided
+        start_idx = 0
+        if after:
+            cursor_value = decode_cursor(after)
+            try:
+                artifact_ids = [assoc.artifact_id for assoc in all_associations]
+                start_idx = artifact_ids.index(cursor_value) + 1
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid cursor: artifact not found",
+                )
+
+        # Paginate
+        end_idx = start_idx + limit
+        page_associations = all_associations[start_idx:end_idx]
+
+        # Fetch artifact metadata for each association
+        items: List[ArtifactSummary] = []
+        for assoc in page_associations:
+            # Try to get artifact metadata from cache database
+            artifact = session.query(Artifact).filter_by(id=assoc.artifact_id).first()
+
+            if artifact:
+                # If artifact metadata exists, use it
+                artifact_summary = ArtifactSummary(
+                    name=artifact.name,
+                    type=artifact.type,
+                    version=artifact.deployed_version or artifact.upstream_version,
+                    source=artifact.source or assoc.artifact_id,
+                )
+            else:
+                # TODO: Fetch artifact metadata from artifact storage system
+                # For now, return artifact_id as both name and source
+                artifact_summary = ArtifactSummary(
+                    name=assoc.artifact_id,
+                    type="unknown",
+                    version=None,
+                    source=assoc.artifact_id,
+                )
+
+            # Apply type filter if specified
+            if artifact_type is None or artifact_summary.type == artifact_type:
+                items.append(artifact_summary)
+
+        # Build pagination info
+        has_next = end_idx < len(all_associations)
+        has_previous = start_idx > 0
+
+        start_cursor = (
+            encode_cursor(page_associations[0].artifact_id) if page_associations else None
+        )
+        end_cursor = (
+            encode_cursor(page_associations[-1].artifact_id) if page_associations else None
+        )
+
+        page_info = PageInfo(
+            has_next_page=has_next,
+            has_previous_page=has_previous,
+            start_cursor=start_cursor,
+            end_cursor=end_cursor,
+            total_count=len(all_associations),
+        )
+
+        logger.info(f"Retrieved {len(items)} artifacts for collection '{collection_id}'")
+        return CollectionArtifactsResponse(items=items, page_info=page_info)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error listing artifacts for collection '{collection_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list collection artifacts: {str(e)}",
         )
 
 
