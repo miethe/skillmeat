@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 
 interface CollectionToolbarProps {
@@ -42,6 +43,8 @@ interface CollectionToolbarProps {
   sortOrder: 'asc' | 'desc';
   onSortChange: (field: string, order: 'asc' | 'desc') => void;
   onRefresh: () => void;
+  isRefreshing?: boolean;
+  lastUpdated?: Date | null;
 }
 
 /**
@@ -63,6 +66,20 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+/**
+ * Format relative time for last updated timestamp
+ */
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return date.toLocaleDateString();
+}
+
 export function CollectionToolbar({
   viewMode,
   onViewModeChange,
@@ -74,6 +91,8 @@ export function CollectionToolbar({
   sortOrder,
   onSortChange,
   onRefresh,
+  isRefreshing = false,
+  lastUpdated = null,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -302,10 +321,23 @@ export function CollectionToolbar({
             </Button>
           </div>
 
-          {/* Refresh Button */}
-          <Button variant="outline" size="sm" onClick={onRefresh} aria-label="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          {/* Refresh Button with timestamp */}
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                Updated {formatRelativeTime(lastUpdated)}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              aria-label="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
