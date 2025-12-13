@@ -21,18 +21,20 @@ function buildUrl(path: string): string {
  * Fetch all collections
  */
 export async function fetchCollections(): Promise<Collection[]> {
-  const response = await fetch(buildUrl('/collections'));
+  const response = await fetch(buildUrl('/user-collections'));
   if (!response.ok) {
     throw new Error(`Failed to fetch collections: ${response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+  // Handle paginated response - backend returns { items: [], page_info: {} }
+  return data.items || data;
 }
 
 /**
  * Fetch single collection by ID
  */
 export async function fetchCollection(id: string): Promise<Collection> {
-  const response = await fetch(buildUrl(`/collections/${id}`));
+  const response = await fetch(buildUrl(`/user-collections/${id}`));
   if (!response.ok) {
     throw new Error(`Failed to fetch collection: ${response.statusText}`);
   }
@@ -62,13 +64,14 @@ export async function updateCollection(
   id: string,
   data: UpdateCollectionRequest
 ): Promise<Collection> {
-  const response = await fetch(buildUrl(`/collections/${id}`), {
+  const response = await fetch(buildUrl(`/user-collections/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to update collection: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to update collection: ${response.statusText}`);
   }
   return response.json();
 }
@@ -77,11 +80,12 @@ export async function updateCollection(
  * Delete collection
  */
 export async function deleteCollection(id: string): Promise<void> {
-  const response = await fetch(buildUrl(`/collections/${id}`), {
+  const response = await fetch(buildUrl(`/user-collections/${id}`), {
     method: 'DELETE',
   });
   if (!response.ok) {
-    throw new Error(`Failed to delete collection: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to delete collection: ${response.statusText}`);
   }
 }
 
@@ -89,20 +93,21 @@ export async function deleteCollection(id: string): Promise<void> {
  * Add artifact to collection
  * @param collectionId - Collection ID
  * @param artifactId - Artifact ID to add
- * @param data - Optional metadata for the artifact link
+ * @param _data - Optional metadata (kept for backward compatibility but unused)
  */
 export async function addArtifactToCollection(
   collectionId: string,
   artifactId: string,
-  data?: Record<string, unknown>
-): Promise<{ artifact_id: string; collection_id: string; added_at: string }> {
-  const response = await fetch(buildUrl(`/collections/${collectionId}/artifacts/${artifactId}`), {
+  _data?: Record<string, unknown>
+): Promise<{ collection_id: string; added_count: number; already_present_count: number; total_artifacts: number }> {
+  const response = await fetch(buildUrl(`/user-collections/${collectionId}/artifacts`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data || {}),
+    body: JSON.stringify({ artifact_ids: [artifactId] }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to add artifact to collection: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to add artifact to collection: ${response.statusText}`);
   }
   return response.json();
 }
@@ -114,60 +119,44 @@ export async function removeArtifactFromCollection(
   collectionId: string,
   artifactId: string
 ): Promise<void> {
-  const response = await fetch(buildUrl(`/collections/${collectionId}/artifacts/${artifactId}`), {
+  const response = await fetch(buildUrl(`/user-collections/${collectionId}/artifacts/${artifactId}`), {
     method: 'DELETE',
   });
   if (!response.ok) {
-    throw new Error(`Failed to remove artifact from collection: ${response.statusText}`);
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to remove artifact from collection: ${response.statusText}`);
   }
 }
 
 /**
  * Copy artifact to another collection
- * @param sourceCollectionId - Source collection ID
- * @param artifactId - Artifact ID to copy
- * @param data - Target collection information
+ * @param _sourceCollectionId - Source collection ID (unused)
+ * @param _artifactId - Artifact ID to copy (unused)
+ * @param data - Target collection information (unused)
+ * @deprecated Not yet implemented - use addArtifactToCollection on target collection instead
  */
 export async function copyArtifactToCollection(
-  sourceCollectionId: string,
-  artifactId: string,
-  data: { target_collection_id: string }
+  _sourceCollectionId: string,
+  _artifactId: string,
+  _data: { target_collection_id: string }
 ): Promise<{ artifact_id: string; collection_id: string; added_at: string }> {
-  const response = await fetch(
-    buildUrl(`/collections/${sourceCollectionId}/artifacts/${artifactId}/copy`),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`Failed to copy artifact: ${response.statusText}`);
-  }
-  return response.json();
+  // TODO: Backend endpoint not implemented. As workaround, use addArtifactToCollection
+  // on the target collection directly
+  throw new Error('Copy artifact not implemented. Use addArtifactToCollection on target collection.');
 }
 
 /**
  * Move artifact to another collection
- * @param sourceCollectionId - Source collection ID
- * @param artifactId - Artifact ID to move
- * @param data - Target collection information
+ * @param _sourceCollectionId - Source collection ID (unused)
+ * @param _artifactId - Artifact ID to move (unused)
+ * @param data - Target collection information (unused)
+ * @deprecated Not yet implemented - use addArtifactToCollection + removeArtifactFromCollection instead
  */
 export async function moveArtifactToCollection(
-  sourceCollectionId: string,
-  artifactId: string,
-  data: { target_collection_id: string }
+  _sourceCollectionId: string,
+  _artifactId: string,
+  _data: { target_collection_id: string }
 ): Promise<{ artifact_id: string; collection_id: string; added_at: string }> {
-  const response = await fetch(
-    buildUrl(`/collections/${sourceCollectionId}/artifacts/${artifactId}/move`),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`Failed to move artifact: ${response.statusText}`);
-  }
-  return response.json();
+  // TODO: Backend endpoint not implemented. As workaround, add to target and remove from source
+  throw new Error('Move artifact not implemented. Use add + remove as workaround.');
 }

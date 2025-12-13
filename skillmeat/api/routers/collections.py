@@ -1,6 +1,14 @@
-"""Collection management API endpoints.
+"""Collection management API endpoints (DEPRECATED).
 
-Provides REST API for managing collections of Claude artifacts.
+WARNING: This router is deprecated. Use /user-collections endpoints instead.
+These endpoints will be removed after 2025-06-01.
+
+Migration guide:
+- GET /collections → GET /user-collections
+- GET /collections/{id} → GET /user-collections/{id}
+- GET /collections/{id}/artifacts → GET /user-collections/{id}/artifacts
+
+For full CRUD operations (create, update, delete), use /user-collections.
 """
 
 import base64
@@ -8,7 +16,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -67,6 +75,23 @@ def decode_cursor(cursor: str) -> str:
         )
 
 
+def add_deprecation_headers(response: Response, endpoint: str) -> None:
+    """Add standard deprecation headers to response.
+
+    Args:
+        response: FastAPI Response object
+        endpoint: Endpoint path (e.g., "", "/{id}", "/{id}/artifacts")
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2025-06-01"
+    response.headers["Link"] = f'</api/v1/user-collections{endpoint}>; rel="successor-version"'
+    logger.warning(
+        f"Deprecated endpoint called: /collections{endpoint}. "
+        f"Use /user-collections{endpoint} instead. "
+        f"This endpoint will be removed after 2025-06-01."
+    )
+
+
 @router.get(
     "",
     response_model=CollectionListResponse,
@@ -79,6 +104,7 @@ def decode_cursor(cursor: str) -> str:
     },
 )
 async def list_collections(
+    response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
     limit: int = Query(
@@ -95,6 +121,7 @@ async def list_collections(
     """List all collections with cursor-based pagination.
 
     Args:
+        response: FastAPI response object for headers
         collection_mgr: Collection manager dependency
         token: Authentication token
         limit: Number of items per page
@@ -106,6 +133,8 @@ async def list_collections(
     Raises:
         HTTPException: On error
     """
+    add_deprecation_headers(response, "")
+
     try:
         logger.info(f"Listing collections (limit={limit}, after={after})")
 
@@ -189,6 +218,7 @@ async def list_collections(
 )
 async def get_collection(
     collection_id: str,
+    response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
 ) -> CollectionResponse:
@@ -196,6 +226,7 @@ async def get_collection(
 
     Args:
         collection_id: Collection identifier
+        response: FastAPI response object for headers
         collection_mgr: Collection manager dependency
         token: Authentication token
 
@@ -205,6 +236,8 @@ async def get_collection(
     Raises:
         HTTPException: If collection not found or on error
     """
+    add_deprecation_headers(response, f"/{collection_id}")
+
     try:
         logger.info(f"Getting collection: {collection_id}")
 
@@ -251,6 +284,7 @@ async def get_collection(
 )
 async def list_collection_artifacts(
     collection_id: str,
+    response: Response,
     collection_mgr: CollectionManagerDep,
     token: TokenDep,
     limit: int = Query(
@@ -272,6 +306,7 @@ async def list_collection_artifacts(
 
     Args:
         collection_id: Collection identifier
+        response: FastAPI response object for headers
         collection_mgr: Collection manager dependency
         token: Authentication token
         limit: Number of items per page
@@ -284,6 +319,8 @@ async def list_collection_artifacts(
     Raises:
         HTTPException: If collection not found or on error
     """
+    add_deprecation_headers(response, f"/{collection_id}/artifacts")
+
     try:
         logger.info(
             f"Listing artifacts in collection '{collection_id}' "

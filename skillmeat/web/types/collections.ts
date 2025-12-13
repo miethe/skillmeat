@@ -8,14 +8,24 @@ export interface Collection {
   id: string;
   /** Collection display name */
   name: string;
+  /** Collection description */
+  description?: string;
   /** Collection format version */
-  version: string;
+  version?: string;
   /** Number of artifacts in the collection */
   artifact_count: number;
+  /** Number of groups in the collection */
+  group_count?: number;
+  /** User who created the collection */
+  created_by?: string;
   /** Collection creation timestamp (ISO 8601) */
-  created: string;
+  created_at?: string;
   /** Last update timestamp (ISO 8601) */
-  updated: string;
+  updated_at?: string;
+  /** @deprecated Use created_at instead */
+  created?: string;
+  /** @deprecated Use updated_at instead */
+  updated?: string;
 }
 
 /** Request to create a new collection */

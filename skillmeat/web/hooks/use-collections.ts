@@ -7,7 +7,13 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '@/lib/api';
-import { createCollection } from '@/lib/api/collections';
+import {
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  addArtifactToCollection,
+  removeArtifactFromCollection,
+} from '@/lib/api/collections';
 import type {
   Collection,
   CreateCollectionRequest,
@@ -101,7 +107,7 @@ export function useCollections(filters?: CollectionFilters) {
       }
 
       const queryString = params.toString();
-      const path = queryString ? `/collections?${queryString}` : '/collections';
+      const path = queryString ? `/user-collections?${queryString}` : '/user-collections';
 
       const response = await apiRequest<ApiCollectionListResponse>(path);
 
@@ -146,7 +152,7 @@ export function useCollection(id: string | undefined) {
   return useQuery({
     queryKey: collectionKeys.detail(id!),
     queryFn: async (): Promise<Collection> => {
-      const collection = await apiRequest<Collection>(`/collections/${id}`);
+      const collection = await apiRequest<Collection>(`/user-collections/${id}`);
       return collection;
     },
     enabled: !!id,
@@ -194,8 +200,8 @@ export function useCollectionArtifacts(
 
       const queryString = params.toString();
       const path = queryString
-        ? `/collections/${id}/artifacts?${queryString}`
-        : `/collections/${id}/artifacts`;
+        ? `/user-collections/${id}/artifacts?${queryString}`
+        : `/user-collections/${id}/artifacts`;
 
       const response = await apiRequest<ApiCollectionArtifactsResponse>(path);
 
@@ -239,9 +245,6 @@ export function useCreateCollection() {
 /**
  * Update existing collection mutation
  *
- * Note: This endpoint is not yet implemented in the backend.
- * This hook is prepared for future implementation.
- *
  * @returns Mutation function for updating collections
  *
  * @example
@@ -257,12 +260,11 @@ export function useUpdateCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_params: {
+    mutationFn: async ({ id, data }: {
       id: string;
       data: UpdateCollectionRequest;
     }): Promise<Collection> => {
-      // TODO: Backend endpoint not yet implemented (Phase 4)
-      throw new ApiError('Collection update not yet implemented', 501);
+      return updateCollection(id, data);
     },
     onSuccess: (_, { id }) => {
       // Invalidate both the specific collection and the list
@@ -274,9 +276,6 @@ export function useUpdateCollection() {
 
 /**
  * Delete collection mutation
- *
- * Note: This endpoint is not yet implemented in the backend.
- * This hook is prepared for future implementation.
  *
  * @returns Mutation function for deleting collections
  *
@@ -290,9 +289,8 @@ export function useDeleteCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_id: string): Promise<void> => {
-      // TODO: Backend endpoint not yet implemented (Phase 4)
-      throw new ApiError('Collection deletion not yet implemented', 501);
+    mutationFn: async (id: string): Promise<void> => {
+      return deleteCollection(id);
     },
     onSuccess: () => {
       // Invalidate collections list to remove deleted item
@@ -304,9 +302,6 @@ export function useDeleteCollection() {
 /**
  * Add artifact to collection mutation
  *
- * Note: This endpoint is not yet implemented in the backend.
- * This hook is prepared for future implementation.
- *
  * @returns Mutation function for adding artifacts to collections
  *
  * @example
@@ -314,8 +309,7 @@ export function useDeleteCollection() {
  * const addArtifact = useAddArtifactToCollection();
  * await addArtifact.mutateAsync({
  *   collectionId: 'default',
- *   artifactId: 'canvas-design',
- *   position: 0
+ *   artifactId: 'canvas-design'
  * });
  * ```
  */
@@ -323,13 +317,11 @@ export function useAddArtifactToCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_params: {
+    mutationFn: async ({ collectionId, artifactId }: {
       collectionId: string;
       artifactId: string;
-      position?: number;
-    }): Promise<void> => {
-      // TODO: Backend endpoint not yet implemented (Phase 4)
-      throw new ApiError('Adding artifacts to collections not yet implemented', 501);
+    }): Promise<{ collection_id: string; added_count: number; already_present_count: number; total_artifacts: number }> => {
+      return addArtifactToCollection(collectionId, artifactId);
     },
     onSuccess: (_, { collectionId }) => {
       // Invalidate collection details and artifacts list
@@ -341,9 +333,6 @@ export function useAddArtifactToCollection() {
 
 /**
  * Remove artifact from collection mutation
- *
- * Note: This endpoint is not yet implemented in the backend.
- * This hook is prepared for future implementation.
  *
  * @returns Mutation function for removing artifacts from collections
  *
@@ -360,12 +349,11 @@ export function useRemoveArtifactFromCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (_params: {
+    mutationFn: async ({ collectionId, artifactId }: {
       collectionId: string;
       artifactId: string;
     }): Promise<void> => {
-      // TODO: Backend endpoint not yet implemented (Phase 4)
-      throw new ApiError('Removing artifacts from collections not yet implemented', 501);
+      return removeArtifactFromCollection(collectionId, artifactId);
     },
     onSuccess: (_, { collectionId }) => {
       // Invalidate collection details and artifacts list

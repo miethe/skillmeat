@@ -165,3 +165,23 @@ class UserCollectionListResponse(PaginatedResponse[UserCollectionResponse]):
     """
 
     pass
+
+
+class ArtifactSummary(BaseModel):
+    """Lightweight artifact summary for collection listings."""
+
+    name: str = Field(description="Artifact name")
+    type: str = Field(description="Artifact type (skill, command, agent, etc.)")
+    version: Optional[str] = Field(default=None, description="Current version")
+    source: str = Field(description="Source specification")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+
+
+class CollectionArtifactsResponse(PaginatedResponse[ArtifactSummary]):
+    """Paginated response for collection artifacts."""
+
+    pass
