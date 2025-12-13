@@ -38,9 +38,19 @@ web/
 │   ├── analytics.ts
 │   └── marketplace.ts
 ├── hooks/                      # Custom React hooks
+├── public/                     # Static assets
+│   └── logo.png                # App logo (header)
 ├── __tests__/                  # Unit tests (Jest)
 └── tests/                      # E2E tests (Playwright)
 ```
+
+### Static Assets
+
+| Asset | Location | Used In |
+|-------|----------|---------|
+| Logo | `public/logo.png` | `components/header.tsx` via `next/image` |
+
+Source: `docs/design/logo/skillmeat-transparent.png`
 
 ---
 
