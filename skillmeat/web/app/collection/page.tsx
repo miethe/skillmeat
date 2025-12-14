@@ -92,11 +92,17 @@ function CollectionPageContent() {
   const { toast } = useToast();
 
   // View mode with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === 'undefined') return 'grid';
-    const stored = localStorage.getItem('collection-view-mode');
-    return (stored as ViewMode) || 'grid';
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  // Sync from localStorage after mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('collection-view-mode');
+      if (stored && ['grid', 'list', 'grouped'].includes(stored)) {
+        setViewMode(stored as ViewMode);
+      }
+    }
+  }, []);
 
   // Persist view mode changes
   useEffect(() => {
