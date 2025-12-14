@@ -319,3 +319,19 @@
 - **Fix**: Added `'Content-Type': 'application/json'` to the default headers in `buildApiHeaders()`
 - **Commit(s)**: 6fb51ab
 - **Status**: RESOLVED
+
+## 2025-12-13
+
+### Create New Collection Button Shows "Not Yet Implemented" Error
+
+**Issue**: Clicking "Create New Collection" button on `/collection` page displays error toast "Collection creation not yet implemented" despite backend endpoint being fully functional.
+- **Location**: `skillmeat/web/hooks/use-collections.ts:233`, `skillmeat/web/lib/api/collections.ts:46`
+- **Root Cause**: Two issues combined:
+  1. `useCreateCollection()` hook threw `ApiError('Collection creation not yet implemented', 501)` immediately instead of calling the API client
+  2. `createCollection()` API client targeted `/collections` (read-only endpoint) instead of `/user-collections` (fully implemented POST endpoint)
+- **Fix**:
+  1. Changed API client endpoint from `/collections` to `/user-collections` in `lib/api/collections.ts`
+  2. Replaced stub in `hooks/use-collections.ts` with actual `createCollection()` call
+  3. Added `description?: string` to `CreateCollectionRequest` type to match backend schema
+- **Commit(s)**: 86e9190
+- **Status**: RESOLVED
