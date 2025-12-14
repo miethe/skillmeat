@@ -41,14 +41,18 @@ If not, utilize artifact-tracking skill to create necessary progress and context
 
 Work through the plan using the pre-computed parallelization strategy in the progress file.
 
-#### 2.1 Read Progress File YAML Only (Token Efficient)
+#### 2.1 Token-Efficient Context Loading
 
-**DO NOT** read the entire progress file yourself; your delegates can read the relevant sections during implementation. Instead, extract only the YAML frontmatter:
+**DO NOT** read full files yourself; subagents read at ~96% lower cost.
+
+**Progress files**: Extract only YAML frontmatter, not full markdown:
 
 ```bash
 # Extract YAML frontmatter (first ~100 lines, ~2KB vs ~25KB for full file)
 head -100 ${progress_file} | sed -n '/^---$/,/^---$/p'
 ```
+
+**Implementation files**: Provide file paths to subagents, not contents. They read at Sonnet/Haiku cost. Only read files yourself when orchestration decisions require understanding current state.
 
 From YAML, identify:
 - Current `tasks` array with `assigned_to`, `dependencies`, `status`
