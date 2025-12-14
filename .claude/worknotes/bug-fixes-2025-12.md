@@ -335,3 +335,19 @@
   3. Added `description?: string` to `CreateCollectionRequest` type to match backend schema
 - **Commit(s)**: 86e9190
 - **Status**: RESOLVED
+
+## 2025-12-14
+
+### React Hydration Mismatch on Navigation and Collection Pages
+
+**Issue**: Client-side hydration mismatch errors on page load with multiple components:
+  - NavSection Marketplace: `aria-expanded={true}` vs `aria-expanded="false"`
+  - CollectionPage: Skeleton vs actual content rendering mismatch
+- **Location**: `skillmeat/web/components/nav-section.tsx:119-126`, `skillmeat/web/context/collection-context.tsx:46-53`, `skillmeat/web/app/collection/page.tsx:95-99`
+- **Root Cause**: Three components read from localStorage during `useState` initialization. Server renders with default values (null/false/grid), but client initializes with localStorage values, causing hydration mismatch when stored values differ.
+- **Fix**: Applied deferred hydration pattern to all three components:
+  1. **NavSection**: Initialize `isExpanded` with deterministic default (`isChildActive || defaultExpanded`), sync from localStorage in useEffect after mount with `hasMounted` state
+  2. **CollectionProvider**: Initialize `selectedCollectionId` with `null`, sync from localStorage in useEffect after mount
+  3. **CollectionPageContent**: Initialize `viewMode` with `'grid'`, sync from localStorage in useEffect after mount
+- **Commit(s)**: c9f8968
+- **Status**: RESOLVED
