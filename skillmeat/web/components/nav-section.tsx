@@ -115,25 +115,30 @@ export function NavSection({
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
   );
 
-  // Initialize expanded state
-  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
-    // Priority: localStorage > active child > defaultExpanded
+  // Initialize expanded state with server-safe default
+  const [isExpanded, setIsExpanded] = useState<boolean>(isChildActive || defaultExpanded);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  // Sync from localStorage after hydration
+  useEffect(() => {
+    setHasMounted(true);
     if (storageKey) {
       const stored = loadExpandedState(storageKey);
-      if (stored !== null) return stored;
+      if (stored !== null) {
+        setIsExpanded(stored);
+      }
     }
-    return isChildActive || defaultExpanded;
-  });
+  }, [storageKey]);
 
   // Auto-expand if child becomes active
   useEffect(() => {
-    if (isChildActive && !isExpanded) {
+    if (hasMounted && isChildActive && !isExpanded) {
       setIsExpanded(true);
       if (storageKey) {
         saveExpandedState(storageKey, true);
       }
     }
-  }, [isChildActive, isExpanded, storageKey]);
+  }, [hasMounted, isChildActive, isExpanded, storageKey]);
 
   // Toggle handler
   const handleToggle = useCallback(() => {

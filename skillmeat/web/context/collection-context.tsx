@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useCollections, useCollection } from '@/hooks/use-collections';
 import { useGroups } from '@/hooks/use-groups';
 import type { Collection } from '@/types/collections';
@@ -42,17 +42,23 @@ interface CollectionProviderProps {
 }
 
 export function CollectionProvider({ children }: CollectionProviderProps) {
-  // Initialize from localStorage (SSR-safe)
-  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      return localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
-
+  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setSelectedCollectionIdState(stored);
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+    }
+  }, []);
 
   // Persist to localStorage
   const setSelectedCollectionId = useCallback((id: string | null) => {
