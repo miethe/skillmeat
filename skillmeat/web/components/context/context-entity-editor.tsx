@@ -212,7 +212,11 @@ export function ContextEntityEditor({
     <form onSubmit={handleSubmit(onSubmit)} className="flex h-full flex-col">
       {/* Error message */}
       {error && (
-        <div className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+        >
           {error}
         </div>
       )}
@@ -296,12 +300,13 @@ export function ContextEntityEditor({
               })}
               placeholder="e.g., .claude/rules/web/hooks.md"
               disabled={isLoading}
+              aria-describedby="path_pattern-help"
             />
-            <p className="text-xs text-muted-foreground">
+            <p id="path_pattern-help" className="text-xs text-muted-foreground">
               Must start with <code className="rounded bg-muted px-1 py-0.5">.claude/</code>
             </p>
             {errors.path_pattern && (
-              <p className="text-sm text-destructive">{errors.path_pattern.message}</p>
+              <p className="text-sm text-destructive" role="alert">{errors.path_pattern.message}</p>
             )}
           </div>
 
@@ -325,8 +330,9 @@ export function ContextEntityEditor({
               {...register('category')}
               placeholder="e.g., api, frontend, debugging"
               disabled={isLoading}
+              aria-describedby="category-help"
             />
-            <p className="text-xs text-muted-foreground">
+            <p id="category-help" className="text-xs text-muted-foreground">
               For progressive disclosure grouping
             </p>
           </div>
@@ -342,6 +348,7 @@ export function ContextEntityEditor({
                   checked={value}
                   onCheckedChange={onChange}
                   disabled={isLoading}
+                  aria-describedby="auto_load-help"
                 />
               )}
             />
@@ -349,7 +356,7 @@ export function ContextEntityEditor({
               <Label htmlFor="auto_load" className="text-sm font-normal">
                 Auto-load when path pattern matches edited files
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p id="auto_load-help" className="text-xs text-muted-foreground">
                 Enable for path-scoped rules and context files
               </p>
             </div>
@@ -363,8 +370,9 @@ export function ContextEntityEditor({
               {...register('version')}
               placeholder="e.g., 1.0.0"
               disabled={isLoading}
+              aria-describedby="version-help"
             />
-            <p className="text-xs text-muted-foreground">Semantic versioning recommended</p>
+            <p id="version-help" className="text-xs text-muted-foreground">Semantic versioning recommended</p>
           </div>
         </div>
 
@@ -382,7 +390,7 @@ export function ContextEntityEditor({
               className="h-full"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p id="content-help" className="text-xs text-muted-foreground">
             Markdown content for this context entity
           </p>
         </div>

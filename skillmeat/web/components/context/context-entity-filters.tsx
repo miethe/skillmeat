@@ -68,6 +68,13 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
     filters.category ||
     filters.auto_load !== undefined;
 
+  const activeFilterCount = [
+    filters.search,
+    filters.entity_type,
+    filters.category,
+    filters.auto_load !== undefined,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-6 p-4">
       {/* Search */}
@@ -153,9 +160,10 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
           size="sm"
           onClick={handleClearFilters}
           className="w-full"
+          aria-label={`Clear ${activeFilterCount} active ${activeFilterCount === 1 ? 'filter' : 'filters'}`}
         >
-          <X className="mr-2 h-4 w-4" />
-          Clear Filters
+          <X className="mr-2 h-4 w-4" aria-hidden="true" />
+          Clear {activeFilterCount} {activeFilterCount === 1 ? 'Filter' : 'Filters'}
         </Button>
       )}
     </div>

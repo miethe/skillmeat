@@ -150,11 +150,11 @@ export function DeployToProjectDialog({
           {/* Project Selector */}
           <div className="space-y-2">
             <label htmlFor="project" className="flex items-center gap-2 text-sm font-medium">
-              <Folder className="h-4 w-4" />
+              <Folder className="h-4 w-4" aria-hidden="true" />
               Target Project
             </label>
             <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isDeploying}>
-              <SelectTrigger id="project">
+              <SelectTrigger id="project" aria-label="Select target project for deployment">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
@@ -199,12 +199,13 @@ export function DeployToProjectDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
+          <Button variant="outline" onClick={handleClose} disabled={isDeploying} aria-label="Cancel deployment">
             Cancel
           </Button>
           <Button
             onClick={handleDeploy}
             disabled={!selectedProject || isDeploying}
+            aria-label={isDeploying ? 'Deploying entity to project' : `Deploy ${entity.name} to selected project`}
           >
             {isDeploying ? 'Deploying...' : 'Deploy'}
           </Button>

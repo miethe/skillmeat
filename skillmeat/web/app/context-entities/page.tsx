@@ -172,6 +172,14 @@ export default function ContextEntitiesPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* Skip Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:rounded focus:outline focus:outline-2 focus:outline-primary"
+      >
+        Skip to main content
+      </a>
+
       {/* Page Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -181,8 +189,8 @@ export default function ContextEntitiesPage() {
             templates.
           </p>
         </div>
-        <Button onClick={handleCreateNew}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={handleCreateNew} aria-label="Add new context entity">
+          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Add Entity
         </Button>
       </div>
@@ -190,15 +198,15 @@ export default function ContextEntitiesPage() {
       {/* Main Layout: Filters + Content */}
       <div className="flex gap-6">
         {/* Filters Sidebar */}
-        <div className="w-64 flex-shrink-0">
+        <nav aria-label="Filter context entities" className="w-64 flex-shrink-0">
           <div className="space-y-4 rounded-lg border bg-card p-4">
             <h2 className="text-sm font-semibold">Filters</h2>
             <ContextEntityFilters filters={filters} onFiltersChange={setFilters} />
           </div>
-        </div>
+        </nav>
 
         {/* Content Area */}
-        <div className="flex-1 space-y-4">
+        <main id="main-content" className="flex-1 space-y-4">
           {/* Results Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -228,7 +236,12 @@ export default function ContextEntitiesPage() {
           )}
 
           {/* Loading State */}
-          {isLoading && <LoadingSkeleton />}
+          {isLoading && (
+            <div role="status" aria-live="polite" aria-label="Loading context entities">
+              <LoadingSkeleton />
+              <span className="sr-only">Loading context entities...</span>
+            </div>
+          )}
 
           {/* Empty State */}
           {!isLoading && !error && (!data?.items || data.items.length === 0) && (
@@ -258,21 +271,22 @@ export default function ContextEntitiesPage() {
                     variant="outline"
                     onClick={handleLoadMore}
                     disabled={isLoading}
+                    aria-label={isLoading ? 'Loading more context entities' : 'Load more context entities'}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading...
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                        Loading more entities...
                       </>
                     ) : (
-                      'Load More'
+                      'Load More Entities'
                     )}
                   </Button>
                 </div>
               )}
             </>
           )}
-        </div>
+        </main>
       </div>
 
       {/* Detail Modal */}

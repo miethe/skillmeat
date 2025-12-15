@@ -219,6 +219,8 @@ export function ContextEntityDetail({
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowRawContent(!showRawContent)}
+                      aria-label={showRawContent ? 'Show formatted content' : 'Show raw markdown content'}
+                      aria-pressed={showRawContent}
                     >
                       {showRawContent ? 'Show Formatted' : 'Show Raw'}
                     </Button>
@@ -226,8 +228,8 @@ export function ContextEntityDetail({
 
                   <div className="rounded-lg border bg-muted/50">
                     {isContentLoading ? (
-                      <div className="flex items-center justify-center p-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <div className="flex items-center justify-center p-8" role="status" aria-live="polite">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
                         <span className="ml-2 text-sm text-muted-foreground">
                           Loading content...
                         </span>
@@ -319,8 +321,9 @@ export function ContextEntityDetail({
                       variant="outline"
                       className="justify-start"
                       onClick={() => onEdit(entity)}
+                      aria-label={`Edit ${entity.name}`}
                     >
-                      <Edit className="mr-2 h-4 w-4" />
+                      <Edit className="mr-2 h-4 w-4" aria-hidden="true" />
                       Edit
                     </Button>
                   )}
@@ -329,14 +332,15 @@ export function ContextEntityDetail({
                       variant="default"
                       className="justify-start"
                       onClick={() => onDeploy(entity)}
+                      aria-label={`Deploy ${entity.name} to project`}
                     >
-                      <Upload className="mr-2 h-4 w-4" />
+                      <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
                       Deploy
                     </Button>
                   )}
                 </div>
-                <Button variant="ghost" onClick={handleClose}>
-                  <X className="mr-2 h-4 w-4" />
+                <Button variant="ghost" onClick={handleClose} aria-label="Close dialog">
+                  <X className="mr-2 h-4 w-4" aria-hidden="true" />
                   Close
                 </Button>
               </div>

@@ -277,16 +277,16 @@ export function ContextEntityCard({
 
         {/* Hover Actions */}
         {(onEdit || onDelete) && (
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             {onEdit && (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
                 onClick={handleEdit}
-                aria-label="Edit entity"
+                aria-label={`Edit ${entity.name}`}
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
             {onDelete && (
@@ -295,9 +295,9 @@ export function ContextEntityCard({
                 size="icon"
                 className="h-8 w-8 text-destructive hover:text-destructive"
                 onClick={handleDelete}
-                aria-label="Delete entity"
+                aria-label={`Delete ${entity.name}`}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -312,7 +312,11 @@ export function ContextEntityCard({
 
         {/* Path Pattern and Token Count */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
+          <span
+            className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded"
+            title={entity.path_pattern}
+            aria-label={`Path pattern: ${entity.path_pattern}`}
+          >
             {truncatedPath}
           </span>
           {entity.version && (
@@ -346,7 +350,7 @@ export function ContextEntityCard({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-xs text-muted-foreground">ⓘ</span>
+                    <span className="text-xs text-muted-foreground" aria-label="Help">ⓘ</span>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Automatically load this entity when path pattern matches</p>
@@ -358,8 +362,12 @@ export function ContextEntityCard({
               id={`auto-load-${entity.id}`}
               checked={entity.auto_load}
               onCheckedChange={handleAutoLoadToggle}
-              aria-label="Auto-load this entity"
+              aria-describedby={`auto-load-help-${entity.id}`}
+              aria-label={`Auto-load ${entity.name} when path pattern matches`}
             />
+            <span id={`auto-load-help-${entity.id}`} className="sr-only">
+              Automatically load this entity when path pattern matches edited files
+            </span>
           </div>
         )}
 
@@ -370,9 +378,9 @@ export function ContextEntityCard({
               variant="ghost"
               size="sm"
               onClick={handlePreview}
-              aria-label="Preview entity"
+              aria-label={`Preview ${entity.name}`}
             >
-              <Eye className="h-4 w-4 mr-1" />
+              <Eye className="h-4 w-4 mr-1" aria-hidden="true" />
               Preview
             </Button>
           )}
@@ -381,9 +389,9 @@ export function ContextEntityCard({
               variant="ghost"
               size="sm"
               onClick={handleDeploy}
-              aria-label="Deploy entity"
+              aria-label={`Deploy ${entity.name} to project`}
             >
-              <Rocket className="h-4 w-4 mr-1" />
+              <Rocket className="h-4 w-4 mr-1" aria-hidden="true" />
               Deploy
             </Button>
           )}
