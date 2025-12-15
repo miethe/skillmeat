@@ -3,90 +3,102 @@ type: progress
 prd: "agent-context-entities"
 phase: 4
 phase_title: "Collections & Templates"
-status: pending
-progress: 0
+status: completed
+progress: 100
 total_tasks: 11
-completed_tasks: 0
+completed_tasks: 11
 created: "2025-12-14"
-updated: "2025-12-14"
+updated: "2025-12-15"
+completed_at: "2025-12-15"
 
 tasks:
   - id: "TASK-4.1"
     name: "Create Project Templates Database Models"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: []
     estimate: 2
+    commit: "a4736d6"
 
   - id: "TASK-4.2"
     name: "Create Alembic Migration for Templates"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: ["TASK-4.1"]
     estimate: 2
+    commit: "a4736d6"
 
   - id: "TASK-4.3"
     name: "Create API Schemas for Templates"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-4.1"]
     estimate: 2
+    commit: "a4736d6"
 
   - id: "TASK-4.4"
     name: "Create Project Templates Router"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-4.2", "TASK-4.3"]
     estimate: 3
+    commit: "a4736d6"
 
   - id: "TASK-4.5"
     name: "Create Template Rendering Service"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-4.1"]
     estimate: 3
+    commit: "a4736d6"
 
   - id: "TASK-4.6"
     name: "Extend Collections API for Context Type"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimate: 2
+    commit: "a4736d6"
 
   - id: "TASK-4.7"
     name: "Create 3 Predefined Templates"
-    status: "pending"
+    status: "completed"
     assigned_to: ["documentation-writer"]
     dependencies: ["TASK-4.1", "TASK-4.5"]
     estimate: 3
+    commit: "a4736d6"
 
   - id: "TASK-4.8"
     name: "Create TemplateCard Component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: 1
+    commit: "a4736d6"
 
   - id: "TASK-4.9"
     name: "Create TemplateDetail Modal"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-4.8"]
     estimate: 2
+    commit: "a4736d6"
 
   - id: "TASK-4.10"
     name: "Create Template Deployment Wizard"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-4.9"]
     estimate: 3
+    commit: "a4736d6"
 
   - id: "TASK-4.11"
     name: "Create Templates List Page"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-4.8", "TASK-4.9", "TASK-4.10"]
     estimate: 2
+    commit: "a4736d6"
 
 parallelization:
   batch_1: ["TASK-4.1", "TASK-4.3"]
