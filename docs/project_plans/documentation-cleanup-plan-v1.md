@@ -240,46 +240,182 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
+## Section 2.5: Implementation Status Analysis (2025-12-15)
+
+This section documents the comprehensive analysis of all PRDs, ideas files, and actual codebase implementation status. This analysis supersedes assumptions in the original cleanup plan.
+
+### 2.5.1 PRD Inventory (12 Major Features)
+
+| PRD | Phase | Status | Story Points | Implementation Status |
+|-----|-------|--------|--------------|----------------------|
+| Artifact Version Tracking & Sync | Phase 2 | Ready | ~70 | ⏳ NOT STARTED |
+| Entity Lifecycle Management | Phase 3 | Draft | 30 | ⏳ NOT STARTED |
+| Web UI Consolidation | Phase 3+ | Draft | ~25 | ⏳ NOT STARTED |
+| Artifact Flow Modal Redesign | Phase 3+ | Design | - | 🟡 PARTIAL (components exist) |
+| Persistent Project Cache | Phase 3+ | Draft | ~36 | ✅ IMPLEMENTED |
+| Versioning & Merge System | Phase 3+ | Draft | 68 | ⏳ NOT STARTED |
+| Smart Import & Discovery | Phase 4 | Draft | ~50 | 🟡 PARTIAL (discovery done, auto-populate pending) |
+| Notification System | Phase 5-6 | Draft | 95 | ✅ IMPLEMENTED |
+| GitHub Marketplace Ingestion | Phase 4+ | Draft | ~60 | ⏳ NOT STARTED |
+| Discovery & Import Enhancement | Phase 5-6 | Draft | ~30 | ✅ IMPLEMENTED |
+| Collections & Site Navigation | Phase 6+ | Draft | 65 | ✅ IMPLEMENTED |
+| Agent Context Entities | Phase 4+ | Draft | ~70 | 🟡 PARTIAL (CLI done, API stubs) |
+
+**Total Planned:** ~600 story points | **Implemented:** ~200+ points
+
+### 2.5.2 Implementation Status Detail
+
+#### ✅ FULLY IMPLEMENTED Features
+
+**1. Notification System** (95 SP)
+- NotificationProvider context with localStorage persistence
+- NotificationCenter UI with bell icon, unread badge, accessibility
+- Support for import_result, sync_result, error, info notification types
+- FIFO eviction (max 50 notifications)
+- Detailed notification expansion (import results, errors)
+- Files: `web/lib/notification-store.tsx`, `web/components/notifications/NotificationCenter.tsx`
+
+**2. Collections & Site Navigation** (65 SP)
+- Collection switcher with localStorage persistence
+- Collection context provider
+- Groups functionality with full CRUD API
+- Grouped artifact view with drag-drop support
+- ManageGroupsDialog component
+- Files: `web/context/collection-context.tsx`, `web/components/collection/collection-switcher.tsx`
+
+**3. Groups Functionality** (included in Collections Nav)
+- SQLAlchemy models: Group, GroupArtifact
+- Full REST API: create, list, get, update, delete, reorder
+- TanStack Query hooks for frontend
+- Files: `api/routers/groups.py`, `cache/models.py`, `web/hooks/use-groups.ts`
+
+**4. Discovery & Import Enhancement** (30 SP)
+- DiscoveryBanner component with dismissal
+- BulkImportModal with per-artifact status
+- Discovery caching with TTL
+- Skip preferences system
+- Analytics integration
+- Files: `web/components/discovery/*.tsx`, `core/discovery.py`
+
+**5. Persistent Project Cache** (36 SP)
+- SQLite database at `~/.skillmeat/cache.db`
+- SQLAlchemy ORM models (Project, Artifact, Collection, etc.)
+- Cache manager with thread-safe operations
+- Background refresh with file watcher
+- Alembic migrations
+- Files: `cache/models.py`, `cache/manager.py`, `cache/refresh.py`, `cache/watcher.py`
+
+#### 🟡 PARTIALLY IMPLEMENTED Features
+
+**6. Agent Context Entities** (~70 SP)
+- ✅ CLI commands: `skillmeat context add/list/show/deploy/remove`
+- ✅ Frontend: Types, API client, React hooks
+- ❌ Backend API: Returns 501 (needs ContextEntity SQLAlchemy model)
+- Blocker: TASK-1.2 database model not yet implemented
+- Files: `cli.py` (lines 8633-8665), `api/routers/context_entities.py` (stubs)
+
+**7. Artifact Flow Modal Redesign**
+- ✅ ArtifactFlowBanner component (3-tier visualization)
+- ✅ DiffViewer component with syntax highlighting
+- ✅ Sync status components (drift alert, comparison selector)
+- ❌ Full modal wrapper combining all components not yet built
+- Files: `web/components/sync-status/*.tsx`, `web/components/entity/diff-viewer.tsx`
+
+**8. Smart Import & Discovery** (~50 SP)
+- ✅ Discovery scan and banner
+- ✅ Bulk import workflow
+- ❌ Auto-populate from GitHub URLs not implemented
+- ❌ Metadata extraction from GitHub API not implemented
+
+#### ⏳ NOT STARTED Features
+
+- Artifact Version Tracking & Sync (Phase 2)
+- Entity Lifecycle Management (Phase 3)
+- Web UI Consolidation (Phase 3+)
+- Versioning & Merge System (Phase 3+)
+- GitHub Marketplace Ingestion (Phase 4+)
+
+### 2.5.3 Ideas Files Summary
+
+**7 files analyzed** in `docs/project_plans/ideas/`:
+
+| File | Date | Key Ideas | Status |
+|------|------|-----------|--------|
+| enhancements-11-25.md | Nov 25 | Auto-scan, auto-populate, plugin support, cache, versioning, diffs | Mixed - cache done, others pending |
+| enhancements-11-30.md | Nov 30 | Auto-sync to multiple projects | Not started |
+| enhancements-12-03.md | Dec 3 | Custom grouping, deployment tab, deployment counter, tooltips | Grouping done |
+| enhancements-12-04.md | Dec 4 | Discovery/import improvements | Implemented |
+| enhancements-12-12-Collections-Nav.md | Dec 12 | Full Collections Navigation spec | Implemented |
+| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Partial |
+| requests-template.md | - | Template for request log format | Reference doc |
+
+### 2.5.4 Key Findings
+
+1. **Phase 5-6 work is largely COMPLETE** - Notification System, Collections Navigation, Discovery Enhancement all implemented
+2. **Phase 3-4 features mostly NOT STARTED** - Version tracking, merge system, entity lifecycle pending
+3. **Context Entities actively in progress** - Recent commits show Phase 2 CLI work complete, blocking on database model
+4. **Documentation reflects old assumptions** - Release notes section assumed features not implemented that are now complete
+
+---
+
 ## Section 3: Update Requirements
 
 ### 3.1 Release Notes (CRITICAL - v0.3.0-beta)
 
 **File:** `/docs/release-notes/v0.3.0-beta.md`
 
-**Current Status:** Needs comprehensive update with Phase 5 & 6 work
+**Current Status:** Needs comprehensive update based on actual implementation analysis (Section 2.5)
 
 **Required Updates:**
 
-1. **New Features**
-   - Collections Navigation (Phase 6)
-   - Agent Context Entities (Phase 5)
-   - Entity Lifecycle Management (Phase 5)
-   - Smart Import Discovery (Phase 5)
-   - Web UI Consolidation (Phase 6)
-   - Marketplace improvements
-   - MCP enhancements
-   - Security updates
+1. **New Features (IMPLEMENTED)**
+   - **Notification System** - Full notification center with bell icon, unread badges, localStorage persistence, expandable details
+   - **Collections Navigation** - Collection switcher, multi-collection support, sidebar restructuring
+   - **Groups Functionality** - Custom groups within collections, drag-drop support, group management UI
+   - **Discovery & Import** - Discovery banner, bulk import modal, skip preferences, caching
+   - **Persistent Project Cache** - SQLite cache, background refresh, file watcher, sub-second load times
+   - **Artifact Flow Banner** - 3-tier visualization (Source → Collection → Project), sync status
+   - **Diff Viewer** - Syntax-highlighted diff comparison with unified/side-by-side views
+   - **Agent Context Entities (CLI)** - `skillmeat context` command group for managing context files
 
-2. **Breaking Changes**
-   - Any API changes
-   - CLI command changes
-   - Data structure changes
+2. **Partial Features (Document as Preview/Beta)**
+   - **Agent Context Entities (Web UI)** - Types and hooks ready, API pending database model
+   - **Artifact Flow Modal** - Components available, full modal integration in progress
+   - **Smart Import** - Discovery working, auto-populate from GitHub URLs coming soon
 
-3. **Bug Fixes**
-   - LocalStorage hydration fixes
-   - Collections API fixes
-   - Web UI fixes
+3. **Breaking Changes**
+   - Collections API: `/user-collections` endpoint for mutations (not `/collections`)
+   - Groups API: New endpoints at `/api/v1/groups`
+   - Cache database: New SQLite schema with Alembic migrations
+   - Context entities: New CLI command group `skillmeat context`
+
+4. **Bug Fixes**
+   - LocalStorage hydration fixes for SSR compatibility
+   - Collections API endpoint corrections
+   - Discovery cache invalidation fixes
+   - Import status mismatch (failed vs skipped) corrections
    - See: `.claude/worknotes/bug-fixes-2025-12.md`
 
-4. **Performance Improvements**
-   - Benchmarks from Phase 5/6
+5. **Performance Improvements**
+   - Project load time: 1+ min → <100ms (with cache)
+   - 95%+ cache hit rate target
+   - Background refresh reduces stale data
 
-5. **Deprecations**
-   - Any deprecated features or commands
+6. **Deprecations**
+   - None in this release
 
-6. **Known Issues**
-   - Phase 4 features not included
-   - Any known limitations
+7. **Known Issues**
+   - Context Entities API returns 501 (database model pending)
+   - Artifact Flow Modal not yet consolidated into single dialog
+   - Auto-populate from GitHub URLs not yet implemented
+   - Versioning & merge system not included (Phase 3+)
+
+8. **Future Roadmap (NOT in v0.3.0-beta)**
+   - Artifact Version Tracking & Bidirectional Sync
+   - Full Entity Lifecycle Management
+   - Versioning & Merge System with conflict resolution
+   - GitHub Marketplace Ingestion
+   - Web UI Consolidation
 
 ---
 
@@ -412,26 +548,37 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
    - Root level (10 files)
    - API tests (5 files)
    - Web frontend (12 files)
-   - Estimated time: 2 hours
 
 2. **UPDATE release notes** (`v0.3.0-beta.md`)
-   - Add all Phase 5 & 6 features
-   - Document breaking changes
-   - List bug fixes
-   - Estimated time: 3 hours
+   - Document 5 FULLY IMPLEMENTED features (see Section 2.5.2):
+     - Notification System (95 SP worth of functionality)
+     - Collections Navigation with Groups (65 SP)
+     - Discovery & Import Enhancement (30 SP)
+     - Persistent Project Cache (36 SP)
+     - Artifact Flow Banner + Diff Viewer
+   - Document 3 PARTIAL features as Preview/Beta:
+     - Agent Context Entities CLI (`skillmeat context` commands)
+     - Smart Import (discovery working, auto-populate pending)
+     - Artifact Flow Modal (components exist, full modal pending)
+   - List breaking changes (see Section 3.1)
+   - Include known issues and blockers
 
 3. **VERIFY core documentation** (4 files)
    - `docs/quickstart.md` - Installation & first steps
-   - `docs/commands.md` - CLI reference
+   - `docs/commands.md` - CLI reference (add `skillmeat context` commands)
    - `docs/web_commands.md` - Web UI commands
    - `docs/examples.md` - Usage examples
-   - Estimated time: 4 hours
 
 4. **UPDATE web UI guide** (`docs/guides/web-ui-guide.md`)
-   - Add Collections Navigation info
-   - Update screenshots
-   - Document new workflows
-   - Estimated time: 3 hours
+   - Document Notification Center (bell icon, expandable details)
+   - Document Collections Navigation (switcher, groups, views)
+   - Document Discovery Banner and Bulk Import
+   - Update screenshots for new UI components
+
+5. **CREATE new documentation** (if not exists)
+   - Collections & Groups guide (new feature)
+   - Discovery & Import guide (new feature)
+   - Context Entities CLI guide (preview)
 
 ---
 
@@ -440,22 +587,27 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 **Goal:** Complete feature documentation
 
 1. **Complete CLI command reference**
-   - Document all 81 commands
+   - Document all 81+ commands (including new `context` group)
+   - Add `skillmeat context add/list/show/deploy/remove` documentation
    - Add error handling
    - Organize by command group
-   - Estimated time: 4 hours
 
 2. **Update feature guides**
    - Marketplace guides (2 files)
    - MCP guides (3 files)
    - Team sharing guide (1 file)
-   - Estimated time: 5 hours
+   - Cache management guide (new - document persistent cache)
 
 3. **Review & consolidate session notes**
-   - Bugs tracking (3 files)
-   - Ideas/enhancements (5 files)
-   - Create proper issue tracking
-   - Estimated time: 2 hours
+   - Bugs tracking (3 files in `docs/project_plans/bugs/`)
+   - Ideas/enhancements (7 files in `docs/project_plans/ideas/`)
+   - Mark implemented ideas as DONE (see Section 2.5.3)
+   - Create proper issue tracking for pending items
+
+4. **Archive or update PRD status**
+   - Mark implemented PRDs (5) as COMPLETE
+   - Update partial PRDs (3) with current blockers
+   - Keep planned PRDs (4) as roadmap reference
 
 ---
 
@@ -681,24 +833,44 @@ tags:
 
 ### Release-Ready Documentation Checklist
 
+**Cleanup Tasks:**
 - [ ] All 25+ policy violation files deleted
-- [ ] Release notes comprehensive and current
-- [ ] All 81 CLI commands documented with examples
+- [ ] No session notes or exploration reports in `/docs/`
+- [ ] Bug and idea tracking moved to proper locations
+- [ ] PRD status updated (5 complete, 3 partial, 4 planned)
+
+**Release Notes (v0.3.0-beta):**
+- [ ] 5 fully implemented features documented
+- [ ] 3 partial/preview features documented
+- [ ] Breaking changes documented
+- [ ] Known issues and blockers listed
+- [ ] Future roadmap section added
+
+**Core Documentation:**
+- [ ] All 81+ CLI commands documented (including new `context` group)
 - [ ] All 12 production web pages documented
-- [ ] Getting started guide is complete and tested
+- [ ] Getting started guide updated for new features
 - [ ] All broken links fixed
 - [ ] Examples are current and working
 - [ ] YAML frontmatter on all permanent docs
-- [ ] No session notes or exploration reports in `/docs/`
-- [ ] Bug and idea tracking moved to proper locations
 
-### Estimated Completion Time
+**New Feature Documentation:**
+- [ ] Notification System guide (or section in web-ui-guide)
+- [ ] Collections & Groups guide
+- [ ] Discovery & Import guide
+- [ ] Persistent Cache guide (or section in architecture docs)
+- [ ] Context Entities CLI reference (preview)
 
-- **Phase 1 (Critical):** 12 hours (1.5 days)
-- **Phase 2 (Important):** 11 hours (1.5 days)
-- **Phase 3 (Long-term):** 18 hours (2-3 days)
+### Implementation Status Summary
 
-**Total:** ~41 hours over 4-6 weeks
+| Category | Count | Details |
+|----------|-------|---------|
+| PRDs Analyzed | 12 | See Section 2.5.1 |
+| Ideas Files Analyzed | 7 | See Section 2.5.3 |
+| Features IMPLEMENTED | 5 | ~200+ story points delivered |
+| Features PARTIAL | 3 | Active development |
+| Features NOT STARTED | 4 | Roadmap items |
+| Total Roadmap | ~600 SP | Across all PRDs |
 
 ---
 
@@ -738,12 +910,17 @@ tags:
 docs/
 ├── README.md                          # Main documentation index
 ├── quickstart.md                      # Getting started (5 min)
-├── commands.md                        # CLI reference (all 81 commands)
+├── commands.md                        # CLI reference (all 81+ commands)
 ├── web_commands.md                    # Web UI reference
 ├── examples.md                        # Usage examples
 ├── SECURITY.md                        # Security info
 ├── guides/
-│   ├── web-ui-guide.md               # Web UI walkthrough
+│   ├── web-ui-guide.md               # Web UI walkthrough (update for new features)
+│   ├── collections-groups-guide.md    # NEW: Collections & Groups (65 SP feature)
+│   ├── discovery-import-guide.md      # NEW: Discovery & Bulk Import (30 SP feature)
+│   ├── notifications-guide.md         # NEW: Notification System (95 SP feature)
+│   ├── cache-management-guide.md      # NEW: Persistent Cache (36 SP feature)
+│   ├── context-entities-guide.md      # NEW: Context Entities CLI (preview)
 │   ├── marketplace-usage-guide.md     # Marketplace features
 │   ├── publishing-to-marketplace.md   # Publish to marketplace
 │   ├── mcp-quick-start.md             # MCP setup
@@ -756,7 +933,7 @@ docs/
 │   └── using-analytics.md             # Analytics guide
 ├── architecture/                      # Architecture decisions
 ├── release-notes/
-│   └── v0.3.0-beta.md                # Current release
+│   └── v0.3.0-beta.md                # Current release (CRITICAL UPDATE)
 ├── api/                               # API documentation
 ├── migration/                         # Migration guides
 ├── legal/                             # Legal/compliance
@@ -769,7 +946,34 @@ docs/
 │   ├── bug-fixes-2025-12.md          # Current bug tracking
 │   └── fixes/                         # Monthly bug tracking
 └── progress/                          # Phase-based progress
+
+docs/project_plans/                    # Planning artifacts (internal)
+├── PRDs/                              # 12 PRDs (5 complete, 3 partial, 4 planned)
+│   ├── features/                      # Feature PRDs
+│   └── enhancements/                  # Enhancement PRDs
+├── implementation_plans/              # Implementation tracking
+├── ideas/                             # 7 ideas files (review & consolidate)
+└── bugs/                              # 3 bug tracking files (review & consolidate)
 ```
+
+---
+
+## Appendix C: PRD Status Cross-Reference
+
+| PRD | Phase | Status | Documentation Action |
+|-----|-------|--------|---------------------|
+| Notification System | 5-6 | ✅ COMPLETE | Create notifications-guide.md |
+| Collections Navigation | 6+ | ✅ COMPLETE | Create collections-groups-guide.md |
+| Discovery Enhancement | 5-6 | ✅ COMPLETE | Create discovery-import-guide.md |
+| Persistent Cache | 3+ | ✅ COMPLETE | Create cache-management-guide.md |
+| Agent Context Entities | 4+ | 🟡 PARTIAL | Create context-entities-guide.md (preview) |
+| Artifact Flow Modal | 3+ | 🟡 PARTIAL | Document in web-ui-guide.md |
+| Smart Import | 4 | 🟡 PARTIAL | Document in discovery-import-guide.md |
+| Version Tracking | 2 | ⏳ PLANNED | Defer documentation |
+| Entity Lifecycle | 3 | ⏳ PLANNED | Defer documentation |
+| Web UI Consolidation | 3+ | ⏳ PLANNED | Defer documentation |
+| Versioning & Merge | 3+ | ⏳ PLANNED | Defer documentation |
+| GitHub Marketplace | 4+ | ⏳ PLANNED | Defer documentation |
 
 ---
 
@@ -777,7 +981,26 @@ docs/
 
 **Author:** Documentation Cleanup & Release Planning
 **Date Created:** 2025-12-14
-**Version:** 1.0
-**Status:** Draft - Ready for Review
+**Last Updated:** 2025-12-15 (Implementation Status Analysis added)
+**Version:** 1.1
+**Status:** Draft - Updated with comprehensive PRD/Implementation analysis
 **Next Review Date:** After Phase 1 completion
+
+### Changelog
+
+**v1.1 (2025-12-15):**
+- Added Section 2.5: Implementation Status Analysis
+- Analyzed all 12 PRDs with actual implementation status
+- Analyzed all 7 ideas files
+- Verified codebase implementation via specialized agents
+- Updated Section 3.1 Release Notes requirements with accurate feature list
+- Updated Phase 1-2 priorities with specific features
+- Updated Success Criteria with implementation summary
+- Added Appendix C: PRD Status Cross-Reference
+- Updated Appendix B with new guides for implemented features
+
+**v1.0 (2025-12-14):**
+- Initial document created with policy violation inventory
+- Identified 25+ files for cleanup
+- Created priority phases for documentation work
 
