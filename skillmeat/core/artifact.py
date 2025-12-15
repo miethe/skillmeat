@@ -38,6 +38,13 @@ class ArtifactType(str, Enum):
     AGENT = "agent"
     # Future: MCP = "mcp", HOOK = "hook"
 
+    # Context entity types (agent-context-entities-v1)
+    PROJECT_CONFIG = "project_config"  # CLAUDE.md files
+    SPEC_FILE = "spec_file"  # Specification documents (.claude/specs/)
+    RULE_FILE = "rule_file"  # Rule files (.claude/rules/)
+    CONTEXT_FILE = "context_file"  # Context documents (.claude/context/)
+    PROGRESS_TEMPLATE = "progress_template"  # Progress tracking templates (.claude/progress/)
+
 
 class UpdateStrategy(str, Enum):
     """Strategies for updating artifacts with local modifications."""

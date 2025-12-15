@@ -238,6 +238,14 @@ class Artifact(Base):
         Boolean, nullable=False, default=False, server_default="0"
     )
 
+    # Context entity fields
+    path_pattern: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    auto_load: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
@@ -267,7 +275,8 @@ class Artifact(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
     )
@@ -295,6 +304,10 @@ class Artifact(Base):
             "upstream_version": self.upstream_version,
             "is_outdated": self.is_outdated,
             "local_modified": self.local_modified,
+            "path_pattern": self.path_pattern,
+            "auto_load": self.auto_load,
+            "category": self.category,
+            "content_hash": self.content_hash,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -768,7 +781,8 @@ class MarketplaceEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_marketplace_type",
         ),
     )
@@ -1092,7 +1106,8 @@ class MarketplaceCatalogEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_catalog_artifact_type",
         ),
         CheckConstraint(
