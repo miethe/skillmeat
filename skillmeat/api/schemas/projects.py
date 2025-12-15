@@ -322,7 +322,9 @@ class ProjectCreateRequest(BaseModel):
         """
         # Must be absolute path
         if not os.path.isabs(v):
-            raise ValueError("Project path must be an absolute path (e.g., /home/user/project or C:\\Users\\project)")
+            raise ValueError(
+                "Project path must be an absolute path (e.g., /home/user/project or C:\\Users\\project)"
+            )
 
         # Check for invalid characters (platform-specific)
         # Windows reserved characters
@@ -476,5 +478,104 @@ class ProjectDeleteResponse(BaseModel):
                 "success": True,
                 "message": "Project removed from tracking successfully",
                 "deleted_files": False,
+            }
+        }
+
+
+class ContextEntityInfo(BaseModel):
+    """Information about a discovered context entity in a project.
+
+    Represents a context file discovered in a project's .claude/ directory
+    with token estimates for progressive disclosure.
+    """
+
+    type: str = Field(
+        description="Type of context entity (spec_file, rule_file, context_file)",
+        examples=["rule_file"],
+    )
+    name: str = Field(
+        description="Name derived from file path",
+        examples=["web-api-client"],
+    )
+    path: str = Field(
+        description="Relative path from project root",
+        examples=[".claude/rules/web/api-client.md"],
+    )
+    tokens: int = Field(
+        description="Estimated token count for this entity",
+        examples=[1500],
+        ge=0,
+    )
+    auto_load: bool = Field(
+        default=False,
+        description="Whether this entity auto-loads based on path patterns",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "type": "rule_file",
+                "name": "web-api-client",
+                "path": ".claude/rules/web/api-client.md",
+                "tokens": 1500,
+                "auto_load": True,
+            }
+        }
+
+
+class ContextMapResponse(BaseModel):
+    """Response for project context map discovery.
+
+    Provides a categorized map of context entities in a project,
+    separated by auto-loading behavior for progressive disclosure.
+    """
+
+    auto_loaded: List[ContextEntityInfo] = Field(
+        description="Entities that auto-load based on path patterns",
+        default_factory=list,
+    )
+    on_demand: List[ContextEntityInfo] = Field(
+        description="Entities that load on-demand (context files)",
+        default_factory=list,
+    )
+    total_auto_load_tokens: int = Field(
+        description="Total estimated tokens for all auto-loaded entities",
+        examples=[5000],
+        ge=0,
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "auto_loaded": [
+                    {
+                        "type": "spec_file",
+                        "name": "doc-policy-spec",
+                        "path": ".claude/specs/doc-policy-spec.md",
+                        "tokens": 800,
+                        "auto_load": True,
+                    },
+                    {
+                        "type": "rule_file",
+                        "name": "web-api-client",
+                        "path": ".claude/rules/web/api-client.md",
+                        "tokens": 1500,
+                        "auto_load": True,
+                    },
+                ],
+                "on_demand": [
+                    {
+                        "type": "context_file",
+                        "name": "api-endpoint-mapping",
+                        "path": ".claude/context/api-endpoint-mapping.md",
+                        "tokens": 3000,
+                        "auto_load": False,
+                    },
+                ],
+                "total_auto_load_tokens": 2300,
             }
         }
