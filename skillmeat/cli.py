@@ -1912,6 +1912,201 @@ def collection_use(name: str):
 
 
 # ====================
+# Project Management Commands
+# ====================
+
+
+@main.group()
+def project():
+    """Manage project-level operations.
+
+    Commands for project-level operations such as context synchronization
+    between collections and deployed projects.
+    """
+    pass
+
+
+@project.command("sync-context")
+@click.argument(
+    "project_path", type=click.Path(exists=True, file_okay=False, dir_okay=True)
+)
+@click.option("--pull", is_flag=True, help="Pull changes from project to collection")
+@click.option("--push", is_flag=True, help="Push collection changes to project")
+@click.option("--status", is_flag=True, help="Show sync status")
+@click.option("--entities", help="Comma-separated entity IDs to sync")
+@click.option("--force", is_flag=True, help="Force overwrite conflicts")
+def sync_context(
+    project_path: str, pull: bool, push: bool, status: bool, entities: str, force: bool
+):
+    """Synchronize context entities between project and collection.
+
+    Manage bi-directional synchronization of context entities (specs, rules, etc.)
+    between your collection and deployed projects.
+
+    Operations:
+      --status: Show which entities have been modified (default if no operation specified)
+      --pull: Update collection from project files (capture manual edits)
+      --push: Update project files from collection (deploy changes)
+
+    Entity Selection:
+      By default, all deployed context entities are synced. Use --entities to
+      specify a comma-separated list of entity IDs to sync selectively.
+
+    Examples:
+      skillmeat project sync-context ~/myproject --status
+      skillmeat project sync-context ~/myproject --pull
+      skillmeat project sync-context ~/myproject --push --force
+      skillmeat project sync-context ~/myproject --pull --entities doc-policy-spec,routers-rule
+    """
+    try:
+        from skillmeat.core.services.context_sync import ContextSyncService
+        from skillmeat.core.collection import CollectionManager
+        from skillmeat.cache.manager import CacheManager
+
+        # Parse entity IDs if provided
+        entity_ids = entities.split(",") if entities else None
+
+        # Initialize managers
+        collection_mgr = CollectionManager()
+        cache_mgr = CacheManager()
+        cache_mgr.initialize_cache()
+
+        # Create sync service
+        sync_service = ContextSyncService(collection_mgr, cache_mgr)
+
+        # Default to status if no operation specified
+        if not status and not pull and not push:
+            status = True
+
+        # Execute operation
+        if status:
+            _show_sync_status(sync_service, project_path)
+        elif pull:
+            _pull_changes(sync_service, project_path, entity_ids)
+        elif push:
+            _push_changes(sync_service, project_path, entity_ids, force)
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception(f"Error in sync-context: {e}")
+        sys.exit(1)
+
+
+def _show_sync_status(sync_service, project_path: str):
+    """Display sync status with Rich formatting."""
+    from skillmeat.core.services.context_sync import ContextSyncService
+
+    modified = sync_service.detect_modified_entities(project_path)
+
+    if not modified:
+        console.print("[green]✓ No modified entities detected[/green]")
+        return
+
+    # Create status table
+    table = Table(title="Context Sync Status")
+    table.add_column("Entity", style="cyan", no_wrap=True)
+    table.add_column("Type", style="magenta")
+    table.add_column("Status", style="yellow")
+
+    for entity in modified:
+        status_text = {
+            "project": "[yellow]Modified in project[/yellow]",
+            "collection": "[blue]Modified in collection[/blue]",
+            "both": "[red]Conflict[/red]",
+            "none": "[dim]Unchanged[/dim]",
+        }.get(entity["modified_in"], "Unknown")
+
+        table.add_row(entity["entity_name"], entity["entity_type"], status_text)
+
+    console.print(table)
+
+    # Count conflicts
+    conflicts = [e for e in modified if e["modified_in"] == "both"]
+    if conflicts:
+        console.print(f"\n[bold red]⚠ {len(conflicts)} conflict(s) detected[/bold red]")
+        console.print(
+            "[dim]Use --force with --push or --pull to resolve conflicts[/dim]"
+        )
+
+
+def _pull_changes(sync_service, project_path: str, entity_ids: Optional[List[str]]):
+    """Pull changes from project to collection."""
+    from skillmeat.core.services.context_sync import ContextSyncService
+
+    # Confirm before pulling
+    if not Confirm.ask("Pull changes from project to collection?"):
+        console.print("[yellow]Cancelled[/yellow]")
+        return
+
+    console.print("[cyan]Pulling changes from project...[/cyan]")
+    results = sync_service.pull_changes(project_path, entity_ids)
+
+    # Show results
+    pulled_count = 0
+    skipped_count = 0
+    conflict_count = 0
+
+    for result in results:
+        if result.action == "pulled":
+            console.print(f"[green]✓[/green] {result.entity_name}: {result.message}")
+            pulled_count += 1
+        elif result.action == "conflict":
+            console.print(f"[yellow]⚠[/yellow] {result.entity_name}: {result.message}")
+            conflict_count += 1
+        else:
+            console.print(f"[dim]-[/dim] {result.entity_name}: {result.message}")
+            skipped_count += 1
+
+    # Summary
+    console.print()
+    console.print(f"[green]Pull completed:[/green]")
+    console.print(f"  Pulled: {pulled_count}")
+    console.print(f"  Skipped: {skipped_count}")
+    if conflict_count > 0:
+        console.print(f"  [yellow]Conflicts: {conflict_count}[/yellow]")
+
+
+def _push_changes(
+    sync_service, project_path: str, entity_ids: Optional[List[str]], force: bool
+):
+    """Push collection changes to project."""
+    from skillmeat.core.services.context_sync import ContextSyncService
+
+    # Confirm before pushing
+    if not Confirm.ask("Push collection changes to project?"):
+        console.print("[yellow]Cancelled[/yellow]")
+        return
+
+    console.print("[cyan]Pushing changes to project...[/cyan]")
+    results = sync_service.push_changes(project_path, entity_ids, overwrite=force)
+
+    # Show results
+    pushed_count = 0
+    skipped_count = 0
+    conflict_count = 0
+
+    for result in results:
+        if result.action == "pushed":
+            console.print(f"[green]✓[/green] {result.entity_name}: {result.message}")
+            pushed_count += 1
+        elif result.action == "conflict":
+            console.print(f"[red]✗[/red] {result.entity_name}: {result.message}")
+            console.print("  [dim]Use --force to overwrite[/dim]")
+            conflict_count += 1
+        else:
+            console.print(f"[dim]-[/dim] {result.entity_name}: {result.message}")
+            skipped_count += 1
+
+    # Summary
+    console.print()
+    console.print(f"[green]Push completed:[/green]")
+    console.print(f"  Pushed: {pushed_count}")
+    console.print(f"  Skipped: {skipped_count}")
+    if conflict_count > 0:
+        console.print(f"  [red]Conflicts: {conflict_count}[/red]")
+
+
+# ====================
 # Migration Command
 # ====================
 
@@ -8673,13 +8868,15 @@ def context():
     "--type",
     "-t",
     "entity_type",
-    type=click.Choice([
-        "project_config",
-        "spec_file",
-        "rule_file",
-        "context_file",
-        "progress_template",
-    ]),
+    type=click.Choice(
+        [
+            "project_config",
+            "spec_file",
+            "rule_file",
+            "context_file",
+            "progress_template",
+        ]
+    ),
     default=None,
     help="Entity type (auto-detected if not provided)",
 )
@@ -8796,17 +8993,23 @@ def context_add(
                 response.raise_for_status()
                 content = response.text
             except requests.exceptions.RequestException as e:
-                console.print(f"[red]Error: Could not fetch from GitHub: {source}[/red]")
+                console.print(
+                    f"[red]Error: Could not fetch from GitHub: {source}[/red]"
+                )
                 console.print(f"[red]Details: {str(e)}[/red]")
                 sys.exit(1)
 
             # Extract filename from URL for name/path pattern
-            url_path = source.split("/blob/")[1] if "/blob/" in source else source.split("/")[-1]
+            url_path = (
+                source.split("/blob/")[1]
+                if "/blob/" in source
+                else source.split("/")[-1]
+            )
             filename = url_path.split("/")[-1]
 
             # Try to extract .claude/ path if present in URL
             if ".claude/" in url_path:
-                path_pattern = url_path[url_path.find(".claude/"):]
+                path_pattern = url_path[url_path.find(".claude/") :]
             else:
                 # Default path pattern based on filename
                 path_pattern = f".claude/{filename}"
@@ -8837,7 +9040,7 @@ def context_add(
             # Extract path pattern relative to .claude/ if present
             path_str = str(local_path)
             if ".claude/" in path_str:
-                path_pattern = path_str[path_str.find(".claude/"):]
+                path_pattern = path_str[path_str.find(".claude/") :]
             else:
                 # Default path pattern based on filename
                 path_pattern = f".claude/{filename}"
@@ -8855,7 +9058,9 @@ def context_add(
             elif ".claude/progress/" in path_pattern:
                 entity_type = "progress_template"
             else:
-                console.print("[yellow]Warning: Could not auto-detect entity type from path[/yellow]")
+                console.print(
+                    "[yellow]Warning: Could not auto-detect entity type from path[/yellow]"
+                )
                 console.print(f"[yellow]Path pattern: {path_pattern}[/yellow]")
                 console.print("[yellow]Please specify --type explicitly[/yellow]")
                 sys.exit(1)
@@ -8885,7 +9090,9 @@ def context_add(
             request_data["source"] = source
 
         # Call API
-        console.print(f"[cyan]Creating context entity '{name}' (type: {entity_type})...[/cyan]")
+        console.print(
+            f"[cyan]Creating context entity '{name}' (type: {entity_type})...[/cyan]"
+        )
 
         try:
             response = requests.post(
@@ -8902,7 +9109,7 @@ def context_add(
             console.print(f"  ID: {result['id']}")
             console.print(f"  Type: {result['type']}")
             console.print(f"  Path Pattern: {result['path_pattern']}")
-            if result.get('category'):
+            if result.get("category"):
                 console.print(f"  Category: {result['category']}")
             console.print(f"  Auto-Load: {'Yes' if result['auto_load'] else 'No'}")
 
@@ -8910,7 +9117,7 @@ def context_add(
             # Try to extract error detail from response
             try:
                 error_body = e.response.json()
-                error_detail = error_body.get('detail', str(e))
+                error_detail = error_body.get("detail", str(e))
             except:
                 error_detail = str(e)
 
@@ -8919,7 +9126,9 @@ def context_add(
         except requests.exceptions.RequestException as e:
             console.print(f"[red]Error: Could not connect to API server[/red]")
             console.print(f"[red]Details: {str(e)}[/red]")
-            console.print("[yellow]Make sure the API server is running: skillmeat web dev --api-only[/yellow]")
+            console.print(
+                "[yellow]Make sure the API server is running: skillmeat web dev --api-only[/yellow]"
+            )
             sys.exit(1)
 
     except Exception as e:
@@ -8934,7 +9143,13 @@ def context_add(
     "-t",
     "entity_type",
     type=click.Choice(
-        ["project_config", "spec_file", "rule_file", "context_file", "progress_template"]
+        [
+            "project_config",
+            "spec_file",
+            "rule_file",
+            "context_file",
+            "progress_template",
+        ]
     ),
     default=None,
     help="Filter by entity type",
@@ -8985,7 +9200,9 @@ def context_list(
         params["auto_load"] = "true"
 
     try:
-        response = requests.get(f"{api_base}/context-entities", params=params, timeout=10)
+        response = requests.get(
+            f"{api_base}/context-entities", params=params, timeout=10
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -9022,7 +9239,9 @@ def context_list(
 
     except requests.exceptions.ConnectionError:
         console.print("[red]Error: Could not connect to API server.[/red]")
-        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        console.print(
+            "[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]"
+        )
         sys.exit(1)
     except requests.exceptions.HTTPError as e:
         error_detail = ""
@@ -9110,8 +9329,12 @@ def context_show(name_or_id: str, full: bool, output_format: str):
                 console.print(f"[red]Entity '{name_or_id}' not found[/red]")
                 sys.exit(1)
             elif e.response.status_code == 501:
-                console.print("[yellow]Context entities API not yet implemented (TASK-1.2 in progress)[/yellow]")
-                console.print("[dim]This feature will be available once the database model is complete.[/dim]")
+                console.print(
+                    "[yellow]Context entities API not yet implemented (TASK-1.2 in progress)[/yellow]"
+                )
+                console.print(
+                    "[dim]This feature will be available once the database model is complete.[/dim]"
+                )
                 sys.exit(1)
             else:
                 raise
@@ -9137,7 +9360,9 @@ def context_show(name_or_id: str, full: bool, output_format: str):
 
             # Add description if present
             if entity.get("description"):
-                metadata_lines.insert(3, f"[cyan]Description:[/cyan] {entity['description']}")
+                metadata_lines.insert(
+                    3, f"[cyan]Description:[/cyan] {entity['description']}"
+                )
 
             # Display metadata panel
             console.print(
@@ -9235,7 +9460,11 @@ def context_remove(name_or_id: str, force: bool):
 
     try:
         # Lookup entity by name or ID
-        response = requests.get(f"{api_base}/context-entities", params={"search": name_or_id, "limit": 50}, timeout=10)
+        response = requests.get(
+            f"{api_base}/context-entities",
+            params={"search": name_or_id, "limit": 50},
+            timeout=10,
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -9248,7 +9477,9 @@ def context_remove(name_or_id: str, force: bool):
         if not entity:
             # Try direct ID lookup
             try:
-                response = requests.get(f"{api_base}/context-entities/{name_or_id}", timeout=10)
+                response = requests.get(
+                    f"{api_base}/context-entities/{name_or_id}", timeout=10
+                )
                 if response.status_code == 200:
                     entity = response.json()
             except Exception:
@@ -9259,14 +9490,20 @@ def context_remove(name_or_id: str, force: bool):
             sys.exit(1)
 
         # Display entity info
-        console.print(f"\n[bold]Entity:[/bold] {entity.get('name')} ({entity.get('type')})")
+        console.print(
+            f"\n[bold]Entity:[/bold] {entity.get('name')} ({entity.get('type')})"
+        )
         console.print(f"[bold]Path Pattern:[/bold] {entity.get('path_pattern')}")
         if entity.get("category"):
             console.print(f"[bold]Category:[/bold] {entity.get('category')}")
 
         # Warning
-        console.print("\n[yellow]Warning: This entity may be deployed to projects.[/yellow]")
-        console.print("Removing it from the collection will not delete deployed files.\n")
+        console.print(
+            "\n[yellow]Warning: This entity may be deployed to projects.[/yellow]"
+        )
+        console.print(
+            "Removing it from the collection will not delete deployed files.\n"
+        )
 
         # Confirmation
         if not force:
@@ -9276,7 +9513,9 @@ def context_remove(name_or_id: str, force: bool):
 
         # Delete
         entity_id = entity.get("id")
-        response = requests.delete(f"{api_base}/context-entities/{entity_id}", timeout=10)
+        response = requests.delete(
+            f"{api_base}/context-entities/{entity_id}", timeout=10
+        )
         response.raise_for_status()
 
         console.print(f"[green]✓[/green] Entity '{entity.get('name')}' removed")
@@ -9284,7 +9523,9 @@ def context_remove(name_or_id: str, force: bool):
 
     except requests.exceptions.ConnectionError:
         console.print("[red]Error: Could not connect to API server.[/red]")
-        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        console.print(
+            "[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]"
+        )
         sys.exit(1)
     except requests.exceptions.HTTPError as e:
         error_detail = ""
@@ -9302,9 +9543,13 @@ def context_remove(name_or_id: str, force: bool):
 
 @context.command("deploy")
 @click.argument("name_or_id")
-@click.option("--to-project", required=True, type=click.Path(), help="Target project path")
+@click.option(
+    "--to-project", required=True, type=click.Path(), help="Target project path"
+)
 @click.option("--overwrite", is_flag=True, help="Overwrite if file exists")
-@click.option("--dry-run", is_flag=True, help="Show what would be deployed without writing")
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be deployed without writing"
+)
 def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: bool):
     """Deploy context entity to a project directory.
 
@@ -9378,7 +9623,9 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
         try:
             target.relative_to(project)
         except ValueError:
-            raise ValueError(f"SECURITY: Deployment path escapes project directory: {target}")
+            raise ValueError(
+                f"SECURITY: Deployment path escapes project directory: {target}"
+            )
 
         # SECURITY CHECK 2: Target must be inside .claude/ directory
         claude_dir = (project / ".claude").resolve()
@@ -9389,13 +9636,19 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
             if target.name in ("CLAUDE.md", "AGENTS.md") and target.parent == project:
                 pass  # OK - project root config files
             else:
-                raise ValueError(f"SECURITY: Deployment path is not in .claude/ directory: {target}")
+                raise ValueError(
+                    f"SECURITY: Deployment path is not in .claude/ directory: {target}"
+                )
 
         return target
 
     try:
         # Lookup entity by name or ID
-        response = requests.get(f"{api_base}/context-entities", params={"search": name_or_id, "limit": 50}, timeout=10)
+        response = requests.get(
+            f"{api_base}/context-entities",
+            params={"search": name_or_id, "limit": 50},
+            timeout=10,
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -9408,7 +9661,9 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
         if not entity:
             # Try direct ID lookup
             try:
-                response = requests.get(f"{api_base}/context-entities/{name_or_id}", timeout=10)
+                response = requests.get(
+                    f"{api_base}/context-entities/{name_or_id}", timeout=10
+                )
                 if response.status_code == 200:
                     entity = response.json()
             except Exception:
@@ -9421,7 +9676,9 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
         # Validate target project
         project_path = Path(to_project).expanduser().resolve()
         if not project_path.exists():
-            console.print(f"[red]Error: Project path does not exist: {project_path}[/red]")
+            console.print(
+                f"[red]Error: Project path does not exist: {project_path}[/red]"
+            )
             sys.exit(1)
 
         # Validate deployment path (SECURITY CRITICAL)
@@ -9439,43 +9696,55 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
         # Dry run mode
         if dry_run:
             console.print("[bold]DRY RUN - No files will be written[/bold]\n")
-            console.print(f"[bold]Would deploy:[/bold] {entity.get('name')} ({entity.get('type')})")
+            console.print(
+                f"[bold]Would deploy:[/bold] {entity.get('name')} ({entity.get('type')})"
+            )
             console.print(f"[bold]To:[/bold] {target_path}")
             console.print(f"[bold]Path pattern:[/bold] {path_pattern}")
             if entity.get("category"):
                 console.print(f"[bold]Category:[/bold] {entity.get('category')}")
             console.print(f"\n[bold]Content preview:[/bold]")
-            content = entity.get('content', '')
+            content = entity.get("content", "")
             content_preview = content[:500]
-            console.print(f"[dim]{content_preview}...[/dim]" if len(content) > 500 else f"[dim]{content_preview}[/dim]")
+            console.print(
+                f"[dim]{content_preview}...[/dim]"
+                if len(content) > 500
+                else f"[dim]{content_preview}[/dim]"
+            )
             return
 
         # Check for conflicts (if file exists and not --overwrite)
         if target_path.exists() and not overwrite:
             existing_content = target_path.read_text()
-            new_content = entity.get('content', '')
+            new_content = entity.get("content", "")
             if existing_content != new_content:
                 console.print(f"[yellow]File already exists: {target_path}[/yellow]")
                 console.print("[dim]Use --overwrite to replace existing file[/dim]")
                 sys.exit(1)
             else:
-                console.print(f"[dim]File already exists with same content, skipping.[/dim]")
+                console.print(
+                    f"[dim]File already exists with same content, skipping.[/dim]"
+                )
                 return
 
         # Deploy - create parent directories if needed
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write content
-        content = entity.get('content', '')
+        content = entity.get("content", "")
         target_path.write_text(content)
 
-        console.print(f"[green]✓[/green] Deployed '{entity.get('name')}' to {target_path}")
+        console.print(
+            f"[green]✓[/green] Deployed '{entity.get('name')}' to {target_path}"
+        )
         if overwrite and target_path.exists():
             console.print("[dim]Existing file was overwritten[/dim]")
 
     except requests.exceptions.ConnectionError:
         console.print("[red]Error: Could not connect to API server.[/red]")
-        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        console.print(
+            "[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]"
+        )
         sys.exit(1)
     except requests.exceptions.HTTPError as e:
         error_detail = ""
