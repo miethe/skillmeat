@@ -49,6 +49,10 @@ export interface Artifact {
   createdAt: string;
   updatedAt: string;
   aliases?: string[];
+  collection?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface ArtifactFilters {

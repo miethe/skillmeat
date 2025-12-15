@@ -17,6 +17,7 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 
 - ✗ **Never** write code directly (Read/Edit/Write for implementation)
 - ✗ **Never** do token-heavy exploration yourself
+- ✗ **Never** read full implementation files before delegating
 - ✓ **Always** delegate implementation to specialized subagents
 - ✓ **Always** use codebase-explorer for pattern discovery
 - ✓ **Focus** on reasoning, analysis, planning, and orchestration
@@ -33,6 +34,8 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 ```
 
 **When you catch yourself about to edit a file**: STOP. Delegate instead.
+
+**File context for subagents**: Provide file paths, not file contents. Subagents can read files themselves at Haiku/Sonnet cost (~96% savings vs Opus reading). Only read files directly when planning decisions require understanding current state.
 
 ## Documentation Policy
 
@@ -363,6 +366,24 @@ locked_at = "2024-11-29T10:00:00Z"
 - Radix UI + shadcn
 - API client usage
 - Testing strategies
+
+---
+
+## Progressive Disclosure Context
+
+**Path-Specific Guidance** (auto-loaded by Claude Code):
+- `.claude/rules/debugging.md` - Universal debugging methodology (symbol-first)
+- `.claude/rules/web/` - Auto-loaded when editing `skillmeat/web/**`
+- `.claude/rules/api/` - Auto-loaded when editing `skillmeat/api/**`
+
+**Deep Context** (load as needed):
+- `.claude/context/api-endpoint-mapping.md` - Full API reference
+- `.claude/context/symbol-usage-guide.md` - Symbol query patterns
+- `.claude/context/stub-patterns.md` - Frontend stubs catalog
+
+**Staleness Hook**: `.claude/hooks/check-context-staleness.sh` (pre-commit warning)
+
+See `.claude/specs/progressive-disclosure-blueprint.md` for architecture details.
 
 ---
 

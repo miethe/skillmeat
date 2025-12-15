@@ -97,6 +97,10 @@ const generateMockArtifacts = (): Artifact[] => {
       createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
       aliases: ['design', 'canvas'],
+      collection: {
+        id: 'design-tools',
+        name: 'Design Tools',
+      },
     },
     {
       id: '2',
@@ -130,6 +134,10 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
+      collection: {
+        id: 'document-processing',
+        name: 'Document Processing',
+      },
     },
     {
       id: '3',
@@ -159,6 +167,10 @@ const generateMockArtifacts = (): Artifact[] => {
       createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
       aliases: ['git'],
+      collection: {
+        id: 'developer-tools',
+        name: 'Developer Tools',
+      },
     },
     {
       id: '4',
@@ -192,6 +204,10 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+      collection: {
+        id: 'developer-tools',
+        name: 'Developer Tools',
+      },
     },
     {
       id: '5',
@@ -225,6 +241,10 @@ const generateMockArtifacts = (): Artifact[] => {
       },
       createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
       updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+      collection: {
+        id: 'infrastructure',
+        name: 'Infrastructure',
+      },
     },
   ];
 };

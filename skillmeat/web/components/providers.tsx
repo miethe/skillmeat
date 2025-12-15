@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { NotificationProvider } from '@/lib/notification-store';
+import { CollectionProvider } from '@/context/collection-context';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -20,10 +21,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NotificationProvider>
-        {children}
-        <Toaster />
-      </NotificationProvider>
+      <CollectionProvider>
+        <NotificationProvider>
+          {children}
+          <Toaster />
+        </NotificationProvider>
+      </CollectionProvider>
     </QueryClientProvider>
   );
 }
