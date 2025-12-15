@@ -25,6 +25,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
@@ -169,6 +170,12 @@ export interface ContextEntityCardProps {
   onEdit?: (entity: ContextEntity) => void;
   /** Callback when delete button is clicked */
   onDelete?: (entity: ContextEntity) => void;
+  /** Show token count badge */
+  showTokenCount?: boolean;
+  /** Estimated token count for this entity */
+  tokenCount?: number;
+  /** Callback when auto-load toggle is changed */
+  onAutoLoadToggle?: (enabled: boolean) => void;
 }
 
 /**
@@ -200,6 +207,9 @@ export function ContextEntityCard({
   onDeploy,
   onEdit,
   onDelete,
+  showTokenCount = false,
+  tokenCount,
+  onAutoLoadToggle,
 }: ContextEntityCardProps) {
   const config = typeConfig[entity.entity_type];
   const Icon = config.icon;
@@ -222,6 +232,10 @@ export function ContextEntityCard({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete?.(entity);
+  };
+
+  const handleAutoLoadToggle = (checked: boolean) => {
+    onAutoLoadToggle?.(checked);
   };
 
   // Truncate path pattern if too long
@@ -296,8 +310,8 @@ export function ContextEntityCard({
           </p>
         )}
 
-        {/* Path Pattern */}
-        <div className="flex items-center gap-2">
+        {/* Path Pattern and Token Count */}
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
             {truncatedPath}
           </span>
@@ -306,7 +320,48 @@ export function ContextEntityCard({
               v{entity.version}
             </Badge>
           )}
+          {showTokenCount && tokenCount !== undefined && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    ~{tokenCount} tokens
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Estimated token usage when loaded</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
+
+        {/* Auto-load Toggle */}
+        {onAutoLoadToggle && (
+          <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <label htmlFor={`auto-load-${entity.id}`} className="text-sm font-medium cursor-pointer">
+                Auto-load
+              </label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs text-muted-foreground">ⓘ</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Automatically load this entity when path pattern matches</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Switch
+              id={`auto-load-${entity.id}`}
+              checked={entity.auto_load}
+              onCheckedChange={handleAutoLoadToggle}
+              aria-label="Auto-load this entity"
+            />
+          </div>
+        )}
 
         {/* Footer: Action Buttons */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t">

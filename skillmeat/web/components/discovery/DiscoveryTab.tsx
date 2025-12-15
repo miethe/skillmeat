@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildArtifactKey } from '@/lib/skip-preferences';
 import { useTrackDiscovery } from '@/lib/analytics';
@@ -57,6 +58,12 @@ export interface DiscoveryTabProps {
   onImport?: (artifact: DiscoveredArtifact) => void;
   onToggleSkip?: (artifactKey: string, skip: boolean) => void;
   onViewDetails?: (artifact: DiscoveredArtifact) => void;
+  /** Show token usage summary (for context entities) */
+  showTokenUsage?: boolean;
+  /** Function to calculate token count for an artifact */
+  getTokenCount?: (artifact: DiscoveredArtifact) => number;
+  /** Token warning threshold */
+  tokenWarningThreshold?: number;
 }
 
 /**
@@ -198,6 +205,9 @@ export function DiscoveryTab({
   onImport,
   onToggleSkip,
   onViewDetails,
+  showTokenUsage = false,
+  getTokenCount,
+  tokenWarningThreshold = 2000,
 }: DiscoveryTabProps) {
   // Filter and sort state
   const [filters, setFilters] = useState<DiscoveryFilters>({
@@ -331,6 +341,18 @@ export function DiscoveryTab({
   // Check if any filters are active
   const hasActiveFilters = filters.search !== '' || filters.status !== 'all' || filters.type !== 'all' || sort.field !== 'name' || sort.order !== 'asc';
 
+  // Calculate total token usage (for context entities with auto-load)
+  const totalAutoLoadTokens = useMemo(() => {
+    if (!showTokenUsage || !getTokenCount) return 0;
+
+    return filteredAndSortedArtifacts.reduce((sum, artifact) => {
+      // Only count artifacts that would be auto-loaded
+      // This is a simplified check - in practice, you'd check the artifact's auto_load property
+      const tokens = getTokenCount(artifact);
+      return sum + tokens;
+    }, 0);
+  }, [filteredAndSortedArtifacts, showTokenUsage, getTokenCount]);
+
   if (isLoading) {
     return (
       <div className="rounded-md border p-4" aria-busy="true">
@@ -357,6 +379,17 @@ export function DiscoveryTab({
 
   return (
     <div className="space-y-4" role="region" aria-label="Discovered artifacts">
+      {/* Token Warning Banner */}
+      {showTokenUsage && totalAutoLoadTokens > tokenWarningThreshold && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Auto-loaded entities use {totalAutoLoadTokens} tokens. Consider reducing auto-load
+            entities to stay under {tokenWarningThreshold} tokens for optimal performance.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Filter Controls */}
       <div className="space-y-4">
         {/* Search */}
@@ -467,12 +500,24 @@ export function DiscoveryTab({
           </div>
         </div>
 
-        {/* Results Summary and Clear Filters */}
+        {/* Results Summary, Token Usage, and Clear Filters */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium">{filteredAndSortedArtifacts.length}</span> of{' '}
-            <span className="font-medium">{artifacts.length}</span> artifacts
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-medium">{filteredAndSortedArtifacts.length}</span> of{' '}
+              <span className="font-medium">{artifacts.length}</span> artifacts
+            </p>
+            {showTokenUsage && totalAutoLoadTokens > 0 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Auto-load: {totalAutoLoadTokens} tokens</span>
+                {totalAutoLoadTokens > tokenWarningThreshold && (
+                  <Badge variant="destructive" className="text-xs">
+                    High usage
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
           {hasActiveFilters && (
             <Button
               variant="ghost"
