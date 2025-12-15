@@ -60,6 +60,17 @@ from .context_entity import (
     ContextEntityResponse,
     ContextEntityListResponse,
 )
+from .project_template import (
+    TemplateEntitySchema,
+    ProjectTemplateBase,
+    ProjectTemplateCreateRequest,
+    ProjectTemplateUpdateRequest,
+    ProjectTemplateResponse,
+    ProjectTemplateListResponse,
+    TemplateVariableValue,
+    DeployTemplateRequest,
+    DeployTemplateResponse,
+)
 
 __all__ = [
     # Common
@@ -111,4 +122,14 @@ __all__ = [
     "ContextEntityUpdateRequest",
     "ContextEntityResponse",
     "ContextEntityListResponse",
+    # Project Templates
+    "TemplateEntitySchema",
+    "ProjectTemplateBase",
+    "ProjectTemplateCreateRequest",
+    "ProjectTemplateUpdateRequest",
+    "ProjectTemplateResponse",
+    "ProjectTemplateListResponse",
+    "TemplateVariableValue",
+    "DeployTemplateRequest",
+    "DeployTemplateResponse",
 ]

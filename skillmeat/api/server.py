@@ -31,6 +31,7 @@ from .routers import (
     marketplace,
     marketplace_sources,
     mcp,
+    project_templates,
     projects,
     user_collections,
 )
@@ -247,6 +248,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
     app.include_router(marketplace_sources.router, prefix=settings.api_prefix, tags=["marketplace-sources"])
+    app.include_router(project_templates.router, prefix=settings.api_prefix, tags=["project-templates"])
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
 
     # Root endpoint
