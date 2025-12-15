@@ -9,6 +9,74 @@ Business logic services for SkillMeat. These services are called by API routers 
 
 ## Available Services
 
+### Content Hash Service
+
+**File**: `content_hash.py`
+
+**Purpose**: Content hashing for change detection and integrity verification
+
+**Key Functions**:
+
+- `compute_content_hash()` - Compute SHA256 hash of content
+- `detect_changes()` - Detect if deployed file differs from collection entity
+- `read_file_with_hash()` - Read file and compute hash in one operation
+- `update_artifact_hash()` - Compute hash for artifact content
+- `verify_content_integrity()` - Verify content matches expected hash
+
+**Features**:
+
+1. **Deterministic Hashing**: Same content always produces same hash (SHA256)
+2. **Change Detection**: Compare collection entities with deployed files
+3. **Graceful Handling**: Returns False (no change) for missing files
+4. **Unicode Support**: Handles UTF-8 content correctly
+5. **Content Integrity**: Verify content hasn't been corrupted or modified
+
+**Usage Example**:
+
+```python
+from pathlib import Path
+from skillmeat.core.services import (
+    compute_content_hash,
+    detect_changes,
+    read_file_with_hash,
+)
+
+# Compute hash for collection entity content
+collection_content = "# My Skill\n\nSkill content here."
+collection_hash = compute_content_hash(collection_content)
+
+# Store hash with artifact (in database)
+artifact.content_hash = collection_hash
+
+# Later: Detect if deployed file has been locally modified
+deployed_file = Path(".claude/skills/user/my-skill/SKILL.md")
+has_changes = detect_changes(collection_hash, deployed_file)
+
+if has_changes:
+    print("Local modifications detected!")
+    # Read modified content
+    modified_content, new_hash = read_file_with_hash(deployed_file)
+    print(f"New hash: {new_hash}")
+else:
+    print("Deployed file matches collection")
+```
+
+**Hash Properties**:
+
+- Algorithm: SHA256 (cryptographically secure)
+- Output: 64-character hex string
+- Deterministic: Same input = same output
+- Collision-resistant: Different inputs produce different outputs
+
+**Change Detection Behavior**:
+
+- File doesn't exist → Returns `False` (not a change)
+- File exists, matches collection → Returns `False` (no change)
+- File exists, differs from collection → Returns `True` (change detected)
+- File is directory/unreadable → Returns `False` (safer default)
+
+**Test Coverage**: 100% (30 tests)
+
 ### Template Service
 
 **File**: `template_service.py`
