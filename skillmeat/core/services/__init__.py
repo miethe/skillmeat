@@ -18,6 +18,11 @@ from skillmeat.core.services.content_hash import (
     update_artifact_hash,
     verify_content_integrity,
 )
+from skillmeat.core.services.context_sync import (
+    ContextSyncService,
+    SyncConflict,
+    SyncResult,
+)
 
 __all__ = [
     # Template service
@@ -32,4 +37,8 @@ __all__ = [
     "read_file_with_hash",
     "update_artifact_hash",
     "verify_content_integrity",
+    # Context sync service
+    "ContextSyncService",
+    "SyncConflict",
+    "SyncResult",
 ]

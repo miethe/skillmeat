@@ -77,6 +77,125 @@ else:
 
 **Test Coverage**: 100% (30 tests)
 
+### Context Sync Service
+
+**File**: `context_sync.py`
+
+**Purpose**: Bi-directional synchronization of context entities between collections and deployed projects
+
+**Key Features**:
+
+1. **Change Detection**: Detect modified entities in project or collection
+2. **Pull Changes**: Update collection from project (capture manual edits)
+3. **Push Changes**: Deploy collection updates to project
+4. **Conflict Detection**: Identify when both sides modified
+5. **Conflict Resolution**: Keep local/remote/merge strategies
+
+**Key Classes**:
+
+- `ContextSyncService` - Main service class
+- `SyncConflict` - Represents a sync conflict
+- `SyncResult` - Result of sync operation
+
+**Methods**:
+
+```python
+class ContextSyncService:
+    def detect_modified_entities(self, project_path: str) -> List[Dict[str, Any]]:
+        """Scan project for modified context entities."""
+
+    def pull_changes(
+        self, project_path: str, entity_ids: Optional[List[str]] = None
+    ) -> List[SyncResult]:
+        """Pull changes from project to collection."""
+
+    def push_changes(
+        self,
+        project_path: str,
+        entity_ids: Optional[List[str]] = None,
+        overwrite: bool = False,
+    ) -> List[SyncResult]:
+        """Push collection changes to project."""
+
+    def detect_conflicts(self, project_path: str) -> List[SyncConflict]:
+        """Detect entities modified in both collection and project."""
+
+    def resolve_conflict(
+        self,
+        conflict: SyncConflict,
+        resolution: Literal["keep_local", "keep_remote", "merge"],
+        merged_content: Optional[str] = None,
+    ) -> SyncResult:
+        """Resolve sync conflict based on user choice."""
+```
+
+**Usage Example**:
+
+```python
+from skillmeat.core.services import ContextSyncService
+from skillmeat.core.collection import CollectionManager
+from skillmeat.cache.manager import CacheManager
+
+# Initialize service
+collection_mgr = CollectionManager()
+cache_mgr = CacheManager()
+sync_service = ContextSyncService(collection_mgr, cache_mgr)
+
+# Detect modified entities
+modified = sync_service.detect_modified_entities("/path/to/project")
+for entity in modified:
+    print(f"{entity['entity_name']}: modified in {entity['modified_in']}")
+
+# Pull changes from project
+results = sync_service.pull_changes("/path/to/project")
+for result in results:
+    print(f"{result.action}: {result.entity_name} - {result.message}")
+
+# Detect and resolve conflicts
+conflicts = sync_service.detect_conflicts("/path/to/project")
+for conflict in conflicts:
+    # User chooses resolution strategy
+    result = sync_service.resolve_conflict(conflict, "keep_local")
+    print(f"Resolved: {result.message}")
+```
+
+**Modification Detection**:
+
+- `"none"` - No changes since last sync
+- `"project"` - Deployed file modified (pull available)
+- `"collection"` - Collection entity modified (push available)
+- `"both"` - Both modified (conflict)
+
+**Conflict Resolution Strategies**:
+
+- `"keep_local"` - Update collection from project (project wins)
+- `"keep_remote"` - Update project from collection (collection wins)
+- `"merge"` - Use provided merged content for both (manual merge)
+
+**Security**:
+
+- All file operations stay within `.claude/` directory
+- Content integrity verified via SHA-256 hashes
+- Atomic writes using temp files (future)
+
+**Current Status**:
+
+- ✅ Core sync logic implemented
+- ✅ Change detection via content hashing
+- ⚠️ Database integration pending (uses TODOs for cache operations)
+- ⚠️ Full pull/push pending cache manager integration
+- ✅ 19 unit tests (100% pass rate)
+
+**TODO**:
+
+- [ ] Integrate with CacheManager to read/write context entities
+- [ ] Implement actual content updates (currently logged only)
+- [ ] Update deployment records with new hashes after sync
+- [ ] Add API endpoints for sync operations
+- [ ] Add CLI commands for sync operations
+
+**Test Coverage**: 19 tests (all passing)
+
 ### Template Service
 
 **File**: `template_service.py`
