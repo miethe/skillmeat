@@ -19,3 +19,6 @@ export * from './version';
 export * from './collections';
 export * from './groups';
 export * from './deployments';
+
+// Context entities (Agent Context Entities v1)
+export * from './context-entity';
