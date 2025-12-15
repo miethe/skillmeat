@@ -194,4 +194,179 @@ describe('DiffViewer', () => {
 
     expect(screen.getByText('Diff Viewer')).toBeInTheDocument();
   });
+
+  // New tests for sync resolution actions
+  describe('Sync Resolution Actions', () => {
+    it('does not show resolution actions by default', () => {
+      render(<DiffViewer files={[mockFileDiffModified]} />);
+
+      expect(screen.queryByText(/Keep Local/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Keep Remote/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Merge')).not.toBeInTheDocument();
+    });
+
+    it('shows resolution actions when showResolutionActions is true', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+        />
+      );
+
+      expect(screen.getByText(/Keep Local \(Project\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Keep Remote \(Collection\)/)).toBeInTheDocument();
+      expect(screen.getByText('Merge')).toBeInTheDocument();
+    });
+
+    it('uses custom labels for resolution buttons', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+          localLabel="Working Copy"
+          remoteLabel="Upstream"
+        />
+      );
+
+      expect(screen.getByText('Keep Working Copy')).toBeInTheDocument();
+      expect(screen.getByText('Keep Upstream')).toBeInTheDocument();
+    });
+
+    it('calls onResolve with correct resolution type when Keep Local clicked', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+        />
+      );
+
+      const keepLocalButton = screen.getByText(/Keep Local \(Project\)/);
+      fireEvent.click(keepLocalButton);
+
+      expect(handleResolve).toHaveBeenCalledWith('keep_local');
+    });
+
+    it('calls onResolve with correct resolution type when Keep Remote clicked', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+        />
+      );
+
+      const keepRemoteButton = screen.getByText(/Keep Remote \(Collection\)/);
+      fireEvent.click(keepRemoteButton);
+
+      expect(handleResolve).toHaveBeenCalledWith('keep_remote');
+    });
+
+    it('calls onResolve with correct resolution type when Merge clicked', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+        />
+      );
+
+      const mergeButton = screen.getByText('Merge');
+      fireEvent.click(mergeButton);
+
+      expect(handleResolve).toHaveBeenCalledWith('merge');
+    });
+
+    it('disables resolution buttons when isResolving is true', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+          isResolving={true}
+        />
+      );
+
+      const keepLocalButton = screen.getByText(/Keep Local \(Project\)/);
+      const keepRemoteButton = screen.getByText(/Keep Remote \(Collection\)/);
+      const mergeButton = screen.getByText('Merge');
+
+      expect(keepLocalButton).toBeDisabled();
+      expect(keepRemoteButton).toBeDisabled();
+      expect(mergeButton).toBeDisabled();
+    });
+
+    it('shows loading spinner when isResolving is true', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+          isResolving={true}
+        />
+      );
+
+      // Loader2 component should be rendered (check for svg with animation class)
+      const spinner = document.querySelector('.animate-spin');
+      expect(spinner).toBeInTheDocument();
+    });
+
+    it('shows preview mode message when previewMode is true', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+          previewMode={true}
+        />
+      );
+
+      expect(screen.getByText(/Preview mode - select which version to keep/)).toBeInTheDocument();
+    });
+
+    it('does not show preview mode message when previewMode is false', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          showResolutionActions={true}
+          onResolve={handleResolve}
+          previewMode={false}
+        />
+      );
+
+      expect(
+        screen.queryByText(/Preview mode - select which version to keep/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('maintains existing diff functionality when resolution actions are enabled', () => {
+      const handleResolve = jest.fn();
+      render(
+        <DiffViewer
+          files={[mockFileDiffModified]}
+          leftLabel="Collection"
+          rightLabel="Project"
+          showResolutionActions={true}
+          onResolve={handleResolve}
+        />
+      );
+
+      // Existing functionality should still work
+      expect(screen.getByText('Collection')).toBeInTheDocument();
+      expect(screen.getByText('Project')).toBeInTheDocument();
+      expect(screen.getByText(/console\.log\('old'\)/)).toBeInTheDocument();
+      expect(screen.getByText(/console\.log\('new'\)/)).toBeInTheDocument();
+    });
+  });
 });
