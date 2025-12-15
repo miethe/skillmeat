@@ -1,0 +1,215 @@
+'use client';
+
+import { useState } from 'react';
+import { Upload, Folder, AlertTriangle, FileText } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import type { ContextEntity } from '@/types/context-entity';
+
+export interface DeployToProjectDialogProps {
+  entity: ContextEntity | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+/**
+ * Dialog for deploying context entities to projects
+ *
+ * Allows users to select a project and deploy a context entity to the appropriate
+ * path within the project's .claude directory. Shows preview of target path and
+ * overwrite warnings.
+ *
+ * TODO: Implement when backend APIs are ready:
+ * - GET /api/v1/projects - List registered projects
+ * - POST /api/v1/context-entities/{id}/deploy - Deploy entity to project
+ */
+export function DeployToProjectDialog({
+  entity,
+  open,
+  onOpenChange,
+  onSuccess,
+}: DeployToProjectDialogProps) {
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [isDeploying, setIsDeploying] = useState(false);
+
+  // TODO: Replace with real projects API hook once implemented
+  // const { data: projects, isLoading: projectsLoading } = useProjects();
+  const mockProjects = [
+    { id: '1', name: 'My Project', path: '/Users/dev/my-project' },
+    { id: '2', name: 'Other Project', path: '/Users/dev/other-project' },
+  ];
+
+  // Compute target path based on selected project and entity path pattern
+  const getTargetPath = () => {
+    if (!selectedProject || !entity) return null;
+    const project = mockProjects.find((p) => p.id === selectedProject);
+    if (!project) return null;
+    return `${project.path}/${entity.path_pattern}`;
+  };
+
+  const targetPath = getTargetPath();
+
+  const handleDeploy = async () => {
+    if (!entity || !selectedProject) return;
+
+    setIsDeploying(true);
+
+    try {
+      // TODO: Implement deployment API call
+      // Example:
+      // await deployContextEntity({
+      //   entityId: entity.id,
+      //   projectPath: mockProjects.find(p => p.id === selectedProject)?.path
+      // });
+
+      // Simulate deployment for now
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      console.log('Deploy entity:', entity.id, 'to project:', selectedProject);
+
+      // Show success and close
+      onSuccess?.();
+      handleClose();
+    } catch (error) {
+      console.error('Deploy failed:', error);
+      // TODO: Show error toast
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!isDeploying) {
+      onOpenChange(false);
+      // Reset state
+      setSelectedProject('');
+    }
+  };
+
+  if (!entity) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Upload className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle>Deploy Context Entity</DialogTitle>
+              <DialogDescription>Deploy {entity.name} to a project</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Entity Info Summary */}
+          <div className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Entity</span>
+              <span className="font-medium">{entity.name}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Type</span>
+              <Badge variant="secondary" className="capitalize">
+                {entity.entity_type.replace('_', ' ')}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Path Pattern</span>
+              <code className="rounded bg-muted px-2 py-1 text-xs">
+                {entity.path_pattern}
+              </code>
+            </div>
+            {entity.category && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Category</span>
+                <Badge variant="outline">{entity.category}</Badge>
+              </div>
+            )}
+          </div>
+
+          {/* Project Selector */}
+          <div className="space-y-2">
+            <label htmlFor="project" className="flex items-center gap-2 text-sm font-medium">
+              <Folder className="h-4 w-4" />
+              Target Project
+            </label>
+            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isDeploying}>
+              <SelectTrigger id="project">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {mockProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The entity will be deployed to the project&apos;s .claude directory
+            </p>
+          </div>
+
+          {/* Target Path Preview */}
+          {targetPath && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="h-4 w-4" />
+                Target Path
+              </label>
+              <div className="rounded-lg bg-muted p-3">
+                <code className="text-xs break-all">{targetPath}</code>
+              </div>
+            </div>
+          )}
+
+          {/* Overwrite Warning */}
+          {selectedProject && (
+            <Alert className="border-yellow-500/50 bg-yellow-500/10">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertTitle className="text-yellow-900 dark:text-yellow-100">
+                Overwrite Warning
+              </AlertTitle>
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                If a file already exists at the target path, it will be overwritten. Make sure to
+                back up any existing files before deploying.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeploy}
+            disabled={!selectedProject || isDeploying}
+          >
+            {isDeploying ? 'Deploying...' : 'Deploy'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
