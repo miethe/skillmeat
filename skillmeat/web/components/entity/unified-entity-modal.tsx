@@ -53,6 +53,8 @@ import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { useDeploymentList } from '@/hooks/use-deployments';
+import { ContextSyncStatus } from '@/components/entity/context-sync-status';
+import { usePendingContextChanges } from '@/hooks/use-context-sync';
 import type {
   ArtifactDiffResponse,
   ArtifactUpstreamDiffResponse,
@@ -80,6 +82,25 @@ interface HistoryEntry {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Check if entity is a context entity (based on type or name pattern)
+ */
+function isContextEntity(entity: Entity): boolean {
+  // Check if entity has 'context' in its type (for future context entity type support)
+  // OR if entity ID follows context entity pattern (entity_type:name)
+  const contextTypes = ['spec_file', 'rule_file', 'context_file', 'project_config', 'progress_template'];
+
+  // Check if entity ID starts with any context type
+  const hasContextType = contextTypes.some(type => entity.id.startsWith(`${type}:`));
+
+  // Check if artifact_type property exists and indicates context
+  const hasContextArtifactType = entity.type?.includes('context') ||
+                                  entity.type?.includes('spec') ||
+                                  entity.type?.includes('rule');
+
+  return hasContextType || hasContextArtifactType;
+}
 
 /**
  * Truncate SHA or version string for display
@@ -479,6 +500,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     const collections = new Set(artifactDeployments.map((d) => d.from_collection));
     return collections.size;
   }, [artifactDeployments]);
+
+  // Get pending context changes count if this is a context entity
+  const pendingContextCount = usePendingContextChanges(
+    isContextEntity(entity) ? entity.id : undefined,
+    entity.projectPath
+  );
 
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
@@ -1256,6 +1283,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
               >
                 Sync Status
+                {isContextEntity(entity) && pendingContextCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {pendingContextCount}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="history"
@@ -1460,12 +1492,24 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               value="sync"
               className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
             >
-              <SyncStatusTab
-                entity={entity}
-                mode={entity.projectPath ? 'project' : 'collection'}
-                projectPath={entity.projectPath || selectedProjectForDiff || undefined}
-                onClose={onClose}
-              />
+              {/* Context entities use specialized sync logic */}
+              {isContextEntity(entity) && entity.projectPath ? (
+                <div className="flex-1 overflow-auto p-6">
+                  <ContextSyncStatus
+                    entityId={entity.id}
+                    entityName={entity.name}
+                    projectPath={entity.projectPath}
+                  />
+                </div>
+              ) : (
+                /* Regular artifacts use standard sync status */
+                <SyncStatusTab
+                  entity={entity}
+                  mode={entity.projectPath ? 'project' : 'collection'}
+                  projectPath={entity.projectPath || selectedProjectForDiff || undefined}
+                  onClose={onClose}
+                />
+              )}
             </TabsContent>
 
             {/* History Tab */}
