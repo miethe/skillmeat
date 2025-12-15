@@ -1,0 +1,27 @@
+{
+  "template": {
+    "name": "Minimal",
+    "description": "Bare minimum template for any project with core directives and documentation policy",
+    "collection_type": "context",
+    "version": "1.0.0",
+    "category": "generic"
+  },
+  "entities": [
+    {
+      "name": "CLAUDE.md",
+      "type": "PROJECT_CONFIG",
+      "path_pattern": "CLAUDE.md",
+      "deploy_order": 1,
+      "required": true,
+      "content": "# {{PROJECT_NAME}}\n\n{{PROJECT_DESCRIPTION}}\n\n## Prime Directives\n\n| Directive | Implementation |\n|-----------|----------------|\n| **Delegate everything** | Opus reasons & orchestrates; subagents implement |\n| Token efficient | Symbol system, codebase-explorer |\n| Rapid iteration | PRD → code → deploy fast |\n| No over-architecture | YAGNI until proven |\n\n### Opus Delegation Principle\n\n**You are Opus. Tokens are expensive. You orchestrate; subagents execute.**\n\n- ✗ **Never** write code directly (Read/Edit/Write for implementation)\n- ✗ **Never** do token-heavy exploration yourself\n- ✓ **Always** delegate implementation to specialized subagents\n- ✓ **Always** use codebase-explorer for pattern discovery\n- ✓ **Focus** on reasoning, analysis, planning, and orchestration\n\n**Delegation Pattern**:\n\n```text\n1. Analyze task → identify what needs to change\n2. Delegate exploration → codebase-explorer finds files/patterns\n3. Read progress YAML → get assigned_to and batch strategy\n4. Delegate implementation → use Task() from Orchestration Quick Reference\n5. Update progress → artifact-tracker marks tasks complete\n6. Commit → only direct action Opus takes\n```\n\n## Documentation Policy\n\n**Reference**: `.claude/specs/doc-policy-spec.md`\n\n**Allowed Documentation**:\n\n- `/docs/` → User/dev/architecture docs (with frontmatter)\n- `.claude/progress/[prd]/` → ONE per phase (YAML+Markdown hybrid)\n- `.claude/worknotes/[prd]/` → ONE context.md per PRD (agent worknotes)\n\n## Agent Delegation\n\n**Mandatory**: All implementation work MUST be delegated.\n\nSee `.claude/specs/doc-policy-spec.md` for agent selection patterns.\n\n---\n\n**Author**: {{AUTHOR}}\n**Created**: {{DATE}}\n**Version**: 1.0.0\n"
+    },
+    {
+      "name": "doc-policy-spec.md",
+      "type": "SPEC_FILE",
+      "path_pattern": ".claude/specs/doc-policy-spec.md",
+      "deploy_order": 2,
+      "required": true,
+      "content": "# Documentation Policy Spec\n\n**Version**: 1.0 (Compressed)\n**Purpose**: Documentation rules and patterns\n**Format**: Dense, structured, AI-optimized\n\n---\n\n## Core Principle\n\n**Create documentation ONLY when**:\n\n1. Explicitly tasked (PRD, plan, request)\n2. Absolutely necessary (essential info)\n3. Fits allowed bucket (see below)\n\n**Rule**: More docs ≠ better. When uncertain → don't create.\n\n---\n\n## Strictly Prohibited\n\n| ✗ Never Create | Why | Alternative |\n|----------------|-----|-------------|\n| Debugging summaries | Becomes outdated | Git commit message |\n| Multiple progress/phase | Creates sprawl | ONE per phase |\n| Session notes as docs | Temporary context | Keep in worknotes |\n| Daily/weekly reports | Documentation debt | Git commits + phase progress |\n\n---\n\n## Allowed Documentation Buckets\n\n### Required Buckets\n\n| Bucket | Purpose | Location |\n|--------|---------|----------|\n| **README (module)** | What this package does | `<module>/README.md` |\n| **Docstrings** | All public APIs | In-code |\n| **Setup Guides** | Installation, config | `/docs/development/` |\n\n### Optional Buckets\n\n| Bucket | Purpose | Location |\n|--------|---------|----------|\n| **Architecture Docs** | System design | `/docs/architecture/` |\n| **How-To Guides** | Task instructions | `/docs/guides/` |\n\n---\n\n## Tracking Documentation (Allowed)\n\n### Progress Files (One Per Phase)\n\n**Location**: `.claude/progress/[prd-name]/phase-[N]-progress.md`\n\n**YAML Frontmatter** (required):\n```yaml\ntasks:\n  - id: \"TASK-1.1\"\n    status: \"pending\"\n    assigned_to: [\"agent-name\"]\n    dependencies: []\n```\n\n### Context Files (One Per PRD)\n\n**Location**: `.claude/worknotes/[prd-name]/context.md`\n\n### Monthly Logs (One Per Month)\n\n**Bug Fixes**: `.claude/worknotes/fixes/bug-fixes-tracking-MM-YY.md`\n\n**Observations**: `.claude/worknotes/observations/observation-log-MM-YY.md`\n\n---\n\n## Frontmatter Requirements\n\nAll documentation in `/docs/` MUST include YAML frontmatter:\n\n```yaml\n---\ntitle: Page Title\ndescription: One-line description\naudience: developers | users | maintainers\ntags: [tag1, tag2]\ncreated: YYYY-MM-DD\nupdated: YYYY-MM-DD\ncategory: setup | api | guides | architecture\nstatus: active | deprecated | draft\nrelated:\n  - path/to/related-doc.md\n---\n```\n\n**Note**: Tracking docs in `.claude/` do NOT require frontmatter.\n\n---\n\n## Decision Tree\n\n```\nShould I write documentation?\n  ├─ Is it explicitly tasked? → YES → Create it\n  ├─ Is it essential info users/devs need? → YES → Create it\n  ├─ Does it fit an allowed bucket? → YES → Create it\n  └─ Will it become outdated? → YES → Don't create, use git commits instead\n```\n\n---\n\n**Version**: 1.0\n**Last Updated**: {{DATE}}\n"
+    }
+  ]
+}
