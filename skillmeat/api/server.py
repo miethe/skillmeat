@@ -24,6 +24,7 @@ from .routers import (
     bundles,
     cache,
     collections,
+    context_entities,
     deployments,
     groups,
     health,
@@ -240,6 +241,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
+    app.include_router(context_entities.router, prefix=settings.api_prefix, tags=["context-entities"])
     app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
     app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
