@@ -15,12 +15,13 @@ import {
   ArrowDown,
   FileText,
   User,
-  GitMerge,
   RefreshCw,
   Github,
   ChevronDown,
   ChevronRight,
   Pencil,
+  FolderOpen,
+  Rocket,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -49,9 +50,17 @@ import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModa
 import { useEditArtifactParameters } from '@/hooks/useDiscovery';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
-import type { ArtifactDiffResponse, ArtifactUpstreamDiffResponse, ArtifactSyncRequest } from '@/sdk';
+import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
+import { useDeploymentList } from '@/hooks/use-deployments';
+import type {
+  ArtifactDiffResponse,
+  ArtifactUpstreamDiffResponse,
+  ArtifactSyncRequest,
+} from '@/sdk';
 import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
 import type { ArtifactParameters } from '@/types/discovery';
+import type { Deployment } from '@/components/deployments/deployment-card';
 
 interface UnifiedEntityModalProps {
   entity: Entity | null;
@@ -171,7 +180,7 @@ function generateMockHistory(entity: Entity): HistoryEntry[] {
 // Loading Skeleton
 // ============================================================================
 
-function EntityModalSkeleton() {
+function _EntityModalSkeleton() {
   return (
     <div className="space-y-6 p-6">
       <div className="space-y-4">
@@ -213,6 +222,8 @@ function EntityModalSkeleton() {
  * - Contents tab with file tree, file creation, and file deletion
  * - Sync Status tab with deploy/sync buttons, diff viewer, status alerts
  * - History tab with timeline of deploy/sync/rollback events
+ * - Collections tab with collection membership and management
+ * - Deployments tab showing where this artifact is deployed
  * - Skeleton loading state
  * - Rollback dialog integration
  * - Full TypeScript support
@@ -229,8 +240,8 @@ function EntityModalSkeleton() {
 export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { deployEntity, syncEntity, refetch } = useEntityLifecycle();
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [_isDeploying, _setIsDeploying] = useState(false);
+  const [_isSyncing, _setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
@@ -328,7 +339,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Allow diff fetching for ALL statuses (synced, modified, outdated, conflict)
   // Key requirement: must have a valid entity ID and effectiveProjectPath
   // Skip discovered artifacts (they don't exist in any collection yet)
-  const shouldFetchDiff = !!(activeTab === 'sync' && entity?.id && effectiveProjectPath && entity?.collection !== 'discovered');
+  const shouldFetchDiff = !!(
+    activeTab === 'sync' &&
+    entity?.id &&
+    effectiveProjectPath &&
+    entity?.collection !== 'discovered'
+  );
 
   const {
     data: diffData,
@@ -422,6 +438,48 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
+  // Fetch deployments for this artifact
+  const {
+    data: deploymentsData,
+    isLoading: isDeploymentsLoading,
+    error: deploymentsError,
+  } = useDeploymentList();
+
+  // Filter deployments by artifact name
+  const artifactDeployments = useMemo(() => {
+    if (!deploymentsData?.deployments || !entity) return [];
+
+    // Filter deployments that match this artifact
+    const filtered = deploymentsData.deployments.filter(
+      (d) => d.artifact_name === entity.name && d.artifact_type === entity.type
+    );
+
+    // Transform to Deployment type with computed status
+    return filtered.map((d): Deployment => {
+      // Determine status based on sync_status
+      let status: 'current' | 'outdated' | 'error' = 'current';
+      if (d.sync_status === 'outdated') {
+        status = 'outdated';
+      } else if (d.sync_status === 'modified') {
+        status = 'outdated'; // Modified means there's a newer version available
+      }
+
+      return {
+        ...d,
+        id: d.artifact_path, // Use path as unique ID
+        status,
+        latest_version: entity.version,
+        deployed_version: d.collection_sha?.substring(0, 7), // Use SHA as version indicator
+      };
+    });
+  }, [deploymentsData, entity]);
+
+  // Count unique collections (projects are determined by the parent query)
+  const deploymentProjectCount = useMemo(() => {
+    const collections = new Set(artifactDeployments.map((d) => d.from_collection));
+    return collections.size;
+  }, [artifactDeployments]);
+
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
 
@@ -456,7 +514,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Event Handlers
   // ============================================================================
 
-  const handleDeploy = async () => {
+  const _handleDeploy = async () => {
     if (!entity.projectPath) {
       toast({
         title: 'Deploy Failed',
@@ -466,7 +524,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       return;
     }
 
-    setIsDeploying(true);
+    _setIsDeploying(true);
     try {
       await deployEntity(entity.id, entity.projectPath);
       toast({
@@ -483,11 +541,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         variant: 'destructive',
       });
     } finally {
-      setIsDeploying(false);
+      _setIsDeploying(false);
     }
   };
 
-  const handleSync = async () => {
+  const _handleSync = async () => {
     if (!entity.projectPath) {
       toast({
         title: 'Sync Failed',
@@ -497,7 +555,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       return;
     }
 
-    setIsSyncing(true);
+    _setIsSyncing(true);
     try {
       await syncEntity(entity.id, entity.projectPath);
       toast({
@@ -514,7 +572,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         variant: 'destructive',
       });
     } finally {
-      setIsSyncing(false);
+      _setIsSyncing(false);
     }
   };
 
@@ -874,7 +932,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Render Upstream Status Section
   // ============================================================================
 
-  const renderUpstreamSection = () => {
+  const _renderUpstreamSection = () => {
     // Check if artifact has a GitHub source (not local-only)
     const hasUpstreamSource = entity?.source && !entity.source.startsWith('local:');
 
@@ -1021,7 +1079,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Render Diff Section
   // ============================================================================
 
-  const renderDiffSection = () => {
+  const _renderDiffSection = () => {
     // Show project selector for collection-mode entities (no projectPath)
     // This allows users to select which project to compare against
     if (!entity.projectPath && entity.collection) {
@@ -1155,7 +1213,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   return (
     <>
       <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl min-h-0">
+        <DialogContent className="flex h-[90vh] max-h-[90vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-6xl xl:max-w-7xl">
           {/* Header Section - Fixed */}
           <div className="border-b px-6 pb-4 pt-6">
             <DialogHeader>
@@ -1205,6 +1263,20 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               >
                 History
               </TabsTrigger>
+              <TabsTrigger
+                value="collections"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                Collections
+              </TabsTrigger>
+              <TabsTrigger
+                value="deployments"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <Rocket className="mr-2 h-4 w-4" />
+                Deployments
+              </TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -1218,7 +1290,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       size="sm"
                       onClick={() => setShowParameterEditor(true)}
                     >
-                      <Pencil className="h-4 w-4 mr-2" />
+                      <Pencil className="mr-2 h-4 w-4" />
                       Edit Parameters
                     </Button>
                   </div>
@@ -1345,10 +1417,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
               <div className="flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
-                <div className={cn(
-                  "flex-shrink-0 overflow-hidden border-r transition-all duration-200",
-                  isEditing ? "w-48" : "w-64 lg:w-72"
-                )}>
+                <div
+                  className={cn(
+                    'flex-shrink-0 overflow-hidden border-r transition-all duration-200',
+                    isEditing ? 'w-48' : 'w-64 lg:w-72'
+                  )}
+                >
                   <FileTree
                     entityId={entity.id}
                     files={filesData?.files || []}
@@ -1382,7 +1456,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Sync Status Tab */}
-            <TabsContent value="sync" className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <TabsContent
+              value="sync"
+              className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
               <SyncStatusTab
                 entity={entity}
                 mode={entity.projectPath ? 'project' : 'collection'}
@@ -1498,6 +1575,101 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                         Sync operations and deployments will appear here once you start managing
                         this entity.
                       </p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Collections Tab */}
+            <TabsContent value="collections" className="mt-0 flex-1">
+              <ScrollArea className="h-[calc(90vh-12rem)]">
+                <div className="py-4">
+                  <ModalCollectionsTab entity={entity} />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Deployments Tab */}
+            <TabsContent value="deployments" className="mt-0 flex-1">
+              <ScrollArea className="h-[calc(90vh-12rem)]">
+                <div className="space-y-4 py-4">
+                  {/* Summary */}
+                  {artifactDeployments.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground">
+                        {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
+                        {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Loading state */}
+                  {isDeploymentsLoading && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <DeploymentCardSkeleton />
+                      <DeploymentCardSkeleton />
+                      <DeploymentCardSkeleton />
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {!isDeploymentsLoading && deploymentsError && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-700 dark:text-red-400" />
+                        <div>
+                          <p className="mb-1 text-sm font-medium text-red-700 dark:text-red-400">
+                            Failed to load deployments
+                          </p>
+                          <p className="text-xs text-red-600/80 dark:text-red-400/80">
+                            {deploymentsError instanceof Error
+                              ? deploymentsError.message
+                              : 'An unknown error occurred'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length === 0 && (
+                    <div className="py-12 text-center">
+                      <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+                      <h3 className="mb-2 text-lg font-semibold">Not deployed to any projects yet</h3>
+                      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                        Deploy this artifact to a project to see it listed here.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Success state - Grid of deployment cards */}
+                  {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length > 0 && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {artifactDeployments.map((deployment) => (
+                        <DeploymentCard
+                          key={deployment.id}
+                          deployment={deployment}
+                          onUpdate={() => {
+                            // TODO: Implement update handler
+                            toast({
+                              title: 'Update Deployment',
+                              description: 'Deployment update functionality coming soon',
+                            });
+                          }}
+                          onRemove={() => {
+                            // TODO: Implement remove handler
+                            toast({
+                              title: 'Remove Deployment',
+                              description: 'Deployment removal functionality coming soon',
+                            });
+                          }}
+                          onViewSource={() => {
+                            // Close modal - user is already viewing the source
+                            onClose();
+                          }}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>

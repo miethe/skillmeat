@@ -1,6 +1,7 @@
 'use client';
 
-import { Package, Terminal, Bot, Server, Webhook, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -11,12 +12,36 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 interface ArtifactListProps {
   artifacts: Artifact[];
   isLoading?: boolean;
   onArtifactClick: (artifact: Artifact) => void;
+  showCollectionColumn?: boolean;
+  onCollectionClick?: (collectionId: string) => void;
+  onMoveToCollection?: (artifact: Artifact) => void;
+  onManageGroups?: (artifact: Artifact) => void;
+  onEdit?: (artifact: Artifact) => void;
+  onDelete?: (artifact: Artifact) => void;
 }
 
 const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: string }>> = {
@@ -69,18 +94,78 @@ const statusColors: Record<string, string> = {
   error: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
 
-function ArtifactListSkeleton() {
+interface ArtifactRowActionsProps {
+  artifact: Artifact;
+  collectionId?: string;
+  onMoveToCollection?: () => void;
+  onManageGroups?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}
+
+function ArtifactRowActions({
+  artifact,
+  collectionId,
+  onMoveToCollection,
+  onManageGroups,
+  onEdit,
+  onDelete,
+}: ArtifactRowActionsProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Actions for ${artifact.name}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={onMoveToCollection}>
+          <FolderPlus className="mr-2 h-4 w-4" />
+          {collectionId ? 'Move to Collection' : 'Add to Collection'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onManageGroups}>
+          <Layers className="mr-2 h-4 w-4" />
+          Manage Groups
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onEdit}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={onDelete}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ArtifactListSkeleton({ showCollectionColumn }: { showCollectionColumn?: boolean }) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
+          {showCollectionColumn && <TableHead>Collection</TableHead>}
           <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Version</TableHead>
           <TableHead>Scope</TableHead>
           <TableHead className="hidden md:table-cell">Deployments</TableHead>
           <TableHead className="hidden lg:table-cell">Last Updated</TableHead>
+          <TableHead className="w-[50px]"></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -92,6 +177,11 @@ function ArtifactListSkeleton() {
                 <Skeleton className="h-3 w-48" />
               </div>
             </TableCell>
+            {showCollectionColumn && (
+              <TableCell>
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </TableCell>
+            )}
             <TableCell>
               <Skeleton className="h-4 w-16" />
             </TableCell>
@@ -109,6 +199,9 @@ function ArtifactListSkeleton() {
             </TableCell>
             <TableCell className="hidden lg:table-cell">
               <Skeleton className="h-4 w-16" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-8 w-8" />
             </TableCell>
           </TableRow>
         ))}
@@ -132,9 +225,32 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-export function ArtifactList({ artifacts, isLoading, onArtifactClick }: ArtifactListProps) {
+export function ArtifactList({
+  artifacts,
+  isLoading,
+  onArtifactClick,
+  showCollectionColumn,
+  onCollectionClick,
+  onMoveToCollection,
+  onManageGroups,
+  onEdit,
+  onDelete,
+}: ArtifactListProps) {
+  const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
+
+  const handleDelete = (artifact: Artifact) => {
+    setDeleteArtifact(artifact);
+  };
+
+  const confirmDelete = () => {
+    if (deleteArtifact) {
+      onDelete?.(deleteArtifact);
+      setDeleteArtifact(null);
+    }
+  };
+
   if (isLoading) {
-    return <ArtifactListSkeleton />;
+    return <ArtifactListSkeleton showCollectionColumn={showCollectionColumn} />;
   }
 
   if (artifacts.length === 0) {
@@ -150,95 +266,148 @@ export function ArtifactList({ artifacts, isLoading, onArtifactClick }: Artifact
   }
 
   return (
-    <div className="rounded-md border" data-testid="artifact-list">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Version</TableHead>
-            <TableHead>Scope</TableHead>
-            <TableHead className="hidden md:table-cell">Deployments</TableHead>
-            <TableHead className="hidden lg:table-cell">Last Updated</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {artifacts.map((artifact) => {
-            const Icon = artifactTypeIcons[artifact.type];
-            return (
-              <TableRow
-                key={artifact.id}
-                className={`cursor-pointer border-l-2 ${artifactTypeBorderAccents[artifact.type]} ${artifactTypeRowTints[artifact.type]}`}
-                onClick={() => onArtifactClick(artifact)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onArtifactClick(artifact);
-                  }
-                }}
-                aria-label={`View details for ${artifact.name}`}
-                data-testid="artifact-row"
-              >
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 font-medium">
-                      {artifact.metadata.title || artifact.name}
-                      {artifact.upstreamStatus.isOutdated && (
-                        <AlertCircle
-                          className="h-3 w-3 text-yellow-600"
-                          data-testid="outdated-indicator"
-                        />
+    <>
+      <div className="rounded-md border" data-testid="artifact-list">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              {showCollectionColumn && <TableHead>Collection</TableHead>}
+              <TableHead>Type</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Version</TableHead>
+              <TableHead>Scope</TableHead>
+              <TableHead className="hidden md:table-cell">Deployments</TableHead>
+              <TableHead className="hidden lg:table-cell">Last Updated</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {artifacts.map((artifact) => {
+              const Icon = artifactTypeIcons[artifact.type];
+              return (
+                <TableRow
+                  key={artifact.id}
+                  className={`cursor-pointer border-l-2 ${artifactTypeBorderAccents[artifact.type]} ${artifactTypeRowTints[artifact.type]}`}
+                  onClick={() => onArtifactClick(artifact)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onArtifactClick(artifact);
+                    }
+                  }}
+                  aria-label={`View details for ${artifact.name}`}
+                  data-testid="artifact-row"
+                >
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 font-medium">
+                        {artifact.metadata.title || artifact.name}
+                        {artifact.upstreamStatus.isOutdated && (
+                          <AlertCircle
+                            className="h-3 w-3 text-yellow-600"
+                            data-testid="outdated-indicator"
+                          />
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {artifact.metadata.description || artifact.name}
+                      </div>
+                    </div>
+                  </TableCell>
+                  {showCollectionColumn && (
+                    <TableCell>
+                      {artifact.collection ? (
+                        <Badge
+                          variant="outline"
+                          className="cursor-pointer hover:bg-accent"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCollectionClick?.(artifact.collection!.id);
+                          }}
+                        >
+                          {artifact.collection.name}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <div className="flex items-center gap-2" data-testid="type-badge">
+                      <Icon
+                        className={`h-4 w-4 ${artifactTypeIconColors[artifact.type]}`}
+                        aria-hidden="true"
+                      />
+                      <span className="text-sm">{artifactTypeLabels[artifact.type]}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {artifact.metadata.description || artifact.name}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      className={statusColors[artifact.status]}
+                      variant="outline"
+                      data-testid="status-badge"
+                    >
+                      {artifact.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                      {artifact.version || 'N/A'}
+                    </code>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs capitalize">
+                      {artifact.scope}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="text-sm">{artifact.usageStats.totalDeployments}</div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="text-sm text-muted-foreground">
+                      {formatRelativeTime(artifact.updatedAt)}
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2" data-testid="type-badge">
-                    <Icon
-                      className={`h-4 w-4 ${artifactTypeIconColors[artifact.type]}`}
-                      aria-hidden="true"
+                  </TableCell>
+                  <TableCell>
+                    <ArtifactRowActions
+                      artifact={artifact}
+                      collectionId={artifact.collection?.id}
+                      onMoveToCollection={onMoveToCollection ? () => onMoveToCollection(artifact) : undefined}
+                      onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
+                      onEdit={onEdit ? () => onEdit(artifact) : undefined}
+                      onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
                     />
-                    <span className="text-sm">{artifactTypeLabels[artifact.type]}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={statusColors[artifact.status]}
-                    variant="outline"
-                    data-testid="status-badge"
-                  >
-                    {artifact.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    {artifact.version || 'N/A'}
-                  </code>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="text-xs capitalize">
-                    {artifact.scope}
-                  </Badge>
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <div className="text-sm">{artifact.usageStats.totalDeployments}</div>
-                </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  <div className="text-sm text-muted-foreground">
-                    {formatRelativeTime(artifact.updatedAt)}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteArtifact} onOpenChange={(open) => !open && setDeleteArtifact(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteArtifact?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

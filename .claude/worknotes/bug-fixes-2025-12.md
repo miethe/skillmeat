@@ -319,3 +319,35 @@
 - **Fix**: Added `'Content-Type': 'application/json'` to the default headers in `buildApiHeaders()`
 - **Commit(s)**: 6fb51ab
 - **Status**: RESOLVED
+
+## 2025-12-13
+
+### Create New Collection Button Shows "Not Yet Implemented" Error
+
+**Issue**: Clicking "Create New Collection" button on `/collection` page displays error toast "Collection creation not yet implemented" despite backend endpoint being fully functional.
+- **Location**: `skillmeat/web/hooks/use-collections.ts:233`, `skillmeat/web/lib/api/collections.ts:46`
+- **Root Cause**: Two issues combined:
+  1. `useCreateCollection()` hook threw `ApiError('Collection creation not yet implemented', 501)` immediately instead of calling the API client
+  2. `createCollection()` API client targeted `/collections` (read-only endpoint) instead of `/user-collections` (fully implemented POST endpoint)
+- **Fix**:
+  1. Changed API client endpoint from `/collections` to `/user-collections` in `lib/api/collections.ts`
+  2. Replaced stub in `hooks/use-collections.ts` with actual `createCollection()` call
+  3. Added `description?: string` to `CreateCollectionRequest` type to match backend schema
+- **Commit(s)**: 86e9190
+- **Status**: RESOLVED
+
+## 2025-12-14
+
+### React Hydration Mismatch on Navigation and Collection Pages
+
+**Issue**: Client-side hydration mismatch errors on page load with multiple components:
+  - NavSection Marketplace: `aria-expanded={true}` vs `aria-expanded="false"`
+  - CollectionPage: Skeleton vs actual content rendering mismatch
+- **Location**: `skillmeat/web/components/nav-section.tsx:119-126`, `skillmeat/web/context/collection-context.tsx:46-53`, `skillmeat/web/app/collection/page.tsx:95-99`
+- **Root Cause**: Three components read from localStorage during `useState` initialization. Server renders with default values (null/false/grid), but client initializes with localStorage values, causing hydration mismatch when stored values differ.
+- **Fix**: Applied deferred hydration pattern to all three components:
+  1. **NavSection**: Initialize `isExpanded` with deterministic default (`isChildActive || defaultExpanded`), sync from localStorage in useEffect after mount with `hasMounted` state
+  2. **CollectionProvider**: Initialize `selectedCollectionId` with `null`, sync from localStorage in useEffect after mount
+  3. **CollectionPageContent**: Initialize `viewMode` with `'grid'`, sync from localStorage in useEffect after mount
+- **Commit(s)**: c9f8968
+- **Status**: RESOLVED

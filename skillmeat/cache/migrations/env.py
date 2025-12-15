@@ -35,9 +35,13 @@ sys.path.insert(0, str(skillmeat_root))
 # Alembic Config object (provides access to .ini values)
 config = context.config
 
-# Interpret the config file for Python logging (if present)
+# Interpret the config file for Python logging (if present and has logging sections)
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    try:
+        fileConfig(config.config_file_name)
+    except KeyError:
+        # Logging sections not present in alembic.ini, skip logging config
+        pass
 
 # SQLAlchemy MetaData object for autogenerate support
 # Since we're using raw SQL schema, we don't have SQLAlchemy models

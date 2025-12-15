@@ -546,6 +546,25 @@ uvicorn skillmeat.api.server:app --workers 4 --host 0.0.0.0 --port 8000
 
 ---
 
+## Path-Specific Rules
+
+Rules in `.claude/rules/api/` auto-load when editing this directory:
+
+| Rule File | Applies To | Contains |
+|-----------|-----------|----------|
+| routers.md | `routers/**/*.py` | Layered architecture, HTTP patterns, HTTPException usage |
+| schemas.md | `schemas/**/*.py` | DTO patterns, Pydantic conventions (Phase 3) |
+| services.md | `core/**/*.py` | Business logic, repository integration (Phase 3) |
+
+## Context Files
+
+| File | Load When |
+|------|-----------|
+| `.claude/context/api-endpoint-mapping.md` | Adding/debugging endpoints |
+| `.claude/context/symbol-usage-guide.md` | Bug investigation, tracing code paths |
+
+---
+
 ## Important Notes
 
 - **Stateless**: API should be stateless; state in collection/filesystem

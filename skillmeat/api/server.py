@@ -25,11 +25,13 @@ from .routers import (
     cache,
     collections,
     deployments,
+    groups,
     health,
     marketplace,
     marketplace_sources,
     mcp,
     projects,
+    user_collections,
 )
 from .middleware import ObservabilityMiddleware, RateLimitMiddleware, get_rate_limiter
 
@@ -233,11 +235,13 @@ def create_app(settings: APISettings = None) -> FastAPI:
 
     # API routers under API prefix
     app.include_router(collections.router, prefix=settings.api_prefix, tags=["collections"])
+    app.include_router(user_collections.router, prefix=settings.api_prefix, tags=["user-collections"])
     app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
     app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
+    app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
     app.include_router(marketplace_sources.router, prefix=settings.api_prefix, tags=["marketplace-sources"])
