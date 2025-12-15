@@ -32,6 +32,10 @@ interface ContextEntityDetailProps {
   onOpenChange: (open: boolean) => void;
   onDeploy?: (entity: ContextEntity) => void;
   onEdit?: (entity: ContextEntity) => void;
+  /** Show token count in metadata */
+  showTokenCount?: boolean;
+  /** Estimated token count for this entity */
+  tokenCount?: number;
 }
 
 const entityTypeLabels: Record<ContextEntityType, string> = {
@@ -93,6 +97,8 @@ export function ContextEntityDetail({
   onOpenChange,
   onDeploy,
   onEdit,
+  showTokenCount = false,
+  tokenCount,
 }: ContextEntityDetailProps) {
   const [showRawContent, setShowRawContent] = useState(false);
 
@@ -185,13 +191,22 @@ export function ContextEntityDetail({
                       value={formatDate(entity.updated_at)}
                     />
                   </div>
-                  {entity.version && (
+                  {(entity.version || (showTokenCount && tokenCount !== undefined)) && (
                     <div className="grid grid-cols-2 gap-4">
-                      <MetadataItem
-                        icon={<Tag className="h-4 w-4" />}
-                        label="Version"
-                        value={entity.version}
-                      />
+                      {entity.version && (
+                        <MetadataItem
+                          icon={<Tag className="h-4 w-4" />}
+                          label="Version"
+                          value={entity.version}
+                        />
+                      )}
+                      {showTokenCount && tokenCount !== undefined && (
+                        <MetadataItem
+                          icon={<FileText className="h-4 w-4" />}
+                          label="Token Count"
+                          value={`~${tokenCount} tokens`}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
