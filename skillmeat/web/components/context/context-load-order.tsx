@@ -56,11 +56,18 @@ function EntityLoadItem({ entity }: EntityLoadItemProps) {
             'h-3.5 w-3.5 flex-shrink-0',
             entity.autoLoad ? 'text-green-600' : 'text-muted-foreground'
           )}
+          aria-hidden="true"
         />
-        <span className="text-sm truncate">{entity.name}</span>
+        <span className="text-sm truncate">
+          {entity.name}
+          <span className="sr-only">
+            {entity.autoLoad ? ' - Auto-load enabled' : ' - Manual load'}
+          </span>
+        </span>
       </div>
       <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
         ~{entity.tokens}
+        <span className="sr-only"> tokens</span>
       </Badge>
     </div>
   );
