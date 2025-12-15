@@ -17,9 +17,23 @@ Implement context entity synchronization between projects and collections, chang
 2. Context sync service (pull/push changes)
 3. Context discovery API endpoint (auto-load mapping)
 4. Sync operations API endpoints
-5. Diff viewer component for conflict resolution
-6. Context discovery panel for projects
+5. **Extend** existing diff-viewer with sync resolution actions
+6. **Extend** existing discovery components for context entities
 7. CLI sync commands
+
+### Component Reuse Principle
+
+**IMPORTANT**: This phase prioritizes extending existing components over creating new ones:
+
+| Existing Component | Location | Extend For |
+|-------------------|----------|------------|
+| `diff-viewer.tsx` (397 lines) | `components/entity/` | Add resolution actions (Keep Local/Remote/Merge) |
+| `DiscoveryTab.tsx` (19KB) | `components/discovery/` | Add token counts, auto-load toggles |
+| `unified-entity-modal.tsx` (66KB) | `components/entity/` | Integrate context sync into Sync Status tab |
+| `merge-workflow.tsx` (36KB) | `components/entity/` | Reuse for context conflict resolution |
+| `context-entity-*.tsx` | `components/context/` | Extend existing context components |
+
+**Rationale**: These components already implement 80%+ of required functionality. Extending saves significant development time and maintains UI consistency.
 
 ---
 
@@ -237,75 +251,142 @@ class SyncStatusResponse(BaseModel):
 
 ---
 
-### TASK-5.5: Create Context Diff Viewer Component
+### TASK-5.5: Extend Diff Viewer with Sync Resolution Actions
 
-**Story Points**: 3
+**Story Points**: 2 _(reduced from 3 - extending existing component)_
 **Assigned To**: `ui-engineer-enhanced`
 **Dependencies**: Phase 3
 
-**Files to Create**:
-- `skillmeat/web/components/context/context-diff-viewer.tsx`
+**Files to Modify**:
+- `skillmeat/web/components/entity/diff-viewer.tsx` _(existing, 397 lines)_
 
-**Features**:
-- Side-by-side diff view
-- Highlight additions (green) and deletions (red)
-- Resolution actions: Keep Local, Keep Remote, Merge (future)
-- Preview result before applying
+**Existing Features** (already implemented):
+- ✅ Side-by-side diff view
+- ✅ Color-coded additions (green) and deletions (red)
+- ✅ File sidebar with change statistics
+- ✅ Scroll support for large files
+- ✅ Unified diff parsing
 
-**Libraries**: Use `react-diff-viewer` or `diff2html`
+**New Features to Add**:
+- Resolution action bar: "Keep Local", "Keep Remote", "Merge" (future)
+- Optional `onResolve` callback prop for conflict resolution
+- Preview mode to show result before applying
+- Integration with context sync workflow
+
+**Implementation Approach**:
+```typescript
+// Extend existing DiffViewer props
+interface DiffViewerProps {
+  // ... existing props
+  showResolutionActions?: boolean;
+  onResolve?: (resolution: 'keep_local' | 'keep_remote' | 'merge') => void;
+  previewMode?: boolean;
+}
+```
 
 **Acceptance Criteria**:
-- [ ] Diff highlights changes correctly
-- [ ] Resolution buttons work
-- [ ] Preview shows final result
-- [ ] Works for large files (scroll)
+- [ ] Resolution buttons appear when `showResolutionActions={true}`
+- [ ] `onResolve` callback fires with correct resolution type
+- [ ] Preview mode shows final result
+- [ ] Existing diff-viewer functionality unchanged when new props not used
 
 ---
 
-### TASK-5.6: Create Context Discovery Panel
+### TASK-5.6: Extend Discovery Components for Context Entities
 
 **Story Points**: 2
 **Assigned To**: `ui-engineer-enhanced`
 **Dependencies**: TASK-5.3, Phase 3
 
-**Files to Create**:
-- `skillmeat/web/components/projects/context-discovery-panel.tsx`
+**Files to Modify**:
+- `skillmeat/web/components/discovery/DiscoveryTab.tsx` _(existing, 19KB)_
+- `skillmeat/web/components/context/context-entity-card.tsx` _(existing)_
+- `skillmeat/web/components/context/context-entity-detail.tsx` _(existing)_
 
-**Features**:
-- Display auto-loaded entities (with token counts)
-- Display on-demand entities
-- Total token usage indicator
-- Load order visualization (specs → rules → context)
-- Toggle auto-load for entities
+**Files to Create** (minimal):
+- `skillmeat/web/components/context/context-load-order.tsx` _(small, ~100 lines)_
+
+**Existing Components to Leverage**:
+- `DiscoveryTab.tsx` - Main discovery interface with filtering, search, import
+- `context-entity-card.tsx` - Card display for context entities
+- `context-entity-detail.tsx` - Detail view for context entities
+- `context-entity-filters.tsx` - Filtering for context type
+
+**New Features to Add**:
+- Token count badges on context entity cards
+- Auto-load toggle switch on cards and detail view
+- Token usage summary in discovery header
+- Load order visualization component (new, small)
+- Warning banner when total auto-load tokens > 2000
+
+**Implementation Approach**:
+```typescript
+// Extend existing ContextEntityCard props
+interface ContextEntityCardProps {
+  // ... existing props
+  showTokenCount?: boolean;
+  tokenCount?: number;
+  onAutoLoadToggle?: (enabled: boolean) => void;
+}
+
+// New small component for load order
+const ContextLoadOrder: React.FC<{ entities: ContextEntity[] }>;
+```
 
 **Acceptance Criteria**:
-- [ ] Shows auto-loaded vs on-demand
-- [ ] Token counts displayed
-- [ ] Can toggle auto-load flag
-- [ ] Warning if token count > threshold (e.g., 2000)
+- [ ] Token counts displayed on cards when `showTokenCount={true}`
+- [ ] Auto-load toggle works and calls API
+- [ ] Load order visualization shows specs → rules → context
+- [ ] Warning appears when total tokens > 2000
+- [ ] Integrates with existing DiscoveryTab filtering
 
 ---
 
-### TASK-5.7: Integrate Sync UI into Project Page
+### TASK-5.7: Integrate Context Sync into Unified Entity Modal
 
 **Story Points**: 2
 **Assigned To**: `ui-engineer-enhanced`
 **Dependencies**: TASK-5.5, 5.6
 
+**Existing Components to Leverage**:
+- `unified-entity-modal.tsx` (66KB) - Already has "Sync Status" tab with diff viewing
+- `merge-workflow.tsx` (36KB) - Already handles merge conflict resolution
+- `conflict-resolver.tsx` - Collection conflict resolution component
+
 **Files to Modify**:
-- `skillmeat/web/app/projects/[id]/page.tsx` (assuming project detail page exists)
+- `skillmeat/web/components/entity/unified-entity-modal.tsx`
+- `skillmeat/web/app/projects/[id]/page.tsx` (if exists)
+
+**Approach**:
+Rather than creating new sync UI, extend the existing unified-entity-modal's "Sync Status" tab to:
+1. Support context entity type in sync status checks
+2. Show context entities alongside other artifact types in sync view
+3. Use extended diff-viewer (TASK-5.5) for context conflict resolution
+4. Add "Sync Context" action to project toolbar/card
 
 **Features**:
-- "Sync Context" button in project toolbar
-- Badge showing pending changes count
-- Modal with diff viewer for each modified entity
-- Batch apply changes (sync all)
+- Context entities appear in unified modal's Sync Status tab
+- Sync button on project page/card triggers existing modal
+- Badge showing pending context changes
+- Batch sync leverages existing merge-workflow.tsx patterns
+
+**Implementation Approach**:
+```typescript
+// Extend SyncStatusTab to handle context entities
+// No new component needed - enhance existing
+const SyncStatusTab: React.FC<{
+  // ... existing props
+  includeContextEntities?: boolean;
+}>;
+```
 
 **Acceptance Criteria**:
-- [ ] Sync button visible on project page
-- [ ] Badge shows count of pending changes
-- [ ] Can review diffs before syncing
-- [ ] Batch sync works
+- [ ] Context entities appear in unified modal's Sync Status tab
+- [ ] Sync button visible on project page/card
+- [ ] Badge shows count of pending context changes
+- [ ] Can review diffs in existing diff-viewer
+- [ ] Batch sync works for context entities
+- [ ] Existing sync functionality for skills/agents unchanged
 
 ---
 
@@ -362,16 +443,18 @@ Task("python-backend-engineer", "TASK-5.4: Sync operations API endpoints...")
 Task("python-backend-engineer", "TASK-5.8: CLI sync commands...")
 ```
 
-**Batch 4** (Parallel - UI Components):
+**Batch 4** (Parallel - UI Extensions):
 ```python
-Task("ui-engineer-enhanced", "TASK-5.5: Context diff viewer component...")
-Task("ui-engineer-enhanced", "TASK-5.6: Context discovery panel...")
+Task("ui-engineer-enhanced", "TASK-5.5: Extend diff-viewer.tsx with sync resolution actions (Keep Local/Remote). Add showResolutionActions and onResolve props. File: components/entity/diff-viewer.tsx")
+Task("ui-engineer-enhanced", "TASK-5.6: Extend discovery components for context entities - add token counts to cards, auto-load toggles, token warning banner. Files: components/discovery/DiscoveryTab.tsx, components/context/context-entity-card.tsx. Create small context-load-order.tsx for load order visualization.")
 ```
 
 **Batch 5** (Sequential - UI Integration):
 ```python
-Task("ui-engineer-enhanced", "TASK-5.7: Integrate sync UI into project page...")
+Task("ui-engineer-enhanced", "TASK-5.7: Extend unified-entity-modal's Sync Status tab to include context entities. Leverage existing merge-workflow.tsx patterns. Add Sync Context button to project toolbar. File: components/entity/unified-entity-modal.tsx")
 ```
+
+**Note**: Batch 4 and 5 are UI extension work, not net-new component creation. This reduces risk and development time.
 
 ---
 
