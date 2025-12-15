@@ -60,6 +60,14 @@ from .context_entity import (
     ContextEntityResponse,
     ContextEntityListResponse,
 )
+from .context_sync import (
+    SyncPullRequest,
+    SyncPushRequest,
+    SyncConflictResponse,
+    SyncResultResponse,
+    SyncStatusResponse,
+    SyncResolveRequest,
+)
 from .project_template import (
     TemplateEntitySchema,
     ProjectTemplateBase,
@@ -122,6 +130,13 @@ __all__ = [
     "ContextEntityUpdateRequest",
     "ContextEntityResponse",
     "ContextEntityListResponse",
+    # Context Sync
+    "SyncPullRequest",
+    "SyncPushRequest",
+    "SyncConflictResponse",
+    "SyncResultResponse",
+    "SyncStatusResponse",
+    "SyncResolveRequest",
     # Project Templates
     "TemplateEntitySchema",
     "ProjectTemplateBase",
