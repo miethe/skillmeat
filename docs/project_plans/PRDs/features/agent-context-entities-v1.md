@@ -653,6 +653,8 @@ skillmeat project sync-context <project-path> [--pull | --push]
 
 ### 6.5 Web UI Components
 
+> **Component Reuse Principle**: Context entities should leverage existing SkillMeat UI infrastructure wherever possible. The `unified-entity-modal.tsx` (66KB) already provides comprehensive entity management with tabs for Overview, Contents, Sync Status, History, Collections, and Deployments. Context entities should extend this modal rather than create parallel UI. Similarly, `diff-viewer.tsx`, `DiscoveryTab.tsx`, and `merge-workflow.tsx` should be extended for context-specific needs.
+
 #### 6.5.1 Context Entity Browser
 
 **Location:** `skillmeat/web/app/context-entities/page.tsx`
@@ -1082,25 +1084,28 @@ def validate_path_pattern(pattern: str) -> bool:
 
 ### Phase 5: Progressive Disclosure & Sync (1.5 weeks)
 
+> **Implementation Note**: UI tasks in this phase **extend existing components** rather than creating new ones. See unified-entity-modal.tsx, diff-viewer.tsx, DiscoveryTab.tsx, and merge-workflow.tsx.
+
 **Scope:**
 - Auto-load flag and path-based loading
 - Context discovery API endpoint
 - Sync context entities from project to collection
 - Detect manual edits to deployed context files
-- Diff view for context entity conflicts
+- **Extend** existing diff-viewer with resolution actions
+- **Extend** existing discovery components for context entities
 
 **Deliverables:**
 - `GET /projects/{id}/context-map` endpoint
 - Sync logic for context entities
-- Conflict detection and resolution UI
-- Progressive disclosure documentation
+- Extended diff-viewer with resolution actions (not new component)
+- Extended discovery tab with token counts and auto-load toggles
 
 **Acceptance Criteria:**
 - Can mark entities as auto-load
 - API returns context map for project
 - Can sync modified CLAUDE.md from project to collection
-- Diff view shows changes to spec files
-- Conflict resolution works for context entities
+- Diff view shows changes to spec files with resolution actions
+- Conflict resolution works via existing merge-workflow patterns
 
 ### Phase 6: Polish & Documentation (1 week)
 

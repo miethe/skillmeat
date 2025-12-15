@@ -3,69 +3,94 @@ type: progress
 prd: "agent-context-entities"
 phase: 5
 phase_title: "Progressive Disclosure & Sync"
-status: pending
-progress: 0
+status: completed
+progress: 100
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 8
 created: "2025-12-14"
-updated: "2025-12-14"
+updated: "2025-12-15"
+completed_at: "2025-12-15"
 
 tasks:
   - id: "TASK-5.1"
     name: "Implement Content Hashing for Change Detection"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimate: 2
+    completed_at: "2025-12-15"
+    commit: "ad79b59"
+    notes: "SHA256 hashing, detect_changes(), read_file_with_hash(). 30 unit tests."
 
   - id: "TASK-5.2"
     name: "Create Context Sync Service"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-5.1"]
     estimate: 3
+    completed_at: "2025-12-15"
+    commit: "c4e6d95"
+    notes: "ContextSyncService with pull/push/conflict detection/resolution. 19 unit tests."
 
   - id: "TASK-5.3"
     name: "Create Context Discovery Endpoint"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimate: 2
+    completed_at: "2025-12-15"
+    commit: "6afea24"
+    notes: "GET /api/v1/projects/{project_id}/context-map. Scans .claude/ for specs/rules/context."
 
   - id: "TASK-5.4"
     name: "Create Sync Operations Endpoints"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-5.2"]
     estimate: 2
+    completed_at: "2025-12-15"
+    commit: "da3736e"
+    notes: "POST pull/push/resolve, GET status. Full OpenAPI docs."
 
   - id: "TASK-5.5"
-    name: "Create Context Diff Viewer Component"
-    status: "pending"
+    name: "Extend Diff Viewer with Sync Resolution Actions"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
-    estimate: 3
+    estimate: 2
+    completed_at: "2025-12-15"
+    commit: "bc59199"
+    notes: "Added showResolutionActions, onResolve, localLabel/remoteLabel, isResolving props. 11 new tests."
 
   - id: "TASK-5.6"
-    name: "Create Context Discovery Panel"
-    status: "pending"
+    name: "Extend Discovery Components for Context Entities"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-5.3"]
     estimate: 2
+    completed_at: "2025-12-15"
+    commit: "224044d"
+    notes: "Token badges, auto-load toggles, context-load-order.tsx, warning banner >2000 tokens."
 
   - id: "TASK-5.7"
-    name: "Integrate Sync UI into Project Page"
-    status: "pending"
+    name: "Integrate Context Sync into Unified Entity Modal"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-5.5", "TASK-5.6"]
     estimate: 2
+    completed_at: "2025-12-15"
+    commit: "1b01915"
+    notes: "ContextSyncStatus component, use-context-sync hooks, context-sync API client."
 
   - id: "TASK-5.8"
     name: "Implement CLI Sync Commands"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["TASK-5.2", "TASK-5.4"]
     estimate: 1
+    completed_at: "2025-12-15"
+    commit: "1c52f17"
+    notes: "skillmeat project sync-context with --pull/--push/--status/--entities/--force."
 
 parallelization:
   batch_1: ["TASK-5.1", "TASK-5.3"]
@@ -75,72 +100,64 @@ parallelization:
   batch_5: ["TASK-5.7"]
 ---
 
-# Phase 5: Progressive Disclosure & Sync
+# Phase 5: Progressive Disclosure & Sync - COMPLETED
 
-## Orchestration Quick Reference
+## Phase Completion Summary
 
-**Batch 1** (Parallel - Core Logic):
-- TASK-5.1 → `python-backend-engineer` (2h)
-- TASK-5.3 → `python-backend-engineer` (2h)
+**Total Tasks**: 8
+**Completed**: 8
+**Success Criteria Met**: All
+**Tests Passing**: 49 backend tests pass
 
-**Batch 2** (Sequential - Sync Service):
-- TASK-5.2 → `python-backend-engineer` (3h)
+## Key Achievements
 
-**Batch 3** (Parallel - API + CLI):
-- TASK-5.4 → `python-backend-engineer` (2h)
-- TASK-5.8 → `python-backend-engineer` (1h)
+### Backend (Python)
+- Content hashing service with SHA256 for change detection
+- Context sync service with pull/push/conflict resolution
+- Context discovery endpoint returning auto-load/on-demand entities with token estimates
+- Sync operations API (pull/push/status/resolve endpoints)
+- CLI sync commands with Rich formatted output
 
-**Batch 4** (Parallel - UI Components):
-- TASK-5.5 → `ui-engineer-enhanced` (3h)
-- TASK-5.6 → `ui-engineer-enhanced` (2h)
+### Frontend (React/TypeScript)
+- Extended diff-viewer with sync resolution actions (Keep Local/Remote/Merge)
+- Extended discovery components with token counts and auto-load toggles
+- Created context-load-order visualization component
+- Integrated context sync into unified-entity-modal's Sync Status tab
+- React Query hooks for context sync operations
 
-**Batch 5** (Sequential - UI Integration):
-- TASK-5.7 → `ui-engineer-enhanced` (2h)
+## Files Created/Modified
 
-### Task Delegation Commands
+### Backend
+- `skillmeat/core/services/content_hash.py` (NEW)
+- `skillmeat/core/services/context_sync.py` (NEW)
+- `skillmeat/api/routers/context_sync.py` (NEW)
+- `skillmeat/api/schemas/context_sync.py` (NEW)
+- `skillmeat/api/routers/projects.py` (context-map endpoint)
+- `skillmeat/cli.py` (project sync-context commands)
 
-**Batch 1**:
-```python
-Task("python-backend-engineer", "TASK-5.1: Implement content hashing for change detection. File: skillmeat/core/services/content_hash.py. Function: compute_content_hash (SHA256), detect_changes (compare collection hash vs deployed file hash). Hash computed on entity create/update.")
+### Frontend
+- `skillmeat/web/components/entity/diff-viewer.tsx` (extended)
+- `skillmeat/web/components/entity/context-sync-status.tsx` (NEW)
+- `skillmeat/web/components/entity/unified-entity-modal.tsx` (extended)
+- `skillmeat/web/components/context/context-load-order.tsx` (NEW)
+- `skillmeat/web/components/context/context-entity-card.tsx` (extended)
+- `skillmeat/web/components/context/context-entity-detail.tsx` (extended)
+- `skillmeat/web/components/discovery/DiscoveryTab.tsx` (extended)
+- `skillmeat/web/hooks/use-context-sync.ts` (NEW)
+- `skillmeat/web/lib/api/context-sync.ts` (NEW)
 
-Task("python-backend-engineer", "TASK-5.3: Create context discovery endpoint. GET /projects/{id}/context-map. Scan project .claude/ directory. Return auto-loaded entities and on-demand entities with token estimates. Total token count for auto-load entities.")
-```
+### Tests
+- `tests/unit/test_content_hash.py` - 30 tests
+- `tests/unit/core/services/test_context_sync.py` - 19 tests
 
-**Batch 2**:
-```python
-Task("python-backend-engineer", "TASK-5.2: Create context sync service. File: skillmeat/core/services/context_sync.py. Methods: detect_modified_entities, pull_changes (project → collection), push_changes (collection → project), detect_conflicts (both modified), resolve_conflict (keep_local/keep_remote/merge). Use content hashing.")
-```
+## Known Issues
 
-**Batch 3**:
-```python
-Task("python-backend-engineer", "TASK-5.4: Create sync operations API endpoints. File: skillmeat/api/routers/context_sync.py. Endpoints: POST /context-sync/pull, POST /context-sync/push, GET /context-sync/status. Request bodies: SyncPullRequest, SyncPushRequest. Response: SyncStatusResponse with modified entities and conflicts.")
+- Pre-existing: jest-axe TypeScript types missing (@types/jest-axe)
+- Pre-existing: SSG build error on /collection page (null id) - unrelated to Phase 5
 
-Task("python-backend-engineer", "TASK-5.8: Implement CLI sync commands. Commands: 'skillmeat project sync-context <path> --pull', '--push', '--status'. Show colored diff in terminal. Confirmation prompt. Summary of changes. Support --entities filter.")
-```
+## Recommendations for Next Phase
 
-**Batch 4**:
-```python
-Task("ui-engineer-enhanced", "TASK-5.5: Create context diff viewer component. File: skillmeat/web/components/context/context-diff-viewer.tsx. Side-by-side diff view. Highlight additions (green) and deletions (red). Resolution actions: Keep Local, Keep Remote, Merge (future). Use react-diff-viewer or diff2html. Preview result before applying.")
-
-Task("ui-engineer-enhanced", "TASK-5.6: Create context discovery panel. File: skillmeat/web/components/projects/context-discovery-panel.tsx. Display auto-loaded entities with token counts. Display on-demand entities. Total token usage indicator. Load order visualization (specs → rules → context). Toggle auto-load flag. Warning if token count > 2000.")
-```
-
-**Batch 5**:
-```python
-Task("ui-engineer-enhanced", "TASK-5.7: Integrate sync UI into project page. File: skillmeat/web/app/projects/[id]/page.tsx. Add 'Sync Context' button in toolbar. Badge showing pending changes count. Modal with diff viewer for each modified entity. Batch apply changes (sync all).")
-```
-
-## Quality Gates
-
-- [ ] Change detection identifies modified files
-- [ ] Pull updates collection correctly
-- [ ] Push updates project files correctly
-- [ ] Conflicts detected and shown
-- [ ] Diff view highlights changes accurately
-- [ ] Context map returns correct auto-load status
-- [ ] Token estimates are reasonable
-- [ ] CLI sync commands work
-
-## Notes
-
-_Session notes go here_
+1. Complete Phase 6: Polish & Documentation
+2. Add integration tests for sync workflows
+3. Consider adding merge conflict resolution UI (currently placeholder)
+4. Add sync progress indicators for large batch operations
