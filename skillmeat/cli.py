@@ -4,6 +4,7 @@ This module provides the complete command-line interface for SkillMeat,
 a personal collection manager for Claude Code artifacts.
 """
 
+import json
 import logging
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
+import requests
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Confirm
@@ -8619,6 +8621,873 @@ def compliance_history(publisher):
     except Exception as e:
         console.print(f"[red]Error retrieving consent history:[/red] {e}")
         logger.exception("Failed to retrieve consent history")
+        sys.exit(1)
+
+
+# ====================
+# Context Entity Management Commands
+# ====================
+
+
+@main.group()
+def context():
+    """Manage context entities (CLAUDE.md, specs, rules, context files).
+
+    Context entities are agent configuration files that can be managed as
+    first-class artifacts in SkillMeat. Store, organize, and deploy context
+    files (CLAUDE.md, specs, rules, etc.) across multiple projects.
+
+    Entity Types Supported:
+      - Project configs (CLAUDE.md, AGENTS.md): Project-level instructions
+      - Spec files (.claude/specs/*.md): Feature specifications and designs
+      - Rule files (.claude/rules/**/*.md): Coding rules and patterns
+      - Context files (.claude/context/*.md): Reference and knowledge files
+      - Progress templates (.claude/progress/*.md): Task tracking templates
+
+    Common Workflows:
+      1. Add entity: skillmeat context add .claude/specs/doc-policy.md
+      2. List entities: skillmeat context list --category backend-rules
+      3. Preview: skillmeat context show doc-policy-spec
+      4. Deploy: skillmeat context deploy doc-policy-spec --to-project ~/my-app
+      5. Clean up: skillmeat context remove old-spec --force
+
+    Benefits:
+      * Share context files across projects without duplication
+      * Version control context entities in your collection
+      * Auto-load context for AI agent workflows (Phase 2)
+      * Organize with categories and auto-load flags
+
+    For detailed help on each command:
+      skillmeat context add --help
+      skillmeat context list --help
+      skillmeat context show --help
+      skillmeat context deploy --help
+      skillmeat context remove --help
+    """
+    pass
+
+
+@context.command("add")
+@click.argument("source")
+@click.option(
+    "--type",
+    "-t",
+    "entity_type",
+    type=click.Choice([
+        "project_config",
+        "spec_file",
+        "rule_file",
+        "context_file",
+        "progress_template",
+    ]),
+    default=None,
+    help="Entity type (auto-detected if not provided)",
+)
+@click.option(
+    "--category",
+    "-c",
+    default=None,
+    help="Category for grouping (e.g., 'specs', 'backend-rules')",
+)
+@click.option(
+    "--auto-load",
+    is_flag=True,
+    help="Mark entity for auto-loading (default: false)",
+)
+@click.option(
+    "--name",
+    "-n",
+    default=None,
+    help="Override artifact name (default: derived from filename)",
+)
+def context_add(
+    source: str,
+    entity_type: Optional[str],
+    category: Optional[str],
+    auto_load: bool,
+    name: Optional[str],
+):
+    """Add a context entity from a local file or GitHub URL.
+
+    Import a context entity (CLAUDE.md, specs, rules, etc.) into your collection
+    from local files or GitHub repositories. Entities are stored in the collection
+    database and can be deployed to multiple projects independently.
+
+    SOURCE Formats:
+      - Local file path: /path/to/file.md or .claude/specs/doc-policy.md
+                         Uses relative paths from current directory or absolute paths
+      - GitHub URL: https://github.com/user/repo/blob/main/CLAUDE.md
+                    Raw content is fetched from GitHub (no token required for public repos)
+
+    Entity Type Auto-Detection:
+      Type is auto-detected from path pattern if not specified with --type:
+      - CLAUDE.md or AGENTS.md → project_config
+      - .claude/specs/*.md → spec_file
+      - .claude/rules/**/*.md → rule_file
+      - .claude/context/*.md → context_file
+      - .claude/progress/*.md → progress_template
+
+    Options:
+      --type (-t): Explicitly set entity type (overrides auto-detection)
+      --category (-c): Grouping category for organizing related entities
+                       Examples: 'backend-rules', 'specs', 'documentation'
+      --auto-load: Mark this entity to auto-load when used in agent context
+                   (Note: Auto-load feature planned for Phase 2)
+      --name (-n): Override auto-generated entity name
+                   Auto-generation: filename without extension, underscores → hyphens
+                   Example: doc_policy_spec.md → doc-policy-spec
+
+    Examples:
+      skillmeat context add .claude/specs/doc-policy-spec.md
+      skillmeat context add https://github.com/anthropics/skills/blob/main/CLAUDE.md --type project_config
+      skillmeat context add .claude/rules/api/routers.md --category backend-rules --auto-load
+      skillmeat context add ~/Downloads/custom-rule.md --name my-custom-rule --type rule_file
+
+    Entity Name Examples:
+      Source File                    → Entity Name
+      doc-policy-spec.md             → doc-policy-spec
+      doc_policy_spec.md             → doc-policy-spec (underscores to hyphens)
+      CLAUDE.md                       → claude (lowercase)
+      custom_rule.md (with -n flag)  → my-custom-rule (uses --name)
+
+    Common Errors:
+      * "File not found: {path}": Check file exists and path is correct
+        - Use absolute paths or paths relative to current directory
+        - Verify no typos in filename
+      * "Could not fetch from GitHub: {url}": GitHub URL is invalid or file doesn't exist
+        - Verify URL is correct: github.com/user/repo/blob/main/path/to/file.md
+        - File must exist in the specified branch
+      * "Could not read file: {path}": Permission denied or file is corrupted
+        - Check file permissions: chmod 644 file.md
+        - Verify file is valid UTF-8 text
+      * "Validation failed": Entity content doesn't match type requirements
+        - Check entity file has valid YAML frontmatter (for specs/rules)
+        - Verify path pattern matches entity type expectations
+      * "Could not connect to API server": API server is not running
+        - Start API: skillmeat web dev --api-only
+        - Check API is listening on http://localhost:8080
+      * "Entity name already exists": Name is already used in collection
+        - Use --name to specify a different name
+        - Or remove the existing entity first: skillmeat context remove old-name
+
+    Pro Tips:
+      * Use absolute paths for reliability: /Users/name/.claude/specs/file.md
+      * For GitHub files, use --type to explicitly set type if auto-detection fails
+      * Organize related entities with --category for easier filtering
+      * Test with --dry-run before deploying entities to projects
+    """
+    import requests
+
+    try:
+        # Detect source type
+        is_github = source.startswith("http://") or source.startswith("https://")
+
+        # Read content and determine path pattern
+        if is_github:
+            # GitHub URL
+            console.print(f"[cyan]Fetching from GitHub: {source}...[/cyan]")
+
+            # Convert GitHub blob URL to raw URL
+            raw_url = source.replace("github.com", "raw.githubusercontent.com")
+            raw_url = raw_url.replace("/blob/", "/")
+
+            try:
+                response = requests.get(raw_url, timeout=30)
+                response.raise_for_status()
+                content = response.text
+            except requests.exceptions.RequestException as e:
+                console.print(f"[red]Error: Could not fetch from GitHub: {source}[/red]")
+                console.print(f"[red]Details: {str(e)}[/red]")
+                sys.exit(1)
+
+            # Extract filename from URL for name/path pattern
+            url_path = source.split("/blob/")[1] if "/blob/" in source else source.split("/")[-1]
+            filename = url_path.split("/")[-1]
+
+            # Try to extract .claude/ path if present in URL
+            if ".claude/" in url_path:
+                path_pattern = url_path[url_path.find(".claude/"):]
+            else:
+                # Default path pattern based on filename
+                path_pattern = f".claude/{filename}"
+
+        else:
+            # Local file path
+            local_path = Path(source).resolve()
+
+            if not local_path.exists():
+                console.print(f"[red]Error: File not found: {source}[/red]")
+                sys.exit(1)
+
+            if not local_path.is_file():
+                console.print(f"[red]Error: Path is not a file: {source}[/red]")
+                sys.exit(1)
+
+            console.print(f"[cyan]Reading from local file: {local_path}...[/cyan]")
+
+            try:
+                content = local_path.read_text(encoding="utf-8")
+            except Exception as e:
+                console.print(f"[red]Error: Could not read file: {source}[/red]")
+                console.print(f"[red]Details: {str(e)}[/red]")
+                sys.exit(1)
+
+            filename = local_path.name
+
+            # Extract path pattern relative to .claude/ if present
+            path_str = str(local_path)
+            if ".claude/" in path_str:
+                path_pattern = path_str[path_str.find(".claude/"):]
+            else:
+                # Default path pattern based on filename
+                path_pattern = f".claude/{filename}"
+
+        # Auto-detect entity type if not provided
+        if entity_type is None:
+            if filename in ["CLAUDE.md", "AGENTS.md"]:
+                entity_type = "project_config"
+            elif ".claude/specs/" in path_pattern:
+                entity_type = "spec_file"
+            elif ".claude/rules/" in path_pattern:
+                entity_type = "rule_file"
+            elif ".claude/context/" in path_pattern:
+                entity_type = "context_file"
+            elif ".claude/progress/" in path_pattern:
+                entity_type = "progress_template"
+            else:
+                console.print("[yellow]Warning: Could not auto-detect entity type from path[/yellow]")
+                console.print(f"[yellow]Path pattern: {path_pattern}[/yellow]")
+                console.print("[yellow]Please specify --type explicitly[/yellow]")
+                sys.exit(1)
+
+        # Determine artifact name
+        if name is None:
+            # Derive from filename (remove .md extension)
+            name = filename.replace(".md", "").replace("_", "-")
+
+        # Prepare API request
+        api_base = "http://localhost:8080"  # TODO: Make this configurable
+        api_url = f"{api_base}/api/v1/context-entities"
+
+        request_data = {
+            "name": name,
+            "entity_type": entity_type,
+            "content": content,
+            "path_pattern": path_pattern,
+            "auto_load": auto_load,
+        }
+
+        if category:
+            request_data["category"] = category
+
+        # Add source metadata if GitHub
+        if is_github:
+            request_data["source"] = source
+
+        # Call API
+        console.print(f"[cyan]Creating context entity '{name}' (type: {entity_type})...[/cyan]")
+
+        try:
+            response = requests.post(
+                api_url,
+                json=request_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            # Display success
+            console.print(f"[green]✓ Added context entity: {result['name']}[/green]")
+            console.print(f"  ID: {result['id']}")
+            console.print(f"  Type: {result['type']}")
+            console.print(f"  Path Pattern: {result['path_pattern']}")
+            if result.get('category'):
+                console.print(f"  Category: {result['category']}")
+            console.print(f"  Auto-Load: {'Yes' if result['auto_load'] else 'No'}")
+
+        except requests.exceptions.HTTPError as e:
+            # Try to extract error detail from response
+            try:
+                error_body = e.response.json()
+                error_detail = error_body.get('detail', str(e))
+            except:
+                error_detail = str(e)
+
+            console.print(f"[red]Error: {error_detail}[/red]")
+            sys.exit(1)
+        except requests.exceptions.RequestException as e:
+            console.print(f"[red]Error: Could not connect to API server[/red]")
+            console.print(f"[red]Details: {str(e)}[/red]")
+            console.print("[yellow]Make sure the API server is running: skillmeat web dev --api-only[/yellow]")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {str(e)}[/red]")
+        logger.exception(f"Error adding context entity: {e}")
+        sys.exit(1)
+
+
+@context.command("list")
+@click.option(
+    "--type",
+    "-t",
+    "entity_type",
+    type=click.Choice(
+        ["project_config", "spec_file", "rule_file", "context_file", "progress_template"]
+    ),
+    default=None,
+    help="Filter by entity type",
+)
+@click.option("--category", "-c", default=None, help="Filter by category")
+@click.option("--auto-load", is_flag=True, help="Show only auto-load entities")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format (table or json)",
+)
+def context_list(
+    entity_type: Optional[str],
+    category: Optional[str],
+    auto_load: bool,
+    output_format: str,
+):
+    """List all context entities with optional filtering.
+
+    Display all context entities in your collection with metadata including
+    type, category, auto-load status, and path patterns. Filter by entity type,
+    category, or auto-load status for focused views.
+
+    Examples:
+        skillmeat context list                                    # Show all entities
+        skillmeat context list --type spec_file                   # Filter by type
+        skillmeat context list --category backend-rules --auto-load  # Combined filters
+        skillmeat context list --format json                      # JSON output for scripting
+
+    Common Errors:
+        * "Could not connect to API server": Make sure the API is running
+          with 'skillmeat web dev --api-only'
+        * "No context entities found": Try removing filters to see all entities
+    """
+    from rich.table import Table
+
+    api_base = "http://localhost:8080/api/v1"
+
+    # Build query params
+    params = {}
+    if entity_type:
+        params["type"] = entity_type
+    if category:
+        params["category"] = category
+    if auto_load:
+        params["auto_load"] = "true"
+
+    try:
+        response = requests.get(f"{api_base}/context-entities", params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        items = data.get("items", [])
+
+        if output_format == "json":
+            console.print(json.dumps(data, indent=2))
+            return
+
+        # Table format
+        if not items:
+            console.print("[dim]No context entities found.[/dim]")
+            if entity_type or category or auto_load:
+                console.print("[dim]Try removing filters to see all entities.[/dim]")
+            return
+
+        table = Table(title=f"Context Entities ({len(items)})")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="magenta")
+        table.add_column("Category", style="green")
+        table.add_column("Auto-Load", style="yellow")
+        table.add_column("Path Pattern", style="blue")
+
+        for entity in items:
+            table.add_row(
+                entity.get("name", "-"),
+                entity.get("type", "-"),
+                entity.get("category", "-") or "-",
+                "✓" if entity.get("auto_load") else "-",
+                entity.get("path_pattern", "-"),
+            )
+
+        console.print(table)
+
+    except requests.exceptions.ConnectionError:
+        console.print("[red]Error: Could not connect to API server.[/red]")
+        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        error_detail = ""
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except Exception:
+            error_detail = str(e)
+        console.print(f"[red]Error: {error_detail}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error listing context entities: {e}[/red]")
+        logger.exception(f"Error in context list: {e}")
+        sys.exit(1)
+
+
+@context.command("show")
+@click.argument("name_or_id")
+@click.option("--full", is_flag=True, help="Show complete content")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["rich", "json"]),
+    default="rich",
+    help="Output format (rich or json)",
+)
+def context_show(name_or_id: str, full: bool, output_format: str):
+    """Show context entity details, metadata, and content.
+
+    Display complete information about a context entity including its type,
+    category, path pattern, auto-load status, and full content. By default,
+    shows a preview of large files (20 lines); use --full to see everything.
+
+    Arguments:
+        name_or_id: Entity name (e.g., 'doc-policy-spec') or UUID (e.g., 'abc123def456...')
+                    Entity names are derived from filenames (doc-policy-spec.md → doc-policy-spec)
+
+    Options:
+        --full: Display complete content instead of preview (recommended for small files)
+        --format: Output as 'rich' (formatted panels) or 'json' (raw JSON for parsing)
+
+    Examples:
+        skillmeat context show doc-policy-spec                 # Preview by name
+        skillmeat context show abc123 --full                   # Full content by ID
+        skillmeat context show routers-rule --format json      # JSON for scripting
+        skillmeat context show my-context | head -20           # Pipe to other commands
+
+    Common Errors:
+        * "Entity 'name' not found": Check spelling of entity name or use full UUID
+          Use 'skillmeat context list' to see all available entities
+        * "Failed to connect to SkillMeat API": Make sure API server is running
+          Run: skillmeat web dev --api-only
+        * "API request timed out": Check network connectivity or API server load
+          Try again in a moment or restart the API server
+    """
+    # API configuration
+    api_host = "127.0.0.1"
+    api_port = 8000
+    api_base = f"http://{api_host}:{api_port}/api/v1"
+
+    try:
+        # First try to find by name using query parameter
+        try:
+            response = requests.get(
+                f"{api_base}/context-entities",
+                params={"search": name_or_id, "limit": 1},
+                timeout=10,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            if data.get("items") and len(data["items"]) > 0:
+                # Found by name search
+                entity = data["items"][0]
+            else:
+                # Not found by name, try by ID
+                response = requests.get(
+                    f"{api_base}/context-entities/{name_or_id}",
+                    timeout=10,
+                )
+                response.raise_for_status()
+                entity = response.json()
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                console.print(f"[red]Entity '{name_or_id}' not found[/red]")
+                sys.exit(1)
+            elif e.response.status_code == 501:
+                console.print("[yellow]Context entities API not yet implemented (TASK-1.2 in progress)[/yellow]")
+                console.print("[dim]This feature will be available once the database model is complete.[/dim]")
+                sys.exit(1)
+            else:
+                raise
+
+        # Output in requested format
+        if output_format == "json":
+            # JSON format - output complete entity
+            console.print(json.dumps(entity, indent=2))
+        else:
+            # Rich format - display with panels
+
+            # Build metadata text
+            metadata_lines = [
+                f"[cyan]Name:[/cyan] {entity.get('name', 'N/A')}",
+                f"[cyan]Type:[/cyan] {entity.get('type', 'N/A')}",
+                f"[cyan]Category:[/cyan] {entity.get('category') or 'None'}",
+                f"[cyan]Path Pattern:[/cyan] {entity.get('path_pattern', 'N/A')}",
+                f"[cyan]Auto-Load:[/cyan] {'Yes' if entity.get('auto_load') else 'No'}",
+                f"[cyan]Content Hash:[/cyan] {entity.get('content_hash') or 'None'}",
+                f"[cyan]Created:[/cyan] {entity.get('created_at', 'N/A')}",
+                f"[cyan]Updated:[/cyan] {entity.get('updated_at', 'N/A')}",
+            ]
+
+            # Add description if present
+            if entity.get("description"):
+                metadata_lines.insert(3, f"[cyan]Description:[/cyan] {entity['description']}")
+
+            # Display metadata panel
+            console.print(
+                Panel(
+                    "\n".join(metadata_lines),
+                    title="[bold blue]Metadata[/bold blue]",
+                    border_style="blue",
+                )
+            )
+
+            # Display content
+            content = entity.get("content", "")
+            if not content:
+                console.print("\n[yellow]No content available[/yellow]")
+            else:
+                lines = content.splitlines()
+                num_lines = len(lines)
+
+                if full or num_lines <= 20:
+                    # Show complete content
+                    console.print(
+                        Panel(
+                            content,
+                            title="[bold green]Content[/bold green]",
+                            border_style="green",
+                        )
+                    )
+                else:
+                    # Show preview (first 20 lines)
+                    preview = "\n".join(lines[:20])
+                    remaining = num_lines - 20
+                    console.print(
+                        Panel(
+                            f"{preview}\n\n[dim]... {remaining} more lines[/dim]",
+                            title="[bold green]Content Preview[/bold green]",
+                            border_style="green",
+                        )
+                    )
+                    console.print("\n[dim]Use --full to show complete content[/dim]")
+
+    except requests.exceptions.ConnectionError:
+        console.print("[red]Failed to connect to SkillMeat API[/red]")
+        console.print(f"[dim]Make sure the API server is running at {api_base}[/dim]")
+        console.print("[dim]Start the server with: skillmeat web dev --api-only[/dim]")
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        console.print("[red]API request timed out[/red]")
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        console.print(f"[red]API request failed: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error displaying context entity: {e}[/red]")
+        logger.exception(f"Error in context show: {e}")
+        sys.exit(1)
+
+
+@context.command("remove")
+@click.argument("name_or_id")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation prompt")
+def context_remove(name_or_id: str, force: bool):
+    """Remove context entity from collection.
+
+    Delete a context entity from your collection. This removes the entity
+    from the collection database but DOES NOT delete any files already
+    deployed to projects. Use this when you no longer need the entity
+    or want to replace it with a newer version.
+
+    Arguments:
+        name_or_id: Entity name (e.g., 'doc-policy-spec') or UUID
+                    Use 'skillmeat context list' to find entity names/IDs
+
+    Options:
+        --force (-f): Skip confirmation prompt (useful for scripting)
+
+    Examples:
+        skillmeat context remove my-rule                   # Interactive prompt
+        skillmeat context remove abc123 --force            # Skip confirmation
+        skillmeat context remove old-spec --force          # Remove without asking
+
+    Important Notes:
+        * Removal is permanent - the entity cannot be recovered
+        * Deployed files in projects are NOT automatically deleted
+        * If you want to keep a backup, use 'skillmeat context show' first
+
+    Common Errors:
+        * "Entity 'name' not found": Check spelling or use 'skillmeat context list'
+        * "Could not connect to API server": Make sure API is running
+          Run: skillmeat web dev --api-only
+        * "Cancelled": You chose not to proceed (only with interactive prompt)
+    """
+    from rich.prompt import Confirm
+
+    api_base = "http://localhost:8080/api/v1"
+
+    try:
+        # Lookup entity by name or ID
+        response = requests.get(f"{api_base}/context-entities", params={"search": name_or_id, "limit": 50}, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        entity = None
+        for item in data.get("items", []):
+            if item.get("name") == name_or_id or item.get("id") == name_or_id:
+                entity = item
+                break
+
+        if not entity:
+            # Try direct ID lookup
+            try:
+                response = requests.get(f"{api_base}/context-entities/{name_or_id}", timeout=10)
+                if response.status_code == 200:
+                    entity = response.json()
+            except Exception:
+                pass
+
+        if not entity:
+            console.print(f"[red]Entity '{name_or_id}' not found[/red]")
+            sys.exit(1)
+
+        # Display entity info
+        console.print(f"\n[bold]Entity:[/bold] {entity.get('name')} ({entity.get('type')})")
+        console.print(f"[bold]Path Pattern:[/bold] {entity.get('path_pattern')}")
+        if entity.get("category"):
+            console.print(f"[bold]Category:[/bold] {entity.get('category')}")
+
+        # Warning
+        console.print("\n[yellow]Warning: This entity may be deployed to projects.[/yellow]")
+        console.print("Removing it from the collection will not delete deployed files.\n")
+
+        # Confirmation
+        if not force:
+            if not Confirm.ask("Are you sure you want to remove this entity?"):
+                console.print("[yellow]Cancelled.[/yellow]")
+                return
+
+        # Delete
+        entity_id = entity.get("id")
+        response = requests.delete(f"{api_base}/context-entities/{entity_id}", timeout=10)
+        response.raise_for_status()
+
+        console.print(f"[green]✓[/green] Entity '{entity.get('name')}' removed")
+        console.print("[dim]Note: Deployed files in projects were not deleted.[/dim]")
+
+    except requests.exceptions.ConnectionError:
+        console.print("[red]Error: Could not connect to API server.[/red]")
+        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        error_detail = ""
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except Exception:
+            error_detail = str(e)
+        console.print(f"[red]Error removing entity: {error_detail}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception(f"Error in context remove: {e}")
+        sys.exit(1)
+
+
+@context.command("deploy")
+@click.argument("name_or_id")
+@click.option("--to-project", required=True, type=click.Path(), help="Target project path")
+@click.option("--overwrite", is_flag=True, help="Overwrite if file exists")
+@click.option("--dry-run", is_flag=True, help="Show what would be deployed without writing")
+def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: bool):
+    """Deploy context entity to a project directory.
+
+    Write a context entity from your collection to a project's .claude/ directory
+    (or project root for CLAUDE.md/AGENTS.md). This automatically creates parent
+    directories as needed and includes security checks to prevent path traversal.
+
+    Arguments:
+        name_or_id: Entity name (e.g., 'doc-policy-spec') or UUID
+                    Use 'skillmeat context list' to find entity names/IDs
+
+    Options:
+        --to-project PATH: Target project directory (required, expands ~ to home)
+                          Example: ~/projects/my-app or /Users/name/projects/api
+        --overwrite: Overwrite file if it already exists (default: prompt if conflict)
+        --dry-run: Preview deployment without writing any files (useful for testing)
+
+    Entity Type Behavior:
+        * project_config (CLAUDE.md, AGENTS.md): Deployed to project root
+        * All other types: Deployed to .claude/ directory based on path pattern
+
+    Examples:
+        skillmeat context deploy doc-policy-spec --to-project ~/projects/my-app
+        skillmeat context deploy routers-rule --to-project ~/projects/api --overwrite
+        skillmeat context deploy CLAUDE --to-project ~/projects/new --dry-run
+        skillmeat context deploy backend-rules --to-project . --dry-run  # Current project
+
+    Security Features:
+        * Path traversal attacks are blocked - target must be inside project
+        * Non-config files must deploy to .claude/ directory
+        * Parent directories are created automatically if needed
+
+    Common Errors:
+        * "Entity 'name' not found": Check spelling or use 'skillmeat context list'
+        * "File already exists: {path}": Use --overwrite to replace or
+          manually resolve conflict before retrying
+        * "Project path does not exist": Create the project directory first
+          mkdir -p ~/projects/my-app
+        * "SECURITY: Deployment path escapes": Entity path pattern is invalid or
+          points outside project - contact the entity creator
+        * "Could not connect to API server": Make sure API is running
+          Run: skillmeat web dev --api-only
+
+    Deployment Tips:
+        * Always use --dry-run first to preview changes
+        * Use --overwrite only if you're sure about overwriting existing files
+        * For multiple deployments, consider scripting with --dry-run validation
+    """
+    api_base = "http://localhost:8080/api/v1"
+
+    def validate_deployment_path(project_path: Path, path_pattern: str) -> Path:
+        """Validate deployment path is safe - SECURITY CRITICAL.
+
+        Args:
+            project_path: Resolved project directory path
+            path_pattern: Path pattern from context entity
+
+        Returns:
+            Validated target path
+
+        Raises:
+            ValueError: If path is unsafe (traversal attempt or outside .claude/)
+        """
+        # Normalize paths
+        project = project_path.resolve()
+
+        # Combine project + path_pattern
+        target = (project / path_pattern).resolve()
+
+        # SECURITY CHECK 1: Target must be inside project directory
+        try:
+            target.relative_to(project)
+        except ValueError:
+            raise ValueError(f"SECURITY: Deployment path escapes project directory: {target}")
+
+        # SECURITY CHECK 2: Target must be inside .claude/ directory
+        claude_dir = (project / ".claude").resolve()
+        try:
+            target.relative_to(claude_dir)
+        except ValueError:
+            # Allow CLAUDE.md and AGENTS.md in project root (special case for project_config)
+            if target.name in ("CLAUDE.md", "AGENTS.md") and target.parent == project:
+                pass  # OK - project root config files
+            else:
+                raise ValueError(f"SECURITY: Deployment path is not in .claude/ directory: {target}")
+
+        return target
+
+    try:
+        # Lookup entity by name or ID
+        response = requests.get(f"{api_base}/context-entities", params={"search": name_or_id, "limit": 50}, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        entity = None
+        for item in data.get("items", []):
+            if item.get("name") == name_or_id or item.get("id") == name_or_id:
+                entity = item
+                break
+
+        if not entity:
+            # Try direct ID lookup
+            try:
+                response = requests.get(f"{api_base}/context-entities/{name_or_id}", timeout=10)
+                if response.status_code == 200:
+                    entity = response.json()
+            except Exception:
+                pass
+
+        if not entity:
+            console.print(f"[red]Entity '{name_or_id}' not found[/red]")
+            sys.exit(1)
+
+        # Validate target project
+        project_path = Path(to_project).expanduser().resolve()
+        if not project_path.exists():
+            console.print(f"[red]Error: Project path does not exist: {project_path}[/red]")
+            sys.exit(1)
+
+        # Validate deployment path (SECURITY CRITICAL)
+        path_pattern = entity.get("path_pattern")
+        if not path_pattern:
+            console.print(f"[red]Error: Entity has no path_pattern defined[/red]")
+            sys.exit(1)
+
+        try:
+            target_path = validate_deployment_path(project_path, path_pattern)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            sys.exit(1)
+
+        # Dry run mode
+        if dry_run:
+            console.print("[bold]DRY RUN - No files will be written[/bold]\n")
+            console.print(f"[bold]Would deploy:[/bold] {entity.get('name')} ({entity.get('type')})")
+            console.print(f"[bold]To:[/bold] {target_path}")
+            console.print(f"[bold]Path pattern:[/bold] {path_pattern}")
+            if entity.get("category"):
+                console.print(f"[bold]Category:[/bold] {entity.get('category')}")
+            console.print(f"\n[bold]Content preview:[/bold]")
+            content = entity.get('content', '')
+            content_preview = content[:500]
+            console.print(f"[dim]{content_preview}...[/dim]" if len(content) > 500 else f"[dim]{content_preview}[/dim]")
+            return
+
+        # Check for conflicts (if file exists and not --overwrite)
+        if target_path.exists() and not overwrite:
+            existing_content = target_path.read_text()
+            new_content = entity.get('content', '')
+            if existing_content != new_content:
+                console.print(f"[yellow]File already exists: {target_path}[/yellow]")
+                console.print("[dim]Use --overwrite to replace existing file[/dim]")
+                sys.exit(1)
+            else:
+                console.print(f"[dim]File already exists with same content, skipping.[/dim]")
+                return
+
+        # Deploy - create parent directories if needed
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write content
+        content = entity.get('content', '')
+        target_path.write_text(content)
+
+        console.print(f"[green]✓[/green] Deployed '{entity.get('name')}' to {target_path}")
+        if overwrite and target_path.exists():
+            console.print("[dim]Existing file was overwritten[/dim]")
+
+    except requests.exceptions.ConnectionError:
+        console.print("[red]Error: Could not connect to API server.[/red]")
+        console.print("[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        error_detail = ""
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except Exception:
+            error_detail = str(e)
+        console.print(f"[red]Error deploying entity: {error_detail}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception(f"Error in context deploy: {e}")
         sys.exit(1)
 
 
