@@ -392,3 +392,19 @@
   - "Templates" → `/templates` (FileText icon)
 - **Commit(s)**: beb93e7
 - **Status**: RESOLVED
+
+### Collection Switcher Not Rendered in Navigation
+
+**Issue**: Users cannot see or switch between collections. The "New Collection" button in the header only appears in "All Collections" mode, but users have no UI to navigate to that mode.
+- **Location**: `skillmeat/web/components/navigation.tsx`
+- **Root Cause**: The `CollectionSwitcherWithDialogs` component exists and is fully functional but was never rendered anywhere in the application. Users had no way to:
+  1. See available collections
+  2. Switch between collections
+  3. Navigate to "All Collections" mode (where "New Collection" button appears)
+  4. Access the "Add Collection" button in the switcher dropdown
+- **Fix**: Added `CollectionSwitcherWithDialogs` to the navigation sidebar:
+  1. Imported `CollectionSwitcherWithDialogs` from `./collection/collection-switcher-with-dialogs`
+  2. Rendered component at top of `<nav>` with `className="w-full"` for proper width
+  3. Added `mb-4` wrapper div for spacing from navigation items below
+- **Commit(s)**: 70abd16
+- **Status**: RESOLVED
