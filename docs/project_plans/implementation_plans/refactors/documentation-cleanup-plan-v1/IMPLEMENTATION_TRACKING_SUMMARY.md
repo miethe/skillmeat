@@ -147,17 +147,21 @@ SkillMeat has 18 major implementation initiatives at various stages of developme
 
 ---
 
-### 5. Marketplace GitHub Ingestion v1 (Large Feature - Planned)
+### 5. Marketplace GitHub Ingestion v1 (Completed)
 
-**Status**: PLANNING
+**Status**: COMPLETED ✅
 **Complexity**: Large | **Timeline**: 5-6 weeks | **Total Points**: 109
 **Location**: `docs/project_plans/implementation_plans/features/marketplace-github-ingestion-v1.md`
 
 #### Phase Status:
-- Phase 1: Database Foundation - COMPLETED
-- Phase 2: Repository Layer - COMPLETED
-- Phase 3: Service Layer - PLANNING
-- Phases 4-8: PLANNING
+- Phase 1: Database Foundation - COMPLETED (commit `fad9cfc`)
+- Phase 2: Repository Layer - COMPLETED (commit `10307db`)
+- Phase 3: Service Layer - COMPLETED (commit `2dffa22`)
+- Phase 4: API Layer - COMPLETED (commit `2dffa22`)
+- Phase 5: UI Layer - COMPLETED (commit `d056e5d`)
+- Phase 6: Testing Layer - COMPLETED (commit `8265707`)
+- Phase 7: Documentation Layer - COMPLETED (commit `8265707`)
+- Phase 8: Deployment Layer - COMPLETED (commit `8265707`)
 
 #### Key Feature:
 GitHub-backed marketplace sources with:
@@ -168,10 +172,10 @@ GitHub-backed marketplace sources with:
 
 ---
 
-### 6. Discovery Import Enhancement v1 (Completed)
+### 6. Discovery Import Enhancement v1 (In Progress)
 
-**Status**: COMPLETED
-**Phases Completed**: 1-5 (Phase 6 Planning)
+**Status**: IN PROGRESS (Phase 6 pending)
+**Phases Completed**: 1-5 completed; Phase 6 in planning
 **Location**: `docs/project_plans/implementation_plans/enhancements/discovery-import-enhancement-v1.md`
 
 #### Key Deliverables:
@@ -209,9 +213,9 @@ GitHub-backed marketplace sources with:
 
 ---
 
-### 9. Marketplace Sources CRUD Enhancement (Planned)
+### 9. Marketplace Sources CRUD Enhancement (Completed)
 
-**Status**: NOT STARTED
+**Status**: COMPLETED ✅
 **Location**: `docs/project_plans/implementation_plans/features/marketplace-sources-crud-enhancement-v1.md`
 
 #### Focus:
@@ -248,9 +252,9 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 
 ---
 
-### 11. Smart Import Discovery v1 (Planned)
+### 11. Smart Import Discovery v1 (Completed)
 
-**Status**: PENDING (Planning Phase)
+**Status**: COMPLETED ✅
 **Location**: `docs/project_plans/implementation_plans/enhancements/smart-import-discovery-v1/`
 
 #### Focus:
@@ -272,10 +276,10 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 
 ---
 
-### 13. Versioning Merge System v1 (Large Feature - Planned)
+### 13. Versioning Merge System v1 (In Progress)
 
-**Status**: PLANNING
-**Phases**: 11 phases planned
+**Status**: IN PROGRESS (Phase 6 implemented; remaining phases planning)
+**Phases**: 11 phases planned (Phase 6 delivered via commit `e49307f`)
 **Location**: `docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
 
 #### Overview:
@@ -300,9 +304,9 @@ Most phases are in planning stage; Phase 1 foundational work pending.
 
 ---
 
-### 15. Entity Lifecycle Management v1 (Planned)
+### 15. Entity Lifecycle Management v1 (Completed)
 
-**Status**: PENDING
+**Status**: COMPLETED ✅
 **Location**: `docs/project_plans/implementation_plans/features/entity-lifecycle-management-v1.md`
 
 #### Focus:
@@ -349,16 +353,16 @@ Earlier iteration with 6 phases planned but superseded by v1 (active).
 | agent-context-entities | 6 | 6 | 0 | 0 | **Completed** ✅ |
 | notification-system | 6 | 6 | 0 | 0 | **Completed** |
 | artifact-flow-modal-redesign | 4 | 4 | 0 | 0 | **Completed** |
-| discovery-import-enhancement | 6 | 5 | 0 | 1 | Mostly Complete |
+| discovery-import-enhancement | 6 | 5 | 0 | 1 | Phase 6 Pending |
 | persistent-project-cache | 6 | 6 | 0 | 0 | **Completed** |
-| marketplace-github-ingestion | 8 | 2 | 0 | 6 | Phase 1-2 Complete |
+| marketplace-github-ingestion | 8 | 8 | 0 | 0 | **Completed** ✅ |
 | discovery-cache-fixes | 1 | 1 | 0 | 0 | **Completed** |
 | collections-api-consolidation | 5 | 5 | 0 | 0 | **Completed** ✅ |
-| smart-import-discovery-v1 | 5 | 0 | 0 | 5 | Planned |
+| smart-import-discovery-v1 | 5 | 5 | 0 | 0 | **Completed** |
 | web-ui-consolidation-v1 | TBD | 0 | 0 | 1 | Planned |
-| versioning-merge-system | 11 | 0 | 0 | 11 | Planned |
-| marketplace-sources-crud | TBD | 0 | 0 | 1 | Not Started |
-| entity-lifecycle-management | TBD | 0 | 0 | 1 | Planned |
+| versioning-merge-system | 11 | 1 | 0 | 10 | Phase 6 Complete |
+| marketplace-sources-crud | 6 | 6 | 0 | 0 | **Completed** |
+| entity-lifecycle-management | 7 | 7 | 0 | 0 | **Completed** |
 
 ### Phase Status Breakdown
 
