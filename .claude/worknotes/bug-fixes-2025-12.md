@@ -408,3 +408,15 @@
   3. Added `mb-4` wrapper div for spacing from navigation items below
 - **Commit(s)**: 70abd16
 - **Status**: RESOLVED
+
+### Collection 404 on Page Load When Stored Collection Deleted
+
+**Issue**: First page load returns 404 for `/api/v1/user-collections/{id}` when the previously selected collection (stored in localStorage) no longer exists.
+- **Location**: `skillmeat/web/context/collection-context.tsx:53,89-93`
+- **Root Cause**: CollectionProvider stored selected collection ID in localStorage (`skillmeat-selected-collection`). On page load, it fetched this stored ID via `useCollection()`. If the collection was deleted or inaccessible, API returned 404, but nothing handled this gracefully - the error persisted on every page load.
+- **Fix**: Added `useEffect` hook that monitors `collectionError`. When an error occurs with a selected collection ID:
+  1. Logs warning message for debugging
+  2. Clears invalid ID from localStorage
+  3. Resets `selectedCollectionId` state to `null` using the direct state setter (avoiding re-persistence)
+- **Commit(s)**: 0175ae0
+- **Status**: RESOLVED
