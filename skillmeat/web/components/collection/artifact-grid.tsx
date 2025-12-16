@@ -124,10 +124,10 @@ function ArtifactCard({
           className="absolute top-2 right-2 cursor-pointer bg-background/95 backdrop-blur text-xs hover:bg-accent z-10"
           onClick={(e) => {
             e.stopPropagation();
-            onCollectionClick?.(artifact.collection!.id);
+            artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
           }}
         >
-          {artifact.collection.name}
+          {artifact.collection?.name}
         </Badge>
       )}
 

@@ -24,12 +24,15 @@ from .routers import (
     bundles,
     cache,
     collections,
+    context_entities,
+    context_sync,
     deployments,
     groups,
     health,
     marketplace,
     marketplace_sources,
     mcp,
+    project_templates,
     projects,
     user_collections,
 )
@@ -240,11 +243,14 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
+    app.include_router(context_entities.router, prefix=settings.api_prefix, tags=["context-entities"])
+    app.include_router(context_sync.router, prefix=settings.api_prefix, tags=["context-sync"])
     app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
     app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
     app.include_router(marketplace_sources.router, prefix=settings.api_prefix, tags=["marketplace-sources"])
+    app.include_router(project_templates.router, prefix=settings.api_prefix, tags=["project-templates"])
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
 
     # Root endpoint

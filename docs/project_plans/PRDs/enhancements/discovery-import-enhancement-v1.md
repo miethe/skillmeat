@@ -4,9 +4,9 @@ description: "Improved artifact import status tracking, pre-scan intelligence, s
 audience: [ai-agents, developers]
 tags: [prd, planning, enhancement, discovery, import, ux]
 created: 2025-12-04
-updated: 2025-12-04
+updated: 2025-12-15
 category: "product-planning"
-status: draft
+status: in_progress
 related:
   - /docs/project_plans/PRDs/features/notification-system-v1.md
   - /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md

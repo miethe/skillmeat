@@ -11,6 +11,8 @@ Models:
     - Collection: User-defined artifact collections
     - Group: Custom grouping of artifacts within collections
     - GroupArtifact: Association between groups and artifacts with ordering
+    - ProjectTemplate: Reusable project templates with artifact deployment patterns
+    - TemplateEntity: Association between templates and artifacts with deployment metadata
     - MarketplaceEntry: Cached marketplace artifact listings
     - MarketplaceSource: GitHub repository sources for marketplace artifacts
     - MarketplaceCatalogEntry: Detected artifacts from marketplace sources
@@ -238,6 +240,14 @@ class Artifact(Base):
         Boolean, nullable=False, default=False, server_default="0"
     )
 
+    # Context entity fields
+    path_pattern: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    auto_load: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
@@ -267,7 +277,8 @@ class Artifact(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
     )
@@ -295,6 +306,10 @@ class Artifact(Base):
             "upstream_version": self.upstream_version,
             "is_outdated": self.is_outdated,
             "local_modified": self.local_modified,
+            "path_pattern": self.path_pattern,
+            "auto_load": self.auto_load,
+            "category": self.category,
+            "content_hash": self.content_hash,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -443,6 +458,8 @@ class Collection(Base):
         name: Collection name (1-255 characters)
         description: Optional detailed description
         created_by: User identifier for future multi-user support
+        collection_type: Optional collection type (e.g., "context", "artifacts")
+        context_category: Optional category for context collections (e.g., "rules", "specs")
         created_at: Timestamp when collection was created
         updated_at: Timestamp when collection was last modified
         groups: List of artifact groups within this collection
@@ -452,6 +469,7 @@ class Collection(Base):
         - idx_collections_name: Fast lookup by name
         - idx_collections_created_by: Filter by creator
         - idx_collections_created_at: Sort by creation date
+        - idx_collections_type: Filter by collection type
     """
 
     __tablename__ = "collections"
@@ -465,6 +483,10 @@ class Collection(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Collection type fields for filtering and categorization
+    collection_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    context_category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -486,6 +508,12 @@ class Collection(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    templates: Mapped[List["ProjectTemplate"]] = relationship(
+        "ProjectTemplate",
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     # Constraints
     __table_args__ = (
@@ -496,6 +524,7 @@ class Collection(Base):
         Index("idx_collections_name", "name"),
         Index("idx_collections_created_by", "created_by"),
         Index("idx_collections_created_at", "created_at"),
+        Index("idx_collections_type", "collection_type"),
     )
 
     def __repr__(self) -> str:
@@ -516,6 +545,8 @@ class Collection(Base):
             "name": self.name,
             "description": self.description,
             "created_by": self.created_by,
+            "collection_type": self.collection_type,
+            "context_category": self.context_category,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -768,7 +799,8 @@ class MarketplaceEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_marketplace_type",
         ),
     )
@@ -1092,7 +1124,8 @@ class MarketplaceCatalogEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')",
+            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_catalog_artifact_type",
         ),
         CheckConstraint(
@@ -1166,6 +1199,173 @@ class MarketplaceCatalogEntry(Base):
             metadata_dict: Dictionary to serialize as JSON
         """
         self.metadata_json = json.dumps(metadata_dict)
+
+
+class ProjectTemplate(Base):
+    """Project template for defining reusable artifact deployment patterns.
+
+    Templates provide a way to define standardized project setups with
+    predefined artifacts and configurations. Each template belongs to a
+    collection and can specify a default project config.
+
+    Attributes:
+        id: Unique template identifier (primary key, UUID hex)
+        name: Template name (1-255 characters, unique)
+        description: Optional detailed description
+        collection_id: Foreign key to collections.id
+        default_project_config_id: Optional foreign key to artifacts.id for project config
+        created_at: Timestamp when template was created
+        updated_at: Timestamp when template was last modified
+        collection: Parent collection object
+        default_config: Optional default project config artifact
+        entities: List of template entities (artifacts with deploy order)
+
+    Indexes:
+        - idx_templates_name (UNIQUE): Fast lookup by name
+        - idx_templates_collection_id: Filter by collection
+        - idx_templates_created_at: Sort by creation date
+    """
+
+    __tablename__ = "project_templates"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Foreign keys
+    collection_id: Mapped[str] = mapped_column(
+        String, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False
+    )
+    default_project_config_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    collection: Mapped["Collection"] = relationship(
+        "Collection", back_populates="templates"
+    )
+    default_config: Mapped[Optional["Artifact"]] = relationship(
+        "Artifact", foreign_keys=[default_project_config_id]
+    )
+    entities: Mapped[List["TemplateEntity"]] = relationship(
+        "TemplateEntity",
+        back_populates="template",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="TemplateEntity.deploy_order",
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "length(name) > 0 AND length(name) <= 255",
+            name="check_template_name_length",
+        ),
+        Index("idx_templates_name", "name", unique=True),
+        Index("idx_templates_collection_id", "collection_id"),
+        Index("idx_templates_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ProjectTemplate."""
+        return (
+            f"<ProjectTemplate(id={self.id!r}, name={self.name!r}, "
+            f"collection_id={self.collection_id!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ProjectTemplate to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the template
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "collection_id": self.collection_id,
+            "default_project_config_id": self.default_project_config_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "entity_count": len(self.entities) if self.entities else 0,
+        }
+
+
+class TemplateEntity(Base):
+    """Association between ProjectTemplate and Artifact with deployment metadata.
+
+    Represents the many-to-many relationship between templates and artifacts,
+    defining which artifacts should be deployed as part of a template with
+    specific ordering and requirement flags.
+
+    Attributes:
+        template_id: Foreign key to project_templates.id (part of composite PK)
+        artifact_id: Foreign key to artifacts.id (part of composite PK)
+        deploy_order: Deployment order within template (0-based)
+        required: Whether artifact is required for template deployment
+        template: Related ProjectTemplate object
+        artifact: Related Artifact object
+
+    Indexes:
+        - idx_template_entities_template_id: Fast lookup by template
+        - idx_template_entities_artifact_id: Fast lookup by artifact
+        - idx_template_entities_deploy_order: Ordered queries within template
+    """
+
+    __tablename__ = "template_entities"
+
+    # Composite primary key
+    template_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("project_templates.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # Deployment metadata
+    deploy_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+
+    # Relationships
+    template: Mapped["ProjectTemplate"] = relationship(
+        "ProjectTemplate", back_populates="entities"
+    )
+    artifact: Mapped["Artifact"] = relationship("Artifact")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("deploy_order >= 0", name="check_deploy_order"),
+        Index("idx_template_entities_template_id", "template_id"),
+        Index("idx_template_entities_artifact_id", "artifact_id"),
+        Index("idx_template_entities_deploy_order", "template_id", "deploy_order"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of TemplateEntity."""
+        return (
+            f"<TemplateEntity(template_id={self.template_id!r}, "
+            f"artifact_id={self.artifact_id!r}, deploy_order={self.deploy_order}, "
+            f"required={self.required})>"
+        )
 
 
 class CacheMetadata(Base):

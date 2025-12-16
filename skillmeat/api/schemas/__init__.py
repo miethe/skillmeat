@@ -53,6 +53,32 @@ from .marketplace import (
     BrokerInfo,
     BrokerListResponse,
 )
+from .context_entity import (
+    ContextEntityType,
+    ContextEntityCreateRequest,
+    ContextEntityUpdateRequest,
+    ContextEntityResponse,
+    ContextEntityListResponse,
+)
+from .context_sync import (
+    SyncPullRequest,
+    SyncPushRequest,
+    SyncConflictResponse,
+    SyncResultResponse,
+    SyncStatusResponse,
+    SyncResolveRequest,
+)
+from .project_template import (
+    TemplateEntitySchema,
+    ProjectTemplateBase,
+    ProjectTemplateCreateRequest,
+    ProjectTemplateUpdateRequest,
+    ProjectTemplateResponse,
+    ProjectTemplateListResponse,
+    TemplateVariableValue,
+    DeployTemplateRequest,
+    DeployTemplateResponse,
+)
 
 __all__ = [
     # Common
@@ -98,4 +124,27 @@ __all__ = [
     "PublishResponse",
     "BrokerInfo",
     "BrokerListResponse",
+    # Context Entities
+    "ContextEntityType",
+    "ContextEntityCreateRequest",
+    "ContextEntityUpdateRequest",
+    "ContextEntityResponse",
+    "ContextEntityListResponse",
+    # Context Sync
+    "SyncPullRequest",
+    "SyncPushRequest",
+    "SyncConflictResponse",
+    "SyncResultResponse",
+    "SyncStatusResponse",
+    "SyncResolveRequest",
+    # Project Templates
+    "TemplateEntitySchema",
+    "ProjectTemplateBase",
+    "ProjectTemplateCreateRequest",
+    "ProjectTemplateUpdateRequest",
+    "ProjectTemplateResponse",
+    "ProjectTemplateListResponse",
+    "TemplateVariableValue",
+    "DeployTemplateRequest",
+    "DeployTemplateResponse",
 ]

@@ -15,6 +15,7 @@ from skillmeat.config import ConfigManager
 from skillmeat.core.artifact import ArtifactManager
 from skillmeat.core.auth import TokenManager
 from skillmeat.core.collection import CollectionManager
+from skillmeat.core.services.context_sync import ContextSyncService
 from skillmeat.core.sync import SyncManager
 
 from .config import APISettings, get_settings
@@ -40,6 +41,7 @@ class AppState:
         self.artifact_manager: Optional[ArtifactManager] = None
         self.token_manager: Optional[TokenManager] = None
         self.sync_manager: Optional[SyncManager] = None
+        self.context_sync_service: Optional[ContextSyncService] = None
         self.settings: Optional[APISettings] = None
         self.metadata_cache: Optional[Any] = None  # MetadataCache, lazily initialized
         self.cache_manager: Optional[Any] = None  # CacheManager, lazily initialized
@@ -64,6 +66,27 @@ class AppState:
             artifact_manager=self.artifact_manager,
         )
 
+        # Initialize cache manager if not already initialized (lazy init pattern)
+        if self.cache_manager is None:
+            try:
+                from skillmeat.cache.manager import CacheManager as CacheManagerImpl
+                self.cache_manager = CacheManagerImpl()
+                logger.info("CacheManager initialized")
+            except Exception as e:
+                logger.warning(f"CacheManager initialization failed: {e}")
+                self.cache_manager = None
+
+        # Initialize context sync service
+        if self.cache_manager is not None:
+            self.context_sync_service = ContextSyncService(
+                collection_mgr=self.collection_manager,
+                cache_mgr=self.cache_manager,
+            )
+            logger.info("ContextSyncService initialized")
+        else:
+            logger.warning("ContextSyncService not initialized (CacheManager unavailable)")
+            self.context_sync_service = None
+
         logger.info("Application state initialized successfully")
 
     def shutdown(self) -> None:
@@ -83,6 +106,7 @@ class AppState:
         self.artifact_manager = None
         self.token_manager = None
         self.sync_manager = None
+        self.context_sync_service = None
         self.metadata_cache = None
         self.cache_manager = None
         self.refresh_job = None
@@ -220,6 +244,28 @@ def get_sync_manager(
     return state.sync_manager
 
 
+def get_context_sync_service(
+    state: Annotated[AppState, Depends(get_app_state)],
+) -> ContextSyncService:
+    """Get ContextSyncService dependency.
+
+    Args:
+        state: Application state
+
+    Returns:
+        ContextSyncService instance
+
+    Raises:
+        HTTPException: If ContextSyncService not available
+    """
+    if state.context_sync_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Context sync service not available",
+        )
+    return state.context_sync_service
+
+
 def verify_api_key(
     api_key: Annotated[Optional[str], Security(api_key_header)],
     settings: Annotated[APISettings, Depends(get_settings)],
@@ -259,5 +305,6 @@ CollectionManagerDep = Annotated[CollectionManager, Depends(get_collection_manag
 ArtifactManagerDep = Annotated[ArtifactManager, Depends(get_artifact_manager)]
 TokenManagerDep = Annotated[TokenManager, Depends(get_token_manager)]
 SyncManagerDep = Annotated[SyncManager, Depends(get_sync_manager)]
+ContextSyncServiceDep = Annotated[ContextSyncService, Depends(get_context_sync_service)]
 SettingsDep = Annotated[APISettings, Depends(get_settings)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
