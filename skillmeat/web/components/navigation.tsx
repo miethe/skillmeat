@@ -14,8 +14,13 @@ import {
   GitBranch,
   Share2,
   Settings,
+  FileText,
+  FileCode2,
+  Github,
+  Book,
 } from 'lucide-react';
 import { NavSection } from './nav-section';
+import { CollectionSwitcherWithDialogs } from './collection/collection-switcher-with-dialogs';
 import type { LucideIcon } from 'lucide-react';
 
 // ============================================================================
@@ -71,6 +76,24 @@ const navigationConfig: NavigationConfig = {
         { name: 'Sources', href: '/marketplace/sources', icon: GitBranch },
       ],
     },
+    {
+      title: 'Agent Context',
+      icon: FileText,
+      storageKey: 'agent-context',
+      items: [
+        { name: 'Context Entities', href: '/context-entities', icon: FileCode2 },
+        { name: 'Templates', href: '/templates', icon: FileText },
+      ],
+    },
+    {
+      title: 'Resources',
+      icon: Book,
+      storageKey: 'resources',
+      items: [
+        { name: 'GitHub', href: 'https://github.com/miethe/skillmeat', icon: Github },
+        { name: 'Documentation', href: 'https://github.com/miethe/skillmeat#readme', icon: Book },
+      ],
+    },
   ],
   bottomItems: [
     { name: 'Sharing', href: '/sharing', icon: Share2 },
@@ -100,6 +123,11 @@ export function Navigation() {
   return (
     <aside className="w-64 border-r bg-background">
       <nav className="space-y-1 p-4">
+        {/* Collection Switcher */}
+        <div className="mb-4">
+          <CollectionSwitcherWithDialogs className="w-full" />
+        </div>
+
         {/* Top Items */}
         {navigationConfig.topItems.map((item) => {
           const Icon = item.icon;
@@ -112,7 +140,7 @@ export function Navigation() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-secondary text-secondary-foreground'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
               )}
