@@ -325,10 +325,10 @@ export function ArtifactList({
                           className="cursor-pointer hover:bg-accent"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onCollectionClick?.(artifact.collection!.id);
+                            artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
                           }}
                         >
-                          {artifact.collection.name}
+                          {artifact.collection?.name}
                         </Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
