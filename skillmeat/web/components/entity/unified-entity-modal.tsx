@@ -86,7 +86,9 @@ interface HistoryEntry {
 /**
  * Check if entity is a context entity (based on type or name pattern)
  */
-function isContextEntity(entity: Entity): boolean {
+function isContextEntity(entity: Entity | null): boolean {
+  if (!entity) return false;
+
   // Check if entity has 'context' in its type (for future context entity type support)
   // OR if entity ID follows context entity pattern (entity_type:name)
   const contextTypes = ['spec_file', 'rule_file', 'context_file', 'project_config', 'progress_template'];
@@ -497,14 +499,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Count unique collections (projects are determined by the parent query)
   const deploymentProjectCount = useMemo(() => {
-    const collections = new Set(artifactDeployments.map((d) => d.from_collection));
+    const collections = new Set(
+      artifactDeployments
+        .map((d) => d.from_collection)
+        .filter((c): c is string => c != null)
+    );
     return collections.size;
   }, [artifactDeployments]);
 
   // Get pending context changes count if this is a context entity
   const pendingContextCount = usePendingContextChanges(
     isContextEntity(entity) ? entity.id : undefined,
-    entity.projectPath
+    entity?.projectPath
   );
 
   // Track if we've shown the error toast to prevent spam
