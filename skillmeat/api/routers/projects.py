@@ -22,6 +22,8 @@ from skillmeat.api.schemas.artifacts import (
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.projects import (
     CacheInfo,
+    ContextEntityInfo,
+    ContextMapResponse,
     DeployedArtifact,
     ModifiedArtifactsResponse,
     ProjectCreateRequest,
@@ -171,7 +173,9 @@ def discover_projects(search_paths: Optional[List[Path]] = None) -> List[Path]:
 
         # Search for .skillmeat-deployed.toml files with depth limit
         try:
-            for deployment_file in search_path.rglob(".claude/.skillmeat-deployed.toml"):
+            for deployment_file in search_path.rglob(
+                ".claude/.skillmeat-deployed.toml"
+            ):
                 # Get project root (parent of .claude)
                 project_path = deployment_file.parent.parent
 
@@ -371,7 +375,9 @@ async def list_projects(
                             cache_last_fetched = cached_project.last_fetched
 
                             # Read deployment metadata from disk to keep counts/dates accurate
-                            summary_base = build_project_summary(Path(cached_project.path))
+                            summary_base = build_project_summary(
+                                Path(cached_project.path)
+                            )
 
                             summary = ProjectSummary(
                                 id=summary_base.id,
@@ -446,7 +452,9 @@ async def list_projects(
                         f"Populated persistent cache with {len(projects_data)} projects"
                     )
                 except Exception as e:
-                    logger.error(f"Failed to populate persistent cache: {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to populate persistent cache: {e}", exc_info=True
+                    )
 
         # Sort by last deployment (most recent first)
         all_projects.sort(
@@ -520,7 +528,10 @@ async def list_projects(
     description="Create a new project by initializing the directory structure and metadata",
     responses={
         201: {"description": "Project created successfully"},
-        400: {"model": ErrorResponse, "description": "Invalid request or project already exists"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or project already exists",
+        },
         401: {"model": ErrorResponse, "description": "Unauthorized"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
@@ -606,6 +617,7 @@ async def create_project(
 
         # Initialize empty deployment tracking file so project is discoverable
         from skillmeat.storage.deployment import DeploymentTracker
+
         DeploymentTracker.write_deployments(project_path, [])
 
         logger.info(f"Project created successfully: {request.name}")
@@ -1250,6 +1262,223 @@ async def get_modified_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get modified artifacts: {str(e)}",
+        )
+
+
+@router.get(
+    "/{project_id}/context-map",
+    response_model=ContextMapResponse,
+    summary="Discover context entities in project",
+    description=(
+        "Scan a project's .claude/ directory to discover context entities "
+        "(specs, rules, context files) with token estimates for progressive disclosure"
+    ),
+    responses={
+        200: {"description": "Successfully discovered context entities"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_project_context_map(
+    project_id: str,
+    token: TokenDep,
+) -> ContextMapResponse:
+    """Discover context entities in a project's .claude/ directory.
+
+    Scans the project for context entities and categorizes them by auto-loading
+    behavior for progressive disclosure patterns:
+
+    - **Auto-loaded**: Specs and rules that load based on path patterns
+    - **On-demand**: Context files that load only when explicitly requested
+
+    Token estimates are calculated as: word_count * 1.3
+
+    Args:
+        project_id: Base64-encoded project path
+        token: Authentication token
+
+    Returns:
+        Context map with categorized entities and token estimates
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        GET /api/v1/projects/L1VzZXJzL21lL3Byb2plY3Qx/context-map
+
+        Returns:
+        {
+            "auto_loaded": [
+                {
+                    "type": "spec_file",
+                    "name": "doc-policy-spec",
+                    "path": ".claude/specs/doc-policy-spec.md",
+                    "tokens": 800,
+                    "auto_load": true
+                }
+            ],
+            "on_demand": [
+                {
+                    "type": "context_file",
+                    "name": "api-endpoint-mapping",
+                    "path": ".claude/context/api-endpoint-mapping.md",
+                    "tokens": 3000,
+                    "auto_load": false
+                }
+            ],
+            "total_auto_load_tokens": 800
+        }
+    """
+    try:
+        logger.info(f"Discovering context entities for project: {project_id}")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Validate project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Initialize response containers
+        auto_loaded: List[ContextEntityInfo] = []
+        on_demand: List[ContextEntityInfo] = []
+        total_auto_load_tokens = 0
+
+        # Check if .claude directory exists
+        claude_dir = project_path / ".claude"
+        if not claude_dir.exists():
+            logger.info(f"No .claude directory found for project: {project_path.name}")
+            return ContextMapResponse(
+                auto_loaded=[],
+                on_demand=[],
+                total_auto_load_tokens=0,
+            )
+
+        def estimate_tokens(content: str) -> int:
+            """Estimate token count from content.
+
+            Args:
+                content: File content to estimate
+
+            Returns:
+                Estimated token count
+            """
+            word_count = len(content.split())
+            return int(word_count * 1.3)
+
+        def extract_name_from_path(file_path: Path) -> str:
+            """Extract entity name from file path.
+
+            Args:
+                file_path: Path to the file
+
+            Returns:
+                Name derived from file path (without extension)
+            """
+            return file_path.stem
+
+        # Scan .claude/specs/*.md (auto-loaded)
+        specs_dir = claude_dir / "specs"
+        if specs_dir.exists() and specs_dir.is_dir():
+            for spec_file in specs_dir.glob("*.md"):
+                try:
+                    content = spec_file.read_text(encoding="utf-8")
+                    tokens = estimate_tokens(content)
+                    relative_path = spec_file.relative_to(project_path)
+
+                    entity = ContextEntityInfo(
+                        type="spec_file",
+                        name=extract_name_from_path(spec_file),
+                        path=str(relative_path),
+                        tokens=tokens,
+                        auto_load=True,
+                    )
+                    auto_loaded.append(entity)
+                    total_auto_load_tokens += tokens
+                except Exception as e:
+                    logger.warning(f"Failed to read spec file {spec_file}: {e}")
+                    continue
+
+        # Scan .claude/rules/**/*.md (auto-loaded)
+        rules_dir = claude_dir / "rules"
+        if rules_dir.exists() and rules_dir.is_dir():
+            for rule_file in rules_dir.rglob("*.md"):
+                try:
+                    content = rule_file.read_text(encoding="utf-8")
+                    tokens = estimate_tokens(content)
+                    relative_path = rule_file.relative_to(project_path)
+
+                    # Create name from path (e.g., web/api-client -> web-api-client)
+                    rule_path_parts = rule_file.relative_to(rules_dir).parts
+                    if len(rule_path_parts) > 1:
+                        # Include parent directory in name
+                        name = "-".join(
+                            [rule_path_parts[-2], extract_name_from_path(rule_file)]
+                        )
+                    else:
+                        name = extract_name_from_path(rule_file)
+
+                    entity = ContextEntityInfo(
+                        type="rule_file",
+                        name=name,
+                        path=str(relative_path),
+                        tokens=tokens,
+                        auto_load=True,
+                    )
+                    auto_loaded.append(entity)
+                    total_auto_load_tokens += tokens
+                except Exception as e:
+                    logger.warning(f"Failed to read rule file {rule_file}: {e}")
+                    continue
+
+        # Scan .claude/context/*.md (on-demand)
+        context_dir = claude_dir / "context"
+        if context_dir.exists() and context_dir.is_dir():
+            for context_file in context_dir.glob("*.md"):
+                try:
+                    content = context_file.read_text(encoding="utf-8")
+                    tokens = estimate_tokens(content)
+                    relative_path = context_file.relative_to(project_path)
+
+                    entity = ContextEntityInfo(
+                        type="context_file",
+                        name=extract_name_from_path(context_file),
+                        path=str(relative_path),
+                        tokens=tokens,
+                        auto_load=False,
+                    )
+                    on_demand.append(entity)
+                except Exception as e:
+                    logger.warning(f"Failed to read context file {context_file}: {e}")
+                    continue
+
+        logger.info(
+            f"Discovered {len(auto_loaded)} auto-loaded and {len(on_demand)} on-demand "
+            f"context entities for project '{project_path.name}' "
+            f"(total auto-load tokens: {total_auto_load_tokens})"
+        )
+
+        return ContextMapResponse(
+            auto_loaded=auto_loaded,
+            on_demand=on_demand,
+            total_auto_load_tokens=total_auto_load_tokens,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error discovering context entities for project '{project_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to discover context entities: {str(e)}",
         )
 
 

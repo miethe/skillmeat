@@ -129,6 +129,8 @@ def collection_to_response(
         name=collection.name,
         description=collection.description,
         created_by=collection.created_by,
+        collection_type=collection.collection_type,
+        context_category=collection.context_category,
         created_at=collection.created_at,
         updated_at=collection.updated_at,
         group_count=group_count,
@@ -204,6 +206,10 @@ async def list_user_collections(
         default=None,
         description="Filter by collection name (case-insensitive)",
     ),
+    collection_type: Optional[str] = Query(
+        default=None,
+        description="Filter by collection type (e.g., 'context')",
+    ),
 ) -> UserCollectionListResponse:
     """List all user collections with cursor-based pagination.
 
@@ -213,6 +219,7 @@ async def list_user_collections(
         limit: Number of items per page
         after: Cursor for next page
         search: Optional name filter
+        collection_type: Optional type filter
 
     Returns:
         Paginated list of collections
@@ -222,7 +229,8 @@ async def list_user_collections(
     """
     try:
         logger.info(
-            f"Listing user collections (limit={limit}, after={after}, search={search})"
+            f"Listing user collections (limit={limit}, after={after}, search={search}, "
+            f"type={collection_type})"
         )
 
         # Build base query
@@ -231,6 +239,10 @@ async def list_user_collections(
         # Apply search filter if provided
         if search:
             query = query.filter(Collection.name.ilike(f"%{search}%"))
+
+        # Apply collection_type filter if provided
+        if collection_type:
+            query = query.filter(Collection.collection_type == collection_type)
 
         # Get all matching collections (for pagination)
         all_collections = query.all()
@@ -335,6 +347,8 @@ async def create_user_collection(
             id=collection_id,
             name=request.name,
             description=request.description,
+            collection_type=request.collection_type,
+            context_category=request.context_category,
             created_by=None,  # TODO: Set from authentication context
         )
 
@@ -449,7 +463,12 @@ async def update_user_collection(
         logger.info(f"Updating user collection: {collection_id}")
 
         # Check if any update parameters provided
-        if request.name is None and request.description is None:
+        if (
+            request.name is None
+            and request.description is None
+            and request.collection_type is None
+            and request.context_category is None
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one update parameter must be provided",
@@ -478,6 +497,14 @@ async def update_user_collection(
         # Update description if provided
         if request.description is not None:
             collection.description = request.description
+
+        # Update collection_type if provided
+        if request.collection_type is not None:
+            collection.collection_type = request.collection_type
+
+        # Update context_category if provided
+        if request.context_category is not None:
+            collection.context_category = request.context_category
 
         session.commit()
         session.refresh(collection)
@@ -880,4 +907,330 @@ async def remove_artifact_from_collection(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove artifact from collection: {str(e)}",
+        )
+
+
+# =============================================================================
+# Entity Management Endpoints (Context Entities)
+# =============================================================================
+
+
+@router.post(
+    "/{collection_id}/entities/{entity_id}",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add entity to collection",
+    description="Add a context entity to a collection (idempotent)",
+    responses={
+        201: {"description": "Successfully added entity"},
+        200: {"description": "Entity already in collection (idempotent)"},
+        404: {
+            "model": ErrorResponse,
+            "description": "Collection or entity not found",
+        },
+        409: {
+            "model": ErrorResponse,
+            "description": "Entity already exists in collection",
+        },
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def add_entity_to_collection(
+    collection_id: str,
+    entity_id: str,
+    session: DbSessionDep,
+    token: TokenDep,
+) -> dict:
+    """Add a context entity to a collection.
+
+    Args:
+        collection_id: Collection identifier
+        entity_id: Entity (artifact) identifier
+        session: Database session
+        token: Authentication token
+
+    Returns:
+        Result with status information
+
+    Raises:
+        HTTPException: If collection not found or entity doesn't exist
+
+    Note:
+        This operation is idempotent - re-adding existing entities returns 200
+    """
+    try:
+        logger.info(f"Adding entity {entity_id} to collection: {collection_id}")
+
+        # Verify collection exists
+        collection = session.query(Collection).filter_by(id=collection_id).first()
+        if not collection:
+            logger.warning(f"User collection not found: {collection_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            )
+
+        # Check if entity exists in artifacts table
+        entity = session.query(Artifact).filter_by(id=entity_id).first()
+        if not entity:
+            logger.warning(f"Entity not found: {entity_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Entity '{entity_id}' not found",
+            )
+
+        # Check if association already exists
+        existing = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id, artifact_id=entity_id)
+            .first()
+        )
+
+        if existing:
+            logger.info(
+                f"Entity {entity_id} already in collection {collection_id} (idempotent)"
+            )
+            return {
+                "collection_id": collection_id,
+                "entity_id": entity_id,
+                "status": "already_present",
+            }
+
+        # Create association
+        association = CollectionArtifact(
+            collection_id=collection_id,
+            artifact_id=entity_id,
+        )
+        session.add(association)
+        session.commit()
+
+        logger.info(f"Added entity {entity_id} to collection {collection_id}")
+        return {
+            "collection_id": collection_id,
+            "entity_id": entity_id,
+            "status": "added",
+        }
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(
+            f"Error adding entity to collection '{collection_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add entity to collection: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{collection_id}/entities/{entity_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove entity from collection",
+    description="Remove a context entity from a collection (idempotent)",
+    responses={
+        204: {"description": "Successfully removed entity"},
+        404: {"model": ErrorResponse, "description": "Collection not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def remove_entity_from_collection(
+    collection_id: str,
+    entity_id: str,
+    session: DbSessionDep,
+    token: TokenDep,
+) -> None:
+    """Remove a context entity from a collection.
+
+    Args:
+        collection_id: Collection identifier
+        entity_id: Entity (artifact) identifier
+        session: Database session
+        token: Authentication token
+
+    Raises:
+        HTTPException: If collection not found or on error
+
+    Note:
+        This operation is idempotent - removing non-existent entities returns 204
+    """
+    try:
+        logger.info(f"Removing entity {entity_id} from collection: {collection_id}")
+
+        # Verify collection exists
+        collection = session.query(Collection).filter_by(id=collection_id).first()
+        if not collection:
+            logger.warning(f"User collection not found: {collection_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            )
+
+        # Remove association if exists
+        association = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id, artifact_id=entity_id)
+            .first()
+        )
+
+        if association:
+            session.delete(association)
+            session.commit()
+            logger.info(f"Removed entity {entity_id} from collection {collection_id}")
+        else:
+            logger.info(
+                f"Entity {entity_id} not in collection {collection_id} (idempotent)"
+            )
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(
+            f"Error removing entity from collection '{collection_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove entity from collection: {str(e)}",
+        )
+
+
+@router.get(
+    "/{collection_id}/entities",
+    response_model=CollectionArtifactsResponse,
+    summary="List entities in collection",
+    description="Retrieve paginated list of context entities in a collection",
+    responses={
+        200: {"description": "Successfully retrieved entities"},
+        404: {"model": ErrorResponse, "description": "Collection not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_collection_entities(
+    collection_id: str,
+    session: DbSessionDep,
+    token: TokenDep,
+    limit: int = Query(default=20, ge=1, le=100),
+    after: Optional[str] = Query(default=None),
+) -> CollectionArtifactsResponse:
+    """List context entities in a collection with pagination.
+
+    Args:
+        collection_id: Collection identifier
+        session: Database session
+        token: Authentication token
+        limit: Number of items per page
+        after: Cursor for next page
+
+    Returns:
+        Paginated list of entities (artifacts)
+
+    Raises:
+        HTTPException: If collection not found or on error
+    """
+    try:
+        logger.info(
+            f"Listing entities for collection '{collection_id}' "
+            f"(limit={limit}, after={after})"
+        )
+
+        # Verify collection exists
+        collection = session.query(Collection).filter_by(id=collection_id).first()
+        if not collection:
+            logger.warning(f"User collection not found: {collection_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            )
+
+        # Build query for collection artifacts
+        query = (
+            session.query(CollectionArtifact)
+            .filter_by(collection_id=collection_id)
+            .order_by(CollectionArtifact.artifact_id)
+        )
+
+        # Get all matching artifact associations
+        all_associations = query.all()
+
+        # Decode cursor if provided
+        start_idx = 0
+        if after:
+            cursor_value = decode_cursor(after)
+            try:
+                artifact_ids = [assoc.artifact_id for assoc in all_associations]
+                start_idx = artifact_ids.index(cursor_value) + 1
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid cursor: entity not found",
+                )
+
+        # Paginate
+        end_idx = start_idx + limit
+        page_associations = all_associations[start_idx:end_idx]
+
+        # Fetch artifact metadata for each association
+        items: List[ArtifactSummary] = []
+        for assoc in page_associations:
+            # Try to get artifact metadata from cache database
+            artifact = session.query(Artifact).filter_by(id=assoc.artifact_id).first()
+
+            if artifact:
+                # If artifact metadata exists, use it
+                artifact_summary = ArtifactSummary(
+                    name=artifact.name,
+                    type=artifact.type,
+                    version=artifact.deployed_version or artifact.upstream_version,
+                    source=artifact.source or assoc.artifact_id,
+                )
+            else:
+                # Fallback: return artifact_id as both name and source
+                artifact_summary = ArtifactSummary(
+                    name=assoc.artifact_id,
+                    type="unknown",
+                    version=None,
+                    source=assoc.artifact_id,
+                )
+
+            items.append(artifact_summary)
+
+        # Build pagination info
+        has_next = end_idx < len(all_associations)
+        has_previous = start_idx > 0
+
+        start_cursor = (
+            encode_cursor(page_associations[0].artifact_id) if page_associations else None
+        )
+        end_cursor = (
+            encode_cursor(page_associations[-1].artifact_id)
+            if page_associations
+            else None
+        )
+
+        page_info = PageInfo(
+            has_next_page=has_next,
+            has_previous_page=has_previous,
+            start_cursor=start_cursor,
+            end_cursor=end_cursor,
+            total_count=len(all_associations),
+        )
+
+        logger.info(f"Retrieved {len(items)} entities for collection '{collection_id}'")
+        return CollectionArtifactsResponse(items=items, page_info=page_info)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error listing entities for collection '{collection_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list collection entities: {str(e)}",
         )

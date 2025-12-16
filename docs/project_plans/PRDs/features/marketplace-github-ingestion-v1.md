@@ -4,9 +4,9 @@ description: "Ingest GitHub repos (including awesome lists) into Marketplace wit
 audience: [ai-agents, developers]
 tags: [prd, marketplace, github, ingestion, discovery]
 created: 2025-12-03
-updated: 2025-12-03
+updated: 2025-12-15
 category: "product-planning"
-status: draft
+status: completed
 related:
   - /docs/project_plans/SPIKEs/marketplace-github-ingestion-spike.md
   - /docs/project_plans/PRDs/enhancements/smart-import-discovery-v1.md

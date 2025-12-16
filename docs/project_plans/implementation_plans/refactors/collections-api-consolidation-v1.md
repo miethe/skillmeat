@@ -6,7 +6,7 @@ tags: [implementation, refactoring, backend, frontend, api]
 created: 2025-12-13
 updated: 2025-12-13
 category: "refactoring"
-status: planned
+status: completed
 ---
 
 # Implementation Plan: Collections API Consolidation

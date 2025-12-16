@@ -25,6 +25,16 @@ class UserCollectionCreateRequest(BaseModel):
         description="Optional collection description",
         examples=["Collection of my most-used skills"],
     )
+    collection_type: Optional[str] = Field(
+        default=None,
+        description="Collection type (e.g., 'context', 'artifacts')",
+        examples=["context"],
+    )
+    context_category: Optional[str] = Field(
+        default=None,
+        description="Category for context collections (e.g., 'rules', 'specs', 'context')",
+        examples=["rules"],
+    )
 
 
 class UserCollectionUpdateRequest(BaseModel):
@@ -44,6 +54,16 @@ class UserCollectionUpdateRequest(BaseModel):
         default=None,
         description="New collection description",
         examples=["Updated description"],
+    )
+    collection_type: Optional[str] = Field(
+        default=None,
+        description="Collection type",
+        examples=["context"],
+    )
+    context_category: Optional[str] = Field(
+        default=None,
+        description="Context category",
+        examples=["rules"],
     )
 
 
@@ -113,6 +133,16 @@ class UserCollectionResponse(BaseModel):
         default=None,
         description="User identifier (for future multi-user support)",
         examples=["user@example.com"],
+    )
+    collection_type: Optional[str] = Field(
+        default=None,
+        description="Collection type",
+        examples=["context"],
+    )
+    context_category: Optional[str] = Field(
+        default=None,
+        description="Context category",
+        examples=["rules"],
     )
     created_at: datetime = Field(
         description="Collection creation timestamp",

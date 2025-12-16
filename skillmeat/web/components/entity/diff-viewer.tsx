@@ -1,11 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Loader2 } from 'lucide-react';
 import { FileDiff } from '../../sdk/models/FileDiff';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+/**
+ * Resolution type for sync conflict resolution
+ */
+export type ResolutionType = 'keep_local' | 'keep_remote' | 'merge';
 
 /**
  * Props for DiffViewer component
@@ -21,6 +26,18 @@ interface DiffViewerProps {
   rightLabel?: string;
   /** Callback when user closes the diff viewer */
   onClose?: () => void;
+  /** Show resolution action buttons (for sync conflict resolution) */
+  showResolutionActions?: boolean;
+  /** Callback when user selects a resolution */
+  onResolve?: (resolution: ResolutionType) => void;
+  /** Custom label for local version button (default: "Local (Project)") */
+  localLabel?: string;
+  /** Custom label for remote version button (default: "Remote (Collection)") */
+  remoteLabel?: string;
+  /** Show preview mode UI before applying resolution */
+  previewMode?: boolean;
+  /** Show loading state during resolution */
+  isResolving?: boolean;
 }
 
 interface DiffLineProps {
@@ -139,14 +156,32 @@ function FileStatusBadge({ status }: { status: FileDiff['status'] }) {
  * - Color-coded additions (green), deletions (red), and context lines
  * - File status badges (added, modified, deleted, unchanged)
  * - Change summary (total files added, modified, deleted)
+ * - Optional sync conflict resolution actions (keep local/remote/merge)
  *
  * @example
+ * Basic diff viewer:
  * ```tsx
  * <DiffViewer
  *   files={diffData.files}
  *   leftLabel="Collection"
  *   rightLabel="Project"
  *   onClose={() => closeDiff()}
+ * />
+ * ```
+ *
+ * @example
+ * With sync resolution actions:
+ * ```tsx
+ * <DiffViewer
+ *   files={diffData.files}
+ *   leftLabel="Collection"
+ *   rightLabel="Project"
+ *   showResolutionActions={true}
+ *   onResolve={(resolution) => handleResolve(resolution)}
+ *   localLabel="Project"
+ *   remoteLabel="Collection"
+ *   isResolving={isResolving}
+ *   previewMode={true}
  * />
  * ```
  *
@@ -158,6 +193,12 @@ export function DiffViewer({
   leftLabel = 'Before',
   rightLabel = 'After',
   onClose,
+  showResolutionActions = false,
+  onResolve,
+  localLabel,
+  remoteLabel,
+  previewMode = false,
+  isResolving = false,
 }: DiffViewerProps) {
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set([0]));
@@ -391,6 +432,47 @@ export function DiffViewer({
           )}
         </div>
       </div>
+
+      {/* Resolution Action Bar (for sync conflict resolution) */}
+      {showResolutionActions && (
+        <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t p-4 bg-muted/20">
+          {previewMode && (
+            <span className="mr-auto text-sm text-muted-foreground">
+              Preview mode - select which version to keep
+            </span>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => onResolve?.('keep_local')}
+            disabled={isResolving}
+            className="hover:bg-accent"
+            title={`Keep the ${localLabel || 'local (project)'} version`}
+          >
+            Keep {localLabel || 'Local (Project)'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onResolve?.('keep_remote')}
+            disabled={isResolving}
+            className="hover:bg-accent"
+            title={`Keep the ${remoteLabel || 'remote (collection)'} version`}
+          >
+            Keep {remoteLabel || 'Remote (Collection)'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => onResolve?.('merge')}
+            disabled={isResolving}
+            className="hover:bg-secondary/80"
+            title="Manually merge changes (coming soon)"
+          >
+            Merge
+          </Button>
+          {isResolving && (
+            <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      )}
     </div>
   );
 }
