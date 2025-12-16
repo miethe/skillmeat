@@ -118,12 +118,12 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#8A2BE2" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8A2BE2" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorDeployments" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#00C853" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#00C853" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -147,7 +147,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   type="monotone"
                   dataKey="usage"
                   name="Usage Events"
-                  stroke="#3b82f6"
+                  stroke="#8A2BE2"
                   strokeWidth={2}
                   fill="url(#colorUsage)"
                 />
@@ -155,7 +155,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   type="monotone"
                   dataKey="deployments"
                   name="Deployments"
-                  stroke="#10b981"
+                  stroke="#00C853"
                   strokeWidth={2}
                   fill="url(#colorDeployments)"
                 />
@@ -183,7 +183,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   type="monotone"
                   dataKey="usage"
                   name="Usage Events"
-                  stroke="#3b82f6"
+                  stroke="#8A2BE2"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}
@@ -192,7 +192,7 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
                   type="monotone"
                   dataKey="deployments"
                   name="Deployments"
-                  stroke="#10b981"
+                  stroke="#00C853"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}
@@ -205,19 +205,19 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
         {/* Summary stats below chart */}
         <div className="mt-6 grid grid-cols-3 gap-4 border-t pt-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-brand">
               {trends.reduce((sum, t) => sum + t.usage_count, 0)}
             </p>
             <p className="text-xs text-muted-foreground">Total Usage</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-success">
               {trends.reduce((sum, t) => sum + t.deployment_count, 0)}
             </p>
             <p className="text-xs text-muted-foreground">Total Deployments</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-purple-600">
+            <p className="text-2xl font-bold text-primary">
               {Math.max(...trends.map((t) => t.unique_artifacts), 0)}
             </p>
             <p className="text-xs text-muted-foreground">Peak Artifacts</p>
