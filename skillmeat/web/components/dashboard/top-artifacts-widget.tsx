@@ -24,11 +24,11 @@ import { calculatePercentage } from '@/lib/utils';
 import type { TopArtifact } from '@/types/analytics';
 
 const COLORS = {
-  skill: '#3b82f6', // blue
-  command: '#10b981', // green
-  agent: '#8b5cf6', // purple
-  mcp: '#f59e0b', // amber
-  hook: '#ec4899', // pink
+  skill: '#8A2BE2',
+  command: '#00C853',
+  agent: '#FFD600',
+  mcp: '#D50000',
+  hook: '#FF69B4',
 };
 
 interface TopArtifactsWidgetProps {

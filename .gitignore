@@ -183,3 +183,4 @@ node_modules/
 next-env.d.ts
 pnpm-lock.yaml
 skillmeat/web/.env.local
+.benchmarks/Darwin-CPython-3.12-64bit

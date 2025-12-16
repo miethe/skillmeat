@@ -1,8 +1,19 @@
 import type { Metadata } from 'next';
+import { Inter, JetBrains_Mono as JetBrainsMono } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/header';
 import { Navigation } from '@/components/navigation';
 import { Providers } from '@/components/providers';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+});
+
+const jetbrainsMono = JetBrainsMono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -11,8 +22,13 @@ export const metadata: Metadata = {
   },
   description:
     'Personal collection manager for Claude Code artifacts (Skills, Commands, Agents, MCP, Hooks)',
+  icons: {
+    icon: '/favicon.svg',
+  },
   keywords: ['claude', 'skills', 'commands', 'agents', 'mcp', 'collection manager', 'artifacts'],
-  authors: [{ name: 'SkillMeat Contributors' }],
+  authors: [{
+    name: 'SkillMeat Contributors'
+  }],
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -35,7 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Providers>
           <div className="flex min-h-screen flex-col">
             <Header />
