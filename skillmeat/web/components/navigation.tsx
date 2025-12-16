@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -122,6 +123,12 @@ export function Navigation() {
 
   return (
     <aside className="w-64 border-r bg-background">
+      <div className="flex h-14 items-center gap-2 border-b px-4">
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/logo.svg" alt="SkillMeat Logo" width={32} height={32} className="h-8 w-auto" />
+          <span className="font-bold">SkillMeat</span>
+        </Link>
+      </div>
       <nav className="space-y-1 p-4">
         {/* Collection Switcher */}
         <div className="mb-4">
@@ -131,7 +138,7 @@ export function Navigation() {
         {/* Top Items */}
         {navigationConfig.topItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`));
 
           return (
             <Link
@@ -175,7 +182,7 @@ export function Navigation() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-secondary text-secondary-foreground'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
               )}
