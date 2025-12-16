@@ -92,6 +92,16 @@ export function CollectionProvider({ children }: CollectionProviderProps) {
     error: collectionError,
   } = useCollection(selectedCollectionId ?? undefined);
 
+  // Clear invalid collection ID from localStorage if fetch fails
+  useEffect(() => {
+    if (collectionError && selectedCollectionId) {
+      // Collection doesn't exist or isn't accessible - clear invalid selection
+      console.warn(`Collection ${selectedCollectionId} not found, clearing selection`);
+      localStorage.removeItem(STORAGE_KEY);
+      setSelectedCollectionIdState(null);
+    }
+  }, [collectionError, selectedCollectionId]);
+
   // Fetch groups for current collection
   const {
     data: groupsData,
