@@ -351,3 +351,19 @@
   3. **CollectionPageContent**: Initialize `viewMode` with `'grid'`, sync from localStorage in useEffect after mount
 - **Commit(s)**: c9f8968
 - **Status**: RESOLVED
+
+## 2025-12-15
+
+### Next.js Build Fails with TypeError on /collection Page Prerendering
+
+**Issue**: `pnpm build` fails with `TypeError: Cannot read properties of null (reading 'id')` during static prerendering of `/collection` page.
+- **Location**: `skillmeat/web/components/collection/artifact-list.tsx:328,331`, `skillmeat/web/components/collection/artifact-grid.tsx:127,130`, `skillmeat/web/components/entity/unified-entity-modal.tsx:89,503,513`
+- **Root Cause**: Non-null assertion operators (`!`) on optional `artifact.collection` and nullable `entity` parameters. During SSR/prerendering, data isn't available yet so these properties are null, but the code assumed they were defined after conditional checks.
+- **Fix**:
+  1. Replaced `artifact.collection!.id` with guard pattern `artifact.collection?.id &&` in onClick handlers
+  2. Added optional chaining to `artifact.collection?.name` in both artifact-list.tsx and artifact-grid.tsx
+  3. Updated `isContextEntity()` to accept `Entity | null` with null guard
+  4. Added `entity?.projectPath` optional chaining
+  5. Added `.filter((c): c is string => c != null)` to filter null `from_collection` values
+- **Commit(s)**: 0638e4a
+- **Status**: RESOLVED
