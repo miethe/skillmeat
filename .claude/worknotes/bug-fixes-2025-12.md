@@ -367,3 +367,28 @@
   5. Added `.filter((c): c is string => c != null)` to filter null `from_collection` values
 - **Commit(s)**: 0638e4a
 - **Status**: RESOLVED
+
+## 2025-12-16
+
+### Context Entities Page Crashes with Radix UI Select Error
+
+**Issue**: Navigating to `/context-entities` fails with error: `A <Select.Item /> must have a value prop that is not an empty string`
+- **Location**: `skillmeat/web/components/context/context-entity-filters.tsx:127,134,45`
+- **Root Cause**: Radix UI Select doesn't allow empty string values for `<SelectItem>`. The category filter used `value=""` for the "All Categories" option, which crashes when rendered.
+- **Fix**: Applied sentinel value pattern:
+  1. Changed `<SelectItem value="">` to `<SelectItem value="__all__">` (line 134)
+  2. Changed Select `value={filters.category || ''}` to `value={filters.category || '__all__'}` (line 127)
+  3. Changed handler condition from `value === ''` to `value === '__all__'` (line 45)
+- **Commit(s)**: beb93e7
+- **Status**: RESOLVED
+
+### Context Entities and Templates Pages Missing from Navigation
+
+**Issue**: The `/context-entities` and `/templates` pages exist but have no navigation entries in the sidebar, making them inaccessible to users.
+- **Location**: `skillmeat/web/components/navigation.tsx:50-80`
+- **Root Cause**: Navigation config was never updated after agent-context-entities-v1 PRD implementation. Only Collections, Marketplace, and bottom items were configured.
+- **Fix**: Added new "Agent Context" collapsible section to `navigationConfig.sections` with:
+  - "Context Entities" → `/context-entities` (FileCode2 icon)
+  - "Templates" → `/templates` (FileText icon)
+- **Commit(s)**: beb93e7
+- **Status**: RESOLVED

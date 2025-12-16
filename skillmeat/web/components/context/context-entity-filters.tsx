@@ -42,7 +42,7 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
   const handleCategoryChange = (value: string) => {
     onFiltersChange({
       ...filters,
-      category: value === '' ? undefined : value,
+      category: value === '__all__' ? undefined : value,
     });
   };
 
@@ -124,14 +124,14 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
           Category
         </Label>
         <Select
-          value={filters.category || ''}
+          value={filters.category || '__all__'}
           onValueChange={handleCategoryChange}
         >
           <SelectTrigger id="category">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Categories</SelectItem>
+            <SelectItem value="__all__">All Categories</SelectItem>
             <SelectItem value="api">API</SelectItem>
             <SelectItem value="frontend">Frontend</SelectItem>
             <SelectItem value="debugging">Debugging</SelectItem>
