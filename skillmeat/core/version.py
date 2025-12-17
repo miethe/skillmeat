@@ -5,7 +5,7 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from rich.console import Console
 from rich.prompt import Confirm
@@ -254,19 +254,34 @@ class VersionManager:
     def list_snapshots(
         self,
         collection_name: Optional[str] = None,
-    ) -> List[Snapshot]:
-        """List all snapshots for collection.
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> Tuple[List[Snapshot], Optional[str]]:
+        """List snapshots with cursor-based pagination.
 
         Args:
             collection_name: Collection name (uses active if None)
+            limit: Maximum snapshots to return (default 50, max 100)
+            cursor: Pagination cursor (snapshot ID to start after)
 
         Returns:
-            List of snapshots, newest first
+            Tuple of (snapshots, next_cursor)
+            - snapshots: List of Snapshot objects, sorted newest first
+            - next_cursor: ID of last snapshot if more exist, None otherwise
+
+        Raises:
+            ValueError: If limit is out of bounds or cursor is invalid
+
+        Example:
+            >>> # Get first page
+            >>> snapshots, cursor = version_mgr.list_snapshots(limit=20)
+            >>> # Get next page
+            >>> more_snapshots, next_cursor = version_mgr.list_snapshots(limit=20, cursor=cursor)
         """
         if collection_name is None:
             collection_name = self.collection_mgr.get_active_collection_name()
 
-        return self.snapshot_mgr.list_snapshots(collection_name)
+        return self.snapshot_mgr.list_snapshots(collection_name, limit=limit, cursor=cursor)
 
     def get_snapshot(
         self,
@@ -282,10 +297,24 @@ class VersionManager:
         Returns:
             Snapshot if found, None otherwise
         """
-        snapshots = self.list_snapshots(collection_name)
-        for snapshot in snapshots:
-            if snapshot.id == snapshot_id:
-                return snapshot
+        # Get all snapshots (iterate through pages if needed)
+        cursor = None
+        while True:
+            snapshots, next_cursor = self.list_snapshots(
+                collection_name, limit=100, cursor=cursor
+            )
+
+            # Search current page
+            for snapshot in snapshots:
+                if snapshot.id == snapshot_id:
+                    return snapshot
+
+            # If no more pages, snapshot not found
+            if next_cursor is None:
+                break
+
+            cursor = next_cursor
+
         return None
 
     def rollback(

@@ -1702,15 +1702,14 @@ def history(collection: Optional[str], limit: int):
         if collection is None:
             collection = version_mgr.collection_mgr.get_active_collection_name()
 
-        # List snapshots
-        snapshots = version_mgr.list_snapshots(collection_name=collection)
+        # List snapshots with pagination
+        snapshots, _ = version_mgr.list_snapshots(
+            collection_name=collection, limit=limit
+        )
 
         if not snapshots:
             console.print("[yellow]No snapshots found[/yellow]")
             return
-
-        # Limit results
-        snapshots = snapshots[:limit]
 
         # Create table
         table = Table(title=f"Snapshots for '{collection}' ({len(snapshots)})")

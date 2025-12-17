@@ -114,11 +114,12 @@ class Deployment:
 class DeploymentManager:
     """Manages artifact deployment to projects."""
 
-    def __init__(self, collection_mgr=None):
+    def __init__(self, collection_mgr=None, version_mgr=None):
         """Initialize deployment manager.
 
         Args:
             collection_mgr: CollectionManager instance (creates default if None)
+            version_mgr: VersionManager instance for automatic version capture
         """
         if collection_mgr is None:
             from skillmeat.core.collection import CollectionManager
@@ -127,6 +128,17 @@ class DeploymentManager:
 
         self.collection_mgr = collection_mgr
         self.filesystem_mgr = FilesystemManager()
+
+        # Lazy initialize VersionManager if not provided
+        self._version_mgr = version_mgr
+
+    @property
+    def version_mgr(self):
+        """Lazy-load VersionManager on first access."""
+        if self._version_mgr is None:
+            from skillmeat.core.version import VersionManager
+            self._version_mgr = VersionManager(collection_mgr=self.collection_mgr)
+        return self._version_mgr
 
     def deploy_artifacts(
         self,
@@ -232,6 +244,26 @@ class DeploymentManager:
                 sha=content_hash,
                 success=True,
             )
+
+        # Capture version snapshot after successful deployment (SVCV-003)
+        if deployments:
+            try:
+                # Create descriptive message for the snapshot
+                artifact_list = ", ".join([d.artifact_name for d in deployments[:3]])
+                if len(deployments) > 3:
+                    artifact_list += f" and {len(deployments) - 3} more"
+
+                message = f"Auto-deploy: {artifact_list} to {project_path} at {datetime.now().isoformat()}"
+
+                console.print(f"[dim]Creating snapshot after deployment...[/dim]")
+                snapshot = self.version_mgr.auto_snapshot(
+                    collection_name=collection.name,
+                    message=message,
+                )
+                console.print(f"[dim]Snapshot created: {snapshot.id}[/dim]")
+            except Exception as e:
+                # Never fail deploy due to snapshot failure
+                console.print(f"[yellow]Warning: Failed to create auto-snapshot: {e}[/yellow]")
 
         return deployments
 

@@ -35,17 +35,32 @@ class SyncManager:
     for keeping collections and projects in sync.
     """
 
-    def __init__(self, collection_manager=None, artifact_manager=None, snapshot_manager=None):
+    def __init__(self, collection_manager=None, artifact_manager=None, snapshot_manager=None, version_manager=None):
         """Initialize SyncManager.
 
         Args:
             collection_manager: Optional CollectionManager instance
             artifact_manager: Optional ArtifactManager instance
             snapshot_manager: Optional SnapshotManager for rollback support
+            version_manager: Optional VersionManager for automatic version capture
         """
         self.collection_mgr = collection_manager
         self.artifact_mgr = artifact_manager
         self.snapshot_mgr = snapshot_manager
+
+        # Lazy initialize VersionManager if not provided
+        self._version_mgr = version_manager
+
+    @property
+    def version_mgr(self):
+        """Lazy-load VersionManager on first access."""
+        if self._version_mgr is None:
+            from skillmeat.core.version import VersionManager
+            self._version_mgr = VersionManager(
+                collection_mgr=self.collection_mgr,
+                snapshot_mgr=self.snapshot_mgr,
+            )
+        return self._version_mgr
 
     def check_drift(
         self,
@@ -668,6 +683,7 @@ class SyncManager:
                 dry_run=dry_run,
                 interactive=interactive,
             )
+            # Note: sync_from_project already captures version on success
 
             # Handle partial success or failure
             if result.status == "partial" and interactive and snapshot:
@@ -973,6 +989,29 @@ class SyncManager:
                 self._update_collection_lock(synced_artifacts, drift_results)
             except Exception as e:
                 logger.warning(f"Failed to update collection lock: {e}")
+
+        # Step 4.5: Capture version snapshot (SVCV-002)
+        if synced_artifacts and self.collection_mgr:
+            try:
+                metadata = self._load_deployment_metadata(project_path)
+                collection_name = metadata.collection if metadata else "default"
+
+                # Create descriptive message for the snapshot
+                artifact_list = ", ".join(synced_artifacts[:3])
+                if len(synced_artifacts) > 3:
+                    artifact_list += f" and {len(synced_artifacts) - 3} more"
+
+                message = f"Auto-sync from project: {artifact_list} at {datetime.now().isoformat()}"
+
+                logger.debug(f"Creating auto-snapshot after sync: {message}")
+                snapshot = self.version_mgr.auto_snapshot(
+                    collection_name=collection_name,
+                    message=message,
+                )
+                logger.info(f"Created auto-snapshot after sync: {snapshot.id}")
+            except Exception as e:
+                # Never fail sync due to snapshot failure
+                logger.warning(f"Failed to create auto-snapshot after sync: {e}")
 
         # Step 5: Record analytics event (stub for P4-002)
         if synced_artifacts:
