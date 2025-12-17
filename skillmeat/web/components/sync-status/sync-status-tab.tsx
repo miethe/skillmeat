@@ -21,6 +21,8 @@ import { SyncActionsFooter } from './sync-actions-footer';
 // Existing components
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
 import { DiffViewer } from '@/components/entity/diff-viewer';
+import { SyncDialog } from '@/components/collection/sync-dialog';
+import type { Artifact } from '@/types/artifact';
 
 // ============================================================================
 // Types
@@ -42,6 +44,44 @@ interface PendingAction {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Convert Entity + upstream diff data to Artifact for SyncDialog compatibility
+ */
+function entityToArtifact(
+  entity: Entity,
+  upstreamDiff?: ArtifactUpstreamDiffResponse
+): Artifact {
+  return {
+    id: entity.id,
+    name: entity.name,
+    type: entity.type,
+    scope: 'user', // Default scope
+    status: entity.status === 'conflict' ? 'conflict' : 'active',
+    version: entity.version,
+    source: entity.source,
+    metadata: {
+      description: entity.description,
+      tags: entity.tags,
+    },
+    upstreamStatus: {
+      hasUpstream: !!entity.source && entity.source !== 'local',
+      upstreamUrl: entity.source,
+      upstreamVersion: upstreamDiff?.upstream_version,
+      currentVersion: entity.version,
+      isOutdated: upstreamDiff?.has_changes ?? false,
+      lastChecked: new Date().toISOString(),
+    },
+    usageStats: {
+      totalDeployments: 0,
+      activeProjects: 0,
+      usageCount: 0,
+    },
+    createdAt: entity.deployedAt || new Date().toISOString(),
+    updatedAt: entity.modifiedAt || new Date().toISOString(),
+    aliases: entity.aliases,
+  };
+}
 
 /**
  * Compute drift status from diff data
@@ -300,6 +340,7 @@ export function SyncStatusTab({
   );
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
 
   // Helper to detect local-only artifacts
   const isLocalOnly = !entity.source || entity.source === 'local';
@@ -557,7 +598,7 @@ export function SyncStatusTab({
   };
 
   const handleMerge = () => {
-    toast({ title: 'Coming Soon', description: 'Merge workflow in Phase 3' });
+    setShowSyncDialog(true);
   };
 
   const handleApplyActions = () => {
@@ -721,43 +762,65 @@ export function SyncStatusTab({
   // Render
   // ============================================================================
 
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* Top: Flow Banner */}
-      <div className="flex-shrink-0 border-b">
-        <ArtifactFlowBanner {...bannerProps} />
-      </div>
+  // Convert Entity to Artifact for SyncDialog compatibility
+  const artifactForSync = entityToArtifact(entity, upstreamDiff);
 
-      {/* Middle: 3-Panel Layout */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Left Panel: File Tree (240px fixed) */}
-        <div className="w-60 flex-shrink-0 border-r min-h-0 overflow-auto">
-          <FileTree {...fileTreeProps} />
+  return (
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        {/* Top: Flow Banner */}
+        <div className="flex-shrink-0 border-b">
+          <ArtifactFlowBanner {...bannerProps} />
         </div>
 
-        {/* Center Panel: Comparison + Diff (flex-1) */}
-        <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
-          <div className="flex-shrink-0 space-y-2 border-b p-4">
-            <ComparisonSelector {...comparisonProps} />
-            <DriftAlertBanner {...alertProps} />
+        {/* Middle: 3-Panel Layout */}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* Left Panel: File Tree (240px fixed) */}
+          <div className="w-60 flex-shrink-0 border-r min-h-0 overflow-auto">
+            <FileTree {...fileTreeProps} />
           </div>
-          <div className="flex-1 overflow-hidden min-h-0 min-w-0">
-            <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
-              <DiffViewer {...diffProps} />
+
+          {/* Center Panel: Comparison + Diff (flex-1) */}
+          <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
+            <div className="flex-shrink-0 space-y-2 border-b p-4">
+              <ComparisonSelector {...comparisonProps} />
+              <DriftAlertBanner {...alertProps} />
+            </div>
+            <div className="flex-1 overflow-hidden min-h-0 min-w-0">
+              <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
+                <DiffViewer {...diffProps} />
+              </div>
             </div>
           </div>
+
+          {/* Right Panel: File Preview (320px fixed) */}
+          <div className="w-80 flex-shrink-0 border-l min-h-0 overflow-auto">
+            <FilePreviewPane {...previewProps} />
+          </div>
         </div>
 
-        {/* Right Panel: File Preview (320px fixed) */}
-        <div className="w-80 flex-shrink-0 border-l min-h-0 overflow-auto">
-          <FilePreviewPane {...previewProps} />
+        {/* Bottom: Actions Footer */}
+        <div className="flex-shrink-0 border-t">
+          <SyncActionsFooter {...footerProps} />
         </div>
       </div>
 
-      {/* Bottom: Actions Footer */}
-      <div className="flex-shrink-0 border-t">
-        <SyncActionsFooter {...footerProps} />
-      </div>
-    </div>
+      {/* Sync Dialog for merge operations */}
+      <SyncDialog
+        artifact={artifactForSync}
+        isOpen={showSyncDialog}
+        onClose={() => setShowSyncDialog(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+          queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
+          queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+          toast({
+            title: 'Sync Complete',
+            description: 'Changes merged successfully',
+          });
+          setShowSyncDialog(false);
+        }}
+      />
+    </>
   );
 }
