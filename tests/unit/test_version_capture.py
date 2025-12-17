@@ -136,19 +136,24 @@ skillmeat-version = "0.3.0"
                 artifact_type="skill",
                 drift_type="modified",
                 collection_sha="old_sha",
-                project_sha="new_sha",
+                project_sha="deployed_sha",  # This is what was deployed
                 collection_version="1.0",
                 project_version="1.0",
                 recommendation="push_to_collection",
             )
             mock_drift.return_value = [drift]
 
+            # Create the artifact path so it exists
+            artifact_path = project_path / "artifact"
+            artifact_path.mkdir(parents=True, exist_ok=True)
+
             # Mock artifact paths
             with patch.object(sync_mgr, '_get_project_artifact_path') as mock_path, \
                  patch.object(sync_mgr, '_compute_artifact_hash') as mock_hash:
 
-                mock_path.return_value = project_path / "artifact"
-                mock_hash.return_value = "new_sha"
+                mock_path.return_value = artifact_path
+                # Current SHA differs from deployed SHA => pullable change
+                mock_hash.return_value = "current_modified_sha"
 
                 # Mock sync artifact success
                 mock_sync_artifact.return_value = ArtifactSyncResult(
@@ -193,6 +198,10 @@ deployed-at = "2024-01-01T00:00:00Z"
 skillmeat-version = "0.3.0"
 """)
 
+        # Create the artifact path so it exists for pullable detection
+        artifact_path = project_path / "artifact"
+        artifact_path.mkdir(parents=True, exist_ok=True)
+
         # Mock successful sync
         with patch.object(sync_mgr, 'check_drift') as mock_drift, \
              patch.object(sync_mgr, '_sync_artifact') as mock_sync_artifact, \
@@ -210,14 +219,15 @@ skillmeat-version = "0.3.0"
                 artifact_type="skill",
                 drift_type="modified",
                 collection_sha="old",
-                project_sha="new",
+                project_sha="deployed_sha",  # What was deployed
                 collection_version="1.0",
                 project_version="1.0",
                 recommendation="push_to_collection",
             )
             mock_drift.return_value = [drift]
-            mock_path.return_value = project_path / "artifact"
-            mock_hash.return_value = "new"
+            mock_path.return_value = artifact_path
+            # Current SHA differs from deployed => pullable change
+            mock_hash.return_value = "current_modified_sha"
             mock_sync_artifact.return_value = ArtifactSyncResult(
                 artifact_name="skill1",
                 success=True,

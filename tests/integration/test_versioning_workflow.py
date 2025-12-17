@@ -153,7 +153,7 @@ class TestRollbackWorkflow:
         assert (collection_path / "skills" / "test-skill").exists()
 
         # Verify safety snapshot was created
-        snapshots_after_rollback = version_mgr.list_snapshots()
+        snapshots_after_rollback, _ = version_mgr.list_snapshots()
         assert len(snapshots_after_rollback) == initial_snapshot_count + 1
 
         # Find safety snapshot
@@ -285,7 +285,7 @@ class TestSnapshotCleanup:
         assert len(deleted) == 7
 
         # Verify 3 remain (newest ones)
-        remaining = version_mgr.list_snapshots()
+        remaining, _ = version_mgr.list_snapshots()
         assert len(remaining) == 3
         assert remaining[0].message == "Snapshot 9"
         assert remaining[1].message == "Snapshot 8"
