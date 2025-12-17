@@ -141,7 +141,7 @@ class TestListSnapshots:
     @patch("skillmeat.core.version.console")
     def test_list_snapshots_empty(self, mock_console, version_manager):
         """Test listing snapshots when none exist."""
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         assert snapshots == []
 
     @patch("skillmeat.core.version.console")
@@ -150,7 +150,7 @@ class TestListSnapshots:
     ):
         """Test listing single snapshot."""
         version_manager.create_snapshot(message="Snapshot 1")
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
 
         assert len(snapshots) == 1
         assert snapshots[0].message == "Snapshot 1"
@@ -168,7 +168,7 @@ class TestListSnapshots:
         time.sleep(0.01)
         version_manager.create_snapshot(message="Snapshot 3")
 
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         assert len(snapshots) == 3
 
         # Should be sorted newest first
@@ -279,17 +279,17 @@ class TestRollback:
         # Modify collection
         (temp_collection / "skills" / "new-skill").mkdir()
 
-        initial_count = len(version_manager.list_snapshots())
+        initial_count = len(version_manager.list_snapshots()[0])
 
         # Rollback (creates auto-snapshot first)
         version_manager.rollback(snapshot.id, confirm=False)
 
         # Should have one more snapshot (the safety snapshot)
-        final_count = len(version_manager.list_snapshots())
+        final_count = len(version_manager.list_snapshots()[0])
         assert final_count == initial_count + 1
 
         # Find the safety snapshot
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         safety_snapshot = next(
             s for s in snapshots if "[auto] Before rollback" in s.message
         )
@@ -328,7 +328,7 @@ class TestCleanupSnapshots:
         deleted = version_manager.cleanup_snapshots(keep_count=10)
 
         assert len(deleted) == 0
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         assert len(snapshots) == 3
 
     @patch("skillmeat.core.version.console")
@@ -343,7 +343,7 @@ class TestCleanupSnapshots:
         deleted = version_manager.cleanup_snapshots(keep_count=2)
 
         assert len(deleted) == 3
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         assert len(snapshots) == 2
 
         # Newest snapshots should be kept
@@ -368,7 +368,7 @@ class TestDeleteSnapshot:
         assert not tarball_path.exists()
 
         # Verify metadata updated
-        snapshots = version_manager.list_snapshots()
+        snapshots, _ = version_manager.list_snapshots()
         assert len(snapshots) == 0
 
     @patch("skillmeat.core.version.console")

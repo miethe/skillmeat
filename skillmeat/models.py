@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Dict, Literal, Any
+from typing import TYPE_CHECKING, List, Optional, Dict, Literal, Any
+
+if TYPE_CHECKING:
+    from skillmeat.storage.snapshot import Snapshot
 
 
 class SyncDirection(Enum):
@@ -919,6 +922,23 @@ class SyncMergeStrategy:
                 f"Invalid conflict_action '{self.conflict_action}'. "
                 f"Must be one of {valid_actions}"
             )
+
+
+@dataclass
+class PaginatedSnapshots:
+    """Paginated snapshot listing result.
+
+    Attributes:
+        items: List of Snapshot objects for current page
+        next_cursor: Cursor for next page (None if no more results)
+        has_more: True if more snapshots exist after this page
+        total_count: Total number of snapshots (None if not computed)
+    """
+
+    items: List["Snapshot"] = field(default_factory=list)
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+    total_count: Optional[int] = None
 
 
 @dataclass
