@@ -87,10 +87,11 @@ phase_execution_order:
 
   - phase: 11
     status: partial
-    effort: 3h
+    effort: 2h
     priority: medium
-    reason: "Complete test coverage and documentation"
+    reason: "Documentation complete, tests remaining"
     depends_on: [7, 8, 9, 10]
+    notes: "All 6 documentation tasks complete (2025-12-17). Unit/E2E tests deferred."
 
 agent_assignments:
   phase_1: [python-backend-engineer]
@@ -109,8 +110,8 @@ agent_assignments:
 # Versioning & Merge System - Work Plan
 
 **PRD**: `docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
-**Status**: 90% complete (7 phases complete: 4, 5, 6, 7, 8, 9, 10 | 3 phases partial: 1, 2, 3 | 1 phase pending: 11)
-**Next Action**: Phase 11 (Testing & Documentation) - ~3h remaining
+**Status**: 95% complete (7 phases complete: 4, 5, 6, 7, 8, 9, 10 | 3 phases partial: 1, 2, 3, 11 (docs done))
+**Next Action**: Phase 11 tests (deferred) - ~2h remaining
 
 ---
 
@@ -332,8 +333,8 @@ Execute in order to get working version/merge system:
 
 ### Phase 11: Testing & Documentation
 
-**Status**: 30% complete
-**Effort**: 3h
+**Status**: 61% complete (documentation done, tests deferred)
+**Effort**: 2h remaining
 **Progress File**: `.claude/progress/versioning-merge-system/phase-11-progress.md`
 **Depends On**: Phase 7, 8, 9, 10
 
@@ -341,8 +342,14 @@ Execute in order to get working version/merge system:
 - ✅ test_merge_engine.py (35+ scenarios)
 - ✅ test_version_manager.py
 - ✅ test_version_graph_builder.py
+- ✅ DOC-001: API documentation (`docs/features/versioning/api-reference.md`)
+- ✅ DOC-002: User guide for version history (`docs/features/versioning/user-guide-history.md`)
+- ✅ DOC-003: User guide for merge workflow (`docs/features/versioning/user-guide-merge.md`)
+- ✅ DOC-004: Architecture documentation (`docs/architecture/versioning/README.md`)
+- ✅ DOC-005: Developer guide for version APIs (`docs/development/versioning/dev-guide-apis.md`)
+- ✅ DOC-006: Developer guide for merge engine (`docs/developers/versioning/dev-guide-merge-engine.md`)
 
-**REMAINING**:
+**DEFERRED** (tests - not blocking MVP):
 
 1. **API Tests** (1h)
    - Test all 13 REST endpoints
@@ -352,18 +359,16 @@ Execute in order to get working version/merge system:
    - Full version/merge workflow
    - File: `tests/test_versioning_e2e.py`
 
-3. **Documentation** (1h)
-   - User guide for version/merge
-   - API documentation
-   - File: `docs/features/versioning-merge.md`
-
 **Success Criteria**:
-- 80%+ test coverage maintained
-- All API endpoints tested
-- E2E workflow tested
-- User documentation complete
+- ⏳ 80%+ test coverage maintained
+- ⏳ All API endpoints tested
+- ⏳ E2E workflow tested
+- ✅ User documentation complete
+- ✅ API documentation complete
+- ✅ Architecture documentation complete
+- ✅ Developer guides complete
 
-**Agent**: python-backend-engineer, documentation-writer
+**Agent**: python-backend-engineer (tests), documentation-writer (docs - COMPLETE)
 
 ---
 
@@ -446,27 +451,32 @@ Execute in order to get working version/merge system:
 2. ✅ Intelligent rollback preserves changes (Phase 6 - DONE)
 3. ✅ Versions auto-captured on sync/deploy (Phase 4 - DONE)
 4. ✅ REST API functional (Phase 7 - DONE)
-5. ✅ Sync integrated with versioning (Phase 10 - DONE, 95%)
-6. ⏳ Tests + docs complete (Phase 11 - PARTIAL)
+5. ✅ Sync integrated with versioning (Phase 10 - DONE)
+6. ⏳ Tests + docs complete (Phase 11 - DOCS DONE, tests deferred)
 
 **Full Feature Complete When**:
 - ✅ Frontend history UI working (Phase 8 - DONE)
 - ✅ Frontend merge UI working (Phase 9 - DONE)
+- ✅ User documentation complete (Phase 11 - DONE 2025-12-17)
+- ✅ API documentation complete (Phase 11 - DONE 2025-12-17)
+- ✅ Architecture documentation complete (Phase 11 - DONE 2025-12-17)
+- ✅ Developer guides complete (Phase 11 - DONE 2025-12-17)
 - ⏳ Retention policies active (Phase 3 - OPTIONAL)
-- ⏳ 80%+ test coverage (Phase 11 - PENDING)
+- ⏳ 80%+ test coverage (Phase 11 - DEFERRED)
 
 ---
 
 ## Notes for Orchestration Agents
 
 1. **Phases 4, 5, 6, 7, 8, 9, 10 are COMPLETE** - Core backend, API, frontend, and sync integration done
-2. **Phase 11 is FINAL** - API tests, E2E tests, documentation (~3h estimated)
-3. **Phases 1-3 are OPTIONAL** - Improve architecture but not blocking MVP
-4. **Use existing tests as examples** - test_merge_engine.py shows patterns
-5. **Tarball approach is VALID** - Don't refactor to per-artifact unless directed
+2. **Phase 11 documentation is COMPLETE** - All 6 docs created (2025-12-17)
+3. **Phase 11 tests are DEFERRED** - API tests, E2E tests (~2h estimated)
+4. **Phases 1-3 are OPTIONAL** - Improve architecture but not blocking MVP
+5. **Use existing tests as examples** - test_merge_engine.py shows patterns
+6. **Tarball approach is VALID** - Don't refactor to per-artifact unless directed
 
 **Remaining Work**:
-- Phase 11: API tests, E2E tests, user documentation (~3h)
+- Phase 11: API tests, E2E tests (~2h) - DEFERRED
 
 **Known Limitations**: None - Phase 10 UI integration complete (d5a0107)
 
@@ -517,3 +527,15 @@ Execute in order to get working version/merge system:
 - Frontend: SyncStatusTab wired to SyncDialog for merge operations
 - Added entityToArtifact() helper to bridge Entity/Artifact type mismatch
 - Commit: d5a0107 feat(web): wire SyncDialog to merge button in SyncStatusTab
+
+### Phase 11 Documentation Complete (2025-12-17)
+
+- All 6 documentation tasks completed via documentation-writer subagent
+- DOC-001: API reference with all 11 endpoints (`docs/features/versioning/api-reference.md`)
+- DOC-002: User guide for version history (`docs/features/versioning/user-guide-history.md`)
+- DOC-003: User guide for merge workflow (`docs/features/versioning/user-guide-merge.md`)
+- DOC-004: Architecture documentation (`docs/architecture/versioning/README.md`)
+- DOC-005: Developer guide for version APIs (`docs/development/versioning/dev-guide-apis.md`)
+- DOC-006: Developer guide for merge engine (`docs/developers/versioning/dev-guide-merge-engine.md`)
+- Test tasks (TEST-001 through TEST-012) deferred per user request
+- Phase status: 61% complete (docs done, tests pending)
