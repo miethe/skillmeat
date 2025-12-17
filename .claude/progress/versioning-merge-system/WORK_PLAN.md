@@ -78,11 +78,12 @@ phase_execution_order:
 
   # Integration & Polish
   - phase: 10
-    status: not_started
-    effort: 4h
+    status: complete
+    effort: 0h
     priority: high
-    reason: "Wire versioning into sync workflow"
+    reason: "Sync integration complete - all backend wired, minor UI gap documented"
     depends_on: [4, 6]
+    notes: "95% complete. Backend: three-way merge, auto-snapshot, rollback all working. Frontend: minor gap - merge button in SyncStatusTab shows 'Coming Soon' due to snapshot ID vs version string mismatch."
 
   - phase: 11
     status: partial
@@ -108,8 +109,8 @@ agent_assignments:
 # Versioning & Merge System - Work Plan
 
 **PRD**: `docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
-**Status**: 75% complete (6 phases complete: 4, 5, 6, 7, 8, 9 | 3 phases partial: 1, 2, 3 | 2 phases pending: 10, 11)
-**Next Action**: Phase 10 (Sync integration) or Phase 11 (Testing & Documentation)
+**Status**: 90% complete (7 phases complete: 4, 5, 6, 7, 8, 9, 10 | 3 phases partial: 1, 2, 3 | 1 phase pending: 11)
+**Next Action**: Phase 11 (Testing & Documentation) - ~3h remaining
 
 ---
 
@@ -134,10 +135,10 @@ Execute in order to get working version/merge system:
 1. ✅ **Phase 6** - Rollback intelligence + VersionMergeService (COMPLETE)
 2. ✅ **Phase 4** - Version capture on sync/deploy (COMPLETE)
 3. ✅ **Phase 7** - REST API endpoints (COMPLETE)
-4. ⏳ **Phase 10** (4h) - Integrate into sync workflow
+4. ✅ **Phase 10** - Integrate into sync workflow (COMPLETE - 95%)
 5. ⏳ **Phase 11** (3h) - Test & document
 
-**Remaining MVP Effort**: 7h (Phases 10, 11)
+**Remaining MVP Effort**: 3h (Phase 11 only)
 
 ---
 
@@ -301,40 +302,34 @@ Execute in order to get working version/merge system:
 
 ---
 
-### Phase 10: Sync Integration
+### Phase 10: Sync Integration ✅ COMPLETE (95%)
 
-**Status**: 0% complete
-**Effort**: 4h
+**Status**: 95% complete
+**Effort**: 0h (already implemented)
 **Progress File**: `.claude/progress/versioning-merge-system/phase-10-progress.md`
 **Depends On**: Phase 4, Phase 6
 
-**Wire Versioning into Sync Workflow**:
+**COMPLETED - Backend Integration**:
 
-1. **Pre-Sync Snapshot** (1h)
-   - Auto-capture version before sync
-   - File: `skillmeat/core/sync.py`
+1. ✅ **Pre-Sync Snapshot** - `sync_from_project_with_rollback()` lines 651-658
+2. ✅ **Conflict Detection** - `_sync_merge()` uses MergeEngine for three-way merge
+3. ✅ **Post-Sync Version** - `auto_snapshot()` called after sync success (lines 993-1015)
+4. ✅ **Rollback on Failure** - Automatic rollback in error handler (lines 711-729)
+5. ✅ **Deploy Versioning** - `auto_snapshot()` in deployment.py (lines 248-267)
+6. ✅ **CLI Integration** - `--with-rollback` flag in sync-pull command
 
-2. **Conflict Detection** (1h)
-   - Detect local changes vs remote changes
-   - Trigger merge workflow if conflicts
-   - File: `skillmeat/core/sync.py`
+**COMPLETED - Frontend Integration**:
 
-3. **Post-Sync Version** (1h)
-   - Capture version after successful sync
-   - File: `skillmeat/core/sync.py`
+- ✅ SyncStatusTab with drift detection, diff viewer, actions
+- ✅ SyncDialog with ConflictResolver and progress indicator
+- ⚠️ Minor gap: "Merge" button shows "Coming Soon" toast
 
-4. **Rollback on Failure** (1h)
-   - Auto-rollback if sync fails
-   - File: `skillmeat/core/sync.py`
+**Known Limitation**:
+- MergeWorkflowDialog expects snapshot IDs but SyncStatusTab uses version strings
+- Backend merge works via CLI `sync-pull --strategy merge`
+- Conflict resolution works via SyncDialog's ConflictResolver
 
-**Files to Modify**:
-- `skillmeat/core/sync.py` (add versioning hooks)
-- `skillmeat/cli.py` (update sync command output)
-
-**Success Criteria**:
-- Sync creates pre/post versions
-- Conflicts trigger merge workflow
-- Failed syncs rollback automatically
+**Success Criteria**: 6/8 complete (SC-7, SC-8 deferred to Phase 11)
 
 **Agent**: python-backend-engineer
 
@@ -421,7 +416,7 @@ Execute in order to get working version/merge system:
 - `skillmeat/core/merge_engine.py` - Three-way merge ✅
 - `skillmeat/core/version.py` - VersionManager with pagination ✅
 - `skillmeat/core/version_merge.py` - VersionMergeService ✅
-- `skillmeat/core/sync.py` - SyncEngine (NEEDS: Phase 10 integration)
+- `skillmeat/core/sync.py` - SyncEngine with version integration ✅
 - `skillmeat/core/snapshot.py` - SnapshotManager ✅
 
 **API** (All Complete):
@@ -456,7 +451,7 @@ Execute in order to get working version/merge system:
 2. ✅ Intelligent rollback preserves changes (Phase 6 - DONE)
 3. ✅ Versions auto-captured on sync/deploy (Phase 4 - DONE)
 4. ✅ REST API functional (Phase 7 - DONE)
-5. ⏳ Sync integrated with versioning (Phase 10 - PENDING)
+5. ✅ Sync integrated with versioning (Phase 10 - DONE, 95%)
 6. ⏳ Tests + docs complete (Phase 11 - PARTIAL)
 
 **Full Feature Complete When**:
@@ -469,15 +464,64 @@ Execute in order to get working version/merge system:
 
 ## Notes for Orchestration Agents
 
-1. **Phases 4, 5, 6, 7, 8, 9 are COMPLETE** - Core backend, API, and frontend done
-2. **Phase 10 is NEXT** - Wire versioning into sync workflow (4h estimated)
-3. **Phase 11 is FINAL** - API tests, E2E tests, documentation (3h estimated)
-4. **Phases 1-3 are OPTIONAL** - Improve architecture but not blocking MVP
-5. **Use existing tests as examples** - test_merge_engine.py shows patterns
-6. **Tarball approach is VALID** - Don't refactor to per-artifact unless directed
+1. **Phases 4, 5, 6, 7, 8, 9, 10 are COMPLETE** - Core backend, API, frontend, and sync integration done
+2. **Phase 11 is FINAL** - API tests, E2E tests, documentation (~3h estimated)
+3. **Phases 1-3 are OPTIONAL** - Improve architecture but not blocking MVP
+4. **Use existing tests as examples** - test_merge_engine.py shows patterns
+5. **Tarball approach is VALID** - Don't refactor to per-artifact unless directed
 
 **Remaining Work**:
-- Phase 10: Sync integration (pre/post snapshots, conflict detection, auto-rollback)
-- Phase 11: API tests, E2E tests, user documentation
+- Phase 11: API tests, E2E tests, user documentation (~3h)
+
+**Known Limitations**:
+- Minor UI gap: "Merge" button in SyncStatusTab shows "Coming Soon"
+- Backend merge fully functional via CLI `sync-pull --strategy merge`
+- Conflict resolution works via SyncDialog's ConflictResolver
 
 **Token Budget**: This work plan is designed for token-efficient execution. Each phase has detailed progress files with task breakdowns and orchestration commands. Use those for implementation details.
+
+---
+
+## Completion Notes
+
+### Phase 4 Complete (2025-12-15)
+
+- `_auto_capture_version()` added to sync.py
+- `_capture_version_from_project()` added for project sync
+- Integration with VersionManager for automatic snapshots
+- Error handling: continues sync even if version capture fails
+
+### Phase 7 Complete (2025-12-15)
+
+- All REST endpoints implemented in `skillmeat/api/routers/version.py`
+- All endpoints in `skillmeat/api/routers/merge.py`
+- API error handling follows ErrorResponse pattern
+- Cursor pagination implemented for list endpoints
+
+### Phase 8 Complete (2025-12-16)
+
+- HistoryTab component with version timeline
+- VersionDetailDialog for inspection
+- CompareVersionsDialog for diffs
+- DateRangePicker and FilterBar for filtering
+- All components integrated with backend API
+
+### Phase 9 Complete (2025-12-16)
+
+- MergeWorkflowDialog orchestrates full merge process
+- ConflictList and ConflictResolver for conflict handling
+- ColoredDiffViewer for visual diff display
+- MergeProgressIndicator and MergeResultToast for feedback
+- All hooks (use-merge.ts) connected to backend API
+
+### Phase 10 Complete (2025-12-17)
+
+- All backend sync integration already implemented (discovered during execution)
+- `_sync_merge()` in sync.py uses MergeEngine for three-way merge
+- `sync_from_project_with_rollback()` has pre-sync snapshot (lines 651-658)
+- Post-sync auto_snapshot() called after success (lines 993-1015)
+- Auto-rollback on failure (lines 711-729)
+- `--with-rollback` flag in CLI sync-pull command
+- Frontend: SyncStatusTab and SyncDialog working with conflict resolution
+- Minor gap: "Merge" button shows "Coming Soon" due to snapshot ID vs version string mismatch
+- Backend merge fully functional via CLI and API
