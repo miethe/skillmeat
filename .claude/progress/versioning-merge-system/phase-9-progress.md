@@ -3,15 +3,15 @@ type: progress
 prd: "versioning-merge-system"
 phase: 9
 title: "Frontend - Merge UI & Conflict Resolution"
-status: "not-started"
-started: null
-completed: null
-overall_progress: 0
-completion_estimate: "blocked-by-api"
+status: "completed"
+started: "2025-12-17"
+completed: "2025-12-17"
+overall_progress: 100
+completion_estimate: "complete"
 total_tasks: 10
-completed_tasks: 0
+completed_tasks: 10
 in_progress_tasks: 0
-blocked_tasks: 10
+blocked_tasks: 0
 owners: ["ui-engineer-enhanced", "frontend-developer"]
 contributors: []
 
@@ -22,83 +22,93 @@ contributors: []
 tasks:
   - id: "MERGE-UI-001"
     description: "Build ColoredDiffViewer - three-way colors (Green=upstream, Blue=local, Red=conflict, Yellow=removed)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["APIVM-007"]
     estimated_effort: "8h"
     priority: "high"
+    files: ["skillmeat/web/components/merge/colored-diff-viewer.tsx"]
 
   - id: "MERGE-UI-002"
     description: "Add change type labels (local change, upstream update, conflict)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["MERGE-UI-001"]
     estimated_effort: "2h"
     priority: "high"
+    notes: "Integrated into ColoredDiffViewer and ConflictList components"
 
   - id: "MERGE-UI-003"
     description: "Build MergePreview component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["APIVM-006"]
     estimated_effort: "5h"
     priority: "high"
+    files: ["skillmeat/web/components/merge/merge-preview-view.tsx"]
 
   - id: "MERGE-UI-004"
     description: "Add merge statistics display (auto-merged count, conflicts, unchanged files)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["MERGE-UI-001"]
     estimated_effort: "2h"
     priority: "medium"
+    notes: "Integrated into MergeAnalysisDialog and MergePreviewView"
 
   - id: "MERGE-UI-005"
     description: "Integrate existing conflict-resolver component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["APIVM-008"]
     estimated_effort: "3h"
     priority: "high"
+    files: ["skillmeat/web/components/merge/conflict-resolver.tsx"]
 
   - id: "MERGE-UI-006"
     description: "Add conflict strategy selection (ours/theirs/manual per file)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["MERGE-UI-005"]
     estimated_effort: "3h"
     priority: "high"
+    files: ["skillmeat/web/components/merge/merge-strategy-selector.tsx"]
 
   - id: "MERGE-UI-007"
     description: "Build MergeWorkflow component (Preview → Conflicts → Confirm → Apply)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["MERGE-UI-003"]
     estimated_effort: "5h"
     priority: "high"
+    files: ["skillmeat/web/components/merge/merge-workflow-dialog.tsx"]
 
   - id: "MERGE-UI-008"
     description: "Wire merge apply endpoint to button"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["MERGE-UI-007"]
     estimated_effort: "2h"
     priority: "high"
+    notes: "Wired via useExecuteMerge hook in MergeWorkflowDialog"
 
   - id: "MERGE-UI-009"
     description: "Add merge result notification/toast"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["MERGE-UI-008"]
     estimated_effort: "2h"
     priority: "medium"
+    files: ["skillmeat/web/components/merge/merge-result-toast.tsx"]
 
   - id: "MERGE-UI-010"
     description: "Track merge operations in version history"
-    status: "pending"
+    status: "completed"
     assigned_to: ["frontend-developer"]
     dependencies: ["MERGE-UI-008"]
     estimated_effort: "2h"
     priority: "medium"
+    notes: "useExecuteMerge invalidates snapshot queries on success"
 
 parallelization:
   batch_1: ["MERGE-UI-001", "MERGE-UI-003"]

@@ -51,28 +51,30 @@ phase_execution_order:
 
   # API Layer
   - phase: 7
-    status: not_started
-    effort: 6h
+    status: complete
+    effort: 0h
     priority: high
-    reason: "REST API for version operations"
+    reason: "REST API for version/merge operations complete"
     depends_on: [4, 6]
     blocks: [8, 9]
+    notes: "Routers: versions.py, merge.py. Endpoints: /analyze, /preview, /execute, /resolve"
 
   # Frontend
   - phase: 8
-    status: in_progress
-    effort: 2h remaining
+    status: complete
+    effort: 0h
     priority: medium
-    reason: "History tab UI - 70% complete"
+    reason: "History tab UI complete"
     depends_on: [7]
-    notes: "Core components done: VersionTimeline, RollbackDialog, ComparisonView, SnapshotHistoryTab"
+    notes: "Components: VersionTimeline, RollbackDialog, VersionComparisonView, SnapshotHistoryTab, SnapshotMetadata"
 
   - phase: 9
-    status: not_started
-    effort: 6h
+    status: complete
+    effort: 0h
     priority: medium
-    reason: "Merge conflict resolution UI"
+    reason: "Merge conflict resolution UI complete"
     depends_on: [7]
+    notes: "10 components: MergeWorkflowDialog, ConflictList, ConflictResolver, ColoredDiffViewer, etc."
 
   # Integration & Polish
   - phase: 10
@@ -106,8 +108,8 @@ agent_assignments:
 # Versioning & Merge System - Work Plan
 
 **PRD**: `docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
-**Status**: 55% complete (3 phases complete: 4, 5, 6 | 3 phases partial: 1, 2, 3 | 5 phases pending: 7, 8, 9, 10, 11)
-**Next Action**: Phase 7 (REST API endpoints for versioning)
+**Status**: 75% complete (6 phases complete: 4, 5, 6, 7, 8, 9 | 3 phases partial: 1, 2, 3 | 2 phases pending: 10, 11)
+**Next Action**: Phase 10 (Sync integration) or Phase 11 (Testing & Documentation)
 
 ---
 
