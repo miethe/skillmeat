@@ -60,11 +60,12 @@ phase_execution_order:
 
   # Frontend
   - phase: 8
-    status: not_started
-    effort: 5h
+    status: in_progress
+    effort: 2h remaining
     priority: medium
-    reason: "History tab UI"
+    reason: "History tab UI - 70% complete"
     depends_on: [7]
+    notes: "Core components done: VersionTimeline, RollbackDialog, ComparisonView, SnapshotHistoryTab"
 
   - phase: 9
     status: not_started
