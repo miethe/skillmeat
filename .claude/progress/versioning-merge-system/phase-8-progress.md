@@ -3,17 +3,21 @@ type: progress
 prd: "versioning-merge-system"
 phase: 8
 title: "Frontend - History Tab & Version Browsing"
-status: "planning"
+status: "not-started"
 started: null
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: "blocked-by-api"
 total_tasks: 10
 completed_tasks: 0
 in_progress_tasks: 0
-blocked_tasks: 0
+blocked_tasks: 10
 owners: ["ui-engineer-enhanced", "frontend-developer"]
 contributors: []
+
+# STATUS NOTE: Not started - blocked by Phase 7 (API endpoints)
+# No version history UI components exist yet
+# Requires: /api/v1/artifacts/{id}/versions endpoints
 
 tasks:
   - id: "HIST-001"

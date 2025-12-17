@@ -276,20 +276,42 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 
 ---
 
-### 13. Versioning Merge System v1 (In Progress)
+### 13. Versioning Merge System v1 (In Progress - Core Complete, UI Pending)
 
-**Status**: IN PROGRESS (Phase 6 implemented; remaining phases planning)
-**Phases**: 11 phases planned (Phase 6 delivered via commit `e49307f`)
+**Status**: IN PROGRESS (Core infrastructure complete; API/UI phases pending)
+**Phases**: 11 phases total
 **Location**: `docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
 
-#### Overview:
-Comprehensive versioning system with:
-- Version control for artifacts
-- Merge conflict resolution
-- Version history tracking
-- Branch management
+#### Phase Status (Updated 2025-12-16):
 
-Most phases are in planning stage; Phase 1 foundational work pending.
+| Phase | Title | Status | Progress | Notes |
+|-------|-------|--------|----------|-------|
+| 1 | Storage Infrastructure | PARTIAL (60%) | 3/6 tasks | Different architecture (tarball snapshots vs per-artifact versions) |
+| 2 | Repository Layer CRUD | PARTIAL | ~50% | SnapshotManager + VersionManager provide similar functionality |
+| 3 | Repository Comparisons | PARTIAL | ~40% | DiffEngine exists; retention policies missing |
+| 4 | Service Layer - Version Mgmt | PARTIAL | ~40% | VersionManager provides core operations |
+| 5 | Three-Way Merge Engine | **COMPLETE (100%)** | 10/11 tasks | `core/merge_engine.py`, `core/diff_engine.py` fully implemented |
+| 6 | Rollback & Integration | PARTIAL (40%) | 2/7 tasks | Basic rollback exists; missing intelligent rollback, conflict detection |
+| 7 | API Layer | NOT STARTED | 0/13 tasks | No version/merge REST endpoints |
+| 8 | Frontend History Tab | NOT STARTED | 0/10 tasks | Blocked by Phase 7 |
+| 9 | Frontend Merge UI | NOT STARTED | 0/10 tasks | Blocked by Phase 7 |
+| 10 | Sync Integration | NOT STARTED | 0/8 tasks | Blocked by Phases 7+9 |
+| 11 | Testing & Documentation | PARTIAL (30%) | 5/18 tasks | Core tests exist; API/E2E tests missing |
+
+#### Key Implementation Files (Commit `e49307f`):
+- `skillmeat/core/merge_engine.py` (433 lines) - Three-way merge with conflict detection
+- `skillmeat/core/diff_engine.py` (~400 lines) - File/directory diffing
+- `skillmeat/core/version.py` (261 lines) - VersionManager with rollback
+- `skillmeat/core/version_graph.py` (626 lines) - Cross-project version tracking
+- `skillmeat/storage/snapshot.py` (271 lines) - Tarball-based snapshot system
+
+#### Architecture Note:
+Implementation uses **collection-level tarball snapshots** (`.tar.gz`) instead of PRD's **per-artifact versioned directories** (`versions/v1-{hash}/`). This is functionally similar but architecturally different. The merge engine and diff engine are fully implemented as designed.
+
+#### Next Steps:
+1. Complete Phase 6 (intelligent rollback, conflict detection)
+2. Implement Phase 7 (REST API endpoints for versions/merge)
+3. Build Phase 8-9 (Frontend history and merge UI)
 
 ---
 
@@ -360,7 +382,7 @@ Earlier iteration with 6 phases planned but superseded by v1 (active).
 | collections-api-consolidation | 5 | 5 | 0 | 0 | **Completed** ✅ |
 | smart-import-discovery-v1 | 5 | 5 | 0 | 0 | **Completed** |
 | web-ui-consolidation-v1 | TBD | 0 | 0 | 1 | Planned |
-| versioning-merge-system | 11 | 1 | 0 | 10 | Phase 6 Complete |
+| versioning-merge-system | 11 | 1 | 3 | 7 | P5 Complete, P1/6/11 Partial, P7-10 Not Started |
 | marketplace-sources-crud | 6 | 6 | 0 | 0 | **Completed** |
 | entity-lifecycle-management | 7 | 7 | 0 | 0 | **Completed** |
 
@@ -699,7 +721,7 @@ docs/project_plans/implementation_plans/
 ├── smart-import-discovery-v1/ (PENDING)
 ├── marketplace-sources-crud-enhancement/ (NOT STARTED)
 ├── collections-api-consolidation/ (COMPLETED ✅)
-├── versioning-merge-system/ (PLANNING)
+├── versioning-merge-system/ (P5 COMPLETE, P1/6/11 PARTIAL, P7-10 NOT STARTED)
 ├── web-ui-consolidation-v1/ (PENDING)
 ├── collections-navigation/ (SUPERSEDED by v1)
 ├── ph2-intelligence/ (RESEARCH/COMPLETED)
