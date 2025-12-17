@@ -36,6 +36,7 @@ class Deployment:
     version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
     last_modified_check: Optional[datetime] = None  # Last drift check timestamp
     modification_detected_at: Optional[datetime] = None  # When modification was first detected
+    merge_base_snapshot: Optional[str] = None  # Content hash (SHA-256) used as merge base for 3-way merges
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -64,6 +65,9 @@ class Deployment:
 
         if self.modification_detected_at:
             result["modification_detected_at"] = self.modification_detected_at.isoformat()
+
+        if self.merge_base_snapshot:
+            result["merge_base_snapshot"] = self.merge_base_snapshot
 
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
@@ -107,6 +111,7 @@ class Deployment:
             version_lineage=version_lineage,
             last_modified_check=last_modified_check,
             modification_detected_at=modification_detected_at,
+            merge_base_snapshot=data.get("merge_base_snapshot"),
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
@@ -214,7 +219,7 @@ class DeploymentManager:
                 console.print(f"[red]Error deploying {artifact.name}:[/red] {e}")
                 continue
 
-            # Compute content hash
+            # Compute content hash (becomes merge base for future three-way merges)
             content_hash = compute_content_hash(dest_path)
 
             # Record deployment
@@ -223,6 +228,8 @@ class DeploymentManager:
             )
 
             # Create deployment object
+            # Set merge_base_snapshot to content_hash at deployment time
+            # This hash becomes the baseline for future three-way merges
             deployment = Deployment(
                 artifact_name=artifact.name,
                 artifact_type=artifact.type.value,
@@ -231,6 +238,7 @@ class DeploymentManager:
                 artifact_path=dest_path.relative_to(dest_base),
                 content_hash=content_hash,
                 local_modifications=False,
+                merge_base_snapshot=content_hash,  # Store baseline for merge tracking
             )
             deployments.append(deployment)
 

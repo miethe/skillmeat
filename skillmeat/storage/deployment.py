@@ -115,6 +115,7 @@ class DeploymentTracker:
             artifact_path=artifact_path,
             content_hash=collection_sha,
             local_modifications=False,
+            merge_base_snapshot=collection_sha,  # Store baseline for merge tracking
         )
 
         if existing is not None:

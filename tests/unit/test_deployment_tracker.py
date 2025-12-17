@@ -42,7 +42,7 @@ class TestDeploymentTracker:
                 from_collection="default",
                 deployed_at=now,
                 artifact_path=Path("skills/test-skill"),
-                collection_sha="abc123",
+                content_hash="abc123",
                 local_modifications=False,
             ),
             Deployment(
@@ -51,7 +51,7 @@ class TestDeploymentTracker:
                 from_collection="default",
                 deployed_at=now,
                 artifact_path=Path("commands/test.md"),
-                collection_sha="def456",
+                content_hash="def456",
                 local_modifications=True,
             ),
         ]
