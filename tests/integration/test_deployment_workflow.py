@@ -367,7 +367,7 @@ class TestDeploymentWorkflow:
         deployments1 = deployment_mgr.deploy_artifacts(
             ["test-skill"], project_path=project_path
         )
-        original_sha = deployments1[0].collection_sha
+        original_sha = deployments1[0].content_hash
 
         # Modify collection artifact
         collection_path = temp_config.get_collection_path("default")
@@ -378,7 +378,7 @@ class TestDeploymentWorkflow:
         deployments2 = deployment_mgr.deploy_artifacts(
             ["test-skill"], project_path=project_path
         )
-        new_sha = deployments2[0].collection_sha
+        new_sha = deployments2[0].content_hash
 
         # SHA should be different
         assert new_sha != original_sha
@@ -387,7 +387,7 @@ class TestDeploymentWorkflow:
         deployment = DeploymentTracker.get_deployment(
             project_path, "test-skill", "skill"
         )
-        assert deployment.collection_sha == new_sha
+        assert deployment.content_hash == new_sha
 
     def test_command_and_agent_deployment(
         self, temp_config, temp_collection, tmp_path, monkeypatch

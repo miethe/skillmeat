@@ -1194,7 +1194,7 @@ class SyncManager:
                 self._sync_overwrite(project_artifact_path, collection_artifact_path)
             elif strategy == "merge":
                 merge_result = self._sync_merge(
-                    project_artifact_path, collection_artifact_path, artifact_name
+                    project_artifact_path, collection_artifact_path, artifact_name, project_path
                 )
                 if merge_result.has_conflict:
                     conflicts_count = len(merge_result.conflict_files)
@@ -1277,6 +1277,7 @@ class SyncManager:
         project_artifact_path: Path,
         collection_artifact_path: Path,
         artifact_name: str,
+        project_path: Optional[Path] = None,
     ) -> ArtifactSyncResult:
         """Merge project changes into collection artifact.
 
@@ -1286,6 +1287,7 @@ class SyncManager:
             project_artifact_path: Path to artifact in project
             collection_artifact_path: Path to artifact in collection
             artifact_name: Name of artifact
+            project_path: Optional project root path (for metadata lookup)
 
         Returns:
             ArtifactSyncResult with merge status
@@ -1294,11 +1296,57 @@ class SyncManager:
 
         merge_engine = MergeEngine()
 
-        # For now, use collection as base (no true three-way merge)
-        # P3-004 will add base version tracking
+        # Get deployment metadata to check for merge_base_snapshot
+        # Infer project_path from artifact_path if not provided
+        if project_path is None:
+            # artifact_path is like /path/to/project/.claude/skills/name
+            # project_path is /path/to/project
+            project_path = project_artifact_path.parent.parent.parent
+
+        metadata = self._load_deployment_metadata(project_path)
+        base_path = None
+
+        if metadata:
+            # Find deployment record for this artifact
+            deployed = next(
+                (d for d in metadata.artifacts if d.name == artifact_name),
+                None
+            )
+
+            if deployed:
+                # Try to get merge_base_snapshot (added in v1.5)
+                merge_base_snapshot = getattr(deployed, 'merge_base_snapshot', None)
+
+                if merge_base_snapshot and self.snapshot_mgr:
+                    # Use merge base from snapshot
+                    collection_name = metadata.collection if metadata else None
+                    base_path = self._extract_base_from_snapshot(
+                        merge_base_snapshot, artifact_name, deployed.artifact_type, collection_name
+                    )
+                    if base_path:
+                        logger.debug(
+                            f"Using merge base snapshot {merge_base_snapshot[:12]}... "
+                            f"for artifact {artifact_name}"
+                        )
+                else:
+                    # FALLBACK: Old deployment without merge_base_snapshot
+                    logger.warning(
+                        f"Deployment record for {artifact_name} missing merge_base_snapshot. "
+                        f"Using fallback: current collection state as baseline. "
+                        f"Consider redeploying to capture proper merge base."
+                    )
+
+        # If no base found, use collection as base (fallback behavior)
+        if base_path is None:
+            base_path = collection_artifact_path
+            logger.debug(
+                f"No merge base available for {artifact_name}, "
+                f"using current collection state as baseline"
+            )
+
         # Use project as "remote" and collection as "local"
         merge_result = merge_engine.merge(
-            base_path=collection_artifact_path,  # Base = current collection
+            base_path=base_path,  # Base = merge base snapshot or collection
             local_path=collection_artifact_path,  # Local = collection
             remote_path=project_artifact_path,  # Remote = project
             output_path=collection_artifact_path,  # Output = collection (in-place)
@@ -1310,6 +1358,128 @@ class SyncManager:
             has_conflict=merge_result.has_conflicts,
             conflict_files=[c.file_path for c in merge_result.conflicts],
         )
+
+    def _extract_base_from_snapshot(
+        self,
+        content_hash: str,
+        artifact_name: str,
+        artifact_type: str,
+        collection_name: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Extract baseline artifact from snapshot for merge.
+
+        Searches version history for a snapshot containing the artifact with
+        the specified content hash, then extracts it for use as merge baseline.
+
+        Args:
+            content_hash: SHA-256 content hash of the artifact to find
+            artifact_name: Name of artifact
+            artifact_type: Type of artifact
+            collection_name: Optional collection name (inferred if not provided)
+
+        Returns:
+            Path to extracted baseline artifact, or None if not found
+        """
+        import tempfile
+        import tarfile
+
+        if not self.snapshot_mgr:
+            logger.debug("No snapshot manager available")
+            return None
+
+        try:
+            # Infer collection name if not provided
+            if not collection_name:
+                metadata = self._load_deployment_metadata(Path.cwd())
+                collection_name = metadata.collection if metadata else None
+
+            if not collection_name:
+                logger.warning("No collection name available for baseline search")
+                return None
+
+            # Get list of snapshots for this collection (sorted newest first)
+            snapshots_list, _ = self.snapshot_mgr.list_snapshots(
+                collection_name, limit=100
+            )
+
+            if not snapshots_list:
+                logger.warning(
+                    f"No snapshots found for collection '{collection_name}'"
+                )
+                return None
+
+            # Search snapshots for one containing artifact with matching hash
+            artifact_type_plural = self._get_artifact_type_plural(artifact_type)
+            temp_dir = None
+
+            for snapshot in snapshots_list:
+                try:
+                    # Create temporary directory for extraction
+                    if not temp_dir:
+                        temp_dir = Path(
+                            tempfile.mkdtemp(
+                                prefix=f"skillmeat-merge-base-{content_hash[:8]}-"
+                            )
+                        )
+
+                    # Extract snapshot
+                    snapshot_extract_dir = temp_dir / snapshot.id
+                    snapshot_extract_dir.mkdir(exist_ok=True)
+
+                    with tarfile.open(snapshot.tarball_path, "r:gz") as tar:
+                        tar.extractall(snapshot_extract_dir)
+
+                    # Find artifact in extracted snapshot
+                    # The tarball contains the collection at the root with collection name
+                    artifact_path = (
+                        snapshot_extract_dir
+                        / collection_name
+                        / artifact_type_plural
+                        / artifact_name
+                    )
+
+                    if artifact_path.exists():
+                        # Compute hash of this artifact version
+                        snapshot_artifact_hash = self._compute_artifact_hash(
+                            artifact_path
+                        )
+
+                        if snapshot_artifact_hash == content_hash:
+                            logger.info(
+                                f"Found matching baseline for {artifact_name} "
+                                f"in snapshot {snapshot.id} (hash: {content_hash[:12]}...)"
+                            )
+                            return artifact_path
+
+                    # Clean up this snapshot extraction if no match
+                    import shutil
+
+                    shutil.rmtree(snapshot_extract_dir, ignore_errors=True)
+
+                except Exception as e:
+                    logger.debug(
+                        f"Error checking snapshot {snapshot.id}: {e}"
+                    )
+                    continue
+
+            # No matching snapshot found
+            logger.warning(
+                f"No snapshot found containing {artifact_name} with hash {content_hash[:12]}..."
+            )
+
+            # Clean up temp directory
+            if temp_dir and temp_dir.exists():
+                import shutil
+
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+            return None
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to search snapshots for baseline: {e}"
+            )
+            return None
 
     def _sync_fork(
         self,

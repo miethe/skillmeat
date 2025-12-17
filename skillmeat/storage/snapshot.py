@@ -157,6 +157,45 @@ class SnapshotManager:
 
         return snapshot
 
+    def get_snapshot(self, snapshot_id: str, collection_name: Optional[str] = None) -> Optional[Snapshot]:
+        """Get a specific snapshot by ID.
+
+        Args:
+            snapshot_id: Snapshot ID to retrieve
+            collection_name: Optional collection name (searches all if not specified)
+
+        Returns:
+            Snapshot object or None if not found
+        """
+        # If collection_name specified, search only that collection
+        if collection_name:
+            metadata = self._read_metadata(collection_name)
+            snapshots_data = metadata.get("snapshots", [])
+
+            for snapshot_data in snapshots_data:
+                if snapshot_data["id"] == snapshot_id:
+                    return Snapshot(
+                        id=snapshot_data["id"],
+                        timestamp=datetime.fromisoformat(snapshot_data["timestamp"]),
+                        message=snapshot_data["message"],
+                        collection_name=collection_name,
+                        artifact_count=snapshot_data["artifact_count"],
+                        tarball_path=Path(snapshot_data["tarball_path"]),
+                    )
+            return None
+
+        # Search all collections
+        for collection_dir in self.snapshots_dir.iterdir():
+            if not collection_dir.is_dir():
+                continue
+
+            collection_name = collection_dir.name
+            snapshot = self.get_snapshot(snapshot_id, collection_name)
+            if snapshot:
+                return snapshot
+
+        return None
+
     def list_snapshots(
         self,
         collection_name: str,
