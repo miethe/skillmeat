@@ -302,10 +302,10 @@ Execute in order to get working version/merge system:
 
 ---
 
-### Phase 10: Sync Integration ✅ COMPLETE (95%)
+### Phase 10: Sync Integration ✅ COMPLETE (100%)
 
-**Status**: 95% complete
-**Effort**: 0h (already implemented)
+**Status**: 100% complete
+**Effort**: 0h (backend already implemented, frontend 30min)
 **Progress File**: `.claude/progress/versioning-merge-system/phase-10-progress.md`
 **Depends On**: Phase 4, Phase 6
 
@@ -322,12 +322,7 @@ Execute in order to get working version/merge system:
 
 - ✅ SyncStatusTab with drift detection, diff viewer, actions
 - ✅ SyncDialog with ConflictResolver and progress indicator
-- ⚠️ Minor gap: "Merge" button shows "Coming Soon" toast
-
-**Known Limitation**:
-- MergeWorkflowDialog expects snapshot IDs but SyncStatusTab uses version strings
-- Backend merge works via CLI `sync-pull --strategy merge`
-- Conflict resolution works via SyncDialog's ConflictResolver
+- ✅ Merge button wired to SyncDialog (commit: d5a0107)
 
 **Success Criteria**: 6/8 complete (SC-7, SC-8 deferred to Phase 11)
 
@@ -473,10 +468,7 @@ Execute in order to get working version/merge system:
 **Remaining Work**:
 - Phase 11: API tests, E2E tests, user documentation (~3h)
 
-**Known Limitations**:
-- Minor UI gap: "Merge" button in SyncStatusTab shows "Coming Soon"
-- Backend merge fully functional via CLI `sync-pull --strategy merge`
-- Conflict resolution works via SyncDialog's ConflictResolver
+**Known Limitations**: None - Phase 10 UI integration complete (d5a0107)
 
 **Token Budget**: This work plan is designed for token-efficient execution. Each phase has detailed progress files with task breakdowns and orchestration commands. Use those for implementation details.
 
@@ -522,6 +514,6 @@ Execute in order to get working version/merge system:
 - Post-sync auto_snapshot() called after success (lines 993-1015)
 - Auto-rollback on failure (lines 711-729)
 - `--with-rollback` flag in CLI sync-pull command
-- Frontend: SyncStatusTab and SyncDialog working with conflict resolution
-- Minor gap: "Merge" button shows "Coming Soon" due to snapshot ID vs version string mismatch
-- Backend merge fully functional via CLI and API
+- Frontend: SyncStatusTab wired to SyncDialog for merge operations
+- Added entityToArtifact() helper to bridge Entity/Artifact type mismatch
+- Commit: d5a0107 feat(web): wire SyncDialog to merge button in SyncStatusTab
