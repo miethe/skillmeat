@@ -3,17 +3,26 @@ type: progress
 prd: "versioning-merge-system"
 phase: 11
 title: "Testing & Documentation"
-status: "planning"
+status: "partial"
 started: "2025-12-03"
 completed: null
-overall_progress: 0
-completion_estimate: "on-track"
+overall_progress: 30
+completion_estimate: "core-tests-only"
 total_tasks: 18
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
-blocked_tasks: 0
+blocked_tasks: 8
 owners: ["python-backend-engineer", "ui-engineer-enhanced", "documentation-writer"]
 contributors: []
+
+# STATUS NOTE: PARTIAL - Core component tests exist
+# Existing tests:
+#   - tests/test_merge_engine.py (merge logic)
+#   - tests/test_merge_error_handling.py (error cases)
+#   - tests/unit/test_version_manager.py (version operations)
+#   - tests/unit/test_version_graph_builder.py (graph building)
+#   - tests/integration/test_versioning_workflow.py (workflows)
+# Missing: API tests (no API), E2E tests (no UI), documentation
 
 tasks:
   - id: "TEST-001"

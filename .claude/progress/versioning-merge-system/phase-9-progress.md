@@ -3,17 +3,21 @@ type: progress
 prd: "versioning-merge-system"
 phase: 9
 title: "Frontend - Merge UI & Conflict Resolution"
-status: "planning"
+status: "not-started"
 started: null
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: "blocked-by-api"
 total_tasks: 10
 completed_tasks: 0
 in_progress_tasks: 0
-blocked_tasks: 0
+blocked_tasks: 10
 owners: ["ui-engineer-enhanced", "frontend-developer"]
 contributors: []
+
+# STATUS NOTE: Not started - blocked by Phase 7 (merge API endpoints)
+# No merge UI or conflict resolution components exist yet
+# Requires: /api/v1/artifacts/{id}/merge/* endpoints
 
 tasks:
   - id: "MERGE-UI-001"

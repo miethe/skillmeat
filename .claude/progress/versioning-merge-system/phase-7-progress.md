@@ -3,17 +3,21 @@ type: progress
 prd: "versioning-merge-system"
 phase: 7
 title: "API Layer - Version & Merge Endpoints"
-status: "pending"
+status: "not-started"
 started: null
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: "blocked-by-core"
 total_tasks: 13
 completed_tasks: 0
 in_progress_tasks: 0
-blocked_tasks: 0
+blocked_tasks: 13
 owners: ["python-backend-engineer", "backend-architect"]
 contributors: ["python-backend-engineer", "backend-architect"]
+
+# STATUS NOTE: Not started - requires Phase 6 completion for full service layer
+# No version/merge API endpoints exist yet
+# MergeEngine and VersionManager exist but no REST API exposure
 
 tasks:
   - id: "APIVM-001"

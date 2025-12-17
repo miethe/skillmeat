@@ -3,21 +3,25 @@ type: progress
 prd: "versioning-merge-system"
 phase: 10
 title: "Sync Workflow Integration"
-status: "pending"
+status: "not-started"
 started: null
 completed: null
 overall_progress: 0
-completion_estimate: "on-track"
+completion_estimate: "blocked-by-api-ui"
 total_tasks: 8
 completed_tasks: 0
 in_progress_tasks: 0
-blocked_tasks: 0
+blocked_tasks: 8
 owners: ["python-backend-engineer", "ui-engineer-enhanced"]
 contributors: ["frontend-developer"]
 duration_days: "3-4"
 dependencies:
   - phase_7
   - phase_9
+
+# STATUS NOTE: Not started - blocked by Phase 7 (API) and Phase 9 (UI)
+# Merge functionality exists in MergeEngine but not wired to sync workflow
+# Requires: API exposure + UI components
 
 tasks:
   - id: "SYNC-INT-001"
