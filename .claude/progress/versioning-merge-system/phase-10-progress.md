@@ -6,12 +6,12 @@ title: "Sync Workflow Integration"
 status: "complete"
 started: "2025-12-17"
 completed: "2025-12-17"
-overall_progress: 95
+overall_progress: 100
 completion_estimate: "done"
 total_tasks: 8
-completed_tasks: 7
+completed_tasks: 8
 in_progress_tasks: 0
-blocked_tasks: 1
+blocked_tasks: 0
 owners: ["python-backend-engineer"]
 contributors: ["ui-engineer-enhanced"]
 duration_days: "1"
@@ -53,17 +53,16 @@ tasks:
 
   - id: "SYNC-INT-004"
     description: "Enhance SyncStatusTab with merge display"
-    status: "partial"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimated_effort: "4 points"
     priority: "medium"
     notes: |
-      SyncStatusTab already has merge button and drift detection.
-      MergeWorkflowDialog exists but expects snapshot IDs.
-      Architectural mismatch: sync tab uses version strings, merge dialog uses snapshot IDs.
-      Minor gap - shows "Coming Soon" toast for now.
-      Proper fix: Create simpler merge dialog for sync context, or add snapshot resolution to diff API.
+      SyncStatusTab wired to SyncDialog for merge operations.
+      Added entityToArtifact() helper to convert Entity to Artifact type.
+      SyncDialog has ConflictResolver for merge strategy selection (ours/theirs/manual).
+      Commit: d5a0107
 
   - id: "SYNC-INT-005"
     description: "Redesign sync dialogs for unified merge workflow"
@@ -110,16 +109,10 @@ parallelization:
   critical_path: ["SYNC-INT-001", "SYNC-INT-006"]
   estimated_total_time: "4h"
 
-blockers:
-  - type: "architectural"
-    description: |
-      MergeWorkflowDialog expects snapshot IDs but SyncStatusTab works with version strings.
-      Not blocking core functionality - sync with merge works via backend.
-      Frontend merge dialog in sync context requires either:
-      1. Create simpler merge dialog suited for sync tab
-      2. Add snapshot ID resolution to diff API
-    severity: "low"
-    workaround: "Backend merge works; CLI sync-pull --strategy merge works"
+blockers: []
+  # Previously blocked by architectural mismatch - RESOLVED
+  # Solution: Wired SyncDialog (with ConflictResolver) instead of MergeWorkflowDialog
+  # Commit: d5a0107
 
 success_criteria:
   - id: "SC-1"
@@ -163,17 +156,16 @@ success_criteria:
     notes: "Deferred to Phase 11"
 ---
 
-# Phase 10: Sync Workflow Integration - COMPLETE (95%)
+# Phase 10: Sync Workflow Integration - COMPLETE (100%)
 
 ## Summary
 
-Phase 10 is functionally complete. All backend sync integration with versioning is done:
+Phase 10 is fully complete. All sync integration with versioning is done:
 - Three-way merge wired to all sync directions
 - Auto-versioning on sync completion
 - Rollback on failure
 - Comprehensive error handling
-
-One minor UI gap remains: The "Merge" button in SyncStatusTab shows "Coming Soon" because the Phase 9 MergeWorkflowDialog expects snapshot IDs while the sync tab works with version strings. This doesn't block core functionality.
+- **UI merge button now functional** (wired to SyncDialog with ConflictResolver)
 
 ## Implementation Details
 
@@ -188,13 +180,13 @@ One minor UI gap remains: The "Merge" button in SyncStatusTab shows "Coming Soon
 | Deploy versioning | deployment.py | 248-267 | ✅ |
 | CLI --with-rollback | cli.py | sync_pull_cmd | ✅ |
 
-### Frontend Integration (95% Complete)
+### Frontend Integration (100% Complete)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| SyncStatusTab | ✅ Working | Drift detection, diff viewer, actions |
+| SyncStatusTab | ✅ Working | Drift detection, diff viewer, merge button wired |
 | SyncDialog | ✅ Working | ConflictResolver, progress indicator |
-| MergeWorkflowDialog | ⚠️ Not wired | Expects snapshot IDs, not version strings |
+| Merge Integration | ✅ Working | SyncStatusTab → SyncDialog for merge ops |
 
 ## CLI Commands Working
 
@@ -208,18 +200,9 @@ skillmeat sync-preview /path/to/project
 
 ## Known Limitations
 
-1. **Merge button in SyncStatusTab**: Shows "Coming Soon" toast instead of opening merge dialog
-   - Root cause: Architectural mismatch between snapshot-based merge API and version-string sync API
-   - Impact: Low - backend merge works via CLI, conflict resolution works via SyncDialog
-   - Fix: Create simpler merge dialog or add snapshot resolution to diff API
-
-## Recommendations
-
-1. **For MVP**: Accept current state - 95% complete is sufficient
-2. **Post-MVP**: Unify snapshot ID and version string approaches
-3. **Phase 11**: Focus on tests and documentation, not this minor UI gap
+None - all integration complete.
 
 ## Commits
 
-- Phase 10 implementation completed as part of Phases 4-9
-- No additional commits needed - integration was done incrementally
+- Phase 10 backend: completed as part of Phases 4-9
+- Phase 10 frontend: `d5a0107` feat(web): wire SyncDialog to merge button in SyncStatusTab
