@@ -276,42 +276,59 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 
 ---
 
-### 13. Versioning Merge System v1 (In Progress - Core Complete, UI Pending)
+### 13. Versioning Merge System v1.5 (In Progress - Core Complete, Testing Deferred)
 
-**Status**: IN PROGRESS (Core infrastructure complete; API/UI phases pending)
-**Phases**: 11 phases total
-**Location**: `docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
+**Status**: IN PROGRESS (Core, API, and UI complete; Testing deferred)
+**Phases**: 6 phases total (v1.5 streamlined from original v1)
+**Location**: `.claude/progress/versioning-merge-system-v1.5/`
+**Updated**: 2025-12-18
 
-#### Phase Status (Updated 2025-12-16):
+#### Phase Status (Updated 2025-12-18):
 
 | Phase | Title | Status | Progress | Notes |
 |-------|-------|--------|----------|-------|
-| 1 | Storage Infrastructure | PARTIAL (60%) | 3/6 tasks | Different architecture (tarball snapshots vs per-artifact versions) |
-| 2 | Repository Layer CRUD | PARTIAL | ~50% | SnapshotManager + VersionManager provide similar functionality |
-| 3 | Repository Comparisons | PARTIAL | ~40% | DiffEngine exists; retention policies missing |
-| 4 | Service Layer - Version Mgmt | PARTIAL | ~40% | VersionManager provides core operations |
-| 5 | Three-Way Merge Engine | **COMPLETE (100%)** | 10/11 tasks | `core/merge_engine.py`, `core/diff_engine.py` fully implemented |
-| 6 | Rollback & Integration | PARTIAL (40%) | 2/7 tasks | Basic rollback exists; missing intelligent rollback, conflict detection |
-| 7 | API Layer | NOT STARTED | 0/13 tasks | No version/merge REST endpoints |
-| 8 | Frontend History Tab | NOT STARTED | 0/10 tasks | Blocked by Phase 7 |
-| 9 | Frontend Merge UI | NOT STARTED | 0/10 tasks | Blocked by Phase 7 |
-| 10 | Sync Integration | NOT STARTED | 0/8 tasks | Blocked by Phases 7+9 |
-| 11 | Testing & Documentation | PARTIAL (30%) | 5/18 tasks | Core tests exist; API/E2E tests missing |
+| 1 | Core Baseline Support | **COMPLETE** | 100% | Three-way merge baseline storage |
+| 2 | Version Lineage Tracking | **COMPLETE** | 100% | Parent-child version relationships |
+| 3-4 | Modification Tracking & Attribution | **COMPLETE** | 100% | Change origin (upstream/local/both), API enhancements |
+| 5 | Frontend Components | **COMPLETE** | 100% | DiffViewer, VersionTimeline, ChangeBadge components |
+| 6 | Testing & Documentation | **PARTIAL** | 14% | Documentation complete; testing deferred |
 
-#### Key Implementation Files (Commit `e49307f`):
-- `skillmeat/core/merge_engine.py` (433 lines) - Three-way merge with conflict detection
-- `skillmeat/core/diff_engine.py` (~400 lines) - File/directory diffing
-- `skillmeat/core/version.py` (261 lines) - VersionManager with rollback
-- `skillmeat/core/version_graph.py` (626 lines) - Cross-project version tracking
-- `skillmeat/storage/snapshot.py` (271 lines) - Tarball-based snapshot system
+#### Key Features Delivered:
+- **Version Lineage Tracking**: Complete version history graph with parent-child relationships
+- **Change Attribution**: Distinguish upstream, local, and conflicting changes (`change_origin` field)
+- **Baseline Storage**: Three-way merge now uses correct baseline (previously defaulted to empty)
+- **Change Badges**: Visual indicators in UI (blue=upstream, amber=local, red=conflict)
+- **Version Timeline**: Change origin labels in version history display
+- **API Endpoints**: `/api/v1/versions/` and `/api/v1/merge/` endpoints
 
-#### Architecture Note:
-Implementation uses **collection-level tarball snapshots** (`.tar.gz`) instead of PRD's **per-artifact versioned directories** (`versions/v1-{hash}/`). This is functionally similar but architecturally different. The merge engine and diff engine are fully implemented as designed.
+#### Key Implementation Files:
+- `skillmeat/core/version_lineage.py` - Version lineage tracking
+- `skillmeat/core/version_tracking.py` - Modification detection
+- `skillmeat/core/merge_engine.py` - Three-way merge with conflict detection
+- `skillmeat/core/diff_engine.py` - File/directory diffing
+- `skillmeat/api/routers/versions.py` - Version management API
+- `skillmeat/api/routers/merge.py` - Merge operations API
+- `skillmeat/web/components/versioning/` - Frontend components (DiffViewer, VersionTimeline, ChangeBadge)
 
-#### Next Steps:
-1. Complete Phase 6 (intelligent rollback, conflict detection)
-2. Implement Phase 7 (REST API endpoints for versions/merge)
-3. Build Phase 8-9 (Frontend history and merge UI)
+#### Documentation (Completed 2025-12-18):
+- `docs/api/versioning.md` - API reference for versioning endpoints
+- `docs/guides/syncing-changes.md` - Updated user guide with change attribution
+- `CHANGELOG.md` - Release notes for v1.5 features
+
+#### Deferred Tasks (Phase 6):
+- Integration tests for deploy→sync→drift→merge workflow
+- Integration tests for conflict workflow
+- Performance tests for version chain queries
+- Migration tests from v1.0 deployments
+- Manual UI testing
+- Load testing with large version chains
+
+#### Recent Commits:
+- `b88f053` feat(web): add DiffViewer, VersionTimeline and badge tooltips
+- `08e661d` feat(web): add change origin types and ChangeBadge component
+- `1c6db79` feat(versioning): implement Phase 4 - change attribution API features
+- `bf021c6` feat(versioning): implement Phase 2 - version lineage tracking
+- `e00864c` feat(sync): implement Phase 1 - core baseline support
 
 ---
 
@@ -382,7 +399,7 @@ Earlier iteration with 6 phases planned but superseded by v1 (active).
 | collections-api-consolidation | 5 | 5 | 0 | 0 | **Completed** ✅ |
 | smart-import-discovery-v1 | 5 | 5 | 0 | 0 | **Completed** |
 | web-ui-consolidation-v1 | TBD | 0 | 0 | 1 | Planned |
-| versioning-merge-system | 11 | 1 | 3 | 7 | P5 Complete, P1/6/11 Partial, P7-10 Not Started |
+| versioning-merge-system-v1.5 | 6 | 5 | 1 | 0 | P1-5 Complete, P6 Docs Done/Tests Deferred |
 | marketplace-sources-crud | 6 | 6 | 0 | 0 | **Completed** |
 | entity-lifecycle-management | 7 | 7 | 0 | 0 | **Completed** |
 

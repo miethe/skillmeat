@@ -23,6 +23,33 @@ SkillMeat provides bidirectional synchronization to keep artifacts consistent ac
 3. **Deployment Lag**: Project has an older version than collection
 4. **Removed**: Artifact was removed from collection but still deployed
 
+### Understanding Change Attribution
+
+SkillMeat tracks the **origin of changes** in three categories:
+
+- **Upstream Changes** (Blue Badge): Changes pulled from your collection or upstream source
+  - Safe to apply - represents upstream improvements
+  - Shown with blue change badges in the UI
+
+- **Local Modifications** (Amber Badge): Changes made locally in your project
+  - Your customizations - preserve if important
+  - Shown with amber change badges in the UI
+
+- **Conflicting Changes** (Red Badge): Both sides changed the same lines
+  - Requires manual resolution
+  - Shown with red change badges in the UI
+  - Indicates potential conflict or decision point
+
+### Change Attribution in Merges
+
+When merging versions, the system performs a **three-way merge** using:
+
+1. **Base** (common ancestor): Starting point before changes
+2. **Local** (your version): Your current changes
+3. **Remote** (upstream version): Incoming changes
+
+Each change is tagged with its origin so you know what's upstream vs local vs conflicting. This enables accurate conflict detection and helps you understand what's changing.
+
 ### Deployment Tracking
 
 SkillMeat automatically creates `.skillmeat-deployed.toml` in each project:
@@ -122,18 +149,22 @@ skillmeat sync check /path/to/project --json | jq '.artifacts[] | select(.drift_
 **UPSTREAM_CHANGED**: Collection has newer version
 - Recommendation: Sync upstream (SYNC_UPSTREAM)
 - Action: Pull changes from collection
+- Change origin: upstream (blue badge)
 
 **MODIFIED_LOCALLY**: Project version differs from deployed
 - Recommendation: Review changes (REVIEW_CHANGES)
 - Action: Decide whether to keep local changes or sync
+- Change origin: local_modification (amber badge)
 
 **REMOVED_FROM_COLLECTION**: Artifact no longer in collection
 - Recommendation: Verify and remove (VERIFY_AND_REMOVE)
 - Action: Remove from project if no longer needed
+- Change origin: upstream (blue badge)
 
 **VERSION_MISMATCH**: Version numbers differ
 - Recommendation: Sync (SYNC)
 - Action: Apply sync strategy
+- Change origin: varies by situation
 
 ## Step 2: Preview Changes
 
@@ -181,6 +212,67 @@ skillmeat sync preview /path/to/project --json
 # Check for conflicts programmatically
 skillmeat sync preview /path/to/project --json | jq '.artifacts[] | select(.status == "WOULD_CONFLICT")'
 ```
+
+## Step 2b: Understanding Version Timeline and Change Badges
+
+SkillMeat provides a visual timeline showing all versions of an artifact with change badges indicating the origin of each change.
+
+### Version Timeline Display
+
+The version timeline shows:
+- **All versions** in chronological order
+- **Change badges** on each file showing its origin
+- **Deployment markers** showing which versions are deployed
+- **Summary counts** of changes by origin
+
+### Change Badge Colors
+
+Understanding the visual indicators:
+
+**Blue Badge** - Upstream Changes
+- Changes from your collection or upstream source
+- Safe to apply and integrate
+- Example: "Latest features from maintainer"
+
+**Amber Badge** - Local Modifications
+- Changes made locally in your project
+- Your customizations and local fixes
+- Example: "Custom configuration for our use case"
+
+**Red Badge** - Conflicting Changes
+- Both sides changed (potential conflict)
+- Requires manual review to merge
+- Example: "Upstream improved error handling, but we also modified it"
+
+### Interpreting Version Timeline
+
+When viewing a version timeline for an artifact:
+
+1. **Identify change origins**: Look at badge colors to understand each change
+2. **Find conflicts**: Red badges indicate decisions to make
+3. **Review drift**: Compare current deployment against upstream
+4. **Plan updates**: Decide if upstream changes are compatible with your customizations
+
+### Example Timeline
+
+```
+Version v2.2.0 (Upstream - 2025-12-18)
+  ├─ canvas-ui.py: Blue badge (upstream)
+  ├─ core.py: Red badge (conflicting)
+  └─ config.yml: Amber badge (local)
+
+Version v2.1.0 (Deployed - 2025-12-15)
+  ├─ canvas-ui.py: Blue badge (upstream)
+  └─ core.py: Amber badge (local)
+
+Version v2.0.0 (Base - 2025-12-01)
+  └─ canvas-ui.py: Blue badge (upstream)
+```
+
+Reading this timeline:
+- v2.2.0 has upstream improvements but one conflicting change in core.py
+- v2.1.0 is currently deployed with one local customization
+- Upgrading to v2.2.0 requires resolving the core.py conflict
 
 ## Step 3: Review Differences
 
@@ -357,7 +449,19 @@ skillmeat sync pull /path/to/project --collection work
 
 ## Handling Sync Conflicts
 
-When merge conflicts occur, resolve them manually:
+When merge conflicts occur, resolve them manually. Use change attribution to understand what changed and why.
+
+### Understanding Conflict Context
+
+Before resolving, check the **change origin** to understand the conflict:
+
+- **Blue (upstream) vs Amber (local)**: Upstream improved something you customized
+  - Decide: Keep your customization, use upstream, or merge both
+  - Strategy: Often merge intelligently to get both benefits
+
+- **Both Red**: Upstream and local both modified
+  - Decide: Which approach is better? Can they be combined?
+  - Strategy: Review both carefully, may need manual merge
 
 ### Conflict Markers
 
@@ -366,55 +470,73 @@ Conflicts appear as Git-style markers:
 ```python
 <<<<<<< LOCAL
 def authenticate(user_id):
-    """Project version"""
+    """Project version - our customization"""
     return authenticate_v2(user_id)
 =======
 def authenticate(user_id):
-    """Collection version"""
+    """Collection version - upstream improvement"""
     return authenticate_v1(user_id)
 >>>>>>> UPSTREAM
 ```
 
 ### Resolution Process
 
-1. **Understand both versions**:
-   - LOCAL = Project version
-   - UPSTREAM = Collection version
+1. **Understand the conflict**:
+   - LOCAL = Your project version (amber badge - local modification)
+   - UPSTREAM = Collection version (blue badge - upstream improvement)
+   - Check the change origin to understand context
 
-2. **Decide on approach**:
-   - Keep LOCAL (project version)
-   - Use UPSTREAM (collection version)
-   - Merge intelligently
+2. **Analyze both approaches**:
+   - What does LOCAL do? (your customization)
+   - What does UPSTREAM do? (upstream improvement)
+   - Can they be combined?
 
-3. **Edit and resolve**:
+3. **Decide on approach**:
+   - Keep LOCAL only (preserve your customization)
+   - Use UPSTREAM only (accept upstream improvement)
+   - Merge intelligently (combine benefits of both)
+
+4. **Edit and resolve** - Example of intelligent merge:
 
    ```python
-   # Resolved: Keep project version but with collection improvements
+   # Resolved: Combine both approaches
    def authenticate(user_id):
-       """Improved authentication"""
-       # Use newer version detection from collection
+       """Improved authentication with both local and upstream logic"""
+       # Use newer version detection from collection (upstream)
        if isinstance(user_id, str):
+           # But use our custom handler (local)
            return authenticate_v2(user_id)
        else:
+           # Fallback to upstream approach
            return authenticate_v1(user_id)
    ```
 
-4. **Remove markers**:
+5. **Remove markers**:
    - Delete all `<<<<<<`, `=======`, `>>>>>>` lines
    - Keep the resolved code
 
-5. **Test thoroughly**:
+6. **Test thoroughly**:
    ```bash
    # Test the resolved artifact
    skillmeat deploy canvas --project /path/to/project
    # Run tests to verify functionality
    ```
 
-6. **Update metadata**:
+7. **Update metadata**:
    ```bash
    # Update deployment tracking
    skillmeat sync pull /path/to/project canvas
    ```
+
+### Conflict Resolution Decision Guide
+
+| Situation | Recommendation | Action |
+|-----------|---|--------|
+| Upstream improved error handling, you added logging | Merge intelligently | Keep both: upstream error handling + your logging |
+| Upstream refactored function signature, you customized behavior | Use upstream | Accept refactor, reapply your customization if needed |
+| Upstream deprecated function, you still use it | Keep local | Keep your version until you can update code |
+| Both added different features | Merge intelligently | Import/call both features if possible |
+| Upstream simplified, you complexified | Review both | Understand why each approach exists before deciding |
 
 ## Preventing Drift
 
