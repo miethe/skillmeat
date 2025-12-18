@@ -35,6 +35,7 @@ from .routers import (
     merge,
     project_templates,
     projects,
+    tags,
     user_collections,
     versions,
 )
@@ -255,6 +256,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
     app.include_router(project_templates.router, prefix=settings.api_prefix, tags=["project-templates"])
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
+    app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
 
     # Root endpoint

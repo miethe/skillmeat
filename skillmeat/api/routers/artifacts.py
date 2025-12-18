@@ -65,6 +65,7 @@ from skillmeat.api.schemas.discovery import (
     SkipPreferenceResponse,
 )
 from skillmeat.api.schemas.errors import ErrorCodes, ErrorDetail
+from skillmeat.api.schemas.tags import TagResponse
 from skillmeat.api.utils.error_handlers import (
     create_bad_request_error,
     create_internal_error,
@@ -84,6 +85,7 @@ from skillmeat.core.importer import (
     BulkImportResultData,
     ImportResultData,
 )
+from skillmeat.core.services import TagService
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 
@@ -5536,3 +5538,95 @@ async def list_skip_preferences(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list skip preferences: {str(e)}"
         )
+
+
+# ====================================================================
+# Artifact-Tag Association Endpoints
+# ====================================================================
+
+
+@router.get(
+    "/{artifact_id}/tags",
+    response_model=List[TagResponse],
+    summary="Get artifact tags",
+    description="Get all tags assigned to an artifact",
+)
+async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
+    """Get all tags assigned to a specific artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+
+    Returns:
+        List of tags assigned to the artifact
+
+    Raises:
+        HTTPException: 500 if operation fails
+    """
+    service = TagService()
+
+    try:
+        return service.get_artifact_tags(artifact_id)
+    except Exception as e:
+        logger.error(f"Failed to get tags for artifact {artifact_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{artifact_id}/tags/{tag_id}",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add tag to artifact",
+    description="Associate a tag with an artifact",
+)
+async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict:
+    """Add a tag to an artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+        tag_id: Unique identifier of the tag
+
+    Returns:
+        Success message with artifact and tag IDs
+
+    Raises:
+        HTTPException: 400 if association already exists or invalid request
+        HTTPException: 404 if artifact or tag not found
+    """
+    service = TagService()
+
+    try:
+        service.add_tag_to_artifact(artifact_id, tag_id)
+        return {"message": f"Tag {tag_id} added to artifact {artifact_id}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete(
+    "/{artifact_id}/tags/{tag_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove tag from artifact",
+    description="Remove a tag from an artifact",
+)
+async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
+    """Remove a tag from an artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+        tag_id: Unique identifier of the tag
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        HTTPException: 400 if invalid request
+        HTTPException: 404 if tag association not found
+    """
+    service = TagService()
+
+    try:
+        if not service.remove_tag_from_artifact(artifact_id, tag_id):
+            raise HTTPException(status_code=404, detail="Tag association not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
