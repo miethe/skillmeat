@@ -101,6 +101,10 @@ from .merge import (
     ConflictResolveRequest,
     ConflictResolveResponse,
 )
+from .drift import (
+    DriftDetectionResponse,
+    DriftSummaryResponse,
+)
 
 __all__ = [
     # Common
@@ -189,4 +193,7 @@ __all__ = [
     "MergeExecuteResponse",
     "ConflictResolveRequest",
     "ConflictResolveResponse",
+    # Drift Detection
+    "DriftDetectionResponse",
+    "DriftSummaryResponse",
 ]
