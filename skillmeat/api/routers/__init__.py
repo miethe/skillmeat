@@ -20,6 +20,7 @@ from . import (
     merge,
     project_templates,
     projects,
+    tags,
     user_collections,
     versions,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "merge",
     "project_templates",
     "projects",
+    "tags",
     "user_collections",
     "versions",
 ]
