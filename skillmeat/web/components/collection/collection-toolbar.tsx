@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 
@@ -45,6 +46,8 @@ interface CollectionToolbarProps {
   onRefresh: () => void;
   isRefreshing?: boolean;
   lastUpdated?: Date | null;
+  selectedTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
 }
 
 /**
@@ -93,6 +96,8 @@ export function CollectionToolbar({
   onRefresh,
   isRefreshing = false,
   lastUpdated = null,
+  selectedTags = [],
+  onTagsChange,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -130,12 +135,13 @@ export function CollectionToolbar({
   const handleClearFilters = useCallback(() => {
     onFiltersChange({});
     setLocalSearch('');
-  }, [onFiltersChange]);
+    onTagsChange?.([]);
+  }, [onFiltersChange, onTagsChange]);
 
   // Calculate active filter count
   const activeFilterCount = Object.entries(filters).filter(
     ([, value]) => value !== undefined && value !== 'all' && value !== ''
-  ).length;
+  ).length + (selectedTags.length > 0 ? 1 : 0);
 
   const hasActiveFilters = activeFilterCount > 0 || localSearch.length > 0;
 
@@ -156,6 +162,11 @@ export function CollectionToolbar({
               aria-label="Search artifacts"
             />
           </div>
+
+          {/* Tag Filter Popover */}
+          {onTagsChange && (
+            <TagFilterPopover selectedTags={selectedTags} onChange={onTagsChange} />
+          )}
 
           {/* Filter Dropdown */}
           <DropdownMenu>

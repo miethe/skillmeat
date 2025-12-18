@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Package } from 'lucide-react';
 import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
@@ -9,6 +10,7 @@ import { ArtifactList } from '@/components/collection/artifact-list';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { TagFilterBar } from '@/components/ui/tag-filter-popover';
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
@@ -90,6 +92,8 @@ function CollectionPageContent() {
   } = useCollectionContext();
 
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -117,6 +121,11 @@ function CollectionPageContent() {
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Tag filtering from URL
+  const selectedTags = useMemo(() => {
+    return searchParams.get('tags')?.split(',').filter(Boolean) || [];
+  }, [searchParams]);
+
   // Refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -142,7 +151,18 @@ function CollectionPageContent() {
     }
   }, [data, lastUpdated]);
 
-  // Apply client-side search and sort
+  // Handle tag selection changes
+  const handleTagsChange = (tags: string[]) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tags.length > 0) {
+      params.set('tags', tags.join(','));
+    } else {
+      params.delete('tags');
+    }
+    router.push(`?${params.toString()}`);
+  };
+
+  // Apply client-side search, tag filter, and sort
   const filteredArtifacts = useMemo(() => {
     let artifacts = data?.artifacts ?? [];
 
@@ -157,11 +177,19 @@ function CollectionPageContent() {
       );
     }
 
+    // Tag filter
+    if (selectedTags.length > 0) {
+      artifacts = artifacts.filter((artifact) =>
+        // Check if artifact has any of the selected tags
+        artifact.metadata.tags?.some((tag) => selectedTags.includes(tag))
+      );
+    }
+
     // Note: Sort is already handled by the useArtifacts hook
     // but we could add additional client-side sorting here if needed
 
     return artifacts;
-  }, [data?.artifacts, searchQuery]);
+  }, [data?.artifacts, searchQuery, selectedTags]);
 
   const handleArtifactClick = (artifact: Artifact) => {
     setSelectedEntity(artifactToEntity(artifact));
@@ -234,7 +262,16 @@ function CollectionPageContent() {
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
         lastUpdated={lastUpdated}
+        selectedTags={selectedTags}
+        onTagsChange={handleTagsChange}
       />
+
+      {/* Tag Filter Bar - Shows active tag filters */}
+      {selectedTags.length > 0 && (
+        <div className="border-b px-6 py-2 bg-muted/10">
+          <TagFilterBar selectedTags={selectedTags} onChange={handleTagsChange} />
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto p-6">
         {/* Error State */}
@@ -260,8 +297,8 @@ function CollectionPageContent() {
           <EmptyState
             title="No artifacts"
             description={
-              searchQuery
-                ? 'No artifacts match your search'
+              searchQuery || selectedTags.length > 0
+                ? 'No artifacts match your filters'
                 : 'Add artifacts to get started'
             }
           />
