@@ -633,6 +633,10 @@ class DriftDetectionResult:
         project_version: Version in project (None if added)
         last_deployed: ISO 8601 timestamp of last deployment (None if never deployed)
         recommendation: Recommended sync action
+        change_origin: Origin of change (deployment, sync, local_modification)
+        baseline_hash: Hash at deployment time (merge base for three-way merge)
+        current_hash: Current hash of the artifact in the project
+        modification_detected_at: ISO 8601 timestamp when modification was first detected
     """
 
     artifact_name: str
@@ -652,8 +656,14 @@ class DriftDetectionResult:
     last_deployed: Optional[str] = None  # ISO 8601 timestamp
     recommendation: str = "review_manually"  # Default recommendation
 
+    # Phase 3: Change Attribution Fields
+    change_origin: Optional[str] = None  # "deployment", "sync", "local_modification"
+    baseline_hash: Optional[str] = None  # deployed.sha (the merge base)
+    current_hash: Optional[str] = None  # current project SHA
+    modification_detected_at: Optional[str] = None  # ISO 8601 timestamp
+
     def __post_init__(self):
-        """Validate drift type."""
+        """Validate drift type and change origin."""
         valid_types = {
             "modified",
             "outdated",
@@ -666,6 +676,15 @@ class DriftDetectionResult:
             raise ValueError(
                 f"Invalid drift_type '{self.drift_type}'. Must be one of {valid_types}"
             )
+
+        # Validate change_origin if provided
+        if self.change_origin is not None:
+            valid_origins = {"deployment", "sync", "local_modification"}
+            if self.change_origin not in valid_origins:
+                raise ValueError(
+                    f"Invalid change_origin '{self.change_origin}'. "
+                    f"Must be one of {valid_origins}"
+                )
 
 
 @dataclass

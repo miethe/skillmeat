@@ -1091,6 +1091,9 @@ async def check_project_modifications(
             if is_modified:
                 modifications_count += 1
 
+            # Determine change origin based on modification status
+            change_origin = "local_modification" if is_modified else None
+
             modification_statuses.append(
                 DeploymentModificationStatus(
                     artifact_name=deployment.artifact_name,
@@ -1099,6 +1102,8 @@ async def check_project_modifications(
                     current_sha=current_sha,
                     is_modified=is_modified,
                     modification_detected_at=modification_detected_at,
+                    change_origin=change_origin,
+                    baseline_hash=deployment.collection_sha,  # Baseline is deployment SHA
                 )
             )
 
@@ -1238,6 +1243,8 @@ async def get_modified_artifacts(
                         deployed_sha=deployment.collection_sha,
                         current_sha=current_sha,
                         modification_detected_at=deployment.modification_detected_at,
+                        change_origin="local_modification",  # Modified in project
+                        baseline_hash=deployment.collection_sha,  # Baseline is deployment SHA
                     )
                 )
 

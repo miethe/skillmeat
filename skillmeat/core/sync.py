@@ -166,6 +166,23 @@ class SyncManager:
                     drift_type = "modified"
                     recommendation = "push_to_collection"
 
+                # Track when modifications are first detected (TASK-3.1)
+                if drift_type in ("modified", "conflict"):
+                    self._track_modification_timestamp(
+                        project_path,
+                        deployed.name,
+                        deployed.artifact_type,
+                    )
+
+                # Create version record for local modifications (TASK-3.2)
+                # Only track if project has local changes (modified or conflict with local changes)
+                if project_changed:
+                    self._create_local_modification_version(
+                        artifact_id=deployed.name,  # Using name as ID
+                        new_content_hash=current_project_sha,
+                        parent_content_hash=deployed.sha,
+                    )
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -1816,6 +1833,185 @@ class SyncManager:
         # This method is now mostly for logging - individual events are
         # tracked per-artifact in _record_artifact_sync_event
         logger.info(f"Sync {sync_type}: {len(artifact_names)} artifacts")
+
+    def _track_modification_timestamp(
+        self,
+        project_path: Path,
+        artifact_name: str,
+        artifact_type: str,
+    ) -> None:
+        """Track when local modifications are first detected.
+
+        Sets modification_detected_at timestamp on deployment record if not already set.
+        This timestamp is used to track when drift was first noticed.
+
+        Args:
+            project_path: Path to project root
+            artifact_name: Name of artifact with modifications
+            artifact_type: Type of artifact
+
+        Note:
+            Only sets timestamp on FIRST detection - does not update on subsequent checks.
+            Timestamp persists in .skillmeat-deployed.toml via DeploymentTracker.
+        """
+        from skillmeat.storage.deployment import DeploymentTracker
+
+        try:
+            # Load current deployment record
+            deployment = DeploymentTracker.get_deployment(
+                project_path, artifact_name, artifact_type
+            )
+
+            if not deployment:
+                logger.debug(
+                    f"No deployment record found for {artifact_name}, skipping modification tracking"
+                )
+                return
+
+            # Only set timestamp if not already set (first detection)
+            if deployment.modification_detected_at is None:
+                deployment.modification_detected_at = datetime.utcnow()
+
+                # Update deployment record in storage
+                deployments = DeploymentTracker.read_deployments(project_path)
+
+                # Replace the deployment record
+                for i, dep in enumerate(deployments):
+                    if (
+                        dep.artifact_name == artifact_name
+                        and dep.artifact_type == artifact_type
+                    ):
+                        deployments[i] = deployment
+                        break
+
+                DeploymentTracker.write_deployments(project_path, deployments)
+
+                logger.info(
+                    f"Modification first detected for {artifact_name} at "
+                    f"{deployment.modification_detected_at.isoformat()}"
+                )
+            else:
+                logger.debug(
+                    f"Modification already tracked for {artifact_name} "
+                    f"(first detected at {deployment.modification_detected_at.isoformat()})"
+                )
+
+        except Exception as e:
+            # Never fail drift detection due to modification tracking
+            logger.warning(
+                f"Failed to track modification timestamp for {artifact_name}: {e}"
+            )
+
+    def _create_local_modification_version(
+        self,
+        artifact_id: str,
+        new_content_hash: str,
+        parent_content_hash: Optional[str],
+    ) -> None:
+        """Create version record for local modification.
+
+        Creates an ArtifactVersion record when local modifications are detected
+        in drift detection. Uses parent_hash from deployment metadata to build
+        version lineage.
+
+        Args:
+            artifact_id: ID of the artifact with local modifications
+            new_content_hash: Content hash of current project file state
+            parent_content_hash: Content hash from deployment metadata (deployed version)
+
+        Note:
+            Idempotent - skips creation if version with this content_hash already exists.
+            Gracefully handles database unavailability.
+            Similar to _create_sync_version but with change_origin='local_modification'.
+        """
+        try:
+            from skillmeat.cache.models import get_session, ArtifactVersion
+
+            session = get_session()
+            try:
+                # Check if this version already exists (deduplication)
+                existing = (
+                    session.query(ArtifactVersion)
+                    .filter_by(content_hash=new_content_hash)
+                    .first()
+                )
+                if existing:
+                    logger.debug(
+                        f"Version {new_content_hash[:12]}... already exists, skipping creation"
+                    )
+                    return
+
+                # Build version lineage from parent
+                lineage = []
+                if parent_content_hash:
+                    # Get parent version for lineage
+                    parent = (
+                        session.query(ArtifactVersion)
+                        .filter_by(content_hash=parent_content_hash)
+                        .first()
+                    )
+
+                    if parent and parent.version_lineage:
+                        # Parent exists in version table - extend its lineage
+                        try:
+                            parent_lineage = json.loads(parent.version_lineage)
+                            lineage = parent_lineage + [new_content_hash]
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Failed to parse parent lineage, starting new lineage"
+                            )
+                            lineage = [parent_content_hash, new_content_hash]
+                    else:
+                        # Parent doesn't exist in version table (legacy deployment)
+                        # Create lineage with both parent and new hash
+                        lineage = [parent_content_hash, new_content_hash]
+                        logger.debug(
+                            f"Parent version {parent_content_hash[:12]}... not in version table "
+                            f"(legacy deployment), creating lineage from scratch"
+                        )
+                else:
+                    # No parent - this is a root version (shouldn't happen for local mods)
+                    lineage = [new_content_hash]
+                    logger.warning(
+                        f"Creating local modification version without parent for {artifact_id}"
+                    )
+
+                # Create new version record
+                version = ArtifactVersion(
+                    artifact_id=artifact_id,
+                    content_hash=new_content_hash,
+                    parent_hash=parent_content_hash,
+                    change_origin="local_modification",
+                    version_lineage=json.dumps(lineage),
+                )
+
+                session.add(version)
+                session.commit()
+
+                logger.info(
+                    f"Created local_modification version for artifact {artifact_id}: "
+                    f"{new_content_hash[:12]}... (parent: "
+                    f"{parent_content_hash[:12] if parent_content_hash else 'none'}...)"
+                )
+
+            finally:
+                session.close()
+
+        except ImportError:
+            logger.debug(
+                "ArtifactVersion model not available, skipping version creation"
+            )
+        except Exception as e:
+            # Never fail drift detection due to version tracking failure
+            # Common case: artifact not in cache yet (foreign key constraint)
+            error_msg = str(e)
+            if "FOREIGN KEY constraint" in error_msg:
+                logger.debug(
+                    f"Artifact {artifact_id} not in cache, skipping version creation. "
+                    f"This is expected for artifacts not yet cached."
+                )
+            else:
+                logger.debug(f"Failed to create local modification version: {e}")
 
     def _create_sync_version(
         self,
