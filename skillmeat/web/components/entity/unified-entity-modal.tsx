@@ -1799,7 +1799,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             type: entity.type as any,
             source: entity.source,
             version: entity.version,
-            scope: (entity.collection || 'user') as any,
+            // FIX: Determine scope based on entity location, not collection name
+            // 'user' = global/collection-level (~/.skillmeat/collection/)
+            // 'local' = project-level (.claude/)
+            scope: entity.projectPath ? 'local' : 'user',
             tags: entity.tags,
             aliases: entity.aliases,
           }}
