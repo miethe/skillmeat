@@ -105,6 +105,14 @@ from .drift import (
     DriftDetectionResponse,
     DriftSummaryResponse,
 )
+from .tags import (
+    TagBase,
+    TagCreateRequest,
+    TagUpdateRequest,
+    TagResponse,
+    TagListResponse,
+    ArtifactTagRequest,
+)
 
 __all__ = [
     # Common
@@ -196,4 +204,11 @@ __all__ = [
     # Drift Detection
     "DriftDetectionResponse",
     "DriftSummaryResponse",
+    # Tags
+    "TagBase",
+    "TagCreateRequest",
+    "TagUpdateRequest",
+    "TagResponse",
+    "TagListResponse",
+    "ArtifactTagRequest",
 ]
