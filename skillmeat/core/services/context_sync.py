@@ -81,6 +81,7 @@ class SyncConflict:
         deployed_content: Current content in deployed file
         collection_path: Path to entity in collection
         deployed_path: Path to deployed file in project
+        baseline_hash: Hash at deployment time (baseline for three-way merge)
     """
 
     entity_id: str
@@ -92,6 +93,7 @@ class SyncConflict:
     deployed_content: str
     collection_path: str
     deployed_path: str
+    baseline_hash: str
 
 
 @dataclass
@@ -522,6 +524,9 @@ class ContextSyncService:
                 # TODO: Get collection path
                 collection_path = ""
 
+                # Get baseline hash from entity info (last_synced_hash)
+                baseline_hash = entity_info.get("last_synced_hash", deployed_hash)
+
                 conflict = SyncConflict(
                     entity_id=entity_info["entity_id"],
                     entity_name=entity_info["entity_name"],
@@ -532,6 +537,7 @@ class ContextSyncService:
                     deployed_content=deployed_content,
                     collection_path=collection_path,
                     deployed_path=str(deployed_path),
+                    baseline_hash=baseline_hash,
                 )
 
                 conflicts.append(conflict)

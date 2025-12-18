@@ -177,6 +177,23 @@ class DriftSummaryResponse(BaseModel):
         description="Number of artifacts with version mismatches",
         examples=[0],
     )
+    # TASK-4.3: Summary count fields
+    upstream_changes: int = Field(
+        description="Count of upstream changes (outdated, added, removed drift)",
+        examples=[2],
+    )
+    local_changes: int = Field(
+        description="Count of local changes (modified drift)",
+        examples=[1],
+    )
+    conflicts: int = Field(
+        description="Count of conflicts (conflict drift)",
+        examples=[0],
+    )
+    total: int = Field(
+        description="Total artifacts with any drift",
+        examples=[3],
+    )
     drift_details: List[DriftDetectionResponse] = Field(
         default_factory=list,
         description="Detailed drift information for each drifted artifact",
@@ -201,6 +218,10 @@ class DriftSummaryResponse(BaseModel):
                 "added_count": 1,
                 "removed_count": 0,
                 "version_mismatch_count": 0,
+                "upstream_changes": 2,  # outdated + added
+                "local_changes": 1,  # modified
+                "conflicts": 0,
+                "total": 3,
                 "drift_details": [
                     {
                         "artifact_name": "pdf",

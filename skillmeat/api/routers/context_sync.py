@@ -327,7 +327,7 @@ async def get_sync_status(
         # Get conflicts
         conflicts = sync_service.detect_conflicts(project_path)
 
-        # Convert to response models
+        # Convert to response models with change attribution
         conflict_responses = [
             SyncConflictResponse(
                 entity_id=c.entity_id,
@@ -339,6 +339,8 @@ async def get_sync_status(
                 deployed_content=c.deployed_content,
                 collection_path=c.collection_path,
                 deployed_path=c.deployed_path,
+                change_origin="conflict",  # Both sides modified
+                baseline_hash=c.baseline_hash,  # Hash at deployment time
             )
             for c in conflicts
         ]
