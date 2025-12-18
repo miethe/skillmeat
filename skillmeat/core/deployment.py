@@ -227,6 +227,14 @@ class DeploymentManager:
                 project_path, artifact, collection.name, content_hash
             )
 
+            # Create version record in cache database (TASK-2.3)
+            self._record_deployment_version(
+                artifact_name=artifact.name,
+                artifact_type=artifact.type.value,
+                project_path=project_path,
+                content_hash=content_hash,
+            )
+
             # Create deployment object
             # Set merge_base_snapshot to content_hash at deployment time
             # This hash becomes the baseline for future three-way merges
@@ -404,6 +412,79 @@ class DeploymentManager:
             # This will be expanded in later phases
 
         return status
+
+    def _record_deployment_version(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        project_path: Path,
+        content_hash: str,
+    ) -> None:
+        """Record artifact version in cache database for deployment.
+
+        Creates an ArtifactVersion record with:
+        - parent_hash = NULL (root version)
+        - change_origin = 'deployment'
+        - version_lineage = [content_hash]
+
+        Args:
+            artifact_name: Name of artifact deployed
+            artifact_type: Type of artifact
+            project_path: Path to project
+            content_hash: SHA-256 hash of deployed artifact content
+        """
+        try:
+            from skillmeat.cache.models import Artifact as CacheArtifact
+            from skillmeat.cache.models import get_session
+            from skillmeat.core.version_tracking import create_deployment_version
+
+            session = get_session()
+            try:
+                # Find or create Artifact record in cache
+                # Use composite key: project_path + artifact_name + artifact_type
+                artifact_id = f"{project_path}::{artifact_name}::{artifact_type}"
+
+                cache_artifact = (
+                    session.query(CacheArtifact)
+                    .filter_by(
+                        name=artifact_name,
+                        type=artifact_type,
+                    )
+                    .join(CacheArtifact.project)
+                    .filter_by(path=str(project_path))
+                    .first()
+                )
+
+                if not cache_artifact:
+                    # Artifact not in cache yet - version tracking will be added
+                    # when cache is populated by cache manager
+                    console.print(
+                        f"[dim]Note: Artifact {artifact_name} not in cache yet, "
+                        "skipping version tracking[/dim]"
+                    )
+                    return
+
+                # Create version record
+                create_deployment_version(
+                    session=session,
+                    artifact_id=cache_artifact.id,
+                    content_hash=content_hash,
+                )
+                session.commit()
+
+                console.print(
+                    f"[dim]Version tracked: {artifact_name} "
+                    f"({content_hash[:8]}...) origin=deployment[/dim]"
+                )
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            # Never fail deploy due to version tracking
+            console.print(
+                f"[yellow]Warning: Failed to record deployment version: {e}[/yellow]"
+            )
 
     def _record_deploy_event(
         self,
