@@ -273,6 +273,13 @@ class Artifact(Base):
         viewonly=True,
         lazy="selectin",
     )
+    versions: Mapped[List["ArtifactVersion"]] = relationship(
+        "ArtifactVersion",
+        back_populates="artifact",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ArtifactVersion.created_at.desc()",
+    )
 
     # Constraints
     __table_args__ = (
@@ -444,6 +451,156 @@ class ArtifactMetadata(Base):
             aliases: List of alias strings
         """
         self.aliases = ",".join(aliases) if aliases else None
+
+
+class ArtifactVersion(Base):
+    """Version history entry for an artifact.
+
+    Tracks version lineage with parent-child relationships and change origin
+    attribution. Each version stores content hash for content-based deduplication.
+
+    Attributes:
+        id: Unique version identifier (UUID hex)
+        artifact_id: Foreign key to artifacts.id
+        content_hash: SHA-256 hash of artifact content (UNIQUE)
+        parent_hash: Content hash of parent version (NULL for root)
+        change_origin: Origin of this version ('deployment', 'sync', 'local_modification')
+        version_lineage: JSON array of ancestor content hashes
+        created_at: Timestamp when version was created
+        metadata_json: Additional JSON metadata
+        artifact: Related Artifact object
+
+    Indexes:
+        - idx_artifact_versions_artifact_id: Fast lookup by artifact
+        - idx_artifact_versions_content_hash (UNIQUE): Content-based deduplication
+        - idx_artifact_versions_parent_hash: Fast lookup by parent
+        - idx_artifact_versions_artifact_created: Composite for artifact+time queries
+        - idx_artifact_versions_change_origin: Filter by origin type
+    """
+
+    __tablename__ = "artifact_versions"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    artifact_id: Mapped[str] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Version tracking
+    content_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    parent_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    change_origin: Mapped[str] = mapped_column(String, nullable=False)
+    version_lineage: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # JSON array
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Metadata
+    metadata_json: Mapped[Optional[str]] = mapped_column(
+        "metadata", Text, nullable=True
+    )
+
+    # Relationships
+    artifact: Mapped["Artifact"] = relationship("Artifact", back_populates="versions")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "change_origin IN ('deployment', 'sync', 'local_modification')",
+            name="check_artifact_versions_change_origin",
+        ),
+        Index("idx_artifact_versions_artifact_id", "artifact_id"),
+        Index("idx_artifact_versions_content_hash", "content_hash", unique=True),
+        Index("idx_artifact_versions_parent_hash", "parent_hash"),
+        Index("idx_artifact_versions_artifact_created", "artifact_id", "created_at"),
+        Index("idx_artifact_versions_change_origin", "change_origin"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactVersion."""
+        return (
+            f"<ArtifactVersion(id={self.id!r}, artifact_id={self.artifact_id!r}, "
+            f"content_hash={self.content_hash[:8]}..., change_origin={self.change_origin!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ArtifactVersion to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the version
+        """
+        # Parse lineage and metadata JSON if present
+        lineage_list = self.get_lineage_list()
+        metadata_dict = self.get_metadata_dict()
+
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "content_hash": self.content_hash,
+            "parent_hash": self.parent_hash,
+            "change_origin": self.change_origin,
+            "version_lineage": lineage_list,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "metadata": metadata_dict,
+        }
+
+    def get_lineage_list(self) -> List[str]:
+        """Parse version_lineage JSON to list.
+
+        Returns:
+            List of ancestor content hashes or empty list if None/invalid
+        """
+        if not self.version_lineage:
+            return []
+
+        try:
+            lineage = json.loads(self.version_lineage)
+            if isinstance(lineage, list):
+                return lineage
+            return []
+        except json.JSONDecodeError:
+            return []
+
+    def set_lineage_list(self, hashes: List[str]) -> None:
+        """Serialize list of hashes to version_lineage JSON.
+
+        Args:
+            hashes: List of ancestor content hashes
+        """
+        if not hashes:
+            self.version_lineage = None
+        else:
+            self.version_lineage = json.dumps(hashes)
+
+    def get_metadata_dict(self) -> Optional[Dict[str, Any]]:
+        """Parse and return metadata as dictionary.
+
+        Returns:
+            Parsed metadata dictionary or None if invalid/missing
+        """
+        if not self.metadata_json:
+            return None
+
+        try:
+            return json.loads(self.metadata_json)
+        except json.JSONDecodeError:
+            return None
+
+    def set_metadata_dict(self, metadata_dict: Dict[str, Any]) -> None:
+        """Set metadata from dictionary.
+
+        Args:
+            metadata_dict: Dictionary to serialize as JSON
+        """
+        self.metadata_json = json.dumps(metadata_dict)
 
 
 class Collection(Base):
