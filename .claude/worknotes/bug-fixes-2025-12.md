@@ -420,3 +420,22 @@
   3. Resets `selectedCollectionId` state to `null` using the direct state setter (avoiding re-persistence)
 - **Commit(s)**: 0175ae0
 - **Status**: RESOLVED
+
+## 2025-12-18
+
+### Take Upstream Hangs and Times Out on Sync Status Tab
+
+**Issue**: Clicking "Take Upstream" in artifact modal Sync Status tab causes web app to hang, then fails with `ECONNRESET` socket hang up error. API logs show warning about existing artifact path but never completes.
+- **Location**: `skillmeat/core/deployment.py:206-210`, `skillmeat/api/routers/artifacts.py:2387-2392`
+- **Root Cause**: Two issues combined:
+  1. `deploy_artifacts()` was designed for CLI use with interactive prompts. When an artifact already exists at the destination, it calls `rich.Confirm.ask()` which blocks waiting for stdin input
+  2. The API endpoint received `overwrite: true` from frontend but never passed it to the core function - `request.overwrite` was ignored
+  3. When called from API context with no stdin, the function hangs forever waiting for user confirmation
+- **Fix**:
+  1. Added `overwrite: bool = False` parameter to `deploy_artifacts()` function signature
+  2. Modified overwrite prompt logic to skip `Confirm.ask()` when `overwrite=True`
+  3. Updated router to pass `request.overwrite` to `deploy_artifacts()` call
+  4. Added `--overwrite/-o` CLI flag for consistency
+  5. Added unit test for overwrite=True behavior
+- **Commit(s)**: 0b2e0c6
+- **Status**: RESOLVED
