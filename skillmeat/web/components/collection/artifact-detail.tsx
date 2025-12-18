@@ -37,6 +37,7 @@ import { DeployDialog } from './deploy-dialog';
 import { SyncDialog } from './sync-dialog';
 import { VersionTreeView } from './version-tree';
 import { useVersionGraph } from '@/hooks/useVersionGraph';
+import { useArtifactTags } from '@/hooks/use-tags';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 interface ArtifactDetailProps {
@@ -44,6 +45,7 @@ interface ArtifactDetailProps {
   isOpen: boolean;
   onClose: () => void;
   isLoading?: boolean;
+  onTagClick?: (tagSlug: string) => void;
 }
 
 const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: string }>> = {
@@ -126,13 +128,16 @@ function formatRelativeTime(dateString: string): string {
   return formatDate(dateString);
 }
 
-export function ArtifactDetail({ artifact, isOpen, onClose, isLoading }: ArtifactDetailProps) {
+export function ArtifactDetail({ artifact, isOpen, onClose, isLoading, onTagClick }: ArtifactDetailProps) {
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
   // Fetch version graph when modal is open
   const artifactId = artifact ? `${artifact.type}:${artifact.name}` : '';
   const { data: versionGraph, isLoading: isVersionGraphLoading } = useVersionGraph(artifactId);
+
+  // Fetch tags for the artifact
+  const { data: tags, isLoading: tagsLoading } = useArtifactTags(artifact?.id);
 
   const Icon = artifact ? artifactTypeIcons[artifact.type] : Package;
   const StatusIcon = (
@@ -233,8 +238,31 @@ export function ArtifactDetail({ artifact, isOpen, onClose, isLoading }: Artifac
                         </div>
                       </div>
 
-                      {/* Tags */}
-                      {artifact.metadata.tags && artifact.metadata.tags.length > 0 && (
+                      {/* Tags from API */}
+                      {tags && tags.length > 0 && (
+                        <div className="space-y-3">
+                          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Tag className="h-4 w-4" />
+                            Tags
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {tags.map((tag) => (
+                              <Badge
+                                key={tag.id}
+                                variant="secondary"
+                                colorStyle={tag.color}
+                                className="cursor-pointer hover:opacity-80"
+                                onClick={() => onTagClick?.(tag.slug)}
+                              >
+                                {tag.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Legacy tags from metadata (fallback) */}
+                      {(!tags || tags.length === 0) && artifact.metadata.tags && artifact.metadata.tags.length > 0 && (
                         <div className="space-y-3">
                           <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                             <Tag className="h-4 w-4" />

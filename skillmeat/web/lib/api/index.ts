@@ -9,3 +9,4 @@ export * from './templates';
 export * from './context-sync';
 export * from './snapshots';
 export * from './merge';
+export * from './tags';
