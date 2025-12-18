@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Versioning & Merge System v1.5
+- **Version Lineage Tracking**: Complete version history graph with parent-child relationships
+- **Change Attribution**: Distinguish upstream, local, and conflicting changes (change_origin field)
+  - `upstream`: Changes from collection/upstream source (blue badge)
+  - `local_modification`: Local project changes (amber badge)
+  - `both`: Both sides changed - potential conflict (red badge)
+- **Baseline Storage**: Three-way merge now uses correct baseline for accurate diff (previously defaulted to empty)
+- **Change Badges**: Visual indicators in diff viewer and version timeline showing change origin
+  - Blue badges: Upstream changes (safe to apply)
+  - Amber badges: Local modifications (your customizations)
+  - Red badges: Conflicts (both sides changed - requires decision)
+- **Version Timeline**: Visual timeline of all versions with change origin labels and deployment markers
+- **Conflict Detection**: Improved accuracy with proper baseline comparison in three-way merge
+- **API Enhancements**: Responses include `change_origin`, `baseline_hash`, `current_hash` fields
+  - New endpoints: `/api/v1/merge/analyze`, `/api/v1/merge/preview`, `/api/v1/merge/execute`, `/api/v1/merge/resolve`
+  - Enhanced `/api/v1/versions/` endpoints with change attribution data
+- **Comprehensive Documentation**:
+  - New API docs: `docs/api/versioning.md` with complete endpoint reference
+  - Updated guides: `docs/guides/syncing-changes.md` with change attribution workflows
+  - Change badge interpretation guide for UI
+
 #### GitHub Marketplace Ingestion (Phase 7)
 - **GitHub Source Management**: Add GitHub repositories as marketplace sources with automatic artifact detection
   - Create, list, update, and delete GitHub sources via API and UI

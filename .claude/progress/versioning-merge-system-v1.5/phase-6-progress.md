@@ -13,80 +13,88 @@ priority: HIGH
 tasks:
   - id: "TASK-6.1"
     description: "Integration tests for deploy→sync→drift→merge workflow"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "3-4h"
     priority: "HIGH"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - "tests/integration/test_version_workflow.py"
 
   - id: "TASK-6.2"
     description: "Integration tests for deploy→modify→sync→conflict workflow"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "3-4h"
     priority: "HIGH"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - "tests/integration/test_conflict_workflow.py"
 
   - id: "TASK-6.3"
     description: "Performance tests for version chain queries"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "2-3h"
     priority: "MEDIUM"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - "tests/performance/test_version_chain_performance.py"
 
   - id: "TASK-6.4"
     description: "Test migration from v1.0 deployments (no baseline)"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "2-3h"
     priority: "HIGH"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - "tests/integration/test_migration_v1_0.py"
 
   - id: "TASK-6.5"
     description: "Manual testing of UI flows (diff viewer, version history)"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimated_effort: "2-3h"
     priority: "HIGH"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - ".claude/worknotes/versioning-merge-system-v1.5/manual-testing-checklist.md"
 
   - id: "TASK-6.6"
     description: "Load testing with large version chains (100+ versions)"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "2-4h"
     priority: "MEDIUM"
+    deferred_reason: "Testing deferred to focus on documentation for v1.5 release"
     files:
       - "tests/performance/test_large_version_chains.py"
 
   - id: "TASK-6.7"
     description: "Documentation updates (API docs, user guides)"
-    status: "pending"
+    status: "completed"
     assigned_to: ["documentation-writer"]
     dependencies: []
     estimated_effort: "3-5h"
     priority: "MEDIUM"
+    completed_at: "2025-12-18"
     files:
       - "docs/api/versioning.md"
-      - "docs/guides/sync-and-merge.md"
+      - "docs/guides/syncing-changes.md"
       - "CHANGELOG.md"
 
 parallelization:
-  batch_1: ["TASK-6.1", "TASK-6.2", "TASK-6.3", "TASK-6.4", "TASK-6.5", "TASK-6.6", "TASK-6.7"]
+  batch_1: ["TASK-6.7"]
+  deferred: ["TASK-6.1", "TASK-6.2", "TASK-6.3", "TASK-6.4", "TASK-6.5", "TASK-6.6"]
 
-completion: 0%
+completion: 14%
 ---
 
 # Phase 6: Testing & Validation
