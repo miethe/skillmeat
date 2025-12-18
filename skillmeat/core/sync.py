@@ -70,6 +70,33 @@ class SyncManager:
             )
         return self._version_mgr
 
+    def determine_change_origin(self, drift_type: str) -> Optional[str]:
+        """Determine the origin of a detected change.
+
+        Maps drift types to change origins for version tracking.
+
+        Args:
+            drift_type: Type of drift detected (modified, outdated, conflict, etc.)
+
+        Returns:
+            Change origin: "local_modification", "sync", "deployment", or None
+
+        Note:
+            Valid change_origin values per DriftDetectionResult model:
+            - "deployment": Artifact deployed from collection
+            - "sync": Upstream changes from collection (sync operation)
+            - "local_modification": Local project changes (user edits)
+        """
+        drift_to_origin = {
+            "modified": "local_modification",  # Local project changes only
+            "outdated": "sync",  # Collection updated (upstream changes)
+            "conflict": "local_modification",  # Both changed (prioritize local for tracking)
+            "added": "sync",  # New in collection (upstream)
+            "removed": "sync",  # Removed from collection (upstream)
+            "version_mismatch": "sync",  # Version changed (upstream)
+        }
+        return drift_to_origin.get(drift_type)
+
     def check_drift(
         self,
         project_path: Path,
@@ -117,6 +144,15 @@ class SyncManager:
 
             if not collection_artifact:
                 # Artifact removed from collection
+                # Get deployment record for modification timestamp
+                from skillmeat.storage.deployment import DeploymentTracker
+                deployment_record = DeploymentTracker.get_deployment(
+                    project_path, deployed.name, deployed.artifact_type
+                )
+                modification_detected = None
+                if deployment_record and deployment_record.modification_detected_at:
+                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -128,6 +164,10 @@ class SyncManager:
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation="remove_from_project",
+                        change_origin=self.determine_change_origin("removed"),
+                        baseline_hash=deployed.sha,
+                        current_hash=deployed.sha,  # Same as baseline since removed
+                        modification_detected_at=modification_detected,
                     )
                 )
                 continue
@@ -183,6 +223,15 @@ class SyncManager:
                         parent_content_hash=deployed.sha,
                     )
 
+                # Get deployment record for modification timestamp (TASK-4.1)
+                from skillmeat.storage.deployment import DeploymentTracker
+                deployment_record = DeploymentTracker.get_deployment(
+                    project_path, deployed.name, deployed.artifact_type
+                )
+                modification_detected = None
+                if deployment_record and deployment_record.modification_detected_at:
+                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -194,23 +243,32 @@ class SyncManager:
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation=recommendation,
+                        change_origin=self.determine_change_origin(drift_type),
+                        baseline_hash=deployed.sha,  # The deployed version = merge base
+                        current_hash=current_project_sha,  # Current project file hash
+                        modification_detected_at=modification_detected,
                     )
                 )
 
         # Check for new artifacts in collection not yet deployed
         for artifact in collection_artifacts:
             if not self._is_deployed(artifact, metadata):
+                collection_sha = self._compute_artifact_hash(artifact["path"])
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=artifact["name"],
                         artifact_type=artifact["type"],
                         drift_type="added",
-                        collection_sha=self._compute_artifact_hash(artifact["path"]),
+                        collection_sha=collection_sha,
                         project_sha=None,
                         collection_version=artifact.get("version"),
                         project_version=None,
                         last_deployed=None,
                         recommendation="deploy_to_project",
+                        change_origin=self.determine_change_origin("added"),
+                        baseline_hash=None,  # No baseline for new artifacts
+                        current_hash=collection_sha,  # Current is the collection SHA
+                        modification_detected_at=None,  # New artifacts have no modifications
                     )
                 )
 
