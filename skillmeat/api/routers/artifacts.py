@@ -2389,6 +2389,7 @@ async def deploy_artifact(
                 collection_name=collection_name,
                 project_path=project_path,
                 artifact_type=artifact_type,
+                overwrite=request.overwrite,
             )
 
             if not deployments:

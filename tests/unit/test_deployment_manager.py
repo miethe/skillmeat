@@ -209,6 +209,56 @@ class TestDeploymentManager:
         captured = capsys.readouterr()
         assert "Skipped" in captured.out
 
+    def test_deploy_artifacts_overwrite_true_skips_prompt(
+        self, tmp_path, mock_collection_mgr, sample_collection, monkeypatch, capsys
+    ):
+        """Test that overwrite=True skips interactive prompt."""
+        collection_path = tmp_path / "collection"
+        project_path = tmp_path / "project"
+        collection_path.mkdir(parents=True)
+        project_path.mkdir(parents=True)
+
+        # Create source skill
+        skill_dir = collection_path / "skills" / "test-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("# Test Skill v2")
+
+        # Create existing deployment
+        existing_dir = project_path / ".claude" / "skills" / "test-skill"
+        existing_dir.mkdir(parents=True)
+        (existing_dir / "SKILL.md").write_text("# Existing v1")
+
+        # Setup mocks
+        mock_collection_mgr.load_collection.return_value = sample_collection
+        mock_collection_mgr.config.get_collection_path.return_value = collection_path
+
+        # Mock Confirm.ask to raise error if called (should not be called)
+        def fail_if_called(msg):
+            raise AssertionError(f"Confirm.ask should not be called with overwrite=True, but was called with: {msg}")
+
+        monkeypatch.setattr("skillmeat.core.deployment.Confirm.ask", fail_if_called)
+
+        # Create manager and deploy with overwrite=True
+        manager = DeploymentManager(collection_mgr=mock_collection_mgr)
+        deployments = manager.deploy_artifacts(
+            ["test-skill"], project_path=project_path, overwrite=True
+        )
+
+        # Should succeed without prompting
+        assert len(deployments) == 1
+        assert deployments[0].artifact_name == "test-skill"
+
+        # Check that file was overwritten
+        deployed_content = (existing_dir / "SKILL.md").read_text()
+        assert "v2" in deployed_content
+
+        # Should print warning but not skip
+        captured = capsys.readouterr()
+        # Check for warning (may be split across lines)
+        assert "already" in captured.out or "exists" in captured.out
+        assert "Deployed" in captured.out  # Should deploy successfully
+        assert "Skipped" not in captured.out
+
     def test_deploy_all(
         self, tmp_path, mock_collection_mgr, sample_collection, monkeypatch
     ):

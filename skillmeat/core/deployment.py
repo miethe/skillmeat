@@ -151,6 +151,7 @@ class DeploymentManager:
         collection_name: Optional[str] = None,
         project_path: Optional[Path] = None,
         artifact_type: Optional[ArtifactType] = None,
+        overwrite: bool = False,
     ) -> List[Deployment]:
         """Deploy specified artifacts to project.
 
@@ -159,6 +160,7 @@ class DeploymentManager:
             collection_name: Source collection (uses active if None)
             project_path: Project directory (uses CWD if None)
             artifact_type: Filter artifacts by type (if ambiguous names)
+            overwrite: If True, skip interactive prompt and overwrite existing artifacts
 
         Returns:
             List of Deployment objects
@@ -205,9 +207,11 @@ class DeploymentManager:
             # Check if destination exists and prompt for overwrite
             if dest_path.exists():
                 console.print(f"[yellow]Warning:[/yellow] {dest_path} already exists")
-                if not Confirm.ask(f"Overwrite {artifact.name}?"):
-                    console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
-                    continue
+                if not overwrite:  # Only prompt if overwrite not explicitly requested
+                    if not Confirm.ask(f"Overwrite {artifact.name}?"):
+                        console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
+                        continue
+                # If overwrite=True, continue without prompting
 
             # Copy artifact
             try:
