@@ -15,11 +15,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArtifactFlowBanner } from './artifact-flow-banner';
 import { ComparisonSelector, type ComparisonScope } from './comparison-selector';
 import { DriftAlertBanner, type DriftStatus } from './drift-alert-banner';
-import { FilePreviewPane } from './file-preview-pane';
 import { SyncActionsFooter } from './sync-actions-footer';
 
 // Existing components
-import { FileTree, type FileNode } from '@/components/entity/file-tree';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { SyncDialog } from '@/components/collection/sync-dialog';
 import type { Artifact } from '@/types/artifact';
@@ -101,47 +99,6 @@ function computeDriftStatus(
   return 'modified';
 }
 
-/**
- * Convert FileDiff[] to FileNode[] for FileTree
- */
-function buildFileTree(files: FileDiff[]): FileNode[] {
-  const root: FileNode[] = [];
-  const pathMap = new Map<string, FileNode>();
-
-  // Create nodes for all files
-  files.forEach((file) => {
-    const parts = file.file_path.split('/');
-    let currentPath = '';
-
-    parts.forEach((part, index) => {
-      const parentPath = currentPath;
-      currentPath = currentPath ? `${currentPath}/${part}` : part;
-      const isLastPart = index === parts.length - 1;
-
-      if (!pathMap.has(currentPath)) {
-        const node: FileNode = {
-          name: part,
-          path: currentPath,
-          type: isLastPart ? 'file' : 'directory',
-          children: isLastPart ? undefined : [],
-        };
-
-        pathMap.set(currentPath, node);
-
-        if (parentPath) {
-          const parent = pathMap.get(parentPath);
-          if (parent && parent.children) {
-            parent.children.push(node);
-          }
-        } else {
-          root.push(node);
-        }
-      }
-    });
-  });
-
-  return root;
-}
 
 /**
  * Get left label for DiffViewer based on comparison scope
@@ -175,33 +132,18 @@ function getRightLabel(scope: ComparisonScope): string {
   }
 }
 
-/**
- * Get tier for FilePreviewPane based on comparison scope
- */
-function getTierFromScope(scope: ComparisonScope): 'source' | 'collection' | 'project' {
-  switch (scope) {
-    case 'source-vs-collection':
-      return 'source';
-    case 'collection-vs-project':
-      return 'collection';
-    case 'source-vs-project':
-      return 'project';
-    default:
-      return 'collection';
-  }
-}
 
 // ============================================================================
 // Loading Skeleton
 // ============================================================================
 
 /**
- * SyncStatusTabSkeleton - Loading state matching the actual layout
+ * SyncStatusTabSkeleton - Loading state matching the simplified layout
  *
- * Mimics the 3-part structure:
- * - Top: ArtifactFlowBanner (3-tier visualization)
- * - Middle: ComparisonSelector + content area
- * - Bottom: Split pane (file tree + content)
+ * Mimics the simplified structure:
+ * - Top: ArtifactFlowBanner
+ * - Middle: ComparisonSelector + DiffViewer (full width)
+ * - Bottom: Actions Footer
  */
 function SyncStatusTabSkeleton() {
   return (
@@ -211,58 +153,23 @@ function SyncStatusTabSkeleton() {
         <Skeleton className="h-24 w-full" />
       </div>
 
-      {/* Middle: 3-Panel Layout Skeleton */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel: File Tree Skeleton (240px) */}
-        <div className="w-60 flex-shrink-0 border-r p-4">
-          <Skeleton className="mb-3 h-5 w-32" />
-          <div className="space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Skeleton className="h-4 w-4" />
-                <Skeleton
-                  className="h-4"
-                  style={{ width: `${40 + Math.random() * 40}%` }}
-                />
-              </div>
-            ))}
-          </div>
+      {/* Middle: Full Width Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Comparison Selector Skeleton */}
+        <div className="flex-shrink-0 space-y-3 border-b p-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-12 w-full" />
         </div>
 
-        {/* Center Panel: Comparison + Diff Skeleton */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Comparison Selector Skeleton */}
-          <div className="flex-shrink-0 space-y-3 border-b p-4">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-
-          {/* Diff Content Skeleton */}
-          <div className="flex-1 space-y-2 p-6">
-            {[...Array(12)].map((_, i) => (
-              <Skeleton
-                key={i}
-                className="h-5"
-                style={{ width: `${60 + Math.random() * 30}%` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Right Panel: File Preview Skeleton (320px) */}
-        <div className="w-80 flex-shrink-0 border-l">
-          <div className="border-b p-4">
-            <Skeleton className="h-5 w-48" />
-          </div>
-          <div className="space-y-3 p-6">
-            {[...Array(10)].map((_, i) => (
-              <Skeleton
-                key={i}
-                className="h-4"
-                style={{ width: `${50 + Math.random() * 40}%` }}
-              />
-            ))}
-          </div>
+        {/* Diff Content Skeleton */}
+        <div className="flex-1 space-y-2 p-6">
+          {[...Array(12)].map((_, i) => (
+            <Skeleton
+              key={i}
+              className="h-5"
+              style={{ width: `${60 + Math.random() * 30}%` }}
+            />
+          ))}
         </div>
       </div>
 
@@ -288,28 +195,26 @@ function SyncStatusTabSkeleton() {
 // ============================================================================
 
 /**
- * SyncStatusTab - Orchestration component for 3-panel sync status UI
+ * SyncStatusTab - Orchestration component for sync status UI
  *
  * Features:
  * - 3-tier flow visualization (Source → Collection → Project)
  * - Comparison scope selector (source-vs-collection, collection-vs-project, source-vs-project)
- * - File tree browser with diff highlighting
- * - Side-by-side diff viewer
- * - File preview pane
+ * - Side-by-side diff viewer (full width)
  * - Drift status alerts with actions
  * - Sync actions footer with batch operations
  *
  * Layout:
  * ```
- * ┌─────────────────────────────────────────────────────────┐
- * │              ArtifactFlowBanner (full width)            │
- * ├──────────┬───────────────────────────┬──────────────────┤
- * │ FileTree │  ComparisonSelector       │                  │
- * │ (240px)  │  DriftAlertBanner         │ FilePreviewPane  │
- * │          │  DiffViewer               │ (320px)          │
- * ├──────────┴───────────────────────────┴──────────────────┤
- * │              SyncActionsFooter (full width)             │
- * └─────────────────────────────────────────────────────────┘
+ * ┌────────────────────────────────────────────┐
+ * │  ArtifactFlowBanner                        │
+ * ├────────────────────────────────────────────┤
+ * │  ComparisonSelector                        │
+ * │  DriftAlertBanner                          │
+ * │  DiffViewer (full width)                   │
+ * ├────────────────────────────────────────────┤
+ * │  SyncActionsFooter                         │
+ * └────────────────────────────────────────────┘
  * ```
  *
  * @example
@@ -338,8 +243,7 @@ export function SyncStatusTab({
   const [comparisonScope, setComparisonScope] = useState<ComparisonScope>(
     mode === 'project' ? 'collection-vs-project' : 'source-vs-collection'
   );
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [pendingActions] = useState<PendingAction[]>([]);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
 
   // Helper to detect local-only artifacts
@@ -378,22 +282,6 @@ export function SyncStatusTab({
       return response.json();
     },
     enabled: !!entity.id && !!projectPath && mode === 'project' && entity.collection !== 'discovered',
-  });
-
-  // File content for preview
-  const {
-    data: fileContent,
-    isLoading: contentLoading,
-  } = useQuery<string>({
-    queryKey: ['file-content', entity.id, selectedFile],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/v1/artifacts/${entity.id}/files/${encodeURIComponent(selectedFile!)}`
-      );
-      if (!response.ok) throw new Error('Failed to fetch file content');
-      return response.text();
-    },
-    enabled: !!entity.id && !!selectedFile,
   });
 
   // ============================================================================
@@ -573,10 +461,6 @@ export function SyncStatusTab({
     setComparisonScope(scope);
   };
 
-  const handleFileSelect = (path: string) => {
-    setSelectedFile(path);
-  };
-
   const handlePullFromSource = () => {
     syncMutation.mutate();
   };
@@ -629,12 +513,6 @@ export function SyncStatusTab({
         return projectDiff;
     }
   }, [comparisonScope, upstreamDiff, projectDiff]);
-
-  // File tree
-  const fileTree = useMemo(
-    () => buildFileTree(currentDiff?.files || []),
-    [currentDiff?.files]
-  );
 
   // Drift status
   const driftStatus = useMemo(
@@ -698,24 +576,10 @@ export function SyncStatusTab({
     onKeepLocal: handleKeepLocal,
   };
 
-  const fileTreeProps = {
-    entityId: entity.id,
-    files: fileTree,
-    selectedPath: selectedFile,
-    onSelect: handleFileSelect,
-  };
-
   const diffProps = {
     files: currentDiff?.files || [],
     leftLabel: getLeftLabel(comparisonScope),
     rightLabel: getRightLabel(comparisonScope),
-  };
-
-  const previewProps = {
-    filePath: selectedFile,
-    content: fileContent || null,
-    tier: getTierFromScope(comparisonScope),
-    isLoading: contentLoading,
   };
 
   const footerProps = {
@@ -773,29 +637,16 @@ export function SyncStatusTab({
           <ArtifactFlowBanner {...bannerProps} />
         </div>
 
-        {/* Middle: 3-Panel Layout */}
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left Panel: File Tree (240px fixed) */}
-          <div className="w-60 flex-shrink-0 border-r min-h-0 overflow-auto">
-            <FileTree {...fileTreeProps} />
+        {/* Middle: Full Width Content */}
+        <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
+          <div className="flex-shrink-0 space-y-2 border-b p-4">
+            <ComparisonSelector {...comparisonProps} />
+            <DriftAlertBanner {...alertProps} />
           </div>
-
-          {/* Center Panel: Comparison + Diff (flex-1) */}
-          <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
-            <div className="flex-shrink-0 space-y-2 border-b p-4">
-              <ComparisonSelector {...comparisonProps} />
-              <DriftAlertBanner {...alertProps} />
+          <div className="flex-1 overflow-hidden min-h-0 min-w-0">
+            <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
+              <DiffViewer {...diffProps} />
             </div>
-            <div className="flex-1 overflow-hidden min-h-0 min-w-0">
-              <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
-                <DiffViewer {...diffProps} />
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel: File Preview (320px fixed) */}
-          <div className="w-80 flex-shrink-0 border-l min-h-0 overflow-auto">
-            <FilePreviewPane {...previewProps} />
           </div>
         </div>
 
