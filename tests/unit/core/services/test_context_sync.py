@@ -281,6 +281,7 @@ def test_resolve_conflict_keep_local():
         deployed_content="# Deployed version",
         collection_path="/collection/rules/api/patterns.md",
         deployed_path="/project/.claude/rules/api/patterns.md",
+        baseline_hash="original123baseline",
     )
 
     result = sync_service.resolve_conflict(conflict, resolution="keep_local")
@@ -304,6 +305,7 @@ def test_resolve_conflict_keep_remote():
         deployed_content="# Deployed version",
         collection_path="/collection/rules/api/patterns.md",
         deployed_path="/project/.claude/rules/api/patterns.md",
+        baseline_hash="original123baseline",
     )
 
     result = sync_service.resolve_conflict(conflict, resolution="keep_remote")
@@ -327,6 +329,7 @@ def test_resolve_conflict_merge():
         deployed_content="# Deployed version",
         collection_path="/collection/rules/api/patterns.md",
         deployed_path="/project/.claude/rules/api/patterns.md",
+        baseline_hash="original123baseline",
     )
 
     merged_content = "# Merged version\n\nBest of both worlds"
@@ -353,6 +356,7 @@ def test_resolve_conflict_merge_missing_content():
         deployed_content="# Deployed version",
         collection_path="/collection/rules/api/patterns.md",
         deployed_path="/project/.claude/rules/api/patterns.md",
+        baseline_hash="original123baseline",
     )
 
     with pytest.raises(ValueError, match="merged_content required"):
