@@ -15,14 +15,12 @@ collection_sha = "7f34152edc1c794e746156bd574dcb0d4d578bcc704c8f818714e188cee6dd
 artifact_name = "notebooklm-skill"
 artifact_type = "skill"
 from_collection = "default"
-deployed_at = "2025-11-15T15:01:24.707340"
+deployed_at = "2025-12-18T16:04:07.770320"
 artifact_path = "skills/notebooklm-skill"
-content_hash = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
+content_hash = "e3f5f6489f2857a86da15b19527e0eea37257da15f54487bab528e64e4f70f63"
 local_modifications = false
-version_lineage = [
-    "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7",
-]
-collection_sha = "9e838aa807f329b02fe6c667571c8f180e4c5f1d753ca812452e13f2539b06e7"
+merge_base_snapshot = "e3f5f6489f2857a86da15b19527e0eea37257da15f54487bab528e64e4f70f63"
+collection_sha = "e3f5f6489f2857a86da15b19527e0eea37257da15f54487bab528e64e4f70f63"
 
 [[deployed]]
 artifact_name = "Confidence Check"
@@ -32,6 +30,9 @@ deployed_at = "2025-12-03T11:45:28.895105"
 artifact_path = "skills/confidence-check"
 content_hash = "2dc376282b95521e6f9229979bc3666e1224ba09e94a3d4b76703f8cab083127"
 local_modifications = false
+version_lineage = [
+    "2dc376282b95521e6f9229979bc3666e1224ba09e94a3d4b76703f8cab083127",
+]
 collection_sha = "2dc376282b95521e6f9229979bc3666e1224ba09e94a3d4b76703f8cab083127"
 
 [[deployed]]
@@ -42,6 +43,9 @@ deployed_at = "2025-12-03T11:45:28.895937"
 artifact_path = "skills/skill-creator"
 content_hash = "c6ba1acd589b1171fe00681bea592239e0899b8bd5a3f8128c7fa3e00cd64c25"
 local_modifications = false
+version_lineage = [
+    "c6ba1acd589b1171fe00681bea592239e0899b8bd5a3f8128c7fa3e00cd64c25",
+]
 collection_sha = "c6ba1acd589b1171fe00681bea592239e0899b8bd5a3f8128c7fa3e00cd64c25"
 
 [[deployed]]
@@ -52,6 +56,9 @@ deployed_at = "2025-12-03T11:45:28.900636"
 artifact_path = "skills/symbols"
 content_hash = "7d0213abbda2a6109c6931bcf5d62d3a39c97f5f4a8770845b0a001a9c7253ef"
 local_modifications = false
+version_lineage = [
+    "7d0213abbda2a6109c6931bcf5d62d3a39c97f5f4a8770845b0a001a9c7253ef",
+]
 collection_sha = "7d0213abbda2a6109c6931bcf5d62d3a39c97f5f4a8770845b0a001a9c7253ef"
 
 [[deployed]]
@@ -62,6 +69,9 @@ deployed_at = "2025-12-03T11:45:28.900852"
 artifact_path = "skills/receiving-code-review"
 content_hash = "f6fd15778eef9f8344da6791531ce24fc32bc7d807762bf79c2540c2d5a34598"
 local_modifications = false
+version_lineage = [
+    "f6fd15778eef9f8344da6791531ce24fc32bc7d807762bf79c2540c2d5a34598",
+]
 collection_sha = "f6fd15778eef9f8344da6791531ce24fc32bc7d807762bf79c2540c2d5a34598"
 
 [[deployed]]
@@ -72,6 +82,9 @@ deployed_at = "2025-12-03T11:45:28.903982"
 artifact_path = "skills/artifact-tracking"
 content_hash = "434a07cfd3734bd9cf3031edc27dce01095e950f5e6e7f78bf33751671ff0f51"
 local_modifications = false
+version_lineage = [
+    "434a07cfd3734bd9cf3031edc27dce01095e950f5e6e7f78bf33751671ff0f51",
+]
 collection_sha = "434a07cfd3734bd9cf3031edc27dce01095e950f5e6e7f78bf33751671ff0f51"
 
 [[deployed]]
@@ -82,4 +95,7 @@ deployed_at = "2025-12-03T11:45:28.904230"
 artifact_path = "skills/meeting-insights-analyzer"
 content_hash = "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656"
 local_modifications = false
+version_lineage = [
+    "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656",
+]
 collection_sha = "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656"
