@@ -182,6 +182,11 @@ class ArtifactResponse(BaseModel):
         description="Artifact aliases",
         examples=[["pdf-processor", "doc-reader"]],
     )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Artifact tags",
+        examples=[["data-processing", "ai-tools"]],
+    )
     metadata: Optional[ArtifactMetadataResponse] = Field(
         default=None,
         description="Artifact metadata",

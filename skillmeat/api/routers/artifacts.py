@@ -474,6 +474,7 @@ def artifact_to_response(
         source=artifact.upstream if artifact.origin == "github" else "local",
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
+        tags=artifact.tags or [],
         metadata=metadata_response,
         upstream=upstream_response,
         added=artifact.added,
