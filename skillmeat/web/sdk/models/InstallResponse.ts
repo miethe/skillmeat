@@ -8,24 +8,25 @@
  * Indicates success status and lists imported artifacts.
  */
 export type InstallResponse = {
-  /**
-   * Whether installation succeeded
-   */
-  success: boolean;
-  /**
-   * List of artifact names that were imported
-   */
-  artifacts_imported: Array<string>;
-  /**
-   * Status message
-   */
-  message: string;
-  /**
-   * The listing ID that was installed
-   */
-  listing_id: string;
-  /**
-   * The broker used for installation
-   */
-  broker: string;
+    /**
+     * Whether installation succeeded
+     */
+    success: boolean;
+    /**
+     * List of artifact names that were imported
+     */
+    artifacts_imported: Array<string>;
+    /**
+     * Status message
+     */
+    message: string;
+    /**
+     * The listing ID that was installed
+     */
+    listing_id: string;
+    /**
+     * The broker used for installation
+     */
+    broker: string;
 };
+
