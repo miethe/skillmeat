@@ -439,3 +439,15 @@
   5. Added unit test for overwrite=True behavior
 - **Commit(s)**: 0b2e0c6
 - **Status**: RESOLVED
+
+### Next.js Build Fails - useSearchParams Missing Suspense Boundary
+
+**Issue**: Web app build fails with error: `useSearchParams() should be wrapped in a suspense boundary at page "/collection"`
+- **Location**: `skillmeat/web/app/collection/page.tsx:95`, `skillmeat/web/app/projects/[id]/page.tsx:56`
+- **Root Cause**: Next.js App Router requires `useSearchParams()` to be wrapped in a Suspense boundary to prevent hydration mismatches during SSR. Both pages called the hook directly without wrapping.
+- **Fix**:
+  1. `/collection/page.tsx`: Wrapped existing `<CollectionPageContent />` in `<Suspense>` with Loader2 spinner fallback
+  2. `/projects/[id]/page.tsx`: Renamed `ProjectDetailPage` to `ProjectDetailPageContent`, created new default export wrapping content in `<Suspense>`
+  3. Added `Suspense` from 'react' and `Loader2` from 'lucide-react' imports to both files
+- **Commit(s)**: 601debd
+- **Status**: RESOLVED
