@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package } from 'lucide-react';
+import { Package, Loader2 } from 'lucide-react';
 import { CollectionHeader } from '@/components/collection/collection-header';
 import { CollectionToolbar } from '@/components/collection/collection-toolbar';
 import { ArtifactGrid } from '@/components/collection/artifact-grid';
@@ -368,7 +368,15 @@ function CollectionPageContent() {
 export default function CollectionPage() {
   return (
     <EntityLifecycleProvider mode="collection">
-      <CollectionPageContent />
+      <Suspense
+        fallback={
+          <div className="flex h-screen items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        }
+      >
+        <CollectionPageContent />
+      </Suspense>
     </EntityLifecycleProvider>
   );
 }

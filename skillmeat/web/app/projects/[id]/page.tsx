@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   GitBranch,
@@ -15,6 +15,7 @@ import {
   Plug,
   Code,
   Settings,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +50,7 @@ const artifactTypeColors = {
   hook: 'bg-pink-500/10 text-pink-500 border-pink-500/20',
 };
 
-export default function ProjectDetailPage() {
+function ProjectDetailPageContent() {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -525,5 +526,19 @@ export default function ProjectDetailPage() {
         />
       </div>
     </EntityLifecycleProvider>
+  );
+}
+
+export default function ProjectDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      }
+    >
+      <ProjectDetailPageContent />
+    </Suspense>
   );
 }
