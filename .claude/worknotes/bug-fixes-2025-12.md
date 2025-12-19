@@ -470,5 +470,20 @@
   4. Changed `update_tag()` to pass request object directly
   5. Removed manual artifact_count calls (service includes it in response)
   6. Fixed frontend `TagListResponse.page_info` to match backend `PageInfo` schema
-- **Commit(s)**: 24c62e5
+- **Commit(s)**: 71a5087
+- **Status**: RESOLVED
+
+### Edit Parameters Modal Uses Plain Text Input for Tags
+
+**Issue**: Tags field in artifact Edit Parameters modal requires comma-separated text input instead of using the TagInput component with search, autocomplete, and inline tag creation.
+- **Location**: `skillmeat/web/components/discovery/ParameterEditorModal.tsx:245-255`
+- **Root Cause**: Original implementation used basic `<Input>` with comma-separated string parsing. The full-featured `TagInput` component already existed but wasn't integrated.
+- **Fix**:
+  1. Imported `TagInput` component and `useTags` hook
+  2. Changed form field type from `string` to `string[]`
+  3. Used `Controller` from react-hook-form to integrate TagInput
+  4. Configured TagInput with suggestions from API, `allowCreate={true}`
+  5. Updated form submission to use array directly (removed comma-split parsing)
+  6. Updated help text to reflect new UX
+- **Commit(s)**: df3fbfd
 - **Status**: RESOLVED
