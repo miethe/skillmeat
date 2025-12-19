@@ -107,12 +107,20 @@ export function ParameterEditorModal({
     setIsSubmitting(true);
 
     try {
+      const tagsById = new Map(
+        (tagsData?.items || []).map((tag) => [tag.id, tag.name])
+      );
+      const normalizedTags = (data.tags || [])
+        .map((tag) => tagsById.get(tag) || tag)
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
       // Tags are already an array from TagInput
       const parameters: ArtifactParameters = {
         source: data.source || undefined,
         version: data.version || undefined,
         scope: data.scope,
-        tags: data.tags?.length > 0 ? data.tags : undefined,
+        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
         aliases: data.aliases
           ? data.aliases
               .split(',')
