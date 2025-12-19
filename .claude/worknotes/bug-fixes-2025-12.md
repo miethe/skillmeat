@@ -487,3 +487,14 @@
   6. Updated help text to reflect new UX
 - **Commit(s)**: df3fbfd
 - **Status**: RESOLVED
+
+## 2025-12-19
+
+### Edit Parameters Modal Fails with GitHubMetadataExtractor Missing Cache Argument
+
+**Issue**: Saving Tags via the Edit Parameters form fails with error: `GitHubMetadataExtractor.__init__() missing 1 required positional argument: 'cache'`
+- **Location**: `skillmeat/api/routers/artifacts.py:2063`
+- **Root Cause**: `GitHubMetadataExtractor()` was instantiated without the required `cache` argument. The class signature is `__init__(self, cache: MetadataCache, token: Optional[str] = None)`, but the call at line 2063 passed no arguments.
+- **Fix**: Changed `GitHubMetadataExtractor()` to `GitHubMetadataExtractor(cache=None)`. This matches the validation-only pattern used in `core/validation.py:40` - no caching is needed for `parse_github_url()` validation.
+- **Commit(s)**: 0410802
+- **Status**: RESOLVED
