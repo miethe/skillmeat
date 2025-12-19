@@ -45,7 +45,7 @@ export const tagKeys = {
  * ```tsx
  * const { data, isLoading } = useTags(50);
  * if (data) {
- *   console.log(`Found ${data.page_info.total} tags`);
+ *   console.log(`Found ${data.page_info.total_count} tags`);
  * }
  * ```
  */

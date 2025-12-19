@@ -116,23 +116,11 @@ async def create_tag(request: TagCreateRequest) -> TagResponse:
     try:
         logger.info(f"Creating tag: {request.name} (slug: {request.slug})")
 
-        tag = service.create_tag(
-            name=request.name,
-            slug=request.slug,
-            color=request.color,
-        )
+        tag = service.create_tag(request)
 
         logger.info(f"Created tag: {tag.id} ('{tag.name}')")
 
-        return TagResponse(
-            id=tag.id,
-            name=tag.name,
-            slug=tag.slug,
-            color=tag.color,
-            created_at=tag.created_at,
-            updated_at=tag.updated_at,
-            artifact_count=service.get_tag_artifact_count(tag.id),
-        )
+        return tag
 
     except ValueError as e:
         logger.warning(f"Tag creation validation error: {e}")
@@ -200,59 +188,16 @@ async def list_tags(
     try:
         logger.info(f"Listing tags (limit={limit}, after={after})")
 
-        # Get all tags ordered by name
-        all_tags = service.list_tags(order_by="name")
-
         # Decode cursor if provided
-        start_idx = 0
+        after_cursor = None
         if after:
-            cursor_id = decode_cursor(after)
-            # Find tag index by ID
-            tag_ids = [tag.id for tag in all_tags]
-            try:
-                start_idx = tag_ids.index(cursor_id) + 1
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid cursor: tag not found",
-                )
+            after_cursor = decode_cursor(after)
 
-        # Paginate
-        end_idx = start_idx + limit
-        page_tags = all_tags[start_idx:end_idx]
+        # Get tags with pagination from service
+        response = service.list_tags(limit=limit, after_cursor=after_cursor)
 
-        # Convert to response format with artifact counts
-        items: List[TagResponse] = []
-        for tag in page_tags:
-            items.append(
-                TagResponse(
-                    id=tag.id,
-                    name=tag.name,
-                    slug=tag.slug,
-                    color=tag.color,
-                    created_at=tag.created_at,
-                    updated_at=tag.updated_at,
-                    artifact_count=service.get_tag_artifact_count(tag.id),
-                )
-            )
-
-        # Build pagination info
-        has_next = end_idx < len(all_tags)
-        has_previous = start_idx > 0
-
-        start_cursor = encode_cursor(page_tags[0].id) if page_tags else None
-        end_cursor = encode_cursor(page_tags[-1].id) if page_tags else None
-
-        page_info = PageInfo(
-            has_next_page=has_next,
-            has_previous_page=has_previous,
-            start_cursor=start_cursor,
-            end_cursor=end_cursor,
-            total_count=len(all_tags),
-        )
-
-        logger.info(f"Retrieved {len(items)} tags")
-        return TagListResponse(items=items, page_info=page_info)
+        logger.info(f"Retrieved {len(response.items)} tags")
+        return response
 
     except HTTPException:
         raise
@@ -293,7 +238,7 @@ async def get_tag(tag_id: str) -> TagResponse:
     try:
         logger.info(f"Getting tag: {tag_id}")
 
-        tag = service.get_tag_by_id(tag_id)
+        tag = service.get_tag(tag_id)
 
         if not tag:
             raise HTTPException(
@@ -301,15 +246,7 @@ async def get_tag(tag_id: str) -> TagResponse:
                 detail=f"Tag '{tag_id}' not found",
             )
 
-        return TagResponse(
-            id=tag.id,
-            name=tag.name,
-            slug=tag.slug,
-            color=tag.color,
-            created_at=tag.created_at,
-            updated_at=tag.updated_at,
-            artifact_count=service.get_tag_artifact_count(tag.id),
-        )
+        return tag
 
     except HTTPException:
         raise
@@ -363,15 +300,7 @@ async def get_tag_by_slug(slug: str) -> TagResponse:
                 detail=f"Tag with slug '{slug}' not found",
             )
 
-        return TagResponse(
-            id=tag.id,
-            name=tag.name,
-            slug=tag.slug,
-            color=tag.color,
-            created_at=tag.created_at,
-            updated_at=tag.updated_at,
-            artifact_count=service.get_tag_artifact_count(tag.id),
-        )
+        return tag
 
     except HTTPException:
         raise
@@ -426,37 +355,18 @@ async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
     try:
         logger.info(f"Updating tag: {tag_id}")
 
-        # Build update dict from request
-        updates = {}
-        if request.name is not None:
-            updates["name"] = request.name
-        if request.slug is not None:
-            updates["slug"] = request.slug
-        if request.color is not None:
-            updates["color"] = request.color
+        # Update tag via service
+        tag = service.update_tag(tag_id, request)
 
-        if not updates:
-            # No fields to update, just return current tag
-            tag = service.get_tag_by_id(tag_id)
-            if not tag:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Tag '{tag_id}' not found",
-                )
-        else:
-            tag = service.update_tag(tag_id, **updates)
+        if not tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag '{tag_id}' not found",
+            )
 
         logger.info(f"Updated tag: {tag.id} ('{tag.name}')")
 
-        return TagResponse(
-            id=tag.id,
-            name=tag.name,
-            slug=tag.slug,
-            color=tag.color,
-            created_at=tag.created_at,
-            updated_at=tag.updated_at,
-            artifact_count=service.get_tag_artifact_count(tag.id),
-        )
+        return tag
 
     except ValueError as e:
         logger.warning(f"Tag update validation error: {e}")
@@ -589,21 +499,7 @@ async def search_tags(
     try:
         logger.info(f"Searching tags: query='{q}', limit={limit}")
 
-        tags = service.search_tags(query=q, limit=limit)
-
-        results: List[TagResponse] = []
-        for tag in tags:
-            results.append(
-                TagResponse(
-                    id=tag.id,
-                    name=tag.name,
-                    slug=tag.slug,
-                    color=tag.color,
-                    created_at=tag.created_at,
-                    updated_at=tag.updated_at,
-                    artifact_count=service.get_tag_artifact_count(tag.id),
-                )
-            )
+        results = service.search_tags(query=q, limit=limit)
 
         logger.info(f"Found {len(results)} matching tags")
         return results
