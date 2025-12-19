@@ -498,3 +498,18 @@
 - **Fix**: Changed `GitHubMetadataExtractor()` to `GitHubMetadataExtractor(cache=None)`. This matches the validation-only pattern used in `core/validation.py:40` - no caching is needed for `parse_github_url()` validation.
 - **Commit(s)**: 0410802
 - **Status**: RESOLVED
+
+### Tags Not Displayed After Saving Despite Successful API Response
+
+**Issue**: Tags appear to save successfully (API logs show update), but never display on artifact cards, in modals, in the filterable tag list, or in the Edit Parameters modal.
+- **Location**: `skillmeat/api/schemas/artifacts.py:185`, `skillmeat/api/routers/artifacts.py:477`, `skillmeat/web/hooks/useDiscovery.ts:144`
+- **Root Cause**: Tags were being persisted correctly to disk (manifest.toml), but:
+  1. `ArtifactResponse` schema was missing the `tags` field entirely
+  2. `artifact_to_response()` function never mapped `artifact.tags` to the response
+  3. Frontend cache invalidation after tag edit only invalidated artifact queries, not entity queries used by the modal
+- **Fix**:
+  1. Added `tags: List[str]` field to `ArtifactResponse` schema
+  2. Added `tags=artifact.tags or []` to `artifact_to_response()` constructor
+  3. Added `['entities']` query invalidation after tag edit in `useEditArtifactParameters` hook
+- **Commit(s)**: aba3e6d
+- **Status**: RESOLVED
