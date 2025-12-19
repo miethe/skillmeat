@@ -26,9 +26,11 @@ export interface TagUpdateRequest {
 export interface TagListResponse {
   items: Tag[];
   page_info: {
-    has_next: boolean;
-    next_cursor?: string;
-    total?: number;
+    has_next_page: boolean;
+    has_previous_page: boolean;
+    start_cursor?: string;
+    end_cursor?: string;
+    total_count?: number;
   };
 }
 

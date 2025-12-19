@@ -451,3 +451,24 @@
   3. Added `Suspense` from 'react' and `Loader2` from 'lucide-react' imports to both files
 - **Commit(s)**: 601debd
 - **Status**: RESOLVED
+
+### Tags API Fails with TypeError on list_tags
+
+**Issue**: Tags API returns 500 error: `TagService.list_tags() got an unexpected keyword argument 'order_by'`
+- **Location**: `skillmeat/api/routers/tags.py` (multiple lines), `skillmeat/web/lib/api/tags.ts`
+- **Root Cause**: Router-to-service contract mismatches after TagService refactor:
+  1. `list_tags(order_by="name")` - service doesn't accept `order_by` param
+  2. `create_tag(name=..., slug=...)` - service expects `TagCreateRequest` object
+  3. `get_tag_by_id()` - method is named `get_tag()`
+  4. `update_tag(id, **updates)` - service expects `TagUpdateRequest` object
+  5. `get_tag_artifact_count()` - method doesn't exist (count is in response)
+  6. Frontend PageInfo types mismatched (`has_next` vs `has_next_page`, etc.)
+- **Fix**:
+  1. Changed `list_tags()` call to use correct signature without `order_by`
+  2. Changed `create_tag()` to pass request object directly
+  3. Changed `get_tag_by_id()` → `get_tag()`
+  4. Changed `update_tag()` to pass request object directly
+  5. Removed manual artifact_count calls (service includes it in response)
+  6. Fixed frontend `TagListResponse.page_info` to match backend `PageInfo` schema
+- **Commit(s)**: 24c62e5
+- **Status**: RESOLVED
