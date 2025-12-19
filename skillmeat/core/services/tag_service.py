@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 from typing import List, Optional
 
 from skillmeat.api.schemas.tags import (
@@ -72,6 +73,37 @@ class TagService:
         self.repo = TagRepository(db_path=db_path)
         self.logger = logging.getLogger(__name__)
         self.logger.info("TagService initialized")
+
+    # =========================================================================
+    # Tag Normalization Helpers
+    # =========================================================================
+
+    def _normalize_tag_names(self, tags: List[str]) -> List[str]:
+        """Normalize tag names (trim, de-duplicate, preserve order)."""
+        normalized: List[str] = []
+        seen = set()
+
+        for tag in tags:
+            if not tag:
+                continue
+            cleaned = tag.strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(cleaned)
+
+        return normalized
+
+    def _slugify(self, name: str) -> str:
+        """Convert a tag name into a kebab-case slug."""
+        slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower())
+        slug = re.sub(r"-{2,}", "-", slug).strip("-")
+        if not slug:
+            raise ValueError("Tag name must contain at least one alphanumeric character")
+        return slug
 
     # =========================================================================
     # CRUD Operations
@@ -376,6 +408,53 @@ class TagService:
     # =========================================================================
     # Artifact Associations
     # =========================================================================
+
+    def sync_artifact_tags(self, artifact_id: str, tags: List[str]) -> List[str]:
+        """Ensure tags exist and sync associations for an artifact."""
+        normalized_tags = self._normalize_tag_names(tags)
+        desired_tag_ids: List[str] = []
+
+        for tag_name in normalized_tags:
+            try:
+                slug = self._slugify(tag_name)
+            except ValueError as e:
+                self.logger.warning(f"Skipping invalid tag name '{tag_name}': {e}")
+                continue
+
+            tag = self.repo.get_by_slug(slug)
+            if not tag:
+                try:
+                    tag = self.repo.create(name=tag_name, slug=slug, color=None)
+                except RepositoryError as e:
+                    self.logger.warning(
+                        f"Tag creation failed for '{tag_name}' (slug='{slug}'): {e}"
+                    )
+                    tag = self.repo.get_by_slug(slug)
+
+            if tag:
+                desired_tag_ids.append(tag.id)
+
+        desired_ids = set(desired_tag_ids)
+        existing_tags = self.repo.get_artifact_tags(artifact_id=artifact_id)
+        existing_ids = {tag.id for tag in existing_tags}
+
+        for tag_id in existing_ids - desired_ids:
+            try:
+                self.repo.remove_tag_from_artifact(artifact_id=artifact_id, tag_id=tag_id)
+            except RepositoryError as e:
+                self.logger.warning(
+                    f"Failed to remove tag {tag_id} from artifact {artifact_id}: {e}"
+                )
+
+        for tag_id in desired_ids - existing_ids:
+            try:
+                self.repo.add_tag_to_artifact(artifact_id=artifact_id, tag_id=tag_id)
+            except RepositoryError as e:
+                self.logger.warning(
+                    f"Failed to add tag {tag_id} to artifact {artifact_id}: {e}"
+                )
+
+        return normalized_tags
 
     def add_tag_to_artifact(self, artifact_id: str, tag_id: str) -> bool:
         """Add tag to artifact.

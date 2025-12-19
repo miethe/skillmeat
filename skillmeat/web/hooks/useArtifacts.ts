@@ -49,6 +49,7 @@ interface ApiArtifact {
   type: ArtifactType;
   source: string;
   version?: string;
+  tags?: string[];
   aliases?: string[];
   metadata?: ApiArtifactMetadata;
   upstream?: ApiArtifactUpstream;
@@ -253,6 +254,19 @@ const DEFAULT_ARTIFACT_LIMIT = 100;
 
 const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
   const metadata = artifact.metadata || {};
+  const artifactTags = artifact.tags || [];
+  const metadataTags = metadata.tags || [];
+  const mergedTags: string[] = [];
+  const seenTags = new Set<string>();
+
+  for (const tag of [...artifactTags, ...metadataTags]) {
+    const normalized = tag?.trim();
+    if (!normalized || seenTags.has(normalized)) {
+      continue;
+    }
+    seenTags.add(normalized);
+    mergedTags.push(normalized);
+  }
   const upstream = artifact.upstream;
   const updatedAt = artifact.updated || artifact.added;
   const isOutdated = upstream?.update_available ?? false;
@@ -272,7 +286,7 @@ const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
       license: metadata.license,
       author: metadata.author,
       version: metadata.version || artifact.version,
-      tags: metadata.tags || [],
+      tags: mergedTags,
     },
     upstreamStatus: {
       hasUpstream: Boolean(upstream?.tracking_enabled),
