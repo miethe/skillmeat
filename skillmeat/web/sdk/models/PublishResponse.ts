@@ -8,24 +8,25 @@
  * Contains submission details and status information.
  */
 export type PublishResponse = {
-  /**
-   * Unique identifier for the submission
-   */
-  submission_id: string;
-  /**
-   * Submission status
-   */
-  status: 'pending' | 'approved' | 'rejected';
-  /**
-   * Status message
-   */
-  message: string;
-  /**
-   * Broker the bundle was published to
-   */
-  broker: string;
-  /**
-   * URL to view the listing (if approved)
-   */
-  listing_url?: string | null;
+    /**
+     * Unique identifier for the submission
+     */
+    submission_id: string;
+    /**
+     * Submission status
+     */
+    status: 'pending' | 'approved' | 'rejected';
+    /**
+     * Status message
+     */
+    message: string;
+    /**
+     * Broker the bundle was published to
+     */
+    broker: string;
+    /**
+     * URL to view the listing (if approved)
+     */
+    listing_url?: (string | null);
 };
+

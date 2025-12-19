@@ -8,16 +8,17 @@
  * Specifies the listing to install and conflict resolution strategy.
  */
 export type InstallRequest = {
-  /**
-   * Listing ID to install
-   */
-  listing_id: string;
-  /**
-   * Broker name (auto-detect if not provided)
-   */
-  broker?: string | null;
-  /**
-   * Conflict resolution strategy
-   */
-  strategy?: 'merge' | 'fork' | 'skip';
+    /**
+     * Listing ID to install
+     */
+    listing_id: string;
+    /**
+     * Broker name (auto-detect if not provided)
+     */
+    broker?: (string | null);
+    /**
+     * Conflict resolution strategy
+     */
+    strategy?: 'merge' | 'fork' | 'skip';
 };
+
