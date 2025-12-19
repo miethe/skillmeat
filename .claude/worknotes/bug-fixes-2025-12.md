@@ -513,3 +513,12 @@
   3. Added `['entities']` query invalidation after tag edit in `useEditArtifactParameters` hook
 - **Commit(s)**: aba3e6d
 - **Status**: RESOLVED
+
+### Artifact Cards Have Inconsistent Heights on /collection Page
+
+**Issue**: Artifact cards have varying sizes depending on whether they have tags attached. Cards with tags are taller than cards without, causing inconsistent row heights.
+- **Location**: `skillmeat/web/components/collection/artifact-grid.tsx:152,205`
+- **Root Cause**: The `UnifiedCard` component conditionally renders the tags section (only when tags exist). Without CSS Grid row height normalization, cards without tags were shorter than cards with tags.
+- **Fix**: Added `auto-rows-fr` Tailwind class to both grid containers (main grid and skeleton). This CSS Grid property (`grid-auto-rows: 1fr`) equalizes row heights based on the tallest item in each row.
+- **Commit(s)**: 7000902
+- **Status**: RESOLVED
