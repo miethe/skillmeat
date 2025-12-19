@@ -197,6 +197,19 @@ function mapApiArtifactToEntity(
   projectPath?: string
 ): Entity {
   const metadata = artifact.metadata || {};
+  const artifactTags = artifact.tags || [];
+  const metadataTags = metadata.tags || [];
+  const mergedTags: string[] = [];
+  const seenTags = new Set<string>();
+
+  for (const tag of [...artifactTags, ...metadataTags]) {
+    const normalized = tag?.trim();
+    if (!normalized || seenTags.has(normalized)) {
+      continue;
+    }
+    seenTags.add(normalized);
+    mergedTags.push(normalized);
+  }
   const upstream = artifact.upstream;
   const isOutdated = upstream?.update_available ?? false;
   const hasLocalMods = upstream?.has_local_modifications ?? false;
@@ -223,7 +236,7 @@ function mapApiArtifactToEntity(
     collection: mode === 'collection' ? 'default' : undefined,
     projectPath: mode === 'project' ? projectPath : undefined,
     status,
-    tags: metadata.tags || [],
+    tags: mergedTags,
     description: metadata.description || undefined,
     version: artifact.version || metadata.version || undefined,
     source: artifact.source,

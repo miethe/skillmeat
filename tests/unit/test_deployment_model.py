@@ -20,7 +20,7 @@ class TestDeployment:
             from_collection="default",
             deployed_at=now,
             artifact_path=Path("skills/test-skill"),
-            collection_sha="abc123",
+            content_hash="abc123",
             local_modifications=False,
         )
 
@@ -29,8 +29,12 @@ class TestDeployment:
         assert deployment.from_collection == "default"
         assert deployment.deployed_at == now
         assert deployment.artifact_path == Path("skills/test-skill")
-        assert deployment.collection_sha == "abc123"
+        assert deployment.content_hash == "abc123"
         assert deployment.local_modifications is False
+
+        # collection_sha is deprecated and only populated during serialization
+        data = deployment.to_dict()
+        assert data["collection_sha"] == "abc123"
 
     def test_deployment_to_dict(self):
         """Test converting Deployment to dictionary."""
@@ -41,7 +45,7 @@ class TestDeployment:
             from_collection="myproject",
             deployed_at=now,
             artifact_path=Path("commands/review.md"),
-            collection_sha="def456",
+            content_hash="def456",
             local_modifications=True,
         )
 
@@ -52,8 +56,10 @@ class TestDeployment:
         assert result["from_collection"] == "myproject"
         assert result["deployed_at"] == now.isoformat()
         assert result["artifact_path"] == "commands/review.md"
-        assert result["collection_sha"] == "def456"
+        assert result["content_hash"] == "def456"
         assert result["local_modifications"] is True
+        # collection_sha is deprecated but still included in serialization
+        assert result["collection_sha"] == "def456"
 
     def test_deployment_from_dict(self):
         """Test creating Deployment from dictionary."""
@@ -87,7 +93,7 @@ class TestDeployment:
             from_collection="default",
             deployed_at=now,
             artifact_path=Path("skills/roundtrip-test"),
-            collection_sha="roundtrip123",
+            content_hash="roundtrip123",
             local_modifications=True,
         )
 
@@ -100,8 +106,10 @@ class TestDeployment:
         assert restored.from_collection == original.from_collection
         assert restored.deployed_at == original.deployed_at
         assert restored.artifact_path == original.artifact_path
-        assert restored.collection_sha == original.collection_sha
+        assert restored.content_hash == original.content_hash
         assert restored.local_modifications == original.local_modifications
+        # collection_sha should be populated from deserialized data
+        assert restored.collection_sha == "roundtrip123"
 
     def test_deployment_datetime_handling(self):
         """Test that datetime serialization works correctly."""
@@ -113,7 +121,7 @@ class TestDeployment:
             from_collection="default",
             deployed_at=dt,
             artifact_path=Path("commands/test.md"),
-            collection_sha="dt123",
+            content_hash="dt123",
         )
 
         data = deployment.to_dict()
@@ -148,7 +156,7 @@ class TestDeployment:
             from_collection="default",
             deployed_at=now,
             artifact_path=Path("skills/path-test"),
-            collection_sha="path123",
+            content_hash="path123",
         )
         assert isinstance(deployment1.artifact_path, Path)
 
@@ -159,3 +167,55 @@ class TestDeployment:
         deployment2 = Deployment.from_dict(data)
         assert isinstance(deployment2.artifact_path, Path)
         assert deployment2.artifact_path == Path("skills/path-test")
+
+    def test_deployment_merge_base_snapshot(self):
+        """Test merge_base_snapshot field."""
+        now = datetime.now()
+
+        # Test with merge_base_snapshot
+        deployment1 = Deployment(
+            artifact_name="merge-test",
+            artifact_type="skill",
+            from_collection="default",
+            deployed_at=now,
+            artifact_path=Path("skills/merge-test"),
+            content_hash="current123",
+            merge_base_snapshot="base456",
+        )
+        assert deployment1.merge_base_snapshot == "base456"
+
+        # Serialize and verify field is included
+        data = deployment1.to_dict()
+        assert "merge_base_snapshot" in data
+        assert data["merge_base_snapshot"] == "base456"
+
+        # Deserialize and verify field is restored
+        restored = Deployment.from_dict(data)
+        assert restored.merge_base_snapshot == "base456"
+
+        # Test without merge_base_snapshot (should be None)
+        deployment2 = Deployment(
+            artifact_name="no-merge-test",
+            artifact_type="skill",
+            from_collection="default",
+            deployed_at=now,
+            artifact_path=Path("skills/no-merge-test"),
+            content_hash="nomg123",
+        )
+        assert deployment2.merge_base_snapshot is None
+
+        # Serialize without merge_base_snapshot (field should not be in dict)
+        data2 = deployment2.to_dict()
+        assert "merge_base_snapshot" not in data2
+
+        # Deserialize old-style deployment without merge_base_snapshot
+        old_data = {
+            "artifact_name": "old-test",
+            "artifact_type": "skill",
+            "from_collection": "default",
+            "deployed_at": now.isoformat(),
+            "artifact_path": "skills/old-test",
+            "collection_sha": "old123",
+        }
+        old_deployment = Deployment.from_dict(old_data)
+        assert old_deployment.merge_base_snapshot is None

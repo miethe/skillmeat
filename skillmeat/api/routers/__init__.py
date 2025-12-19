@@ -17,9 +17,12 @@ from . import (
     marketplace,
     marketplace_sources,
     mcp,
+    merge,
     project_templates,
     projects,
+    tags,
     user_collections,
+    versions,
 )
 
 __all__ = [
@@ -36,7 +39,10 @@ __all__ = [
     "marketplace",
     "marketplace_sources",
     "mcp",
+    "merge",
     "project_templates",
     "projects",
+    "tags",
     "user_collections",
+    "versions",
 ]

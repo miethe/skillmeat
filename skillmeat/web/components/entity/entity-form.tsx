@@ -19,6 +19,14 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { TagInput, type Tag } from '@/components/ui/tag-input';
+import {
+  useTags,
+  useArtifactTags,
+  useAddTagToArtifact,
+  useRemoveTagFromArtifact,
+  useCreateTag,
+} from '@/hooks/use-tags';
 
 /**
  * Props for EntityForm component
@@ -82,11 +90,27 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<'github' | 'local'>('github');
-  const [tags, setTags] = useState<string[]>(entity?.tags || []);
-  const [tagInput, setTagInput] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // GitHub metadata auto-population
   const { mutate: fetchMetadata, data: metadata, isPending: isMetadataLoading } = useGitHubMetadata();
+
+  // Fetch available tags for suggestions
+  const { data: tagsData } = useTags(100);
+  const { data: currentTags } = useArtifactTags(entity?.id);
+
+  // Tag mutations
+  const addTag = useAddTagToArtifact();
+  const removeTag = useRemoveTagFromArtifact();
+  const createTag = useCreateTag();
+
+  // Transform tags for TagInput
+  const tagSuggestions: Tag[] = tagsData?.items?.map(t => ({
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    color: t.color,
+  })) || [];
 
   // Determine the entity type config
   const typeConfig = entityType
@@ -112,10 +136,21 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     },
   });
 
-  // Update tags in form when local tags state changes
+  // Initialize selected tags when entity or current tags change
   useEffect(() => {
-    setValue('tags', tags);
-  }, [tags, setValue]);
+    if (currentTags && currentTags.length > 0) {
+      setSelectedTagIds(currentTags.map(tag => tag.id));
+    } else if (entity?.tags) {
+      // If we have tag names but not IDs, try to match them
+      const matchedTagIds = entity.tags
+        .map(tagName => {
+          const tag = tagSuggestions.find(t => t.name === tagName || t.slug === tagName);
+          return tag?.id;
+        })
+        .filter((id): id is string => id !== undefined);
+      setSelectedTagIds(matchedTagIds);
+    }
+  }, [entity, currentTags, tagSuggestions]);
 
   // Auto-populate fields when GitHub metadata arrives
   useEffect(() => {
@@ -131,11 +166,21 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
         setValue('description', metadata.description);
       }
       // Auto-populate tags from GitHub topics
-      if (metadata.topics && metadata.topics.length > 0 && tags.length === 0) {
-        setTags(metadata.topics);
+      if (metadata.topics && metadata.topics.length > 0 && selectedTagIds.length === 0) {
+        // Try to match GitHub topics to existing tags
+        const matchedTagIds = metadata.topics
+          .map(topic => {
+            const tag = tagSuggestions.find(t => t.slug === topic.toLowerCase());
+            return tag?.id;
+          })
+          .filter((id): id is string => id !== undefined);
+
+        if (matchedTagIds.length > 0) {
+          setSelectedTagIds(matchedTagIds);
+        }
       }
     }
-  }, [metadata, mode, setValue, getValues, tags.length]);
+  }, [metadata, mode, setValue, getValues, selectedTagIds.length, tagSuggestions]);
 
   // Debounced GitHub metadata fetch
   const handleSourceChange = useDebouncedCallback((source: string) => {
@@ -149,35 +194,46 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     if (!typeConfig) return [];
 
     if (mode === 'edit') {
-      // In edit mode, only show editable fields (tags, description)
+      // In edit mode, only show editable fields (description, but NOT tags - we handle that separately)
       return typeConfig.formSchema.fields.filter(
-        (field) => field.name === 'tags' || field.name === 'description'
+        (field) => field.name === 'description'
       );
     }
 
-    return typeConfig.formSchema.fields;
+    // In create mode, filter out tags field (we handle it separately with TagInput)
+    return typeConfig.formSchema.fields.filter(field => field.name !== 'tags');
   };
 
   const fields = getFields();
 
-  // Handle tag input
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addTag();
+  // Handle tag changes
+  const handleTagsChange = async (newTagIds: string[]) => {
+    if (!entity?.id) {
+      // In create mode, just update state
+      setSelectedTagIds(newTagIds);
+      return;
     }
-  };
 
-  const addTag = () => {
-    const tag = tagInput.trim();
-    if (tag && !tags.includes(tag)) {
-      setTags([...tags, tag]);
-      setTagInput('');
+    // In edit mode, apply changes to backend
+    try {
+      // Find added tags
+      const added = newTagIds.filter(id => !selectedTagIds.includes(id));
+      // Find removed tags
+      const removed = selectedTagIds.filter(id => !newTagIds.includes(id));
+
+      // Apply changes
+      for (const tagId of added) {
+        await addTag.mutateAsync({ artifactId: entity.id, tagId });
+      }
+      for (const tagId of removed) {
+        await removeTag.mutateAsync({ artifactId: entity.id, tagId });
+      }
+
+      setSelectedTagIds(newTagIds);
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update tags');
     }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((t) => t !== tagToRemove));
   };
 
   // Form submission
@@ -191,12 +247,17 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
           throw new Error('Entity type is required for create mode');
         }
 
+        // Convert tag IDs to tag names for creation
+        const tagNames = selectedTagIds
+          .map(id => tagSuggestions.find(t => t.id === id)?.name)
+          .filter((name): name is string => name !== undefined);
+
         await createEntity({
           name: data.name,
           type: entityType,
           source: data.source,
           sourceType: sourceType,
-          tags: tags,
+          tags: tagNames,
           description: data.description,
         });
       } else {
@@ -205,7 +266,6 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
         }
 
         await updateEntity(entity.id, {
-          tags: tags,
           description: data.description,
         });
       }
@@ -225,51 +285,6 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     // Skip source field if we're rendering it separately
     if (field.name === 'source' && mode === 'create') {
       return null;
-    }
-
-    // Handle tags separately
-    if (field.type === 'tags') {
-      return (
-        <div key={field.name} className="space-y-2">
-          <Label htmlFor={fieldId}>{field.label}</Label>
-          <div className="space-y-2">
-            {/* Existing tags */}
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <div
-                    key={tag}
-                    className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-sm text-secondary-foreground"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Tag input */}
-            <div className="flex gap-2">
-              <Input
-                id={fieldId}
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                placeholder={field.placeholder}
-                className="flex-1"
-              />
-              <Button type="button" variant="outline" onClick={addTag} disabled={!tagInput.trim()}>
-                Add
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
     }
 
     switch (field.type) {
@@ -460,6 +475,21 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
 
       {/* Dynamic fields */}
       {fields.map((field) => renderField(field))}
+
+      {/* Tags section - always shown */}
+      <div className="space-y-2">
+        <Label htmlFor="tags">Tags</Label>
+        <TagInput
+          value={selectedTagIds}
+          onChange={handleTagsChange}
+          suggestions={tagSuggestions}
+          placeholder="Add tags..."
+          allowCreate={true}
+        />
+        <p className="text-xs text-muted-foreground">
+          Press Enter or comma to add tags. Create new tags by typing.
+        </p>
+      </div>
 
       {/* Action buttons */}
       <div className="flex justify-end gap-3 border-t pt-4">

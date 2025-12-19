@@ -65,6 +65,7 @@ from skillmeat.api.schemas.discovery import (
     SkipPreferenceResponse,
 )
 from skillmeat.api.schemas.errors import ErrorCodes, ErrorDetail
+from skillmeat.api.schemas.tags import TagResponse
 from skillmeat.api.utils.error_handlers import (
     create_bad_request_error,
     create_internal_error,
@@ -84,6 +85,7 @@ from skillmeat.core.importer import (
     BulkImportResultData,
     ImportResultData,
 )
+from skillmeat.core.services import TagService
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 
@@ -472,6 +474,7 @@ def artifact_to_response(
         source=artifact.upstream if artifact.origin == "github" else "local",
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
+        tags=artifact.tags or [],
         metadata=metadata_response,
         upstream=upstream_response,
         added=artifact.added,
@@ -2049,6 +2052,7 @@ async def update_artifact_parameters(
 
         # Track updated fields
         updated_fields = []
+        pending_tag_sync: Optional[List[str]] = None
         params = request.parameters
 
         # Validate and update source
@@ -2058,7 +2062,7 @@ async def update_artifact_parameters(
                 try:
                     from skillmeat.core.github_metadata import GitHubMetadataExtractor
 
-                    extractor = GitHubMetadataExtractor()
+                    extractor = GitHubMetadataExtractor(cache=None)
                     # This will raise ValueError if invalid
                     extractor.parse_github_url(params.source)
                 except ValueError as e:
@@ -2103,9 +2107,24 @@ async def update_artifact_parameters(
 
         # Update tags
         if params.tags is not None:
-            artifact.tags = params.tags
+            normalized_tags = []
+            seen_tags = set()
+            for tag in params.tags:
+                if not isinstance(tag, str):
+                    continue
+                cleaned = tag.strip()
+                if not cleaned:
+                    continue
+                key = cleaned.lower()
+                if key in seen_tags:
+                    continue
+                seen_tags.add(key)
+                normalized_tags.append(cleaned)
+
+            artifact.tags = normalized_tags
             updated_fields.append("tags")
-            logger.info(f"Updated tags for {artifact_id}: {params.tags}")
+            pending_tag_sync = normalized_tags
+            logger.info(f"Updated tags for {artifact_id}: {normalized_tags}")
 
         # Update aliases
         if params.aliases is not None:
@@ -2151,6 +2170,15 @@ async def update_artifact_parameters(
             message = (
                 f"Updated {len(updated_fields)} field(s): {', '.join(updated_fields)}"
             )
+
+            if pending_tag_sync is not None:
+                try:
+                    TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to sync tag associations for {artifact_id}: {e}",
+                        exc_info=True,
+                    )
         else:
             logger.info(f"No parameter changes requested for artifact: {artifact_id}")
             message = "No parameters were updated"
@@ -2389,6 +2417,7 @@ async def deploy_artifact(
                 collection_name=collection_name,
                 project_path=project_path,
                 artifact_type=artifact_type,
+                overwrite=request.overwrite,
             )
 
             if not deployments:
@@ -5535,3 +5564,95 @@ async def list_skip_preferences(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list skip preferences: {str(e)}"
         )
+
+
+# ====================================================================
+# Artifact-Tag Association Endpoints
+# ====================================================================
+
+
+@router.get(
+    "/{artifact_id}/tags",
+    response_model=List[TagResponse],
+    summary="Get artifact tags",
+    description="Get all tags assigned to an artifact",
+)
+async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
+    """Get all tags assigned to a specific artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+
+    Returns:
+        List of tags assigned to the artifact
+
+    Raises:
+        HTTPException: 500 if operation fails
+    """
+    service = TagService()
+
+    try:
+        return service.get_artifact_tags(artifact_id)
+    except Exception as e:
+        logger.error(f"Failed to get tags for artifact {artifact_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{artifact_id}/tags/{tag_id}",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add tag to artifact",
+    description="Associate a tag with an artifact",
+)
+async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict:
+    """Add a tag to an artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+        tag_id: Unique identifier of the tag
+
+    Returns:
+        Success message with artifact and tag IDs
+
+    Raises:
+        HTTPException: 400 if association already exists or invalid request
+        HTTPException: 404 if artifact or tag not found
+    """
+    service = TagService()
+
+    try:
+        service.add_tag_to_artifact(artifact_id, tag_id)
+        return {"message": f"Tag {tag_id} added to artifact {artifact_id}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete(
+    "/{artifact_id}/tags/{tag_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove tag from artifact",
+    description="Remove a tag from an artifact",
+)
+async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
+    """Remove a tag from an artifact.
+
+    Args:
+        artifact_id: Unique identifier of the artifact
+        tag_id: Unique identifier of the tag
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        HTTPException: 400 if invalid request
+        HTTPException: 404 if tag association not found
+    """
+    service = TagService()
+
+    try:
+        if not service.remove_tag_from_artifact(artifact_id, tag_id):
+            raise HTTPException(status_code=404, detail="Tag association not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

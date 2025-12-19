@@ -6,7 +6,7 @@ import tarfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils.filesystem import atomic_write
 
@@ -157,15 +157,72 @@ class SnapshotManager:
 
         return snapshot
 
-    def list_snapshots(self, collection_name: str) -> List[Snapshot]:
-        """List all snapshots for collection, newest first.
+    def get_snapshot(self, snapshot_id: str, collection_name: Optional[str] = None) -> Optional[Snapshot]:
+        """Get a specific snapshot by ID.
+
+        Args:
+            snapshot_id: Snapshot ID to retrieve
+            collection_name: Optional collection name (searches all if not specified)
+
+        Returns:
+            Snapshot object or None if not found
+        """
+        # If collection_name specified, search only that collection
+        if collection_name:
+            metadata = self._read_metadata(collection_name)
+            snapshots_data = metadata.get("snapshots", [])
+
+            for snapshot_data in snapshots_data:
+                if snapshot_data["id"] == snapshot_id:
+                    return Snapshot(
+                        id=snapshot_data["id"],
+                        timestamp=datetime.fromisoformat(snapshot_data["timestamp"]),
+                        message=snapshot_data["message"],
+                        collection_name=collection_name,
+                        artifact_count=snapshot_data["artifact_count"],
+                        tarball_path=Path(snapshot_data["tarball_path"]),
+                    )
+            return None
+
+        # Search all collections
+        for collection_dir in self.snapshots_dir.iterdir():
+            if not collection_dir.is_dir():
+                continue
+
+            collection_name = collection_dir.name
+            snapshot = self.get_snapshot(snapshot_id, collection_name)
+            if snapshot:
+                return snapshot
+
+        return None
+
+    def list_snapshots(
+        self,
+        collection_name: str,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> Tuple[List[Snapshot], Optional[str]]:
+        """List snapshots for collection with cursor-based pagination.
 
         Args:
             collection_name: Name of collection
+            limit: Maximum number of snapshots to return (default 50, max 100)
+            cursor: Pagination cursor (snapshot ID to start after)
 
         Returns:
-            List of Snapshot objects, sorted newest first
+            Tuple of (snapshots, next_cursor)
+            - snapshots: List of Snapshot objects, sorted newest first
+            - next_cursor: ID of last snapshot if more exist, None otherwise
+
+        Raises:
+            ValueError: If limit is out of bounds or cursor is invalid
         """
+        # Validate and cap limit
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        limit = min(limit, 100)  # Cap at 100
+
+        # Get all snapshots
         metadata = self._read_metadata(collection_name)
         snapshots_data = metadata.get("snapshots", [])
 
@@ -183,7 +240,28 @@ class SnapshotManager:
 
         # Sort by timestamp, newest first
         snapshots.sort(key=lambda s: s.timestamp, reverse=True)
-        return snapshots
+
+        # Apply cursor-based pagination
+        if cursor:
+            # Find the cursor position
+            cursor_idx = None
+            for idx, snapshot in enumerate(snapshots):
+                if snapshot.id == cursor:
+                    cursor_idx = idx
+                    break
+
+            if cursor_idx is None:
+                raise ValueError(f"Invalid cursor: snapshot '{cursor}' not found")
+
+            # Return items after cursor
+            snapshots = snapshots[cursor_idx + 1 :]
+
+        # Apply limit and determine next cursor
+        has_more = len(snapshots) > limit
+        result_snapshots = snapshots[:limit]
+        next_cursor = result_snapshots[-1].id if has_more and result_snapshots else None
+
+        return result_snapshots, next_cursor
 
     def restore_snapshot(self, snapshot: Snapshot, collection_path: Path) -> None:
         """Restore collection from snapshot.
@@ -256,14 +334,27 @@ class SnapshotManager:
         Returns:
             List of deleted snapshots
         """
-        snapshots = self.list_snapshots(collection_name)
+        # Get all snapshots by requesting with large limit to ensure we get all
+        # This is acceptable for cleanup since we need to see the full list anyway
+        all_snapshots = []
+        cursor = None
+        while True:
+            snapshots, next_cursor = self.list_snapshots(
+                collection_name, limit=100, cursor=cursor
+            )
+            all_snapshots.extend(snapshots)
+
+            if next_cursor is None:
+                break
+
+            cursor = next_cursor
 
         # Snapshots are already sorted newest first
-        if len(snapshots) <= keep_count:
+        if len(all_snapshots) <= keep_count:
             return []
 
         # Delete old snapshots
-        snapshots_to_delete = snapshots[keep_count:]
+        snapshots_to_delete = all_snapshots[keep_count:]
         for snapshot in snapshots_to_delete:
             self.delete_snapshot(snapshot)
 

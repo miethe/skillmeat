@@ -20,6 +20,10 @@ from skillmeat.api.schemas.artifacts import (
     ModificationCheckResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
+from skillmeat.api.schemas.drift import (
+    DriftDetectionResponse,
+    DriftSummaryResponse,
+)
 from skillmeat.api.schemas.projects import (
     CacheInfo,
     ContextEntityInfo,
@@ -982,8 +986,8 @@ async def check_project_modifications(
 ) -> ModificationCheckResponse:
     """Check for modifications in all deployed artifacts.
 
-    Compares the current content hash of each deployed artifact with
-    the hash recorded at deployment time to detect local modifications.
+    Uses drift detection to properly identify change origins (local_modification,
+    sync, or deployment) and track modification timestamps.
 
     This operation updates the deployment metadata with modification
     timestamps when changes are first detected.
@@ -993,7 +997,7 @@ async def check_project_modifications(
         token: Authentication token
 
     Returns:
-        Modification check results with status for each deployment
+        Modification check results with status and change origin for each deployment
 
     Raises:
         HTTPException: If project not found or on error
@@ -1013,7 +1017,8 @@ async def check_project_modifications(
                     "deployed_sha": "abc123...",
                     "current_sha": "def456...",
                     "is_modified": true,
-                    "modification_detected_at": "2025-11-20T15:45:00Z"
+                    "modification_detected_at": "2025-11-20T15:45:00Z",
+                    "change_origin": "local_modification"
                 }
             ]
         }
@@ -1040,70 +1045,57 @@ async def check_project_modifications(
                 detail=f"No deployments found for project: {project_path.name}",
             )
 
-        # Load current deployments
-        deployments = DeploymentTracker.read_deployments(project_path)
+        # Use sync manager to check drift - this provides proper change_origin detection
+        from skillmeat.core.sync import SyncManager
+        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
 
-        # Check each deployment for modifications
+        try:
+            drift_results = sync_mgr.check_drift(project_path=project_path)
+        except Exception as e:
+            logger.error(f"Drift detection failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to check drift: {str(e)}",
+            )
+
+        # Convert drift results to modification statuses
         modification_statuses: List[DeploymentModificationStatus] = []
         modifications_count = 0
         checked_at = datetime.now(timezone.utc)
 
-        for deployment in deployments:
-            # Compute current content hash
-            artifact_full_path = project_path / ".claude" / deployment.artifact_path
-
-            if not artifact_full_path.exists():
-                # Artifact has been deleted
-                logger.warning(
-                    f"Deployed artifact not found: {deployment.artifact_name} at {artifact_full_path}"
-                )
-                # Skip deleted artifacts
+        for drift in drift_results:
+            # Skip artifacts that were added or removed (not relevant for modification check)
+            if drift.drift_type in ("added", "removed"):
                 continue
 
-            try:
-                current_sha = compute_content_hash(artifact_full_path)
-            except Exception as e:
-                logger.error(
-                    f"Failed to compute hash for {deployment.artifact_name}: {e}"
-                )
-                # Use a placeholder to indicate error
-                current_sha = "error"
-
-            # Compare with deployed SHA
-            is_modified = current_sha != deployment.collection_sha
-
-            # Update deployment metadata if modification detected
-            modification_detected_at = deployment.modification_detected_at
-            if is_modified and not deployment.local_modifications:
-                # First time detecting this modification
-                modification_detected_at = checked_at
-                deployment.local_modifications = True
-                deployment.modification_detected_at = modification_detected_at
-            elif not is_modified and deployment.local_modifications:
-                # Modification was reverted
-                deployment.local_modifications = False
-                deployment.modification_detected_at = None
-                modification_detected_at = None
-
-            # Track last check time
-            deployment.last_modified_check = checked_at
+            # Determine if artifact is modified
+            is_modified = drift.drift_type in ("modified", "conflict")
 
             if is_modified:
                 modifications_count += 1
 
+            # Parse modification timestamp if present
+            modification_detected_at = None
+            if drift.modification_detected_at:
+                try:
+                    modification_detected_at = datetime.fromisoformat(
+                        drift.modification_detected_at.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    pass
+
             modification_statuses.append(
                 DeploymentModificationStatus(
-                    artifact_name=deployment.artifact_name,
-                    artifact_type=deployment.artifact_type,
-                    deployed_sha=deployment.collection_sha,
-                    current_sha=current_sha,
+                    artifact_name=drift.artifact_name,
+                    artifact_type=drift.artifact_type,
+                    deployed_sha=drift.baseline_hash or drift.collection_sha or "",
+                    current_sha=drift.current_hash or drift.project_sha or "",
                     is_modified=is_modified,
                     modification_detected_at=modification_detected_at,
+                    change_origin=drift.change_origin,  # From DriftDetectionResult
+                    baseline_hash=drift.baseline_hash,
                 )
             )
-
-        # Save updated deployment metadata
-        DeploymentTracker.write_deployments(project_path, deployments)
 
         logger.info(
             f"Modification check complete: {modifications_count} of {len(modification_statuses)} artifacts modified"
@@ -1147,18 +1139,17 @@ async def get_modified_artifacts(
 ) -> ModifiedArtifactsResponse:
     """Get list of all modified artifacts in a project.
 
-    This is a convenience endpoint that filters the results from
-    check-modifications to return only modified artifacts.
+    Uses drift detection to properly identify change origins and
+    filter for modified artifacts only.
 
-    Note: This performs a live check of all deployments. Results
-    are not cached between calls.
+    Note: This performs a live drift check. Results are not cached between calls.
 
     Args:
         project_id: Base64-encoded project path
         token: Authentication token
 
     Returns:
-        List of modified artifacts with their current and deployed hashes
+        List of modified artifacts with change origin and hashes
 
     Raises:
         HTTPException: If project not found or on error
@@ -1175,7 +1166,8 @@ async def get_modified_artifacts(
                     "artifact_type": "skill",
                     "deployed_sha": "abc123...",
                     "current_sha": "def456...",
-                    "modification_detected_at": "2025-11-20T15:45:00Z"
+                    "modification_detected_at": "2025-11-20T15:45:00Z",
+                    "change_origin": "local_modification"
                 }
             ],
             "total_count": 2,
@@ -1204,42 +1196,51 @@ async def get_modified_artifacts(
                 detail=f"No deployments found for project: {project_path.name}",
             )
 
-        # Load current deployments
-        deployments = DeploymentTracker.read_deployments(project_path)
+        # Use sync manager to check drift - provides proper change_origin
+        from skillmeat.core.sync import SyncManager
+        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
 
-        # Find modified artifacts
+        try:
+            drift_results = sync_mgr.check_drift(project_path=project_path)
+        except Exception as e:
+            logger.error(f"Drift detection failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to check drift: {str(e)}",
+            )
+
+        # Filter for modified artifacts only
         from skillmeat.api.schemas.projects import ModifiedArtifactInfo
 
         modified_artifacts: List[ModifiedArtifactInfo] = []
         checked_at = datetime.now(timezone.utc)
 
-        for deployment in deployments:
-            # Compute current content hash
-            artifact_full_path = project_path / ".claude" / deployment.artifact_path
-
-            if not artifact_full_path.exists():
-                # Skip deleted artifacts
+        for drift in drift_results:
+            # Only include artifacts that are modified or in conflict
+            if drift.drift_type not in ("modified", "conflict"):
                 continue
 
-            try:
-                current_sha = compute_content_hash(artifact_full_path)
-            except Exception as e:
-                logger.error(
-                    f"Failed to compute hash for {deployment.artifact_name}: {e}"
-                )
-                continue
-
-            # Check if modified
-            if current_sha != deployment.collection_sha:
-                modified_artifacts.append(
-                    ModifiedArtifactInfo(
-                        artifact_name=deployment.artifact_name,
-                        artifact_type=deployment.artifact_type,
-                        deployed_sha=deployment.collection_sha,
-                        current_sha=current_sha,
-                        modification_detected_at=deployment.modification_detected_at,
+            # Parse modification timestamp if present
+            modification_detected_at = None
+            if drift.modification_detected_at:
+                try:
+                    modification_detected_at = datetime.fromisoformat(
+                        drift.modification_detected_at.replace("Z", "+00:00")
                     )
+                except (ValueError, AttributeError):
+                    pass
+
+            modified_artifacts.append(
+                ModifiedArtifactInfo(
+                    artifact_name=drift.artifact_name,
+                    artifact_type=drift.artifact_type,
+                    deployed_sha=drift.baseline_hash or drift.collection_sha or "",
+                    current_sha=drift.current_hash or drift.project_sha or "",
+                    modification_detected_at=modification_detected_at,
+                    change_origin=drift.change_origin,  # From DriftDetectionResult
+                    baseline_hash=drift.baseline_hash,
                 )
+            )
 
         logger.info(
             f"Found {len(modified_artifacts)} modified artifacts in project '{project_path.name}'"
@@ -1479,6 +1480,234 @@ async def get_project_context_map(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to discover context entities: {str(e)}",
+        )
+
+
+# =============================================================================
+# Drift Detection Endpoints
+# =============================================================================
+
+
+def calculate_drift_summary(
+    project_path: str,
+    collection_name: str,
+    drift_results: List,
+) -> DriftSummaryResponse:
+    """Calculate drift summary counts from drift detection results.
+
+    Args:
+        project_path: Path to the project directory
+        collection_name: Name of the collection being compared
+        drift_results: List of DriftDetectionResult objects
+
+    Returns:
+        DriftSummaryResponse with calculated summary counts
+
+    Note:
+        This helper function implements TASK-4.3 summary count calculation:
+        - upstream_changes: Count of "outdated", "added", "removed" drift
+        - local_changes: Count of "modified" drift
+        - conflicts: Count of "conflict" drift
+        - total: Total artifacts with drift
+    """
+    from skillmeat.models import DriftDetectionResult
+
+    # Initialize counters
+    upstream_changes = 0
+    local_changes = 0
+    conflicts = 0
+    modified_count = 0
+    outdated_count = 0
+    conflict_count = 0
+    added_count = 0
+    removed_count = 0
+    version_mismatch_count = 0
+
+    # Count by drift type
+    for drift in drift_results:
+        drift_type = drift.drift_type
+
+        # Update summary counts (TASK-4.3)
+        if drift_type in ("outdated", "added", "removed"):
+            upstream_changes += 1
+        elif drift_type == "modified":
+            local_changes += 1
+        elif drift_type == "conflict":
+            conflicts += 1
+
+        # Update individual type counts
+        if drift_type == "modified":
+            modified_count += 1
+        elif drift_type == "outdated":
+            outdated_count += 1
+        elif drift_type == "conflict":
+            conflict_count += 1
+        elif drift_type == "added":
+            added_count += 1
+        elif drift_type == "removed":
+            removed_count += 1
+        elif drift_type == "version_mismatch":
+            version_mismatch_count += 1
+
+    # Convert DriftDetectionResult to DriftDetectionResponse
+    drift_details = [
+        DriftDetectionResponse(
+            artifact_name=d.artifact_name,
+            artifact_type=d.artifact_type,
+            drift_type=d.drift_type,
+            collection_sha=d.collection_sha,
+            project_sha=d.project_sha,
+            collection_version=d.collection_version,
+            project_version=d.project_version,
+            last_deployed=d.last_deployed,
+            recommendation=d.recommendation,
+            change_origin=d.change_origin,
+            baseline_hash=d.baseline_hash,
+            current_hash=d.current_hash,
+            modification_detected_at=d.modification_detected_at,
+        )
+        for d in drift_results
+    ]
+
+    return DriftSummaryResponse(
+        project_path=project_path,
+        collection_name=collection_name,
+        total_artifacts=len(drift_results),
+        drifted_count=len(drift_results),
+        modified_count=modified_count,
+        outdated_count=outdated_count,
+        conflict_count=conflict_count,
+        added_count=added_count,
+        removed_count=removed_count,
+        version_mismatch_count=version_mismatch_count,
+        upstream_changes=upstream_changes,
+        local_changes=local_changes,
+        conflicts=conflicts,
+        total=len(drift_results),
+        drift_details=drift_details,
+        checked_at=datetime.now(timezone.utc),
+    )
+
+
+@router.get(
+    "/{project_id}/drift/summary",
+    response_model=DriftSummaryResponse,
+    summary="Get drift detection summary",
+    description="Detect drift between project and collection with summary counts",
+    responses={
+        200: {"description": "Successfully detected drift"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_project_drift_summary(
+    project_id: str,
+    token: TokenDep,
+    collection_name: Optional[str] = Query(
+        default=None,
+        description="Collection name to compare against (defaults to deployed collection)",
+    ),
+) -> DriftSummaryResponse:
+    """Get drift detection summary for a project.
+
+    Detects drift between deployed artifacts and collection state, returning
+    summary counts for:
+    - upstream_changes: Changes from collection (outdated, added, removed)
+    - local_changes: Local modifications in project
+    - conflicts: Both local and upstream changes
+    - total: Total artifacts with drift
+
+    This endpoint implements TASK-4.3 drift summary counts.
+
+    Args:
+        project_id: Base64-encoded project path
+        token: Authentication token
+        collection_name: Optional collection name override
+
+    Returns:
+        Drift summary with counts and detailed drift information
+
+    Raises:
+        HTTPException: If project not found or on error
+
+    Example:
+        GET /api/v1/projects/L1VzZXJzL21lL3Byb2plY3Qx/drift/summary
+
+        Returns:
+        {
+            "project_path": "/Users/me/project1",
+            "collection_name": "default",
+            "upstream_changes": 2,
+            "local_changes": 1,
+            "conflicts": 0,
+            "total": 3,
+            "drift_details": [...]
+        }
+    """
+    try:
+        logger.info(f"Getting drift summary for project: {project_id}")
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Validate project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Check if deployment file exists
+        deployment_file = DeploymentTracker.get_deployment_file_path(project_path)
+        if not deployment_file.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No deployments found for project: {project_path.name}",
+            )
+
+        # Get SyncManager from app state
+        from skillmeat.api.dependencies import app_state
+
+        if not hasattr(app_state, "sync_manager") or app_state.sync_manager is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="SyncManager not available",
+            )
+
+        sync_manager = app_state.sync_manager
+
+        # Detect drift
+        drift_results = sync_manager.check_drift(
+            project_path=project_path,
+            collection_name=collection_name,
+        )
+
+        # Calculate summary
+        summary = calculate_drift_summary(
+            project_path=str(project_path),
+            collection_name=collection_name or "default",
+            drift_results=drift_results,
+        )
+
+        logger.info(
+            f"Drift summary: {summary.upstream_changes} upstream, "
+            f"{summary.local_changes} local, {summary.conflicts} conflicts"
+        )
+
+        return summary
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting drift summary for project '{project_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get drift summary: {str(e)}",
         )
 
 

@@ -273,6 +273,21 @@ class Artifact(Base):
         viewonly=True,
         lazy="selectin",
     )
+    tags: Mapped[List["Tag"]] = relationship(
+        "Tag",
+        secondary="artifact_tags",
+        primaryjoin="Artifact.id == foreign(ArtifactTag.artifact_id)",
+        secondaryjoin="foreign(ArtifactTag.tag_id) == Tag.id",
+        lazy="selectin",
+        back_populates="artifacts",
+    )
+    versions: Mapped[List["ArtifactVersion"]] = relationship(
+        "ArtifactVersion",
+        back_populates="artifact",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ArtifactVersion.created_at.desc()",
+    )
 
     # Constraints
     __table_args__ = (
@@ -444,6 +459,156 @@ class ArtifactMetadata(Base):
             aliases: List of alias strings
         """
         self.aliases = ",".join(aliases) if aliases else None
+
+
+class ArtifactVersion(Base):
+    """Version history entry for an artifact.
+
+    Tracks version lineage with parent-child relationships and change origin
+    attribution. Each version stores content hash for content-based deduplication.
+
+    Attributes:
+        id: Unique version identifier (UUID hex)
+        artifact_id: Foreign key to artifacts.id
+        content_hash: SHA-256 hash of artifact content (UNIQUE)
+        parent_hash: Content hash of parent version (NULL for root)
+        change_origin: Origin of this version ('deployment', 'sync', 'local_modification')
+        version_lineage: JSON array of ancestor content hashes
+        created_at: Timestamp when version was created
+        metadata_json: Additional JSON metadata
+        artifact: Related Artifact object
+
+    Indexes:
+        - idx_artifact_versions_artifact_id: Fast lookup by artifact
+        - idx_artifact_versions_content_hash (UNIQUE): Content-based deduplication
+        - idx_artifact_versions_parent_hash: Fast lookup by parent
+        - idx_artifact_versions_artifact_created: Composite for artifact+time queries
+        - idx_artifact_versions_change_origin: Filter by origin type
+    """
+
+    __tablename__ = "artifact_versions"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Foreign key
+    artifact_id: Mapped[str] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Version tracking
+    content_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    parent_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    change_origin: Mapped[str] = mapped_column(String, nullable=False)
+    version_lineage: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # JSON array
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Metadata
+    metadata_json: Mapped[Optional[str]] = mapped_column(
+        "metadata", Text, nullable=True
+    )
+
+    # Relationships
+    artifact: Mapped["Artifact"] = relationship("Artifact", back_populates="versions")
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "change_origin IN ('deployment', 'sync', 'local_modification')",
+            name="check_artifact_versions_change_origin",
+        ),
+        Index("idx_artifact_versions_artifact_id", "artifact_id"),
+        Index("idx_artifact_versions_content_hash", "content_hash", unique=True),
+        Index("idx_artifact_versions_parent_hash", "parent_hash"),
+        Index("idx_artifact_versions_artifact_created", "artifact_id", "created_at"),
+        Index("idx_artifact_versions_change_origin", "change_origin"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactVersion."""
+        return (
+            f"<ArtifactVersion(id={self.id!r}, artifact_id={self.artifact_id!r}, "
+            f"content_hash={self.content_hash[:8]}..., change_origin={self.change_origin!r})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ArtifactVersion to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the version
+        """
+        # Parse lineage and metadata JSON if present
+        lineage_list = self.get_lineage_list()
+        metadata_dict = self.get_metadata_dict()
+
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "content_hash": self.content_hash,
+            "parent_hash": self.parent_hash,
+            "change_origin": self.change_origin,
+            "version_lineage": lineage_list,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "metadata": metadata_dict,
+        }
+
+    def get_lineage_list(self) -> List[str]:
+        """Parse version_lineage JSON to list.
+
+        Returns:
+            List of ancestor content hashes or empty list if None/invalid
+        """
+        if not self.version_lineage:
+            return []
+
+        try:
+            lineage = json.loads(self.version_lineage)
+            if isinstance(lineage, list):
+                return lineage
+            return []
+        except json.JSONDecodeError:
+            return []
+
+    def set_lineage_list(self, hashes: List[str]) -> None:
+        """Serialize list of hashes to version_lineage JSON.
+
+        Args:
+            hashes: List of ancestor content hashes
+        """
+        if not hashes:
+            self.version_lineage = None
+        else:
+            self.version_lineage = json.dumps(hashes)
+
+    def get_metadata_dict(self) -> Optional[Dict[str, Any]]:
+        """Parse and return metadata as dictionary.
+
+        Returns:
+            Parsed metadata dictionary or None if invalid/missing
+        """
+        if not self.metadata_json:
+            return None
+
+        try:
+            return json.loads(self.metadata_json)
+        except json.JSONDecodeError:
+            return None
+
+    def set_metadata_dict(self, metadata_dict: Dict[str, Any]) -> None:
+        """Set metadata from dictionary.
+
+        Args:
+            metadata_dict: Dictionary to serialize as JSON
+        """
+        self.metadata_json = json.dumps(metadata_dict)
 
 
 class Collection(Base):
@@ -754,6 +919,143 @@ class CollectionArtifact(Base):
             f"collection_id={self.collection_id!r}, "
             f"artifact_id={self.artifact_id!r}, "
             f"added_at={self.added_at!r})>"
+        )
+
+
+class Tag(Base):
+    """Tag for categorizing and organizing artifacts.
+
+    Tags provide a flexible categorization system for artifacts, enabling
+    filtering, searching, and organization. Each tag has a unique name and
+    optional color for visual distinction.
+
+    Attributes:
+        id: Unique tag identifier (primary key, UUID hex)
+        name: Tag name (unique, non-empty, max 100 characters)
+        slug: URL-friendly identifier (unique, kebab-case)
+        color: Optional hex color code (e.g., "#FF5733")
+        created_at: Timestamp when tag was created
+        updated_at: Timestamp when tag was last modified
+        artifacts: List of artifacts with this tag (via association)
+
+    Indexes:
+        - idx_tags_name (UNIQUE): Fast lookup by name
+        - idx_tags_slug (UNIQUE): Fast lookup by slug
+    """
+
+    __tablename__ = "tags"
+
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: uuid.uuid4().hex
+    )
+
+    # Core fields
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    artifacts: Mapped[List["Artifact"]] = relationship(
+        "Artifact",
+        secondary="artifact_tags",
+        primaryjoin="Tag.id == ArtifactTag.tag_id",
+        secondaryjoin="foreign(ArtifactTag.artifact_id) == Artifact.id",
+        lazy="selectin",
+        back_populates="tags",
+        viewonly=True,
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "length(name) > 0 AND length(name) <= 100",
+            name="check_tag_name_length",
+        ),
+        CheckConstraint(
+            "length(slug) > 0 AND length(slug) <= 100",
+            name="check_tag_slug_length",
+        ),
+        CheckConstraint(
+            "color IS NULL OR (length(color) = 7 AND color LIKE '#%')",
+            name="check_tag_color_format",
+        ),
+        Index("idx_tags_name", "name", unique=True),
+        Index("idx_tags_slug", "slug", unique=True),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of Tag."""
+        return f"<Tag(id={self.id!r}, name={self.name!r}, slug={self.slug!r})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert Tag to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the tag
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "color": self.color,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ArtifactTag(Base):
+    """Association between Artifact and Tag (many-to-many).
+
+    Links artifacts to tags for categorization and filtering. Each artifact
+    can have multiple tags, and each tag can be applied to multiple artifacts.
+
+    Attributes:
+        artifact_id: Foreign key to artifacts.id (part of composite PK)
+        tag_id: Foreign key to tags.id (part of composite PK)
+        created_at: Timestamp when tag was added to artifact
+
+    Indexes:
+        - idx_artifact_tags_artifact_id: Fast lookup by artifact
+        - idx_artifact_tags_tag_id: Fast lookup by tag
+        - idx_artifact_tags_created_at: Sort by tag application date
+    """
+
+    __tablename__ = "artifact_tags"
+
+    # Composite primary key
+    artifact_id: Mapped[str] = mapped_column(
+        String, ForeignKey("artifacts.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[str] = mapped_column(
+        String, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_artifact_tags_artifact_id", "artifact_id"),
+        Index("idx_artifact_tags_tag_id", "tag_id"),
+        Index("idx_artifact_tags_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of ArtifactTag."""
+        return (
+            f"<ArtifactTag(artifact_id={self.artifact_id!r}, "
+            f"tag_id={self.tag_id!r}, created_at={self.created_at!r})>"
         )
 
 

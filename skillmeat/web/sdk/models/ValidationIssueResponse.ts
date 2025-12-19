@@ -6,20 +6,21 @@
  * Single validation issue.
  */
 export type ValidationIssueResponse = {
-  /**
-   * Issue severity (error, warning, info)
-   */
-  severity: string;
-  /**
-   * Issue category (security, schema, integrity, size)
-   */
-  category: string;
-  /**
-   * Issue message
-   */
-  message: string;
-  /**
-   * File path if issue relates to specific file
-   */
-  file_path?: string | null;
+    /**
+     * Issue severity (error, warning, info)
+     */
+    severity: string;
+    /**
+     * Issue category (security, schema, integrity, size)
+     */
+    category: string;
+    /**
+     * Issue message
+     */
+    message: string;
+    /**
+     * File path if issue relates to specific file
+     */
+    file_path?: (string | null);
 };
+

@@ -9,8 +9,9 @@ import type { BrokerInfo } from './BrokerInfo';
  * Contains a list of all configured brokers with their status.
  */
 export type BrokerListResponse = {
-  /**
-   * List of available brokers
-   */
-  brokers: Array<BrokerInfo>;
+    /**
+     * List of available brokers
+     */
+    brokers: Array<BrokerInfo>;
 };
+

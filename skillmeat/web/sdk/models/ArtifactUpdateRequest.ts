@@ -10,16 +10,17 @@ import type { ArtifactUpdateMetadataRequest } from './ArtifactUpdateMetadataRequ
  * implemented in the backend but are included for future compatibility.
  */
 export type ArtifactUpdateRequest = {
-  /**
-   * Artifact aliases (not yet implemented)
-   */
-  aliases?: Array<string> | null;
-  /**
-   * Artifact tags
-   */
-  tags?: Array<string> | null;
-  /**
-   * Artifact metadata to update
-   */
-  metadata?: ArtifactUpdateMetadataRequest | null;
+    /**
+     * Artifact aliases (not yet implemented)
+     */
+    aliases?: (Array<string> | null);
+    /**
+     * Artifact tags
+     */
+    tags?: (Array<string> | null);
+    /**
+     * Artifact metadata to update
+     */
+    metadata?: (ArtifactUpdateMetadataRequest | null);
 };
+

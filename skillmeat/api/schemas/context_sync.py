@@ -66,6 +66,8 @@ class SyncConflictResponse(BaseModel):
         deployed_content: Current content in deployed file
         collection_path: Path to entity in collection
         deployed_path: Path to deployed file in project
+        change_origin: Origin of the change (optional)
+        baseline_hash: Hash at deployment time (baseline for three-way merge)
     """
 
     entity_id: str = Field(..., description="Entity identifier")
@@ -77,6 +79,14 @@ class SyncConflictResponse(BaseModel):
     deployed_content: str = Field(..., description="Current content in deployed file")
     collection_path: str = Field(..., description="Path to entity in collection")
     deployed_path: str = Field(..., description="Path to deployed file in project")
+    change_origin: Optional[str] = Field(
+        default=None,
+        description="Origin of the change (deployment/sync/local_modification)",
+    )
+    baseline_hash: Optional[str] = Field(
+        default=None,
+        description="Hash at deployment time (baseline for three-way merge)",
+    )
 
 
 class SyncResultResponse(BaseModel):

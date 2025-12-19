@@ -10,20 +10,21 @@ import type { DeploymentModificationStatus } from './DeploymentModificationStatu
  * identifying which artifacts have been modified.
  */
 export type ModificationCheckResponse = {
-  /**
-   * Base64-encoded project path
-   */
-  project_id: string;
-  /**
-   * Timestamp when check was performed
-   */
-  checked_at: string;
-  /**
-   * Number of modified artifacts detected
-   */
-  modifications_detected: number;
-  /**
-   * Status of each deployment in the project
-   */
-  deployments: Array<DeploymentModificationStatus>;
+    /**
+     * Base64-encoded project path
+     */
+    project_id: string;
+    /**
+     * Timestamp when check was performed
+     */
+    checked_at: string;
+    /**
+     * Number of modified artifacts detected
+     */
+    modifications_detected: number;
+    /**
+     * Status of each deployment in the project
+     */
+    deployments: Array<DeploymentModificationStatus>;
 };
+

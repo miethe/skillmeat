@@ -10,6 +10,7 @@
 import { StatsCards } from './stats-cards';
 import { TopArtifactsWidget } from './top-artifacts-widget';
 import { UsageTrendsWidget } from './usage-trends-widget';
+import { TagMetricsWidget } from './tag-metrics-widget';
 import { useAnalyticsStream } from '@/hooks/useAnalyticsStream';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -62,9 +63,10 @@ export function AnalyticsGrid({ enableLiveUpdates = true }: AnalyticsGridProps) 
       <StatsCards />
 
       {/* Main Analytics Widgets */}
-      <div className="grid gap-6 md:grid-cols-2" data-testid="widgets-grid">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" data-testid="widgets-grid">
         <TopArtifactsWidget limit={10} showChart={true} />
         <UsageTrendsWidget showType="area" />
+        <TagMetricsWidget limit={5} />
       </div>
     </div>
   );

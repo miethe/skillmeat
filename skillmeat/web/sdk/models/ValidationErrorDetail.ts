@@ -9,16 +9,17 @@
  * that occur during request processing.
  */
 export type ValidationErrorDetail = {
-  /**
-   * Name of the field that failed validation
-   */
-  field: string;
-  /**
-   * Error message describing the validation failure
-   */
-  message: string;
-  /**
-   * Type of validation error
-   */
-  type: string;
+    /**
+     * Name of the field that failed validation
+     */
+    field: string;
+    /**
+     * Error message describing the validation failure
+     */
+    message: string;
+    /**
+     * Type of validation error
+     */
+    type: string;
 };
+

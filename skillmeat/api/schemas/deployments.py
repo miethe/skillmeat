@@ -170,6 +170,10 @@ class DeploymentInfo(BaseModel):
         default=None,
         description="Sync status: synced, modified, outdated",
     )
+    merge_base_snapshot: Optional[str] = Field(
+        default=None,
+        description="Content hash (SHA-256) used as merge base for 3-way merges",
+    )
 
     class Config:
         """Pydantic config."""

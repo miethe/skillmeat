@@ -23,10 +23,55 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+    VariantProps<typeof badgeVariants> {
+  /**
+   * Custom hex color for the badge background.
+   * Overrides variant color when provided.
+   * @example "#FF5733"
+   */
+  colorStyle?: string;
+}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+function Badge({ className, variant, colorStyle, style, ...props }: BadgeProps) {
+  const customStyle = colorStyle
+    ? {
+        backgroundColor: colorStyle,
+        borderColor: colorStyle,
+        color: getContrastTextColor(colorStyle),
+        ...style,
+      }
+    : style;
+
+  return (
+    <div
+      className={cn(badgeVariants({ variant }), className)}
+      style={customStyle}
+      {...props}
+    />
+  );
+}
+
+/**
+ * Calculate contrast text color (white or black) for a given background color.
+ * Uses relative luminance formula from WCAG 2.0.
+ */
+function getContrastTextColor(hexColor: string): string {
+  // Remove # if present
+  const hex = hexColor.replace('#', '');
+
+  // Parse RGB values
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  // Calculate relative luminance
+  const luminance =
+    0.2126 * (r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4)) +
+    0.7152 * (g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4)) +
+    0.0722 * (b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4));
+
+  // Use white text for dark backgrounds, black for light backgrounds
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
 }
 
 export { Badge, badgeVariants };

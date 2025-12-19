@@ -4,26 +4,188 @@ prd: versioning-merge-system
 title: "Versioning & Merge System - Development Context"
 status: active
 created: "2025-11-30"
-updated: "2025-11-30"
-critical_notes_count: 0
-implementation_decisions_count: 5
-active_gotchas_count: 0
-agent_contributors: []
-agents: []
-phase_status: []
+updated: "2025-12-16"
+critical_notes_count: 1
+implementation_decisions_count: 6
+active_gotchas_count: 1
+agent_contributors: ["backend-architect", "python-backend-engineer"]
+agents: ["backend-architect", "python-backend-engineer", "data-layer-expert"]
+
+phase_status:
+  - phase: 1
+    title: "Storage Infrastructure"
+    status: "partial"
+    progress: 60
+    note: "Different architecture - tarball snapshots vs per-artifact versions"
+  - phase: 2
+    title: "Repository Layer CRUD"
+    status: "partial"
+    progress: 50
+    note: "SnapshotManager + VersionManager provide similar functionality"
+  - phase: 3
+    title: "Repository Comparisons"
+    status: "partial"
+    progress: 40
+    note: "DiffEngine exists; retention policies missing"
+  - phase: 4
+    title: "Service Layer - Version Mgmt"
+    status: "partial"
+    progress: 40
+    note: "VersionManager provides core operations"
+  - phase: 5
+    title: "Three-Way Merge Engine"
+    status: "completed"
+    progress: 100
+    note: "core/merge_engine.py, core/diff_engine.py fully implemented"
+  - phase: 6
+    title: "Rollback & Integration"
+    status: "partial"
+    progress: 40
+    note: "Basic rollback exists; missing intelligent rollback, conflict detection"
+  - phase: 7
+    title: "API Layer"
+    status: "not-started"
+    progress: 0
+    note: "No version/merge REST endpoints"
+  - phase: 8
+    title: "Frontend History Tab"
+    status: "not-started"
+    progress: 0
+    note: "Blocked by Phase 7"
+  - phase: 9
+    title: "Frontend Merge UI"
+    status: "not-started"
+    progress: 0
+    note: "Blocked by Phase 7"
+  - phase: 10
+    title: "Sync Integration"
+    status: "not-started"
+    progress: 0
+    note: "Blocked by Phases 7+9"
+  - phase: 11
+    title: "Testing & Documentation"
+    status: "partial"
+    progress: 30
+    note: "Core tests exist; API/E2E tests missing"
+
 blockers: []
-decisions: []
+
+decisions:
+  - id: "DEC-001"
+    date: "2025-12-15"
+    title: "Architecture Deviation: Tarball Snapshots"
+    decision: "Implementation uses collection-level tarball snapshots instead of per-artifact versioned directories"
+    rationale: "Faster implementation, simpler storage, works with existing SnapshotManager"
+    impact: "Functionally similar but architecturally different from PRD"
+  - id: "DEC-002"
+    date: "2025-12-15"
+    title: "MergeEngine Implementation"
+    decision: "Implemented three-way merge with Git-style conflict markers via MergeEngine class"
+    rationale: "Clean separation of concerns, reusable across sync/deploy operations"
+    impact: "Phase 5 fully complete"
+
 integrations: []
-gotchas: []
-modified_files: []
+
+gotchas:
+  - id: "GOTCHA-001"
+    title: "Progress File Status Drift"
+    description: "Progress files showed all phases as 'pending' while significant code existed. Always verify codebase state before trusting progress files."
+    discovered: "2025-12-16"
+    status: "resolved"
+
+modified_files:
+  - path: "skillmeat/core/merge_engine.py"
+    status: "created"
+    lines: 433
+    note: "Three-way merge with conflict detection"
+  - path: "skillmeat/core/diff_engine.py"
+    status: "created"
+    lines: 400
+    note: "File/directory diffing, three-way diff"
+  - path: "skillmeat/core/version.py"
+    status: "created"
+    lines: 261
+    note: "VersionManager with rollback"
+  - path: "skillmeat/core/version_graph.py"
+    status: "created"
+    lines: 626
+    note: "Cross-project version tracking"
+  - path: "skillmeat/storage/snapshot.py"
+    status: "created"
+    lines: 271
+    note: "Tarball-based snapshot system"
+  - path: "skillmeat/models.py"
+    status: "modified"
+    note: "Added MergeResult, MergeStats, ConflictMetadata, ThreeWayDiffResult"
+  - path: "tests/test_merge_engine.py"
+    status: "created"
+    note: "Merge engine unit tests"
+  - path: "tests/test_merge_error_handling.py"
+    status: "created"
+    note: "Error handling tests"
+  - path: "tests/unit/test_version_manager.py"
+    status: "created"
+    note: "Version manager tests"
+  - path: "tests/unit/test_version_graph_builder.py"
+    status: "created"
+    note: "Version graph tests"
+  - path: "tests/integration/test_versioning_workflow.py"
+    status: "created"
+    note: "Integration workflow tests"
 ---
 
 # Context: Versioning & Merge System Implementation
 
-**Date**: 2025-11-30
+**Date**: 2025-11-30 | **Last Updated**: 2025-12-16
 **PRD**: `/docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
 **Implementation Plan**: `/docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
-**Progress Tracking**: `.claude/progress/versioning-merge-system/phase-1-progress.md`
+**Progress Tracking**: `.claude/progress/versioning-merge-system/`
+
+---
+
+## ⚠️ Implementation Status (2025-12-16)
+
+### Summary
+
+**Phase 5 (Merge Engine) is COMPLETE. Phases 1-4, 6 are PARTIAL. Phases 7-10 are NOT STARTED.**
+
+### What's Actually Built
+
+| Component | File | Lines | Status |
+|-----------|------|-------|--------|
+| **MergeEngine** | `core/merge_engine.py` | 433 | ✅ Complete - Three-way merge with conflict detection |
+| **DiffEngine** | `core/diff_engine.py` | ~400 | ✅ Complete - File/directory diffing |
+| **VersionManager** | `core/version.py` | 261 | ⚠️ Partial - Basic rollback, missing intelligent rollback |
+| **VersionGraphBuilder** | `core/version_graph.py` | 626 | ✅ Complete - Cross-project tracking |
+| **SnapshotManager** | `storage/snapshot.py` | 271 | ✅ Complete - Tarball snapshots |
+
+### Architecture Deviation
+
+The PRD describes **per-artifact versioned directories**:
+```
+~/.skillmeat/collection/artifacts/{name}/
+  ├── versions/
+  │   ├── v1-{hash}/
+  │   └── v2-{hash}/
+  └── latest -> v2-{hash}/
+```
+
+**What was implemented**: **Collection-level tarball snapshots**:
+```
+~/.skillmeat/snapshots/{collection}/
+  ├── snapshots.toml
+  ├── 20251203-120000-123456.tar.gz
+  └── 20251203-130000-789012.tar.gz
+```
+
+This is functionally similar but architecturally different. The merge engine and diff engine are fully implemented as designed.
+
+### Next Steps (Priority Order)
+
+1. **Complete Phase 6**: Intelligent rollback, conflict detection
+2. **Implement Phase 7**: REST API endpoints for versions/merge
+3. **Build Phases 8-9**: Frontend history and merge UI
+4. **Wire Phase 10**: Integrate into sync workflow
 
 ---
 

@@ -197,6 +197,16 @@ class ModifiedArtifactInfo(BaseModel):
         default=None,
         description="Timestamp when modification was first detected",
     )
+    change_origin: Optional[str] = Field(
+        default=None,
+        description="Origin of the change (deployment/sync/local_modification)",
+        examples=["local_modification", "sync", "deployment"],
+    )
+    baseline_hash: Optional[str] = Field(
+        default=None,
+        description="Hash at deployment time (baseline for three-way merge)",
+        examples=["abc123def456789abcdef123456789abcdef123456789abcdef123456789ab"],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -208,6 +218,8 @@ class ModifiedArtifactInfo(BaseModel):
                 "deployed_sha": "abc123def456789abcdef123456789abcdef123456789abcdef123456789ab",
                 "current_sha": "def789ghi012345ghijkl678901234ghijkl678901234ghijkl678901234gh",
                 "modification_detected_at": "2025-11-20T15:45:00Z",
+                "change_origin": "local_modification",
+                "baseline_hash": "abc123def456789abcdef123456789abcdef123456789abcdef123456789ab",
             }
         }
 
