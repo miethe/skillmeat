@@ -149,7 +149,7 @@ function ArtifactCard({
 function ArtifactGridSkeleton() {
   return (
     <div
-      className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+      className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
       data-testid="artifact-grid-skeleton"
     >
       {[...Array(6)].map((_, i) => (
@@ -202,7 +202,7 @@ export function ArtifactGrid({
   return (
     <>
       <div
-        className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+        className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
         role="grid"
         aria-label="Artifact grid"
         data-testid="artifact-grid"
