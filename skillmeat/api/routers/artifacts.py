@@ -2060,7 +2060,7 @@ async def update_artifact_parameters(
                 try:
                     from skillmeat.core.github_metadata import GitHubMetadataExtractor
 
-                    extractor = GitHubMetadataExtractor()
+                    extractor = GitHubMetadataExtractor(cache=None)
                     # This will raise ValueError if invalid
                     extractor.parse_github_url(params.source)
                 except ValueError as e:
