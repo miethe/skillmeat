@@ -102,8 +102,9 @@ class TestSnapshotManager:
 
     def test_list_snapshots_empty(self, snapshot_manager):
         """Test listing snapshots when none exist."""
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, next_cursor = snapshot_manager.list_snapshots("test-collection")
         assert snapshots == []
+        assert next_cursor is None
 
     def test_list_snapshots_single(
         self, temp_collection_path, snapshot_manager, temp_snapshots_dir
@@ -113,10 +114,11 @@ class TestSnapshotManager:
             temp_collection_path, "test-collection", "Snapshot 1"
         )
 
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, next_cursor = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 1
         assert snapshots[0].message == "Snapshot 1"
         assert snapshots[0].collection_name == "test-collection"
+        assert next_cursor is None
 
     def test_list_snapshots_multiple_sorted(
         self, temp_collection_path, snapshot_manager, temp_snapshots_dir
@@ -137,13 +139,14 @@ class TestSnapshotManager:
             temp_collection_path, "test-collection", "Snapshot 3"
         )
 
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, next_cursor = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 3
 
         # Should be sorted newest first
         assert snapshots[0].message == "Snapshot 3"
         assert snapshots[1].message == "Snapshot 2"
         assert snapshots[2].message == "Snapshot 1"
+        assert next_cursor is None
 
     def test_restore_snapshot(
         self, temp_collection_path, snapshot_manager, tmp_path, temp_snapshots_dir
@@ -206,7 +209,7 @@ class TestSnapshotManager:
         assert not tarball_path.exists()
 
         # Verify metadata updated
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, _ = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 0
 
     def test_delete_snapshot_missing_tarball(
@@ -223,7 +226,7 @@ class TestSnapshotManager:
         # Should not raise error
         snapshot_manager.delete_snapshot(snapshot)
 
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, _ = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 0
 
     def test_cleanup_old_snapshots_under_limit(
@@ -243,7 +246,7 @@ class TestSnapshotManager:
         )
 
         assert len(deleted) == 0
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, _ = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 3
 
     def test_cleanup_old_snapshots_over_limit(
@@ -263,7 +266,7 @@ class TestSnapshotManager:
         )
 
         assert len(deleted) == 3
-        snapshots = snapshot_manager.list_snapshots("test-collection")
+        snapshots, _ = snapshot_manager.list_snapshots("test-collection")
         assert len(snapshots) == 2
 
         # Newest snapshots should be kept

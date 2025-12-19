@@ -6,16 +6,17 @@
  * Response for project deletion.
  */
 export type ProjectDeleteResponse = {
-  /**
-   * Whether the deletion was successful
-   */
-  success: boolean;
-  /**
-   * Human-readable status message
-   */
-  message: string;
-  /**
-   * Whether project files were deleted from disk
-   */
-  deleted_files?: boolean;
+    /**
+     * Whether the deletion was successful
+     */
+    success: boolean;
+    /**
+     * Human-readable status message
+     */
+    message: string;
+    /**
+     * Whether project files were deleted from disk
+     */
+    deleted_files?: boolean;
 };
+

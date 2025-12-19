@@ -36,6 +36,7 @@ class Deployment:
     version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
     last_modified_check: Optional[datetime] = None  # Last drift check timestamp
     modification_detected_at: Optional[datetime] = None  # When modification was first detected
+    merge_base_snapshot: Optional[str] = None  # Content hash (SHA-256) used as merge base for 3-way merges
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -64,6 +65,9 @@ class Deployment:
 
         if self.modification_detected_at:
             result["modification_detected_at"] = self.modification_detected_at.isoformat()
+
+        if self.merge_base_snapshot:
+            result["merge_base_snapshot"] = self.merge_base_snapshot
 
         # Keep collection_sha for backward compatibility (same as content_hash)
         result["collection_sha"] = self.content_hash
@@ -107,6 +111,7 @@ class Deployment:
             version_lineage=version_lineage,
             last_modified_check=last_modified_check,
             modification_detected_at=modification_detected_at,
+            merge_base_snapshot=data.get("merge_base_snapshot"),
             collection_sha=data.get("collection_sha"),  # Keep for backward compat
         )
 
@@ -114,11 +119,12 @@ class Deployment:
 class DeploymentManager:
     """Manages artifact deployment to projects."""
 
-    def __init__(self, collection_mgr=None):
+    def __init__(self, collection_mgr=None, version_mgr=None):
         """Initialize deployment manager.
 
         Args:
             collection_mgr: CollectionManager instance (creates default if None)
+            version_mgr: VersionManager instance for automatic version capture
         """
         if collection_mgr is None:
             from skillmeat.core.collection import CollectionManager
@@ -128,12 +134,24 @@ class DeploymentManager:
         self.collection_mgr = collection_mgr
         self.filesystem_mgr = FilesystemManager()
 
+        # Lazy initialize VersionManager if not provided
+        self._version_mgr = version_mgr
+
+    @property
+    def version_mgr(self):
+        """Lazy-load VersionManager on first access."""
+        if self._version_mgr is None:
+            from skillmeat.core.version import VersionManager
+            self._version_mgr = VersionManager(collection_mgr=self.collection_mgr)
+        return self._version_mgr
+
     def deploy_artifacts(
         self,
         artifact_names: List[str],
         collection_name: Optional[str] = None,
         project_path: Optional[Path] = None,
         artifact_type: Optional[ArtifactType] = None,
+        overwrite: bool = False,
     ) -> List[Deployment]:
         """Deploy specified artifacts to project.
 
@@ -142,6 +160,7 @@ class DeploymentManager:
             collection_name: Source collection (uses active if None)
             project_path: Project directory (uses CWD if None)
             artifact_type: Filter artifacts by type (if ambiguous names)
+            overwrite: If True, skip interactive prompt and overwrite existing artifacts
 
         Returns:
             List of Deployment objects
@@ -188,9 +207,11 @@ class DeploymentManager:
             # Check if destination exists and prompt for overwrite
             if dest_path.exists():
                 console.print(f"[yellow]Warning:[/yellow] {dest_path} already exists")
-                if not Confirm.ask(f"Overwrite {artifact.name}?"):
-                    console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
-                    continue
+                if not overwrite:  # Only prompt if overwrite not explicitly requested
+                    if not Confirm.ask(f"Overwrite {artifact.name}?"):
+                        console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
+                        continue
+                # If overwrite=True, continue without prompting
 
             # Copy artifact
             try:
@@ -202,7 +223,7 @@ class DeploymentManager:
                 console.print(f"[red]Error deploying {artifact.name}:[/red] {e}")
                 continue
 
-            # Compute content hash
+            # Compute content hash (becomes merge base for future three-way merges)
             content_hash = compute_content_hash(dest_path)
 
             # Record deployment
@@ -210,7 +231,17 @@ class DeploymentManager:
                 project_path, artifact, collection.name, content_hash
             )
 
+            # Create version record in cache database (TASK-2.3)
+            self._record_deployment_version(
+                artifact_name=artifact.name,
+                artifact_type=artifact.type.value,
+                project_path=project_path,
+                content_hash=content_hash,
+            )
+
             # Create deployment object
+            # Set merge_base_snapshot to content_hash at deployment time
+            # This hash becomes the baseline for future three-way merges
             deployment = Deployment(
                 artifact_name=artifact.name,
                 artifact_type=artifact.type.value,
@@ -219,6 +250,7 @@ class DeploymentManager:
                 artifact_path=dest_path.relative_to(dest_base),
                 content_hash=content_hash,
                 local_modifications=False,
+                merge_base_snapshot=content_hash,  # Store baseline for merge tracking
             )
             deployments.append(deployment)
 
@@ -232,6 +264,26 @@ class DeploymentManager:
                 sha=content_hash,
                 success=True,
             )
+
+        # Capture version snapshot after successful deployment (SVCV-003)
+        if deployments:
+            try:
+                # Create descriptive message for the snapshot
+                artifact_list = ", ".join([d.artifact_name for d in deployments[:3]])
+                if len(deployments) > 3:
+                    artifact_list += f" and {len(deployments) - 3} more"
+
+                message = f"Auto-deploy: {artifact_list} to {project_path} at {datetime.now().isoformat()}"
+
+                console.print(f"[dim]Creating snapshot after deployment...[/dim]")
+                snapshot = self.version_mgr.auto_snapshot(
+                    collection_name=collection.name,
+                    message=message,
+                )
+                console.print(f"[dim]Snapshot created: {snapshot.id}[/dim]")
+            except Exception as e:
+                # Never fail deploy due to snapshot failure
+                console.print(f"[yellow]Warning: Failed to create auto-snapshot: {e}[/yellow]")
 
         return deployments
 
@@ -364,6 +416,79 @@ class DeploymentManager:
             # This will be expanded in later phases
 
         return status
+
+    def _record_deployment_version(
+        self,
+        artifact_name: str,
+        artifact_type: str,
+        project_path: Path,
+        content_hash: str,
+    ) -> None:
+        """Record artifact version in cache database for deployment.
+
+        Creates an ArtifactVersion record with:
+        - parent_hash = NULL (root version)
+        - change_origin = 'deployment'
+        - version_lineage = [content_hash]
+
+        Args:
+            artifact_name: Name of artifact deployed
+            artifact_type: Type of artifact
+            project_path: Path to project
+            content_hash: SHA-256 hash of deployed artifact content
+        """
+        try:
+            from skillmeat.cache.models import Artifact as CacheArtifact
+            from skillmeat.cache.models import get_session
+            from skillmeat.core.version_tracking import create_deployment_version
+
+            session = get_session()
+            try:
+                # Find or create Artifact record in cache
+                # Use composite key: project_path + artifact_name + artifact_type
+                artifact_id = f"{project_path}::{artifact_name}::{artifact_type}"
+
+                cache_artifact = (
+                    session.query(CacheArtifact)
+                    .filter_by(
+                        name=artifact_name,
+                        type=artifact_type,
+                    )
+                    .join(CacheArtifact.project)
+                    .filter_by(path=str(project_path))
+                    .first()
+                )
+
+                if not cache_artifact:
+                    # Artifact not in cache yet - version tracking will be added
+                    # when cache is populated by cache manager
+                    console.print(
+                        f"[dim]Note: Artifact {artifact_name} not in cache yet, "
+                        "skipping version tracking[/dim]"
+                    )
+                    return
+
+                # Create version record
+                create_deployment_version(
+                    session=session,
+                    artifact_id=cache_artifact.id,
+                    content_hash=content_hash,
+                )
+                session.commit()
+
+                console.print(
+                    f"[dim]Version tracked: {artifact_name} "
+                    f"({content_hash[:8]}...) origin=deployment[/dim]"
+                )
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            # Never fail deploy due to version tracking
+            console.print(
+                f"[yellow]Warning: Failed to record deployment version: {e}[/yellow]"
+            )
 
     def _record_deploy_event(
         self,

@@ -169,10 +169,12 @@ Most collection mutations in web UI currently fail
 - Phases: 5 (all pending)
 - Feature: Intelligent artifact discovery
 
-### Versioning Merge System v1
-- Status: PLANNING
-- Size: Large (11 phases)
-- Feature: Version control + merge conflicts
+### Versioning Merge System v1.5
+- Status: IN PROGRESS (Core, API, UI complete; Tests deferred)
+- Size: 6 phases (P1-5 complete, P6 docs done)
+- Feature: Version lineage tracking, change attribution, three-way merge
+- Documentation: `docs/api/versioning.md`, updated `docs/guides/syncing-changes.md`, `CHANGELOG.md`
+- Key Files: `core/version_lineage.py`, `api/routers/versions.py`, `api/routers/merge.py`
 
 ### Web UI Consolidation v1
 - Status: PENDING
@@ -219,25 +221,35 @@ Most collection mutations in web UI currently fail
   └── phase-6-progress.md ✓
 ```
 
-### In Planning
+### In Progress
+```
+.claude/progress/versioning-merge-system-v1.5/
+  ├── phase-1-progress.md ✓ COMPLETED (Core baseline support)
+  ├── phase-2-progress.md ✓ COMPLETED (Version lineage)
+  ├── phase-3-4-progress.md ✓ COMPLETED (Change attribution)
+  ├── phase-5-progress.md ✓ COMPLETED (Frontend components)
+  └── phase-6-progress.md ⟲ PARTIAL (Docs done, tests deferred)
+```
+
+### Completed (Recently Validated)
 ```
 .claude/progress/agent-context-entities/
   ├── phase-1-progress.md ✓ COMPLETED
   ├── phase-2-progress.md ✓ COMPLETED
-  ├── phase-3-progress.md ⏳ PENDING
-  ├── phase-4-progress.md ⏳ PENDING
-  ├── phase-5-progress.md ⏳ PENDING
-  └── phase-6-progress.md ⏳ PENDING
+  ├── phase-3-progress.md ✓ COMPLETED
+  ├── phase-4-progress.md ✓ COMPLETED
+  ├── phase-5-progress.md ✓ COMPLETED
+  └── phase-6-progress.md ✓ COMPLETED
 
 .claude/progress/marketplace-github-ingestion/
   ├── phase-1-progress.md ✓ COMPLETED
   ├── phase-2-progress.md ✓ COMPLETED
-  ├── phase-3-progress.md ⏳ PENDING
-  ├── phase-4-progress.md ⏳ PENDING
-  ├── phase-5-progress.md ⏳ PENDING
-  ├── phase-6-progress.md ⏳ PENDING
-  ├── phase-7-progress.md ⏳ PENDING
-  └── phase-8-progress.md ⏳ PENDING
+  ├── phase-3-progress.md ✓ COMPLETED
+  ├── phase-4-progress.md ✓ COMPLETED
+  ├── phase-5-progress.md ✓ COMPLETED
+  ├── phase-6-progress.md ✓ COMPLETED
+  ├── phase-7-progress.md ✓ COMPLETED
+  └── phase-8-progress.md ✓ COMPLETED
 ```
 
 ---

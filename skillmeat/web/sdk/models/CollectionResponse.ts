@@ -9,28 +9,29 @@
  * and timestamps.
  */
 export type CollectionResponse = {
-  /**
-   * Collection unique identifier
-   */
-  id: string;
-  /**
-   * Collection name
-   */
-  name: string;
-  /**
-   * Collection format version
-   */
-  version: string;
-  /**
-   * Number of artifacts in collection
-   */
-  artifact_count: number;
-  /**
-   * Collection creation timestamp
-   */
-  created: string;
-  /**
-   * Last update timestamp
-   */
-  updated: string;
+    /**
+     * Collection unique identifier
+     */
+    id: string;
+    /**
+     * Collection name
+     */
+    name: string;
+    /**
+     * Collection format version
+     */
+    version: string;
+    /**
+     * Number of artifacts in collection
+     */
+    artifact_count: number;
+    /**
+     * Collection creation timestamp
+     */
+    created: string;
+    /**
+     * Last update timestamp
+     */
+    updated: string;
 };
+

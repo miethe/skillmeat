@@ -142,6 +142,8 @@ export function useEditArtifactParameters() {
       // Invalidate specific artifact and list queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['artifacts', 'detail', artifactId] });
       queryClient.invalidateQueries({ queryKey: ['artifacts', 'list'] });
+      // Also invalidate entities query used by entity lifecycle
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
     },
   });
 }

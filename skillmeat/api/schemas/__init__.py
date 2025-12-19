@@ -79,6 +79,40 @@ from .project_template import (
     DeployTemplateRequest,
     DeployTemplateResponse,
 )
+from .version import (
+    SnapshotResponse,
+    SnapshotListResponse,
+    SnapshotCreateRequest,
+    SnapshotCreateResponse,
+    ConflictMetadataResponse,
+    RollbackSafetyAnalysisResponse,
+    RollbackRequest,
+    RollbackResponse,
+    VersionDiffRequest,
+    VersionDiffResponse,
+)
+from .merge import (
+    MergeAnalyzeRequest,
+    MergeSafetyResponse,
+    MergePreviewRequest,
+    MergePreviewResponse,
+    MergeExecuteRequest,
+    MergeExecuteResponse,
+    ConflictResolveRequest,
+    ConflictResolveResponse,
+)
+from .drift import (
+    DriftDetectionResponse,
+    DriftSummaryResponse,
+)
+from .tags import (
+    TagBase,
+    TagCreateRequest,
+    TagUpdateRequest,
+    TagResponse,
+    TagListResponse,
+    ArtifactTagRequest,
+)
 
 __all__ = [
     # Common
@@ -147,4 +181,34 @@ __all__ = [
     "TemplateVariableValue",
     "DeployTemplateRequest",
     "DeployTemplateResponse",
+    # Version Management
+    "SnapshotResponse",
+    "SnapshotListResponse",
+    "SnapshotCreateRequest",
+    "SnapshotCreateResponse",
+    "ConflictMetadataResponse",
+    "RollbackSafetyAnalysisResponse",
+    "RollbackRequest",
+    "RollbackResponse",
+    "VersionDiffRequest",
+    "VersionDiffResponse",
+    # Merge Operations
+    "MergeAnalyzeRequest",
+    "MergeSafetyResponse",
+    "MergePreviewRequest",
+    "MergePreviewResponse",
+    "MergeExecuteRequest",
+    "MergeExecuteResponse",
+    "ConflictResolveRequest",
+    "ConflictResolveResponse",
+    # Drift Detection
+    "DriftDetectionResponse",
+    "DriftSummaryResponse",
+    # Tags
+    "TagBase",
+    "TagCreateRequest",
+    "TagUpdateRequest",
+    "TagResponse",
+    "TagListResponse",
+    "ArtifactTagRequest",
 ]

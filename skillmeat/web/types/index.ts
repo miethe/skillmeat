@@ -14,6 +14,8 @@ export * from './mcp';
 export * from './notification';
 export * from './project';
 export * from './version';
+export * from './drift';
+export * from './sync';
 
 // Collections navigation types (Phase 3)
 export * from './collections';

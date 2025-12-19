@@ -28,7 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { TagInput } from '@/components/ui/tag-input';
 import { useToast } from '@/hooks/use-toast';
+import { useTags } from '@/hooks/use-tags';
 import type { ArtifactType, ArtifactScope } from '@/types/artifact';
 
 export interface ArtifactParameters {
@@ -58,7 +60,7 @@ interface FormData {
   source: string;
   version: string;
   scope: ArtifactScope;
-  tags: string;
+  tags: string[];
   aliases: string;
 }
 
@@ -71,6 +73,9 @@ export function ParameterEditorModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Fetch available tags for suggestions
+  const { data: tagsData } = useTags();
+
   const {
     register,
     handleSubmit,
@@ -82,7 +87,7 @@ export function ParameterEditorModal({
       source: artifact.source || '',
       version: artifact.version || '',
       scope: artifact.scope || 'user',
-      tags: artifact.tags?.join(', ') || '',
+      tags: artifact.tags || [],
       aliases: artifact.aliases?.join(', ') || '',
     },
   });
@@ -93,7 +98,7 @@ export function ParameterEditorModal({
       source: artifact.source || '',
       version: artifact.version || '',
       scope: artifact.scope || 'user',
-      tags: artifact.tags?.join(', ') || '',
+      tags: artifact.tags || [],
       aliases: artifact.aliases?.join(', ') || '',
     });
   }, [artifact, reset]);
@@ -102,17 +107,20 @@ export function ParameterEditorModal({
     setIsSubmitting(true);
 
     try {
-      // Parse comma-separated strings to arrays
+      const tagsById = new Map(
+        (tagsData?.items || []).map((tag) => [tag.id, tag.name])
+      );
+      const normalizedTags = (data.tags || [])
+        .map((tag) => tagsById.get(tag) || tag)
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+      // Tags are already an array from TagInput
       const parameters: ArtifactParameters = {
         source: data.source || undefined,
         version: data.version || undefined,
         scope: data.scope,
-        tags: data.tags
-          ? data.tags
-              .split(',')
-              .map((t) => t.trim())
-              .filter(Boolean)
-          : undefined,
+        tags: normalizedTags.length > 0 ? normalizedTags : undefined,
         aliases: data.aliases
           ? data.aliases
               .split(',')
@@ -245,13 +253,23 @@ export function ParameterEditorModal({
           {/* Tags */}
           <div className="space-y-2">
             <Label htmlFor="tags">Tags</Label>
-            <Input
-              id="tags"
-              placeholder="web, frontend, development"
-              {...register('tags')}
-              disabled={isSubmitting}
+            <Controller
+              name="tags"
+              control={control}
+              render={({ field }) => (
+                <TagInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  suggestions={tagsData?.items || []}
+                  allowCreate={true}
+                  placeholder="Add tags..."
+                  disabled={isSubmitting}
+                />
+              )}
             />
-            <p className="text-xs text-muted-foreground">Separate multiple tags with commas</p>
+            <p className="text-xs text-muted-foreground">
+              Type to search existing tags or create new ones
+            </p>
           </div>
 
           {/* Aliases */}

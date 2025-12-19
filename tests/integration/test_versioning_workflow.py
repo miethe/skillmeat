@@ -88,7 +88,7 @@ class TestSnapshotCreationAndListing:
         assert snapshot1.message == "First snapshot"
 
         # List snapshots
-        snapshots = version_mgr.list_snapshots()
+        snapshots, _ = version_mgr.list_snapshots()
         assert len(snapshots) == 1
         assert snapshots[0].id == snapshot1.id
 
@@ -99,7 +99,7 @@ class TestSnapshotCreationAndListing:
         snapshot2 = version_mgr.create_snapshot(message="Second snapshot")
 
         # List should show both, newest first
-        snapshots = version_mgr.list_snapshots()
+        snapshots, _ = version_mgr.list_snapshots()
         assert len(snapshots) == 2
         assert snapshots[0].id == snapshot2.id
         assert snapshots[1].id == snapshot1.id
@@ -135,7 +135,7 @@ class TestRollbackWorkflow:
 
         # Create initial snapshot
         snapshot = version_mgr.create_snapshot(message="Before modifications")
-        initial_snapshot_count = len(version_mgr.list_snapshots())
+        initial_snapshot_count = len(version_mgr.list_snapshots()[0])
 
         # Modify collection: add new skill
         new_skill_dir = collection_path / "skills" / "new-skill"
@@ -153,7 +153,7 @@ class TestRollbackWorkflow:
         assert (collection_path / "skills" / "test-skill").exists()
 
         # Verify safety snapshot was created
-        snapshots_after_rollback = version_mgr.list_snapshots()
+        snapshots_after_rollback, _ = version_mgr.list_snapshots()
         assert len(snapshots_after_rollback) == initial_snapshot_count + 1
 
         # Find safety snapshot
@@ -207,13 +207,13 @@ class TestAutoSnapshotIntegration:
         collection_mgr,
     ):
         """Test removing artifact creates auto-snapshot."""
-        initial_snapshot_count = len(version_mgr.list_snapshots())
+        initial_snapshot_count = len(version_mgr.list_snapshots()[0])
 
         # Remove artifact (should create auto-snapshot)
         artifact_mgr.remove("test-skill", ArtifactType.SKILL)
 
         # Verify auto-snapshot was created
-        snapshots = version_mgr.list_snapshots()
+        snapshots, _ = version_mgr.list_snapshots()
         assert len(snapshots) == initial_snapshot_count + 1
 
         # Find auto-snapshot
@@ -244,7 +244,7 @@ class TestAutoSnapshotIntegration:
         assert not skill_path.exists()
 
         # Get the auto-snapshot
-        snapshots = version_mgr.list_snapshots()
+        snapshots, _ = version_mgr.list_snapshots()
         auto_snapshot = next(
             s for s in snapshots if "[auto] Before removing" in s.message
         )
@@ -275,7 +275,7 @@ class TestSnapshotCleanup:
             time.sleep(0.01)
 
         # Verify all exist
-        snapshots = version_mgr.list_snapshots()
+        snapshots, _ = version_mgr.list_snapshots()
         assert len(snapshots) == 10
 
         # Cleanup, keeping only 3
@@ -285,7 +285,7 @@ class TestSnapshotCleanup:
         assert len(deleted) == 7
 
         # Verify 3 remain (newest ones)
-        remaining = version_mgr.list_snapshots()
+        remaining, _ = version_mgr.list_snapshots()
         assert len(remaining) == 3
         assert remaining[0].message == "Snapshot 9"
         assert remaining[1].message == "Snapshot 8"

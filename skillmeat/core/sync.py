@@ -5,6 +5,7 @@ deployed projects, including drift detection and deployment tracking.
 """
 
 import hashlib
+import json
 import logging
 import sys
 from datetime import datetime
@@ -35,17 +36,66 @@ class SyncManager:
     for keeping collections and projects in sync.
     """
 
-    def __init__(self, collection_manager=None, artifact_manager=None, snapshot_manager=None):
+    def __init__(
+        self,
+        collection_manager=None,
+        artifact_manager=None,
+        snapshot_manager=None,
+        version_manager=None,
+    ):
         """Initialize SyncManager.
 
         Args:
             collection_manager: Optional CollectionManager instance
             artifact_manager: Optional ArtifactManager instance
             snapshot_manager: Optional SnapshotManager for rollback support
+            version_manager: Optional VersionManager for automatic version capture
         """
         self.collection_mgr = collection_manager
         self.artifact_mgr = artifact_manager
         self.snapshot_mgr = snapshot_manager
+
+        # Lazy initialize VersionManager if not provided
+        self._version_mgr = version_manager
+
+    @property
+    def version_mgr(self):
+        """Lazy-load VersionManager on first access."""
+        if self._version_mgr is None:
+            from skillmeat.core.version import VersionManager
+
+            self._version_mgr = VersionManager(
+                collection_mgr=self.collection_mgr,
+                snapshot_mgr=self.snapshot_mgr,
+            )
+        return self._version_mgr
+
+    def determine_change_origin(self, drift_type: str) -> Optional[str]:
+        """Determine the origin of a detected change.
+
+        Maps drift types to change origins for version tracking.
+
+        Args:
+            drift_type: Type of drift detected (modified, outdated, conflict, etc.)
+
+        Returns:
+            Change origin: "local_modification", "sync", "deployment", or None
+
+        Note:
+            Valid change_origin values per DriftDetectionResult model:
+            - "deployment": Artifact deployed from collection
+            - "sync": Upstream changes from collection (sync operation)
+            - "local_modification": Local project changes (user edits)
+        """
+        drift_to_origin = {
+            "modified": "local_modification",  # Local project changes only
+            "outdated": "sync",  # Collection updated (upstream changes)
+            "conflict": "local_modification",  # Both changed (prioritize local for tracking)
+            "added": "sync",  # New in collection (upstream)
+            "removed": "sync",  # Removed from collection (upstream)
+            "version_mismatch": "sync",  # Version changed (upstream)
+        }
+        return drift_to_origin.get(drift_type)
 
     def check_drift(
         self,
@@ -94,6 +144,15 @@ class SyncManager:
 
             if not collection_artifact:
                 # Artifact removed from collection
+                # Get deployment record for modification timestamp
+                from skillmeat.storage.deployment import DeploymentTracker
+                deployment_record = DeploymentTracker.get_deployment(
+                    project_path, deployed.name, deployed.artifact_type
+                )
+                modification_detected = None
+                if deployment_record and deployment_record.modification_detected_at:
+                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -105,6 +164,10 @@ class SyncManager:
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation="remove_from_project",
+                        change_origin=self.determine_change_origin("removed"),
+                        baseline_hash=deployed.sha,
+                        current_hash=deployed.sha,  # Same as baseline since removed
+                        modification_detected_at=modification_detected,
                     )
                 )
                 continue
@@ -143,6 +206,32 @@ class SyncManager:
                     drift_type = "modified"
                     recommendation = "push_to_collection"
 
+                # Track when modifications are first detected (TASK-3.1)
+                if drift_type in ("modified", "conflict"):
+                    self._track_modification_timestamp(
+                        project_path,
+                        deployed.name,
+                        deployed.artifact_type,
+                    )
+
+                # Create version record for local modifications (TASK-3.2)
+                # Only track if project has local changes (modified or conflict with local changes)
+                if project_changed:
+                    self._create_local_modification_version(
+                        artifact_id=deployed.name,  # Using name as ID
+                        new_content_hash=current_project_sha,
+                        parent_content_hash=deployed.sha,
+                    )
+
+                # Get deployment record for modification timestamp (TASK-4.1)
+                from skillmeat.storage.deployment import DeploymentTracker
+                deployment_record = DeploymentTracker.get_deployment(
+                    project_path, deployed.name, deployed.artifact_type
+                )
+                modification_detected = None
+                if deployment_record and deployment_record.modification_detected_at:
+                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=deployed.name,
@@ -154,23 +243,32 @@ class SyncManager:
                         project_version=deployed.version,
                         last_deployed=deployed.deployed_at,
                         recommendation=recommendation,
+                        change_origin=self.determine_change_origin(drift_type),
+                        baseline_hash=deployed.sha,  # The deployed version = merge base
+                        current_hash=current_project_sha,  # Current project file hash
+                        modification_detected_at=modification_detected,
                     )
                 )
 
         # Check for new artifacts in collection not yet deployed
         for artifact in collection_artifacts:
             if not self._is_deployed(artifact, metadata):
+                collection_sha = self._compute_artifact_hash(artifact["path"])
                 drift_results.append(
                     DriftDetectionResult(
                         artifact_name=artifact["name"],
                         artifact_type=artifact["type"],
                         drift_type="added",
-                        collection_sha=self._compute_artifact_hash(artifact["path"]),
+                        collection_sha=collection_sha,
                         project_sha=None,
                         collection_version=artifact.get("version"),
                         project_version=None,
                         last_deployed=None,
                         recommendation="deploy_to_project",
+                        change_origin=self.determine_change_origin("added"),
+                        baseline_hash=None,  # No baseline for new artifacts
+                        current_hash=collection_sha,  # Current is the collection SHA
+                        modification_detected_at=None,  # New artifacts have no modifications
                     )
                 )
 
@@ -411,7 +509,9 @@ class SyncManager:
         try:
             # Get collection path
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
+            collection_path = self.collection_mgr.config.get_collection_path(
+                collection_name
+            )
 
             artifacts = []
 
@@ -620,7 +720,9 @@ class SyncManager:
 
         try:
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
+            collection_path = self.collection_mgr.config.get_collection_path(
+                collection_name
+            )
         except Exception as e:
             logger.warning(f"Failed to get collection path: {e}")
             return self.sync_from_project(
@@ -651,7 +753,9 @@ class SyncManager:
                 console.print(
                     f"[yellow]Warning: Failed to create snapshot: {e}[/yellow]"
                 )
-                if not Confirm.ask("Proceed without snapshot protection?", default=False):
+                if not Confirm.ask(
+                    "Proceed without snapshot protection?", default=False
+                ):
                     return SyncResult(
                         status="cancelled",
                         message="Sync cancelled (snapshot creation failed)",
@@ -668,6 +772,7 @@ class SyncManager:
                 dry_run=dry_run,
                 interactive=interactive,
             )
+            # Note: sync_from_project already captures version on success
 
             # Handle partial success or failure
             if result.status == "partial" and interactive and snapshot:
@@ -681,7 +786,9 @@ class SyncManager:
                 console.print(f"Synced: {len(result.artifacts_synced)} artifacts")
                 console.print(f"Conflicts: {len(result.conflicts)} artifacts")
 
-                if Confirm.ask("\n[bold]Rollback to pre-sync state?[/bold]", default=False):
+                if Confirm.ask(
+                    "\n[bold]Rollback to pre-sync state?[/bold]", default=False
+                ):
                     logger.info("User requested rollback")
                     self.snapshot_mgr.restore_snapshot(snapshot, collection_path)
                     return SyncResult(
@@ -760,7 +867,9 @@ class SyncManager:
                 coll_name = collection_name or metadata.collection
                 try:
                     collection = self.collection_mgr.get_collection(coll_name)
-                    coll_path = self.collection_mgr.config.get_collection_path(coll_name)
+                    coll_path = self.collection_mgr.config.get_collection_path(
+                        coll_name
+                    )
                     if not collection or not coll_path.exists():
                         issues.append(
                             f"Collection '{coll_name}' not found or path does not exist.\n"
@@ -907,7 +1016,13 @@ class SyncManager:
 
         # Use progress bar for operations with >3 artifacts
         if len(pullable_drift) > 3 and not dry_run:
-            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+            from rich.progress import (
+                Progress,
+                SpinnerColumn,
+                TextColumn,
+                BarColumn,
+                TaskProgressColumn,
+            )
 
             with Progress(
                 SpinnerColumn(),
@@ -918,7 +1033,7 @@ class SyncManager:
             ) as progress:
                 task = progress.add_task(
                     f"Syncing {len(pullable_drift)} artifacts...",
-                    total=len(pullable_drift)
+                    total=len(pullable_drift),
                 )
 
                 for drift in pullable_drift:
@@ -969,10 +1084,35 @@ class SyncManager:
         # Step 4: Update lock files (if collection manager available)
         if synced_artifacts and self.collection_mgr:
             try:
-                logger.debug(f"Updating collection lock for {len(synced_artifacts)} artifacts")
+                logger.debug(
+                    f"Updating collection lock for {len(synced_artifacts)} artifacts"
+                )
                 self._update_collection_lock(synced_artifacts, drift_results)
             except Exception as e:
                 logger.warning(f"Failed to update collection lock: {e}")
+
+        # Step 4.5: Capture version snapshot (SVCV-002)
+        if synced_artifacts and self.collection_mgr:
+            try:
+                metadata = self._load_deployment_metadata(project_path)
+                collection_name = metadata.collection if metadata else "default"
+
+                # Create descriptive message for the snapshot
+                artifact_list = ", ".join(synced_artifacts[:3])
+                if len(synced_artifacts) > 3:
+                    artifact_list += f" and {len(synced_artifacts) - 3} more"
+
+                message = f"Auto-sync from project: {artifact_list} at {datetime.now().isoformat()}"
+
+                logger.debug(f"Creating auto-snapshot after sync: {message}")
+                snapshot = self.version_mgr.auto_snapshot(
+                    collection_name=collection_name,
+                    message=message,
+                )
+                logger.info(f"Created auto-snapshot after sync: {snapshot.id}")
+            except Exception as e:
+                # Never fail sync due to snapshot failure
+                logger.warning(f"Failed to create auto-snapshot after sync: {e}")
 
         # Step 5: Record analytics event (stub for P4-002)
         if synced_artifacts:
@@ -1069,7 +1209,10 @@ class SyncManager:
             )
             # Track failed sync
             self._record_artifact_sync_event(
-                artifact_name, artifact_type, strategy, "error",
+                artifact_name,
+                artifact_type,
+                strategy,
+                "error",
                 project_path=project_path,
                 sha_before=drift.collection_sha,
                 error_message=result.error,
@@ -1085,7 +1228,10 @@ class SyncManager:
             )
             # Track failed sync
             self._record_artifact_sync_event(
-                artifact_name, artifact_type, strategy, "error",
+                artifact_name,
+                artifact_type,
+                strategy,
+                "error",
                 project_path=project_path,
                 error_message=result.error,
             )
@@ -1097,7 +1243,9 @@ class SyncManager:
             collection_name = metadata.collection if metadata else "default"
 
             collection = self.collection_mgr.load_collection(collection_name)
-            collection_path = self.collection_mgr.config.get_collection_path(collection_name)
+            collection_path = self.collection_mgr.config.get_collection_path(
+                collection_name
+            )
 
             artifact_type_plural = self._get_artifact_type_plural(artifact_type)
             collection_artifact_path = (
@@ -1142,7 +1290,10 @@ class SyncManager:
                 )
                 # Track cancelled sync
                 self._record_artifact_sync_event(
-                    artifact_name, artifact_type, strategy, "cancelled",
+                    artifact_name,
+                    artifact_type,
+                    strategy,
+                    "cancelled",
                     project_path=project_path,
                     sha_before=drift.collection_sha,
                     sha_after=drift.project_sha,
@@ -1155,13 +1306,19 @@ class SyncManager:
                 self._sync_overwrite(project_artifact_path, collection_artifact_path)
             elif strategy == "merge":
                 merge_result = self._sync_merge(
-                    project_artifact_path, collection_artifact_path, artifact_name
+                    project_artifact_path,
+                    collection_artifact_path,
+                    artifact_name,
+                    project_path,
                 )
                 if merge_result.has_conflict:
                     conflicts_count = len(merge_result.conflict_files)
                     # Track sync with conflicts
                     self._record_artifact_sync_event(
-                        artifact_name, artifact_type, strategy, "conflict",
+                        artifact_name,
+                        artifact_type,
+                        strategy,
+                        "conflict",
                         project_path=project_path,
                         sha_before=drift.collection_sha,
                         sha_after=drift.project_sha,
@@ -1185,7 +1342,10 @@ class SyncManager:
                 )
                 # Track error
                 self._record_artifact_sync_event(
-                    artifact_name, artifact_type, strategy, "error",
+                    artifact_name,
+                    artifact_type,
+                    strategy,
+                    "error",
                     project_path=project_path,
                     error_message=result.error,
                 )
@@ -1193,12 +1353,49 @@ class SyncManager:
 
             # Track successful sync
             self._record_artifact_sync_event(
-                artifact_name, artifact_type, strategy, "success",
+                artifact_name,
+                artifact_type,
+                strategy,
+                "success",
                 project_path=project_path,
                 sha_before=drift.collection_sha,
                 sha_after=drift.project_sha,
                 conflicts_detected=conflicts_count,
             )
+
+            # Create version record for sync operation
+            # Get artifact_id from cache (needed for version tracking)
+            try:
+                from skillmeat.cache.models import get_session, Artifact
+
+                session = get_session()
+                try:
+                    # Find artifact by name and type in the collection
+                    # We need to get the artifact_id from the cache database
+                    # For now, we'll use the artifact name as a proxy
+                    # TODO: Improve artifact ID lookup when cache is more mature
+
+                    # Compute new hash after sync
+                    new_hash = self._compute_artifact_hash(collection_artifact_path)
+
+                    # Get parent hash (before sync) from drift
+                    parent_hash = drift.collection_sha
+
+                    # Create version record
+                    # Note: artifact_id is typically the artifact name for now
+                    # This will be improved when we have better artifact ID tracking
+                    self._create_sync_version(
+                        artifact_id=artifact_name,  # Using name as ID for now
+                        new_content_hash=new_hash,
+                        parent_content_hash=parent_hash,
+                    )
+                finally:
+                    session.close()
+            except Exception as e:
+                # Don't fail sync if version tracking fails
+                logger.debug(
+                    f"Could not create version record for {artifact_name}: {e}"
+                )
 
             return ArtifactSyncResult(artifact_name=artifact_name, success=True)
 
@@ -1206,7 +1403,10 @@ class SyncManager:
             logger.error(f"Failed to sync artifact {artifact_name}: {e}")
             # Track error
             self._record_artifact_sync_event(
-                artifact_name, artifact_type, strategy, "error",
+                artifact_name,
+                artifact_type,
+                strategy,
+                "error",
                 project_path=project_path,
                 sha_before=drift.collection_sha,
                 error_message=str(e),
@@ -1238,6 +1438,7 @@ class SyncManager:
         project_artifact_path: Path,
         collection_artifact_path: Path,
         artifact_name: str,
+        project_path: Optional[Path] = None,
     ) -> ArtifactSyncResult:
         """Merge project changes into collection artifact.
 
@@ -1247,6 +1448,7 @@ class SyncManager:
             project_artifact_path: Path to artifact in project
             collection_artifact_path: Path to artifact in collection
             artifact_name: Name of artifact
+            project_path: Optional project root path (for metadata lookup)
 
         Returns:
             ArtifactSyncResult with merge status
@@ -1255,11 +1457,59 @@ class SyncManager:
 
         merge_engine = MergeEngine()
 
-        # For now, use collection as base (no true three-way merge)
-        # P3-004 will add base version tracking
+        # Get deployment metadata to check for merge_base_snapshot
+        # Infer project_path from artifact_path if not provided
+        if project_path is None:
+            # artifact_path is like /path/to/project/.claude/skills/name
+            # project_path is /path/to/project
+            project_path = project_artifact_path.parent.parent.parent
+
+        metadata = self._load_deployment_metadata(project_path)
+        base_path = None
+
+        if metadata:
+            # Find deployment record for this artifact
+            deployed = next(
+                (d for d in metadata.artifacts if d.name == artifact_name), None
+            )
+
+            if deployed:
+                # Try to get merge_base_snapshot (added in v1.5)
+                merge_base_snapshot = getattr(deployed, "merge_base_snapshot", None)
+
+                if merge_base_snapshot and self.snapshot_mgr:
+                    # Use merge base from snapshot
+                    collection_name = metadata.collection if metadata else None
+                    base_path = self._extract_base_from_snapshot(
+                        merge_base_snapshot,
+                        artifact_name,
+                        deployed.artifact_type,
+                        collection_name,
+                    )
+                    if base_path:
+                        logger.debug(
+                            f"Using merge base snapshot {merge_base_snapshot[:12]}... "
+                            f"for artifact {artifact_name}"
+                        )
+                else:
+                    # FALLBACK: Old deployment without merge_base_snapshot
+                    logger.warning(
+                        f"Deployment record for {artifact_name} missing merge_base_snapshot. "
+                        f"Using fallback: current collection state as baseline. "
+                        f"Consider redeploying to capture proper merge base."
+                    )
+
+        # If no base found, use collection as base (fallback behavior)
+        if base_path is None:
+            base_path = collection_artifact_path
+            logger.debug(
+                f"No merge base available for {artifact_name}, "
+                f"using current collection state as baseline"
+            )
+
         # Use project as "remote" and collection as "local"
         merge_result = merge_engine.merge(
-            base_path=collection_artifact_path,  # Base = current collection
+            base_path=base_path,  # Base = merge base snapshot or collection
             local_path=collection_artifact_path,  # Local = collection
             remote_path=project_artifact_path,  # Remote = project
             output_path=collection_artifact_path,  # Output = collection (in-place)
@@ -1271,6 +1521,122 @@ class SyncManager:
             has_conflict=merge_result.has_conflicts,
             conflict_files=[c.file_path for c in merge_result.conflicts],
         )
+
+    def _extract_base_from_snapshot(
+        self,
+        content_hash: str,
+        artifact_name: str,
+        artifact_type: str,
+        collection_name: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Extract baseline artifact from snapshot for merge.
+
+        Searches version history for a snapshot containing the artifact with
+        the specified content hash, then extracts it for use as merge baseline.
+
+        Args:
+            content_hash: SHA-256 content hash of the artifact to find
+            artifact_name: Name of artifact
+            artifact_type: Type of artifact
+            collection_name: Optional collection name (inferred if not provided)
+
+        Returns:
+            Path to extracted baseline artifact, or None if not found
+        """
+        import tempfile
+        import tarfile
+
+        if not self.snapshot_mgr:
+            logger.debug("No snapshot manager available")
+            return None
+
+        try:
+            # Infer collection name if not provided
+            if not collection_name:
+                metadata = self._load_deployment_metadata(Path.cwd())
+                collection_name = metadata.collection if metadata else None
+
+            if not collection_name:
+                logger.warning("No collection name available for baseline search")
+                return None
+
+            # Get list of snapshots for this collection (sorted newest first)
+            snapshots_list, _ = self.snapshot_mgr.list_snapshots(
+                collection_name, limit=100
+            )
+
+            if not snapshots_list:
+                logger.warning(f"No snapshots found for collection '{collection_name}'")
+                return None
+
+            # Search snapshots for one containing artifact with matching hash
+            artifact_type_plural = self._get_artifact_type_plural(artifact_type)
+            temp_dir = None
+
+            for snapshot in snapshots_list:
+                try:
+                    # Create temporary directory for extraction
+                    if not temp_dir:
+                        temp_dir = Path(
+                            tempfile.mkdtemp(
+                                prefix=f"skillmeat-merge-base-{content_hash[:8]}-"
+                            )
+                        )
+
+                    # Extract snapshot
+                    snapshot_extract_dir = temp_dir / snapshot.id
+                    snapshot_extract_dir.mkdir(exist_ok=True)
+
+                    with tarfile.open(snapshot.tarball_path, "r:gz") as tar:
+                        tar.extractall(snapshot_extract_dir)
+
+                    # Find artifact in extracted snapshot
+                    # The tarball contains the collection at the root with collection name
+                    artifact_path = (
+                        snapshot_extract_dir
+                        / collection_name
+                        / artifact_type_plural
+                        / artifact_name
+                    )
+
+                    if artifact_path.exists():
+                        # Compute hash of this artifact version
+                        snapshot_artifact_hash = self._compute_artifact_hash(
+                            artifact_path
+                        )
+
+                        if snapshot_artifact_hash == content_hash:
+                            logger.info(
+                                f"Found matching baseline for {artifact_name} "
+                                f"in snapshot {snapshot.id} (hash: {content_hash[:12]}...)"
+                            )
+                            return artifact_path
+
+                    # Clean up this snapshot extraction if no match
+                    import shutil
+
+                    shutil.rmtree(snapshot_extract_dir, ignore_errors=True)
+
+                except Exception as e:
+                    logger.debug(f"Error checking snapshot {snapshot.id}: {e}")
+                    continue
+
+            # No matching snapshot found
+            logger.warning(
+                f"No snapshot found containing {artifact_name} with hash {content_hash[:12]}..."
+            )
+
+            # Clean up temp directory
+            if temp_dir and temp_dir.exists():
+                import shutil
+
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Failed to search snapshots for baseline: {e}")
+            return None
 
     def _sync_fork(
         self,
@@ -1370,7 +1736,9 @@ class SyncManager:
                 "[yellow]Conflicts will be marked with Git-style markers[/yellow]\n"
             )
 
-    def _confirm_sync(self, drift_results: List[DriftDetectionResult] = None, strategy: str = "prompt") -> bool:
+    def _confirm_sync(
+        self, drift_results: List[DriftDetectionResult] = None, strategy: str = "prompt"
+    ) -> bool:
         """Confirm sync operation with user.
 
         Args:
@@ -1386,17 +1754,25 @@ class SyncManager:
         console = Console()
 
         # Show warnings
-        console.print("\n[bold yellow]⚠  Warning: This will modify your collection[/bold yellow]")
+        console.print(
+            "\n[bold yellow]⚠  Warning: This will modify your collection[/bold yellow]"
+        )
 
         if drift_results:
             console.print(f"Artifacts to sync: [cyan]{len(drift_results)}[/cyan]")
 
         if strategy == "overwrite":
-            console.print("[yellow]Strategy: overwrite - Collection versions will be replaced[/yellow]")
+            console.print(
+                "[yellow]Strategy: overwrite - Collection versions will be replaced[/yellow]"
+            )
         elif strategy == "merge":
-            console.print("[yellow]Strategy: merge - May produce conflicts requiring manual resolution[/yellow]")
+            console.print(
+                "[yellow]Strategy: merge - May produce conflicts requiring manual resolution[/yellow]"
+            )
         elif strategy == "fork":
-            console.print("[cyan]Strategy: fork - Will create new artifacts with -fork suffix[/cyan]")
+            console.print(
+                "[cyan]Strategy: fork - Will create new artifacts with -fork suffix[/cyan]"
+            )
 
         # Ask for confirmation
         return Confirm.ask("\n[bold]Proceed with sync?[/bold]", default=True)
@@ -1427,7 +1803,9 @@ class SyncManager:
                 metadata = self._load_deployment_metadata(Path("."))
                 collection_name = metadata.collection if metadata else "default"
                 collection = self.collection_mgr.load_collection(collection_name)
-                collection_path = self.collection_mgr.config.get_collection_path(collection_name)
+                collection_path = self.collection_mgr.config.get_collection_path(
+                    collection_name
+                )
 
                 # Compute new hash
                 artifact_type_plural = self._get_artifact_type_plural(
@@ -1513,3 +1891,280 @@ class SyncManager:
         # This method is now mostly for logging - individual events are
         # tracked per-artifact in _record_artifact_sync_event
         logger.info(f"Sync {sync_type}: {len(artifact_names)} artifacts")
+
+    def _track_modification_timestamp(
+        self,
+        project_path: Path,
+        artifact_name: str,
+        artifact_type: str,
+    ) -> None:
+        """Track when local modifications are first detected.
+
+        Sets modification_detected_at timestamp on deployment record if not already set.
+        This timestamp is used to track when drift was first noticed.
+
+        Args:
+            project_path: Path to project root
+            artifact_name: Name of artifact with modifications
+            artifact_type: Type of artifact
+
+        Note:
+            Only sets timestamp on FIRST detection - does not update on subsequent checks.
+            Timestamp persists in .skillmeat-deployed.toml via DeploymentTracker.
+        """
+        from skillmeat.storage.deployment import DeploymentTracker
+
+        try:
+            # Load current deployment record
+            deployment = DeploymentTracker.get_deployment(
+                project_path, artifact_name, artifact_type
+            )
+
+            if not deployment:
+                logger.debug(
+                    f"No deployment record found for {artifact_name}, skipping modification tracking"
+                )
+                return
+
+            # Only set timestamp if not already set (first detection)
+            if deployment.modification_detected_at is None:
+                deployment.modification_detected_at = datetime.utcnow()
+
+                # Update deployment record in storage
+                deployments = DeploymentTracker.read_deployments(project_path)
+
+                # Replace the deployment record
+                for i, dep in enumerate(deployments):
+                    if (
+                        dep.artifact_name == artifact_name
+                        and dep.artifact_type == artifact_type
+                    ):
+                        deployments[i] = deployment
+                        break
+
+                DeploymentTracker.write_deployments(project_path, deployments)
+
+                logger.info(
+                    f"Modification first detected for {artifact_name} at "
+                    f"{deployment.modification_detected_at.isoformat()}"
+                )
+            else:
+                logger.debug(
+                    f"Modification already tracked for {artifact_name} "
+                    f"(first detected at {deployment.modification_detected_at.isoformat()})"
+                )
+
+        except Exception as e:
+            # Never fail drift detection due to modification tracking
+            logger.warning(
+                f"Failed to track modification timestamp for {artifact_name}: {e}"
+            )
+
+    def _create_local_modification_version(
+        self,
+        artifact_id: str,
+        new_content_hash: str,
+        parent_content_hash: Optional[str],
+    ) -> None:
+        """Create version record for local modification.
+
+        Creates an ArtifactVersion record when local modifications are detected
+        in drift detection. Uses parent_hash from deployment metadata to build
+        version lineage.
+
+        Args:
+            artifact_id: ID of the artifact with local modifications
+            new_content_hash: Content hash of current project file state
+            parent_content_hash: Content hash from deployment metadata (deployed version)
+
+        Note:
+            Idempotent - skips creation if version with this content_hash already exists.
+            Gracefully handles database unavailability.
+            Similar to _create_sync_version but with change_origin='local_modification'.
+        """
+        try:
+            from skillmeat.cache.models import get_session, ArtifactVersion
+
+            session = get_session()
+            try:
+                # Check if this version already exists (deduplication)
+                existing = (
+                    session.query(ArtifactVersion)
+                    .filter_by(content_hash=new_content_hash)
+                    .first()
+                )
+                if existing:
+                    logger.debug(
+                        f"Version {new_content_hash[:12]}... already exists, skipping creation"
+                    )
+                    return
+
+                # Build version lineage from parent
+                lineage = []
+                if parent_content_hash:
+                    # Get parent version for lineage
+                    parent = (
+                        session.query(ArtifactVersion)
+                        .filter_by(content_hash=parent_content_hash)
+                        .first()
+                    )
+
+                    if parent and parent.version_lineage:
+                        # Parent exists in version table - extend its lineage
+                        try:
+                            parent_lineage = json.loads(parent.version_lineage)
+                            lineage = parent_lineage + [new_content_hash]
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Failed to parse parent lineage, starting new lineage"
+                            )
+                            lineage = [parent_content_hash, new_content_hash]
+                    else:
+                        # Parent doesn't exist in version table (legacy deployment)
+                        # Create lineage with both parent and new hash
+                        lineage = [parent_content_hash, new_content_hash]
+                        logger.debug(
+                            f"Parent version {parent_content_hash[:12]}... not in version table "
+                            f"(legacy deployment), creating lineage from scratch"
+                        )
+                else:
+                    # No parent - this is a root version (shouldn't happen for local mods)
+                    lineage = [new_content_hash]
+                    logger.warning(
+                        f"Creating local modification version without parent for {artifact_id}"
+                    )
+
+                # Create new version record
+                version = ArtifactVersion(
+                    artifact_id=artifact_id,
+                    content_hash=new_content_hash,
+                    parent_hash=parent_content_hash,
+                    change_origin="local_modification",
+                    version_lineage=json.dumps(lineage),
+                )
+
+                session.add(version)
+                session.commit()
+
+                logger.info(
+                    f"Created local_modification version for artifact {artifact_id}: "
+                    f"{new_content_hash[:12]}... (parent: "
+                    f"{parent_content_hash[:12] if parent_content_hash else 'none'}...)"
+                )
+
+            finally:
+                session.close()
+
+        except ImportError:
+            logger.debug(
+                "ArtifactVersion model not available, skipping version creation"
+            )
+        except Exception as e:
+            # Never fail drift detection due to version tracking failure
+            # Common case: artifact not in cache yet (foreign key constraint)
+            error_msg = str(e)
+            if "FOREIGN KEY constraint" in error_msg:
+                logger.debug(
+                    f"Artifact {artifact_id} not in cache, skipping version creation. "
+                    f"This is expected for artifacts not yet cached."
+                )
+            else:
+                logger.debug(f"Failed to create local modification version: {e}")
+
+    def _create_sync_version(
+        self,
+        artifact_id: str,
+        new_content_hash: str,
+        parent_content_hash: Optional[str],
+    ) -> None:
+        """Create version record for upstream sync operation.
+
+        Syncs have a parent (the previous deployed version) because they
+        represent updating an existing artifact from upstream.
+
+        Args:
+            artifact_id: ID of the artifact being synced
+            new_content_hash: Content hash of new upstream content
+            parent_content_hash: Content hash of currently deployed version (parent)
+
+        Note:
+            Requires database session access. Uses get_session() from cache.models.
+            Handles legacy artifacts without version records gracefully.
+        """
+        try:
+            from skillmeat.cache.models import get_session, ArtifactVersion
+
+            session = get_session()
+            try:
+                # Check if this version already exists (deduplication)
+                existing = (
+                    session.query(ArtifactVersion)
+                    .filter_by(content_hash=new_content_hash)
+                    .first()
+                )
+                if existing:
+                    logger.debug(
+                        f"Version {new_content_hash[:12]}... already exists, skipping creation"
+                    )
+                    return
+
+                # Build version lineage from parent
+                lineage = []
+                if parent_content_hash:
+                    # Get parent version for lineage
+                    parent = (
+                        session.query(ArtifactVersion)
+                        .filter_by(content_hash=parent_content_hash)
+                        .first()
+                    )
+
+                    if parent and parent.version_lineage:
+                        # Parent exists in version table - extend its lineage
+                        try:
+                            parent_lineage = json.loads(parent.version_lineage)
+                            lineage = parent_lineage + [new_content_hash]
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"Failed to parse parent lineage, starting new lineage"
+                            )
+                            lineage = [parent_content_hash, new_content_hash]
+                    else:
+                        # Parent doesn't exist in version table (legacy deployment)
+                        # Create lineage with both parent and new hash
+                        lineage = [parent_content_hash, new_content_hash]
+                        logger.debug(
+                            f"Parent version {parent_content_hash[:12]}... not in version table "
+                            f"(legacy deployment), creating lineage from scratch"
+                        )
+                else:
+                    # No parent - this is a root version
+                    lineage = [new_content_hash]
+
+                # Create new version record
+                version = ArtifactVersion(
+                    artifact_id=artifact_id,
+                    content_hash=new_content_hash,
+                    parent_hash=parent_content_hash,
+                    change_origin="sync",
+                    version_lineage=json.dumps(lineage),
+                )
+
+                session.add(version)
+                session.commit()
+
+                logger.info(
+                    f"Created sync version for artifact {artifact_id}: "
+                    f"{new_content_hash[:12]}... (parent: "
+                    f"{parent_content_hash[:12] if parent_content_hash else 'none'}...)"
+                )
+
+            finally:
+                session.close()
+
+        except ImportError:
+            logger.warning(
+                "ArtifactVersion model not available, skipping version creation"
+            )
+        except Exception as e:
+            # Never fail sync due to version tracking failure
+            logger.warning(f"Failed to create sync version: {e}")

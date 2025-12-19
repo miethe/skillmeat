@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export type ErrorResponse = {
-  detail: string;
-  status_code?: number;
+    detail: string;
+    status_code?: number;
 };
+

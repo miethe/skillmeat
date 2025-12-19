@@ -71,9 +71,12 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from skillmeat.cache.models import (
+    Artifact,
+    ArtifactTag,
     Base,
     MarketplaceCatalogEntry,
     MarketplaceSource,
+    Tag,
     create_db_engine,
     create_tables,
 )
@@ -1929,5 +1932,592 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
 
             logger.debug(f"Type counts for source {source_id or 'all'}: {counts}")
             return counts
+        finally:
+            session.close()
+
+
+# =============================================================================
+# Tag Repository
+# =============================================================================
+
+
+class TagRepository(BaseRepository[Tag]):
+    """Repository for tag management and artifact-tag associations.
+
+    Provides CRUD operations for tags, search capabilities, and methods for
+    managing many-to-many relationships between artifacts and tags.
+
+    Usage:
+        >>> repo = TagRepository()
+        >>>
+        >>> # Create tag
+        >>> tag = repo.create("Python", "python", "#3776AB")
+        >>>
+        >>> # Search tags
+        >>> tags = repo.search_by_name("py")
+        >>>
+        >>> # Associate tag with artifact
+        >>> repo.add_tag_to_artifact(artifact_id="art-123", tag_id=tag.id)
+        >>>
+        >>> # Get artifacts by tag
+        >>> artifacts, cursor, has_more = repo.get_artifacts_by_tag(tag.id)
+    """
+
+    def __init__(self, db_path: Optional[str | Path] = None):
+        """Initialize tag repository.
+
+        Args:
+            db_path: Optional path to database file (uses default if None)
+        """
+        super().__init__(db_path, Tag)
+
+    # =========================================================================
+    # REPO-001: CRUD Operations
+    # =========================================================================
+
+    def create(self, name: str, slug: str, color: Optional[str] = None) -> Tag:
+        """Create a new tag.
+
+        Args:
+            name: Tag name (unique, max 100 characters)
+            slug: URL-friendly identifier (unique, kebab-case)
+            color: Optional hex color code (e.g., "#FF5733")
+
+        Returns:
+            Created Tag instance
+
+        Raises:
+            RepositoryError: If tag with same name/slug already exists
+
+        Example:
+            >>> tag = repo.create("Python", "python", "#3776AB")
+            >>> print(f"Created tag: {tag.name}")
+        """
+        session = self._get_session()
+        try:
+            # Check for duplicates
+            existing = (
+                session.query(Tag)
+                .filter(or_(Tag.name == name, Tag.slug == slug))
+                .first()
+            )
+
+            if existing:
+                if existing.name == name:
+                    raise RepositoryError(f"Tag with name '{name}' already exists")
+                else:
+                    raise RepositoryError(f"Tag with slug '{slug}' already exists")
+
+            # Create tag
+            tag = Tag(
+                id=uuid.uuid4().hex,
+                name=name,
+                slug=slug,
+                color=color,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+
+            session.add(tag)
+            session.commit()
+            session.refresh(tag)
+
+            logger.info(f"Created tag: {tag.name} (id={tag.id})")
+            return tag
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to create tag: {e}") from e
+        finally:
+            session.close()
+
+    def get_by_id(self, tag_id: str) -> Optional[Tag]:
+        """Get tag by ID.
+
+        Args:
+            tag_id: Tag identifier
+
+        Returns:
+            Tag instance or None if not found
+
+        Example:
+            >>> tag = repo.get_by_id("abc123")
+            >>> if tag:
+            ...     print(f"Found: {tag.name}")
+        """
+        session = self._get_session()
+        try:
+            tag = session.query(Tag).filter_by(id=tag_id).first()
+            return tag
+        finally:
+            session.close()
+
+    def get_by_slug(self, slug: str) -> Optional[Tag]:
+        """Get tag by slug.
+
+        Args:
+            slug: URL-friendly identifier
+
+        Returns:
+            Tag instance or None if not found
+
+        Example:
+            >>> tag = repo.get_by_slug("python")
+            >>> if tag:
+            ...     print(f"Found: {tag.name}")
+        """
+        session = self._get_session()
+        try:
+            tag = session.query(Tag).filter_by(slug=slug).first()
+            return tag
+        finally:
+            session.close()
+
+    def update(
+        self,
+        tag_id: str,
+        name: Optional[str] = None,
+        slug: Optional[str] = None,
+        color: Optional[str] = None,
+    ) -> Optional[Tag]:
+        """Update tag attributes.
+
+        Args:
+            tag_id: Tag identifier
+            name: New tag name (optional)
+            slug: New slug (optional)
+            color: New color code (optional)
+
+        Returns:
+            Updated Tag instance or None if not found
+
+        Raises:
+            RepositoryError: If update conflicts with existing tag
+
+        Example:
+            >>> tag = repo.update("abc123", color="#FF0000")
+            >>> if tag:
+            ...     print(f"Updated: {tag.name}")
+        """
+        session = self._get_session()
+        try:
+            tag = session.query(Tag).filter_by(id=tag_id).first()
+            if not tag:
+                return None
+
+            # Check for conflicts if changing name or slug
+            if name and name != tag.name:
+                existing = session.query(Tag).filter_by(name=name).first()
+                if existing:
+                    raise RepositoryError(f"Tag with name '{name}' already exists")
+                tag.name = name
+
+            if slug and slug != tag.slug:
+                existing = session.query(Tag).filter_by(slug=slug).first()
+                if existing:
+                    raise RepositoryError(f"Tag with slug '{slug}' already exists")
+                tag.slug = slug
+
+            if color is not None:
+                tag.color = color
+
+            tag.updated_at = datetime.utcnow()
+
+            # Use merge to update
+            tag = session.merge(tag)
+            session.commit()
+            session.refresh(tag)
+
+            logger.info(f"Updated tag: {tag.name} (id={tag.id})")
+            return tag
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to update tag: {e}") from e
+        finally:
+            session.close()
+
+    def delete(self, tag_id: str) -> bool:
+        """Delete tag by ID.
+
+        Also removes all artifact-tag associations (CASCADE).
+
+        Args:
+            tag_id: Tag identifier
+
+        Returns:
+            True if deleted, False if not found
+
+        Example:
+            >>> deleted = repo.delete("abc123")
+            >>> if deleted:
+            ...     print("Tag deleted")
+        """
+        session = self._get_session()
+        try:
+            tag = session.query(Tag).filter_by(id=tag_id).first()
+            if not tag:
+                return False
+
+            session.delete(tag)
+            session.commit()
+
+            logger.info(f"Deleted tag: {tag.name} (id={tag.id})")
+            return True
+
+        except Exception as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to delete tag: {e}") from e
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-002: Search & List
+    # =========================================================================
+
+    def list_all(
+        self, limit: int = 100, after_cursor: Optional[str] = None
+    ) -> tuple[List[Tag], Optional[str], bool]:
+        """List all tags with cursor-based pagination.
+
+        Args:
+            limit: Maximum number of tags to return (default: 100)
+            after_cursor: Cursor for pagination (tag ID)
+
+        Returns:
+            Tuple of (tags, next_cursor, has_more):
+                - tags: List of Tag instances
+                - next_cursor: Cursor for next page (None if no more)
+                - has_more: Whether more results exist
+
+        Example:
+            >>> tags, cursor, has_more = repo.list_all(limit=50)
+            >>> while has_more:
+            ...     tags, cursor, has_more = repo.list_all(limit=50, after_cursor=cursor)
+        """
+        session = self._get_session()
+        try:
+            query = session.query(Tag).order_by(Tag.created_at.desc(), Tag.id)
+
+            # Apply cursor if provided
+            if after_cursor:
+                cursor_tag = session.query(Tag).filter_by(id=after_cursor).first()
+                if cursor_tag:
+                    query = query.filter(
+                        or_(
+                            Tag.created_at < cursor_tag.created_at,
+                            and_(
+                                Tag.created_at == cursor_tag.created_at,
+                                Tag.id > cursor_tag.id,
+                            ),
+                        )
+                    )
+
+            # Fetch limit + 1 to check if more exist
+            tags = query.limit(limit + 1).all()
+
+            # Determine pagination state
+            has_more = len(tags) > limit
+            if has_more:
+                tags = tags[:limit]
+                next_cursor = tags[-1].id if tags else None
+            else:
+                next_cursor = None
+
+            logger.debug(
+                f"Listed {len(tags)} tags (cursor={after_cursor}, has_more={has_more})"
+            )
+            return tags, next_cursor, has_more
+
+        finally:
+            session.close()
+
+    def search_by_name(self, pattern: str, limit: int = 50) -> List[Tag]:
+        """Search tags by name pattern (case-insensitive).
+
+        Args:
+            pattern: Search pattern (matches anywhere in name)
+            limit: Maximum results to return (default: 50)
+
+        Returns:
+            List of matching Tag instances
+
+        Example:
+            >>> tags = repo.search_by_name("py")
+            >>> # Returns tags like "Python", "PyTorch", etc.
+        """
+        session = self._get_session()
+        try:
+            tags = (
+                session.query(Tag)
+                .filter(Tag.name.ilike(f"%{pattern}%"))
+                .order_by(Tag.name)
+                .limit(limit)
+                .all()
+            )
+
+            logger.debug(f"Found {len(tags)} tags matching pattern '{pattern}'")
+            return tags
+
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-003: Artifact-Tag Associations
+    # =========================================================================
+
+    def add_tag_to_artifact(self, artifact_id: str, tag_id: str) -> ArtifactTag:
+        """Add tag to artifact (create association).
+
+        Args:
+            artifact_id: Artifact identifier
+            tag_id: Tag identifier
+
+        Returns:
+            Created ArtifactTag association
+
+        Raises:
+            RepositoryError: If association already exists or IDs invalid
+
+        Example:
+            >>> assoc = repo.add_tag_to_artifact("art-123", "tag-456")
+            >>> print(f"Tagged artifact at {assoc.created_at}")
+        """
+        session = self._get_session()
+        try:
+            # Check if association already exists
+            existing = (
+                session.query(ArtifactTag)
+                .filter_by(artifact_id=artifact_id, tag_id=tag_id)
+                .first()
+            )
+
+            if existing:
+                raise RepositoryError(
+                    f"Artifact {artifact_id} already has tag {tag_id}"
+                )
+
+            # Verify artifact and tag exist
+            artifact = session.query(Artifact).filter_by(id=artifact_id).first()
+            if not artifact:
+                raise RepositoryError(f"Artifact {artifact_id} not found")
+
+            tag = session.query(Tag).filter_by(id=tag_id).first()
+            if not tag:
+                raise RepositoryError(f"Tag {tag_id} not found")
+
+            # Create association
+            assoc = ArtifactTag(
+                artifact_id=artifact_id,
+                tag_id=tag_id,
+                created_at=datetime.utcnow(),
+            )
+
+            session.add(assoc)
+            session.commit()
+            session.refresh(assoc)
+
+            logger.info(f"Added tag {tag_id} to artifact {artifact_id}")
+            return assoc
+
+        except IntegrityError as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to add tag to artifact: {e}") from e
+        finally:
+            session.close()
+
+    def remove_tag_from_artifact(self, artifact_id: str, tag_id: str) -> bool:
+        """Remove tag from artifact (delete association).
+
+        Args:
+            artifact_id: Artifact identifier
+            tag_id: Tag identifier
+
+        Returns:
+            True if removed, False if association didn't exist
+
+        Example:
+            >>> removed = repo.remove_tag_from_artifact("art-123", "tag-456")
+            >>> if removed:
+            ...     print("Tag removed from artifact")
+        """
+        session = self._get_session()
+        try:
+            assoc = (
+                session.query(ArtifactTag)
+                .filter_by(artifact_id=artifact_id, tag_id=tag_id)
+                .first()
+            )
+
+            if not assoc:
+                return False
+
+            session.delete(assoc)
+            session.commit()
+
+            logger.info(f"Removed tag {tag_id} from artifact {artifact_id}")
+            return True
+
+        except Exception as e:
+            session.rollback()
+            raise RepositoryError(f"Failed to remove tag from artifact: {e}") from e
+        finally:
+            session.close()
+
+    def get_artifact_tags(self, artifact_id: str) -> List[Tag]:
+        """Get all tags for an artifact.
+
+        Args:
+            artifact_id: Artifact identifier
+
+        Returns:
+            List of Tag instances (ordered by name)
+
+        Example:
+            >>> tags = repo.get_artifact_tags("art-123")
+            >>> for tag in tags:
+            ...     print(f"- {tag.name}")
+        """
+        session = self._get_session()
+        try:
+            tags = (
+                session.query(Tag)
+                .join(ArtifactTag, Tag.id == ArtifactTag.tag_id)
+                .filter(ArtifactTag.artifact_id == artifact_id)
+                .order_by(Tag.name)
+                .all()
+            )
+
+            logger.debug(f"Found {len(tags)} tags for artifact {artifact_id}")
+            return tags
+
+        finally:
+            session.close()
+
+    def get_artifacts_by_tag(
+        self, tag_id: str, limit: int = 100, after_cursor: Optional[str] = None
+    ) -> tuple[List[Artifact], Optional[str], bool]:
+        """Get all artifacts with a specific tag (paginated).
+
+        Args:
+            tag_id: Tag identifier
+            limit: Maximum number of artifacts to return (default: 100)
+            after_cursor: Cursor for pagination (artifact ID)
+
+        Returns:
+            Tuple of (artifacts, next_cursor, has_more):
+                - artifacts: List of Artifact instances
+                - next_cursor: Cursor for next page (None if no more)
+                - has_more: Whether more results exist
+
+        Example:
+            >>> artifacts, cursor, has_more = repo.get_artifacts_by_tag("tag-123")
+            >>> for artifact in artifacts:
+            ...     print(f"- {artifact.name}")
+        """
+        session = self._get_session()
+        try:
+            query = (
+                session.query(Artifact)
+                .join(ArtifactTag, Artifact.id == ArtifactTag.artifact_id)
+                .filter(ArtifactTag.tag_id == tag_id)
+                .order_by(ArtifactTag.created_at.desc(), Artifact.id)
+            )
+
+            # Apply cursor if provided
+            if after_cursor:
+                cursor_assoc = (
+                    session.query(ArtifactTag)
+                    .filter_by(artifact_id=after_cursor, tag_id=tag_id)
+                    .first()
+                )
+                if cursor_assoc:
+                    query = query.filter(
+                        or_(
+                            ArtifactTag.created_at < cursor_assoc.created_at,
+                            and_(
+                                ArtifactTag.created_at == cursor_assoc.created_at,
+                                Artifact.id > cursor_assoc.artifact_id,
+                            ),
+                        )
+                    )
+
+            # Fetch limit + 1 to check if more exist
+            artifacts = query.limit(limit + 1).all()
+
+            # Determine pagination state
+            has_more = len(artifacts) > limit
+            if has_more:
+                artifacts = artifacts[:limit]
+                next_cursor = artifacts[-1].id if artifacts else None
+            else:
+                next_cursor = None
+
+            logger.debug(
+                f"Found {len(artifacts)} artifacts with tag {tag_id} "
+                f"(cursor={after_cursor}, has_more={has_more})"
+            )
+            return artifacts, next_cursor, has_more
+
+        finally:
+            session.close()
+
+    # =========================================================================
+    # REPO-004: Statistics
+    # =========================================================================
+
+    def get_tag_artifact_count(self, tag_id: str) -> int:
+        """Get number of artifacts with a specific tag.
+
+        Args:
+            tag_id: Tag identifier
+
+        Returns:
+            Count of artifacts with this tag
+
+        Example:
+            >>> count = repo.get_tag_artifact_count("tag-123")
+            >>> print(f"Tag used on {count} artifacts")
+        """
+        session = self._get_session()
+        try:
+            count = (
+                session.query(func.count(ArtifactTag.artifact_id))
+                .filter_by(tag_id=tag_id)
+                .scalar()
+            )
+
+            return count or 0
+
+        finally:
+            session.close()
+
+    def get_all_tag_counts(self) -> List[tuple[Tag, int]]:
+        """Get all tags with their artifact counts.
+
+        Returns:
+            List of (tag, count) tuples, ordered by count descending
+
+        Example:
+            >>> tag_counts = repo.get_all_tag_counts()
+            >>> for tag, count in tag_counts:
+            ...     print(f"{tag.name}: {count} artifacts")
+        """
+        session = self._get_session()
+        try:
+            results = (
+                session.query(
+                    Tag,
+                    func.count(ArtifactTag.artifact_id).label("count"),
+                )
+                .outerjoin(ArtifactTag, Tag.id == ArtifactTag.tag_id)
+                .group_by(Tag.id)
+                .order_by(func.count(ArtifactTag.artifact_id).desc(), Tag.name)
+                .all()
+            )
+
+            logger.debug(f"Retrieved counts for {len(results)} tags")
+            return results
+
         finally:
             session.close()

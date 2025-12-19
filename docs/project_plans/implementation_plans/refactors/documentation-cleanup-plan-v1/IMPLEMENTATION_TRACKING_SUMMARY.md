@@ -276,20 +276,59 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 
 ---
 
-### 13. Versioning Merge System v1 (In Progress)
+### 13. Versioning Merge System v1.5 (In Progress - Core Complete, Testing Deferred)
 
-**Status**: IN PROGRESS (Phase 6 implemented; remaining phases planning)
-**Phases**: 11 phases planned (Phase 6 delivered via commit `e49307f`)
-**Location**: `docs/project_plans/implementation_plans/enhancements/versioning-merge-system-v1.md`
+**Status**: IN PROGRESS (Core, API, and UI complete; Testing deferred)
+**Phases**: 6 phases total (v1.5 streamlined from original v1)
+**Location**: `.claude/progress/versioning-merge-system-v1.5/`
+**Updated**: 2025-12-18
 
-#### Overview:
-Comprehensive versioning system with:
-- Version control for artifacts
-- Merge conflict resolution
-- Version history tracking
-- Branch management
+#### Phase Status (Updated 2025-12-18):
 
-Most phases are in planning stage; Phase 1 foundational work pending.
+| Phase | Title | Status | Progress | Notes |
+|-------|-------|--------|----------|-------|
+| 1 | Core Baseline Support | **COMPLETE** | 100% | Three-way merge baseline storage |
+| 2 | Version Lineage Tracking | **COMPLETE** | 100% | Parent-child version relationships |
+| 3-4 | Modification Tracking & Attribution | **COMPLETE** | 100% | Change origin (upstream/local/both), API enhancements |
+| 5 | Frontend Components | **COMPLETE** | 100% | DiffViewer, VersionTimeline, ChangeBadge components |
+| 6 | Testing & Documentation | **PARTIAL** | 14% | Documentation complete; testing deferred |
+
+#### Key Features Delivered:
+- **Version Lineage Tracking**: Complete version history graph with parent-child relationships
+- **Change Attribution**: Distinguish upstream, local, and conflicting changes (`change_origin` field)
+- **Baseline Storage**: Three-way merge now uses correct baseline (previously defaulted to empty)
+- **Change Badges**: Visual indicators in UI (blue=upstream, amber=local, red=conflict)
+- **Version Timeline**: Change origin labels in version history display
+- **API Endpoints**: `/api/v1/versions/` and `/api/v1/merge/` endpoints
+
+#### Key Implementation Files:
+- `skillmeat/core/version_lineage.py` - Version lineage tracking
+- `skillmeat/core/version_tracking.py` - Modification detection
+- `skillmeat/core/merge_engine.py` - Three-way merge with conflict detection
+- `skillmeat/core/diff_engine.py` - File/directory diffing
+- `skillmeat/api/routers/versions.py` - Version management API
+- `skillmeat/api/routers/merge.py` - Merge operations API
+- `skillmeat/web/components/versioning/` - Frontend components (DiffViewer, VersionTimeline, ChangeBadge)
+
+#### Documentation (Completed 2025-12-18):
+- `docs/api/versioning.md` - API reference for versioning endpoints
+- `docs/guides/syncing-changes.md` - Updated user guide with change attribution
+- `CHANGELOG.md` - Release notes for v1.5 features
+
+#### Deferred Tasks (Phase 6):
+- Integration tests for deploy→sync→drift→merge workflow
+- Integration tests for conflict workflow
+- Performance tests for version chain queries
+- Migration tests from v1.0 deployments
+- Manual UI testing
+- Load testing with large version chains
+
+#### Recent Commits:
+- `b88f053` feat(web): add DiffViewer, VersionTimeline and badge tooltips
+- `08e661d` feat(web): add change origin types and ChangeBadge component
+- `1c6db79` feat(versioning): implement Phase 4 - change attribution API features
+- `bf021c6` feat(versioning): implement Phase 2 - version lineage tracking
+- `e00864c` feat(sync): implement Phase 1 - core baseline support
 
 ---
 
@@ -360,7 +399,7 @@ Earlier iteration with 6 phases planned but superseded by v1 (active).
 | collections-api-consolidation | 5 | 5 | 0 | 0 | **Completed** ✅ |
 | smart-import-discovery-v1 | 5 | 5 | 0 | 0 | **Completed** |
 | web-ui-consolidation-v1 | TBD | 0 | 0 | 1 | Planned |
-| versioning-merge-system | 11 | 1 | 0 | 10 | Phase 6 Complete |
+| versioning-merge-system-v1.5 | 6 | 5 | 1 | 0 | P1-5 Complete, P6 Docs Done/Tests Deferred |
 | marketplace-sources-crud | 6 | 6 | 0 | 0 | **Completed** |
 | entity-lifecycle-management | 7 | 7 | 0 | 0 | **Completed** |
 
@@ -699,7 +738,7 @@ docs/project_plans/implementation_plans/
 ├── smart-import-discovery-v1/ (PENDING)
 ├── marketplace-sources-crud-enhancement/ (NOT STARTED)
 ├── collections-api-consolidation/ (COMPLETED ✅)
-├── versioning-merge-system/ (PLANNING)
+├── versioning-merge-system/ (P5 COMPLETE, P1/6/11 PARTIAL, P7-10 NOT STARTED)
 ├── web-ui-consolidation-v1/ (PENDING)
 ├── collections-navigation/ (SUPERSEDED by v1)
 ├── ph2-intelligence/ (RESEARCH/COMPLETED)

@@ -23,6 +23,7 @@ from skillmeat.core.services.context_sync import (
     SyncConflict,
     SyncResult,
 )
+from skillmeat.core.services.tag_service import TagService
 
 __all__ = [
     # Template service
@@ -41,4 +42,6 @@ __all__ = [
     "ContextSyncService",
     "SyncConflict",
     "SyncResult",
+    # Tag service
+    "TagService",
 ]

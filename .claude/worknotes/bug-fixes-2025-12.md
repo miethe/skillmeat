@@ -420,3 +420,105 @@
   3. Resets `selectedCollectionId` state to `null` using the direct state setter (avoiding re-persistence)
 - **Commit(s)**: 0175ae0
 - **Status**: RESOLVED
+
+## 2025-12-18
+
+### Take Upstream Hangs and Times Out on Sync Status Tab
+
+**Issue**: Clicking "Take Upstream" in artifact modal Sync Status tab causes web app to hang, then fails with `ECONNRESET` socket hang up error. API logs show warning about existing artifact path but never completes.
+- **Location**: `skillmeat/core/deployment.py:206-210`, `skillmeat/api/routers/artifacts.py:2387-2392`
+- **Root Cause**: Two issues combined:
+  1. `deploy_artifacts()` was designed for CLI use with interactive prompts. When an artifact already exists at the destination, it calls `rich.Confirm.ask()` which blocks waiting for stdin input
+  2. The API endpoint received `overwrite: true` from frontend but never passed it to the core function - `request.overwrite` was ignored
+  3. When called from API context with no stdin, the function hangs forever waiting for user confirmation
+- **Fix**:
+  1. Added `overwrite: bool = False` parameter to `deploy_artifacts()` function signature
+  2. Modified overwrite prompt logic to skip `Confirm.ask()` when `overwrite=True`
+  3. Updated router to pass `request.overwrite` to `deploy_artifacts()` call
+  4. Added `--overwrite/-o` CLI flag for consistency
+  5. Added unit test for overwrite=True behavior
+- **Commit(s)**: 0b2e0c6
+- **Status**: RESOLVED
+
+### Next.js Build Fails - useSearchParams Missing Suspense Boundary
+
+**Issue**: Web app build fails with error: `useSearchParams() should be wrapped in a suspense boundary at page "/collection"`
+- **Location**: `skillmeat/web/app/collection/page.tsx:95`, `skillmeat/web/app/projects/[id]/page.tsx:56`
+- **Root Cause**: Next.js App Router requires `useSearchParams()` to be wrapped in a Suspense boundary to prevent hydration mismatches during SSR. Both pages called the hook directly without wrapping.
+- **Fix**:
+  1. `/collection/page.tsx`: Wrapped existing `<CollectionPageContent />` in `<Suspense>` with Loader2 spinner fallback
+  2. `/projects/[id]/page.tsx`: Renamed `ProjectDetailPage` to `ProjectDetailPageContent`, created new default export wrapping content in `<Suspense>`
+  3. Added `Suspense` from 'react' and `Loader2` from 'lucide-react' imports to both files
+- **Commit(s)**: 601debd
+- **Status**: RESOLVED
+
+### Tags API Fails with TypeError on list_tags
+
+**Issue**: Tags API returns 500 error: `TagService.list_tags() got an unexpected keyword argument 'order_by'`
+- **Location**: `skillmeat/api/routers/tags.py` (multiple lines), `skillmeat/web/lib/api/tags.ts`
+- **Root Cause**: Router-to-service contract mismatches after TagService refactor:
+  1. `list_tags(order_by="name")` - service doesn't accept `order_by` param
+  2. `create_tag(name=..., slug=...)` - service expects `TagCreateRequest` object
+  3. `get_tag_by_id()` - method is named `get_tag()`
+  4. `update_tag(id, **updates)` - service expects `TagUpdateRequest` object
+  5. `get_tag_artifact_count()` - method doesn't exist (count is in response)
+  6. Frontend PageInfo types mismatched (`has_next` vs `has_next_page`, etc.)
+- **Fix**:
+  1. Changed `list_tags()` call to use correct signature without `order_by`
+  2. Changed `create_tag()` to pass request object directly
+  3. Changed `get_tag_by_id()` → `get_tag()`
+  4. Changed `update_tag()` to pass request object directly
+  5. Removed manual artifact_count calls (service includes it in response)
+  6. Fixed frontend `TagListResponse.page_info` to match backend `PageInfo` schema
+- **Commit(s)**: 71a5087
+- **Status**: RESOLVED
+
+### Edit Parameters Modal Uses Plain Text Input for Tags
+
+**Issue**: Tags field in artifact Edit Parameters modal requires comma-separated text input instead of using the TagInput component with search, autocomplete, and inline tag creation.
+- **Location**: `skillmeat/web/components/discovery/ParameterEditorModal.tsx:245-255`
+- **Root Cause**: Original implementation used basic `<Input>` with comma-separated string parsing. The full-featured `TagInput` component already existed but wasn't integrated.
+- **Fix**:
+  1. Imported `TagInput` component and `useTags` hook
+  2. Changed form field type from `string` to `string[]`
+  3. Used `Controller` from react-hook-form to integrate TagInput
+  4. Configured TagInput with suggestions from API, `allowCreate={true}`
+  5. Updated form submission to use array directly (removed comma-split parsing)
+  6. Updated help text to reflect new UX
+- **Commit(s)**: df3fbfd
+- **Status**: RESOLVED
+
+## 2025-12-19
+
+### Edit Parameters Modal Fails with GitHubMetadataExtractor Missing Cache Argument
+
+**Issue**: Saving Tags via the Edit Parameters form fails with error: `GitHubMetadataExtractor.__init__() missing 1 required positional argument: 'cache'`
+- **Location**: `skillmeat/api/routers/artifacts.py:2063`
+- **Root Cause**: `GitHubMetadataExtractor()` was instantiated without the required `cache` argument. The class signature is `__init__(self, cache: MetadataCache, token: Optional[str] = None)`, but the call at line 2063 passed no arguments.
+- **Fix**: Changed `GitHubMetadataExtractor()` to `GitHubMetadataExtractor(cache=None)`. This matches the validation-only pattern used in `core/validation.py:40` - no caching is needed for `parse_github_url()` validation.
+- **Commit(s)**: 0410802
+- **Status**: RESOLVED
+
+### Tags Not Displayed After Saving Despite Successful API Response
+
+**Issue**: Tags appear to save successfully (API logs show update), but never display on artifact cards, in modals, in the filterable tag list, or in the Edit Parameters modal.
+- **Location**: `skillmeat/api/schemas/artifacts.py:185`, `skillmeat/api/routers/artifacts.py:477`, `skillmeat/web/hooks/useDiscovery.ts:144`
+- **Root Cause**: Tags were being persisted correctly to disk (manifest.toml), but:
+  1. `ArtifactResponse` schema was missing the `tags` field entirely
+  2. `artifact_to_response()` function never mapped `artifact.tags` to the response
+  3. Frontend cache invalidation after tag edit only invalidated artifact queries, not entity queries used by the modal
+- **Fix**:
+  1. Added `tags: List[str]` field to `ArtifactResponse` schema
+  2. Added `tags=artifact.tags or []` to `artifact_to_response()` constructor
+  3. Added `['entities']` query invalidation after tag edit in `useEditArtifactParameters` hook
+- **Commit(s)**: aba3e6d
+- **Status**: RESOLVED
+
+### Artifact Cards Have Inconsistent Heights on /collection Page
+
+**Issue**: Artifact cards have varying sizes depending on whether they have tags attached. Cards with tags are taller than cards without, causing inconsistent row heights.
+- **Location**: `skillmeat/web/components/collection/artifact-grid.tsx:152,205`
+- **Root Cause**: The `UnifiedCard` component conditionally renders the tags section (only when tags exist). Without CSS Grid row height normalization, cards without tags were shorter than cards with tags.
+- **Fix**: Added `auto-rows-fr` Tailwind class to both grid containers (main grid and skeleton). This CSS Grid property (`grid-auto-rows: 1fr`) equalizes row heights based on the tallest item in each row.
+- **Commit(s)**: 7000902
+- **Status**: RESOLVED

@@ -688,11 +688,19 @@ def agent(
     default=None,
     help="Artifact type (required if names are ambiguous)",
 )
+@click.option(
+    "--overwrite",
+    "-o",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing artifacts without prompting",
+)
 def deploy(
     names: List[str],
     collection: Optional[str],
     project: Optional[Path],
     artifact_type: Optional[str],
+    overwrite: bool,
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -703,6 +711,7 @@ def deploy(
       skillmeat deploy my-skill               # Deploy to current dir
       skillmeat deploy skill1 skill2          # Deploy multiple
       skillmeat deploy my-skill --project /path/to/proj
+      skillmeat deploy my-skill --overwrite   # Skip overwrite prompt
     """
     try:
         deployment_mgr = DeploymentManager()
@@ -718,6 +727,7 @@ def deploy(
             collection_name=collection,
             project_path=project,
             artifact_type=type_filter,
+            overwrite=overwrite,
         )
 
         console.print(f"[green]Deployed {len(deployments)} artifact(s)[/green]")
@@ -1702,15 +1712,14 @@ def history(collection: Optional[str], limit: int):
         if collection is None:
             collection = version_mgr.collection_mgr.get_active_collection_name()
 
-        # List snapshots
-        snapshots = version_mgr.list_snapshots(collection_name=collection)
+        # List snapshots with pagination
+        snapshots, _ = version_mgr.list_snapshots(
+            collection_name=collection, limit=limit
+        )
 
         if not snapshots:
             console.print("[yellow]No snapshots found[/yellow]")
             return
-
-        # Limit results
-        snapshots = snapshots[:limit]
 
         # Create table
         table = Table(title=f"Snapshots for '{collection}' ({len(snapshots)})")

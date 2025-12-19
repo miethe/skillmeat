@@ -10,12 +10,13 @@ import type { PageInfo } from './PageInfo';
  * Extends the generic paginated response with collection-specific items.
  */
 export type CollectionListResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<CollectionResponse>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
+    /**
+     * List of items for this page
+     */
+    items: Array<CollectionResponse>;
+    /**
+     * Pagination metadata
+     */
+    page_info: PageInfo;
 };
+
