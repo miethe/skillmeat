@@ -247,6 +247,8 @@ class Artifact(Base):
     )
     category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -325,6 +327,8 @@ class Artifact(Base):
             "auto_load": self.auto_load,
             "category": self.category,
             "content_hash": self.content_hash,
+            "content": self.content,
+            "description": self.description,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

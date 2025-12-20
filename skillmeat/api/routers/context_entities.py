@@ -39,16 +39,46 @@ from skillmeat.api.schemas.context_entity import (
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.core.validators.context_entity import validate_context_entity
 
-# Note: ContextEntity model will be imported once TASK-1.2 is complete
-# For now, this is a placeholder comment
-# from skillmeat.cache.models import ContextEntity, get_session
+from skillmeat.cache.models import Artifact, Project, get_session
 
 logger = logging.getLogger(__name__)
+
+# Sentinel project ID for context entities (not tied to a real project)
+CONTEXT_ENTITIES_PROJECT_ID = "ctx_project_global"
+
+
+def ensure_context_entities_project(session) -> None:
+    """Ensure the sentinel project for context entities exists.
+
+    Context entities are stored as Artifacts but aren't tied to any real project.
+    We use a sentinel project to satisfy the foreign key constraint.
+    """
+    project = session.query(Project).filter_by(id=CONTEXT_ENTITIES_PROJECT_ID).first()
+    if not project:
+        project = Project(
+            id=CONTEXT_ENTITIES_PROJECT_ID,
+            name="Context Entities",
+            path="~/.skillmeat/context-entities",
+            description="Virtual project for context entity storage",
+            status="active",
+        )
+        session.add(project)
+        session.commit()
+        logger.info(f"Created sentinel project for context entities: {project.id}")
 
 router = APIRouter(
     prefix="/context-entities",
     tags=["context-entities"],
 )
+
+# Context entity types mapped to Artifact types
+CONTEXT_ENTITY_TYPES = {
+    "project_config",
+    "spec_file",
+    "rule_file",
+    "context_file",
+    "progress_template",
+}
 
 
 def compute_content_hash(content: str) -> str:
@@ -163,82 +193,88 @@ async def list_context_entities(
         HTTPException: On error
 
     Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
+        This endpoint uses Artifact model with type filtering.
     """
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        # Build query - filter by context entity types
+        query = session.query(Artifact).filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     # Build query
-    #     query = session.query(ContextEntity)
-    #
-    #     # Apply filters
-    #     if entity_type:
-    #         query = query.filter_by(type=entity_type.value)
-    #     if category:
-    #         query = query.filter_by(category=category)
-    #     if auto_load is not None:
-    #         query = query.filter_by(auto_load=auto_load)
-    #     if search:
-    #         search_pattern = f"%{search}%"
-    #         query = query.filter(
-    #             (ContextEntity.name.ilike(search_pattern))
-    #             | (ContextEntity.description.ilike(search_pattern))
-    #             | (ContextEntity.path_pattern.ilike(search_pattern))
-    #         )
-    #
-    #     # Decode cursor if provided
-    #     if after:
-    #         cursor_id = decode_cursor(after)
-    #         query = query.filter(ContextEntity.id > cursor_id)
-    #
-    #     # Order by ID for consistent pagination
-    #     query = query.order_by(ContextEntity.id)
-    #
-    #     # Fetch limit + 1 to check for next page
-    #     entities = query.limit(limit + 1).all()
-    #
-    #     # Check if there are more pages
-    #     has_next = len(entities) > limit
-    #     if has_next:
-    #         entities = entities[:limit]
-    #
-    #     # Build response
-    #     items = [
-    #         ContextEntityResponse.model_validate(entity) for entity in entities
-    #     ]
-    #
-    #     # Build pagination info
-    #     start_cursor = encode_cursor(items[0].id) if items else None
-    #     end_cursor = encode_cursor(items[-1].id) if items else None
-    #
-    #     page_info = PageInfo(
-    #         has_next_page=has_next,
-    #         has_previous_page=after is not None,
-    #         start_cursor=start_cursor,
-    #         end_cursor=end_cursor,
-    #         total_count=None,  # Total count expensive for large datasets
-    #     )
-    #
-    #     logger.info(f"Listed {len(items)} context entities")
-    #     return ContextEntityListResponse(items=items, page_info=page_info)
-    #
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     logger.error(f"Error listing context entities: {e}", exc_info=True)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=f"Failed to list context entities: {str(e)}",
-    #     )
-    # finally:
-    #     session.close()
+        # Apply filters
+        if entity_type:
+            query = query.filter_by(type=entity_type.value)
+        if category:
+            query = query.filter_by(category=category)
+        if auto_load is not None:
+            query = query.filter_by(auto_load=auto_load)
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                (Artifact.name.ilike(search_pattern))
+                | (Artifact.description.ilike(search_pattern))
+                | (Artifact.path_pattern.ilike(search_pattern))
+            )
+
+        # Decode cursor if provided
+        if after:
+            cursor_id = decode_cursor(after)
+            query = query.filter(Artifact.id > cursor_id)
+
+        # Order by ID for consistent pagination
+        query = query.order_by(Artifact.id)
+
+        # Fetch limit + 1 to check for next page
+        artifacts = query.limit(limit + 1).all()
+
+        # Check if there are more pages
+        has_next = len(artifacts) > limit
+        if has_next:
+            artifacts = artifacts[:limit]
+
+        # Build response
+        items = [
+            ContextEntityResponse(
+                id=artifact.id,
+                name=artifact.name,
+                entity_type=artifact.type,
+                content=artifact.content or "",
+                path_pattern=artifact.path_pattern or "",
+                description=artifact.description,
+                category=artifact.category,
+                auto_load=artifact.auto_load,
+                version=artifact.deployed_version,
+                content_hash=artifact.content_hash,
+                created_at=artifact.created_at,
+                updated_at=artifact.updated_at,
+            )
+            for artifact in artifacts
+        ]
+
+        # Build pagination info
+        start_cursor = encode_cursor(items[0].id) if items else None
+        end_cursor = encode_cursor(items[-1].id) if items else None
+
+        page_info = PageInfo(
+            has_next_page=has_next,
+            has_previous_page=after is not None,
+            start_cursor=start_cursor,
+            end_cursor=end_cursor,
+            total_count=None,  # Total count expensive for large datasets
+        )
+
+        logger.info(f"Listed {len(items)} context entities")
+        return ContextEntityListResponse(items=items, page_info=page_info)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing context entities: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list context entities: {str(e)}",
+        )
+    finally:
+        session.close()
 
 
 @router.post(
@@ -301,58 +337,68 @@ async def create_context_entity(
     # Compute content hash
     content_hash = compute_content_hash(request.content)
 
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        # Ensure sentinel project exists
+        ensure_context_entities_project(session)
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     # Create entity
-    #     entity = ContextEntity(
-    #         id=uuid.uuid4().hex,
-    #         name=request.name,
-    #         type=request.entity_type.value,
-    #         content=request.content,
-    #         path_pattern=request.path_pattern,
-    #         description=request.description,
-    #         category=request.category,
-    #         auto_load=request.auto_load,
-    #         version=request.version,
-    #         content_hash=content_hash,
-    #     )
-    #
-    #     session.add(entity)
-    #     session.commit()
-    #     session.refresh(entity)
-    #
-    #     logger.info(
-    #         f"Created context entity: {entity.id} ('{entity.name}') type={entity.type}"
-    #     )
-    #
-    #     return ContextEntityResponse.model_validate(entity)
-    #
-    # except HTTPException:
-    #     session.rollback()
-    #     raise
-    # except IntegrityError as e:
-    #     session.rollback()
-    #     logger.error(f"Integrity error creating context entity: {e}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail="Context entity with this name or path pattern already exists",
-    #     ) from e
-    # except Exception as e:
-    #     session.rollback()
-    #     logger.error(f"Failed to create context entity: {e}", exc_info=True)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail="Failed to create context entity",
-    #     ) from e
-    # finally:
-    #     session.close()
+        # Create artifact with context entity type
+        artifact = Artifact(
+            id=f"ctx_{uuid.uuid4().hex[:12]}",
+            project_id=CONTEXT_ENTITIES_PROJECT_ID,
+            name=request.name,
+            type=request.entity_type.value,
+            content=request.content,
+            path_pattern=request.path_pattern,
+            description=request.description,
+            category=request.category,
+            auto_load=request.auto_load,
+            deployed_version=request.version if request.version else None,
+            content_hash=content_hash,
+        )
+
+        session.add(artifact)
+        session.commit()
+        session.refresh(artifact)
+
+        logger.info(
+            f"Created context entity: {artifact.id} ('{artifact.name}') type={artifact.type}"
+        )
+
+        return ContextEntityResponse(
+            id=artifact.id,
+            name=artifact.name,
+            entity_type=artifact.type,
+            content=artifact.content or "",
+            path_pattern=artifact.path_pattern or "",
+            description=artifact.description,
+            category=artifact.category,
+            auto_load=artifact.auto_load,
+            version=artifact.deployed_version,
+            content_hash=artifact.content_hash,
+            created_at=artifact.created_at,
+            updated_at=artifact.updated_at,
+        )
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as e:
+        session.rollback()
+        logger.error(f"Integrity error creating context entity: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Context entity with this name or path pattern already exists",
+        ) from e
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to create context entity: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create context entity",
+        ) from e
+    finally:
+        session.close()
 
 
 @router.get(
@@ -389,38 +435,48 @@ async def get_context_entity(entity_id: str) -> ContextEntityResponse:
         HTTPException 500: If database operation fails
 
     Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
+        This endpoint uses Artifact model with type filtering.
     """
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        artifact = (
+            session.query(Artifact)
+            .filter(Artifact.id == entity_id)
+            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Context entity '{entity_id}' not found",
+            )
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     entity = session.query(ContextEntity).filter_by(id=entity_id).first()
-    #     if not entity:
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND,
-    #             detail=f"Context entity '{entity_id}' not found",
-    #         )
-    #
-    #     logger.info(f"Retrieved context entity {entity_id}")
-    #     return ContextEntityResponse.model_validate(entity)
-    #
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     logger.error(f"Error getting context entity '{entity_id}': {e}", exc_info=True)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=f"Failed to get context entity: {str(e)}",
-    #     )
-    # finally:
-    #     session.close()
+        logger.info(f"Retrieved context entity {entity_id}")
+        return ContextEntityResponse(
+            id=artifact.id,
+            name=artifact.name,
+            entity_type=artifact.type,
+            content=artifact.content or "",
+            path_pattern=artifact.path_pattern or "",
+            description=artifact.description,
+            category=artifact.category,
+            auto_load=artifact.auto_load,
+            version=artifact.deployed_version,
+            content_hash=artifact.content_hash,
+            created_at=artifact.created_at,
+            updated_at=artifact.updated_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting context entity '{entity_id}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get context entity: {str(e)}",
+        )
+    finally:
+        session.close()
 
 
 @router.put(
@@ -460,90 +516,100 @@ async def update_context_entity(
         HTTPException 500: If database operation fails
 
     Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
+        This endpoint uses Artifact model with type filtering.
     """
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        artifact = (
+            session.query(Artifact)
+            .filter(Artifact.id == entity_id)
+            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Context entity '{entity_id}' not found",
+            )
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     entity = session.query(ContextEntity).filter_by(id=entity_id).first()
-    #     if not entity:
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND,
-    #             detail=f"Context entity '{entity_id}' not found",
-    #         )
-    #
-    #     # Track if content changed
-    #     content_changed = False
-    #
-    #     # Update fields
-    #     if request.name is not None:
-    #         entity.name = request.name
-    #     if request.entity_type is not None:
-    #         entity.type = request.entity_type.value
-    #     if request.content is not None:
-    #         entity.content = request.content
-    #         content_changed = True
-    #     if request.path_pattern is not None:
-    #         entity.path_pattern = request.path_pattern
-    #     if request.description is not None:
-    #         entity.description = request.description
-    #     if request.category is not None:
-    #         entity.category = request.category
-    #     if request.auto_load is not None:
-    #         entity.auto_load = request.auto_load
-    #     if request.version is not None:
-    #         entity.version = request.version
-    #
-    #     # Validate content if changed or type changed
-    #     if content_changed or request.entity_type is not None:
-    #         validation_errors = validate_context_entity(
-    #             entity_type=entity.type,
-    #             content=entity.content,
-    #             path=entity.path_pattern,
-    #         )
-    #         if validation_errors:
-    #             session.rollback()
-    #             raise HTTPException(
-    #                 status_code=status.HTTP_400_BAD_REQUEST,
-    #                 detail=f"Content validation failed: {'; '.join(validation_errors)}",
-    #             )
-    #
-    #     # Recompute content hash if content changed
-    #     if content_changed:
-    #         entity.content_hash = compute_content_hash(entity.content)
-    #
-    #     session.commit()
-    #     session.refresh(entity)
-    #
-    #     logger.info(f"Updated context entity {entity_id}")
-    #     return ContextEntityResponse.model_validate(entity)
-    #
-    # except HTTPException:
-    #     session.rollback()
-    #     raise
-    # except IntegrityError as e:
-    #     session.rollback()
-    #     logger.error(f"Integrity error updating context entity: {e}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail="Context entity with this name or path pattern already exists",
-    #     ) from e
-    # except Exception as e:
-    #     session.rollback()
-    #     logger.error(f"Failed to update context entity {entity_id}: {e}", exc_info=True)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail="Failed to update context entity",
-    #     ) from e
-    # finally:
-    #     session.close()
+        # Track if content changed
+        content_changed = False
+
+        # Update fields
+        if request.name is not None:
+            artifact.name = request.name
+        if request.entity_type is not None:
+            artifact.type = request.entity_type.value
+        if request.content is not None:
+            artifact.content = request.content
+            content_changed = True
+        if request.path_pattern is not None:
+            artifact.path_pattern = request.path_pattern
+        if request.description is not None:
+            artifact.description = request.description
+        if request.category is not None:
+            artifact.category = request.category
+        if request.auto_load is not None:
+            artifact.auto_load = request.auto_load
+        if request.version is not None:
+            artifact.deployed_version = request.version
+
+        # Validate content if changed or type changed
+        if content_changed or request.entity_type is not None:
+            validation_errors = validate_context_entity(
+                entity_type=artifact.type,
+                content=artifact.content or "",
+                path=artifact.path_pattern or "",
+            )
+            if validation_errors:
+                session.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Content validation failed: {'; '.join(validation_errors)}",
+                )
+
+        # Recompute content hash if content changed
+        if content_changed:
+            artifact.content_hash = compute_content_hash(artifact.content or "")
+
+        session.commit()
+        session.refresh(artifact)
+
+        logger.info(f"Updated context entity {entity_id}")
+        return ContextEntityResponse(
+            id=artifact.id,
+            name=artifact.name,
+            entity_type=artifact.type,
+            content=artifact.content or "",
+            path_pattern=artifact.path_pattern or "",
+            description=artifact.description,
+            category=artifact.category,
+            auto_load=artifact.auto_load,
+            version=artifact.deployed_version,
+            content_hash=artifact.content_hash,
+            created_at=artifact.created_at,
+            updated_at=artifact.updated_at,
+        )
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as e:
+        session.rollback()
+        logger.error(f"Integrity error updating context entity: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Context entity with this name or path pattern already exists",
+        ) from e
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to update context entity {entity_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update context entity",
+        ) from e
+    finally:
+        session.close()
 
 
 @router.delete(
@@ -573,42 +639,39 @@ async def delete_context_entity(entity_id: str) -> None:
         HTTPException 500: If database operation fails
 
     Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
+        This endpoint uses Artifact model with type filtering.
     """
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        artifact = (
+            session.query(Artifact)
+            .filter(Artifact.id == entity_id)
+            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Context entity '{entity_id}' not found",
+            )
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     entity = session.query(ContextEntity).filter_by(id=entity_id).first()
-    #     if not entity:
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND,
-    #             detail=f"Context entity '{entity_id}' not found",
-    #         )
-    #
-    #     session.delete(entity)
-    #     session.commit()
-    #
-    #     logger.info(f"Deleted context entity {entity_id}")
-    #
-    # except HTTPException:
-    #     session.rollback()
-    #     raise
-    # except Exception as e:
-    #     session.rollback()
-    #     logger.error(f"Failed to delete context entity {entity_id}: {e}", exc_info=True)
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail="Failed to delete context entity",
-    #     ) from e
-    # finally:
-    #     session.close()
+        session.delete(artifact)
+        session.commit()
+
+        logger.info(f"Deleted context entity {entity_id}")
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to delete context entity {entity_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete context entity",
+        ) from e
+    finally:
+        session.close()
 
 
 @router.get(
@@ -647,44 +710,41 @@ async def get_context_entity_content(entity_id: str) -> Response:
         HTTPException 500: If database operation fails
 
     Note:
-        This endpoint requires TASK-1.2 (database model) to be completed.
-        Current implementation will raise 501 Not Implemented.
+        This endpoint uses Artifact model with type filtering.
     """
-    # TODO: Implement once TASK-1.2 (ContextEntity model) is complete
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Context entities database model not yet implemented (TASK-1.2)",
-    )
+    session = get_session()
+    try:
+        artifact = (
+            session.query(Artifact)
+            .filter(Artifact.id == entity_id)
+            .filter(Artifact.type.in_(CONTEXT_ENTITY_TYPES))
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Context entity '{entity_id}' not found",
+            )
 
-    # Implementation template (uncomment once ContextEntity model exists):
-    # session = get_session()
-    # try:
-    #     entity = session.query(ContextEntity).filter_by(id=entity_id).first()
-    #     if not entity:
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND,
-    #             detail=f"Context entity '{entity_id}' not found",
-    #         )
-    #
-    #     logger.info(f"Retrieved content for context entity {entity_id}")
-    #     return Response(
-    #         content=entity.content,
-    #         media_type="text/plain",
-    #         headers={
-    #             "Content-Disposition": f'attachment; filename="{entity.name}.md"'
-    #         },
-    #     )
-    #
-    # except HTTPException:
-    #     raise
-    # except Exception as e:
-    #     logger.error(
-    #         f"Error getting content for context entity '{entity_id}': {e}",
-    #         exc_info=True,
-    #     )
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=f"Failed to get context entity content: {str(e)}",
-    #     )
-    # finally:
-    #     session.close()
+        logger.info(f"Retrieved content for context entity {entity_id}")
+        return Response(
+            content=artifact.content or "",
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f'attachment; filename="{artifact.name}.md"'
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting content for context entity '{entity_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get context entity content: {str(e)}",
+        )
+    finally:
+        session.close()
