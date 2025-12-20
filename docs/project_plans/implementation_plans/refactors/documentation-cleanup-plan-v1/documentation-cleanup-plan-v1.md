@@ -32,8 +32,9 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 **Status Snapshot (2025-12-19):**
 - Root-level, web frontend, and web test delete targets are already removed.
-- Remaining review items: `skillmeat/api/tests/README_PERFORMANCE.md`, `skillmeat/cache/WATCHER.md`.
-- Planned move target `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` not found.
+- Cache watcher documentation moved to developer docs (`docs/developers/cache/WATCHER.md`), to be relocated under `docs/dev/cache/` during consolidation.
+- Planned move target is now located at `.claude/worknotes/fixes/2025-11-26_nextjs-build-cache-fix.md`.
+- `skillmeat/api/tests/README_PERFORMANCE.md` still needs a final disposition.
 - Nine "docs to review" entries still exist and need triage.
 
 ### 1.1 Root Level Files (Previously Targeted; Removed)
@@ -69,19 +70,19 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | LOAD_TEST_RESULTS.md | `/skillmeat/api/tests/LOAD_TEST_RESULTS.md` | REMOVED (2025-12-19) | Load test report |
 | README_PERFORMANCE.md | `/skillmeat/api/tests/README_PERFORMANCE.md` | REVIEW | Check if this contains permanent performance info |
 
-**Action:** Only `README_PERFORMANCE.md` remains for review. Confirm whether it belongs in `docs/testing/` or should be removed.
+**Action:** Only `README_PERFORMANCE.md` remains for review. Confirm whether it belongs in `docs/ops/testing/` or `docs/ops/performance/` (per consolidation plan), or remove it.
 
 **Keep:** `/skillmeat/api/tests/README.md` (if it exists and documents test structure)
 
 ---
 
-### 1.3 Cache Module Issues (1 file)
+### 1.3 Cache Module Documentation
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| WATCHER.md | `/skillmeat/cache/WATCHER.md` | REVIEW | Check if cache watcher needs user-facing docs |
+| WATCHER.md | `docs/developers/cache/WATCHER.md` | KEEP (2025-12-19) | Keep as implementation guide; move to `docs/dev/cache/` in consolidation |
 
-**Decision:** Either delete or move to proper documentation location if it describes user-facing cache functionality.
+**Action:** No further cleanup needed unless consolidating developer docs paths.
 
 ---
 
@@ -126,15 +127,15 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
-### 1.6 Files to MOVE (Target Not Found)
+### 1.6 Files to MOVE (Completed)
 
 **Rationale:** Consolidate worknotes into proper `.claude/` tracking structure.
 
 | Current Path | Target Path | Status | Notes |
 |--------------|-------------|--------|-------|
-| `/docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` | `.claude/worknotes/fixes/bug-fixes-2025-11.md` | NOT FOUND (2025-12-19) | Consolidate into monthly bug fixes tracking |
+| `/docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` | `.claude/worknotes/fixes/2025-11-26_nextjs-build-cache-fix.md` | MOVED (2025-12-19) | Worknote now lives in `.claude` |
 
-**Action:** Remove this move task or locate the correct worknote file if it exists under a different name.
+**Action:** None.
 
 ---
 
@@ -147,16 +148,67 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | `docs/project_plans/bugs/bugs-11-25.md` | Session notes | Review & consolidate into bug tracker |
 | `docs/project_plans/bugs/bugs-11-29.md` | Session notes | Review & consolidate into bug tracker |
 | `docs/project_plans/bugs/bugs-12-02.md` | Session notes | Review & consolidate into bug tracker |
-| `docs/project_plans/ideas/enhancements-11-25.md` | Daily log | Review & consolidate into features list |
-| `docs/project_plans/ideas/enhancements-11-30.md` | Daily log | Review & consolidate |
-| `docs/project_plans/ideas/enhancements-12-03.md` | Daily log | Review & consolidate |
-| `docs/project_plans/ideas/enhancements-12-04.md` | Daily log | Review & consolidate |
-| `docs/project_plans/ideas/enhancements-12-12-Collections-Nav.md` | Session notes | Review & consolidate |
-| `docs/project_plans/ideas/agent-context-entities-v1.md` | PRD or idea? | Review classification |
 
-**Action:** Determine if information is valuable or just session tracking. Consolidate into features/bugs tracking or delete.
+**Action:** NO ACTION. These are identified bugs and should be kept for documentation.
 
 ---
+
+### 1.8 Docs Directory Consolidation (Reduce Root-Level Sprawl)
+
+**Goal:** Consolidate `docs/` into four top-level areas:
+- `docs/project_plans/` - Roadmaps, PRDs, implementation plans, tracking.
+- `docs/user/` - End-user guides, quickstart, CLI/web commands, release notes, migration.
+- `docs/dev/` - Developer guides, architecture, API references, design patterns, implementation notes.
+- `docs/ops/` - Operational docs (observability, performance, security, legal, testing, runbooks).
+
+**Notes:**
+- Keep assets under `docs/user/assets/` (screenshots/videos) to avoid extra top-level directories.
+- Prefer merging or nesting rather than keeping parallel roots with overlapping scope.
+
+**Proposed Migration Map (current → target):**
+
+| Current | Proposed Location | Action | Notes |
+|---------|-------------------|--------|-------|
+| `docs/api/` | `docs/dev/api/` | MOVE | Developer API reference |
+| `docs/architecture/` | `docs/dev/architecture/` | MOVE | Architecture docs |
+| `docs/benchmarks/` | `docs/ops/performance/benchmarks/` | MOVE | Performance benchmarks |
+| `docs/beta/` | `docs/user/beta/` | MOVE | Beta program docs |
+| `docs/cache/` | `docs/dev/cache/` | MERGE | Merge with `docs/developers/cache/` |
+| `docs/designs/` | `docs/dev/designs/` | MOVE | Design artifacts |
+| `docs/developers/` | `docs/dev/developers/` | MOVE | Consolidate under dev |
+| `docs/development/` | `docs/dev/development/` | MOVE | Engineering workflow |
+| `docs/features/` | `docs/dev/features/` | MOVE | Feature implementation notes |
+| `docs/guides/` | `docs/user/guides/` | MOVE | End-user guides |
+| `docs/legal/` | `docs/ops/legal/` | MOVE | Legal/compliance docs |
+| `docs/migration/` | `docs/user/migration/` | MOVE | Merge with migration doc |
+| `docs/migration.md` | `docs/user/migration/README.md` | MOVE | Consolidate with migration guide |
+| `docs/observability/` | `docs/ops/observability/` | MOVE | Ops observability |
+| `docs/performance/` | `docs/ops/performance/` | MOVE | Performance docs |
+| `docs/release-notes/` | `docs/user/release-notes/` | MOVE | User-facing release notes |
+| `docs/runbooks/` | `docs/ops/runbooks/` | MOVE | Operational runbooks |
+| `docs/screenshots/` | `docs/user/assets/screenshots/` | MOVE | User-facing assets |
+| `docs/security/` | `docs/ops/security/` | MOVE | Security policies |
+| `docs/SECURITY.md` | `docs/ops/security/SECURITY.md` | MOVE | Consolidate security docs |
+| `docs/testing/` | `docs/ops/testing/` | MOVE | Testing guidance |
+| `docs/training/` | `docs/user/training/` | MOVE | Onboarding/training |
+| `docs/user-guide/` | `docs/user/guide/` | MOVE | Merge with guides |
+| `docs/videos/` | `docs/user/assets/videos/` | MOVE | User-facing assets |
+| `docs/quickstart.md` | `docs/user/quickstart.md` | MOVE | End-user entrypoint |
+| `docs/commands.md` | `docs/user/cli/commands.md` | MOVE | CLI reference |
+| `docs/web_commands.md` | `docs/user/cli/web-commands.md` | MOVE | Web CLI reference |
+| `docs/examples.md` | `docs/user/examples.md` | MOVE | User examples |
+| `docs/template-deployment-optimization.md` | `docs/dev/optimization/template-deployment.md` | MOVE | Dev optimization notes |
+
+**README Requirements (new or updated):**
+- `docs/project_plans/README.md`: how to use PRDs, implementation plans, tracking.
+- `docs/user/README.md`: onboarding path, guides index, release notes, migrations.
+- `docs/dev/README.md`: architecture map, API index, engineering workflow.
+- `docs/ops/README.md`: operational ownership, runbooks, security/compliance, testing.
+
+**Action Items:**
+- [ ] Create new top-level directories and move content per map.
+- [ ] Update internal links to reflect new paths.
+- [ ] Remove empty legacy directories after migration.
 
 ## Section 2: Documentation Gap Analysis
 
@@ -168,26 +220,26 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 | Command Group | Commands | Coverage | Status | Notes |
 |---------------|----------|----------|--------|-------|
-| Core | init, list, show, remove | 4 | Verify in docs/commands.md |
-| Add | add skill, add command, add agent | 3 | Verify in docs/commands.md |
-| Deploy | deploy, undeploy | 2 | Verify in docs/commands.md |
-| MCP | mcp add/deploy/undeploy/list/health | 5 | Check docs/guides/mcp-*.md |
+| Core | init, list, show, remove | 4 | Verify in docs/user/cli/commands.md |
+| Add | add skill, add command, add agent | 3 | Verify in docs/user/cli/commands.md |
+| Deploy | deploy, undeploy | 2 | Verify in docs/user/cli/commands.md |
+| MCP | mcp add/deploy/undeploy/list/health | 5 | Check docs/user/guides/mcp-*.md |
 | Versioning | snapshot, history, rollback | 3 | Check docs/migration.md |
-| Collection | collection create/list/use | 3 | Verify in docs/commands.md |
-| Config | config list/get/set | 3 | Verify in docs/commands.md |
-| Cache | cache status/clear/refresh | 3 | Verify in docs/guides/ |
-| Search | search, find-duplicates | 2 | Check docs/guides/searching.md |
-| Sync | sync-check, sync-pull, sync-preview | 3 | Check docs/guides/syncing-changes.md |
-| Analytics | usage, top, cleanup, trends, export, stats, clear | 7 | Check docs/guides/using-analytics.md |
-| Web | web dev/build/start/doctor | 4 | Check docs/web_commands.md |
+| Collection | collection create/list/use | 3 | Verify in docs/user/cli/commands.md |
+| Config | config list/get/set | 3 | Verify in docs/user/cli/commands.md |
+| Cache | cache status/clear/refresh | 3 | Verify in docs/user/guides/ |
+| Search | search, find-duplicates | 2 | Check docs/user/guides/searching.md |
+| Sync | sync-check, sync-pull, sync-preview | 3 | Check docs/user/guides/syncing-changes.md |
+| Analytics | usage, top, cleanup, trends, export, stats, clear | 7 | Check docs/user/guides/using-analytics.md |
+| Web | web dev/build/start/doctor | 4 | Check docs/user/cli/web-commands.md |
 | Bundle | bundle create/inspect/import | 3 | Verify coverage |
-| Vault | vault add/list/remove/push/pull/ls | 6 | Check docs/guides/ |
+| Vault | vault add/list/remove/push/pull/ls | 6 | Check docs/user/guides/ |
 | Sign | sign generate-key, list-keys, export-key, import-key | 4 | Check docs/security/ |
-| Marketplace | marketplace-search, marketplace-install | 2 | Check docs/guides/marketplace-*.md |
+| Marketplace | marketplace-search, marketplace-install | 2 | Check docs/user/guides/marketplace-*.md |
 | Compliance | compliance-scan, compliance-checklist, compliance-consent | 3 | Check docs/legal/ |
 
 **Action Items:**
-- [ ] Verify `docs/commands.md` documents all 81 commands with examples
+- [ ] Verify `docs/user/cli/commands.md` documents all 81 commands with examples
 - [ ] Add missing command documentation
 - [ ] Update examples to match current CLI behavior
 - [ ] Add error handling/troubleshooting for each command group
@@ -200,18 +252,18 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 | Page | Route | Documentation | Status |
 |------|-------|---------------|---------|
-| Dashboard | `/` | docs/guides/web-ui-guide.md | Verify coverage |
-| Collection Browser | `/collection` | docs/guides/web-ui-guide.md | Verify coverage |
-| Projects | `/projects` | docs/guides/web-ui-guide.md | Verify coverage |
-| Project Detail | `/projects/[id]` | docs/guides/web-ui-guide.md | Verify coverage |
-| Project Entity Management | `/projects/[id]/manage` | docs/guides/web-ui-guide.md | Verify coverage |
-| Project Settings | `/projects/[id]/settings` | docs/guides/web-ui-guide.md | Verify coverage |
-| Entity Management | `/manage` | docs/guides/web-ui-guide.md | Verify coverage |
-| Deployments Dashboard | `/deployments` | docs/guides/ or section in web-ui-guide.md | Check coverage |
-| Marketplace | `/marketplace` | docs/guides/marketplace-usage-guide.md | Verify coverage |
-| Team Sharing | `/sharing` | docs/guides/team-sharing-guide.md | Verify coverage |
-| MCP Servers | `/mcp` | docs/guides/mcp-*.md | Verify coverage |
-| Settings | `/settings` | docs/guides/web-ui-guide.md | Placeholder - verify |
+| Dashboard | `/` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Collection Browser | `/collection` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Projects | `/projects` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Project Detail | `/projects/[id]` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Project Entity Management | `/projects/[id]/manage` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Project Settings | `/projects/[id]/settings` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Entity Management | `/manage` | docs/user/guides/web-ui-guide.md | Verify coverage |
+| Deployments Dashboard | `/deployments` | docs/user/guides/ or section in web-ui-guide.md | Check coverage |
+| Marketplace | `/marketplace` | docs/user/guides/marketplace-usage-guide.md | Verify coverage |
+| Team Sharing | `/sharing` | docs/user/guides/team-sharing-guide.md | Verify coverage |
+| MCP Servers | `/mcp` | docs/user/guides/mcp-*.md | Verify coverage |
+| Settings | `/settings` | docs/user/guides/web-ui-guide.md | Placeholder - verify |
 
 **In Development Pages (3):**
 
@@ -222,7 +274,7 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | MCP Server Detail | `/mcp/[name]` | Phase 4 | Defer documentation |
 
 **Action Items:**
-- [ ] Verify `docs/guides/web-ui-guide.md` covers all 12 production pages
+- [ ] Verify `docs/user/guides/web-ui-guide.md` covers all 12 production pages
 - [ ] Add missing page documentation
 - [ ] Include screenshots/diagrams for complex workflows
 - [ ] Document common use cases for each page
@@ -234,17 +286,17 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 | File | Purpose | Status | Next Action |
 |------|---------|--------|------------|
-| docs/quickstart.md | Getting started in 5 minutes | Core | Verify up-to-date |
-| docs/commands.md | CLI reference | Core | Complete command list |
-| docs/web_commands.md | Web UI guide | Core | Update for current UI |
-| docs/examples.md | Usage examples | Core | Add new examples |
-| docs/guides/web-ui-guide.md | Web UI navigation | Core | Update for Collections Nav |
-| docs/guides/marketplace-*.md | Marketplace features | Core | 2 files, verify current |
-| docs/guides/mcp-*.md | MCP server setup | Core | 3 files, verify current |
-| docs/guides/team-sharing-guide.md | Team sharing features | Core | Verify implemented |
-| docs/guides/searching.md | Search functionality | Optional | Verify coverage |
-| docs/guides/syncing-changes.md | Sync operations | Optional | Verify up-to-date |
-| docs/release-notes/v0.3.0-beta.md | v0.3.0 release notes | Critical | **NEEDS UPDATE** |
+| docs/user/quickstart.md | Getting started in 5 minutes | Core | Verify up-to-date |
+| docs/user/cli/commands.md | CLI reference | Core | Complete command list |
+| docs/user/cli/web-commands.md | Web UI guide | Core | Update for current UI |
+| docs/user/examples.md | Usage examples | Core | Add new examples |
+| docs/user/guides/web-ui-guide.md | Web UI navigation | Core | Update for Collections Nav |
+| docs/user/guides/marketplace-*.md | Marketplace features | Core | 2 files, verify current |
+| docs/user/guides/mcp-*.md | MCP server setup | Core | 3 files, verify current |
+| docs/user/guides/team-sharing-guide.md | Team sharing features | Core | Verify implemented |
+| docs/user/guides/searching.md | Search functionality | Optional | Verify coverage |
+| docs/user/guides/syncing-changes.md | Sync operations | Optional | Verify up-to-date |
+| docs/user/release-notes/v0.3.0-beta.md | v0.3.0 release notes | Critical | **NEEDS UPDATE** |
 
 ---
 
@@ -255,7 +307,7 @@ This section documents the current implementation status aligned to
 which is the canonical status source. Any other status documents should be updated
 to match it or explicitly labeled as historical context.
 
-### 2.5.1 PRD Inventory (12 Major Features)
+### 2.5.1 PRD Inventory (13 Major Features)
 
 | PRD | Phase | Status | Story Points | Implementation Status |
 |-----|-------|--------|--------------|----------------------|
@@ -270,7 +322,7 @@ to match it or explicitly labeled as historical context.
 | GitHub Marketplace Ingestion | Phase 4+ | Draft | ~60 | ✅ COMPLETED (tracking summary) |
 | Discovery & Import Enhancement | Phase 5-6 | Draft | ~30 | 🟡 IN PROGRESS (Phase 6 pending) |
 | Collections & Site Navigation | Phase 6+ | Draft | 65 | ✅ COMPLETED (tracking summary) |
-| Agent Context Entities | Phase 4+ | Draft | ~70 | ✅ COMPLETED (tracking summary; validate API) |
+| Agent Context Entities | Phase 4+ | Draft | ~70 | ✅ COMPLETED (tracking summary + backend implemented) |
 | Tags Refactor v1 | Phase 3+ | Draft | ~52 | ✅ COMPLETED (per code review) |
 
 **Total Planned:** ~600 story points | **Implemented:** See tracking summary for latest counts
@@ -313,34 +365,34 @@ to match it or explicitly labeled as historical context.
 - GitHub-backed marketplace sources with ingestion workflow (per tracking summary)
 - Files: `api/routers/marketplace_sources.py`, `web/app/marketplace/page.tsx`
 
-**6. Artifact Flow Modal Redesign**
+**6. Agent Context Entities**
+- Backend CRUD implemented via Artifact model filtering, with validation and content hashing
+- CLI + web UI already delivered (per tracking summary)
+- Files: `api/routers/context_entities.py`, `web/app/context-entities/page.tsx`
+
+**7. Artifact Flow Modal Redesign**
 - Modal redesign delivered (per tracking summary)
 - Files: `web/components/entity/unified-entity-modal.tsx`, `web/components/sync-status/sync-status-tab.tsx`
 
-**7. Tags Refactor v1**
+**8. Tags Refactor v1**
 - Tags CRUD API and artifact association endpoints
 - Tag input, tag filtering, and tag management hooks
 - Files: `api/routers/tags.py`, `web/components/ui/tag-input.tsx`, `web/hooks/use-tags.ts`
 
 #### 🟡 IN PROGRESS / PARTIAL
 
-**8. Discovery & Import Enhancement** (Phase 6 pending)
+**9. Discovery & Import Enhancement** (Phase 6 pending)
 - Phases 1-5 complete; Phase 6 monitoring/optimization/release pending
 - Files: `docs/project_plans/implementation_plans/enhancements/discovery-import-enhancement-v1.md`
 
-**9. Versioning & Merge System v1.5**
+**10. Versioning & Merge System v1.5**
 - Core, API, and UI complete; testing deferred (tracking summary)
 - Files: `api/routers/merge.py`, `web/components/entity/merge-workflow.tsx`
 
-**10. Smart Import & Discovery** (~50 SP)
+**11. Smart Import & Discovery** (~50 SP)
 - Discovery scan and bulk import workflow present
 - Auto-populate from GitHub URLs and metadata extraction pending
 - Files: `web/components/discovery/*.tsx`, `core/discovery.py`
-
-**11. Agent Context Entities**
-- Marked complete in tracking summary, but API router still returns 501
-- Action: validate backend model implementation or update tracking summary
-- Files: `api/routers/context_entities.py`, `web/app/context-entities/page.tsx`
 
 #### ⏳ NOT STARTED Features
 
@@ -359,14 +411,14 @@ to match it or explicitly labeled as historical context.
 | enhancements-12-03.md | Dec 3 | Custom grouping, deployment tab, deployment counter, tooltips | Grouping done |
 | enhancements-12-04.md | Dec 4 | Discovery/import improvements | Implemented |
 | enhancements-12-12-Collections-Nav.md | Dec 12 | Full Collections Navigation spec | Implemented |
-| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Implemented (tracking summary; validate API) |
+| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Implemented |
 | requests-template.md | - | Template for request log format | Reference doc |
 
 ### 2.5.4 Key Findings
 
 1. **Tracking summary is canonical** - Quick reference/exploration docs must be reconciled or labeled as historical.
-2. **Multiple major initiatives are complete** - Collections Navigation, Notification System, Marketplace ingestion, Artifact Flow Modal, Tags refactor.
-3. **Remaining gaps are focused** - Context Entities API validation, Discovery Enhancement Phase 6, Versioning/Merge testing.
+2. **Multiple major initiatives are complete** - Collections Navigation, Notification System, Marketplace ingestion, Artifact Flow Modal, Tags refactor, Context Entities.
+3. **Remaining gaps are focused** - Discovery Enhancement Phase 6, Versioning/Merge testing, Smart Import auto-populate.
 4. **Documentation assumptions are stale** - Release notes and guides need updates to reflect completed work.
 
 ---
@@ -391,7 +443,7 @@ to match it or explicitly labeled as historical context.
    - **Diff Viewer** - Syntax-highlighted diff comparison with unified/side-by-side views
    - **Marketplace GitHub Ingestion** - GitHub-backed sources with ingestion workflow
    - **Tags Refactor** - Tags CRUD + artifact associations with UI tag management
-   - **Agent Context Entities** - CLI and web UI (tracking summary; validate API backend)
+   - **Agent Context Entities** - Backend CRUD + CLI + web UI
 
 2. **Partial Features (Document as Preview/Beta)**
    - **Discovery Enhancement Phase 6** - Monitoring/optimization/release tasks pending
@@ -420,7 +472,6 @@ to match it or explicitly labeled as historical context.
    - None in this release
 
 7. **Known Issues**
-   - Context Entities API returns 501 (database model pending)
    - Auto-populate from GitHub URLs not yet implemented
    - Versioning & merge system testing not yet complete
 
@@ -433,7 +484,7 @@ to match it or explicitly labeled as historical context.
 
 ### 3.2 Getting Started Documentation
 
-**File:** `/docs/quickstart.md`
+**File:** `/docs/user/quickstart.md`
 
 **Status:** Core documentation, verify completeness
 
@@ -452,7 +503,7 @@ to match it or explicitly labeled as historical context.
 
 ### 3.3 CLI Command Reference
 
-**File:** `/docs/commands.md`
+**File:** `/docs/user/cli/commands.md`
 
 **Status:** May be incomplete
 
@@ -486,7 +537,7 @@ to match it or explicitly labeled as historical context.
 
 ### 3.4 Web UI Guide Update
 
-**File:** `/docs/guides/web-ui-guide.md`
+**File:** `/docs/user/guides/web-ui-guide.md`
 
 **Status:** Needs update for Collections Navigation (Phase 6)
 
@@ -510,8 +561,8 @@ to match it or explicitly labeled as historical context.
 ### 3.5 Marketplace Guide Updates
 
 **Files:**
-- `docs/guides/marketplace-usage-guide.md`
-- `docs/guides/publishing-to-marketplace.md`
+- `docs/user/guides/marketplace-usage-guide.md`
+- `docs/user/guides/publishing-to-marketplace.md`
 
 **Required Verifications:**
 - [ ] Installation instructions are current
@@ -525,9 +576,9 @@ to match it or explicitly labeled as historical context.
 ### 3.6 MCP Management Guides
 
 **Files:**
-- `docs/guides/mcp-quick-start.md`
-- `docs/guides/mcp-management.md`
-- `docs/guides/mcp-examples.md`
+- `docs/user/guides/mcp-quick-start.md`
+- `docs/user/guides/mcp-management.md`
+- `docs/user/guides/mcp-examples.md`
 
 **Required Verifications:**
 - [ ] Setup instructions are correct
@@ -540,7 +591,7 @@ to match it or explicitly labeled as historical context.
 
 ### 3.7 Team Sharing Guide
 
-**File:** `docs/guides/team-sharing-guide.md`
+**File:** `docs/user/guides/team-sharing-guide.md`
 
 **Required Verifications:**
 - [ ] Feature is fully implemented
@@ -556,32 +607,35 @@ to match it or explicitly labeled as historical context.
 
 **Goal:** Fix critical documentation gaps before release
 
-1. **DELETE all policy violations** (25+ files)
-   - Root level (10 files)
-   - API tests (5 files)
-   - Web frontend (12 files)
+1. **CONFIRM cleanup completion** (25+ files)
+   - Root level (10 files) removed
+   - API tests (4 files removed, 1 review)
+   - Web frontend (9 files removed)
 
 2. **UPDATE release notes** (`v0.3.0-beta.md`)
-   - Document 5 FULLY IMPLEMENTED features (see Section 2.5.2):
-     - Notification System (95 SP worth of functionality)
-     - Collections Navigation with Groups (65 SP)
-     - Discovery & Import Enhancement (30 SP)
-     - Persistent Project Cache (36 SP)
-     - Artifact Flow Banner + Diff Viewer
-   - Document 3 PARTIAL features as Preview/Beta:
-     - Agent Context Entities CLI (`skillmeat context` commands)
-     - Smart Import (discovery working, auto-populate pending)
-     - Artifact Flow Modal (components exist, full modal pending)
+   - Document implemented features (see Section 2.5.2):
+     - Notification System
+     - Collections Navigation + Groups
+     - Discovery & Import Enhancement (Phases 1-5)
+     - Persistent Project Cache
+     - Artifact Flow Modal Redesign + Diff Viewer
+     - Marketplace GitHub Ingestion
+     - Tags Refactor
+     - Agent Context Entities (backend + CLI + UI)
+   - Document partial features as Preview/Beta:
+     - Discovery Enhancement Phase 6 (monitoring/release)
+     - Smart Import auto-populate (GitHub metadata)
+     - Versioning & Merge System testing
    - List breaking changes (see Section 3.1)
    - Include known issues and blockers
 
 3. **VERIFY core documentation** (4 files)
-   - `docs/quickstart.md` - Installation & first steps
-   - `docs/commands.md` - CLI reference (add `skillmeat context` commands)
-   - `docs/web_commands.md` - Web UI commands
-   - `docs/examples.md` - Usage examples
+   - `docs/quickstart.md` → `docs/user/quickstart.md` - Installation & first steps
+   - `docs/commands.md` → `docs/user/cli/commands.md` - CLI reference
+   - `docs/web_commands.md` → `docs/user/cli/web-commands.md` - Web UI commands
+   - `docs/examples.md` → `docs/user/examples.md` - Usage examples
 
-4. **UPDATE web UI guide** (`docs/guides/web-ui-guide.md`)
+4. **UPDATE web UI guide** (`docs/user/guides/web-ui-guide.md`)
    - Document Notification Center (bell icon, expandable details)
    - Document Collections Navigation (switcher, groups, views)
    - Document Discovery Banner and Bulk Import
@@ -590,7 +644,8 @@ to match it or explicitly labeled as historical context.
 5. **CREATE new documentation** (if not exists)
    - Collections & Groups guide (new feature)
    - Discovery & Import guide (new feature)
-   - Context Entities CLI guide (preview)
+   - Context Entities guide (CLI + web UI)
+   - Tags guide (or add to entity management docs)
 
 ---
 
@@ -620,6 +675,11 @@ to match it or explicitly labeled as historical context.
    - Mark implemented PRDs (5) as COMPLETE
    - Update partial PRDs (3) with current blockers
    - Keep planned PRDs (4) as roadmap reference
+
+5. **Consolidate docs directory structure**
+   - Move content into `docs/user/`, `docs/dev/`, `docs/ops/`
+   - Add top-level README files (see Section 1.8)
+   - Update internal links and remove empty legacy dirs
 
 ---
 
@@ -651,64 +711,62 @@ to match it or explicitly labeled as historical context.
 
 ### 5.1 Cleanup Tasks
 
-- [ ] **DELETE root level files (10)**
-  - [ ] IMPLEMENTATION_SUMMARY.md
-  - [ ] P4-005-IMPLEMENTATION-SUMMARY.md
-  - [ ] P5-004-SECURITY-REVIEW-COMPLETE.md
-  - [ ] OBSERVABILITY_IMPLEMENTATION_COMPLETE.md
-  - [ ] EXPLORATION_INDEX.md
-  - [ ] EXPLORATION_SUMMARY.md
-  - [ ] QUICK_REFERENCE_COMPONENTS.md
-  - [ ] SMOKE_TEST_REPORT_SID-035.md
-  - [ ] CODEBASE_EXPLORATION_REPORT.md
-  - [ ] DIS-5.8-COMPLETION-SUMMARY.md
+- [x] **DELETE root level files (10)**
+  - [x] IMPLEMENTATION_SUMMARY.md
+  - [x] P4-005-IMPLEMENTATION-SUMMARY.md
+  - [x] P5-004-SECURITY-REVIEW-COMPLETE.md
+  - [x] OBSERVABILITY_IMPLEMENTATION_COMPLETE.md
+  - [x] EXPLORATION_INDEX.md
+  - [x] EXPLORATION_SUMMARY.md
+  - [x] QUICK_REFERENCE_COMPONENTS.md
+  - [x] SMOKE_TEST_REPORT_SID-035.md
+  - [x] CODEBASE_EXPLORATION_REPORT.md
+  - [x] DIS-5.8-COMPLETION-SUMMARY.md
 
-- [ ] **DELETE API test files (5)**
-  - [ ] ERROR_HANDLING_TEST_RESULTS.md
-  - [ ] PERFORMANCE_REPORT.md
-  - [ ] PERFORMANCE_SUMMARY.md
-  - [ ] LOAD_TEST_RESULTS.md
+- [x] **DELETE API test files (4)**
+  - [x] ERROR_HANDLING_TEST_RESULTS.md
+  - [x] PERFORMANCE_REPORT.md
+  - [x] PERFORMANCE_SUMMARY.md
+  - [x] LOAD_TEST_RESULTS.md
   - [ ] Review README_PERFORMANCE.md
 
-- [ ] **DELETE web frontend files (12)**
-  - [ ] IMPLEMENTATION.md
-  - [ ] COMPONENT_ARCHITECTURE.md
-  - [ ] P1-002_IMPLEMENTATION_STATUS.md
-  - [ ] COLLECTIONS_DASHBOARD_IMPLEMENTATION.md
-  - [ ] MARKETPLACE_UI_IMPLEMENTATION.md
-  - [ ] MARKETPLACE_QUICK_START.md
-  - [ ] DEPLOY_SYNC_UI_IMPLEMENTATION.md
-  - [ ] DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md
-  - [ ] ANALYTICS_WIDGETS_IMPLEMENTATION.md
-  - [ ] TESTING.md
-  - [ ] Review SDK_README_TEMPLATE.md
+- [x] **DELETE web frontend files (9)**
+  - [x] IMPLEMENTATION.md
+  - [x] COMPONENT_ARCHITECTURE.md
+  - [x] P1-002_IMPLEMENTATION_STATUS.md
+  - [x] COLLECTIONS_DASHBOARD_IMPLEMENTATION.md
+  - [x] MARKETPLACE_UI_IMPLEMENTATION.md
+  - [x] MARKETPLACE_QUICK_START.md
+  - [x] DEPLOY_SYNC_UI_IMPLEMENTATION.md
+  - [x] DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md
+  - [x] ANALYTICS_WIDGETS_IMPLEMENTATION.md
 
-- [ ] **DELETE web test files (7)**
-  - [ ] TASK_COMPLETION.md
-  - [ ] CROSS_BROWSER_TEST_SUMMARY.md
-  - [ ] SKIP_WORKFLOW_TEST_SUMMARY.md
-  - [ ] QUICK_START.md
-  - [ ] CROSS_BROWSER_TESTING.md
-  - [ ] MARKETPLACE_SOURCES_TESTING.md
-  - [ ] Review test/e2e structure
+- [x] **DELETE web test files (7)**
+  - [x] TASK_COMPLETION.md
+  - [x] CROSS_BROWSER_TEST_SUMMARY.md
+  - [x] SKIP_WORKFLOW_TEST_SUMMARY.md
+  - [x] QUICK_START.md
+  - [x] CROSS_BROWSER_TESTING.md
+  - [x] MARKETPLACE_SOURCES_TESTING.md
+  - [x] Review test/e2e structure
 
-- [ ] **MOVE files to proper location**
-  - [ ] Move `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` to `.claude/worknotes/fixes/`
+- [x] **MOVE files to proper location**
+  - [x] `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` → `.claude/worknotes/fixes/2025-11-26_nextjs-build-cache-fix.md`
 
 - [ ] **REVIEW session notes**
   - [ ] `docs/project_plans/bugs/bugs-*.md` (3 files)
   - [ ] `docs/project_plans/ideas/enhancements-*.md` (5 files)
   - [ ] `docs/project_plans/ideas/agent-context-entities-v1.md` (1 file)
 
-- [ ] **REVIEW cache watcher**
-  - [ ] Determine fate of `skillmeat/cache/WATCHER.md`
+- [x] **REVIEW cache watcher**
+  - [x] Moved to `docs/developers/cache/WATCHER.md` (move again during consolidation)
 
 ---
 
 ### 5.2 Documentation Updates
 
 - [ ] **Release Notes (CRITICAL)**
-  - [ ] Update `docs/release-notes/v0.3.0-beta.md`
+  - [ ] Update `docs/release-notes/v0.3.0-beta.md` → `docs/user/release-notes/v0.3.0-beta.md`
   - [ ] Add Phase 5 features
   - [ ] Add Phase 6 features
   - [ ] Document breaking changes
@@ -716,12 +774,12 @@ to match it or explicitly labeled as historical context.
   - [ ] Add known issues
 
 - [ ] **Getting Started**
-  - [ ] Verify `docs/quickstart.md` completeness
+  - [ ] Verify `docs/quickstart.md` → `docs/user/quickstart.md` completeness
   - [ ] Test installation instructions
   - [ ] Update examples if needed
 
 - [ ] **CLI Reference**
-  - [ ] Verify `docs/commands.md` has all 81 commands
+  - [ ] Verify `docs/commands.md` → `docs/user/cli/commands.md` has all 81 commands
   - [ ] Add missing commands
   - [ ] Add examples
   - [ ] Add error handling
@@ -750,6 +808,13 @@ to match it or explicitly labeled as historical context.
   - [ ] Consolidate `docs/project_plans/ideas/` entries
   - [ ] Organize by priority/phase
   - [ ] Remove session notes files
+
+- [ ] **Consolidate docs directory structure** (see Section 1.8)
+  - [ ] Create `docs/user/`, `docs/dev/`, `docs/ops/`
+  - [ ] Move content per migration map
+  - [ ] Add top-level README files
+  - [ ] Update internal links
+  - [ ] Remove empty legacy directories
 
 ---
 
@@ -850,10 +915,11 @@ tags:
 - [ ] No session notes or exploration reports in `/docs/`
 - [ ] Bug and idea tracking moved to proper locations
 - [ ] PRD status updated (5 complete, 3 partial, 4 planned)
+- [ ] Docs directory consolidated into `project_plans/`, `user/`, `dev/`, `ops/` with README files
 
 **Release Notes (v0.3.0-beta):**
-- [ ] 5 fully implemented features documented
-- [ ] 3 partial/preview features documented
+- [ ] All implemented features documented (see Section 2.5.2)
+- [ ] Partial/preview features documented (Phase 6, Smart Import, Versioning/Merge testing)
 - [ ] Breaking changes documented
 - [ ] Known issues and blockers listed
 - [ ] Future roadmap section added
@@ -871,7 +937,8 @@ tags:
 - [ ] Collections & Groups guide
 - [ ] Discovery & Import guide
 - [ ] Persistent Cache guide (or section in architecture docs)
-- [ ] Context Entities CLI reference (preview)
+- [ ] Context Entities guide (CLI + web UI)
+- [ ] Tags guide (or section in entity management docs)
 
 ### Implementation Status Summary
 
@@ -879,9 +946,9 @@ tags:
 |----------|-------|---------|
 | PRDs Analyzed | 12 | See Section 2.5.1 |
 | Ideas Files Analyzed | 7 | See Section 2.5.3 |
-| Features IMPLEMENTED | 5 | ~200+ story points delivered |
-| Features PARTIAL | 3 | Active development |
-| Features NOT STARTED | 4 | Roadmap items |
+| Features IMPLEMENTED | See tracking summary | Multiple initiatives complete |
+| Features PARTIAL | See Section 2.5.2 | Active development |
+| Features NOT STARTED | See Section 2.5.2 | Roadmap items |
 | Total Roadmap | ~600 SP | Across all PRDs |
 
 ---
@@ -901,18 +968,18 @@ tags:
 
 ## Appendix A: File Inventory Summary
 
-**Total files to process: 32**
+**Total files pending review: 10**
 
 | Category | Files | Action | Time |
 |----------|-------|--------|------|
-| Root level | 10 | DELETE | 0.5h |
-| API tests | 5 | DELETE | 0.5h |
-| Web frontend | 12 | DELETE | 1h |
-| Web tests | 7 | DELETE | 0.5h |
-| Move | 1 | MOVE | 0.5h |
+| Root level | 0 | DELETE | 0h |
+| API tests | 1 | REVIEW | 0.25h |
+| Web frontend | 0 | DELETE | 0h |
+| Web tests | 0 | DELETE | 0h |
+| Move | 0 | MOVE | 0h |
 | Review | 9 | REVIEW/CONSOLIDATE | 2h |
 | Update | 11 | UPDATE | 12h |
-| **TOTAL** | **32** | | **17h** |
+| **TOTAL** | **10** | | **14.25h** |
 
 ---
 
@@ -921,37 +988,45 @@ tags:
 ```
 docs/
 ├── README.md                          # Main documentation index
-├── quickstart.md                      # Getting started (5 min)
-├── commands.md                        # CLI reference (all 81+ commands)
-├── web_commands.md                    # Web UI reference
-├── examples.md                        # Usage examples
-├── SECURITY.md                        # Security info
-├── guides/
-│   ├── web-ui-guide.md               # Web UI walkthrough (update for new features)
-│   ├── collections-groups-guide.md    # NEW: Collections & Groups (65 SP feature)
-│   ├── discovery-import-guide.md      # NEW: Discovery & Bulk Import (30 SP feature)
-│   ├── notifications-guide.md         # NEW: Notification System (95 SP feature)
-│   ├── cache-management-guide.md      # NEW: Persistent Cache (36 SP feature)
-│   ├── context-entities-guide.md      # NEW: Context Entities CLI (preview)
-│   ├── marketplace-usage-guide.md     # Marketplace features
-│   ├── publishing-to-marketplace.md   # Publish to marketplace
-│   ├── mcp-quick-start.md             # MCP setup
-│   ├── mcp-management.md              # MCP commands
-│   ├── mcp-examples.md                # MCP examples
-│   ├── team-sharing-guide.md          # Sharing features
-│   ├── searching.md                   # Search guide
-│   ├── syncing-changes.md             # Sync operations
-│   ├── updating-safely.md             # Update safety
-│   └── using-analytics.md             # Analytics guide
-├── architecture/                      # Architecture decisions
-├── release-notes/
-│   └── v0.3.0-beta.md                # Current release (CRITICAL UPDATE)
-├── api/                               # API documentation
-├── migration/                         # Migration guides
-├── legal/                             # Legal/compliance
-├── security/                          # Security guides
-├── observability/                     # Monitoring guides
-└── testing/                           # Testing documentation
+├── project_plans/
+│   ├── README.md                      # Planning docs index
+│   └── ...                            # PRDs, implementation plans, reports
+├── user/
+│   ├── README.md                      # User docs index and onboarding path
+│   ├── quickstart.md                  # Getting started (5 min)
+│   ├── examples.md                    # Usage examples
+│   ├── cli/
+│   │   ├── commands.md                # CLI reference (all 81+ commands)
+│   │   └── web-commands.md            # Web UI CLI reference
+│   ├── guides/                        # Web UI + feature guides
+│   ├── guide/                         # Consolidated user-guide content
+│   ├── release-notes/                 # Releases and changelogs
+│   ├── migration/                     # Migration and upgrade notes
+│   ├── training/                      # Training/onboarding materials
+│   ├── beta/                          # Beta program docs
+│   └── assets/
+│       ├── screenshots/
+│       └── videos/
+├── dev/
+│   ├── README.md                      # Developer docs index
+│   ├── api/                           # API references
+│   ├── architecture/                  # Architecture docs
+│   ├── designs/                       # Design artifacts
+│   ├── developers/                    # Developer guides
+│   ├── development/                   # Engineering workflow
+│   ├── features/                      # Feature implementation notes
+│   ├── cache/                         # Cache documentation
+│   └── optimization/
+│       └── template-deployment.md
+└── ops/
+    ├── README.md                      # Ops docs index
+    ├── observability/                 # Monitoring guides
+    ├── performance/                   # Performance guidance
+    │   └── benchmarks/                # Benchmark results/methods
+    ├── runbooks/                      # Operational runbooks
+    ├── security/                      # Security docs (incl. SECURITY.md)
+    ├── legal/                         # Legal/compliance
+    └── testing/                       # Testing documentation
 
 .claude/                               # Internal tracking
 ├── worknotes/
@@ -976,16 +1051,16 @@ docs/project_plans/                    # Planning artifacts (internal)
 |-----|-------|--------|---------------------|
 | Notification System | 5-6 | ✅ COMPLETE | Create notifications-guide.md |
 | Collections Navigation | 6+ | ✅ COMPLETE | Create collections-groups-guide.md |
-| Discovery Enhancement | 5-6 | ✅ COMPLETE | Create discovery-import-guide.md |
+| Discovery Enhancement | 5-6 | 🟡 IN PROGRESS | Update discovery-import-guide.md (Phase 6 pending) |
 | Persistent Cache | 3+ | ✅ COMPLETE | Create cache-management-guide.md |
-| Agent Context Entities | 4+ | 🟡 PARTIAL | Create context-entities-guide.md (preview) |
-| Artifact Flow Modal | 3+ | 🟡 PARTIAL | Document in web-ui-guide.md |
+| Agent Context Entities | 4+ | ✅ COMPLETE | Create context-entities-guide.md |
+| Artifact Flow Modal | 3+ | ✅ COMPLETE | Document in web-ui-guide.md |
 | Smart Import | 4 | 🟡 PARTIAL | Document in discovery-import-guide.md |
 | Version Tracking | 2 | ⏳ PLANNED | Defer documentation |
 | Entity Lifecycle | 3 | ⏳ PLANNED | Defer documentation |
 | Web UI Consolidation | 3+ | ⏳ PLANNED | Defer documentation |
-| Versioning & Merge | 3+ | ⏳ PLANNED | Defer documentation |
-| GitHub Marketplace | 4+ | ⏳ PLANNED | Defer documentation |
+| Versioning & Merge | 3+ | 🟡 IN PROGRESS | Document testing gap and status |
+| GitHub Marketplace | 4+ | ✅ COMPLETE | Update marketplace guides |
 
 ---
 
@@ -993,12 +1068,20 @@ docs/project_plans/                    # Planning artifacts (internal)
 
 **Author:** Documentation Cleanup & Release Planning
 **Date Created:** 2025-12-14
-**Last Updated:** 2025-12-15 (Implementation Status Analysis added)
-**Version:** 1.1
-**Status:** Draft - Updated with comprehensive PRD/Implementation analysis
+**Last Updated:** 2025-12-19 (Cleanup status + docs consolidation + status alignment)
+**Version:** 1.2
+**Status:** Draft - Updated with cleanup status, consolidation plan, and tracking summary alignment
 **Next Review Date:** After Phase 1 completion
 
 ### Changelog
+
+**v1.2 (2025-12-19):**
+- Updated cleanup status with completed deletions and moved worknotes
+- Aligned implementation status with tracking summary (context entities backend complete)
+- Added docs directory consolidation plan (user/dev/ops structure + README requirements)
+- Refreshed Phase 1-2 priorities and release-notes requirements
+- Replaced Appendix B structure with consolidated layout
+- Updated Appendix C PRD status cross-reference
 
 **v1.1 (2025-12-15):**
 - Added Section 2.5: Implementation Status Analysis
