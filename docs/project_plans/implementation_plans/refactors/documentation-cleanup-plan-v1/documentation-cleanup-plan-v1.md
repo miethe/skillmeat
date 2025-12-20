@@ -30,38 +30,46 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ## Section 1: Cleanup Phase
 
-### 1.1 Root Level Files to DELETE (10 files)
+**Status Snapshot (2025-12-19):**
+- Root-level, web frontend, and web test delete targets are already removed.
+- Remaining review items: `skillmeat/api/tests/README_PERFORMANCE.md`, `skillmeat/cache/WATCHER.md`.
+- Planned move target `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` not found.
+- Nine "docs to review" entries still exist and need triage.
+
+### 1.1 Root Level Files (Previously Targeted; Removed)
 
 **Rationale:** These are exploration summaries, session notes, and completion reports that violate the documentation policy. They create noise and become outdated. Implementation details belong in git commits.
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| IMPLEMENTATION_SUMMARY.md | `/IMPLEMENTATION_SUMMARY.md` | DELETE | Session notes, not user-facing |
-| P4-005-IMPLEMENTATION-SUMMARY.md | `/P4-005-IMPLEMENTATION-SUMMARY.md` | DELETE | Phase 4 summary, belongs in git |
-| P5-004-SECURITY-REVIEW-COMPLETE.md | `/P5-004-SECURITY-REVIEW-COMPLETE.md` | DELETE | Completion report, outdated |
-| OBSERVABILITY_IMPLEMENTATION_COMPLETE.md | `/OBSERVABILITY_IMPLEMENTATION_COMPLETE.md` | DELETE | Completion report |
-| EXPLORATION_INDEX.md | `/EXPLORATION_INDEX.md` | DELETE | Index of exploration, redundant |
-| EXPLORATION_SUMMARY.md | `/EXPLORATION_SUMMARY.md` | DELETE | Exploration session notes |
-| QUICK_REFERENCE_COMPONENTS.md | `/QUICK_REFERENCE_COMPONENTS.md` | DELETE | Should be in docs/ or component docs |
-| SMOKE_TEST_REPORT_SID-035.md | `/SMOKE_TEST_REPORT_SID-035.md` | DELETE | Test report, not documentation |
-| CODEBASE_EXPLORATION_REPORT.md | `/CODEBASE_EXPLORATION_REPORT.md` | DELETE | Exploration report |
-| DIS-5.8-COMPLETION-SUMMARY.md | `/DIS-5.8-COMPLETION-SUMMARY.md` | DELETE | Implementation summary |
+| IMPLEMENTATION_SUMMARY.md | `/IMPLEMENTATION_SUMMARY.md` | REMOVED (2025-12-19) | Session notes, not user-facing |
+| P4-005-IMPLEMENTATION-SUMMARY.md | `/P4-005-IMPLEMENTATION-SUMMARY.md` | REMOVED (2025-12-19) | Phase 4 summary, belongs in git |
+| P5-004-SECURITY-REVIEW-COMPLETE.md | `/P5-004-SECURITY-REVIEW-COMPLETE.md` | REMOVED (2025-12-19) | Completion report, outdated |
+| OBSERVABILITY_IMPLEMENTATION_COMPLETE.md | `/OBSERVABILITY_IMPLEMENTATION_COMPLETE.md` | REMOVED (2025-12-19) | Completion report |
+| EXPLORATION_INDEX.md | `/EXPLORATION_INDEX.md` | REMOVED (2025-12-19) | Index of exploration, redundant |
+| EXPLORATION_SUMMARY.md | `/EXPLORATION_SUMMARY.md` | REMOVED (2025-12-19) | Exploration session notes |
+| QUICK_REFERENCE_COMPONENTS.md | `/QUICK_REFERENCE_COMPONENTS.md` | REMOVED (2025-12-19) | Should be in docs/ or component docs |
+| SMOKE_TEST_REPORT_SID-035.md | `/SMOKE_TEST_REPORT_SID-035.md` | REMOVED (2025-12-19) | Test report, not documentation |
+| CODEBASE_EXPLORATION_REPORT.md | `/CODEBASE_EXPLORATION_REPORT.md` | REMOVED (2025-12-19) | Exploration report |
+| DIS-5.8-COMPLETION-SUMMARY.md | `/DIS-5.8-COMPLETION-SUMMARY.md` | REMOVED (2025-12-19) | Implementation summary |
 
-**Action:** Verify no valuable content by scanning each file. If critical info exists, migrate to proper documentation location before deletion.
+**Action:** No action needed (already removed). Keep list for historical reference.
 
 ---
 
-### 1.2 API Test Violations to DELETE (5 files)
+### 1.2 API Test Violations (One Review Item Remaining)
 
 **Rationale:** Test result reports and performance summaries are temporary artifacts. Use git commits for test result tracking.
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| ERROR_HANDLING_TEST_RESULTS.md | `/skillmeat/api/tests/ERROR_HANDLING_TEST_RESULTS.md` | DELETE | Test results report |
-| PERFORMANCE_REPORT.md | `/skillmeat/api/tests/PERFORMANCE_REPORT.md` | DELETE | Performance test report |
-| PERFORMANCE_SUMMARY.md | `/skillmeat/api/tests/PERFORMANCE_SUMMARY.md` | DELETE | Performance summary |
-| LOAD_TEST_RESULTS.md | `/skillmeat/api/tests/LOAD_TEST_RESULTS.md` | DELETE | Load test report |
+| ERROR_HANDLING_TEST_RESULTS.md | `/skillmeat/api/tests/ERROR_HANDLING_TEST_RESULTS.md` | REMOVED (2025-12-19) | Test results report |
+| PERFORMANCE_REPORT.md | `/skillmeat/api/tests/PERFORMANCE_REPORT.md` | REMOVED (2025-12-19) | Performance test report |
+| PERFORMANCE_SUMMARY.md | `/skillmeat/api/tests/PERFORMANCE_SUMMARY.md` | REMOVED (2025-12-19) | Performance summary |
+| LOAD_TEST_RESULTS.md | `/skillmeat/api/tests/LOAD_TEST_RESULTS.md` | REMOVED (2025-12-19) | Load test report |
 | README_PERFORMANCE.md | `/skillmeat/api/tests/README_PERFORMANCE.md` | REVIEW | Check if this contains permanent performance info |
+
+**Action:** Only `README_PERFORMANCE.md` remains for review. Confirm whether it belongs in `docs/testing/` or should be removed.
 
 **Keep:** `/skillmeat/api/tests/README.md` (if it exists and documents test structure)
 
@@ -77,21 +85,21 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
-### 1.4 Web Frontend Violations to DELETE (12 files)
+### 1.4 Web Frontend Violations (Previously Targeted; Removed)
 
 **Rationale:** Implementation status, architecture docs, and quick starts created during development should be replaced with proper release documentation.
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| IMPLEMENTATION.md | `/skillmeat/web/IMPLEMENTATION.md` | DELETE | Development notes |
-| COMPONENT_ARCHITECTURE.md | `/skillmeat/web/COMPONENT_ARCHITECTURE.md` | DELETE | Architecture notes (move to docs/web-architecture.md if needed) |
-| P1-002_IMPLEMENTATION_STATUS.md | `/skillmeat/web/P1-002_IMPLEMENTATION_STATUS.md` | DELETE | Phase status, outdated |
-| COLLECTIONS_DASHBOARD_IMPLEMENTATION.md | `/skillmeat/web/COLLECTIONS_DASHBOARD_IMPLEMENTATION.md` | DELETE | Feature implementation notes |
-| MARKETPLACE_UI_IMPLEMENTATION.md | `/skillmeat/web/MARKETPLACE_UI_IMPLEMENTATION.md` | DELETE | Feature implementation notes |
-| MARKETPLACE_QUICK_START.md | `/skillmeat/web/MARKETPLACE_QUICK_START.md` | DELETE | Ad-hoc guide, use docs/ location |
-| DEPLOY_SYNC_UI_IMPLEMENTATION.md | `/skillmeat/web/DEPLOY_SYNC_UI_IMPLEMENTATION.md` | DELETE | Feature implementation notes |
-| DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md | `/skillmeat/web/DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md` | DELETE | Implementation summary |
-| ANALYTICS_WIDGETS_IMPLEMENTATION.md | `/skillmeat/web/ANALYTICS_WIDGETS_IMPLEMENTATION.md` | DELETE | Feature implementation notes |
+| IMPLEMENTATION.md | `/skillmeat/web/IMPLEMENTATION.md` | REMOVED (2025-12-19) | Development notes |
+| COMPONENT_ARCHITECTURE.md | `/skillmeat/web/COMPONENT_ARCHITECTURE.md` | REMOVED (2025-12-19) | Architecture notes (move to docs/web-architecture.md if needed) |
+| P1-002_IMPLEMENTATION_STATUS.md | `/skillmeat/web/P1-002_IMPLEMENTATION_STATUS.md` | REMOVED (2025-12-19) | Phase status, outdated |
+| COLLECTIONS_DASHBOARD_IMPLEMENTATION.md | `/skillmeat/web/COLLECTIONS_DASHBOARD_IMPLEMENTATION.md` | REMOVED (2025-12-19) | Feature implementation notes |
+| MARKETPLACE_UI_IMPLEMENTATION.md | `/skillmeat/web/MARKETPLACE_UI_IMPLEMENTATION.md` | REMOVED (2025-12-19) | Feature implementation notes |
+| MARKETPLACE_QUICK_START.md | `/skillmeat/web/MARKETPLACE_QUICK_START.md` | REMOVED (2025-12-19) | Ad-hoc guide, use docs/ location |
+| DEPLOY_SYNC_UI_IMPLEMENTATION.md | `/skillmeat/web/DEPLOY_SYNC_UI_IMPLEMENTATION.md` | REMOVED (2025-12-19) | Feature implementation notes |
+| DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md | `/skillmeat/web/DEPLOY_SYNC_IMPLEMENTATION_SUMMARY.md` | REMOVED (2025-12-19) | Implementation summary |
+| ANALYTICS_WIDGETS_IMPLEMENTATION.md | `/skillmeat/web/ANALYTICS_WIDGETS_IMPLEMENTATION.md` | REMOVED (2025-12-19) | Feature implementation notes |
 
 **Keep:**
 - `/skillmeat/web/README.md` (module documentation)
@@ -100,33 +108,33 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
-### 1.5 Web Test Violations to DELETE (7 files)
+### 1.5 Web Test Violations (Previously Targeted; Removed)
 
 **Rationale:** Test-specific documentation and quick starts created during test development. Use proper testing docs instead.
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| TASK_COMPLETION.md | `/skillmeat/web/tests/TASK_COMPLETION.md` | DELETE | Test task tracking |
-| TASK_SUMMARY.md | `/skillmeat/web/__tests__/notifications/TEST_SUMMARY.md` | DELETE | Test summary report |
-| CROSS_BROWSER_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TEST_SUMMARY.md` | DELETE | Test summary |
-| SKIP_WORKFLOW_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/SKIP_WORKFLOW_TEST_SUMMARY.md` | DELETE | Test summary |
-| QUICK_START.md | `/skillmeat/web/tests/e2e/QUICK_START.md` | DELETE | Test quick start (move to docs/testing if needed) |
-| CROSS_BROWSER_TESTING.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TESTING.md` | DELETE | Test guide (move to docs/testing if needed) |
-| MARKETPLACE_SOURCES_TESTING.md | `/skillmeat/web/tests/e2e/MARKETPLACE_SOURCES_TESTING.md` | DELETE | Feature test docs |
+| TASK_COMPLETION.md | `/skillmeat/web/tests/TASK_COMPLETION.md` | REMOVED (2025-12-19) | Test task tracking |
+| TASK_SUMMARY.md | `/skillmeat/web/__tests__/notifications/TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary report |
+| CROSS_BROWSER_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary |
+| SKIP_WORKFLOW_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/SKIP_WORKFLOW_TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary |
+| QUICK_START.md | `/skillmeat/web/tests/e2e/QUICK_START.md` | REMOVED (2025-12-19) | Test quick start (move to docs/testing if needed) |
+| CROSS_BROWSER_TESTING.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TESTING.md` | REMOVED (2025-12-19) | Test guide (move to docs/testing if needed) |
+| MARKETPLACE_SOURCES_TESTING.md | `/skillmeat/web/tests/e2e/MARKETPLACE_SOURCES_TESTING.md` | REMOVED (2025-12-19) | Feature test docs |
 
 **Keep:** `/skillmeat/web/tests/README.md` and `/skillmeat/web/tests/e2e/` if they document test structure/setup.
 
 ---
 
-### 1.6 Files to MOVE (1 file)
+### 1.6 Files to MOVE (Target Not Found)
 
 **Rationale:** Consolidate worknotes into proper `.claude/` tracking structure.
 
 | Current Path | Target Path | Status | Notes |
 |--------------|-------------|--------|-------|
-| `/docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` | `.claude/worknotes/fixes/bug-fixes-2025-11.md` | MOVE | Consolidate into monthly bug fixes tracking |
+| `/docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` | `.claude/worknotes/fixes/bug-fixes-2025-11.md` | NOT FOUND (2025-12-19) | Consolidate into monthly bug fixes tracking |
 
-**Action:** Append content to or merge with existing bug fixes file.
+**Action:** Remove this move task or locate the correct worknote file if it exists under a different name.
 
 ---
 
@@ -240,9 +248,12 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
-## Section 2.5: Implementation Status Analysis (2025-12-15)
+## Section 2.5: Implementation Status Analysis (2025-12-19)
 
-This section documents the comprehensive analysis of all PRDs, ideas files, and actual codebase implementation status. This analysis supersedes assumptions in the original cleanup plan.
+This section documents the current implementation status aligned to
+`docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_TRACKING_SUMMARY.md`,
+which is the canonical status source. Any other status documents should be updated
+to match it or explicitly labeled as historical context.
 
 ### 2.5.1 PRD Inventory (12 Major Features)
 
@@ -251,21 +262,22 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
 | Artifact Version Tracking & Sync | Phase 2 | Ready | ~70 | ⏳ NOT STARTED |
 | Entity Lifecycle Management | Phase 3 | Draft | 30 | ⏳ NOT STARTED |
 | Web UI Consolidation | Phase 3+ | Draft | ~25 | ⏳ NOT STARTED |
-| Artifact Flow Modal Redesign | Phase 3+ | Design | - | 🟡 PARTIAL (components exist) |
-| Persistent Project Cache | Phase 3+ | Draft | ~36 | ✅ IMPLEMENTED |
-| Versioning & Merge System | Phase 3+ | Draft | 68 | ⏳ NOT STARTED |
-| Smart Import & Discovery | Phase 4 | Draft | ~50 | 🟡 PARTIAL (discovery done, auto-populate pending) |
-| Notification System | Phase 5-6 | Draft | 95 | ✅ IMPLEMENTED |
-| GitHub Marketplace Ingestion | Phase 4+ | Draft | ~60 | ⏳ NOT STARTED |
-| Discovery & Import Enhancement | Phase 5-6 | Draft | ~30 | ✅ IMPLEMENTED |
-| Collections & Site Navigation | Phase 6+ | Draft | 65 | ✅ IMPLEMENTED |
-| Agent Context Entities | Phase 4+ | Draft | ~70 | 🟡 PARTIAL (CLI done, API stubs) |
+| Artifact Flow Modal Redesign | Phase 3+ | Design | - | ✅ COMPLETED (tracking summary) |
+| Persistent Project Cache | Phase 3+ | Draft | ~36 | ✅ COMPLETED (tracking summary) |
+| Versioning & Merge System | Phase 3+ | Draft | 68 | 🟡 IN PROGRESS (core + API + UI complete; testing deferred) |
+| Smart Import & Discovery | Phase 4 | Draft | ~50 | 🟡 PARTIAL (discovery done; auto-populate pending) |
+| Notification System | Phase 5-6 | Draft | 95 | ✅ COMPLETED (tracking summary) |
+| GitHub Marketplace Ingestion | Phase 4+ | Draft | ~60 | ✅ COMPLETED (tracking summary) |
+| Discovery & Import Enhancement | Phase 5-6 | Draft | ~30 | 🟡 IN PROGRESS (Phase 6 pending) |
+| Collections & Site Navigation | Phase 6+ | Draft | 65 | ✅ COMPLETED (tracking summary) |
+| Agent Context Entities | Phase 4+ | Draft | ~70 | ✅ COMPLETED (tracking summary; validate API) |
+| Tags Refactor v1 | Phase 3+ | Draft | ~52 | ✅ COMPLETED (per code review) |
 
-**Total Planned:** ~600 story points | **Implemented:** ~200+ points
+**Total Planned:** ~600 story points | **Implemented:** See tracking summary for latest counts
 
 ### 2.5.2 Implementation Status Detail
 
-#### ✅ FULLY IMPLEMENTED Features
+#### ✅ COMPLETED (tracking summary or code-verified)
 
 **1. Notification System** (95 SP)
 - NotificationProvider context with localStorage persistence
@@ -289,15 +301,7 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
 - TanStack Query hooks for frontend
 - Files: `api/routers/groups.py`, `cache/models.py`, `web/hooks/use-groups.ts`
 
-**4. Discovery & Import Enhancement** (30 SP)
-- DiscoveryBanner component with dismissal
-- BulkImportModal with per-artifact status
-- Discovery caching with TTL
-- Skip preferences system
-- Analytics integration
-- Files: `web/components/discovery/*.tsx`, `core/discovery.py`
-
-**5. Persistent Project Cache** (36 SP)
+**4. Persistent Project Cache** (36 SP)
 - SQLite database at `~/.skillmeat/cache.db`
 - SQLAlchemy ORM models (Project, Artifact, Collection, etc.)
 - Cache manager with thread-safe operations
@@ -305,35 +309,44 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
 - Alembic migrations
 - Files: `cache/models.py`, `cache/manager.py`, `cache/refresh.py`, `cache/watcher.py`
 
-#### 🟡 PARTIALLY IMPLEMENTED Features
+**5. Marketplace GitHub Ingestion v1**
+- GitHub-backed marketplace sources with ingestion workflow (per tracking summary)
+- Files: `api/routers/marketplace_sources.py`, `web/app/marketplace/page.tsx`
 
-**6. Agent Context Entities** (~70 SP)
-- ✅ CLI commands: `skillmeat context add/list/show/deploy/remove`
-- ✅ Frontend: Types, API client, React hooks
-- ❌ Backend API: Returns 501 (needs ContextEntity SQLAlchemy model)
-- Blocker: TASK-1.2 database model not yet implemented
-- Files: `cli.py` (lines 8633-8665), `api/routers/context_entities.py` (stubs)
+**6. Artifact Flow Modal Redesign**
+- Modal redesign delivered (per tracking summary)
+- Files: `web/components/entity/unified-entity-modal.tsx`, `web/components/sync-status/sync-status-tab.tsx`
 
-**7. Artifact Flow Modal Redesign**
-- ✅ ArtifactFlowBanner component (3-tier visualization)
-- ✅ DiffViewer component with syntax highlighting
-- ✅ Sync status components (drift alert, comparison selector)
-- ❌ Full modal wrapper combining all components not yet built
-- Files: `web/components/sync-status/*.tsx`, `web/components/entity/diff-viewer.tsx`
+**7. Tags Refactor v1**
+- Tags CRUD API and artifact association endpoints
+- Tag input, tag filtering, and tag management hooks
+- Files: `api/routers/tags.py`, `web/components/ui/tag-input.tsx`, `web/hooks/use-tags.ts`
 
-**8. Smart Import & Discovery** (~50 SP)
-- ✅ Discovery scan and banner
-- ✅ Bulk import workflow
-- ❌ Auto-populate from GitHub URLs not implemented
-- ❌ Metadata extraction from GitHub API not implemented
+#### 🟡 IN PROGRESS / PARTIAL
+
+**8. Discovery & Import Enhancement** (Phase 6 pending)
+- Phases 1-5 complete; Phase 6 monitoring/optimization/release pending
+- Files: `docs/project_plans/implementation_plans/enhancements/discovery-import-enhancement-v1.md`
+
+**9. Versioning & Merge System v1.5**
+- Core, API, and UI complete; testing deferred (tracking summary)
+- Files: `api/routers/merge.py`, `web/components/entity/merge-workflow.tsx`
+
+**10. Smart Import & Discovery** (~50 SP)
+- Discovery scan and bulk import workflow present
+- Auto-populate from GitHub URLs and metadata extraction pending
+- Files: `web/components/discovery/*.tsx`, `core/discovery.py`
+
+**11. Agent Context Entities**
+- Marked complete in tracking summary, but API router still returns 501
+- Action: validate backend model implementation or update tracking summary
+- Files: `api/routers/context_entities.py`, `web/app/context-entities/page.tsx`
 
 #### ⏳ NOT STARTED Features
 
 - Artifact Version Tracking & Sync (Phase 2)
 - Entity Lifecycle Management (Phase 3)
 - Web UI Consolidation (Phase 3+)
-- Versioning & Merge System (Phase 3+)
-- GitHub Marketplace Ingestion (Phase 4+)
 
 ### 2.5.3 Ideas Files Summary
 
@@ -346,15 +359,15 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
 | enhancements-12-03.md | Dec 3 | Custom grouping, deployment tab, deployment counter, tooltips | Grouping done |
 | enhancements-12-04.md | Dec 4 | Discovery/import improvements | Implemented |
 | enhancements-12-12-Collections-Nav.md | Dec 12 | Full Collections Navigation spec | Implemented |
-| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Partial |
+| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Implemented (tracking summary; validate API) |
 | requests-template.md | - | Template for request log format | Reference doc |
 
 ### 2.5.4 Key Findings
 
-1. **Phase 5-6 work is largely COMPLETE** - Notification System, Collections Navigation, Discovery Enhancement all implemented
-2. **Phase 3-4 features mostly NOT STARTED** - Version tracking, merge system, entity lifecycle pending
-3. **Context Entities actively in progress** - Recent commits show Phase 2 CLI work complete, blocking on database model
-4. **Documentation reflects old assumptions** - Release notes section assumed features not implemented that are now complete
+1. **Tracking summary is canonical** - Quick reference/exploration docs must be reconciled or labeled as historical.
+2. **Multiple major initiatives are complete** - Collections Navigation, Notification System, Marketplace ingestion, Artifact Flow Modal, Tags refactor.
+3. **Remaining gaps are focused** - Context Entities API validation, Discovery Enhancement Phase 6, Versioning/Merge testing.
+4. **Documentation assumptions are stale** - Release notes and guides need updates to reflect completed work.
 
 ---
 
@@ -372,16 +385,18 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
    - **Notification System** - Full notification center with bell icon, unread badges, localStorage persistence, expandable details
    - **Collections Navigation** - Collection switcher, multi-collection support, sidebar restructuring
    - **Groups Functionality** - Custom groups within collections, drag-drop support, group management UI
-   - **Discovery & Import** - Discovery banner, bulk import modal, skip preferences, caching
+   - **Discovery & Import** - Discovery banner, bulk import modal, skip preferences, caching (Phases 1-5)
    - **Persistent Project Cache** - SQLite cache, background refresh, file watcher, sub-second load times
-   - **Artifact Flow Banner** - 3-tier visualization (Source → Collection → Project), sync status
+   - **Artifact Flow Modal Redesign** - Consolidated flow with sync status and diff viewer
    - **Diff Viewer** - Syntax-highlighted diff comparison with unified/side-by-side views
-   - **Agent Context Entities (CLI)** - `skillmeat context` command group for managing context files
+   - **Marketplace GitHub Ingestion** - GitHub-backed sources with ingestion workflow
+   - **Tags Refactor** - Tags CRUD + artifact associations with UI tag management
+   - **Agent Context Entities** - CLI and web UI (tracking summary; validate API backend)
 
 2. **Partial Features (Document as Preview/Beta)**
-   - **Agent Context Entities (Web UI)** - Types and hooks ready, API pending database model
-   - **Artifact Flow Modal** - Components available, full modal integration in progress
-   - **Smart Import** - Discovery working, auto-populate from GitHub URLs coming soon
+   - **Discovery Enhancement Phase 6** - Monitoring/optimization/release tasks pending
+   - **Smart Import** - Auto-populate from GitHub URLs and metadata extraction pending
+   - **Versioning & Merge System** - Core/API/UI complete, testing deferred
 
 3. **Breaking Changes**
    - Collections API: `/user-collections` endpoint for mutations (not `/collections`)
@@ -406,15 +421,12 @@ This section documents the comprehensive analysis of all PRDs, ideas files, and 
 
 7. **Known Issues**
    - Context Entities API returns 501 (database model pending)
-   - Artifact Flow Modal not yet consolidated into single dialog
    - Auto-populate from GitHub URLs not yet implemented
-   - Versioning & merge system not included (Phase 3+)
+   - Versioning & merge system testing not yet complete
 
 8. **Future Roadmap (NOT in v0.3.0-beta)**
    - Artifact Version Tracking & Bidirectional Sync
    - Full Entity Lifecycle Management
-   - Versioning & Merge System with conflict resolution
-   - GitHub Marketplace Ingestion
    - Web UI Consolidation
 
 ---
@@ -1003,4 +1015,3 @@ docs/project_plans/                    # Planning artifacts (internal)
 - Initial document created with policy violation inventory
 - Identified 25+ files for cleanup
 - Created priority phases for documentation work
-
