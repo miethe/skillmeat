@@ -99,11 +99,10 @@ const defaultConfig: TypeConfig = {
 // ============================================================================
 
 interface TypeBadgeProps {
-  entityType: ContextEntityType;
+  config: TypeConfig;
 }
 
-function TypeBadge({ entityType }: TypeBadgeProps) {
-  const config = typeConfig[entityType];
+function TypeBadge({ config }: TypeBadgeProps) {
   const Icon = config.icon;
 
   return (
@@ -287,7 +286,7 @@ export function ContextEntityCard({
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <TypeBadge entityType={entity.entity_type} />
+            <TypeBadge config={config} />
             <AutoLoadIndicator autoLoad={entity.auto_load} />
           </div>
         </div>
