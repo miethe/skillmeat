@@ -539,3 +539,16 @@
   4. Updated `TypeBadge` to receive pre-resolved `config` from parent instead of doing its own lookup
 - **Commit(s)**: d98ab9a, 062f4e5, 0599018
 - **Status**: RESOLVED
+
+### DeployToProjectDialog Crashes on Preview with entity_type.replace() Error
+
+**Issue**: Clicking "Preview" on any artifact in /context-entities page fails with `TypeError: Cannot read properties of undefined (reading 'replace')`.
+- **Location**: `skillmeat/web/components/context/deploy-to-project-dialog.tsx:133`, `skillmeat/web/app/context-entities/page.tsx:326`
+- **Root Cause**: Two issues:
+  1. `entity.entity_type.replace('_', ' ')` called without null check - crashes when `entity_type` is undefined
+  2. Prop mismatch: page passed `onClose` but dialog interface expects `onOpenChange`
+- **Fix**:
+  1. Added optional chaining with fallback: `entity.entity_type?.replace('_', ' ') || 'Unknown'`
+  2. Changed prop from `onClose={handleDeployClose}` to `onOpenChange={(open) => !open && handleDeployClose()}`
+- **Commit(s)**: 1cc2b1e
+- **Status**: RESOLVED

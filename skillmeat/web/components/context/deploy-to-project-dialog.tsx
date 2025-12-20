@@ -130,7 +130,7 @@ export function DeployToProjectDialog({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Type</span>
               <Badge variant="secondary" className="capitalize">
-                {entity.entity_type.replace('_', ' ')}
+                {entity.entity_type?.replace('_', ' ') || 'Unknown'}
               </Badge>
             </div>
             <div className="flex items-center justify-between text-sm">
