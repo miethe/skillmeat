@@ -85,6 +85,15 @@ const typeConfig: Record<ContextEntityType, TypeConfig> = {
   },
 };
 
+// Default config for unknown entity types
+const defaultConfig: TypeConfig = {
+  icon: FileText,
+  label: 'Entity',
+  borderColor: 'border-l-gray-500',
+  bgColor: 'bg-gray-500/[0.02] dark:bg-gray-500/[0.03]',
+  badgeClassName: 'border-gray-500 text-gray-700 bg-gray-50 dark:bg-gray-950',
+};
+
 // ============================================================================
 // Sub-components
 // ============================================================================
@@ -211,18 +220,15 @@ export function ContextEntityCard({
   tokenCount,
   onAutoLoadToggle,
 }: ContextEntityCardProps) {
-  const config = typeConfig[entity.entity_type];
-  if (!config) {
-    return (
-      <Card className="border-l-4 border-l-gray-500 bg-gray-50">
-        <div className="p-4">
-          <p className="text-sm text-red-600">
-            Unknown entity type: {entity.entity_type}
-          </p>
-        </div>
-      </Card>
-    );
+  // Normalize entity type to lowercase and lookup config
+  const normalizedType = (entity.entity_type?.toLowerCase() || '') as ContextEntityType;
+  const config = typeConfig[normalizedType] || defaultConfig;
+
+  // Warn developers if using fallback config
+  if (!typeConfig[normalizedType] && entity.entity_type) {
+    console.warn(`Unknown entity type: ${entity.entity_type}, using default config`);
   }
+
   const Icon = config.icon;
 
   const handlePreview = (e: React.MouseEvent) => {
