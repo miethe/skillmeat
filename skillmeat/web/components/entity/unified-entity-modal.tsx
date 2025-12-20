@@ -22,6 +22,7 @@ import {
   Pencil,
   FolderOpen,
   Rocket,
+  Trash2,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -44,6 +45,7 @@ import { ContentPane } from '@/components/entity/content-pane';
 import { FileCreationDialog } from '@/components/entity/file-creation-dialog';
 import { FileDeletionDialog } from '@/components/entity/file-deletion-dialog';
 import { UnsavedChangesDialog } from '@/components/entity/unsaved-changes-dialog';
+import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
@@ -286,6 +288,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   } | null>(null);
   // Parameter editor state
   const [showParameterEditor, setShowParameterEditor] = useState(false);
+  // Artifact deletion state
+  const [showDeletionDialog, setShowDeletionDialog] = useState(false);
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1321,8 +1325,17 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="overview" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-6 py-4">
-                  {/* Edit Parameters Button */}
-                  <div className="flex justify-end">
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setShowDeletionDialog(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1811,6 +1824,17 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           onSave={handleSaveParameters}
         />
       )}
+
+      {/* Artifact Deletion Dialog */}
+      <ArtifactDeletionDialog
+        artifact={entity as any}
+        open={showDeletionDialog}
+        onOpenChange={setShowDeletionDialog}
+        onSuccess={() => {
+          onClose();
+          setShowDeletionDialog(false);
+        }}
+      />
     </>
   );
 }
