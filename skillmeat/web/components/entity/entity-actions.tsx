@@ -16,16 +16,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { RollbackDialog } from './rollback-dialog';
+import { ArtifactDeletionDialog } from './artifact-deletion-dialog';
 import type { Entity } from '@/types/entity';
 
 /**
@@ -87,23 +80,8 @@ export function EntityActions({
   onViewDiff,
   onRollback,
 }: EntityActionsProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [showDeletionDialog, setShowDeletionDialog] = React.useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
-  const handleDelete = async () => {
-    if (!onDelete) return;
-
-    setIsDeleting(true);
-    try {
-      await onDelete();
-      setShowDeleteDialog(false);
-    } catch (error) {
-      console.error('Failed to delete entity:', error);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleRollback = async () => {
     if (!onRollback) return;
@@ -162,7 +140,7 @@ export function EntityActions({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => setShowDeleteDialog(true)}
+                onClick={() => setShowDeletionDialog(true)}
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -173,30 +151,18 @@ export function EntityActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete {entity.name}?</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. This will permanently delete the {entity.type} "
-              {entity.name}".
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Artifact Deletion Dialog */}
+      <ArtifactDeletionDialog
+        artifact={entity as any}
+        open={showDeletionDialog}
+        onOpenChange={setShowDeletionDialog}
+        context={entity.projectPath ? 'project' : 'collection'}
+        projectPath={entity.projectPath}
+        onSuccess={() => {
+          onDelete?.();
+          setShowDeletionDialog(false);
+        }}
+      />
 
       {/* Rollback Confirmation Dialog */}
       <RollbackDialog
