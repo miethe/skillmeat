@@ -323,7 +323,7 @@ export default function ContextEntitiesPage() {
         <DeployToProjectDialog
           entity={selectedEntity}
           open={isDeployOpen}
-          onClose={handleDeployClose}
+          onOpenChange={(open) => !open && handleDeployClose()}
           onSuccess={() => {
             handleDeployClose();
             toast({
