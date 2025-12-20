@@ -527,9 +527,15 @@
 
 ### ContextEntityCard Crashes on Unknown Entity Type
 
-**Issue**: Context entities page fails with `TypeError: Cannot read properties of undefined (reading 'icon')` at ContextEntityCard line 215.
-- **Location**: `skillmeat/web/components/context/context-entity-card.tsx:214-215`
-- **Root Cause**: `typeConfig[entity.entity_type]` returns `undefined` when `entity.entity_type` doesn't match any key in the `typeConfig` Record. Line 215 then crashes accessing `.icon` on undefined.
-- **Fix**: Added defensive null check after `typeConfig` lookup. If `config` is undefined, renders an error state Card with gray styling and red text showing the unknown entity type, instead of crashing.
-- **Commit(s)**: 0f3a60e
+**Issue**: Context entities page fails with `TypeError: Cannot read properties of undefined (reading 'icon')` at ContextEntityCard.
+- **Location**: `skillmeat/web/components/context/context-entity-card.tsx:214-215,107`
+- **Root Cause**: Two issues:
+  1. `typeConfig[entity.entity_type]` returns `undefined` when type doesn't match - API may return different casing than expected lowercase snake_case values
+  2. `TypeBadge` sub-component did its own `typeConfig` lookup without normalization, crashing when accessing `config.icon` on undefined
+- **Fix**:
+  1. Added type normalization: `(entity.entity_type?.toLowerCase() || '') as ContextEntityType`
+  2. Added `defaultConfig` with gray styling as fallback instead of error state
+  3. Added `console.warn()` for debugging unknown types
+  4. Updated `TypeBadge` to receive pre-resolved `config` from parent instead of doing its own lookup
+- **Commit(s)**: d98ab9a, 062f4e5, 0599018
 - **Status**: RESOLVED
