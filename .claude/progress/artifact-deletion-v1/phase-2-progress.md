@@ -3,68 +3,72 @@ type: progress
 prd: "artifact-deletion-v1"
 phase: 2
 title: "Integration Points"
-status: pending
-progress: 0
+status: completed
+progress: 100
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 blocked_tasks: 0
 created: "2025-12-20"
 updated: "2025-12-20"
+completed_at: "2025-12-20"
+commits:
+  - "b750312"
+  - "e15f47a"
 
 tasks:
   - id: "FE-009"
     title: "Modify EntityActions to use ArtifactDeletionDialog"
-    status: "pending"
+    status: "completed"
     priority: "high"
     estimate: "1pt"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     file_targets:
       - "skillmeat/web/components/entity/entity-actions.tsx"
-    notes: "Replace simple delete dialog with ArtifactDeletionDialog component"
+    notes: "Replaced simple delete dialog with ArtifactDeletionDialog, context-aware (collection vs project)"
 
   - id: "FE-010"
     title: "Add Delete button to UnifiedEntityModal Overview tab"
-    status: "pending"
+    status: "completed"
     priority: "high"
     estimate: "0.5pt"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     file_targets:
       - "skillmeat/web/components/entity/unified-entity-modal.tsx"
-    notes: "Add Delete button beside Edit Parameters button in Overview tab"
+    notes: "Added Delete button with destructive styling next to Edit Parameters button"
 
   - id: "FE-011"
     title: "Integration tests for deletion flow"
-    status: "pending"
+    status: "completed"
     priority: "medium"
     estimate: "1.5pt"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["FE-009", "FE-010"]
     file_targets:
       - "skillmeat/web/__tests__/integration/artifact-deletion.test.tsx"
-    notes: "Test full flow from card menu through dialog to API calls"
+    notes: "26 integration tests covering EntityActions, Modal, state management, mutation flow, cache invalidation"
 
   - id: "FE-012"
     title: "E2E test for artifact deletion"
-    status: "pending"
+    status: "completed"
     priority: "medium"
     estimate: "1.5pt"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["FE-011"]
     file_targets:
-      - "skillmeat/web/tests/artifact-deletion.spec.ts"
-    notes: "Playwright E2E test for deletion from collection and project pages"
+      - "skillmeat/web/tests/e2e/artifact-deletion.spec.ts"
+    notes: "30+ Playwright E2E scenarios for deletion from collection, modal, cascading deletion, error handling, mobile responsiveness"
 
   - id: "FE-013"
     title: "Verify error handling across integration points"
-    status: "pending"
+    status: "completed"
     priority: "low"
     estimate: "0.5pt"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["FE-011"]
     file_targets: []
-    notes: "Verify toast notifications, error states, and recovery paths"
+    notes: "Verification complete - all error handling production ready"
 
 parallelization:
   batch_1: ["FE-009", "FE-010"]
@@ -86,189 +90,98 @@ references:
 
 ## Summary
 
-Phase 2 integrates the ArtifactDeletionDialog into existing components (EntityActions and UnifiedEntityModal) and adds comprehensive integration and E2E tests.
+Phase 2 integrated the ArtifactDeletionDialog into existing components (EntityActions and UnifiedEntityModal) and added comprehensive integration and E2E tests.
 
 **Estimated Effort**: 5 story points (2-3 days)
-**Dependencies**: Phase 1 completion (FE-003, FE-005)
+**Actual Completion**: 1 session
+**Dependencies**: Phase 1 completion (FE-003, FE-005) ✅
 **Assigned Agents**: ui-engineer-enhanced
 
-## Orchestration Quick Reference
+## Completion Summary
 
-### Batch 1 (Parallel - FE-009 and FE-010)
+### Batch 1: Component Integration ✅
 
-**FE-009** → `ui-engineer-enhanced` (1pt)
+**FE-009: EntityActions Integration**
+- Replaced simple delete dialog with ArtifactDeletionDialog
+- Context-aware: Automatically detects collection vs project based on `entity.projectPath`
+- Passes projectPath prop for project-specific options
+- Maintains existing onDelete callback behavior
+- Commit: b750312
 
-```
-Task("ui-engineer-enhanced", "FE-009: Modify EntityActions to use ArtifactDeletionDialog.
+**FE-010: UnifiedEntityModal Delete Button**
+- Added Delete button with destructive styling to Overview tab
+- Button positioned before Edit Parameters button
+- Opens ArtifactDeletionDialog on click
+- Closes both dialog and modal on success
+- Commit: b750312
 
-File: skillmeat/web/components/entity/entity-actions.tsx
+### Batch 2: Integration Tests ✅
 
-Changes:
-1. Import ArtifactDeletionDialog from './artifact-deletion-dialog'
-2. Add state: showDeletionDialog: boolean
-3. Replace onClick={() => setShowDeleteDialog(true)} with setShowDeletionDialog(true)
-4. Remove the existing simple Dialog for delete confirmation (lines ~177-199)
-5. Add ArtifactDeletionDialog component at end of component:
-   <ArtifactDeletionDialog
-     entity={entity}
-     open={showDeletionDialog}
-     onOpenChange={setShowDeletionDialog}
-     context={entity.projectPath ? 'project' : 'collection'}
-     projectPath={entity.projectPath}
-     onSuccess={() => {
-       onDelete?.();
-       setShowDeletionDialog(false);
-     }}
-   />
+**FE-011: Integration Tests**
+- Created 26 integration tests in `__tests__/integration/artifact-deletion.test.tsx`
+- Test suites cover:
+  - EntityActions integration (dialog opening, context passing)
+  - UnifiedEntityModal integration (button presence, modal closure)
+  - Dialog state management (toggles, selections, counts)
+  - Mutation flow (pending states, error handling, success callbacks)
+  - Cache invalidation
+  - Loading states
+  - Accessibility (labels, roles, aria-live)
+- All 98 artifact-deletion tests passing
+- Commit: e15f47a
 
-Preserve existing dropdown menu structure - only change what happens on delete click.")
-```
+### Batch 3: E2E Tests & Verification ✅
 
-**FE-010** → `ui-engineer-enhanced` (0.5pt)
+**FE-012: E2E Tests**
+- Created 30+ Playwright E2E scenarios in `tests/e2e/artifact-deletion.spec.ts`
+- Scenarios cover:
+  - Delete from Collection page
+  - Delete from Modal
+  - Cascading deletion (projects + deployments)
+  - Cancel flow
+  - Error handling
+  - Accessibility
+  - Mobile responsiveness
+- Commit: e15f47a
 
-```
-Task("ui-engineer-enhanced", "FE-010: Add Delete button to UnifiedEntityModal Overview tab.
+**FE-013: Error Handling Verification**
+- Comprehensive verification report completed
+- All error handling implementation is production ready:
+  - ✅ API error extraction with fallback
+  - ✅ Promise.allSettled for partial failures
+  - ✅ Success/warning/error toast notifications
+  - ✅ Loading state management
+  - ✅ Cache invalidation
+- Minor recommendation: Standardize API client error parsing (text vs json) in Phase 3
 
-File: skillmeat/web/components/entity/unified-entity-modal.tsx
+## Quality Gates Met
 
-Changes:
-1. Import ArtifactDeletionDialog from './artifact-deletion-dialog'
-2. Add state: showDeletionDialog: boolean (near line 288)
-3. In Overview tab header (around line 1324-1334), add Delete button:
-   <div className='flex justify-end gap-2'>
-     <Button
-       variant='outline'
-       size='sm'
-       className='text-destructive hover:text-destructive hover:bg-destructive/10'
-       onClick={() => setShowDeletionDialog(true)}
-     >
-       <Trash2 className='mr-2 h-4 w-4' />
-       Delete
-     </Button>
-     <Button variant='outline' size='sm' onClick={() => setShowParameterEditor(true)}>
-       <Pencil className='mr-2 h-4 w-4' />
-       Edit Parameters
-     </Button>
-   </div>
-4. Add ArtifactDeletionDialog at end of component (before closing fragments)
+- [x] EntityActions Delete opens new dialog (not simple confirmation)
+- [x] Modal Overview tab has Delete button beside Edit Parameters
+- [x] Context correctly detected (collection vs project)
+- [x] Integration tests pass (26 tests)
+- [x] E2E tests pass (30+ scenarios)
+- [x] Error handling works across all entry points
+- [x] Cache invalidation triggers UI updates
+- [x] No TypeScript errors in modified components
+- [x] Build compiles successfully
 
-Import Trash2 from lucide-react.")
-```
+## Files Changed
 
-### Batch 2 (Sequential - Depends on Batch 1)
+| File | Type | LOC |
+|------|------|-----|
+| `components/entity/entity-actions.tsx` | Modified | -51, +40 |
+| `components/entity/unified-entity-modal.tsx` | Modified | +28 |
+| `__tests__/integration/artifact-deletion.test.tsx` | Created | +786 |
+| `tests/e2e/artifact-deletion.spec.ts` | Created | +648 |
 
-**FE-011** → `ui-engineer-enhanced` (1.5pt)
+**Total**: ~1,500 lines of code/tests added
 
-```
-Task("ui-engineer-enhanced", "FE-011: Integration tests for deletion flow.
+## Next Phase
 
-File: skillmeat/web/__tests__/integration/artifact-deletion.test.tsx
-
-Test cases:
-1. EntityActions: Click delete → dialog opens with correct context
-2. EntityActions: Collection context → shows 'Delete from Projects' toggle
-3. EntityActions: Project context → shows 'Delete from Collection' toggle
-4. UnifiedEntityModal: Delete button in Overview opens dialog
-5. Full flow: Toggle on → expand section → select items → delete → API called
-6. Cache invalidation: After delete, queries refetch
-7. Dialog closes on success
-8. Error toast on failure
-
-Setup:
-- Mock useArtifactDeletion hook
-- Mock useDeploymentList for expansion sections
-- Render components with QueryClient wrapper
-
-Use @testing-library/react with userEvent for interactions.")
-```
-
-### Batch 3 (Parallel - FE-012 and FE-013)
-
-**FE-012** → `ui-engineer-enhanced` (1.5pt)
-
-```
-Task("ui-engineer-enhanced", "FE-012: E2E test for artifact deletion.
-
-File: skillmeat/web/tests/artifact-deletion.spec.ts
-
-Playwright E2E tests:
-
-1. Delete from Collection page:
-   - Navigate to /collection
-   - Click artifact card menu (...)
-   - Click Delete
-   - Verify dialog shows with 'Delete from Collection' context
-   - Toggle 'Also delete from Projects' → verify expansion
-   - Click Delete → verify API call made
-   - Verify artifact removed from list
-
-2. Delete from Project page:
-   - Navigate to /projects/[id]
-   - Click artifact card menu
-   - Click Delete
-   - Verify 'Delete from Project' context
-   - Complete deletion
-   - Verify removed from project view
-
-3. Delete from Modal:
-   - Open artifact modal
-   - Go to Overview tab
-   - Click Delete button
-   - Complete flow
-
-Setup: Use test API with mock data or real local API.
-Consider test fixtures for consistent state.")
-```
-
-**FE-013** → `ui-engineer-enhanced` (0.5pt)
-
-```
-Task("ui-engineer-enhanced", "FE-013: Verify error handling across integration points.
-
-Manual verification and test review:
-
-1. Network failure during deletion:
-   - API returns 500 → error toast shown
-   - Dialog remains open for retry
-
-2. Partial failure (multiple undeployments):
-   - Some succeed, some fail
-   - Error message lists what failed
-   - User can retry
-
-3. 404 artifact not found:
-   - Artifact deleted elsewhere
-   - Clear message, dialog closes
-
-4. Validation error (400):
-   - Invalid request format
-   - Clear error message
-
-Verify toast notifications use correct variant (destructive for errors).
-Verify dialog loading states during operations.")
-```
-
-## Key Files
-
-| File | Purpose | Changes |
-|------|---------|---------|
-| `components/entity/entity-actions.tsx` | Card menu | +40 LOC |
-| `components/entity/unified-entity-modal.tsx` | Modal overview | +30 LOC |
-| `__tests__/integration/artifact-deletion.test.tsx` | Integration tests | ~200 LOC |
-| `tests/artifact-deletion.spec.ts` | E2E tests | ~150 LOC |
-
-## Acceptance Criteria
-
-- [ ] EntityActions Delete opens new dialog (not simple confirmation)
-- [ ] Modal Overview tab has Delete button beside Edit Parameters
-- [ ] Context correctly detected (collection vs project)
-- [ ] Integration tests pass
-- [ ] E2E tests pass
-- [ ] Error handling works across all entry points
-- [ ] Cache invalidation triggers UI updates
-
-## Notes
-
-- EntityActions already has onDelete prop - just change what dialog is shown
-- UnifiedEntityModal has pattern for parameter editor modal to follow
-- Both entry points should use same ArtifactDeletionDialog component
+Phase 3: Testing & Polish
+- FE-018: Performance optimization
+- FE-019: Mobile responsiveness
+- FE-020: Final accessibility pass
+- FE-021: Documentation & code comments
+- FE-022: Code review & merge
