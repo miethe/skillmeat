@@ -522,3 +522,14 @@
 - **Fix**: Added `auto-rows-fr` Tailwind class to both grid containers (main grid and skeleton). This CSS Grid property (`grid-auto-rows: 1fr`) equalizes row heights based on the tallest item in each row.
 - **Commit(s)**: 7000902
 - **Status**: RESOLVED
+
+## 2025-12-20
+
+### ContextEntityCard Crashes on Unknown Entity Type
+
+**Issue**: Context entities page fails with `TypeError: Cannot read properties of undefined (reading 'icon')` at ContextEntityCard line 215.
+- **Location**: `skillmeat/web/components/context/context-entity-card.tsx:214-215`
+- **Root Cause**: `typeConfig[entity.entity_type]` returns `undefined` when `entity.entity_type` doesn't match any key in the `typeConfig` Record. Line 215 then crashes accessing `.icon` on undefined.
+- **Fix**: Added defensive null check after `typeConfig` lookup. If `config` is undefined, renders an error state Card with gray styling and red text showing the unknown entity type, instead of crashing.
+- **Commit(s)**: 0f3a60e
+- **Status**: RESOLVED

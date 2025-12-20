@@ -212,6 +212,17 @@ export function ContextEntityCard({
   onAutoLoadToggle,
 }: ContextEntityCardProps) {
   const config = typeConfig[entity.entity_type];
+  if (!config) {
+    return (
+      <Card className="border-l-4 border-l-gray-500 bg-gray-50">
+        <div className="p-4">
+          <p className="text-sm text-red-600">
+            Unknown entity type: {entity.entity_type}
+          </p>
+        </div>
+      </Card>
+    );
+  }
   const Icon = config.icon;
 
   const handlePreview = (e: React.MouseEvent) => {
