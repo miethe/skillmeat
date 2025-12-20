@@ -22,6 +22,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MarkdownEditor } from '@/components/editor/markdown-editor';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  useCreateContextEntity,
+  useUpdateContextEntity,
+} from '@/hooks/use-context-entities';
 
 /**
  * Props for ContextEntityEditor component
@@ -33,10 +43,12 @@ export interface ContextEntityEditorProps {
   entity?: ContextEntity;
   /** Initial markdown content (for create mode) */
   initialContent?: string;
-  /** Callback when form is saved */
-  onSave: (data: CreateContextEntityRequest | UpdateContextEntityRequest) => void;
-  /** Callback when form is cancelled */
-  onCancel: () => void;
+  /** Whether the editor dialog is open */
+  open: boolean;
+  /** Callback when dialog should close */
+  onClose: () => void;
+  /** Callback when entity is successfully created/updated */
+  onSuccess: () => void;
   /** Whether save operation is in progress */
   isLoading?: boolean;
 }
@@ -85,13 +97,14 @@ const ENTITY_TYPE_OPTIONS: Array<{ value: ContextEntityType; label: string; desc
   ];
 
 /**
- * ContextEntityEditor - Create or edit context entity form
+ * ContextEntityEditor - Create or edit context entity form in a modal dialog
  *
  * Provides a two-column layout (desktop) or stacked layout (mobile) for editing
  * context entity metadata and markdown content. Includes real-time validation
  * and an inline markdown editor.
  *
  * Features:
+ * - Modal dialog wrapper
  * - Metadata fields (name, type, path pattern, description, category, auto-load, version)
  * - CodeMirror-based markdown editor
  * - Real-time validation feedback
@@ -102,27 +115,27 @@ const ENTITY_TYPE_OPTIONS: Array<{ value: ContextEntityType; label: string; desc
  * ```tsx
  * // Create mode
  * <ContextEntityEditor
- *   initialContent="# New Context Entity\n..."
- *   onSave={(data) => createContextEntity(data)}
- *   onCancel={() => closeDialog()}
- *   isLoading={isCreating}
+ *   open={isOpen}
+ *   onClose={() => setIsOpen(false)}
+ *   onSuccess={() => handleSuccess()}
  * />
  *
  * // Edit mode
  * <ContextEntityEditor
  *   entity={existingEntity}
- *   onSave={(data) => updateContextEntity(entity.id, data)}
- *   onCancel={() => closeDialog()}
- *   isLoading={isUpdating}
+ *   open={isOpen}
+ *   onClose={() => setIsOpen(false)}
+ *   onSuccess={() => handleSuccess()}
  * />
  * ```
  */
 export function ContextEntityEditor({
   entity,
   initialContent = '',
-  onSave,
-  onCancel,
-  isLoading = false,
+  open,
+  onClose,
+  onSuccess,
+  isLoading: externalIsLoading = false,
 }: ContextEntityEditorProps) {
   const [markdownContent, setMarkdownContent] = useState<string>(
     entity?.content_hash || initialContent
@@ -132,13 +145,17 @@ export function ContextEntityEditor({
   // Determine if we're in edit mode
   const isEditMode = !!entity;
 
+  // Mutations
+  const createEntity = useCreateContextEntity();
+  const updateEntity = useUpdateContextEntity();
+  const isLoading = externalIsLoading || createEntity.isPending || updateEntity.isPending;
+
   // Form setup with react-hook-form
   const {
     register,
     handleSubmit,
     formState: { errors },
     control,
-    watch,
   } = useForm<FormData>({
     defaultValues: {
       name: entity?.name || '',
@@ -151,9 +168,6 @@ export function ContextEntityEditor({
       content: entity?.content_hash || initialContent,
     },
   });
-
-  // Watch auto_load value for checkbox
-  const autoLoadValue = watch('auto_load');
 
   // Update markdown content when entity changes
   useEffect(() => {
@@ -190,8 +204,8 @@ export function ContextEntityEditor({
         return;
       }
 
-      // Build request data
-      const requestData: CreateContextEntityRequest | UpdateContextEntityRequest = {
+      // Build request data (same structure for both create and update)
+      const requestData = {
         name: data.name,
         entity_type: data.entity_type,
         content: markdownContent,
@@ -202,24 +216,41 @@ export function ContextEntityEditor({
         version: data.version || undefined,
       };
 
-      onSave(requestData);
+      // Call appropriate mutation
+      if (isEditMode && entity) {
+        await updateEntity.mutateAsync({
+          id: entity.id,
+          data: requestData as UpdateContextEntityRequest
+        });
+      } else {
+        await createEntity.mutateAsync(requestData as CreateContextEntityRequest);
+      }
+
+      // Success - call parent callback
+      onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex h-full flex-col">
-      {/* Error message */}
-      {error && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {error}
-        </div>
-      )}
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{isEditMode ? 'Edit Context Entity' : 'Create Context Entity'}</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
+          {/* Error message */}
+          {error && (
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {error}
+            </div>
+          )}
 
       {/* Two-column layout (desktop) / stacked (mobile) */}
       <div className="flex flex-1 flex-col gap-6 overflow-hidden lg:flex-row">
@@ -396,24 +427,26 @@ export function ContextEntityEditor({
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="mt-6 flex justify-end gap-3 border-t pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {isEditMode ? 'Saving...' : 'Creating...'}
-            </>
-          ) : isEditMode ? (
-            'Save Changes'
-          ) : (
-            'Create Entity'
-          )}
-        </Button>
-      </div>
-    </form>
+          {/* Action buttons */}
+          <div className="mt-6 flex justify-end gap-3 border-t pt-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditMode ? 'Saving...' : 'Creating...'}
+                </>
+              ) : isEditMode ? (
+                'Save Changes'
+              ) : (
+                'Create Entity'
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
