@@ -311,8 +311,8 @@ SkillMeat previously had dual collection systems causing 404 errors. This has be
 - `skillmeat/web/components/versioning/` - Frontend components (DiffViewer, VersionTimeline, ChangeBadge)
 
 #### Documentation (Completed 2025-12-18):
-- `docs/api/versioning.md` - API reference for versioning endpoints
-- `docs/guides/syncing-changes.md` - Updated user guide with change attribution
+- `docs/dev/api/versioning.md` - API reference for versioning endpoints
+- `docs/user/guides/syncing-changes.md` - Updated user guide with change attribution
 - `CHANGELOG.md` - Release notes for v1.5 features
 
 #### Deferred Tasks (Phase 6):

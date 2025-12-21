@@ -821,10 +821,10 @@ The following features are explicitly out of scope for v1.0 and may be addressed
 ## 15. Related Documents
 
 - [Implementation Plan](collections-navigation-v1.md) - Detailed phased breakdown
-- [Collections Navigation Enhancement Ideas](../ideas/enhancements-12-12-Collections-Nav.md) - Original enhancement brief
-- [SkillMeat Architecture](../../architecture/overview.md) - System architecture
-- [Design System & Tokens](../../design/design-tokens.md) - Radix + shadcn guidance
-- [API Documentation](../../../api/docs/openapi.json) - Current API surface
+- [Collections Navigation Enhancement Ideas](../../ideas/README.md) - Consolidated enhancement brief
+- [SkillMeat Architecture](../../../dev/architecture/overview.md) - System architecture
+- [Design System & Tokens](../../../dev/designs/) - Radix + shadcn guidance
+- [API Documentation](../../../../skillmeat/api/openapi.json) - Current API surface
 
 ---
 
