@@ -32,10 +32,10 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 **Status Snapshot (2025-12-19):**
 - Root-level, web frontend, and web test delete targets are already removed.
-- Cache watcher documentation moved to developer docs (`docs/developers/cache/WATCHER.md`), to be relocated under `docs/dev/cache/` during consolidation.
+- Cache watcher documentation relocated to `docs/dev/cache/WATCHER.md` as part of consolidation.
 - Planned move target is now located at `.claude/worknotes/fixes/2025-11-26_nextjs-build-cache-fix.md`.
-- `skillmeat/api/tests/README_PERFORMANCE.md` still needs a final disposition.
-- Nine "docs to review" entries still exist and need triage.
+- `skillmeat/api/tests/README_PERFORMANCE.md` is no longer present in the repository.
+- Docs-to-review items were consolidated into `docs/project_plans/bugs/README.md` and `docs/project_plans/ideas/README.md`.
 
 ### 1.1 Root Level Files (Previously Targeted; Removed)
 
@@ -68,9 +68,9 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | PERFORMANCE_REPORT.md | `/skillmeat/api/tests/PERFORMANCE_REPORT.md` | REMOVED (2025-12-19) | Performance test report |
 | PERFORMANCE_SUMMARY.md | `/skillmeat/api/tests/PERFORMANCE_SUMMARY.md` | REMOVED (2025-12-19) | Performance summary |
 | LOAD_TEST_RESULTS.md | `/skillmeat/api/tests/LOAD_TEST_RESULTS.md` | REMOVED (2025-12-19) | Load test report |
-| README_PERFORMANCE.md | `/skillmeat/api/tests/README_PERFORMANCE.md` | REVIEW | Check if this contains permanent performance info |
+| README_PERFORMANCE.md | `/skillmeat/api/tests/README_PERFORMANCE.md` | REMOVED (2025-12-20) | File not found in repo |
 
-**Action:** Only `README_PERFORMANCE.md` remains for review. Confirm whether it belongs in `docs/ops/testing/` or `docs/ops/performance/` (per consolidation plan), or remove it.
+**Action:** No action needed; `README_PERFORMANCE.md` is already gone.
 
 **Keep:** `/skillmeat/api/tests/README.md` (if it exists and documents test structure)
 
@@ -80,7 +80,7 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 | File | Path | Status | Notes |
 |------|------|--------|-------|
-| WATCHER.md | `docs/developers/cache/WATCHER.md` | KEEP (2025-12-19) | Keep as implementation guide; move to `docs/dev/cache/` in consolidation |
+| WATCHER.md | `docs/dev/cache/WATCHER.md` | MOVED (2025-12-20) | Consolidated under `docs/dev/cache/` |
 
 **Action:** No further cleanup needed unless consolidating developer docs paths.
 
@@ -119,8 +119,8 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | TASK_SUMMARY.md | `/skillmeat/web/__tests__/notifications/TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary report |
 | CROSS_BROWSER_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary |
 | SKIP_WORKFLOW_TEST_SUMMARY.md | `/skillmeat/web/tests/e2e/SKIP_WORKFLOW_TEST_SUMMARY.md` | REMOVED (2025-12-19) | Test summary |
-| QUICK_START.md | `/skillmeat/web/tests/e2e/QUICK_START.md` | REMOVED (2025-12-19) | Test quick start (move to docs/testing if needed) |
-| CROSS_BROWSER_TESTING.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TESTING.md` | REMOVED (2025-12-19) | Test guide (move to docs/testing if needed) |
+| QUICK_START.md | `/skillmeat/web/tests/e2e/QUICK_START.md` | REMOVED (2025-12-19) | Test quick start (move to docs/ops/testing if needed) |
+| CROSS_BROWSER_TESTING.md | `/skillmeat/web/tests/e2e/CROSS_BROWSER_TESTING.md` | REMOVED (2025-12-19) | Test guide (move to docs/ops/testing if needed) |
 | MARKETPLACE_SOURCES_TESTING.md | `/skillmeat/web/tests/e2e/MARKETPLACE_SOURCES_TESTING.md` | REMOVED (2025-12-19) | Feature test docs |
 
 **Keep:** `/skillmeat/web/tests/README.md` and `/skillmeat/web/tests/e2e/` if they document test structure/setup.
@@ -139,17 +139,16 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 ---
 
-### 1.7 Docs to REVIEW (9 files)
+### 1.7 Docs to REVIEW (Consolidated)
 
 **Rationale:** These may be session notes or daily logs that should either be consolidated or deleted.
 
 | Path | Type | Recommendation |
 |------|------|-----------------|
-| `docs/project_plans/bugs/bugs-11-25.md` | Session notes | Review & consolidate into bug tracker |
-| `docs/project_plans/bugs/bugs-11-29.md` | Session notes | Review & consolidate into bug tracker |
-| `docs/project_plans/bugs/bugs-12-02.md` | Session notes | Review & consolidate into bug tracker |
+| `docs/project_plans/bugs/README.md` | Bug backlog | Keep and maintain as canonical backlog |
+| `docs/project_plans/ideas/README.md` | Ideas backlog | Keep and maintain as canonical backlog |
 
-**Action:** NO ACTION. These are identified bugs and should be kept for documentation.
+**Action:** Completed. Legacy session-note files were removed after consolidation.
 
 ---
 
@@ -169,35 +168,35 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 
 | Current | Proposed Location | Action | Notes |
 |---------|-------------------|--------|-------|
-| `docs/api/` | `docs/dev/api/` | MOVE | Developer API reference |
-| `docs/architecture/` | `docs/dev/architecture/` | MOVE | Architecture docs |
-| `docs/benchmarks/` | `docs/ops/performance/benchmarks/` | MOVE | Performance benchmarks |
-| `docs/beta/` | `docs/user/beta/` | MOVE | Beta program docs |
-| `docs/cache/` | `docs/dev/cache/` | MERGE | Merge with `docs/developers/cache/` |
-| `docs/designs/` | `docs/dev/designs/` | MOVE | Design artifacts |
-| `docs/developers/` | `docs/dev/developers/` | MOVE | Consolidate under dev |
-| `docs/development/` | `docs/dev/development/` | MOVE | Engineering workflow |
-| `docs/features/` | `docs/dev/features/` | MOVE | Feature implementation notes |
-| `docs/guides/` | `docs/user/guides/` | MOVE | End-user guides |
-| `docs/legal/` | `docs/ops/legal/` | MOVE | Legal/compliance docs |
-| `docs/migration/` | `docs/user/migration/` | MOVE | Merge with migration doc |
-| `docs/migration.md` | `docs/user/migration/README.md` | MOVE | Consolidate with migration guide |
-| `docs/observability/` | `docs/ops/observability/` | MOVE | Ops observability |
-| `docs/performance/` | `docs/ops/performance/` | MOVE | Performance docs |
-| `docs/release-notes/` | `docs/user/release-notes/` | MOVE | User-facing release notes |
-| `docs/runbooks/` | `docs/ops/runbooks/` | MOVE | Operational runbooks |
-| `docs/screenshots/` | `docs/user/assets/screenshots/` | MOVE | User-facing assets |
-| `docs/security/` | `docs/ops/security/` | MOVE | Security policies |
-| `docs/SECURITY.md` | `docs/ops/security/SECURITY.md` | MOVE | Consolidate security docs |
-| `docs/testing/` | `docs/ops/testing/` | MOVE | Testing guidance |
-| `docs/training/` | `docs/user/training/` | MOVE | Onboarding/training |
-| `docs/user-guide/` | `docs/user/guide/` | MOVE | Merge with guides |
-| `docs/videos/` | `docs/user/assets/videos/` | MOVE | User-facing assets |
-| `docs/quickstart.md` | `docs/user/quickstart.md` | MOVE | End-user entrypoint |
-| `docs/commands.md` | `docs/user/cli/commands.md` | MOVE | CLI reference |
-| `docs/web_commands.md` | `docs/user/cli/web-commands.md` | MOVE | Web CLI reference |
-| `docs/examples.md` | `docs/user/examples.md` | MOVE | User examples |
-| `docs/template-deployment-optimization.md` | `docs/dev/optimization/template-deployment.md` | MOVE | Dev optimization notes |
+| `docs/api/` | `docs/dev/api/` | MOVED (2025-12-20) | Developer API reference |
+| `docs/architecture/` | `docs/dev/architecture/` | MOVED (2025-12-20) | Architecture docs |
+| `docs/benchmarks/` | `docs/ops/performance/benchmarks/` | MOVED (2025-12-20) | Performance benchmarks |
+| `docs/beta/` | `docs/user/beta/` | MOVED (2025-12-20) | Beta program docs |
+| `docs/cache/` | `docs/dev/cache/` | MERGED (2025-12-20) | Merged with `docs/developers/cache/` |
+| `docs/designs/` | `docs/dev/designs/` | MOVED (2025-12-20) | Design artifacts |
+| `docs/developers/` | `docs/dev/developers/` | MOVED (2025-12-20) | Consolidate under dev |
+| `docs/development/` | `docs/dev/development/` | MOVED (2025-12-20) | Engineering workflow |
+| `docs/features/` | `docs/dev/features/` | MOVED (2025-12-20) | Feature implementation notes |
+| `docs/guides/` | `docs/user/guides/` | MOVED (2025-12-20) | End-user guides |
+| `docs/legal/` | `docs/ops/legal/` | MOVED (2025-12-20) | Legal/compliance docs |
+| `docs/migration/` | `docs/user/migration/` | MOVED (2025-12-20) | Merge with migration doc |
+| `docs/migration.md` | `docs/user/migration/README.md` | MOVED (2025-12-20) | Consolidate with migration guide |
+| `docs/observability/` | `docs/ops/observability/` | MOVED (2025-12-20) | Ops observability |
+| `docs/performance/` | `docs/ops/performance/` | MOVED (2025-12-20) | Performance docs |
+| `docs/release-notes/` | `docs/user/release-notes/` | MOVED (2025-12-20) | User-facing release notes |
+| `docs/runbooks/` | `docs/ops/runbooks/` | MOVED (2025-12-20) | Operational runbooks |
+| `docs/screenshots/` | `docs/user/assets/screenshots/` | MOVED (2025-12-20) | User-facing assets |
+| `docs/security/` | `docs/ops/security/` | MOVED (2025-12-20) | Security policies |
+| `docs/SECURITY.md` | `docs/ops/security/SECURITY.md` | MOVED (2025-12-20) | Consolidate security docs |
+| `docs/testing/` | `docs/ops/testing/` | MOVED (2025-12-20) | Testing guidance |
+| `docs/training/` | `docs/user/training/` | MOVED (2025-12-20) | Onboarding/training |
+| `docs/user-guide/` | `docs/user/guide/` | MOVED (2025-12-20) | Merge with guides |
+| `docs/videos/` | `docs/user/assets/videos/` | MOVED (2025-12-20) | User-facing assets |
+| `docs/quickstart.md` | `docs/user/quickstart.md` | MOVED (2025-12-20) | End-user entrypoint |
+| `docs/commands.md` | `docs/user/cli/commands.md` | MOVED (2025-12-20) | CLI reference |
+| `docs/web_commands.md` | `docs/user/cli/web-commands.md` | MOVED (2025-12-20) | Web CLI reference |
+| `docs/examples.md` | `docs/user/examples.md` | MOVED (2025-12-20) | User examples |
+| `docs/template-deployment-optimization.md` | `docs/dev/optimization/template-deployment.md` | MOVED (2025-12-20) | Dev optimization notes |
 
 **README Requirements (new or updated):**
 - `docs/project_plans/README.md`: how to use PRDs, implementation plans, tracking.
@@ -206,9 +205,9 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 - `docs/ops/README.md`: operational ownership, runbooks, security/compliance, testing.
 
 **Action Items:**
-- [ ] Create new top-level directories and move content per map.
-- [ ] Update internal links to reflect new paths.
-- [ ] Remove empty legacy directories after migration.
+- [x] Create new top-level directories and move content per map. (2025-12-20)
+- [x] Update internal links to reflect new paths. (2025-12-20)
+- [x] Remove empty legacy directories after migration. (2025-12-20)
 
 ## Section 2: Documentation Gap Analysis
 
@@ -224,7 +223,7 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | Add | add skill, add command, add agent | 3 | Verify in docs/user/cli/commands.md |
 | Deploy | deploy, undeploy | 2 | Verify in docs/user/cli/commands.md |
 | MCP | mcp add/deploy/undeploy/list/health | 5 | Check docs/user/guides/mcp-*.md |
-| Versioning | snapshot, history, rollback | 3 | Check docs/migration.md |
+| Versioning | snapshot, history, rollback | 3 | Check docs/user/migration/README.md |
 | Collection | collection create/list/use | 3 | Verify in docs/user/cli/commands.md |
 | Config | config list/get/set | 3 | Verify in docs/user/cli/commands.md |
 | Cache | cache status/clear/refresh | 3 | Verify in docs/user/guides/ |
@@ -234,9 +233,9 @@ This plan addresses **25+ policy violations** in the SkillMeat documentation and
 | Web | web dev/build/start/doctor | 4 | Check docs/user/cli/web-commands.md |
 | Bundle | bundle create/inspect/import | 3 | Verify coverage |
 | Vault | vault add/list/remove/push/pull/ls | 6 | Check docs/user/guides/ |
-| Sign | sign generate-key, list-keys, export-key, import-key | 4 | Check docs/security/ |
+| Sign | sign generate-key, list-keys, export-key, import-key | 4 | Check docs/ops/security/ |
 | Marketplace | marketplace-search, marketplace-install | 2 | Check docs/user/guides/marketplace-*.md |
-| Compliance | compliance-scan, compliance-checklist, compliance-consent | 3 | Check docs/legal/ |
+| Compliance | compliance-scan, compliance-checklist, compliance-consent | 3 | Check docs/ops/legal/ |
 
 **Action Items:**
 - [ ] Verify `docs/user/cli/commands.md` documents all 81 commands with examples
@@ -402,17 +401,16 @@ to match it or explicitly labeled as historical context.
 
 ### 2.5.3 Ideas Files Summary
 
-**7 files analyzed** in `docs/project_plans/ideas/`:
+**Ideas backlog consolidated** in `docs/project_plans/ideas/`:
 
-| File | Date | Key Ideas | Status |
-|------|------|-----------|--------|
-| enhancements-11-25.md | Nov 25 | Auto-scan, auto-populate, plugin support, cache, versioning, diffs | Mixed - cache done, others pending |
-| enhancements-11-30.md | Nov 30 | Auto-sync to multiple projects | Not started |
-| enhancements-12-03.md | Dec 3 | Custom grouping, deployment tab, deployment counter, tooltips | Grouping done |
-| enhancements-12-04.md | Dec 4 | Discovery/import improvements | Implemented |
-| enhancements-12-12-Collections-Nav.md | Dec 12 | Full Collections Navigation spec | Implemented |
-| agent-context-entities-v1.md | Dec 14 | Context entities as first-class artifacts | Implemented |
-| requests-template.md | - | Template for request log format | Reference doc |
+| File | Purpose | Status |
+|------|---------|--------|
+| `docs/project_plans/ideas/README.md` | Canonical backlog with consolidated legacy ideas | Active |
+| `docs/project_plans/ideas/enhancements-11-30.md` | Auto-sync across multiple projects | Triage |
+| `docs/project_plans/ideas/enhancements-12-03.md` | Grouping, deployment tab, counters, tooltips | Triage |
+| `docs/project_plans/ideas/requests-template.md` | Request-log template | Reference |
+
+**Legacy notes** were consolidated into the backlog (e.g., collections navigation, tags refactor, context entities, discovery improvements).
 
 ### 2.5.4 Key Findings
 
@@ -427,7 +425,7 @@ to match it or explicitly labeled as historical context.
 
 ### 3.1 Release Notes (CRITICAL - v0.3.0-beta)
 
-**File:** `/docs/release-notes/v0.3.0-beta.md`
+**File:** `/docs/user/release-notes/v0.3.0-beta.md`
 
 **Current Status:** Needs comprehensive update based on actual implementation analysis (Section 2.5)
 
@@ -630,10 +628,10 @@ to match it or explicitly labeled as historical context.
    - Include known issues and blockers
 
 3. **VERIFY core documentation** (4 files)
-   - `docs/quickstart.md` → `docs/user/quickstart.md` - Installation & first steps
-   - `docs/commands.md` → `docs/user/cli/commands.md` - CLI reference
-   - `docs/web_commands.md` → `docs/user/cli/web-commands.md` - Web UI commands
-   - `docs/examples.md` → `docs/user/examples.md` - Usage examples
+   - `docs/user/quickstart.md` → `docs/user/quickstart.md` - Installation & first steps
+   - `docs/user/cli/commands.md` → `docs/user/cli/commands.md` - CLI reference
+   - `docs/user/cli/web-commands.md` → `docs/user/cli/web-commands.md` - Web UI commands
+   - `docs/user/examples.md` → `docs/user/examples.md` - Usage examples
 
 4. **UPDATE web UI guide** (`docs/user/guides/web-ui-guide.md`)
    - Document Notification Center (bell icon, expandable details)
@@ -728,7 +726,7 @@ to match it or explicitly labeled as historical context.
   - [x] PERFORMANCE_REPORT.md
   - [x] PERFORMANCE_SUMMARY.md
   - [x] LOAD_TEST_RESULTS.md
-  - [ ] Review README_PERFORMANCE.md
+  - [x] Review README_PERFORMANCE.md (file missing)
 
 - [x] **DELETE web frontend files (9)**
   - [x] IMPLEMENTATION.md
@@ -753,20 +751,20 @@ to match it or explicitly labeled as historical context.
 - [x] **MOVE files to proper location**
   - [x] `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md` → `.claude/worknotes/fixes/2025-11-26_nextjs-build-cache-fix.md`
 
-- [ ] **REVIEW session notes**
-  - [ ] `docs/project_plans/bugs/bugs-*.md` (3 files)
-  - [ ] `docs/project_plans/ideas/enhancements-*.md` (5 files)
-  - [ ] `docs/project_plans/ideas/agent-context-entities-v1.md` (1 file)
+- [x] **REVIEW session notes**
+  - [x] Consolidated bug notes into `docs/project_plans/bugs/README.md`
+  - [x] Consolidated idea notes into `docs/project_plans/ideas/README.md`
+  - [x] Removed legacy session-note files
 
 - [x] **REVIEW cache watcher**
-  - [x] Moved to `docs/developers/cache/WATCHER.md` (move again during consolidation)
+  - [x] Moved to `docs/dev/cache/WATCHER.md` during consolidation
 
 ---
 
 ### 5.2 Documentation Updates
 
 - [ ] **Release Notes (CRITICAL)**
-  - [ ] Update `docs/release-notes/v0.3.0-beta.md` → `docs/user/release-notes/v0.3.0-beta.md`
+  - [ ] Update `docs/user/release-notes/v0.3.0-beta.md`
   - [ ] Add Phase 5 features
   - [ ] Add Phase 6 features
   - [ ] Document breaking changes
@@ -774,12 +772,12 @@ to match it or explicitly labeled as historical context.
   - [ ] Add known issues
 
 - [ ] **Getting Started**
-  - [ ] Verify `docs/quickstart.md` → `docs/user/quickstart.md` completeness
+  - [ ] Verify `docs/user/quickstart.md` completeness
   - [ ] Test installation instructions
   - [ ] Update examples if needed
 
 - [ ] **CLI Reference**
-  - [ ] Verify `docs/commands.md` → `docs/user/cli/commands.md` has all 81 commands
+  - [ ] Verify `docs/user/cli/commands.md` has all 81 commands
   - [ ] Add missing commands
   - [ ] Add examples
   - [ ] Add error handling
@@ -800,21 +798,21 @@ to match it or explicitly labeled as historical context.
 
 ### 5.3 Consolidation Tasks
 
-- [ ] **Create proper issue tracker** for bugs
-  - [ ] Consolidate `docs/project_plans/bugs/` entries
-  - [ ] Remove session notes files
+- [x] **Create proper issue tracker** for bugs
+  - [x] Consolidated `docs/project_plans/bugs/` entries into `docs/project_plans/bugs/README.md`
+  - [x] Removed session notes files
 
-- [ ] **Create feature list** for ideas
-  - [ ] Consolidate `docs/project_plans/ideas/` entries
-  - [ ] Organize by priority/phase
-  - [ ] Remove session notes files
+- [x] **Create feature list** for ideas
+  - [x] Consolidated `docs/project_plans/ideas/` entries into `docs/project_plans/ideas/README.md`
+  - [x] Organized by priority/phase in backlog table
+  - [x] Removed session notes files
 
-- [ ] **Consolidate docs directory structure** (see Section 1.8)
-  - [ ] Create `docs/user/`, `docs/dev/`, `docs/ops/`
-  - [ ] Move content per migration map
-  - [ ] Add top-level README files
-  - [ ] Update internal links
-  - [ ] Remove empty legacy directories
+- [x] **Consolidate docs directory structure** (see Section 1.8)
+  - [x] Create `docs/user/`, `docs/dev/`, `docs/ops/`
+  - [x] Move content per migration map
+  - [x] Add top-level README files
+  - [x] Update internal links
+  - [x] Remove empty legacy directories
 
 ---
 

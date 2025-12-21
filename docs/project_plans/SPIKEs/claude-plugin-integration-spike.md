@@ -4,7 +4,7 @@ spike_id: "SPIKE-2025-11-30-claude-plugins"
 date: 2025-11-30
 status: research
 complexity: large
-related_request: "enhancements-11-25.md (item 3)"
+related_request: "docs/project_plans/ideas/README.md (I-20251125-03)"
 tags: [spike, plugins, integration, marketplace, architecture]
 ---
 
@@ -13,7 +13,7 @@ tags: [spike, plugins, integration, marketplace, architecture]
 **SPIKE ID**: `SPIKE-2025-11-30-claude-plugins`
 **Date**: 2025-11-30
 **Author**: SPIKE Writer Agent (Haiku 4.5)
-**Related Request**: enhancements-11-25.md - Item 3: Native Claude Plugin support
+**Related Request**: `docs/project_plans/ideas/README.md` (I-20251125-03) - Native Claude Plugin support
 **Complexity**: Large (XL scope, significant architectural implications)
 
 ---

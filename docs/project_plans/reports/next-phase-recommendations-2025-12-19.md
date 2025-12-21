@@ -19,22 +19,15 @@
   - `skillmeat/cache/WATCHER.md`
 - The planned move item does not exist:
   - `docs/worknotes/2025-11-26_nextjs-build-cache-fix.md`
-- The nine "docs to review" entries do exist and remain untriaged:
-  - `docs/project_plans/bugs/bugs-11-25.md`
-  - `docs/project_plans/bugs/bugs-11-29.md`
-  - `docs/project_plans/bugs/bugs-12-02.md`
-  - `docs/project_plans/ideas/enhancements-11-25.md`
-  - `docs/project_plans/ideas/enhancements-11-30.md`
-  - `docs/project_plans/ideas/enhancements-12-03.md`
-  - `docs/project_plans/ideas/enhancements-12-04.md`
-  - `docs/project_plans/ideas/enhancements-12-12-Collections-Nav.md`
-  - `docs/project_plans/ideas/agent-context-entities-v1.md`
+- The review items were consolidated into backlogs:
+  - `docs/project_plans/bugs/README.md`
+  - `docs/project_plans/ideas/README.md`
+  - Active request logs: `docs/project_plans/ideas/enhancements-11-30.md`, `docs/project_plans/ideas/enhancements-12-03.md`
 
 ### 2. Implementation tracking docs are out of sync with the canonical source
 
 - `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_TRACKING_SUMMARY.md` is the canonical status source.
-- `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_QUICK_REFERENCE.md` and `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/EXPLORATION_REPORT.md` still describe Collections Navigation v1 as in progress, and Agent Context Entities v1 as pending.
-- These should be updated to mirror the tracking summary or explicitly labeled as historical context.
+- `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_QUICK_REFERENCE.md` and `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/EXPLORATION_REPORT.md` were retired during cleanup to avoid stale status duplication.
 
 ### 3. Collections API consolidation appears implemented in code
 
@@ -76,11 +69,8 @@
 ### Priority 0: Documentation truthing and cleanup (1-2 weeks)
 
 - Update `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/documentation-cleanup-plan-v1.md` to reflect current repository state (remove already-deleted targets, update the move item, focus on remaining review items).
-- Treat `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_TRACKING_SUMMARY.md` as canonical, then reconcile or retire the conflicting status docs:
-  - `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_QUICK_REFERENCE.md`
-  - `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/EXPLORATION_REPORT.md`
-  - `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_TRACKING_SUMMARY.md`
-- Decide where `skillmeat/cache/WATCHER.md` and `skillmeat/api/tests/README_PERFORMANCE.md` belong (move to `docs/cache` or `docs/testing`, or delete if not needed).
+- Treat `docs/project_plans/implementation_plans/refactors/documentation-cleanup-plan-v1/IMPLEMENTATION_TRACKING_SUMMARY.md` as canonical and avoid duplicating status in auxiliary docs (quick reference and exploration report were retired).
+- Decide where `docs/dev/cache/WATCHER.md` and `skillmeat/api/tests/README_PERFORMANCE.md` belong (move to `docs/ops/testing` if needed, or delete if not needed).
 - Triage the nine "docs to review" and consolidate into a single backlog or archive file.
 - Update release notes to include tags refactor completion and current status of context entities (per tracking summary and code validation).
 

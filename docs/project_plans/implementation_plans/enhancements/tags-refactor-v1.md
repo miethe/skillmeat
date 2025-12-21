@@ -8,7 +8,7 @@ updated: 2025-12-18
 category: "product-planning"
 status: draft
 related:
-  - /docs/project_plans/ideas/tags-refactor-v1.md
+  - /docs/project_plans/ideas/README.md
 ---
 
 # Implementation Plan: Tags Refactor V1
@@ -17,7 +17,7 @@ related:
 **Date**: 2025-12-18
 **Author**: Implementation Planner
 **Related Documents**:
-- **Idea**: `/docs/project_plans/ideas/tags-refactor-v1.md`
+- **Idea**: `/docs/project_plans/ideas/README.md` (I-20251218-02)
 - **Bug Report**: Artifact parameters scope validation (422 error)
 
 **Complexity**: Medium
@@ -463,14 +463,14 @@ Task("frontend-developer", "TEST-003-TEST-004: Frontend component and E2E tests.
 ### Batch 9: Documentation (Phase 8 - 1 day)
 ```
 Task("api-documenter", "DOC-001: Generate API documentation.
-     Files: docs/api/tags.md
+     Files: docs/dev/api/tags.md
      Include: All endpoints, request/response examples")
 
 Task("documentation-writer", "DOC-002-DOC-004: Create user and developer guides.
      Files:
        - docs/components/TagInput.md
-       - docs/guides/tags-user-guide.md
-       - docs/guides/tags-architecture.md")
+       - docs/user/guides/tags-user-guide.md
+       - docs/user/guides/tags-architecture.md")
 ```
 
 ---
