@@ -152,7 +152,7 @@ pnpm test:lighthouse --url http://localhost:3000
 
 ## SLA Targets
 
-See [docs/performance/sla.md](/home/user/skillmeat/docs/performance/sla.md) for complete SLA definitions.
+See [docs/ops/performance/sla.md](/home/user/skillmeat/docs/ops/performance/sla.md) for complete SLA definitions.
 
 ### Summary
 
@@ -297,7 +297,7 @@ If SLAs are not met:
 
 ## Resources
 
-- [SLA Documentation](../../docs/performance/sla.md)
+- [SLA Documentation](../../docs/ops/performance/sla.md)
 - [Locust Documentation](https://docs.locust.io/)
 - [Lighthouse Documentation](https://developers.google.com/web/tools/lighthouse)
 - [Core Web Vitals](https://web.dev/vitals/)
@@ -307,7 +307,7 @@ If SLAs are not met:
 
 When adding performance tests:
 
-1. Define clear SLA targets in [sla.md](../../docs/performance/sla.md)
+1. Define clear SLA targets in [sla.md](../../docs/ops/performance/sla.md)
 2. Add test to appropriate file (locustfile.py, benchmark_*.py)
 3. Update this README with usage instructions
 4. Add test to GitHub Actions workflow if needed
@@ -317,7 +317,7 @@ When adding performance tests:
 
 For questions or issues with performance testing:
 
-- Check [docs/performance/sla.md](../../docs/performance/sla.md) for SLA definitions
+- Check [docs/ops/performance/sla.md](../../docs/ops/performance/sla.md) for SLA definitions
 - Review GitHub Actions logs for CI failures
 - Open an issue with benchmark results and system info
 - Contact the SkillMeat development team

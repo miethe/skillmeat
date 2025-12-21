@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New endpoints: `/api/v1/merge/analyze`, `/api/v1/merge/preview`, `/api/v1/merge/execute`, `/api/v1/merge/resolve`
   - Enhanced `/api/v1/versions/` endpoints with change attribution data
 - **Comprehensive Documentation**:
-  - New API docs: `docs/api/versioning.md` with complete endpoint reference
-  - Updated guides: `docs/guides/syncing-changes.md` with change attribution workflows
+  - New API docs: `docs/dev/api/versioning.md` with complete endpoint reference
+  - Updated guides: `docs/user/guides/syncing-changes.md` with change attribution workflows
   - Change badge interpretation guide for UI
 
 #### GitHub Marketplace Ingestion (Phase 7)
@@ -348,10 +348,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 - Added comprehensive command reference (1689 lines of documentation)
 - Created 4 feature guides (2525 lines total):
-  - `docs/guides/searching.md` - Finding artifacts across projects
-  - `docs/guides/updating-safely.md` - Preview and update workflows
-  - `docs/guides/syncing-changes.md` - Project-to-collection sync
-  - `docs/guides/using-analytics.md` - Analytics and reporting
+  - `docs/user/guides/searching.md` - Finding artifacts across projects
+  - `docs/user/guides/updating-safely.md` - Preview and update workflows
+  - `docs/user/guides/syncing-changes.md` - Project-to-collection sync
+  - `docs/user/guides/using-analytics.md` - Analytics and reporting
 - Added performance benchmarks report with detailed metrics
 - Added security review documentation with threat model analysis
 - Updated command reference with all Phase 2 commands and examples
@@ -453,12 +453,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration tests for CLI commands
 - Test fixtures for Skills, Commands, and Agents
 - Complete documentation:
-  - Quickstart guide (`docs/quickstart.md`)
-  - Command reference (`docs/commands.md`)
-  - Migration guide (`docs/migration.md`)
-  - Example workflows (`docs/examples.md`)
-  - Architecture documentation (`docs/architecture/`)
-  - Security documentation (`docs/SECURITY.md`)
+  - Quickstart guide (`docs/user/quickstart.md`)
+  - Command reference (`docs/user/cli/commands.md`)
+  - Migration guide (`docs/user/migration/README.md`)
+  - Example workflows (`docs/user/examples.md`)
+  - Architecture documentation (`docs/dev/architecture/`)
+  - Security documentation (`docs/ops/security/SECURITY.md`)
   - Updated README with installation and usage
 
 #### Quality & Release (Phase 9)
@@ -501,7 +501,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Collection isolation in multi-collection setups
 
 ### Security
-- Added comprehensive security documentation (`docs/SECURITY.md`)
+- Added comprehensive security documentation (`docs/ops/security/SECURITY.md`)
 - GitHub tokens stored with 0600 permissions
 - Input validation on all CLI arguments
 - Path operations use `Path.resolve()` for safety
@@ -549,12 +549,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - README.md: Complete project overview
-- docs/quickstart.md: 5-minute getting started guide
-- docs/commands.md: Full CLI reference
-- docs/migration.md: Migrating from skillman
-- docs/examples.md: Common workflows
-- docs/SECURITY.md: Security best practices
-- docs/architecture/: Technical architecture documentation
+- docs/user/quickstart.md: 5-minute getting started guide
+- docs/user/cli/commands.md: Full CLI reference
+- docs/user/migration/README.md: Migrating from skillman
+- docs/user/examples.md: Common workflows
+- docs/ops/security/SECURITY.md: Security best practices
+- docs/dev/architecture/: Technical architecture documentation
 - docs/implementation-plan.md: Detailed implementation phases
 
 ### Acknowledgments
@@ -656,7 +656,7 @@ This release represents the complete rewrite and expansion of the original `skil
    skillmeat analytics usage
    ```
 
-See `docs/quickstart.md` for detailed instructions.
+See `docs/user/quickstart.md` for detailed instructions.
 
 ---
 

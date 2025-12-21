@@ -22,10 +22,10 @@ This document summarizes the comprehensive implementation plan for transforming 
    - Reusability assessment: 85-100% for core components
 
 3. **Architecture Design**
-   - Location: `docs/architecture/detailed-architecture.md`
+   - Location: `docs/dev/architecture/detailed-architecture.md`
    - Comprehensive module structure, data models, and interfaces
-   - Quick reference: `docs/architecture/architecture-summary.md`
-   - Data flows: `docs/architecture/data-flow.md`
+   - Quick reference: `docs/dev/architecture/architecture-summary.md`
+   - Data flows: `docs/dev/architecture/data-flow.md`
 
 4. **Implementation Plan**
    - Location: `docs/implementation-plan.md`
@@ -225,9 +225,9 @@ Based on comprehensive codebase analysis:
 ### Immediate Actions (Week 1)
 
 1. **Review Architecture Documents**
-   - `docs/architecture/detailed-architecture.md`
-   - `docs/architecture/architecture-summary.md`
-   - `docs/architecture/data-flow.md`
+   - `docs/dev/architecture/detailed-architecture.md`
+   - `docs/dev/architecture/architecture-summary.md`
+   - `docs/dev/architecture/data-flow.md`
 
 2. **Make Design Decisions**
    - Artifact naming (unique across types?)
@@ -361,7 +361,7 @@ skillmeat migrate --from-skillman
 
 ### Key Documents
 - [PRD](docs/project_plans/initialization/init-prd.md)
-- [Detailed Architecture](docs/architecture/detailed-architecture.md)
+- [Detailed Architecture](docs/dev/architecture/detailed-architecture.md)
 - [Implementation Plan](docs/implementation-plan.md)
 
 ### External References

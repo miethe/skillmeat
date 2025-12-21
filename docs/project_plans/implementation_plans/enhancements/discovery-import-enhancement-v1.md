@@ -351,7 +351,7 @@ skillmeat/web/components/notifications/NotificationItem.tsx (update)
 skillmeat/web/lib/toast-utils.ts (update)
   - Toast shows detailed breakdown with click-through
 
-docs/api/openapi-updated.json (generated)
+docs/dev/api/openapi-updated.json (generated)
   - Updated OpenAPI schema with new types
 ```
 
@@ -411,13 +411,13 @@ skillmeat/core/discovery.py
 skillmeat/api/config.py
   - Add feature flags: ENABLE_DISCOVERY_TAB, ENABLE_SKIP_PREFERENCES
 
-docs/guides/understanding-import-status.md (new)
+docs/user/guides/understanding-import-status.md (new)
   - User guide for import status enum
 
-docs/guides/skip-preferences-guide.md (new)
+docs/user/guides/skip-preferences-guide.md (new)
   - User guide for skip preferences
 
-docs/api/status-enum-reference.md (new)
+docs/dev/api/status-enum-reference.md (new)
   - API reference for status enum values
 
 docs/RELEASE-NOTES-v1.1.0.md (new)
@@ -793,9 +793,9 @@ Phase 1 (Backend Schema & Pre-scan)
 ### Documentation Files
 
 **New Files**:
-- `docs/guides/understanding-import-status.md` - User guide for status enum
-- `docs/guides/skip-preferences-guide.md` - User guide for skip feature
-- `docs/api/status-enum-reference.md` - API reference for status enum
+- `docs/user/guides/understanding-import-status.md` - User guide for status enum
+- `docs/user/guides/skip-preferences-guide.md` - User guide for skip feature
+- `docs/dev/api/status-enum-reference.md` - API reference for status enum
 - `docs/RELEASE-NOTES-v1.1.0.md` - Release notes
 
 ---

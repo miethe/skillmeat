@@ -50,7 +50,7 @@ web/
 |-------|----------|---------|
 | Logo | `public/logo.png` | `components/header.tsx` via `next/image` |
 
-Source: `docs/design/logo/skillmeat-transparent.png`
+Source: `docs/dev/designs/logo/skillmeat-transparent.png`
 
 ---
 

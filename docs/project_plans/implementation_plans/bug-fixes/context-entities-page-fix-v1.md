@@ -8,7 +8,7 @@ updated: 2025-12-20
 category: "bug-fix"
 status: in-progress
 related:
-  - /docs/designs/screenshots/context-entities-v1.png
+  - /docs/dev/designs/screenshots/context-entities-v1.png
 ---
 
 # Context Entities Page Fix - Implementation Plan

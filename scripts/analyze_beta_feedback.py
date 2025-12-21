@@ -23,10 +23,10 @@ import statistics
 class BetaFeedbackAnalyzer:
     """Analyze beta feedback and generate insights."""
 
-    def __init__(self, feedback_dir: str = "docs/beta/feedback", output_file: Optional[str] = None):
+    def __init__(self, feedback_dir: str = "docs/user/beta/feedback", output_file: Optional[str] = None):
         """Initialize analyzer with feedback directory."""
         self.feedback_dir = Path(feedback_dir)
-        self.output_file = Path(output_file) if output_file else Path("docs/beta/feedback-report.md")
+        self.output_file = Path(output_file) if output_file else Path("docs/user/beta/feedback-report.md")
         self.feedback_data: List[Dict[str, Any]] = []
         self.bugs: List[Dict[str, Any]] = []
         self.feature_requests: List[Dict[str, Any]] = []
@@ -418,13 +418,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--feedback-dir",
-        default="docs/beta/feedback",
-        help="Directory containing feedback JSON files (default: docs/beta/feedback)",
+        default="docs/user/beta/feedback",
+        help="Directory containing feedback JSON files (default: docs/user/beta/feedback)",
     )
     parser.add_argument(
         "--output",
-        default="docs/beta/feedback-report.md",
-        help="Output report file (default: docs/beta/feedback-report.md)",
+        default="docs/user/beta/feedback-report.md",
+        help="Output report file (default: docs/user/beta/feedback-report.md)",
     )
 
     args = parser.parse_args()

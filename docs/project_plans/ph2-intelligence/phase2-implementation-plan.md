@@ -119,7 +119,7 @@ Phase 2 layers intelligence on top of the SkillMeat collection core by introduci
 | P2-005 | Search Tests | `test_search.py` covering metadata, regex, fuzzy, cross-project, duplicates | 100+ artifact dataset fixture; runtime <5s | 2 pts | test-engineer | P2-004 |
 
 **Phase 2 Quality Gates**
-- Search commands documented in `docs/guides/searching.md`.
+- Search commands documented in `docs/user/guides/searching.md`.
 - Duplicate detection handles hash collisions gracefully.
 - CLI respects `--limit` and `--json` flags.
 - Telemetry hooks emit `DEPLOY` + `SEARCH` events for analytics seed data.
@@ -199,7 +199,7 @@ Phase 2 layers intelligence on top of the SkillMeat collection core by introduci
 
 | Task ID | Task Name | Description | Acceptance Criteria | Estimate | Subagent(s) | Dependencies |
 |---------|-----------|-------------|---------------------|----------|-------------|--------------|
-| P6-001 | Command Reference Updates | Update `docs/commands.md` + CLI `--help` strings for new commands | All new flags documented with examples | 2 pts | cli-engineer | P4-004 |
+| P6-001 | Command Reference Updates | Update `docs/user/cli/commands.md` + CLI `--help` strings for new commands | All new flags documented with examples | 2 pts | cli-engineer | P4-004 |
 | P6-002 | Feature Guides | Write guides: `searching`, `updating-safely`, `syncing-changes`, `using-analytics` | Guides include prerequisites, CLI samples, troubleshooting | 3 pts | documentation-writer | P3-004 |
 | P6-003 | README + CHANGELOG Refresh | Highlight Phase 2 features, bump version to 0.2.0-alpha | CHANGELOG entries reference issues; README hero updated | 1 pt | release-manager | P6-002 |
 | P6-004 | Release Checklist | Execute DoD checklist, tag release, upload artifacts | DoD items marked, release artifacts archived | 1 pt | release-manager | P5-004 |

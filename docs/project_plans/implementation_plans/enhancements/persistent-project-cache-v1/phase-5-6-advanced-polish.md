@@ -191,7 +191,7 @@ Benchmark cache performance against success criteria. Optimize queries and index
 
 **Files to Create:**
 - `/Users/miethe/dev/homelab/development/skillmeat/tests/benchmarks/test_cache_performance.py`
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/performance_report.md` (generated)
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/ops/performance_report.md` (generated)
 
 ---
 
@@ -287,10 +287,10 @@ Write comprehensive documentation for cache feature: configuration guide, API re
 - Link to related docs
 
 **Files to Create:**
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/cache/configuration-guide.md`
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/cache/api-reference.md`
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/cache/troubleshooting-guide.md`
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/cache/architecture-decision-record.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/cache/configuration-guide.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/cache/api-reference.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/cache/troubleshooting-guide.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/cache/architecture-decision-record.md`
 
 ---
 
@@ -427,7 +427,7 @@ Task("python-backend-engineer", "CACHE-6.3: Cache recovery and error scenario te
   Reason: Ensure production reliability")
 
 Task("documentation-writer", "CACHE-6.4: Write configuration guide and API documentation.
-  Location: docs/cache/*.md (configuration-guide, api-reference, troubleshooting, ADR)
+  Location: docs/dev/cache/*.md (configuration-guide, api-reference, troubleshooting, ADR)
   Content: CLI config, API endpoints, examples, architecture decisions, troubleshooting
   Reason: Enable users and developers to understand and use cache feature")
 ```

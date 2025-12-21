@@ -1333,8 +1333,8 @@ function getOriginLabel(origin: ChangeOrigin): string {
 **Files Changed:**
 - `tests/integration/test_state_tracking_workflow.py` (integration tests)
 - `tests/performance/test_version_queries.py` (performance tests)
-- `docs/api/drift-detection.md` (API docs)
-- `docs/user-guide/version-tracking.md` (user guide)
+- `docs/dev/api/drift-detection.md` (API docs)
+- `docs/user/guide/version-tracking.md` (user guide)
 
 ---
 
@@ -1634,8 +1634,8 @@ def backfill_merge_base_snapshots():
 
 - **Parent PRD:** `/docs/project_plans/PRDs/enhancements/versioning-merge-system-v1.md`
 - **Implementation Guide:** `/docs/implementation/state-tracking-guide.md` (to be created)
-- **API Documentation:** `/docs/api/drift-detection.md` (to be updated)
-- **Migration Guide:** `/docs/migration/v1.0-to-v1.5.md` (to be created)
+- **API Documentation:** `/docs/dev/api/drift-detection.md` (to be updated)
+- **Migration Guide:** `/docs/user/migration/v1.0-to-v1.5.md` (to be created)
 
 ---
 

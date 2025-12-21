@@ -783,7 +783,7 @@ Use libgit2 (pygit2) for merge:
 
 ### Related Documentation
 
-- **ADR-004:** Artifact Version Tracking - `/docs/architecture/decisions/004-artifact-version-tracking.md`
+- **ADR-004:** Artifact Version Tracking - `/docs/dev/architecture/decisions/004-artifact-version-tracking.md`
 - **Phase 2 Plan:** Intelligence & Sync - `/docs/project_plans/ph2-intelligence/AI_AGENT_PRD_PHASE2.md`
 - **API Contracts:** Version Tracking APIs - `/docs/project_plans/ph2-intelligence/version-tracking-api-contracts.md`
 - **Implementation Plan:** Detailed task breakdown - `/docs/project_plans/ph2-intelligence/artifact-version-tracking-implementation-plan.md`

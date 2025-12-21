@@ -24,7 +24,7 @@ Implement comprehensive version tracking and visualization for artifacts deploye
 
 ## Architecture Reference
 
-See ADR-004: `/Users/miethe/dev/homelab/development/skillmeat/docs/architecture/decisions/004-artifact-version-tracking.md`
+See ADR-004: `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/architecture/decisions/004-artifact-version-tracking.md`
 
 ## Work Breakdown
 
@@ -580,8 +580,8 @@ interface VersionVisualizationStore {
 #### Task 5.3: Documentation
 
 **Create/Update**:
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/guides/version-tracking.md`
-- `/Users/miethe/dev/homelab/development/skillmeat/docs/api/version-endpoints.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/user/guides/version-tracking.md`
+- `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/api/version-endpoints.md`
 - Update quickstart guide
 - Update architecture diagrams
 
@@ -854,8 +854,8 @@ Task 1.1 → Task 1.2 → Task 1.3 → Task 1.4
 - `web/src/components/versions/ModificationBadge.tsx`
 
 **Documentation**:
-- `docs/guides/version-tracking.md`
-- `docs/api/version-endpoints.md`
+- `docs/user/guides/version-tracking.md`
+- `docs/dev/api/version-endpoints.md`
 
 ### Specialist Assignments
 

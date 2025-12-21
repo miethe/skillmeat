@@ -2266,7 +2266,7 @@ Task("documentation-writer", "
   - Troubleshooting: artifacts not found, import fails
   - Best practices: what gets discovered, when to use
 
-  Format: Markdown file in docs/guides/
+  Format: Markdown file in docs/user/guides/
   Include screenshots/screenshots where helpful.
 
   Acceptance criteria:
@@ -2293,7 +2293,7 @@ Task("documentation-writer", "
   - Troubleshooting: fetch fails, incomplete metadata
   - Best practices: what gets populated, accuracy
 
-  Format: Markdown file in docs/guides/
+  Format: Markdown file in docs/user/guides/
   Include examples of common GitHub URLs.
 
   Acceptance criteria:
@@ -2594,9 +2594,9 @@ skillmeat/web/tests/discovery.test.tsx
 skillmeat/web/e2e/discovery.spec.ts
 skillmeat/web/e2e/auto-population.spec.ts
 
-docs/guides/discovery-guide.md
-docs/guides/auto-population-guide.md
-docs/api/discovery-endpoints.md
+docs/user/guides/discovery-guide.md
+docs/user/guides/auto-population-guide.md
+docs/dev/api/discovery-endpoints.md
 ```
 
 **Modified Files:**
