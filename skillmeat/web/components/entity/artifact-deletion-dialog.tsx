@@ -7,6 +7,12 @@
  * - Delete deployment metadata
  *
  * Uses step-based flow with toggle options and project/deployment selection.
+ *
+ * Mobile-responsive: Optimized for 320px-768px viewports with:
+ * - 44px minimum touch targets (WCAG)
+ * - Scrollable content areas
+ * - Stacked buttons on mobile
+ * - Truncated/wrapped text
  */
 
 'use client';
@@ -93,9 +99,14 @@ export function ArtifactDeletionDialog({
   // Fetch deployments for this artifact
   // Note: useDeployments returns filtered list but we need project_path from deployment list
   // For now, we'll use the deployment list hook directly
-  const { data: deploymentList, isLoading: deploymentsLoading } = useDeploymentList();
+  // Performance: Only fetch when dialog is open, use longer staleTime for modal context
+  const { data: deploymentList, isLoading: deploymentsLoading } = useDeploymentList(undefined, {
+    enabled: open,
+    staleTime: 5 * 60 * 1000, // 5 minutes - deployments won't change while modal is open
+  });
 
   // Filter deployments for this artifact
+  // Performance: Memoized to avoid re-filtering on every render
   const deployments = React.useMemo(() => {
     if (!deploymentList) return [];
     return deploymentList.deployments.filter(
@@ -104,6 +115,7 @@ export function ArtifactDeletionDialog({
   }, [deploymentList, artifact.name]);
 
   // Extract unique project paths from deployments
+  // Performance: Memoized to avoid re-computing on every render
   const projectPaths = React.useMemo(() => {
     // Since ArtifactDeploymentInfo doesn't have project_path,
     // we use the parent deploymentList.project_path
@@ -155,7 +167,8 @@ export function ArtifactDeletionDialog({
   }, [deleteDeployments, deployments]);
 
   // Toggle individual project selection
-  const toggleProject = (projectPath: string) => {
+  // Performance: useCallback to prevent re-creating function on every render
+  const toggleProject = React.useCallback((projectPath: string) => {
     setSelectedProjectPaths((prev) => {
       const next = new Set(prev);
       if (next.has(projectPath)) {
@@ -165,10 +178,11 @@ export function ArtifactDeletionDialog({
       }
       return next;
     });
-  };
+  }, []);
 
   // Toggle all projects
-  const toggleAllProjects = () => {
+  // Performance: useCallback with dependencies to avoid re-creating unless needed
+  const toggleAllProjects = React.useCallback(() => {
     if (selectedProjectPaths.size === projectPaths.length) {
       // Deselect all
       setSelectedProjectPaths(new Set());
@@ -176,10 +190,11 @@ export function ArtifactDeletionDialog({
       // Select all
       setSelectedProjectPaths(new Set(projectPaths));
     }
-  };
+  }, [selectedProjectPaths.size, projectPaths]);
 
   // Toggle individual deployment selection
-  const toggleDeployment = (deploymentPath: string) => {
+  // Performance: useCallback to prevent re-creating function on every render
+  const toggleDeployment = React.useCallback((deploymentPath: string) => {
     setSelectedDeploymentPaths((prev) => {
       const next = new Set(prev);
       if (next.has(deploymentPath)) {
@@ -189,10 +204,11 @@ export function ArtifactDeletionDialog({
       }
       return next;
     });
-  };
+  }, []);
 
   // Toggle all deployments
-  const toggleAllDeployments = () => {
+  // Performance: useCallback with dependencies to avoid re-creating unless needed
+  const toggleAllDeployments = React.useCallback(() => {
     if (selectedDeploymentPaths.size === deployments.length) {
       // Deselect all
       setSelectedDeploymentPaths(new Set());
@@ -200,7 +216,7 @@ export function ArtifactDeletionDialog({
       // Select all
       setSelectedDeploymentPaths(new Set(deployments.map((d) => d.artifact_path)));
     }
-  };
+  }, [selectedDeploymentPaths.size, deployments]);
 
   // Handle deletion
   const handleDelete = async () => {
@@ -264,11 +280,11 @@ export function ArtifactDeletionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
-            Delete {artifact.name}?
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col w-[90vw] sm:w-full">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" aria-hidden="true" />
+            <span className="truncate">Delete {artifact.name}?</span>
           </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-3">
@@ -280,11 +296,11 @@ export function ArtifactDeletionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Deletion Options */}
-        <div className="space-y-4 py-4">
+        {/* Deletion Options - Scrollable on mobile */}
+        <div className="space-y-4 py-4 overflow-y-auto flex-1 min-h-0">
           {/* Delete from Collection Toggle */}
           {context === 'collection' && (
-            <div className="flex items-start space-x-3">
+            <div className="flex items-start space-x-3 min-h-[44px]">
               <Checkbox
                 id="delete-collection"
                 checked={deleteFromCollection}
@@ -292,11 +308,12 @@ export function ArtifactDeletionDialog({
                   setDeleteFromCollection(checked === true)
                 }
                 disabled={deletion.isPending}
+                className="mt-0.5 min-w-[20px] min-h-[20px]"
               />
-              <div className="grid gap-1.5 leading-none">
+              <div className="grid gap-1.5 leading-none flex-1 min-w-0">
                 <Label
                   htmlFor="delete-collection"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-sm sm:text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                 >
                   Delete from Collection
                 </Label>
@@ -308,7 +325,7 @@ export function ArtifactDeletionDialog({
           )}
 
           {/* Delete from Projects Toggle */}
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start space-x-3 min-h-[44px]">
             <Checkbox
               id="delete-projects"
               checked={deleteFromProjects}
@@ -316,11 +333,12 @@ export function ArtifactDeletionDialog({
                 setDeleteFromProjects(checked === true)
               }
               disabled={deletion.isPending || deploymentsLoading || projectCount === 0}
+              className="mt-0.5 min-w-[20px] min-h-[20px]"
             />
-            <div className="grid gap-1.5 leading-none">
+            <div className="grid gap-1.5 leading-none flex-1 min-w-0">
               <Label
                 htmlFor="delete-projects"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                className="text-sm sm:text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
                 Also delete from Projects
                 {!deploymentsLoading && projectCount > 0 && (
@@ -340,7 +358,7 @@ export function ArtifactDeletionDialog({
           </div>
 
           {/* Delete Deployments Toggle - RED styling with AlertTriangle */}
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start space-x-3 min-h-[44px]">
             <Checkbox
               id="delete-deployments"
               checked={deleteDeployments}
@@ -348,17 +366,19 @@ export function ArtifactDeletionDialog({
                 setDeleteDeployments(checked === true)
               }
               disabled={deletion.isPending || deploymentsLoading || deploymentCount === 0}
-              className="border-destructive data-[state=checked]:bg-destructive"
+              className="border-destructive data-[state=checked]:bg-destructive mt-0.5 min-w-[20px] min-h-[20px]"
             />
-            <div className="grid gap-1.5 leading-none flex-1">
+            <div className="grid gap-1.5 leading-none flex-1 min-w-0">
               <Label
                 htmlFor="delete-deployments"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-destructive flex items-center gap-1.5"
+                className="text-sm sm:text-base font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-destructive flex items-center gap-1.5 flex-wrap cursor-pointer"
               >
-                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                Delete Deployments
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                  Delete Deployments
+                </span>
                 {!deploymentsLoading && deploymentCount > 0 && (
-                  <span className="ml-1 text-muted-foreground" aria-label={`${deploymentCount} deployment${deploymentCount !== 1 ? 's' : ''} found`}>
+                  <span className="text-muted-foreground" aria-label={`${deploymentCount} deployment${deploymentCount !== 1 ? 's' : ''} found`}>
                     ({deploymentCount} deployment{deploymentCount !== 1 ? 's' : ''})
                   </span>
                 )}

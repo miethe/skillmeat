@@ -47,6 +47,7 @@ export const deploymentKeys = {
  * List all deployments for a project
  *
  * @param projectPath - Optional project path (uses CWD if not specified)
+ * @param options - Optional query options (enabled, staleTime)
  * @returns Query result with deployment list
  *
  * @example
@@ -59,15 +60,23 @@ export const deploymentKeys = {
  *   ))
  * }
  * ```
+ *
+ * @example
+ * ```tsx
+ * // Performance: only fetch when dialog is open
+ * const { data } = useDeploymentList(undefined, { enabled: open });
+ * ```
  */
 export function useDeploymentList(
-  projectPath?: string
+  projectPath?: string,
+  options?: { enabled?: boolean; staleTime?: number }
 ): UseQueryResult<ArtifactDeploymentListResponse, Error> {
   return useQuery({
     queryKey: deploymentKeys.list(projectPath),
     queryFn: () => listDeployments(projectPath),
-    staleTime: 2 * 60 * 1000, // 2 minutes (deployments change frequently)
+    staleTime: options?.staleTime ?? 2 * 60 * 1000, // 2 minutes (deployments change frequently)
     refetchOnWindowFocus: true, // Refetch when user returns to window
+    enabled: options?.enabled ?? true,
   });
 }
 
