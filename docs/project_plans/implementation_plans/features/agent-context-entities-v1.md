@@ -408,9 +408,9 @@ Task("ui-engineer-enhanced", "TASK-5.7: Extend unified-entity-modal's Sync Statu
 
 **Batch 1** (Parallel - Documentation):
 ```python
-Task("documentation-writer", "TASK-6.1: Create user guide for context entities. File: docs/guides/context-entities.md. Cover: adding entities, creating templates, deploying to projects, syncing changes. Include screenshots. Frontmatter with title, audience, tags.")
+Task("documentation-writer", "TASK-6.1: Create user guide for context entities. File: docs/user/guides/context-entities.md. Cover: adding entities, creating templates, deploying to projects, syncing changes. Include screenshots. Frontmatter with title, audience, tags.")
 
-Task("documentation-writer", "TASK-6.2: Create developer guide for templates. File: docs/developers/creating-templates.md. How to create custom templates, template variables, validation rules, testing templates. Example template walkthrough.")
+Task("documentation-writer", "TASK-6.2: Create developer guide for templates. File: docs/dev/developers/creating-templates.md. How to create custom templates, template variables, validation rules, testing templates. Example template walkthrough.")
 
 Task("documentation-writer", "TASK-6.3: Write video script for project scaffolding. < 5 minute demo: select template, configure project, deploy, open in Claude Code. Highlight time savings vs manual setup.")
 ```

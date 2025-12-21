@@ -155,19 +155,19 @@ skillmeat update python
 ## Documentation
 
 ### Getting Started
-- **[Quickstart Guide](docs/quickstart.md)** - Get started in 5 minutes
-- **[Commands Reference](docs/commands.md)** - Complete CLI documentation
+- **[Quickstart Guide](docs/user/quickstart.md)** - Get started in 5 minutes
+- **[Commands Reference](docs/user/cli/commands.md)** - Complete CLI documentation
 
 ### Feature Guides
-- **[Smart Search Guide](docs/guides/searching.md)** - Find artifacts across projects
-- **[Safe Updates Guide](docs/guides/updating-safely.md)** - Preview and update artifacts
-- **[Syncing Changes Guide](docs/guides/syncing-changes.md)** - Sync projects with collection
-- **[Analytics Guide](docs/guides/using-analytics.md)** - Track usage and trends
+- **[Smart Search Guide](docs/user/guides/searching.md)** - Find artifacts across projects
+- **[Safe Updates Guide](docs/user/guides/updating-safely.md)** - Preview and update artifacts
+- **[Syncing Changes Guide](docs/user/guides/syncing-changes.md)** - Sync projects with collection
+- **[Analytics Guide](docs/user/guides/using-analytics.md)** - Track usage and trends
 
 ### Resources
-- **[Migration Guide](docs/migration.md)** - Migrate from skillman
-- **[Examples](docs/examples.md)** - Real-world workflows and patterns
-- **[Security Guide](docs/SECURITY.md)** - Security best practices
+- **[Migration Guide](docs/user/migration/README.md)** - Migrate from skillman
+- **[Examples](docs/user/examples.md)** - Real-world workflows and patterns
+- **[Security Guide](docs/ops/security/SECURITY.md)** - Security best practices
 
 ## Core Concepts
 
@@ -275,7 +275,7 @@ See [Using Skills in Claude - Security](https://support.claude.com/en/articles/1
 
 ## Migrating from skillman
 
-If you're using the original `skillman` tool, see our [Migration Guide](docs/migration.md) for step-by-step instructions.
+If you're using the original `skillman` tool, see our [Migration Guide](docs/user/migration/README.md) for step-by-step instructions.
 
 Key changes:
 - `skillman add <spec>` → `skillmeat add skill <spec>`
@@ -412,7 +412,7 @@ A: SkillMeat is the evolution of skillman with support for multiple artifact typ
 
 **Q: Can I use both skillman and skillmeat?**
 
-A: Yes! They store data in different locations and won't conflict. See the [Migration Guide](docs/migration.md).
+A: Yes! They store data in different locations and won't conflict. See the [Migration Guide](docs/user/migration/README.md).
 
 **Q: Do artifacts get re-downloaded for each project?**
 
@@ -420,7 +420,7 @@ A: No. Artifacts are stored once in your collection (`~/.skillmeat/`) and copied
 
 **Q: How do I share my collection with my team?**
 
-A: Document your collection setup commands (see [Examples](docs/examples.md#example-7-team-artifact-sharing)) or export your `collection.toml` manifest.
+A: Document your collection setup commands (see [Examples](docs/user/examples.md#example-7-team-artifact-sharing)) or export your `collection.toml` manifest.
 
 **Q: Can I use private GitHub repositories?**
 

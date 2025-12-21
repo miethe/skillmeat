@@ -31,7 +31,7 @@ Final polish, performance optimization, accessibility improvements, and comprehe
 **Dependencies**: Phase 1-5 complete
 
 **Files to Create**:
-- `docs/guides/context-entities.md`
+- `docs/user/guides/context-entities.md`
 
 **Content Outline**:
 
@@ -154,7 +154,7 @@ A: Ensure path_pattern starts with `.claude/` and doesn't contain `..`
 - [ ] Examples are realistic and tested
 - [ ] Screenshots are up-to-date
 - [ ] Frontmatter complete
-- [ ] Published to `/docs/guides/`
+- [ ] Published to `/docs/user/guides/`
 
 ---
 
@@ -165,7 +165,7 @@ A: Ensure path_pattern starts with `.claude/` and doesn't contain `..`
 **Dependencies**: Phase 4
 
 **Files to Create**:
-- `docs/developers/creating-templates.md`
+- `docs/dev/developers/creating-templates.md`
 
 **Content Outline**:
 
@@ -295,8 +295,8 @@ skillmeat template import my-template.json
 **Dependencies**: Phase 4
 
 **Files to Create**:
-- `docs/videos/project-scaffolding-walkthrough.md` (script)
-- Recording (future): `docs/videos/project-scaffolding-walkthrough.mp4`
+- `docs/user/assets/videos/project-scaffolding-walkthrough.md` (script)
+- Recording (future): `docs/user/assets/videos/project-scaffolding-walkthrough.mp4`
 
 **Script Outline** (< 5 minutes):
 

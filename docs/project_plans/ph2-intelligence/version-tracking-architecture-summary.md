@@ -440,7 +440,7 @@ if ".." in self.name:
 
 ### Documentation
 
-- **ADR-004**: `/Users/miethe/dev/homelab/development/skillmeat/docs/architecture/decisions/004-artifact-version-tracking.md`
+- **ADR-004**: `/Users/miethe/dev/homelab/development/skillmeat/docs/dev/architecture/decisions/004-artifact-version-tracking.md`
 - **Implementation Plan**: `/Users/miethe/dev/homelab/development/skillmeat/docs/project_plans/ph2-intelligence/artifact-version-tracking-implementation-plan.md`
 
 ### Existing Code

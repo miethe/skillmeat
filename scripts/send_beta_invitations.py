@@ -32,7 +32,7 @@ class BetaInvitationSender:
         self.dry_run = dry_run
         self.participants: List[Dict[str, str]] = []
         self.sent_invitations: Dict[str, Dict[str, Any]] = {}
-        self.tracking_file = Path("docs/beta/invitation-tracking.json")
+        self.tracking_file = Path("docs/user/beta/invitation-tracking.json")
         self.failed_sends: List[str] = []
 
     def load_participants(self) -> bool:
@@ -119,7 +119,7 @@ class BetaInvitationSender:
 
     def _get_invitation_template(self) -> str:
         """Load invitation email template from docs."""
-        template_file = Path("docs/beta/participant-invitation-email.md")
+        template_file = Path("docs/user/beta/participant-invitation-email.md")
 
         if not template_file.exists():
             print(f"Template file not found: {template_file}")

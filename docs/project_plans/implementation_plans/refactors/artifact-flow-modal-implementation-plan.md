@@ -4,8 +4,8 @@
 
 Refactor the "Sync Status" tab in `unified-entity-modal.tsx` to match the new 3-panel design with artifact flow visualization. This redesign enables full lifecycle management across Source, Collection, and Project tiers from a single location.
 
-**Design Reference**: `docs/designs/artifact-flow-modal-redesign.md`
-**Visual Reference**: `docs/designs/renders/artifact-flow-modal.png`
+**Design Reference**: `docs/dev/designs/artifact-flow-modal-redesign.md`
+**Visual Reference**: `docs/dev/designs/renders/artifact-flow-modal.png`
 
 ---
 

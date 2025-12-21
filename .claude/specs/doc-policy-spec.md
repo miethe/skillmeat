@@ -140,12 +140,12 @@
 
 | Bucket | Purpose | Location | Examples |
 |--------|---------|----------|----------|
-| **User** | Help users | `/docs/guides/`, `/docs/user-guides/` | Setup, tutorials, troubleshooting |
-| **Developer** | Help devs | `/docs/api/`, `/docs/development/` | API docs, integration guides |
-| **Architecture** | Design decisions | `/docs/architecture/`, `/docs/design/` | ADRs, diagrams, specs |
+| **User** | Help users | `/docs/user/`, `/docs/user/guides/` | Setup, tutorials, troubleshooting |
+| **Developer** | Help devs | `/docs/dev/`, `/docs/dev/development/` | API docs, integration guides |
+| **Architecture** | Design decisions | `/docs/dev/architecture/`, `/docs/dev/designs/` | ADRs, diagrams, specs |
 | **README** | Document projects | Root of project/package/module | Project/package READMEs |
 | **Configuration** | Setup/deploy | `/docs/configuration/`, `/docs/deployment/` | Env setup, deploy guides |
-| **Test** | Testing strategy | `/docs/testing/` | Test plans, strategies |
+| **Test** | Testing strategy | `/docs/ops/testing/` | Test plans, strategies |
 | **Product** | Requirements | `/docs/project_plans/`, `/docs/product/` | PRDs, impl plans |
 | **Tracking** | Progress/context | `.claude/progress/`, `.claude/worknotes/` | Phase tracking (structured) |
 
@@ -269,7 +269,7 @@ docs/
 ### ❌ Anti-Pattern 5: Debugging as Docs
 
 ```plaintext
-docs/development/
+docs/dev/development/
 └── event-loop-issues-nov-2.md     ❌ WRONG
 ```
 
@@ -304,7 +304,7 @@ Some docs...
 ls .claude/progress/
 ls .claude/worknotes/fixes/
 ls .claude/worknotes/observations/
-ls docs/api/
+ls docs/dev/api/
 ```
 
 ### Check 2: Naming Compliance
@@ -345,9 +345,9 @@ done
 
 | Task Type | Doc Type | Location | Naming |
 |-----------|----------|----------|--------|
-| Setup guide | Guide | `/docs/guides/` | Explicit |
-| API endpoints | API ref | `/docs/api/` | Explicit |
-| Architecture | ADR | `/docs/architecture/` | `adr-NNN.md` |
+| Setup guide | Guide | `/docs/user/guides/` | Explicit |
+| API endpoints | API ref | `/docs/dev/api/` | Explicit |
+| Architecture | ADR | `/docs/dev/architecture/` | `adr-NNN.md` |
 | Impl notes | Context | `.claude/worknotes/[prd]/` | `phase-N-context.md` |
 | Phase progress | Progress | `.claude/progress/[prd]/` | `phase-N-progress.md` |
 | Bug fixes (monthly) | Bug tracking | `.claude/worknotes/fixes/` | `bug-fixes-tracking-MM-YY.md` |

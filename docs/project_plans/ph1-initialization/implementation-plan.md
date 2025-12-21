@@ -783,10 +783,10 @@ This document provides a detailed implementation plan for transforming **skillma
 4. **Update Documentation**
 
    - `README.md` - Quickstart, installation, basic usage
-   - `docs/commands.md` - Complete command reference
-   - `docs/architecture/` - Already created by subagents
-   - `docs/migration.md` - Migration from skillman guide
-   - `docs/examples.md` - Common workflows
+   - `docs/user/cli/commands.md` - Complete command reference
+   - `docs/dev/architecture/` - Already created by subagents
+   - `docs/user/migration/README.md` - Migration from skillman guide
+   - `docs/user/examples.md` - Common workflows
 
 5. **Create Migration Tool**
 

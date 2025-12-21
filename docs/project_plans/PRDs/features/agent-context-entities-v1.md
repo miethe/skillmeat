@@ -1163,8 +1163,8 @@ def validate_path_pattern(pattern: str) -> bool:
 
 ### 10.4 Documentation
 
-- [ ] User guide published at `/docs/guides/context-entities.md`
-- [ ] Developer guide published at `/docs/developers/creating-templates.md`
+- [ ] User guide published at `/docs/user/guides/context-entities.md`
+- [ ] Developer guide published at `/docs/dev/developers/creating-templates.md`
 - [ ] API documentation updated with new endpoints
 - [ ] CLI help text accurate and complete
 - [ ] Video walkthrough available (< 5 minutes)

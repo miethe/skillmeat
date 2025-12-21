@@ -272,16 +272,16 @@ Implement intelligent local artifact caching with background refresh, ensure all
   - [ ] Grouped View: Drag-and-drop guide
   - [ ] Deployment Dashboard: Deployment tracking
   - [ ] Caching: How cache works, refresh behavior
-  - [ ] File: `/docs/user-guide/collections.md`
-  - [ ] File: `/docs/user-guide/deployment-dashboard.md`
+  - [ ] File: `/docs/user/guide/collections.md`
+  - [ ] File: `/docs/user/guide/deployment-dashboard.md`
 - [ ] Developer Documentation:
   - [ ] Architecture overview (database, API, frontend layers)
   - [ ] Type definitions and interfaces
   - [ ] Hook usage patterns
   - [ ] Context provider API
   - [ ] Cache API and refresh scheduler
-  - [ ] File: `/docs/architecture/collections-system.md`
-  - [ ] File: `/docs/developers/caching-system.md`
+  - [ ] File: `/docs/dev/architecture/collections-system.md`
+  - [ ] File: `/docs/dev/developers/caching-system.md`
 - [ ] Deployment Guide:
   - [ ] Migration from old system to new
   - [ ] Database schema changes
@@ -294,10 +294,10 @@ Implement intelligent local artifact caching with background refresh, ensure all
   - [ ] Quick start guide for Collections
 
 **Files to Create/Modify**:
-- Create: `/docs/user-guide/collections.md` (~200 lines)
-- Create: `/docs/user-guide/deployment-dashboard.md` (~150 lines)
-- Create: `/docs/architecture/collections-system.md` (~200 lines)
-- Create: `/docs/developers/caching-system.md` (~150 lines)
+- Create: `/docs/user/guide/collections.md` (~200 lines)
+- Create: `/docs/user/guide/deployment-dashboard.md` (~150 lines)
+- Create: `/docs/dev/architecture/collections-system.md` (~200 lines)
+- Create: `/docs/dev/developers/caching-system.md` (~150 lines)
 - Create: `/docs/deployment/collections-migration.md` (~150 lines)
 - Modify: `/README.md` - Add collections feature section
 

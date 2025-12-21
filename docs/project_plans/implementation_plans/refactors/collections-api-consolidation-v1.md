@@ -265,7 +265,7 @@ status: completed
 | File | Changes | Phase |
 |------|---------|-------|
 | `skillmeat/cli/commands/migrate.py` | New CLI command for migrating file-based collections to DB | Phase 4 |
-| `docs/guides/migration-guide.md` | Documentation for migration process | Phase 4 |
+| `docs/user/guides/migration-guide.md` | Documentation for migration process | Phase 4 |
 
 ---
 
@@ -529,7 +529,7 @@ Task("documentation-writer", "TASK-5.2-5.3: Update API docs with deprecation not
 
 Files:
 - OpenAPI spec (auto-generated, but add notes)
-- Add docs/guides/api-migration.md
+- Add docs/user/guides/api-migration.md
 
 Content:
 - Mark /collections endpoints as deprecated

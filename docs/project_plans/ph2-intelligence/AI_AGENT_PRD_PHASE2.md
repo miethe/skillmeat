@@ -728,11 +728,11 @@ tests/fixtures/phase2/
 ### Final Documentation (Agent 4)
 
 - `docs/phase2-features.md` - Overview
-- `docs/guides/searching.md` - Search guide
-- `docs/guides/updating-safely.md` - Update guide
-- `docs/guides/syncing-changes.md` - Sync guide
-- `docs/guides/using-analytics.md` - Analytics guide
-- Update `docs/commands.md` with new commands
+- `docs/user/guides/searching.md` - Search guide
+- `docs/user/guides/updating-safely.md` - Update guide
+- `docs/user/guides/syncing-changes.md` - Sync guide
+- `docs/user/guides/using-analytics.md` - Analytics guide
+- Update `docs/user/cli/commands.md` with new commands
 - Update `README.md` with Phase 2 highlights
 
 ---
