@@ -395,9 +395,9 @@ export function ArtifactDeletionDialog({
 
           {/* Project Selection Section - Expandable */}
           {deleteFromProjects && projectPaths.length > 0 && (
-            <div className="border rounded-md p-4 space-y-3 bg-muted/30" role="region" aria-label="Project selection">
+            <div className="border rounded-md p-3 sm:p-4 space-y-3 bg-muted/30" role="region" aria-label="Project selection">
               {/* Section Header with Counter */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <Label className="text-sm font-medium">
                   Select which projects:{' '}
                   <span className="text-muted-foreground" aria-live="polite">
@@ -410,6 +410,7 @@ export function ArtifactDeletionDialog({
                   onClick={toggleAllProjects}
                   disabled={deletion.isPending}
                   type="button"
+                  className="min-h-[44px] w-full sm:w-auto"
                   aria-label={
                     selectedProjectPaths.size === projectPaths.length
                       ? 'Deselect all projects'
@@ -437,17 +438,18 @@ export function ArtifactDeletionDialog({
                   </div>
                 ) : (
                   projectPaths.map((projectPath) => (
-                    <div key={projectPath} className="flex items-center space-x-2" role="listitem">
+                    <div key={projectPath} className="flex items-center space-x-2 min-h-[44px]" role="listitem">
                       <Checkbox
                         id={`project-${projectPath}`}
                         checked={selectedProjectPaths.has(projectPath)}
                         onCheckedChange={() => toggleProject(projectPath)}
                         disabled={deletion.isPending}
+                        className="min-w-[20px] min-h-[20px]"
                         aria-label={`Undeploy from ${projectPath}`}
                       />
                       <Label
                         htmlFor={`project-${projectPath}`}
-                        className="text-sm font-normal cursor-pointer flex-1 truncate"
+                        className="text-sm font-normal cursor-pointer flex-1 min-w-0 break-all sm:truncate"
                         title={projectPath}
                       >
                         {projectPath}
@@ -461,11 +463,11 @@ export function ArtifactDeletionDialog({
 
           {/* Deployment Deletion Section - RED WARNING */}
           {deleteDeployments && deployments.length > 0 && (
-            <div className="border border-red-200 dark:border-red-800 rounded-md p-4 space-y-4 bg-red-50 dark:bg-red-950" role="region" aria-label="Deployment deletion warning">
+            <div className="border border-red-200 dark:border-red-800 rounded-md p-3 sm:p-4 space-y-4 bg-red-50 dark:bg-red-950" role="region" aria-label="Deployment deletion warning">
               {/* RED Warning Banner */}
               <div className="flex items-start gap-2 p-3 rounded-md bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700" role="alert" aria-live="assertive">
                 <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <p className="text-sm font-semibold text-red-700 dark:text-red-300">
                     WARNING: This will permanently delete files from your filesystem.
                   </p>
@@ -476,7 +478,7 @@ export function ArtifactDeletionDialog({
               </div>
 
               {/* Section Header with Counter */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <Label className="text-sm font-semibold text-red-700 dark:text-red-300">
                   Deployments to delete:{' '}
                   <span className="text-red-600 dark:text-red-400" aria-live="polite">
@@ -489,7 +491,7 @@ export function ArtifactDeletionDialog({
                   onClick={toggleAllDeployments}
                   disabled={deletion.isPending}
                   type="button"
-                  className="text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-900"
+                  className="text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-900 min-h-[44px] w-full sm:w-auto"
                   aria-label={
                     selectedDeploymentPaths.size === deployments.length
                       ? 'Deselect all deployments'
@@ -517,19 +519,19 @@ export function ArtifactDeletionDialog({
                   </div>
                 ) : (
                   deployments.map((deployment) => (
-                    <div key={deployment.artifact_path} className="flex items-start space-x-2 p-2 rounded bg-white dark:bg-red-900/20" role="listitem">
+                    <div key={deployment.artifact_path} className="flex items-start space-x-2 p-2 rounded bg-white dark:bg-red-900/20 min-h-[44px]" role="listitem">
                       <Checkbox
                         id={`deployment-${deployment.artifact_path}`}
                         checked={selectedDeploymentPaths.has(deployment.artifact_path)}
                         onCheckedChange={() => toggleDeployment(deployment.artifact_path)}
                         disabled={deletion.isPending}
-                        className="border-red-300 dark:border-red-700 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600 mt-0.5"
+                        className="border-red-300 dark:border-red-700 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600 mt-0.5 min-w-[20px] min-h-[20px]"
                         aria-label={`Delete deployment at ${deployment.artifact_path}`}
                       />
                       <div className="flex-1 min-w-0">
                         <Label
                           htmlFor={`deployment-${deployment.artifact_path}`}
-                          className="text-xs font-mono cursor-pointer block text-red-900 dark:text-red-100 break-all"
+                          className="text-xs sm:text-sm font-mono cursor-pointer block text-red-900 dark:text-red-100 break-all"
                           title={deployment.artifact_path}
                         >
                           {deployment.artifact_path}
@@ -549,11 +551,12 @@ export function ArtifactDeletionDialog({
         </div>
 
         {/* Footer with Actions */}
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 flex-col sm:flex-row gap-2 sm:gap-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={deletion.isPending}
+            className="min-h-[44px] w-full sm:w-auto order-2 sm:order-1"
           >
             Cancel
           </Button>
@@ -561,16 +564,17 @@ export function ArtifactDeletionDialog({
             variant="destructive"
             onClick={handleDelete}
             disabled={deletion.isPending || deploymentsLoading}
+            className="min-h-[44px] w-full sm:w-auto order-1 sm:order-2"
           >
             {deletion.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                <span>Deleting...</span>
               </>
             ) : (
               <>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Artifact
+                <Trash2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                <span>Delete Artifact</span>
               </>
             )}
           </Button>
