@@ -26,8 +26,8 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionUpdateRequest,
     UserCollectionWithGroupsResponse,
 )
+from skillmeat.api.services import get_artifact_metadata
 from skillmeat.cache.models import (
-    Artifact,
     Collection,
     CollectionArtifact,
     Group,
@@ -663,29 +663,10 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
-        # Fetch artifact metadata for each association
+        # Fetch artifact metadata for each association using fallback service
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
-            # Try to get artifact metadata from cache database
-            artifact = session.query(Artifact).filter_by(id=assoc.artifact_id).first()
-
-            if artifact:
-                # If artifact metadata exists, use it
-                artifact_summary = ArtifactSummary(
-                    name=artifact.name,
-                    type=artifact.type,
-                    version=artifact.deployed_version or artifact.upstream_version,
-                    source=artifact.source or assoc.artifact_id,
-                )
-            else:
-                # TODO: Fetch artifact metadata from artifact storage system
-                # For now, return artifact_id as both name and source
-                artifact_summary = ArtifactSummary(
-                    name=assoc.artifact_id,
-                    type="unknown",
-                    version=None,
-                    source=assoc.artifact_id,
-                )
+            artifact_summary = get_artifact_metadata(session, assoc.artifact_id)
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
