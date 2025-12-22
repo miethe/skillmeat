@@ -574,3 +574,29 @@
 - **Fix**: Added composite key fallback: `key={artifact.id || \`${artifact.name}-${artifact.type}\`}`
 - **Commit(s)**: 4b48327
 - **Status**: RESOLVED
+
+### Collection View Crashes on "Cannot read properties of undefined (reading 'tags')"
+
+**Issue**: Opening the unified modal for artifacts within a specific collection on `/collection` page throws `TypeError: Cannot read properties of undefined (reading 'tags')` at page.tsx:40.
+- **Location**: `skillmeat/web/app/collection/page.tsx:40-41`, `skillmeat/web/components/collection/artifact-list.tsx:307,316`
+- **Root Cause**: When viewing a specific collection, `/user-collections/{id}/artifacts` returns `ArtifactSummary` objects (4 fields: name, type, version, source) that lack the `metadata` property. The `artifactToEntity` function accessed `artifact.metadata.tags` and `artifact.metadata.description` without null checks.
+- **Fix**: Added optional chaining (`?.`) to all metadata property accesses:
+  - `artifact.metadata?.tags || []`
+  - `artifact.metadata?.description`
+  - `artifact.metadata?.version`
+  - `artifact.metadata?.title || artifact.name`
+- **Commit(s)**: 43350e0
+- **Status**: RESOLVED
+
+### Collection View Cards Appear Different from Catalog View
+
+**Issue**: Artifact cards within a specific collection appear sparse/different from the main catalog view - missing description, tags, usage stats, and other metadata.
+- **Location**: `skillmeat/web/app/collection/page.tsx:247-285`
+- **Root Cause**: Same as above - `ArtifactSummary` has only 4 fields vs full `Artifact` with 16+ fields. Both views use the same `UnifiedCard` component, but sparse data results in sparse cards.
+- **Fix**: Added `enrichArtifactSummary()` function that:
+  1. Takes an `ArtifactSummary` and the full artifacts array from `useArtifacts()`
+  2. Finds the matching full `Artifact` by name
+  3. Returns the enriched artifact with all metadata, usageStats, etc.
+  4. Applied in `filteredArtifacts` useMemo when viewing a specific collection
+- **Commit(s)**: 43350e0
+- **Status**: RESOLVED
