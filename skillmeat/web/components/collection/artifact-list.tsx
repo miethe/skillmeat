@@ -304,7 +304,7 @@ export function ArtifactList({
                   <TableCell>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 font-medium">
-                        {artifact.metadata.title || artifact.name}
+                        {artifact.metadata?.title || artifact.name}
                         {artifact.upstreamStatus.isOutdated && (
                           <AlertCircle
                             className="h-3 w-3 text-yellow-600"
@@ -313,7 +313,7 @@ export function ArtifactList({
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {artifact.metadata.description || artifact.name}
+                        {artifact.metadata?.description || artifact.name}
                       </div>
                     </div>
                   </TableCell>

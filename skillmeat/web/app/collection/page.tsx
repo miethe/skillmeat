@@ -22,6 +22,57 @@ import type { Entity } from '@/types/entity';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
 
+/**
+ * Enrich ArtifactSummary with full Artifact data
+ *
+ * When viewing a specific collection, the API returns lightweight ArtifactSummary objects.
+ * This function enriches them with full Artifact data from the catalog for consistent UI rendering.
+ *
+ * @param summary - Lightweight artifact summary from collection endpoint
+ * @param allArtifacts - Full artifact list from catalog
+ * @returns Full Artifact object or enriched fallback
+ */
+function enrichArtifactSummary(
+  summary: { name: string; type: string; version?: string | null; source: string },
+  allArtifacts: Artifact[]
+): Artifact {
+  // Try to find matching full artifact by name (primary key for artifacts)
+  const fullArtifact = allArtifacts.find(a => a.name === summary.name);
+
+  if (fullArtifact) {
+    return fullArtifact;
+  }
+
+  // Fallback: Convert summary to Artifact-like structure with defaults
+  // This ensures cards still render even if full data isn't available
+  return {
+    id: `${summary.type}:${summary.name}`,
+    name: summary.name,
+    type: summary.type as any,
+    scope: 'user',
+    status: 'active',
+    version: summary.version || undefined,
+    source: summary.source,
+    metadata: {
+      title: summary.name,
+      description: '',
+      tags: [],
+    },
+    upstreamStatus: {
+      hasUpstream: false,
+      isOutdated: false,
+    },
+    usageStats: {
+      totalDeployments: 0,
+      activeProjects: 0,
+      usageCount: 0,
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    aliases: [],
+  };
+}
+
 // Helper function to convert Artifact to Entity for the modal
 function artifactToEntity(artifact: Artifact): Entity {
   const statusMap: Record<string, Entity['status']> = {
@@ -37,9 +88,9 @@ function artifactToEntity(artifact: Artifact): Entity {
     type: artifact.type,
     collection: artifact.collection?.name || 'default',
     status: statusMap[artifact.status] || 'synced',
-    tags: artifact.metadata.tags || [],
-    description: artifact.metadata.description,
-    version: artifact.version || artifact.metadata.version,
+    tags: artifact.metadata?.tags || [],
+    description: artifact.metadata?.description,
+    version: artifact.version || artifact.metadata?.version,
     source: artifact.source || 'unknown',
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
@@ -195,38 +246,35 @@ function CollectionPageContent() {
   // Apply client-side search, tag filter, and sort
   const filteredArtifacts = useMemo(() => {
     // Handle different response shapes: useArtifacts returns .artifacts, useCollectionArtifacts returns .items
-    let artifacts: (Artifact | any)[] = [];
+    let artifacts: Artifact[] = [];
+
     if (isSpecificCollection && data && 'items' in data) {
-      artifacts = data.items ?? [];
+      // Collection-specific view: Enrich ArtifactSummary objects with full Artifact data
+      const summaries = data.items ?? [];
+      const fullArtifacts = allArtifactsData?.artifacts ?? [];
+
+      // Enrich each summary with full data from catalog
+      artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts));
     } else if (!isSpecificCollection && data && 'artifacts' in data) {
+      // All collections view: Already have full Artifact objects
       artifacts = data.artifacts ?? [];
     }
 
     // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      artifacts = artifacts.filter((a: any) => {
-        // Handle both Artifact and ArtifactSummary types
+      artifacts = artifacts.filter((a) => {
         const nameMatch = a.name.toLowerCase().includes(query);
-        // Only access metadata if it exists (full Artifact objects)
-        const descMatch =
-          'metadata' in a && a.metadata?.description?.toLowerCase().includes(query);
-        const tagMatch =
-          'metadata' in a &&
-          a.metadata?.tags?.some((tag: string) => tag.toLowerCase().includes(query));
+        const descMatch = a.metadata?.description?.toLowerCase().includes(query);
+        const tagMatch = a.metadata?.tags?.some((tag: string) => tag.toLowerCase().includes(query));
         return nameMatch || descMatch || tagMatch;
       });
     }
 
     // Tag filter
     if (selectedTags.length > 0) {
-      artifacts = artifacts.filter((artifact: any) => {
-        // Only filter by tags if metadata exists (full Artifact objects)
-        if ('metadata' in artifact && artifact.metadata?.tags) {
-          return artifact.metadata.tags.some((tag: string) => selectedTags.includes(tag));
-        }
-        // For ArtifactSummary, skip tag filtering (no tag data available)
-        return false;
+      artifacts = artifacts.filter((artifact) => {
+        return artifact.metadata?.tags?.some((tag: string) => selectedTags.includes(tag)) ?? false;
       });
     }
 
@@ -234,13 +282,11 @@ function CollectionPageContent() {
     // but we could add additional client-side sorting here if needed
 
     return artifacts;
-  }, [isSpecificCollection, data, searchQuery, selectedTags]);
+  }, [isSpecificCollection, data, allArtifactsData, searchQuery, selectedTags]);
 
-  const handleArtifactClick = (artifact: Artifact | any) => {
-    // NOTE: Type assertion needed temporarily - TASK-2.1 will properly handle ArtifactSummary conversion
-    // When viewing a specific collection, artifact may be ArtifactSummary (partial data)
-    // When viewing all collections, artifact is full Artifact object
-    setSelectedEntity(artifactToEntity(artifact as Artifact));
+  const handleArtifactClick = (artifact: Artifact) => {
+    // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
+    setSelectedEntity(artifactToEntity(artifact));
     setIsDetailOpen(true);
   };
 
