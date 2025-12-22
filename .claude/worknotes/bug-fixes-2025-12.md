@@ -557,11 +557,13 @@
 
 ### UnifiedCard Crashes on ArtifactSummary with Unknown Type
 
-**Issue**: Switching to a specific collection on `/collection` page throws `TypeError: Cannot read properties of undefined (reading 'icon')` at unified-card.tsx:217.
-- **Location**: `skillmeat/web/components/shared/unified-card.tsx:214-217`
-- **Root Cause**: When viewing a specific collection, `useCollectionArtifacts` returns `ArtifactSummary` objects that have `type: string` (generic) instead of strict `EntityType`. When an unknown type is passed to `getEntityTypeConfig()`, it returns `undefined`, and accessing `config.icon` crashes.
-- **Fix**: Added defensive null check with fallback: `const iconName = config?.icon ?? 'FileText'`
-- **Commit(s)**: 4b48327
+**Issue**: Switching to a specific collection on `/collection` page throws `TypeError: Cannot read properties of undefined (reading 'icon')` at unified-card.tsx:217, and `Cannot read properties of undefined (reading 'color')` at line 341.
+- **Location**: `skillmeat/web/components/shared/unified-card.tsx:214-217,341`
+- **Root Cause**: When viewing a specific collection, `useCollectionArtifacts` returns `ArtifactSummary` objects that have `type: string` (generic) instead of strict `EntityType`. When an unknown type is passed to `getEntityTypeConfig()`, it returns `undefined`, and accessing `config.icon` or `config.color` crashes.
+- **Fix**: Added defensive null checks with fallbacks:
+  - `const iconName = config?.icon ?? 'FileText'` (line 216)
+  - `config?.color ?? 'text-muted-foreground'` (line 341)
+- **Commit(s)**: 996df89, a373a88
 - **Status**: RESOLVED
 
 ### ArtifactGrid Missing Key Prop for ArtifactSummary Objects
