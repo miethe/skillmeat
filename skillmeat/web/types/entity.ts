@@ -5,6 +5,8 @@
  * for the unified artifact management system.
  */
 
+import type { Collection } from './collections';
+
 /**
  * Supported artifact entity types in SkillMeat
  * - skill: Reusable Claude skills with markdown documentation
@@ -325,6 +327,8 @@ export interface Entity {
   modifiedAt?: string;
   /** Quick-access aliases */
   aliases?: string[];
+  /** Collections this artifact belongs to */
+  collections?: Collection[];
 }
 
 /**

@@ -14,6 +14,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useRemoveArtifactFromCollection } from '@/hooks/use-collections';
+import { useQueryClient } from '@tanstack/react-query';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -46,8 +47,9 @@ interface ModalCollectionsTabProps {
 export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const { collections, isLoadingCollections } = useCollectionContext();
+  const { isLoadingCollections } = useCollectionContext();
   const removeFromCollection = useRemoveArtifactFromCollection();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   // Convert Entity to Artifact format for MoveCopyDialog
@@ -84,11 +86,8 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
       : undefined,
   };
 
-  // Find collections this artifact belongs to
-  // Filter collections that might contain this artifact
-  const artifactCollections = collections.filter(
-    (c) => c.id === entity.collection || c.name === entity.collection
-  );
+  // Use entity's collections array directly (populated by artifactToEntity)
+  const artifactCollections = entity.collections || [];
 
   const handleRemoveFromCollection = async (collectionId: string) => {
     try {
@@ -96,6 +95,9 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
         collectionId,
         artifactId: entity.id,
       });
+
+      // Invalidate artifacts queries to refresh entity.collections
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
 
       toast({
         title: 'Removed from Collection',
@@ -206,6 +208,8 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
         sourceCollectionId={entity.collection}
         onSuccess={() => {
           setShowAddDialog(false);
+          // Invalidate artifacts queries to refresh entity.collections
+          queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({
             title: 'Added to Collection',
             description: `${entity.name} has been added to the collection.`,
