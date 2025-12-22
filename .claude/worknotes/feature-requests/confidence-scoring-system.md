@@ -59,7 +59,7 @@ Implement a multi-dimensional confidence scoring system that enables high-confid
 - Usage-based trust accumulation
 
 #### 2. User Rating System
-- 1-5 star ratings stored locally
+- 1-5 star ratings stored locally (private store with opt-in export)
 - Optional feedback text
 - Rating prompts after artifact usage
 - Export format for community sharing
@@ -69,6 +69,8 @@ Implement a multi-dimensional confidence scoring system that enables high-confid
 - Weighted aggregation with trust factors
 - Score freshness decay over time
 - Anti-gaming protections
+ - Normalization across heterogeneous sources
+ - Provenance retained for per-source breakdowns
 
 #### 4. Match Analysis Engine
 - Keyword matching against artifact metadata
@@ -76,16 +78,24 @@ Implement a multi-dimensional confidence scoring system that enables high-confid
 - Project context boosting
 - Historical success tracking
 
-#### 5. CLI Commands
+#### 5. Confirmation & Feedback Loop
+- CLI can present the best match and request confirmation
+- Optional auto-accept mode for trusted workflows
+- Future web UI to review auto-added artifacts and rate them
+
+#### 6. CLI Commands
 ```bash
 skillmeat match "<query>"      # Find best matches with scores
+skillmeat match "<query>" --confirm-best  # Ask to confirm best match
+skillmeat match "<query>" --auto-accept   # Auto-accept best match
+skillmeat match "<query>" --json          # Structured output for agents
 skillmeat rate <artifact>      # Rate an artifact
 skillmeat show --scores        # View artifact scores
 skillmeat scores import        # Import community scores
 skillmeat scores refresh       # Update all scores
 ```
 
-#### 6. API Endpoints
+#### 7. API Endpoints
 ```
 GET  /api/v1/match?q=<query>              # Match analysis
 GET  /api/v1/artifacts/{id}/scores        # Get artifact scores
@@ -193,13 +203,36 @@ class ScoreCalculator:
                           weights: ScoreWeights) -> ConfidenceScore:
         """Compute composite confidence score."""
 
+    def normalize_scores(self, scores: Dict[str, float]) -> Dict[str, float]:
+        """Normalize and handle missing signals."""
+
+    def apply_priors(self, scores: Dict[str, float]) -> Dict[str, float]:
+        """Apply cold-start priors for sparse data."""
+
     def apply_decay(self, score: float, last_update: datetime) -> float:
         """Apply freshness decay to score."""
 ```
 
+#### Event Model & Scoring Signals
+Define score-impacting events so "usage" and "success" are measurable:
+- `match_confirmed`: user confirms the suggested best match
+- `match_auto_accepted`: auto-accept path used (flag for later review)
+- `artifact_deployed`: artifact deployed to a project
+- `artifact_used`: explicit user/agent signal that it was used successfully
+
+These events feed historical success and trust accumulation with clear attribution.
+
+#### Normalization & Conflict Handling
+To keep scores comparable across sources:
+- Normalize each source to a 0-100 scale with documented mappings
+- Use weighted Bayesian averaging with priors for low-signal artifacts
+- Apply freshness decay per source before aggregation
+- Preserve per-source scores for explainability
+
 ### Storage Requirements
 
-- **Local ratings**: Store in collection manifest (TOML)
+- **Local ratings**: Store in a private local store, exportable by opt-in
+- **Manifest summary**: Store aggregate rating metadata only (no free-text)
 - **Community scores**: Cache in local SQLite or JSON file
 - **Embeddings**: Pre-computed and cached for artifacts
 - **Match history**: Store in analytics database
@@ -210,6 +243,7 @@ class ScoreCalculator:
 |-------------|---------|----------|
 | GitHub API | Import stars as quality signal | P1 |
 | SkillMeat Registry | Sync community scores | P1 |
+| Embedding skill provider (Haiku 4.5 sub-skill) | Semantic similarity | P1 |
 | Local embedding model | Semantic similarity | P1 |
 | npm Registry | Download counts for JS artifacts | P2 |
 | External rating APIs | Import from other tools | P3 |
@@ -226,6 +260,7 @@ GET /api/v1/match?q={query}&limit={n}&min_confidence={score}
 Response:
 {
   "query": "process PDF and extract tables",
+  "schema_version": "v1",
   "matches": [
     {
       "artifact": {
@@ -237,7 +272,11 @@ Response:
       "scores": {
         "trust": 95,
         "quality": 87,
-        "match": 89
+        "match": 89,
+        "community_sources": {
+          "registry": 92,
+          "github": 88
+        }
       },
       "breakdown": {
         "keyword_match": 90,
@@ -314,10 +353,14 @@ Would you like to add any of these? [1/2/n]:
 
 ## Implementation Phases
 
+### Phase 0: SPIKE (1 sprint)
+- [ ] Research community practices for scoring and reputation
+- [ ] Recommend baseline weights and anti-gaming strategies
+
 ### Phase 1: Foundation (2-3 sprints)
 - [ ] Data model extensions (ArtifactRating, SourceConfig)
 - [ ] Basic trust score configuration
-- [ ] User rating storage (local manifest)
+- [ ] User rating storage (local private store + manifest summary)
 - [ ] `skillmeat rate` CLI command
 - [ ] `skillmeat show --scores` command
 
@@ -375,7 +418,7 @@ Would you like to add any of these? [1/2/n]:
 
 ## Dependencies
 
-- **Embedding model**: Need to select and integrate (recommend sentence-transformers)
+- **Embedding provider**: Skill-based (Haiku 4.5 sub-skill) or local model
 - **SQLite**: For local score caching
 - **GitHub API**: For stars import
 - **Analytics system**: For tracking success metrics
@@ -385,9 +428,13 @@ Would you like to add any of these? [1/2/n]:
 ## Open Questions
 
 1. Should we build our own community registry or integrate with existing?
+   - **Recommendation**: Start with import-only; define a signed score payload for future registry support
 2. What's the minimum viable embedding model for semantic matching?
+   - **Recommendation**: Use a skill-based provider by default, with local model and keyword fallback
 3. How to handle conflicting scores from different sources?
+   - **Recommendation**: Weighted Bayesian average + freshness decay + per-source breakdown
 4. Should scores be versioned with artifact versions?
+   - **Recommendation**: Yes; store per-version scores plus a "latest" rollup
 
 ---
 

@@ -236,7 +236,7 @@ description: |
 
 #### 1. Discovery Workflow
 
-```markdown
+````markdown
 ## Discovery Workflow
 
 When user asks about available artifacts or needs a capability:
@@ -259,11 +259,11 @@ When user asks about available artifacts or needs a capability:
 4. **Offer Next Steps**
    - "Would you like me to add this to your collection?"
    - "Should I deploy this to the current project?"
-```
+````
 
 #### 2. Deployment Workflow
 
-```markdown
+````markdown
 ## Deployment Workflow
 
 When user wants to add or deploy an artifact:
@@ -278,20 +278,25 @@ When user wants to add or deploy an artifact:
    skillmeat add <type> <source>/<artifact>
    ```
 
-3. **Deploy to Project**
+3. **Preview Plan**
+   ```bash
+   skillmeat deploy <artifact> --project . --plan
+   ```
+
+4. **Deploy to Project**
    ```bash
    skillmeat deploy <artifact> --project .
    ```
 
-4. **Confirm Success**
+5. **Confirm Success**
    - Show deployment location
    - Verify artifact is functional
    - Suggest related artifacts
-```
+````
 
 #### 3. Self-Enhancement Workflow (AI Agent)
 
-```markdown
+````markdown
 ## Self-Enhancement Workflow
 
 When agent identifies a capability gap:
@@ -313,7 +318,7 @@ When agent identifies a capability gap:
    - Wait for explicit user approval
    - Deploy only what was approved
    - Confirm deployment success
-```
+````
 
 ---
 
@@ -367,6 +372,7 @@ When agent identifies a capability gap:
 2. **Show what will change** - List files to be created/modified
 3. **Verify sources** - Prefer official `anthropics/*` sources
 4. **Respect signatures** - Warn on unsigned bundles
+5. **Honor plan mode** - Alias or skill must present plan before write actions
 
 ---
 
@@ -428,6 +434,12 @@ LLM-computed semantic match between user need and artifact capabilities:
 | Context Relevance | 25% | Project type alignment |
 | Historical Success | 10% | Past usage for similar tasks |
 
+**Embedding Providers**:
+- **Skill-based** (default): Haiku 4.5 sub-skill performs embeddings
+- **Local model**: offline embeddings for privacy and speed
+- **API-based**: opt-in external provider for higher accuracy
+- **Fallback**: keyword-only when embeddings unavailable
+
 **Match Analysis Process**:
 ```
 User Request: "I need to process PDF documents and extract tables"
@@ -459,6 +471,11 @@ Default Weights:
 - W₃ (Match): 0.50
 ```
 
+**Normalization & Priors**:
+- Normalize available signals to 0-100
+- Apply priors for low-signal artifacts
+- Reweight when signals are missing
+
 **Confidence Thresholds**:
 
 | Score | Interpretation | Agent Behavior |
@@ -468,6 +485,10 @@ Default Weights:
 | 50-69 | Possible match | Present as option, explain limitations |
 | 30-49 | Low confidence | Only show if user requests all options |
 | 0-29 | Poor match | Do not suggest |
+
+**Suggestion Policy**:
+- Configurable thresholds via `skillmeat config set suggestion-policy`
+- Allows per-user tuning of when agents proactively suggest matches
 
 ### User Rating System
 
@@ -484,16 +505,16 @@ Optional: Brief feedback
 
 #### Rating Storage
 
-**Local** (in collection manifest):
+**Local** (private store + manifest summary):
 ```toml
 [[artifacts]]
 name = "pdf"
 # ... other fields
 [artifacts.user_rating]
 score = 4
-feedback = "Great for extraction, forms could be better"
 rated_at = "2025-12-18T10:30:00Z"
 ```
+Free-text feedback remains in the private store and is only exported by opt-in.
 
 **Export Format** (for community aggregation):
 ```json
@@ -527,6 +548,11 @@ Community scores aggregate from multiple sources:
 Community Score = Σ(source_score × trust_weight) / Σ(trust_weight)
 ```
 
+**Normalization & Conflict Handling**:
+- Normalize each source to 0-100 before aggregation
+- Apply priors for low-signal artifacts
+- Preserve per-source scores for explainability
+
 #### Score Import
 
 ```bash
@@ -545,10 +571,13 @@ skillmeat show pdf --scores
 ```bash
 # Analyze match for a capability request
 skillmeat match "process PDF and extract tables" --json
+skillmeat match "process PDF and extract tables" --confirm-best
+skillmeat match "process PDF and extract tables" --auto-accept
 
 # Output:
 {
   "query": "process PDF and extract tables",
+  "schema_version": "v1",
   "matches": [
     {
       "artifact": "pdf",
@@ -570,6 +599,11 @@ skillmeat match "process PDF and extract tables" --json
   "recommendation": "pdf skill is the best match (89% confidence)"
 }
 ```
+
+**Output Contract**:
+- Always include `schema_version`
+- Use stable keys for `scores`, `breakdown`, and `explanation`
+- Return structured error objects for unmatched or ambiguous queries
 
 #### For Natural Language Queries
 
@@ -614,6 +648,12 @@ Without context: playwright (70%), jest (68%), cypress (65%)
 With context: jest (85%), react-testing-library (82%), playwright (70%)
 ```
 
+### Caching & Invalidation
+
+- Cache embeddings per artifact version; invalidate on metadata changes
+- Cache match results per query+context for a short TTL
+- Record which provider generated embeddings for reproducibility
+
 ### Score Freshness & Decay
 
 Scores decay over time to ensure relevance:
@@ -631,6 +671,12 @@ skillmeat scores refresh
 # View score age
 skillmeat show pdf --scores --verbose
 ```
+
+### Confirmation Flow & Review Queue
+
+- `skillmeat match --confirm-best` prompts the user to confirm the top match
+- `skillmeat match --auto-accept` records an auto-accepted match for review
+- Future web UI: review auto-added artifacts and provide ratings
 
 ---
 
@@ -665,6 +711,10 @@ skillmeat show pdf --scores --verbose
 
 ## Implementation Phases
 
+### Phase 0: SPIKE (1 sprint)
+
+- [ ] Research community practices and define baseline scoring guidance
+
 ### Phase 1: Core Skill (MVP)
 
 - [ ] SKILL.md with discovery and deployment workflows
@@ -690,7 +740,7 @@ skillmeat show pdf --scores --verbose
 
 - [ ] Source trust score configuration
 - [ ] Basic user rating system (1-5 stars)
-- [ ] Rating storage in manifest
+- [ ] Rating storage in private store + manifest summary
 - [ ] `skillmeat show --scores` command
 - [ ] `skillmeat rate <artifact>` command
 
@@ -753,7 +803,8 @@ skillmeat show pdf --scores --verbose
 7. **Embedding Model**: Which model for semantic similarity?
    - Local lightweight model (fast, offline)
    - API-based (more accurate, requires network)
-   - **Recommendation**: Local by default, API opt-in for better accuracy
+   - Skill-based provider (no setup, uses Haiku 4.5 sub-skill)
+   - **Recommendation**: Skill-based by default, with local and API opt-in
 
 8. **Community Score Governance**: How to prevent gaming?
    - Rate limiting per user
