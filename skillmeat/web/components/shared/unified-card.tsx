@@ -338,7 +338,7 @@ export const UnifiedCard = React.memo(
                   data.status && statusColors[data.status]
                 )}
               >
-                <Icon className={cn('h-4 w-4', config.color)} />
+                <Icon className={cn('h-4 w-4', config?.color ?? 'text-muted-foreground')} />
               </div>
 
               {/* Name and title */}
