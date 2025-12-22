@@ -552,3 +552,23 @@
   2. Changed prop from `onClose={handleDeployClose}` to `onOpenChange={(open) => !open && handleDeployClose()}`
 - **Commit(s)**: 1cc2b1e
 - **Status**: RESOLVED
+
+## 2025-12-22
+
+### UnifiedCard Crashes on ArtifactSummary with Unknown Type
+
+**Issue**: Switching to a specific collection on `/collection` page throws `TypeError: Cannot read properties of undefined (reading 'icon')` at unified-card.tsx:217.
+- **Location**: `skillmeat/web/components/shared/unified-card.tsx:214-217`
+- **Root Cause**: When viewing a specific collection, `useCollectionArtifacts` returns `ArtifactSummary` objects that have `type: string` (generic) instead of strict `EntityType`. When an unknown type is passed to `getEntityTypeConfig()`, it returns `undefined`, and accessing `config.icon` crashes.
+- **Fix**: Added defensive null check with fallback: `const iconName = config?.icon ?? 'FileText'`
+- **Commit(s)**: 4b48327
+- **Status**: RESOLVED
+
+### ArtifactGrid Missing Key Prop for ArtifactSummary Objects
+
+**Issue**: React warning: "Each child in a list should have a unique 'key' prop" in ArtifactGrid component.
+- **Location**: `skillmeat/web/components/collection/artifact-grid.tsx:212`
+- **Root Cause**: `ArtifactSummary` objects from the collection artifacts API don't have an `id` field. The `key={artifact.id}` was `undefined`, causing React to warn about duplicate keys.
+- **Fix**: Added composite key fallback: `key={artifact.id || \`${artifact.name}-${artifact.type}\`}`
+- **Commit(s)**: 4b48327
+- **Status**: RESOLVED
