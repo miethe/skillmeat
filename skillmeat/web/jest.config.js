@@ -97,7 +97,11 @@ const customJestConfig = {
   ],
 
   // Transform patterns
-  transformIgnorePatterns: ['/node_modules/', '^.+\\.module\\.(css|sass|scss)$'],
+  // Allow transformation of ESM modules like react-markdown
+  transformIgnorePatterns: [
+    '/node_modules/(?!(react-markdown|vfile|vfile-message|unist-.*|unified|bail|is-plain-obj|trough|remark-.*|mdast-util-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|react-markdown)/)',
+    '^.+\\.module\\.(css|sass|scss)$',
+  ],
 
   // Coverage reporters
   coverageReporters: ['text', 'lcov', 'html', 'json'],
