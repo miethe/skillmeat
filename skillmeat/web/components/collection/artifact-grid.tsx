@@ -209,7 +209,7 @@ export function ArtifactGrid({
       >
         {artifacts.map((artifact) => (
           <ArtifactCard
-            key={artifact.id}
+            key={artifact.id || `${artifact.name}-${artifact.type}`}
             artifact={artifact}
             onClick={() => onArtifactClick(artifact)}
             showCollectionBadge={showCollectionBadge}

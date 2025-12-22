@@ -213,8 +213,9 @@ export const UnifiedCard = React.memo(
     const data = normalizeCardData(item);
     const config = getEntityTypeConfig(data.type as EntityType);
 
-    // Type-safe icon lookup with fallback
-    const IconComponent = (LucideIcons as any)[config.icon] as
+    // Type-safe icon lookup with fallback (config may be undefined for unknown types)
+    const iconName = config?.icon ?? 'FileText';
+    const IconComponent = (LucideIcons as any)[iconName] as
       | React.ComponentType<{ className?: string }>
       | undefined;
     const Icon = IconComponent || LucideIcons.FileText;
