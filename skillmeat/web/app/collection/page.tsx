@@ -14,6 +14,7 @@ import { TagFilterBar } from '@/components/ui/tag-filter-popover';
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
+import { useCollectionArtifacts } from '@/hooks/use-collections';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
@@ -34,7 +35,7 @@ function artifactToEntity(artifact: Artifact): Entity {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type,
-    collection: 'default',
+    collection: artifact.collection?.name || 'default',
     status: statusMap[artifact.status] || 'synced',
     tags: artifact.metadata.tags || [],
     description: artifact.metadata.description,
@@ -43,6 +44,15 @@ function artifactToEntity(artifact: Artifact): Entity {
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
     aliases: artifact.aliases || [],
+    collections: artifact.collection
+      ? [
+          {
+            id: artifact.collection.id,
+            name: artifact.collection.name,
+            artifact_count: 0, // Not available in artifact context
+          },
+        ]
+      : [],
   };
 }
 
@@ -136,13 +146,33 @@ function CollectionPageContent() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Fetch artifacts using existing hook
-  // Note: For now using useArtifacts since it returns full Artifact objects
-  // In the future, this can be enhanced to filter by selectedCollectionId
-  const { data, isLoading: isLoadingArtifacts, error, refetch } = useArtifacts(
-    filters,
-    { field: sortField as any, order: sortOrder }
+  // Conditionally fetch artifacts based on selected collection
+  // When a specific collection is selected, use collection-specific endpoint
+  // When "All Collections" or no selection, use general artifacts endpoint
+  const {
+    data: collectionArtifactsData,
+    isLoading: isLoadingCollectionArtifacts,
+    error: collectionArtifactsError,
+    refetch: refetchCollectionArtifacts,
+  } = useCollectionArtifacts(
+    selectedCollectionId && selectedCollectionId !== 'all' ? selectedCollectionId : undefined
   );
+
+  const {
+    data: allArtifactsData,
+    isLoading: isLoadingAllArtifacts,
+    error: allArtifactsError,
+    refetch: refetchAllArtifacts,
+  } = useArtifacts(filters, { field: sortField as any, order: sortOrder });
+
+  // Select the appropriate data, loading state, and error based on selection
+  const isSpecificCollection = !!selectedCollectionId && selectedCollectionId !== 'all';
+  const data = isSpecificCollection ? collectionArtifactsData : allArtifactsData;
+  const isLoadingArtifacts = isSpecificCollection
+    ? isLoadingCollectionArtifacts
+    : isLoadingAllArtifacts;
+  const error = isSpecificCollection ? collectionArtifactsError : allArtifactsError;
+  const refetch = isSpecificCollection ? refetchCollectionArtifacts : refetchAllArtifacts;
 
   // Initialize lastUpdated on first load
   useEffect(() => {
@@ -164,35 +194,53 @@ function CollectionPageContent() {
 
   // Apply client-side search, tag filter, and sort
   const filteredArtifacts = useMemo(() => {
-    let artifacts = data?.artifacts ?? [];
+    // Handle different response shapes: useArtifacts returns .artifacts, useCollectionArtifacts returns .items
+    let artifacts: (Artifact | any)[] = [];
+    if (isSpecificCollection && data && 'items' in data) {
+      artifacts = data.items ?? [];
+    } else if (!isSpecificCollection && data && 'artifacts' in data) {
+      artifacts = data.artifacts ?? [];
+    }
 
     // Search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      artifacts = artifacts.filter(
-        (a) =>
-          a.name.toLowerCase().includes(query) ||
-          a.metadata.description?.toLowerCase().includes(query) ||
-          a.metadata.tags?.some((tag) => tag.toLowerCase().includes(query))
-      );
+      artifacts = artifacts.filter((a: any) => {
+        // Handle both Artifact and ArtifactSummary types
+        const nameMatch = a.name.toLowerCase().includes(query);
+        // Only access metadata if it exists (full Artifact objects)
+        const descMatch =
+          'metadata' in a && a.metadata?.description?.toLowerCase().includes(query);
+        const tagMatch =
+          'metadata' in a &&
+          a.metadata?.tags?.some((tag: string) => tag.toLowerCase().includes(query));
+        return nameMatch || descMatch || tagMatch;
+      });
     }
 
     // Tag filter
     if (selectedTags.length > 0) {
-      artifacts = artifacts.filter((artifact) =>
-        // Check if artifact has any of the selected tags
-        artifact.metadata.tags?.some((tag) => selectedTags.includes(tag))
-      );
+      artifacts = artifacts.filter((artifact: any) => {
+        // Only filter by tags if metadata exists (full Artifact objects)
+        if ('metadata' in artifact && artifact.metadata?.tags) {
+          return artifact.metadata.tags.some((tag: string) => selectedTags.includes(tag));
+        }
+        // For ArtifactSummary, skip tag filtering (no tag data available)
+        return false;
+      });
     }
 
     // Note: Sort is already handled by the useArtifacts hook
     // but we could add additional client-side sorting here if needed
 
     return artifacts;
-  }, [data?.artifacts, searchQuery, selectedTags]);
+  }, [isSpecificCollection, data, searchQuery, selectedTags]);
 
-  const handleArtifactClick = (artifact: Artifact) => {
-    setSelectedEntity(artifactToEntity(artifact));
+  const handleArtifactClick = (artifact: Artifact | any) => {
+    // NOTE: Type assertion needed temporarily - TASK-2.1 will properly handle ArtifactSummary conversion
+    // When viewing a specific collection, artifact may be ArtifactSummary (partial data)
+    // When viewing all collections, artifact is full Artifact object
+    setSelectedEntity(artifactToEntity(artifact as Artifact));
     setIsDetailOpen(true);
   };
 
@@ -295,11 +343,19 @@ function CollectionPageContent() {
         {/* Empty State */}
         {!error && !isLoadingArtifacts && filteredArtifacts.length === 0 && (
           <EmptyState
-            title="No artifacts"
+            title={
+              searchQuery || selectedTags.length > 0
+                ? 'No results found'
+                : isSpecificCollection
+                  ? 'No artifacts in this collection'
+                  : 'No artifacts'
+            }
             description={
               searchQuery || selectedTags.length > 0
-                ? 'No artifacts match your filters'
-                : 'Add artifacts to get started'
+                ? 'Try adjusting your search or filters'
+                : isSpecificCollection
+                  ? 'Add artifacts to this collection to get started'
+                  : 'Add artifacts to get started'
             }
           />
         )}
