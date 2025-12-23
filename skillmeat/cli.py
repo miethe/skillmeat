@@ -344,13 +344,23 @@ def show(
             else:
                 console.print()
                 console.print("[bold cyan]Confidence Scores[/bold cyan]")
-                console.print(f"  Trust Score:   [yellow]{result['trust_score']:.1f}[/yellow]/100")
-                console.print(f"  Quality Score: [yellow]{result['quality_score']:.1f}[/yellow]/100")
-                console.print(f"  Confidence:    [green]{result['confidence']:.1f}[/green]/100")
+                console.print(
+                    f"  Trust Score:   [yellow]{result['trust_score']:.1f}[/yellow]/100"
+                )
+                console.print(
+                    f"  Quality Score: [yellow]{result['quality_score']:.1f}[/yellow]/100"
+                )
+                console.print(
+                    f"  Confidence:    [green]{result['confidence']:.1f}[/green]/100"
+                )
                 console.print()
                 if rating_count > 0:
-                    stars = "★" * int(round(avg_rating)) + "☆" * (5 - int(round(avg_rating)))
-                    console.print(f"  User Rating:   [yellow]{stars}[/yellow] ({avg_rating:.1f}/5, {rating_count} ratings)")
+                    stars = "★" * int(round(avg_rating)) + "☆" * (
+                        5 - int(round(avg_rating))
+                    )
+                    console.print(
+                        f"  User Rating:   [yellow]{stars}[/yellow] ({avg_rating:.1f}/5, {rating_count} ratings)"
+                    )
                 else:
                     console.print(f"  User Rating:   [dim]No ratings yet[/dim]")
 
@@ -397,7 +407,9 @@ def show(
     default=False,
     help="Output as JSON",
 )
-def rate(artifact: str, rating: int, feedback: Optional[str], share: bool, as_json: bool):
+def rate(
+    artifact: str, rating: int, feedback: Optional[str], share: bool, as_json: bool
+):
     """Rate an artifact from 1-5.
 
     Provide feedback on artifacts you've used to help improve quality scores.
@@ -428,7 +440,9 @@ def rate(artifact: str, rating: int, feedback: Optional[str], share: bool, as_js
                 "rating": user_rating.rating,
                 "feedback": user_rating.feedback,
                 "shared": user_rating.share_with_community,
-                "rated_at": user_rating.rated_at.isoformat() if user_rating.rated_at else None,
+                "rated_at": (
+                    user_rating.rated_at.isoformat() if user_rating.rated_at else None
+                ),
             }
             console.print(json.dumps(result, indent=2))
         else:
@@ -3824,11 +3838,15 @@ def _display_match_results(scores, artifacts, query, scoring_result, verbose):
     # Header with scoring mode info
     mode = "Semantic + Keyword" if scoring_result.used_semantic else "Keyword-only"
     console.print(f"\n[bold]Artifact Match Results:[/bold] {mode}")
-    console.print(f'[dim]Query: "{query}" | Duration: {scoring_result.duration_ms:.0f}ms[/dim]')
+    console.print(
+        f'[dim]Query: "{query}" | Duration: {scoring_result.duration_ms:.0f}ms[/dim]'
+    )
 
     # Show degradation warning if applicable
     if scoring_result.degraded:
-        console.print(f"[yellow]Warning:[/yellow] {scoring_result.degradation_reason}\n")
+        console.print(
+            f"[yellow]Warning:[/yellow] {scoring_result.degradation_reason}\n"
+        )
     else:
         console.print()
 
@@ -3868,11 +3886,13 @@ def _display_match_results(scores, artifacts, query, scoring_result, verbose):
 
         if verbose:
             # Add score breakdown
-            row.extend([
-                f"{score.trust_score:.1f}",
-                f"{score.quality_score:.1f}",
-                f"{score.match_score:.1f}",
-            ])
+            row.extend(
+                [
+                    f"{score.trust_score:.1f}",
+                    f"{score.quality_score:.1f}",
+                    f"{score.match_score:.1f}",
+                ]
+            )
 
         table.add_row(*row)
 
@@ -4008,21 +4028,76 @@ def match(
 
         # Display results
         if output_json:
-            # JSON output - defer detailed implementation to P2-T6
-            # For now, output basic structure
+            # Enhanced JSON output (P2-T6)
+            from datetime import datetime, timezone
+
+            # Build artifact lookup by ID for metadata
+            artifact_by_id = {}
+            for artifact in artifacts:
+                # artifact_id format: "type:name" (e.g., "skill:pdf-processor")
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+                artifact_by_id[artifact_id] = artifact
+
+            # Generate explanation for each score
+            def generate_explanation(score: "ArtifactScore") -> str:
+                """Generate human-readable explanation for a score."""
+                confidence = score.confidence
+                if confidence >= 70:
+                    category = "High match"
+                elif confidence >= 50:
+                    category = "Moderate match"
+                else:
+                    category = "Low relevance"
+
+                # Build reason based on component scores
+                reasons = []
+                if score.match_score >= 80:
+                    reasons.append(f"strong match score ({score.match_score:.1f}%)")
+                elif score.match_score >= 60:
+                    reasons.append(f"moderate match ({score.match_score:.1f}%)")
+
+                if score.trust_score >= 80:
+                    reasons.append(f"high trust ({score.trust_score:.1f}%)")
+                if score.quality_score >= 70:
+                    reasons.append(f"good quality ({score.quality_score:.1f}%)")
+
+                reason_str = ", ".join(reasons) if reasons else "see component scores"
+                return f"{category}: {reason_str}"
+
             output = {
+                "schema_version": "1.0.0",
                 "query": query,
+                "scored_at": datetime.now(timezone.utc).isoformat(),
                 "used_semantic": result.used_semantic,
                 "degraded": result.degraded,
                 "degradation_reason": result.degradation_reason,
                 "duration_ms": result.duration_ms,
+                "total_artifacts": len(artifacts),
+                "result_count": len(top_scores),
                 "results": [
                     {
                         "artifact_id": score.artifact_id,
+                        "name": (
+                            artifact_by_id[score.artifact_id].name
+                            if score.artifact_id in artifact_by_id
+                            else score.artifact_id.split(":", 1)[1]
+                        ),
+                        "artifact_type": (
+                            artifact_by_id[score.artifact_id].type.value
+                            if score.artifact_id in artifact_by_id
+                            else score.artifact_id.split(":", 1)[0]
+                        ),
+                        "title": (
+                            artifact_by_id[score.artifact_id].metadata.title
+                            if score.artifact_id in artifact_by_id
+                            and artifact_by_id[score.artifact_id].metadata.title
+                            else None
+                        ),
                         "confidence": score.confidence,
                         "trust_score": score.trust_score,
                         "quality_score": score.quality_score,
                         "match_score": score.match_score,
+                        "explanation": generate_explanation(score),
                     }
                     for score in top_scores
                 ],
@@ -4031,9 +4106,7 @@ def match(
             print(json.dumps(output, indent=2))
         else:
             # Rich table output
-            _display_match_results(
-                top_scores, artifacts, query, result, verbose
-            )
+            _display_match_results(top_scores, artifacts, query, result, verbose)
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}", err=True)

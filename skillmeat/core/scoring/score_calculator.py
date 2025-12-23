@@ -35,6 +35,7 @@ from skillmeat.core.scoring.context_booster import ContextBooster
 from skillmeat.core.scoring.match_analyzer import MatchAnalyzer
 from skillmeat.core.scoring.models import ArtifactScore
 from skillmeat.core.scoring.semantic_scorer import SemanticScorer
+from skillmeat.observability.tracing import trace_operation
 
 logger = logging.getLogger(__name__)
 
@@ -140,72 +141,98 @@ class ScoreCalculator:
             ... )
             >>> assert 0 <= score.confidence <= 100
         """
-        # Validate input scores
-        if not 0 <= trust_score <= 100:
-            raise ValueError(f"trust_score must be 0-100, got {trust_score}")
-        if not 0 <= quality_score <= 100:
-            raise ValueError(f"quality_score must be 0-100, got {quality_score}")
+        with trace_operation(
+            "scoring.calculate_score",
+            artifact_id=f"{artifact_type}:{artifact_name}",
+            query=query,
+        ) as span:
+            # Validate input scores
+            if not 0 <= trust_score <= 100:
+                raise ValueError(f"trust_score must be 0-100, got {trust_score}")
+            if not 0 <= quality_score <= 100:
+                raise ValueError(f"quality_score must be 0-100, got {quality_score}")
 
-        # 1. Compute keyword match score (always available)
-        keyword_score = self.match_analyzer.score_artifact(
-            query=query, artifact=artifact, artifact_name=artifact_name
-        )
-
-        # 2. Attempt semantic scoring if available
-        semantic_score: Optional[float] = None
-        if self.semantic_scorer and self.semantic_scorer.is_available():
-            try:
-                semantic_score = await self.semantic_scorer.score_artifact(
-                    query=query, artifact=artifact
+            # 1. Compute keyword match score (always available)
+            keyword_score = self.match_analyzer.score_artifact(
+                query=query, artifact=artifact, artifact_name=artifact_name
+            )
+    
+            # 2. Attempt semantic scoring if available
+            semantic_score: Optional[float] = None
+            if self.semantic_scorer and self.semantic_scorer.is_available():
+                try:
+                    semantic_score = await self.semantic_scorer.score_artifact(
+                        query=query, artifact=artifact
+                    )
+                except Exception as e:
+                    logger.warning(f"Semantic scoring failed: {e}, using keyword only")
+                    semantic_score = None
+    
+            # 3. Blend semantic and keyword scores
+            if semantic_score is not None:
+                # Blend: 60% semantic + 40% keyword
+                match_score = (semantic_score * SEMANTIC_WEIGHT) + (
+                    keyword_score * KEYWORD_WEIGHT
                 )
-            except Exception as e:
-                logger.warning(f"Semantic scoring failed: {e}, using keyword only")
-                semantic_score = None
-
-        # 3. Blend semantic and keyword scores
-        if semantic_score is not None:
-            # Blend: 60% semantic + 40% keyword
-            match_score = (semantic_score * SEMANTIC_WEIGHT) + (
-                keyword_score * KEYWORD_WEIGHT
+                logger.debug(
+                    f"Blended match score: {match_score:.1f} "
+                    f"(semantic={semantic_score:.1f}, keyword={keyword_score:.1f})"
+                )
+            else:
+                # Fallback to 100% keyword score
+                match_score = keyword_score
+                logger.debug(f"Using keyword-only match score: {match_score:.1f}")
+    
+            # 4. Apply context boost if configured
+            if self.context_booster:
+                match_score = self.context_booster.apply_boost(artifact, match_score)
+                # Clamp to valid range after boost
+                match_score = min(100.0, match_score)
+                logger.debug(f"After context boost: {match_score:.1f}")
+    
+            # 5. Calculate composite confidence score
+            confidence = (
+                (trust_score * self.weights["trust"])
+                + (quality_score * self.weights["quality"])
+                + (match_score * self.weights["match"])
             )
-            logger.debug(
-                f"Blended match score: {match_score:.1f} "
-                f"(semantic={semantic_score:.1f}, keyword={keyword_score:.1f})"
+    
+            # Ensure confidence is in valid range
+            confidence = min(100.0, max(0.0, confidence))
+    
+            # 6. Build ArtifactScore result
+            artifact_id = f"{artifact_type}:{artifact_name}"
+
+            # Add span attributes
+            span.set_attribute("scoring.trust_score", trust_score)
+            span.set_attribute("scoring.quality_score", quality_score)
+            span.set_attribute("scoring.match_score", round(match_score, 2))
+            span.set_attribute("scoring.confidence", confidence)
+            used_semantic = semantic_score is not None
+            span.set_attribute("scoring.used_semantic", used_semantic)
+            if used_semantic:
+                # Create child span for semantic scoring
+                span.add_event("scoring.semantic_match", {
+                    "semantic_score": round(semantic_score, 2),
+                    "keyword_score": round(keyword_score, 2),
+                    "blend_weight_semantic": SEMANTIC_WEIGHT,
+                    "blend_weight_keyword": KEYWORD_WEIGHT,
+                })
+            else:
+                # Keyword-only scoring
+                span.add_event("scoring.keyword_only", {
+                    "keyword_score": round(keyword_score, 2),
+                })
+
+            return ArtifactScore(
+                artifact_id=artifact_id,
+                trust_score=trust_score,
+                quality_score=quality_score,
+                match_score=match_score,
+                confidence=confidence,
+                schema_version="1.0.0",
+                last_updated=datetime.now(timezone.utc),
             )
-        else:
-            # Fallback to 100% keyword score
-            match_score = keyword_score
-            logger.debug(f"Using keyword-only match score: {match_score:.1f}")
-
-        # 4. Apply context boost if configured
-        if self.context_booster:
-            match_score = self.context_booster.apply_boost(artifact, match_score)
-            # Clamp to valid range after boost
-            match_score = min(100.0, match_score)
-            logger.debug(f"After context boost: {match_score:.1f}")
-
-        # 5. Calculate composite confidence score
-        confidence = (
-            (trust_score * self.weights["trust"])
-            + (quality_score * self.weights["quality"])
-            + (match_score * self.weights["match"])
-        )
-
-        # Ensure confidence is in valid range
-        confidence = min(100.0, max(0.0, confidence))
-
-        # 6. Build ArtifactScore result
-        artifact_id = f"{artifact_type}:{artifact_name}"
-
-        return ArtifactScore(
-            artifact_id=artifact_id,
-            trust_score=trust_score,
-            quality_score=quality_score,
-            match_score=match_score,
-            confidence=confidence,
-            schema_version="1.0.0",
-            last_updated=datetime.now(timezone.utc),
-        )
 
     async def calculate_scores(
         self,

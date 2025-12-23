@@ -191,6 +191,8 @@ async def match_artifacts(
                 matches.append(matched)
 
             span.set_attribute("matches_returned", len(matches))
+            span.set_attribute("result_count", len(matches))
+            span.set_attribute("duration_ms", round(result.duration_ms, 2))
             span.add_event("matches_prepared")
 
             return MatchResponse(

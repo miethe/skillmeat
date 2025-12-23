@@ -34,6 +34,7 @@ from skillmeat.core.scoring.match_analyzer import MatchAnalyzer
 from skillmeat.core.scoring.models import ArtifactScore, ScoringResult
 from skillmeat.core.scoring.semantic_scorer import SemanticScorer
 from skillmeat.core.scoring.utils import with_timeout
+from skillmeat.observability.tracing import trace_operation
 
 logger = logging.getLogger(__name__)
 
@@ -177,91 +178,102 @@ class ScoringService:
             >>> for score in result.scores:
             ...     print(f"{score.artifact_id}: {score.confidence:.1f}%")
         """
-        start_time = time.perf_counter()
-        timeout_seconds = timeout if timeout is not None else self.semantic_timeout
+        with trace_operation(
+            "scoring.score_artifacts",
+            query=query,
+            artifact_count=len(artifacts),
+        ) as span:
+            start_time = time.perf_counter()
+            timeout_seconds = timeout if timeout is not None else self.semantic_timeout
 
-        # Default to keyword scoring
-        used_semantic = False
-        degraded = False
-        degradation_reason = None
+            # Default to keyword scoring
+            used_semantic = False
+            degraded = False
+            degradation_reason = None
 
-        # Try semantic scoring if enabled
-        if self.enable_semantic and self.semantic_available:
-            try:
-                # Attempt semantic scoring with timeout
-                semantic_scores = await with_timeout(
-                    self._score_semantic(query, artifacts),
-                    timeout_seconds=timeout_seconds,
-                    fallback=None,
-                    raise_on_timeout=not self.fallback_to_keyword,
-                )
-
-                if semantic_scores is not None:
-                    # Semantic scoring succeeded
-                    used_semantic = True
-                    scores = semantic_scores
-                else:
-                    # Timeout occurred, use fallback
-                    degraded = True
-                    degradation_reason = (
-                        f"Semantic scoring timed out after {timeout_seconds}s"
+            # Try semantic scoring if enabled
+            if self.enable_semantic and self.semantic_available:
+                try:
+                    # Attempt semantic scoring with timeout
+                    semantic_scores = await with_timeout(
+                        self._score_semantic(query, artifacts),
+                        timeout_seconds=timeout_seconds,
+                        fallback=None,
+                        raise_on_timeout=not self.fallback_to_keyword,
                     )
+
+                    if semantic_scores is not None:
+                        # Semantic scoring succeeded
+                        used_semantic = True
+                        scores = semantic_scores
+                    else:
+                        # Timeout occurred, use fallback
+                        degraded = True
+                        degradation_reason = (
+                            f"Semantic scoring timed out after {timeout_seconds}s"
+                        )
+                        scores = self._score_keyword(query, artifacts)
+
+                except EmbeddingServiceUnavailable as e:
+                    # Embedding service unavailable
+                    if not self.fallback_to_keyword:
+                        raise
+
+                    degraded = True
+                    degradation_reason = f"Embedding service unavailable: {str(e)}"
+                    logger.warning(degradation_reason)
                     scores = self._score_keyword(query, artifacts)
 
-            except EmbeddingServiceUnavailable as e:
-                # Embedding service unavailable
-                if not self.fallback_to_keyword:
-                    raise
+                except ScoringTimeout as e:
+                    # Timeout in strict mode
+                    if not self.fallback_to_keyword:
+                        raise
 
+                    degraded = True
+                    degradation_reason = str(e)
+                    logger.warning(degradation_reason)
+                    scores = self._score_keyword(query, artifacts)
+
+                except Exception as e:
+                    # Unexpected error
+                    logger.error(f"Semantic scoring failed unexpectedly: {e}")
+
+                    if not self.fallback_to_keyword:
+                        raise
+
+                    degraded = True
+                    degradation_reason = f"Semantic scoring error: {str(e)}"
+                    scores = self._score_keyword(query, artifacts)
+
+            elif self.enable_semantic and not self.semantic_available:
+                # Semantic enabled but not available
                 degraded = True
-                degradation_reason = f"Embedding service unavailable: {str(e)}"
-                logger.warning(degradation_reason)
+                degradation_reason = (
+                    "Embedding service not available (missing API key or configuration)"
+                )
                 scores = self._score_keyword(query, artifacts)
 
-            except ScoringTimeout as e:
-                # Timeout in strict mode
-                if not self.fallback_to_keyword:
-                    raise
-
-                degraded = True
-                degradation_reason = str(e)
-                logger.warning(degradation_reason)
+            else:
+                # Semantic disabled, use keyword-only
                 scores = self._score_keyword(query, artifacts)
 
-            except Exception as e:
-                # Unexpected error
-                logger.error(f"Semantic scoring failed unexpectedly: {e}")
+            duration_ms = (time.perf_counter() - start_time) * 1000
 
-                if not self.fallback_to_keyword:
-                    raise
+            # Add span attributes
+            span.set_attribute("scoring.used_semantic", used_semantic)
+            span.set_attribute("scoring.degraded", degraded)
+            span.set_attribute("scoring.duration_ms", round(duration_ms, 2))
+            if degraded and degradation_reason:
+                span.add_event("scoring.degraded", {"reason": degradation_reason})
 
-                degraded = True
-                degradation_reason = f"Semantic scoring error: {str(e)}"
-                scores = self._score_keyword(query, artifacts)
-
-        elif self.enable_semantic and not self.semantic_available:
-            # Semantic enabled but not available
-            degraded = True
-            degradation_reason = (
-                "Embedding service not available (missing API key or configuration)"
+            return ScoringResult(
+                scores=scores,
+                used_semantic=used_semantic,
+                degraded=degraded,
+                degradation_reason=degradation_reason,
+                duration_ms=duration_ms,
+                query=query,
             )
-            scores = self._score_keyword(query, artifacts)
-
-        else:
-            # Semantic disabled, use keyword-only
-            scores = self._score_keyword(query, artifacts)
-
-        # Calculate duration
-        duration_ms = (time.perf_counter() - start_time) * 1000
-
-        return ScoringResult(
-            scores=scores,
-            used_semantic=used_semantic,
-            degraded=degraded,
-            degradation_reason=degradation_reason,
-            duration_ms=duration_ms,
-            query=query,
-        )
 
     async def _score_semantic(
         self, query: str, artifacts: List[Tuple[str, ArtifactMetadata]]
