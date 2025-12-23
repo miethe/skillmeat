@@ -256,7 +256,7 @@ class TestMatchCommand:
         mock_artifacts,
         mock_scoring_result,
     ):
-        """Test match command with --json output."""
+        """Test match command with --json output (enhanced in P2-T6)."""
         # Setup mocks
         mock_artifact_manager = MagicMock()
         mock_artifact_manager.list_artifacts.return_value = mock_artifacts
@@ -273,13 +273,36 @@ class TestMatchCommand:
         assert result.exit_code == 0
         # Parse JSON output
         output_data = json.loads(result.output)
+
+        # Original fields
         assert output_data["query"] == "pdf"
         assert output_data["used_semantic"] is True
         assert output_data["degraded"] is False
         assert len(output_data["results"]) == 3
         assert output_data["results"][0]["artifact_id"] == "skill:pdf-processor"
-        # Check confidence is reasonable (scoring may recalculate)
         assert output_data["results"][0]["confidence"] > 80.0
+
+        # Enhanced fields (P2-T6)
+        assert output_data["schema_version"] == "1.0.0"
+        assert "scored_at" in output_data
+        # Validate ISO 8601 timestamp
+        from datetime import datetime
+        datetime.fromisoformat(output_data["scored_at"].replace("Z", "+00:00"))
+        assert output_data["total_artifacts"] == 3
+        assert output_data["result_count"] == 3
+
+        # Enhanced result fields
+        first_result = output_data["results"][0]
+        assert first_result["name"] == "pdf-processor"
+        assert first_result["artifact_type"] == "skill"
+        assert first_result["title"] == "PDF Processor"
+        assert "explanation" in first_result
+        assert isinstance(first_result["explanation"], str)
+        # Explanation should be descriptive (High/Moderate/Low match)
+        assert any(
+            keyword in first_result["explanation"]
+            for keyword in ["High match", "Moderate match", "Low relevance"]
+        )
 
     @patch("skillmeat.cli.ArtifactManager")
     def test_match_no_artifacts(
