@@ -5,8 +5,9 @@ which combines trust scores (source reputation), quality scores (community ratin
 and match scores (query relevance) into a composite confidence metric.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import List
 
 
 @dataclass
@@ -42,7 +43,9 @@ class ArtifactScore:
         if not 0 <= self.quality_score <= 100:
             raise ValueError(f"quality_score must be 0-100, got {self.quality_score}")
         if self.match_score is not None and not 0 <= self.match_score <= 100:
-            raise ValueError(f"match_score must be 0-100 or None, got {self.match_score}")
+            raise ValueError(
+                f"match_score must be 0-100 or None, got {self.match_score}"
+            )
 
         # Calculate composite confidence
         # If match_score is None, redistribute weight to trust and quality
@@ -112,3 +115,47 @@ class CommunityScore:
         """Validate score range."""
         if not 0 <= self.score <= 100:
             raise ValueError(f"score must be 0-100, got {self.score}")
+
+
+@dataclass
+class ScoringResult:
+    """Result of a scoring operation with metadata and degradation info.
+
+    This class captures not just the scores, but also metadata about how
+    those scores were computed, enabling clients to understand when
+    degradation occurred and adjust UI accordingly.
+
+    Attributes:
+        scores: List of artifact scores ordered by relevance
+        used_semantic: Whether semantic scoring was used (True) or degraded to keyword-only (False)
+        degraded: Whether any fallback/degradation occurred during scoring
+        degradation_reason: Human-readable explanation of why degradation occurred (if any)
+        duration_ms: Total time taken for scoring operation in milliseconds
+        query: Original search query that was scored
+
+    Example:
+        >>> result = await scoring_service.score_artifacts("pdf tool", artifacts)
+        >>> if result.degraded:
+        ...     print(f"Warning: {result.degradation_reason}")
+        >>> print(f"Found {len(result.scores)} matches in {result.duration_ms:.1f}ms")
+        >>> if result.used_semantic:
+        ...     print("✓ Using semantic scoring")
+        ... else:
+        ...     print("⚠ Using keyword-only scoring")
+    """
+
+    scores: List[ArtifactScore]
+    used_semantic: bool
+    degraded: bool
+    degradation_reason: str | None
+    duration_ms: float
+    query: str = ""
+
+    def __post_init__(self):
+        """Validate scoring result data."""
+        if self.duration_ms < 0:
+            raise ValueError(f"duration_ms must be >= 0, got {self.duration_ms}")
+
+        # If degraded=True, must have a reason
+        if self.degraded and not self.degradation_reason:
+            raise ValueError("degraded=True requires degradation_reason to be set")
