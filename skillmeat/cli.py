@@ -269,11 +269,32 @@ def cmd_list(
     default=None,
     help="Collection name (default: active collection)",
 )
-def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
+@click.option(
+    "--scores",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Show confidence scores (trust, quality, ratings)",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Output scores as JSON (only with --scores)",
+)
+def show(
+    name: str,
+    artifact_type: Optional[str],
+    collection: Optional[str],
+    scores: bool,
+    as_json: bool,
+):
     """Show detailed information about an artifact.
 
     Examples:
-      skillmeat show my-skill           # Show skill details
+      skillmeat show my-skill             # Show skill details
+      skillmeat show my-skill --scores    # Include confidence scores
       skillmeat show review --type command  # Show command (if ambiguous)
     """
     try:
@@ -289,12 +310,145 @@ def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
             collection_name=collection,
         )
 
+        # Show scores if requested
+        if scores:
+            from skillmeat.core.scoring import QualityScorer
+            from skillmeat.storage.rating_store import RatingManager
+
+            # Build artifact ID (type:name format)
+            artifact_id = f"{artifact_type or 'skill'}:{name}"
+
+            scorer = QualityScorer()
+            manager = RatingManager()
+
+            result = scorer.calculate_confidence_score(
+                artifact_id=artifact_id,
+                source_type="unknown",  # Default, could be enhanced
+            )
+
+            rating_count = scorer.get_rating_count(artifact_id)
+            avg_rating = manager.get_average_rating(artifact_id)
+
+            if as_json:
+                score_data = {
+                    "artifact_id": artifact_id,
+                    "trust_score": result["trust_score"],
+                    "quality_score": result["quality_score"],
+                    "confidence": result["confidence"],
+                    "rating_count": rating_count,
+                    "average_rating": round(avg_rating, 2) if avg_rating else None,
+                    "schema_version": result["schema_version"],
+                }
+                console.print(json.dumps(score_data, indent=2))
+            else:
+                console.print()
+                console.print("[bold cyan]Confidence Scores[/bold cyan]")
+                console.print(f"  Trust Score:   [yellow]{result['trust_score']:.1f}[/yellow]/100")
+                console.print(f"  Quality Score: [yellow]{result['quality_score']:.1f}[/yellow]/100")
+                console.print(f"  Confidence:    [green]{result['confidence']:.1f}[/green]/100")
+                console.print()
+                if rating_count > 0:
+                    stars = "★" * int(round(avg_rating)) + "☆" * (5 - int(round(avg_rating)))
+                    console.print(f"  User Rating:   [yellow]{stars}[/yellow] ({avg_rating:.1f}/5, {rating_count} ratings)")
+                else:
+                    console.print(f"  User Rating:   [dim]No ratings yet[/dim]")
+
     except ValueError as e:
         # Ambiguous name or not found
         console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+# ====================
+# Rating Commands
+# ====================
+
+
+@main.command()
+@click.argument("artifact")
+@click.option(
+    "--rating",
+    "-r",
+    type=click.IntRange(1, 5),
+    required=True,
+    help="Rating from 1 (poor) to 5 (excellent)",
+)
+@click.option(
+    "--feedback",
+    "-f",
+    default=None,
+    help="Optional text feedback",
+)
+@click.option(
+    "--share",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Share rating with community",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Output as JSON",
+)
+def rate(artifact: str, rating: int, feedback: Optional[str], share: bool, as_json: bool):
+    """Rate an artifact from 1-5.
+
+    Provide feedback on artifacts you've used to help improve quality scores.
+    Ratings are stored locally and can optionally be shared with the community.
+
+    Examples:
+      skillmeat rate canvas-design --rating 5              # Rate excellent
+      skillmeat rate my-skill -r 4 -f "Works great!"       # Rate with feedback
+      skillmeat rate skill:review -r 5 --share             # Share with community
+    """
+    try:
+        from skillmeat.storage.rating_store import RatingManager, RateLimitExceededError
+
+        manager = RatingManager()
+
+        # Add the rating
+        user_rating = manager.add_rating(
+            artifact_id=artifact,
+            rating=rating,
+            feedback=feedback,
+            share=share,
+        )
+
+        if as_json:
+            result = {
+                "id": user_rating.id,
+                "artifact_id": user_rating.artifact_id,
+                "rating": user_rating.rating,
+                "feedback": user_rating.feedback,
+                "shared": user_rating.share_with_community,
+                "rated_at": user_rating.rated_at.isoformat() if user_rating.rated_at else None,
+            }
+            console.print(json.dumps(result, indent=2))
+        else:
+            stars = "★" * rating + "☆" * (5 - rating)
+            console.print(f"[green]Rating saved![/green]")
+            console.print(f"  Artifact: [cyan]{artifact}[/cyan]")
+            console.print(f"  Rating:   [yellow]{stars}[/yellow] ({rating}/5)")
+            if feedback:
+                console.print(f"  Feedback: {feedback}")
+            if share:
+                console.print(f"  [dim]Shared with community[/dim]")
+
+    except RateLimitExceededError as e:
+        console.print(f"[yellow]Rate limit: {e}[/yellow]")
+        sys.exit(1)
+    except ValueError as e:
+        console.print(f"[red]Invalid input: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception(f"Failed to rate artifact: {e}")
         sys.exit(1)
 
 
