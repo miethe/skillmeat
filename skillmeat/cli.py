@@ -4,6 +4,7 @@ This module provides the complete command-line interface for SkillMeat,
 a personal collection manager for Claude Code artifacts.
 """
 
+import asyncio
 import json
 import logging
 import sys
@@ -3793,6 +3794,246 @@ def search(
                 _display_search_json(result, cross_project=False)
             else:
                 _display_search_results(result, cross_project=False)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]", err=True)
+        sys.exit(1)
+
+
+def _display_match_results(scores, artifacts, query, scoring_result, verbose):
+    """Display match results with Rich formatting and color-coded confidence.
+
+    Args:
+        scores: List of ArtifactScore objects
+        artifacts: List of Artifact objects (for type lookup)
+        query: Original search query
+        scoring_result: ScoringResult object
+        verbose: Whether to show detailed score breakdown
+    """
+    from rich.text import Text
+
+    # Create artifact lookup map
+    artifact_map = {a.name: a for a in artifacts}
+
+    # Header with scoring mode info
+    mode = "Semantic + Keyword" if scoring_result.used_semantic else "Keyword-only"
+    console.print(f"\n[bold]Artifact Match Results:[/bold] {mode}")
+    console.print(f'[dim]Query: "{query}" | Duration: {scoring_result.duration_ms:.0f}ms[/dim]')
+
+    # Show degradation warning if applicable
+    if scoring_result.degraded:
+        console.print(f"[yellow]Warning:[/yellow] {scoring_result.degradation_reason}\n")
+    else:
+        console.print()
+
+    # Create results table
+    table = Table(title=f"Top {len(scores)} Matches")
+    table.add_column("Artifact", style="cyan", no_wrap=False)
+    table.add_column("Confidence", justify="right", width=12)
+    table.add_column("Type", style="green", width=10)
+
+    if verbose:
+        # Add breakdown columns
+        table.add_column("Trust", justify="right", width=8)
+        table.add_column("Quality", justify="right", width=8)
+        table.add_column("Match", justify="right", width=8)
+
+    for score in scores:
+        # Extract artifact name from artifact_id (format: "skill:name")
+        artifact_name = score.artifact_id.split(":", 1)[-1]
+
+        # Get artifact type
+        artifact = artifact_map.get(artifact_name)
+        artifact_type = artifact.type.value if artifact else "unknown"
+
+        # Color-code confidence score
+        confidence = score.confidence
+        if confidence >= 70:
+            confidence_style = "green"
+        elif confidence >= 50:
+            confidence_style = "yellow"
+        else:
+            confidence_style = "red"
+
+        confidence_text = Text(f"{confidence:.1f}", style=confidence_style)
+
+        # Build row
+        row = [artifact_name, confidence_text, artifact_type]
+
+        if verbose:
+            # Add score breakdown
+            row.extend([
+                f"{score.trust_score:.1f}",
+                f"{score.quality_score:.1f}",
+                f"{score.match_score:.1f}",
+            ])
+
+        table.add_row(*row)
+
+    console.print(table)
+
+    # Footer
+    console.print(f"\n[dim]Showing top {len(scores)} results[/dim]")
+    if not verbose:
+        console.print("[dim]Use --verbose to see score breakdown[/dim]")
+    console.print("[dim]Use --json for machine-readable output[/dim]")
+
+    # Legend
+    console.print("\n[dim]Confidence Score Legend:[/dim]")
+    console.print("  [green]Green (70-100):[/green] High confidence match")
+    console.print("  [yellow]Yellow (50-69):[/yellow] Medium confidence match")
+    console.print("  [red]Red (0-49):[/red] Low confidence match")
+
+
+@main.command()
+@click.argument("query")
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=5,
+    help="Maximum results to show (default: 5)",
+)
+@click.option(
+    "--min-confidence",
+    "-m",
+    type=float,
+    default=0.0,
+    help="Minimum confidence threshold (0-100, default: 0)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection to search (default: active collection)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show score breakdown",
+)
+def match(
+    query: str,
+    limit: int,
+    min_confidence: float,
+    collection: Optional[str],
+    output_json: bool,
+    verbose: bool,
+):
+    """Match artifacts against a query using confidence scoring.
+
+    Uses AI-powered semantic matching combined with keyword analysis to rank
+    artifacts by relevance. Results show confidence scores (0-100) and are
+    color-coded for quick assessment.
+
+    \b
+    Examples:
+      # Basic search
+      skillmeat match "pdf processor"
+
+      # Limit results
+      skillmeat match "authentication" --limit 3
+
+      # Filter by confidence threshold
+      skillmeat match "testing" --min-confidence 50
+
+      # Show detailed score breakdown
+      skillmeat match "database" --verbose
+
+      # JSON output for scripting
+      skillmeat match "api" --json
+    """
+    try:
+        from skillmeat.core.scoring.service import ScoringService
+
+        # Validate min_confidence range
+        if not 0 <= min_confidence <= 100:
+            console.print(
+                "[red]Error:[/red] min-confidence must be between 0 and 100",
+                err=True,
+            )
+            sys.exit(1)
+
+        # Load artifacts from collection
+        artifact_mgr = ArtifactManager()
+        artifacts = artifact_mgr.list_artifacts(collection_name=collection)
+
+        if not artifacts:
+            console.print("[yellow]No artifacts found in collection[/yellow]")
+            return
+
+        # Convert to format expected by ScoringService
+        # ScoringService expects: List[Tuple[str, ArtifactMetadata]]
+        artifacts_for_scoring = [(a.name, a.metadata) for a in artifacts]
+
+        # Create scoring service (will use keyword-only if no API key)
+        scoring_service = ScoringService(
+            enable_semantic=True,  # Try semantic, fall back to keyword
+            semantic_timeout=5.0,
+            fallback_to_keyword=True,
+        )
+
+        # Score artifacts
+        result = asyncio.run(
+            scoring_service.score_artifacts(query, artifacts_for_scoring)
+        )
+
+        # Filter by min_confidence
+        filtered_scores = [
+            score for score in result.scores if score.confidence >= min_confidence
+        ]
+
+        # Limit results
+        top_scores = filtered_scores[:limit]
+
+        if not top_scores:
+            console.print(
+                f"[yellow]No artifacts found matching '{query}' "
+                f"with confidence >= {min_confidence}[/yellow]"
+            )
+            return
+
+        # Display results
+        if output_json:
+            # JSON output - defer detailed implementation to P2-T6
+            # For now, output basic structure
+            output = {
+                "query": query,
+                "used_semantic": result.used_semantic,
+                "degraded": result.degraded,
+                "degradation_reason": result.degradation_reason,
+                "duration_ms": result.duration_ms,
+                "results": [
+                    {
+                        "artifact_id": score.artifact_id,
+                        "confidence": score.confidence,
+                        "trust_score": score.trust_score,
+                        "quality_score": score.quality_score,
+                        "match_score": score.match_score,
+                    }
+                    for score in top_scores
+                ],
+            }
+            # Use print() directly for JSON to avoid Rich formatting
+            print(json.dumps(output, indent=2))
+        else:
+            # Rich table output
+            _display_match_results(
+                top_scores, artifacts, query, result, verbose
+            )
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}", err=True)
