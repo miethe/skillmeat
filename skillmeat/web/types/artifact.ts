@@ -35,6 +35,14 @@ export interface UsageStats {
   usageCount: number;
 }
 
+export interface ArtifactScore {
+  confidence: number;
+  trustScore?: number;
+  qualityScore?: number;
+  matchScore?: number;
+  lastUpdated?: string;
+}
+
 export interface Artifact {
   id: string;
   name: string;
@@ -53,6 +61,7 @@ export interface Artifact {
     id: string;
     name: string;
   };
+  score?: ArtifactScore;
 }
 
 export interface ArtifactFilters {
