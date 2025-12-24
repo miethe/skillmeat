@@ -3,10 +3,10 @@ type: progress
 prd: "PRD-001-confidence-scoring"
 phase: "3-5"
 phase_title: "Community, Web UI, Advanced"
-status: in_progress
-progress: 50
+status: completed
+progress: 100
 total_tasks: 12
-completed_tasks: 6
+completed_tasks: 12
 estimated_effort: "5-6 weeks"
 story_points: 23
 dependencies:
@@ -28,27 +28,34 @@ tasks:
 
   - id: "P3-T2"
     title: "GitHub Stars Import"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T1"]
     story_points: 3
     phase: 3
+    commit: "6579984"
+    tests: 35
 
   - id: "P3-T3"
     title: "Score Freshness Decay"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T1"]
     story_points: 2
     phase: 3
+    commit: "caae3ec"
+    tests: 45
+    coverage: "100%"
 
   - id: "P3-T4"
     title: "CLI: scores import/refresh"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3-T2", "P3-T3"]
     story_points: 2
     phase: 3
+    commit: "7b2d492"
+    tests: 19
 
   # Phase 4 tasks
   - id: "P4-T1"
@@ -105,27 +112,32 @@ tasks:
   # Phase 5 tasks
   - id: "P5-T1"
     title: "Weight Customization"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     story_points: 1
     phase: 5
+    commit: "97294a9"
 
   - id: "P5-T2"
     title: "Historical Success Tracking"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     story_points: 1
     phase: 5
+    commit: "524501a"
 
   - id: "P5-T3"
     title: "Anti-Gaming Protections"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer", "backend-architect"]
     dependencies: []
     story_points: 1
     phase: 5
+    commit: "a980c34"
+    tests: 24
+    coverage: "98.5%"
 
 parallelization:
   # Phase 3
@@ -219,18 +231,18 @@ Acceptance: No false positives, gaming detected")
 ## Quality Gates
 
 ### Phase 3
-- [ ] Community scores imported and aggregated
-- [ ] Decay applied correctly (5%/month)
-- [ ] All imported scores have source attribution
+- [x] Community scores imported and aggregated
+- [x] Decay applied correctly (5%/month)
+- [x] All imported scores have source attribution
 
 ### Phase 4
-- [ ] Score components visible on artifact cards
-- [ ] Rating dialog accessible via keyboard
-- [ ] Search sorts by confidence
+- [x] Score components visible on artifact cards
+- [x] Rating dialog accessible via keyboard
+- [x] Search sorts by confidence
 
 ### Phase 5
-- [ ] Weight customization works end-to-end
-- [ ] Anti-gaming detections have no false positives
+- [x] Weight customization works end-to-end
+- [x] Anti-gaming detections have no false positives
 
 ## Notes
 
