@@ -71,7 +71,7 @@ export interface ArtifactFilters {
   search?: string;
 }
 
-export type SortField = 'name' | 'updatedAt' | 'usageCount';
+export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';
 export type SortOrder = 'asc' | 'desc';
 
 export interface ArtifactSort {

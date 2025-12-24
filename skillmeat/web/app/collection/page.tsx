@@ -179,8 +179,8 @@ function CollectionPageContent() {
   // Filters, search, sort state
   const [filters, setFilters] = useState<ArtifactFilters>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState('confidence');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Tag filtering from URL
   const selectedTags = useMemo(() => {
@@ -278,11 +278,34 @@ function CollectionPageContent() {
       });
     }
 
-    // Note: Sort is already handled by the useArtifacts hook
-    // but we could add additional client-side sorting here if needed
+    // Apply client-side sorting (confidence sorting requires client-side since backend doesn't support it)
+    if (sortField === 'confidence') {
+      artifacts = [...artifacts].sort((a, b) => {
+        const aConfidence = a.score?.confidence ?? 0;
+        const bConfidence = b.score?.confidence ?? 0;
+        return sortOrder === 'asc' ? aConfidence - bConfidence : bConfidence - aConfidence;
+      });
+    } else if (sortField === 'name') {
+      artifacts = [...artifacts].sort((a, b) => {
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    } else if (sortField === 'updatedAt') {
+      artifacts = [...artifacts].sort((a, b) => {
+        const aDate = new Date(a.updatedAt).getTime();
+        const bDate = new Date(b.updatedAt).getTime();
+        return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
+      });
+    } else if (sortField === 'usageCount') {
+      artifacts = [...artifacts].sort((a, b) => {
+        const aUsage = a.usageStats?.usageCount ?? 0;
+        const bUsage = b.usageStats?.usageCount ?? 0;
+        return sortOrder === 'asc' ? aUsage - bUsage : bUsage - aUsage;
+      });
+    }
 
     return artifacts;
-  }, [isSpecificCollection, data, allArtifactsData, searchQuery, selectedTags]);
+  }, [isSpecificCollection, data, allArtifactsData, searchQuery, selectedTags, sortField, sortOrder]);
 
   const handleArtifactClick = (artifact: Artifact) => {
     // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
