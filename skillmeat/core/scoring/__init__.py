@@ -1,5 +1,13 @@
 """Scoring infrastructure for artifact confidence and quality metrics."""
 
+from .anti_gaming import (
+    AntiGamingGuard,
+    AnomalyDetector,
+    RateLimiter,
+    RateLimitConfig,
+    ViolationRecord,
+    ViolationType,
+)
 from .context_booster import ContextBooster, ProjectContext
 from .embedding_provider import EmbeddingProvider
 from .exceptions import (
@@ -40,6 +48,13 @@ __all__ = [
     "HaikuEmbedder",
     # Service
     "ScoringService",
+    # Anti-Gaming
+    "AntiGamingGuard",
+    "RateLimiter",
+    "RateLimitConfig",
+    "AnomalyDetector",
+    "ViolationRecord",
+    "ViolationType",
     # Exceptions
     "ScoringError",
     "EmbeddingServiceUnavailable",
