@@ -1882,6 +1882,54 @@ class MatchHistory(Base):
         }
 
 
+class GitHubRepoCache(Base):
+    """Cached GitHub repository statistics.
+
+    Stores GitHub repository stats to minimize API calls and respect rate limits.
+    Cache entries expire after a configurable TTL (default: 24 hours).
+
+    Attributes:
+        cache_key: Repository identifier in format "owner/repo" (primary key)
+        data: JSON-serialized GitHubRepoStats data
+        fetched_at: Timestamp when data was fetched from GitHub
+
+    Indexes:
+        - idx_github_repo_cache_fetched_at: For TTL-based expiry queries
+    """
+
+    __tablename__ = "github_repo_cache"
+
+    # Primary key
+    cache_key: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Core fields
+    data: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Timestamp
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints
+    __table_args__ = (Index("idx_github_repo_cache_fetched_at", "fetched_at"),)
+
+    def __repr__(self) -> str:
+        """Return string representation of GitHubRepoCache."""
+        return f"<GitHubRepoCache(cache_key={self.cache_key!r}, fetched_at={self.fetched_at})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert GitHubRepoCache to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the cache entry
+        """
+        return {
+            "cache_key": self.cache_key,
+            "data": json.loads(self.data) if self.data else None,
+            "fetched_at": self.fetched_at.isoformat() if self.fetched_at else None,
+        }
+
+
 class CacheMetadata(Base):
     """Cache system metadata.
 
