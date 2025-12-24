@@ -903,6 +903,28 @@ def deploy(
         for deployment in deployments:
             console.print(f"  {deployment.artifact_name} -> {deployment.artifact_path}")
 
+        # Auto-confirm recent matches (P5-T2)
+        try:
+            from skillmeat.core.scoring.match_history import (
+                MatchHistoryTracker,
+                MatchOutcome,
+            )
+
+            tracker = MatchHistoryTracker()
+            for deployment in deployments:
+                # Try to find recent match for this artifact (within 30 min)
+                artifact_id = f"{deployment.artifact_type}:{deployment.artifact_name}"
+                recent_match = tracker.get_recent_match(artifact_id, within_minutes=30)
+                if recent_match and not recent_match.outcome:
+                    tracker.confirm_match(recent_match.id, MatchOutcome.CONFIRMED)
+                    console.print(
+                        f"[dim]Auto-confirmed match {recent_match.id} "
+                        f"for {deployment.artifact_name}[/dim]"
+                    )
+        except Exception as e:
+            # Don't fail deployment if auto-confirmation fails
+            logger.debug(f"Auto-confirmation failed: {e}")
+
         # Invalidate cache after successful deploy
         try:
             from skillmeat.cache.manager import CacheManager
@@ -2599,6 +2621,35 @@ def config_get(key: str):
         sys.exit(1)
 
 
+def parse_score_weights(value: str) -> Dict[str, float]:
+    """Parse weight string like 'trust=0.3,quality=0.3,match=0.4'
+
+    Args:
+        value: Weight specification string
+
+    Returns:
+        Dict with keys: trust, quality, match
+
+    Raises:
+        ValueError: If format invalid
+
+    Example:
+        >>> parse_score_weights("trust=0.3,quality=0.3,match=0.4")
+        {'trust': 0.3, 'quality': 0.3, 'match': 0.4}
+    """
+    weights = {}
+    try:
+        for pair in value.split(","):
+            key, val = pair.strip().split("=")
+            weights[key.strip()] = float(val.strip())
+    except (ValueError, AttributeError) as e:
+        raise ValueError(
+            f"Invalid format. Expected 'trust=0.3,quality=0.3,match=0.4', got: {value}"
+        ) from e
+
+    return weights
+
+
 @config.command(name="set")
 @click.argument("key")
 @click.argument("value")
@@ -2609,17 +2660,28 @@ def config_set(key: str, value: str):
       - github-token: GitHub personal access token
       - default-collection: Default collection name
       - update-strategy: Default update strategy (prompt/upstream/local)
+      - score-weights: Scoring weights as 'trust=0.3,quality=0.3,match=0.4'
 
     Examples:
       skillmeat config set github-token ghp_xxxxx
       skillmeat config set default-collection work
+      skillmeat config set score-weights 'trust=0.25,quality=0.25,match=0.50'
     """
     try:
         config_mgr = ConfigManager()
-        config_mgr.set(key, value)
 
-        console.print(f"[green]Set {key}[/green]")
+        # Special handling for score-weights
+        if key == "score-weights":
+            weights = parse_score_weights(value)
+            config_mgr.set_score_weights(weights)
+            console.print(f"[green]Set score weights: {weights}[/green]")
+        else:
+            config_mgr.set(key, value)
+            console.print(f"[green]Set {key}[/green]")
 
+    except ValueError as e:
+        console.print(f"[red]Invalid value: {e}[/red]")
+        sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -4025,6 +4087,21 @@ def match(
                 f"with confidence >= {min_confidence}[/yellow]"
             )
             return
+
+        # Record matches in history for analytics (P5-T2)
+        try:
+            from skillmeat.core.scoring.match_history import MatchHistoryTracker
+
+            tracker = MatchHistoryTracker()
+            for score in top_scores:
+                tracker.record_match(
+                    query=query,
+                    artifact_id=score.artifact_id,
+                    confidence=score.confidence,
+                )
+        except Exception as e:
+            # Don't fail the whole command if history recording fails
+            console.print(f"[dim]Warning: Could not record match history: {e}[/dim]")
 
         # Display results
         if output_json:
@@ -10234,6 +10311,702 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         logger.exception(f"Error in context deploy: {e}")
+        sys.exit(1)
+
+
+# ====================
+# Scores Commands
+# ====================
+
+
+@main.group()
+def scores():
+    """Manage community scores and ratings.
+
+    Import scores from external sources (GitHub stars, registries) and
+    refresh stale data to maintain up-to-date quality metrics.
+
+    Examples:
+      skillmeat scores import              # Import from all sources
+      skillmeat scores refresh             # Refresh stale scores
+      skillmeat scores show canvas         # Show scores for artifact
+    """
+    pass
+
+
+@scores.command("import")
+@click.option(
+    "--source",
+    type=click.Choice(["github", "all"]),
+    default="all",
+    help="Source to import from (default: all)",
+)
+@click.option(
+    "--artifact",
+    "-a",
+    help="Import for specific artifact only (e.g., anthropics/skills/pdf)",
+)
+@click.option(
+    "--token",
+    envvar="GITHUB_TOKEN",
+    help="GitHub API token (or set GITHUB_TOKEN env var)",
+)
+@click.option(
+    "--concurrency",
+    default=5,
+    type=int,
+    help="Max concurrent requests (default: 5)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def import_scores(
+    source: str,
+    artifact: Optional[str],
+    token: Optional[str],
+    concurrency: int,
+    output_json: bool,
+):
+    """Import community scores from external sources.
+
+    Fetches GitHub stars and other quality signals for artifacts,
+    normalizes them to 0-100 scores, and caches results locally.
+
+    Examples:
+      skillmeat scores import
+      skillmeat scores import --source github
+      skillmeat scores import -a anthropics/skills/pdf
+      skillmeat scores import --token ghp_xxx
+      skillmeat scores import --json
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.github_stars_importer import (
+        GitHubStarsImporter,
+        GitHubAPIError,
+        RateLimitError,
+    )
+    from skillmeat.storage.rating_store import RatingManager
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    try:
+        # Get list of artifacts to import
+        artifact_mgr = ArtifactManager()
+        if artifact:
+            # Single artifact
+            artifacts = [artifact]
+        else:
+            # All artifacts from collection
+            collection_mgr = CollectionManager()
+            collections = collection_mgr.list_collections()
+            if not collections:
+                console.print(
+                    "[yellow]No collections found. Initialize one first.[/yellow]"
+                )
+                sys.exit(1)
+
+            # Use default collection or first available
+            default_collection = collections[0]
+            artifact_list = artifact_mgr.list_artifacts(
+                collection_name=default_collection
+            )
+            artifacts = []
+            for a in artifact_list:
+                # Extract owner/repo from upstream if available
+                if a.upstream:
+                    # upstream format: https://github.com/owner/repo or similar
+                    parts = a.upstream.rstrip("/").split("/")
+                    if len(parts) >= 2:
+                        owner_repo = f"{parts[-2]}/{parts[-1]}"
+                        if a.resolved_version:
+                            artifacts.append(
+                                f"{owner_repo}/{a.name}@{a.resolved_version}"
+                            )
+                        else:
+                            artifacts.append(f"{owner_repo}/{a.name}")
+                # Skip local artifacts (no upstream GitHub URL)
+
+        if not artifacts:
+            console.print("[yellow]No artifacts found to import scores for.[/yellow]")
+            sys.exit(0)
+
+        # Initialize importer
+        if source == "github" or source == "all":
+            importer = GitHubStarsImporter(token=token)
+
+            # Import with progress display
+            results = []
+            if not output_json:
+                console.print(
+                    f"[cyan]Importing scores for {len(artifacts)} artifact(s)...[/cyan]"
+                )
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+                disable=output_json,
+            ) as progress:
+                task = progress.add_task(
+                    "Importing GitHub stars...", total=len(artifacts)
+                )
+
+                # Run async batch import
+                import asyncio
+
+                async def _import():
+                    return await importer.batch_import(
+                        artifacts, concurrency=concurrency
+                    )
+
+                score_sources = asyncio.run(_import())
+                progress.advance(task, len(artifacts))
+
+                # Process results
+                for i, artifact_source in enumerate(artifacts):
+                    # Find matching score source
+                    score_source = next(
+                        (
+                            s
+                            for s in score_sources
+                            if artifact_source.startswith(
+                                s.source_name.replace("github_stars:", "")
+                            )
+                        ),
+                        None,
+                    )
+
+                    if score_source:
+                        results.append(
+                            {
+                                "artifact": artifact_source,
+                                "source": "github_stars",
+                                "score": score_source.score,
+                                "raw_stars": score_source.sample_size,
+                                "imported_at": score_source.last_updated.isoformat(),
+                                "status": "success",
+                            }
+                        )
+                    else:
+                        results.append(
+                            {
+                                "artifact": artifact_source,
+                                "source": "github_stars",
+                                "score": None,
+                                "raw_stars": None,
+                                "imported_at": None,
+                                "status": "failed",
+                            }
+                        )
+
+            # Output results
+            if output_json:
+                output = {
+                    "schema_version": "1",
+                    "command": "scores import",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "results": results,
+                    "summary": {
+                        "total": len(results),
+                        "success": len(
+                            [r for r in results if r["status"] == "success"]
+                        ),
+                        "failed": len([r for r in results if r["status"] == "failed"]),
+                        "skipped": 0,
+                    },
+                }
+                console.print(json.dumps(output, indent=2))
+            else:
+                # Human-readable table
+                table = Table(title="Import Results")
+                table.add_column("Artifact", style="cyan")
+                table.add_column("Score", justify="right")
+                table.add_column("Stars", justify="right")
+                table.add_column("Source", style="green")
+                table.add_column("Status")
+
+                for result in results:
+                    status_icon = "✓" if result["status"] == "success" else "✗"
+                    table.add_row(
+                        result["artifact"][:50],  # Truncate long names
+                        (
+                            f"{result['score']:.1f}"
+                            if result["score"] is not None
+                            else "N/A"
+                        ),
+                        (
+                            str(result["raw_stars"])
+                            if result["raw_stars"] is not None
+                            else "N/A"
+                        ),
+                        result["source"],
+                        (
+                            f"[green]{status_icon}[/green]"
+                            if result["status"] == "success"
+                            else f"[red]{status_icon}[/red]"
+                        ),
+                    )
+
+                console.print(table)
+
+                # Summary
+                success_count = len([r for r in results if r["status"] == "success"])
+                console.print(
+                    f"\n[green]Imported {success_count}/{len(results)} scores successfully[/green]"
+                )
+
+    except RateLimitError as e:
+        console.print(f"[red]Rate limit exceeded: {e}[/red]")
+        console.print(f"[dim]Resets at: {e.reset_at}[/dim]")
+        console.print("[yellow]Tip: Use --token to increase rate limits[/yellow]")
+        sys.exit(1)
+    except GitHubAPIError as e:
+        console.print(f"[red]GitHub API error: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error importing scores: {e}[/red]")
+        logger.exception(f"Error in scores import: {e}")
+        sys.exit(1)
+
+
+@scores.command("refresh")
+@click.option(
+    "--stale-days",
+    default=60,
+    type=int,
+    help="Refresh scores older than N days (default: 60)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force refresh all scores, ignoring staleness",
+)
+@click.option(
+    "--artifact",
+    "-a",
+    help="Refresh specific artifact only",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def refresh_scores(
+    stale_days: int,
+    force: bool,
+    artifact: Optional[str],
+    output_json: bool,
+):
+    """Refresh stale community scores.
+
+    Checks for scores older than the staleness threshold and re-imports
+    them from external sources. Uses ScoreDecay to determine which scores
+    need refreshing.
+
+    Examples:
+      skillmeat scores refresh
+      skillmeat scores refresh --stale-days 30
+      skillmeat scores refresh --force
+      skillmeat scores refresh -a anthropics/skills/pdf
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.score_decay import ScoreDecay
+    from skillmeat.core.scoring.github_stars_importer import GitHubStarsImporter
+    from skillmeat.cache.models import GitHubRepoCache, get_session
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    try:
+        # Initialize decay calculator
+        decay = ScoreDecay()
+
+        # Get cached scores
+        session = get_session()
+        try:
+            query = session.query(GitHubRepoCache)
+            if artifact:
+                # Parse artifact to owner/repo
+                parts = artifact.split("@")[0].split("/")
+                if len(parts) >= 2:
+                    cache_key = f"{parts[0]}/{parts[1]}"
+                    query = query.filter(GitHubRepoCache.cache_key == cache_key)
+
+            cached_entries = query.all()
+        finally:
+            session.close()
+
+        if not cached_entries:
+            console.print("[yellow]No cached scores found.[/yellow]")
+            console.print("[dim]Run 'skillmeat scores import' first.[/dim]")
+            sys.exit(0)
+
+        # Identify stale scores
+        stale_entries = []
+        for entry in cached_entries:
+            if force:
+                stale_entries.append(entry)
+            else:
+                # Check if should refresh
+                if decay.should_refresh(entry.fetched_at, threshold_days=stale_days):
+                    stale_entries.append(entry)
+
+        if not stale_entries:
+            if not output_json:
+                console.print("[green]All scores are up-to-date![/green]")
+            else:
+                output = {
+                    "schema_version": "1",
+                    "command": "scores refresh",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "results": [],
+                    "summary": {
+                        "total": 0,
+                        "refreshed": 0,
+                        "failed": 0,
+                        "skipped": len(cached_entries),
+                    },
+                }
+                console.print(json.dumps(output, indent=2))
+            sys.exit(0)
+
+        # Refresh stale scores
+        if not output_json:
+            console.print(
+                f"[cyan]Refreshing {len(stale_entries)} stale score(s)...[/cyan]"
+            )
+
+        config_mgr = ConfigManager()
+        token = config_mgr.get("github-token")
+        importer = GitHubStarsImporter(token=token)
+
+        results = []
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            disable=output_json,
+        ) as progress:
+            task = progress.add_task("Refreshing scores...", total=len(stale_entries))
+
+            import asyncio
+
+            async def _refresh():
+                refreshed = []
+                for entry in stale_entries:
+                    # Parse cache key to owner/repo
+                    owner, repo = entry.cache_key.split("/")
+                    try:
+                        stats = await importer.fetch_repo_stats(owner, repo)
+                        score = importer.normalize_stars_to_score(stats.stars)
+                        refreshed.append(
+                            {
+                                "artifact": entry.cache_key,
+                                "score": score,
+                                "raw_stars": stats.stars,
+                                "refreshed_at": stats.fetched_at.isoformat(),
+                                "status": "success",
+                            }
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to refresh {entry.cache_key}: {e}")
+                        refreshed.append(
+                            {
+                                "artifact": entry.cache_key,
+                                "score": None,
+                                "raw_stars": None,
+                                "refreshed_at": None,
+                                "status": "failed",
+                            }
+                        )
+                    progress.advance(task)
+                return refreshed
+
+            results = asyncio.run(_refresh())
+
+        # Output results
+        if output_json:
+            output = {
+                "schema_version": "1",
+                "command": "scores refresh",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "results": results,
+                "summary": {
+                    "total": len(results),
+                    "refreshed": len([r for r in results if r["status"] == "success"]),
+                    "failed": len([r for r in results if r["status"] == "failed"]),
+                    "skipped": len(cached_entries) - len(stale_entries),
+                },
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable table
+            table = Table(title="Refresh Results")
+            table.add_column("Artifact", style="cyan")
+            table.add_column("Score", justify="right")
+            table.add_column("Stars", justify="right")
+            table.add_column("Status")
+
+            for result in results:
+                status_icon = "✓" if result["status"] == "success" else "✗"
+                table.add_row(
+                    result["artifact"],
+                    f"{result['score']:.1f}" if result["score"] is not None else "N/A",
+                    (
+                        str(result["raw_stars"])
+                        if result["raw_stars"] is not None
+                        else "N/A"
+                    ),
+                    (
+                        f"[green]{status_icon}[/green]"
+                        if result["status"] == "success"
+                        else f"[red]{status_icon}[/red]"
+                    ),
+                )
+
+            console.print(table)
+
+            # Summary
+            success_count = len([r for r in results if r["status"] == "success"])
+            console.print(
+                f"\n[green]Refreshed {success_count}/{len(results)} scores successfully[/green]"
+            )
+
+    except Exception as e:
+        console.print(f"[red]Error refreshing scores: {e}[/red]")
+        logger.exception(f"Error in scores refresh: {e}")
+        sys.exit(1)
+
+
+@scores.command("show")
+@click.argument("artifact")
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def show_scores(artifact: str, output_json: bool):
+    """Show detailed scores for an artifact.
+
+    Displays all available scores for an artifact, including GitHub stars,
+    user ratings, and aggregated quality metrics.
+
+    Examples:
+      skillmeat scores show anthropics/skills/pdf
+      skillmeat scores show canvas
+      skillmeat scores show canvas --json
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.github_stars_importer import GitHubStarsImporter
+    from skillmeat.cache.models import GitHubRepoCache, get_session
+    from rich.table import Table
+
+    try:
+        # Parse artifact to owner/repo
+        parts = artifact.split("@")[0].split("/")
+        if len(parts) < 2:
+            console.print(f"[red]Invalid artifact format: {artifact}[/red]")
+            console.print("[dim]Expected format: owner/repo/path or owner/repo[/dim]")
+            sys.exit(1)
+
+        cache_key = f"{parts[0]}/{parts[1]}"
+
+        # Get cached score
+        session = get_session()
+        try:
+            entry = (
+                session.query(GitHubRepoCache).filter_by(cache_key=cache_key).first()
+            )
+        finally:
+            session.close()
+
+        if not entry:
+            console.print(f"[yellow]No cached scores found for {artifact}[/yellow]")
+            console.print("[dim]Run 'skillmeat scores import' first.[/dim]")
+            sys.exit(0)
+
+        # Parse cached data
+        import json as json_lib
+
+        data = json_lib.loads(entry.data)
+        importer = GitHubStarsImporter()
+        score = importer.normalize_stars_to_score(data["stars"])
+
+        # Calculate age
+        from skillmeat.core.scoring.score_decay import ScoreDecay
+
+        decay = ScoreDecay()
+        age_days = (
+            datetime.now(timezone.utc) - entry.fetched_at.replace(tzinfo=timezone.utc)
+        ).total_seconds() / 86400
+
+        # Output results
+        if output_json:
+            output = {
+                "artifact": artifact,
+                "cache_key": cache_key,
+                "score": score,
+                "raw_stars": data["stars"],
+                "forks": data["forks"],
+                "watchers": data["watchers"],
+                "last_updated": data["last_updated"],
+                "fetched_at": data["fetched_at"],
+                "age_days": age_days,
+                "is_stale": decay.should_refresh(entry.fetched_at),
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable display
+            table = Table(title=f"Scores for {artifact}")
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", justify="right")
+
+            table.add_row("Normalized Score", f"{score:.1f}/100")
+            table.add_row("GitHub Stars", str(data["stars"]))
+            table.add_row("Forks", str(data["forks"]))
+            table.add_row("Watchers", str(data["watchers"]))
+            table.add_row("Last Updated", data["last_updated"])
+            table.add_row("Fetched At", data["fetched_at"])
+            table.add_row("Age (days)", f"{age_days:.1f}")
+
+            # Staleness indicator
+            if decay.should_refresh(entry.fetched_at):
+                table.add_row("Status", "[yellow]Stale (needs refresh)[/yellow]")
+            else:
+                table.add_row("Status", "[green]Fresh[/green]")
+
+            console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error showing scores: {e}[/red]")
+        logger.exception(f"Error in scores show: {e}")
+        sys.exit(1)
+
+
+@scores.command("confirm")
+@click.argument("match_id", type=int)
+@click.option("--yes", "outcome", flag_value="confirmed", help="Match was helpful")
+@click.option("--no", "outcome", flag_value="rejected", help="Match was not helpful")
+def confirm_match(match_id: int, outcome: Optional[str]):
+    """Confirm or reject a previous match.
+
+    Records user feedback on whether a match result was helpful or not.
+    This data is used to improve the scoring algorithm over time.
+
+    Examples:
+      skillmeat scores confirm 123 --yes
+      skillmeat scores confirm 123 --no
+    """
+    from skillmeat.core.scoring.match_history import MatchHistoryTracker, MatchOutcome
+
+    try:
+        if not outcome:
+            console.print("[red]Error:[/red] Must specify --yes or --no")
+            sys.exit(1)
+
+        tracker = MatchHistoryTracker()
+        tracker.confirm_match(match_id, MatchOutcome(outcome))
+        console.print(f"[green]✓[/green] Match {match_id} marked as {outcome}")
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error confirming match: {e}[/red]")
+        logger.exception(f"Error in scores confirm: {e}")
+        sys.exit(1)
+
+
+@scores.command("stats")
+@click.option("--artifact", "-a", help="Show stats for specific artifact")
+@click.option("--query", "-q", help="Show stats for specific query")
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def show_stats(
+    artifact: Optional[str],
+    query: Optional[str],
+    output_json: bool,
+):
+    """Show match success statistics.
+
+    Displays statistics about match confirmations and success rates.
+    Use --artifact to see stats for a specific artifact, --query to see
+    stats for a specific search query, or neither for overall statistics.
+
+    Examples:
+      skillmeat scores stats
+      skillmeat scores stats --artifact skill:pdf
+      skillmeat scores stats --query "pdf processor"
+      skillmeat scores stats --json
+    """
+    from skillmeat.core.scoring.match_history import MatchHistoryTracker
+    from rich.table import Table
+
+    try:
+        tracker = MatchHistoryTracker()
+
+        # Get statistics based on filters
+        if artifact:
+            stats = tracker.get_artifact_stats(artifact)
+            title = f"Match Stats for {artifact}"
+        elif query:
+            stats = tracker.get_query_stats(query)
+            title = f"Match Stats for query: {query}"
+        else:
+            stats = tracker.get_overall_stats()
+            title = "Overall Match Statistics"
+
+        # Output results
+        if output_json:
+            output = {
+                "total_matches": stats.total_matches,
+                "confirmed": stats.confirmed,
+                "rejected": stats.rejected,
+                "ignored": stats.ignored,
+                "confirmation_rate": stats.confirmation_rate,
+                "average_confidence": stats.average_confidence,
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable table
+            table = Table(title=title)
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", justify="right")
+
+            table.add_row("Total Matches", str(stats.total_matches))
+            table.add_row("Confirmed", f"[green]{stats.confirmed}[/green]")
+            table.add_row("Rejected", f"[red]{stats.rejected}[/red]")
+            table.add_row("Ignored", f"[dim]{stats.ignored}[/dim]")
+            table.add_row("Confirmation Rate", f"{stats.confirmation_rate:.1%}")
+            table.add_row("Avg Confidence", f"{stats.average_confidence:.1f}")
+
+            console.print(table)
+
+            # Interpretation hint
+            if stats.total_matches > 0:
+                if stats.confirmation_rate >= 0.7:
+                    console.print("\n[green]Good match quality![/green]")
+                elif stats.confirmation_rate >= 0.5:
+                    console.print("\n[yellow]Moderate match quality[/yellow]")
+                else:
+                    console.print(
+                        "\n[red]Low match quality - algorithm may need tuning[/red]"
+                    )
+
+    except Exception as e:
+        console.print(f"[red]Error showing statistics: {e}[/red]")
+        logger.exception(f"Error in scores stats: {e}")
         sys.exit(1)
 
 
