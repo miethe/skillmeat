@@ -1810,7 +1810,9 @@ class CommunityScore(Base):
             "artifact_id": self.artifact_id,
             "source": self.source,
             "score": self.score,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "last_updated": (
+                self.last_updated.isoformat() if self.last_updated else None
+            ),
             "imported_from": self.imported_from,
         }
 
