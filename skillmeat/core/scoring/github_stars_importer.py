@@ -213,13 +213,15 @@ class GitHubStarsImporter:
 
                     # Handle errors
                     if response.status_code == 404:
-                        raise RepoNotFoundError(
-                            f"Repository {owner}/{repo} not found"
-                        )
+                        raise RepoNotFoundError(f"Repository {owner}/{repo} not found")
                     elif response.status_code == 403:
                         # Rate limit exceeded
-                        reset_timestamp = int(response.headers.get("X-RateLimit-Reset", 0))
-                        reset_at = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc)
+                        reset_timestamp = int(
+                            response.headers.get("X-RateLimit-Reset", 0)
+                        )
+                        reset_at = datetime.fromtimestamp(
+                            reset_timestamp, tz=timezone.utc
+                        )
                         raise RateLimitError(
                             f"Rate limit exceeded. Resets at {reset_at}", reset_at
                         )
@@ -250,7 +252,9 @@ class GitHubStarsImporter:
 
                 except (httpx.TimeoutException, httpx.NetworkError) as e:
                     if attempt == max_retries - 1:
-                        raise GitHubAPIError(f"Network error fetching {owner}/{repo}: {e}")
+                        raise GitHubAPIError(
+                            f"Network error fetching {owner}/{repo}: {e}"
+                        )
                     logger.warning(
                         f"Network error (attempt {attempt + 1}/{max_retries}): {e}"
                     )
@@ -258,7 +262,9 @@ class GitHubStarsImporter:
                     retry_delay *= 2  # Exponential backoff
 
         # Should not reach here
-        raise GitHubAPIError(f"Failed to fetch {owner}/{repo} after {max_retries} retries")
+        raise GitHubAPIError(
+            f"Failed to fetch {owner}/{repo} after {max_retries} retries"
+        )
 
     def normalize_stars_to_score(self, stars: int) -> float:
         """Normalize star count to 0-100 score using logarithmic scale.
@@ -398,9 +404,7 @@ class GitHubStarsImporter:
         score_sources = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(
-                    f"Error importing {artifact_sources[i]}: {result}"
-                )
+                logger.error(f"Error importing {artifact_sources[i]}: {result}")
             elif result is not None:
                 score_sources.append(result)
 
@@ -470,9 +474,7 @@ class GitHubStarsImporter:
 
             cache_key = f"{owner}/{repo}"
             entry = (
-                session.query(GitHubRepoCache)
-                .filter_by(cache_key=cache_key)
-                .first()
+                session.query(GitHubRepoCache).filter_by(cache_key=cache_key).first()
             )
 
             if not entry:
@@ -480,7 +482,12 @@ class GitHubStarsImporter:
 
             # Check if expired
             now = datetime.now(timezone.utc)
-            cache_age = (now - entry.fetched_at).total_seconds() / 3600  # hours
+            # Convert naive datetime to aware if needed
+            fetched_at = entry.fetched_at
+            if fetched_at.tzinfo is None:
+                fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+
+            cache_age = (now - fetched_at).total_seconds() / 3600  # hours
             if cache_age > self.cache_ttl_hours:
                 logger.debug(f"Cache expired for {cache_key} (age: {cache_age:.1f}h)")
                 return None

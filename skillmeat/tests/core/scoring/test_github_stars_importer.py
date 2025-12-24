@@ -227,7 +227,9 @@ class TestFetchRepoStats:
         mock_response.status_code = 403
         mock_response.is_success = False
         mock_response.headers = {
-            "X-RateLimit-Reset": str(int(datetime.now(timezone.utc).timestamp()) + 3600),
+            "X-RateLimit-Reset": str(
+                int(datetime.now(timezone.utc).timestamp()) + 3600
+            ),
         }
 
         with patch("httpx.AsyncClient") as mock_client_class:
@@ -237,10 +239,12 @@ class TestFetchRepoStats:
             mock_client.get = AsyncMock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
-            with pytest.raises(RateLimitError) as exc_info:
-                await importer.fetch_repo_stats("owner", "repo")
+            # Mock cache miss to force API call
+            with patch.object(importer, "_get_cached_stats", return_value=None):
+                with pytest.raises(RateLimitError) as exc_info:
+                    await importer.fetch_repo_stats("owner", "repo")
 
-            assert isinstance(exc_info.value.reset_at, datetime)
+                assert isinstance(exc_info.value.reset_at, datetime)
 
     @pytest.mark.asyncio
     async def test_fetch_repo_stats_api_error(self, importer):
@@ -257,8 +261,10 @@ class TestFetchRepoStats:
             mock_client.get = AsyncMock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
-            with pytest.raises(GitHubAPIError):
-                await importer.fetch_repo_stats("owner", "repo")
+            # Mock cache miss to force API call
+            with patch.object(importer, "_get_cached_stats", return_value=None):
+                with pytest.raises(GitHubAPIError):
+                    await importer.fetch_repo_stats("owner", "repo")
 
     @pytest.mark.asyncio
     async def test_fetch_repo_stats_network_error_retry(self, importer):
@@ -308,9 +314,11 @@ class TestFetchRepoStats:
             mock_client.get = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
             mock_client_class.return_value = mock_client
 
-            with patch("asyncio.sleep", new_callable=AsyncMock):
-                with pytest.raises(GitHubAPIError):
-                    await importer.fetch_repo_stats("owner", "repo")
+            # Mock cache miss to force API call
+            with patch.object(importer, "_get_cached_stats", return_value=None):
+                with patch("asyncio.sleep", new_callable=AsyncMock):
+                    with pytest.raises(GitHubAPIError):
+                        await importer.fetch_repo_stats("owner", "repo")
 
 
 # =============================================================================
@@ -373,26 +381,12 @@ class TestCaching:
     @pytest.mark.asyncio
     async def test_cache_expiry_fetches_new_data(self, importer, mock_repo_data):
         """Test expired cache triggers new API fetch."""
-        # Create expired cache entry (2 hours old, TTL is 1 hour)
-        expired_stats = GitHubRepoStats(
-            owner="owner",
-            repo="repo",
-            stars=50,
-            forks=5,
-            watchers=2,
-            open_issues=1,
-            last_updated=datetime.now(timezone.utc) - timedelta(hours=2),
-            fetched_at=datetime.now(timezone.utc) - timedelta(hours=2),
-        )
-
+        # _get_cached_stats will return None for expired cache (expiry logic tested separately)
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.is_success = True
         mock_response.json.return_value = mock_repo_data
         mock_response.headers = {"X-RateLimit-Remaining": "5000"}
-
-        # First call returns expired cache, subsequent calls return None (cache miss)
-        cache_calls = [expired_stats, None]
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = MagicMock()
@@ -401,14 +395,13 @@ class TestCaching:
             mock_client.get = AsyncMock(return_value=mock_response)
             mock_client_class.return_value = mock_client
 
-            with patch.object(
-                importer, "_get_cached_stats", side_effect=cache_calls
-            ):
+            # Mock returns None (expired cache)
+            with patch.object(importer, "_get_cached_stats", return_value=None):
                 with patch.object(importer, "_cache_stats"):
                     stats = await importer.fetch_repo_stats("owner", "repo")
 
-                    # Verify new stats fetched
-                    assert stats.stars == 150  # From mock_repo_data, not expired cache
+                    # Verify new stats fetched from API
+                    assert stats.stars == 150  # From mock_repo_data
 
 
 # =============================================================================
