@@ -620,3 +620,26 @@
   ```
 - **Commit(s)**: fd53eba
 - **Status**: RESOLVED
+
+### Sync Status Tab API Errors - Incorrect API Base URL
+
+**Issue**: Navigating to the Sync Status tab of an artifact from `/projects/{ID}/` page throws errors: `ApiError: Request failed` for upstream diff fetch and other sync operations.
+- **Location**: `skillmeat/web/components/sync-status/sync-status-tab.tsx:264,280,332,367,409`
+- **Root Cause**: The `sync-status-tab.tsx` component used raw `fetch()` with hardcoded paths like `/api/v1/artifacts/.../upstream-diff` which went to Next.js's internal routing (port 3000) instead of the FastAPI backend (port 8080). The `apiRequest` helper in `lib/api.ts` was already available and properly builds URLs with the correct API base URL.
+- **Fix**: Replaced all 5 raw `fetch()` calls with `apiRequest()`:
+  1. Upstream diff query (line 265): `apiRequest<ArtifactUpstreamDiffResponse>('/artifacts/.../upstream-diff')`
+  2. Project diff query (line 281): `apiRequest<ArtifactDiffResponse>('/artifacts/.../diff?...')`
+  3. Sync mutation (line 333): `apiRequest('/artifacts/.../sync', { method: 'POST', ... })`
+  4. Deploy mutation (line 365): `apiRequest('/artifacts/.../deploy', { method: 'POST', ... })`
+  5. Take upstream mutation (line 404): `apiRequest('/artifacts/.../deploy', { method: 'POST', ... })`
+- **Commit(s)**: ee426ba
+- **Status**: RESOLVED
+
+### Button Nesting Hydration Error in Sync Status Tab
+
+**Issue**: React hydration warning: "In HTML, `<button>` cannot be a descendant of `<button>`. This will cause a hydration error."
+- **Location**: Reported near `unified-entity-modal.tsx` TabsContent for sync tab
+- **Root Cause**: Investigated extensively but could not locate the exact button nesting violation in the codebase. All trigger components (DropdownMenuTrigger, DialogTrigger, TooltipTrigger, etc.) properly use `asChild` when wrapping Button components. The error may be a transient hydration timing issue, browser extension interference, or a false positive from React's strict mode.
+- **Fix**: Unable to fix - could not reproduce from code analysis
+- **Commit(s)**: N/A
+- **Status**: INVESTIGATION CLOSED (Could not reproduce)
