@@ -4,6 +4,7 @@ This module provides the complete command-line interface for SkillMeat,
 a personal collection manager for Claude Code artifacts.
 """
 
+import asyncio
 import json
 import logging
 import sys
@@ -31,6 +32,7 @@ from skillmeat.core.mcp import MCPDeploymentManager, MCPServerMetadata
 from skillmeat.sources.github import GitHubSource
 from skillmeat.sources.local import LocalSource
 from skillmeat.utils.validator import ArtifactValidator
+from skillmeat.defaults import SmartDefaults
 
 # Console for output
 console = Console(force_terminal=True, legacy_windows=False)
@@ -46,7 +48,9 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 @click.version_option(version=__version__, prog_name="skillmeat")
-def main():
+@click.option("--smart-defaults", is_flag=True, hidden=True, help="Enable smart defaults mode (used by claudectl wrapper)")
+@click.pass_context
+def main(ctx, smart_defaults):
     """SkillMeat: Personal collection manager for Claude Code artifacts.
 
     Manage Skills, Commands, Agents, and more across multiple projects.
@@ -58,7 +62,8 @@ def main():
       skillmeat deploy my-skill             # Deploy to current project
       skillmeat snapshot "Backup"           # Create snapshot
     """
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj["smart_defaults"] = smart_defaults
 
 
 # ====================
@@ -269,11 +274,32 @@ def cmd_list(
     default=None,
     help="Collection name (default: active collection)",
 )
-def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
+@click.option(
+    "--scores",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Show confidence scores (trust, quality, ratings)",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Output scores as JSON (only with --scores)",
+)
+def show(
+    name: str,
+    artifact_type: Optional[str],
+    collection: Optional[str],
+    scores: bool,
+    as_json: bool,
+):
     """Show detailed information about an artifact.
 
     Examples:
-      skillmeat show my-skill           # Show skill details
+      skillmeat show my-skill             # Show skill details
+      skillmeat show my-skill --scores    # Include confidence scores
       skillmeat show review --type command  # Show command (if ambiguous)
     """
     try:
@@ -289,12 +315,159 @@ def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
             collection_name=collection,
         )
 
+        # Show scores if requested
+        if scores:
+            from skillmeat.core.scoring import QualityScorer
+            from skillmeat.storage.rating_store import RatingManager
+
+            # Build artifact ID (type:name format)
+            artifact_id = f"{artifact_type or 'skill'}:{name}"
+
+            scorer = QualityScorer()
+            manager = RatingManager()
+
+            result = scorer.calculate_confidence_score(
+                artifact_id=artifact_id,
+                source_type="unknown",  # Default, could be enhanced
+            )
+
+            rating_count = scorer.get_rating_count(artifact_id)
+            avg_rating = manager.get_average_rating(artifact_id)
+
+            if as_json:
+                score_data = {
+                    "artifact_id": artifact_id,
+                    "trust_score": result["trust_score"],
+                    "quality_score": result["quality_score"],
+                    "confidence": result["confidence"],
+                    "rating_count": rating_count,
+                    "average_rating": round(avg_rating, 2) if avg_rating else None,
+                    "schema_version": result["schema_version"],
+                }
+                console.print(json.dumps(score_data, indent=2))
+            else:
+                console.print()
+                console.print("[bold cyan]Confidence Scores[/bold cyan]")
+                console.print(
+                    f"  Trust Score:   [yellow]{result['trust_score']:.1f}[/yellow]/100"
+                )
+                console.print(
+                    f"  Quality Score: [yellow]{result['quality_score']:.1f}[/yellow]/100"
+                )
+                console.print(
+                    f"  Confidence:    [green]{result['confidence']:.1f}[/green]/100"
+                )
+                console.print()
+                if rating_count > 0:
+                    stars = "★" * int(round(avg_rating)) + "☆" * (
+                        5 - int(round(avg_rating))
+                    )
+                    console.print(
+                        f"  User Rating:   [yellow]{stars}[/yellow] ({avg_rating:.1f}/5, {rating_count} ratings)"
+                    )
+                else:
+                    console.print(f"  User Rating:   [dim]No ratings yet[/dim]")
+
     except ValueError as e:
         # Ambiguous name or not found
         console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+# ====================
+# Rating Commands
+# ====================
+
+
+@main.command()
+@click.argument("artifact")
+@click.option(
+    "--rating",
+    "-r",
+    type=click.IntRange(1, 5),
+    required=True,
+    help="Rating from 1 (poor) to 5 (excellent)",
+)
+@click.option(
+    "--feedback",
+    "-f",
+    default=None,
+    help="Optional text feedback",
+)
+@click.option(
+    "--share",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Share rating with community",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Output as JSON",
+)
+def rate(
+    artifact: str, rating: int, feedback: Optional[str], share: bool, as_json: bool
+):
+    """Rate an artifact from 1-5.
+
+    Provide feedback on artifacts you've used to help improve quality scores.
+    Ratings are stored locally and can optionally be shared with the community.
+
+    Examples:
+      skillmeat rate canvas-design --rating 5              # Rate excellent
+      skillmeat rate my-skill -r 4 -f "Works great!"       # Rate with feedback
+      skillmeat rate skill:review -r 5 --share             # Share with community
+    """
+    try:
+        from skillmeat.storage.rating_store import RatingManager, RateLimitExceededError
+
+        manager = RatingManager()
+
+        # Add the rating
+        user_rating = manager.add_rating(
+            artifact_id=artifact,
+            rating=rating,
+            feedback=feedback,
+            share=share,
+        )
+
+        if as_json:
+            result = {
+                "id": user_rating.id,
+                "artifact_id": user_rating.artifact_id,
+                "rating": user_rating.rating,
+                "feedback": user_rating.feedback,
+                "shared": user_rating.share_with_community,
+                "rated_at": (
+                    user_rating.rated_at.isoformat() if user_rating.rated_at else None
+                ),
+            }
+            console.print(json.dumps(result, indent=2))
+        else:
+            stars = "★" * rating + "☆" * (5 - rating)
+            console.print(f"[green]Rating saved![/green]")
+            console.print(f"  Artifact: [cyan]{artifact}[/cyan]")
+            console.print(f"  Rating:   [yellow]{stars}[/yellow] ({rating}/5)")
+            if feedback:
+                console.print(f"  Feedback: {feedback}")
+            if share:
+                console.print(f"  [dim]Shared with community[/dim]")
+
+    except RateLimitExceededError as e:
+        console.print(f"[yellow]Rate limit: {e}[/yellow]")
+        sys.exit(1)
+    except ValueError as e:
+        console.print(f"[red]Invalid input: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        logger.exception(f"Failed to rate artifact: {e}")
         sys.exit(1)
 
 
@@ -319,19 +492,69 @@ def show(name: str, artifact_type: Optional[str], collection: Optional[str]):
     is_flag=True,
     help="Remove from collection but keep files on disk",
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Skip confirmation (required for scripts)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
+)
+@click.pass_context
 def remove(
-    name: str, artifact_type: Optional[str], collection: Optional[str], keep_files: bool
+    ctx,
+    name: str,
+    artifact_type: Optional[str],
+    collection: Optional[str],
+    keep_files: bool,
+    force: bool,
+    output_format: Optional[str],
 ):
     """Remove artifact from collection.
 
     By default, removes both the collection entry and the files.
     Use --keep-files to only remove from collection manifest.
 
+    Interactive mode requires confirmation. Use --force to skip in scripts.
+
     Examples:
-      skillmeat remove my-skill         # Remove completely
+      skillmeat remove my-skill         # Remove completely (with confirmation)
       skillmeat remove my-skill --keep-files  # Keep files
+      claudectl remove my-skill --force  # For scripts (skip confirmation)
     """
+    # Apply smart defaults
+    params = {
+        "name": name,
+        "collection": collection,
+        "format": output_format,
+    }
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
+        # Require confirmation for TTY unless --force
+        if sys.stdout.isatty() and not force:
+            action = "Remove from manifest only" if keep_files else "Remove completely"
+            if not Confirm.ask(f"{action}: '{name}'?"):
+                if resolved_format == "json":
+                    click.echo(json.dumps({"status": "cancelled", "command": "remove"}))
+                else:
+                    console.print("[yellow]Cancelled[/yellow]")
+                return
+        elif not force and not sys.stdout.isatty():
+            # Script mode without --force
+            console.print(
+                "[red]Error: Use --force flag for non-interactive removal[/red]"
+            )
+            sys.exit(2)  # Invalid usage
+
         artifact_mgr = ArtifactManager()
 
         # Convert type string to enum
@@ -341,7 +564,7 @@ def remove(
         artifact_mgr.remove(
             name=name,
             artifact_type=type_filter,
-            collection_name=collection,
+            collection_name=params.get("collection"),
             keep_files=keep_files,
         )
 
@@ -352,16 +575,39 @@ def remove(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
 
+        # Output
+        if resolved_format == "json":
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "command": "remove",
+                        "artifact": name,
+                        "keep_files": keep_files,
+                    }
+                )
+            )
+        else:
+            action = "Removed from manifest" if keep_files else "Removed"
+            console.print(f"[green]{action}: {name}[/green]")
+
     except ValueError as e:
-        console.print(f"[yellow]{e}[/yellow]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
@@ -401,6 +647,26 @@ def _security_warning():
     console.print()
 
 
+def _format_artifact_output(artifact, output_format: str = "table") -> None:
+    """Format artifact output based on output format preference."""
+    if output_format == "json":
+        output = {
+            "status": "success",
+            "command": "add",
+            "artifact": {
+                "name": artifact.name,
+                "type": artifact.artifact_type.value,
+                "collection": getattr(artifact, "collection_name", "default")
+                or "default",
+            },
+        }
+        click.echo(json.dumps(output, indent=2))
+    else:
+        console.print(
+            f"[green]Added {artifact.artifact_type.value}: {artifact.name}[/green]"
+        )
+
+
 def _add_artifact_from_spec(
     spec: str,
     artifact_type: ArtifactType,
@@ -409,6 +675,7 @@ def _add_artifact_from_spec(
     no_verify: bool,
     force: bool,
     dangerously_skip_permissions: bool,
+    output_format: str = "table",
 ):
     """Shared logic for adding artifacts from GitHub or local paths."""
     try:
@@ -424,7 +691,8 @@ def _add_artifact_from_spec(
         # Determine if spec is GitHub or local path
         if "/" in spec and not spec.startswith((".", "/")):
             # Likely GitHub spec
-            console.print(f"[cyan]Fetching from GitHub: {spec}...[/cyan]")
+            if output_format != "json":
+                console.print(f"[cyan]Fetching from GitHub: {spec}...[/cyan]")
 
             artifact = artifact_mgr.add_from_github(
                 spec=spec,
@@ -435,9 +703,7 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(
-                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
-            )
+            _format_artifact_output(artifact, output_format)
 
         else:
             # Local path
@@ -446,7 +712,8 @@ def _add_artifact_from_spec(
                 console.print(f"[red]Path not found: {spec}[/red]")
                 sys.exit(1)
 
-            console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
+            if output_format != "json":
+                console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
 
             artifact = artifact_mgr.add_from_local(
                 path=str(local_path),
@@ -457,9 +724,7 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(
-                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
-            )
+            _format_artifact_output(artifact, output_format)
 
         # Invalidate cache after successful add
         try:
@@ -660,6 +925,88 @@ def agent(
     )
 
 
+@main.command(name="quick-add")
+@click.argument("spec")
+@click.option(
+    "--type",
+    "-t",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    default=None,
+    help="Artifact type (auto-detected from name if not specified)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+@click.option("--name", "-n", default=None, help="Override artifact name")
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing")
+@click.option("--dangerously-skip-permissions", is_flag=True, hidden=True)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected if not specified)",
+)
+@click.pass_context
+def quick_add(
+    ctx,
+    spec,
+    artifact_type,
+    collection,
+    name,
+    force,
+    dangerously_skip_permissions,
+    output_format,
+):
+    """Add artifact with smart defaults (claudectl mode).
+
+    SPEC can be: user/repo/path[@version] or local path.
+    Type is auto-detected from name (-cli, -agent, etc).
+
+    Examples:
+      skillmeat --smart-defaults quick-add anthropics/skills/pdf
+      claudectl quick-add pdf-cli  # Auto-detects as command
+    """
+    from skillmeat.defaults import SmartDefaults
+
+    # Get artifact name from spec for type detection
+    artifact_name = spec.split("/")[-1].split("@")[0]
+
+    # Apply smart defaults
+    params = {
+        "name": artifact_name,  # For type detection
+        "collection": collection,
+        "format": output_format,
+    }
+
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    # Detect type from name if not specified
+    resolved_type = artifact_type
+    if not resolved_type:
+        resolved_type = SmartDefaults.detect_artifact_type(artifact_name)
+
+    # Get output format
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
+    # Call existing add logic
+    _add_artifact_from_spec(
+        spec=spec,
+        artifact_type=ArtifactType(resolved_type),
+        collection=params.get("collection"),
+        name=name,
+        no_verify=False,
+        force=force,
+        dangerously_skip_permissions=dangerously_skip_permissions,
+        output_format=resolved_format,
+    )
+
+
 # ====================
 # Deployment Commands
 # ====================
@@ -695,12 +1042,22 @@ def agent(
     default=False,
     help="Overwrite existing artifacts without prompting",
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected if not specified)",
+)
+@click.pass_context
 def deploy(
+    ctx,
     names: List[str],
     collection: Optional[str],
     project: Optional[Path],
     artifact_type: Optional[str],
     overwrite: bool,
+    output_format: Optional[str],
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -709,30 +1066,112 @@ def deploy(
 
     Examples:
       skillmeat deploy my-skill               # Deploy to current dir
+      claudectl deploy my-skill               # Same, using smart defaults
       skillmeat deploy skill1 skill2          # Deploy multiple
       skillmeat deploy my-skill --project /path/to/proj
       skillmeat deploy my-skill --overwrite   # Skip overwrite prompt
     """
+    from skillmeat.defaults import SmartDefaults
+
     try:
+        # Apply smart defaults if enabled
+        params = {
+            "names": names,
+            "collection": collection,
+            "project": project,
+            "artifact_type": artifact_type,
+            "format": output_format,
+        }
+
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Get resolved values
+        resolved_project = params.get("project") or Path.cwd()
+        resolved_collection = params.get("collection")
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
         deployment_mgr = DeploymentManager()
 
         # Convert type string to enum
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
         # Deploy artifacts
-        console.print(f"[cyan]Deploying {len(names)} artifact(s)...[/cyan]")
+        if resolved_format != "json":
+            console.print(f"[cyan]Deploying {len(names)} artifact(s)...[/cyan]")
 
-        deployments = deployment_mgr.deploy_artifacts(
-            artifact_names=list(names),
-            collection_name=collection,
-            project_path=project,
-            artifact_type=type_filter,
-            overwrite=overwrite,
-        )
+        # Suppress console output in JSON mode
+        if resolved_format == "json":
+            import io
+            import contextlib
 
-        console.print(f"[green]Deployed {len(deployments)} artifact(s)[/green]")
-        for deployment in deployments:
-            console.print(f"  {deployment.artifact_name} -> {deployment.artifact_path}")
+            # Redirect console to suppress Rich output
+            with (
+                contextlib.redirect_stderr(io.StringIO()),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                deployments = deployment_mgr.deploy_artifacts(
+                    artifact_names=list(names),
+                    collection_name=resolved_collection,
+                    project_path=resolved_project,
+                    artifact_type=type_filter,
+                    overwrite=overwrite,
+                )
+        else:
+            deployments = deployment_mgr.deploy_artifacts(
+                artifact_names=list(names),
+                collection_name=resolved_collection,
+                project_path=resolved_project,
+                artifact_type=type_filter,
+                overwrite=overwrite,
+            )
+
+        # Output based on format
+        if resolved_format == "json":
+            import json
+
+            output = {
+                "status": "success",
+                "command": "deploy",
+                "deployments": [
+                    {
+                        "artifact": d.artifact_name,
+                        "type": d.artifact_type,
+                        "path": str(d.artifact_path),
+                    }
+                    for d in deployments
+                ],
+            }
+            click.echo(json.dumps(output, indent=2))
+        else:
+            console.print(f"[green]Deployed {len(deployments)} artifact(s)[/green]")
+            for deployment in deployments:
+                console.print(
+                    f"  {deployment.artifact_name} -> {deployment.artifact_path}"
+                )
+
+        # Auto-confirm recent matches (P5-T2)
+        try:
+            from skillmeat.core.scoring.match_history import (
+                MatchHistoryTracker,
+                MatchOutcome,
+            )
+
+            tracker = MatchHistoryTracker()
+            for deployment in deployments:
+                # Try to find recent match for this artifact (within 30 min)
+                artifact_id = f"{deployment.artifact_type}:{deployment.artifact_name}"
+                recent_match = tracker.get_recent_match(artifact_id, within_minutes=30)
+                if recent_match and not recent_match.outcome:
+                    tracker.confirm_match(recent_match.id, MatchOutcome.CONFIRMED)
+                    if resolved_format != "json":
+                        console.print(
+                            f"[dim]Auto-confirmed match {recent_match.id} "
+                            f"for {deployment.artifact_name}[/dim]"
+                        )
+        except Exception as e:
+            # Don't fail deployment if auto-confirmation fails
+            logger.debug(f"Auto-confirmation failed: {e}")
 
         # Invalidate cache after successful deploy
         try:
@@ -741,7 +1180,8 @@ def deploy(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
@@ -771,21 +1211,70 @@ def deploy(
     default=None,
     help="Artifact type (required if name is ambiguous)",
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Skip confirmation (required for scripts)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
+)
+@click.pass_context
 def undeploy(
+    ctx,
     name: str,
     project: Optional[Path],
     artifact_type: Optional[str],
+    force: bool,
+    output_format: Optional[str],
 ):
     """Remove deployed artifact from project.
 
     Removes the artifact from the project's .claude/ directory and
     updates deployment tracking.
 
+    Interactive mode requires confirmation. Use --force to skip in scripts.
+
     Examples:
       skillmeat undeploy my-skill
       skillmeat undeploy my-skill --project /path/to/proj
+      claudectl undeploy my-skill --force  # For scripts
     """
+    # Apply smart defaults
+    params = {
+        "name": name,
+        "project": project,
+        "format": output_format,
+    }
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+    resolved_project = params.get("project") or Path.cwd()
+
     try:
+        # Require confirmation for TTY unless --force
+        if sys.stdout.isatty() and not force:
+            if not Confirm.ask(f"Undeploy '{name}' from {resolved_project}?"):
+                if resolved_format == "json":
+                    click.echo(
+                        json.dumps({"status": "cancelled", "command": "undeploy"})
+                    )
+                else:
+                    console.print("[yellow]Cancelled[/yellow]")
+                return
+        elif not force and not sys.stdout.isatty():
+            # Script mode without --force
+            console.print(
+                "[red]Error: Use --force flag for non-interactive undeploy[/red]"
+            )
+            sys.exit(2)  # Invalid usage
+
         deployment_mgr = DeploymentManager()
 
         # Convert type string to enum
@@ -794,7 +1283,7 @@ def undeploy(
         # Undeploy artifact
         deployment_mgr.undeploy(
             artifact_name=name,
-            project_path=project,
+            project_path=resolved_project,
             artifact_type=type_filter,
         )
 
@@ -805,16 +1294,38 @@ def undeploy(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
 
+        # Output
+        if resolved_format == "json":
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "command": "undeploy",
+                        "artifact": name,
+                        "project": str(resolved_project),
+                    }
+                )
+            )
+        else:
+            console.print(f"[green]Undeployed: {name}[/green]")
+
     except ValueError as e:
-        console.print(f"[yellow]{e}[/yellow]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
@@ -2373,31 +2884,81 @@ def config():
 
 
 @config.command(name="list")
-def config_list():
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def config_list(ctx, output_format):
     """List all configuration values.
 
     Examples:
       skillmeat config list
+      skillmeat config list --format json
     """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         config_mgr = ConfigManager()
         all_config = config_mgr.read()
 
         if not all_config:
-            console.print("[yellow]No configuration set[/yellow]")
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "config": {},
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print("[yellow]No configuration set[/yellow]")
             return
 
-        table = Table(title="Configuration")
-        table.add_column("Key", style="cyan")
-        table.add_column("Value", style="green")
+        if resolved_format == "json":
+            # Mask sensitive values in JSON too
+            safe_config = {}
+            for k, v in all_config.items():
+                if "token" in k.lower() and v:
+                    safe_config[k] = (
+                        str(v)[:4] + "****" + str(v)[-4:] if len(str(v)) > 8 else "****"
+                    )
+                else:
+                    safe_config[k] = v
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "config": safe_config,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            table = Table(title="Configuration")
+            table.add_column("Key", style="cyan")
+            table.add_column("Value", style="green")
 
-        for key, value in all_config.items():
-            # Mask GitHub tokens
-            if key == "github-token" and value:
-                value = value[:8] + "..." if len(value) > 8 else "***"
-            table.add_row(key, str(value))
+            for key, value in all_config.items():
+                # Mask GitHub tokens
+                if "token" in key.lower() and value:
+                    value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                table.add_row(key, str(value))
 
-        console.print(table)
+            console.print(table)
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -2406,28 +2967,109 @@ def config_list():
 
 @config.command(name="get")
 @click.argument("key")
-def config_get(key: str):
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def config_get(ctx, key: str, output_format):
     """Get a configuration value.
 
     Examples:
       skillmeat config get github-token
-      skillmeat config get default-collection
+      skillmeat config get active-collection
+      skillmeat config get default-collection --format json
     """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         config_mgr = ConfigManager()
         value = config_mgr.get(key)
 
-        if value is not None:
-            # Mask GitHub tokens
-            if key == "github-token" and value:
-                value = value[:8] + "..." if len(value) > 8 else "***"
-            console.print(f"{key} = {value}")
+        if resolved_format == "json":
+            if value is not None:
+                # Mask sensitive values
+                if "token" in key.lower() and value:
+                    display_value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                else:
+                    display_value = value
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "key": key,
+                            "value": display_value,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "key": key,
+                            "value": None,
+                        },
+                        indent=2,
+                    )
+                )
         else:
-            console.print(f"[yellow]{key} not set[/yellow]")
+            if value is not None:
+                # Mask GitHub tokens
+                if "token" in key.lower() and value:
+                    value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                console.print(f"{key} = {value}")
+            else:
+                console.print(f"[yellow]{key} not set[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+
+def parse_score_weights(value: str) -> Dict[str, float]:
+    """Parse weight string like 'trust=0.3,quality=0.3,match=0.4'
+
+    Args:
+        value: Weight specification string
+
+    Returns:
+        Dict with keys: trust, quality, match
+
+    Raises:
+        ValueError: If format invalid
+
+    Example:
+        >>> parse_score_weights("trust=0.3,quality=0.3,match=0.4")
+        {'trust': 0.3, 'quality': 0.3, 'match': 0.4}
+    """
+    weights = {}
+    try:
+        for pair in value.split(","):
+            key, val = pair.strip().split("=")
+            weights[key.strip()] = float(val.strip())
+    except (ValueError, AttributeError) as e:
+        raise ValueError(
+            f"Invalid format. Expected 'trust=0.3,quality=0.3,match=0.4', got: {value}"
+        ) from e
+
+    return weights
 
 
 @config.command(name="set")
@@ -2440,16 +3082,124 @@ def config_set(key: str, value: str):
       - github-token: GitHub personal access token
       - default-collection: Default collection name
       - update-strategy: Default update strategy (prompt/upstream/local)
+      - score-weights: Scoring weights as 'trust=0.3,quality=0.3,match=0.4'
 
     Examples:
       skillmeat config set github-token ghp_xxxxx
       skillmeat config set default-collection work
+      skillmeat config set score-weights 'trust=0.25,quality=0.25,match=0.50'
     """
     try:
         config_mgr = ConfigManager()
-        config_mgr.set(key, value)
 
-        console.print(f"[green]Set {key}[/green]")
+        # Special handling for score-weights
+        if key == "score-weights":
+            weights = parse_score_weights(value)
+            config_mgr.set_score_weights(weights)
+            console.print(f"[green]Set score weights: {weights}[/green]")
+        else:
+            config_mgr.set(key, value)
+            console.print(f"[green]Set {key}[/green]")
+
+    except ValueError as e:
+        console.print(f"[red]Invalid value: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name="active-collection")
+@click.argument("name", required=False)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def active_collection_cmd(ctx, name, output_format):
+    """View or switch active collection.
+
+    Without arguments, shows the current active collection.
+    With a name, switches to that collection.
+
+    Examples:
+      skillmeat active-collection            # Show current
+      skillmeat active-collection work       # Switch to 'work'
+      skillmeat active-collection --format json
+    """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
+    try:
+        config_mgr = ConfigManager()
+        collection_mgr = CollectionManager()
+
+        if name:
+            # Switch collection
+            collections = collection_mgr.list_collections()
+            if name not in collections:
+                if resolved_format == "json":
+                    click.echo(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "error": f"Collection '{name}' not found",
+                                "available": collections,
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    console.print(f"[red]Collection '{name}' not found[/red]")
+                    console.print(f"Available: {', '.join(collections)}")
+                sys.exit(3)  # NOT_FOUND
+
+            config_mgr.set("active_collection", name)
+
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "command": "active-collection",
+                            "active": name,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print(f"[green]Switched to collection: {name}[/green]")
+        else:
+            # Show current
+            current = (
+                config_mgr.get("active_collection")
+                or config_mgr.get("default-collection")
+                or "default"
+            )
+            collections = collection_mgr.list_collections()
+
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "command": "active-collection",
+                            "active": current,
+                            "available": collections,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print(f"Active collection: [cyan]{current}[/cyan]")
+                if len(collections) > 1:
+                    console.print(f"Available: {', '.join(collections)}")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -2975,6 +3725,7 @@ def diff_three_way_cmd(
 )
 @click.option(
     "--summary-only",
+    "--stat",
     is_flag=True,
     help="Show only diff summary, not full file-by-file diff",
 )
@@ -2985,7 +3736,16 @@ def diff_three_way_cmd(
     type=int,
     help="Maximum number of changed files to show (default: 100)",
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected from TTY if not specified)",
+)
+@click.pass_context
 def diff_artifact_cmd(
+    ctx,
     name: str,
     upstream: bool,
     project: Optional[Path],
@@ -2993,6 +3753,7 @@ def diff_artifact_cmd(
     artifact_type: Optional[str],
     summary_only: bool,
     limit: int,
+    output_format: Optional[str],
 ):
     """Compare artifact versions and show differences.
 
@@ -3011,21 +3772,53 @@ def diff_artifact_cmd(
       skillmeat diff artifact my-skill --project /path/to/other/project
       skillmeat diff artifact my-skill --upstream --summary-only
       skillmeat diff artifact my-skill --upstream --limit 50
+      skillmeat diff artifact my-skill --upstream --format json
+      claudectl diff artifact my-skill --upstream --stat
     """
     try:
         from skillmeat.core.artifact import ArtifactManager, ArtifactType
+        from skillmeat.defaults import SmartDefaults
+        import json
+
+        # Apply smart defaults
+        params = {"format": output_format}
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (user override > smart defaults > auto-detect)
+        resolved_format = (
+            output_format
+            or params.get("format")
+            or SmartDefaults.detect_output_format()
+        )
 
         # Validate that exactly one comparison mode is specified
         if upstream and project:
-            console.print(
-                "[red]Error:[/red] Cannot specify both --upstream and --project"
-            )
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": "Cannot specify both --upstream and --project",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    "[red]Error:[/red] Cannot specify both --upstream and --project"
+                )
             sys.exit(1)
 
         if not upstream and not project:
-            console.print(
-                "[red]Error:[/red] Must specify either --upstream or --project"
-            )
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": "Must specify either --upstream or --project",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    "[red]Error:[/red] Must specify either --upstream or --project"
+                )
             sys.exit(1)
 
         # Initialize artifact manager
@@ -3035,7 +3828,8 @@ def diff_artifact_cmd(
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
         # Get local artifact
-        console.print(f"[cyan]Locating artifact '{name}'...[/cyan]")
+        if resolved_format != "json":
+            console.print(f"[cyan]Locating artifact '{name}'...[/cyan]")
         try:
             artifact = artifact_mgr.get_artifact(
                 name=name,
@@ -3043,7 +3837,15 @@ def diff_artifact_cmd(
                 collection_name=collection,
             )
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": str(e),
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
 
         # Get local artifact path
@@ -3054,13 +3856,24 @@ def diff_artifact_cmd(
         )
 
         if not local_path.exists():
-            console.print(f"[red]Error:[/red] Artifact path not found: {local_path}")
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": f"Artifact path not found: {local_path}",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    f"[red]Error:[/red] Artifact path not found: {local_path}"
+                )
             sys.exit(1)
 
         # Determine comparison target
         if upstream:
             # Compare with upstream
-            console.print(f"[cyan]Fetching upstream version...[/cyan]")
+            if resolved_format != "json":
+                console.print(f"[cyan]Fetching upstream version...[/cyan]")
 
             # Check if artifact has upstream info
             if not artifact.origin or not artifact.origin.startswith(("http", "git")):
@@ -3127,7 +3940,8 @@ def diff_artifact_cmd(
             )
 
         # Perform diff
-        console.print("[cyan]Computing diff...[/cyan]")
+        if resolved_format != "json":
+            console.print("[cyan]Computing diff...[/cyan]")
         engine = DiffEngine()
 
         result = engine.diff_directories(
@@ -3137,8 +3951,55 @@ def diff_artifact_cmd(
         )
 
         # Display results
-        console.print()
-        _display_artifact_diff(result, name, limit, summary_only)
+        if resolved_format == "json":
+            # JSON output
+            output = {
+                "status": "success",
+                "command": "diff",
+                "artifact": name,
+                "comparison": (
+                    "upstream"
+                    if upstream
+                    else f'project:{project.name if project else "unknown"}'
+                ),
+                "has_changes": result.has_changes,
+                "summary": {
+                    "total_files": (
+                        len(result.files_added)
+                        + len(result.files_removed)
+                        + len(result.files_modified)
+                        + len(result.files_unchanged)
+                    ),
+                    "files_added": len(result.files_added),
+                    "files_removed": len(result.files_removed),
+                    "files_modified": len(result.files_modified),
+                    "files_unchanged": len(result.files_unchanged),
+                    "lines_added": result.total_lines_added,
+                    "lines_removed": result.total_lines_removed,
+                },
+            }
+
+            # Include detailed changes if not summary_only
+            if not summary_only and result.has_changes:
+                output["changes"] = {
+                    "added": [str(f) for f in result.files_added[:limit]],
+                    "removed": [str(f) for f in result.files_removed[:limit]],
+                    "modified": [
+                        {
+                            "path": str(f.path),
+                            "lines_added": f.lines_added,
+                            "lines_removed": f.lines_removed,
+                            "is_binary": f.status == "binary",
+                        }
+                        for f in result.files_modified[:limit]
+                    ],
+                }
+
+            click.echo(json.dumps(output, indent=2))
+        else:
+            # Table output (existing behavior)
+            console.print()
+            _display_artifact_diff(result, name, limit, summary_only)
 
         # Clean up temp workspace if we fetched upstream
         if upstream and fetch_result.temp_workspace:
@@ -3553,12 +4414,15 @@ def _display_artifact_diff(
     help="Disable cache for fresh results",
 )
 @click.option(
-    "--json",
-    "output_json",
-    is_flag=True,
-    help="Output results as JSON",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
 )
+@click.pass_context
 def search(
+    ctx,
     query: str,
     collection: Optional[str],
     artifact_type: Optional[str],
@@ -3568,7 +4432,7 @@ def search(
     projects: tuple,
     discover: bool,
     no_cache: bool,
-    output_json: bool,
+    output_format: Optional[str],
 ):
     """Search artifacts by metadata or content.
 
@@ -3587,8 +4451,16 @@ def search(
       skillmeat search "api" --discover
 
       # JSON output
-      skillmeat search "database" --json
+      skillmeat search "database" --format json
+      claudectl search "database"  # Auto-detects JSON format
     """
+    # Apply smart defaults
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         from skillmeat.core.search import SearchManager
 
@@ -3618,7 +4490,7 @@ def search(
             )
 
             # Display results
-            if output_json:
+            if resolved_format == "json":
                 _display_search_json(result, cross_project=True)
             else:
                 _display_search_results(result, cross_project=True)
@@ -3635,10 +4507,324 @@ def search(
             )
 
             # Display results
-            if output_json:
+            if resolved_format == "json":
                 _display_search_json(result, cross_project=False)
             else:
                 _display_search_results(result, cross_project=False)
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        import traceback
+
+        console.print(f"[dim]{traceback.format_exc()}[/dim]", err=True)
+        sys.exit(1)
+
+
+def _display_match_results(scores, artifacts, query, scoring_result, verbose):
+    """Display match results with Rich formatting and color-coded confidence.
+
+    Args:
+        scores: List of ArtifactScore objects
+        artifacts: List of Artifact objects (for type lookup)
+        query: Original search query
+        scoring_result: ScoringResult object
+        verbose: Whether to show detailed score breakdown
+    """
+    from rich.text import Text
+
+    # Create artifact lookup map
+    artifact_map = {a.name: a for a in artifacts}
+
+    # Header with scoring mode info
+    mode = "Semantic + Keyword" if scoring_result.used_semantic else "Keyword-only"
+    console.print(f"\n[bold]Artifact Match Results:[/bold] {mode}")
+    console.print(
+        f'[dim]Query: "{query}" | Duration: {scoring_result.duration_ms:.0f}ms[/dim]'
+    )
+
+    # Show degradation warning if applicable
+    if scoring_result.degraded:
+        console.print(
+            f"[yellow]Warning:[/yellow] {scoring_result.degradation_reason}\n"
+        )
+    else:
+        console.print()
+
+    # Create results table
+    table = Table(title=f"Top {len(scores)} Matches")
+    table.add_column("Artifact", style="cyan", no_wrap=False)
+    table.add_column("Confidence", justify="right", width=12)
+    table.add_column("Type", style="green", width=10)
+
+    if verbose:
+        # Add breakdown columns
+        table.add_column("Trust", justify="right", width=8)
+        table.add_column("Quality", justify="right", width=8)
+        table.add_column("Match", justify="right", width=8)
+
+    for score in scores:
+        # Extract artifact name from artifact_id (format: "skill:name")
+        artifact_name = score.artifact_id.split(":", 1)[-1]
+
+        # Get artifact type
+        artifact = artifact_map.get(artifact_name)
+        artifact_type = artifact.type.value if artifact else "unknown"
+
+        # Color-code confidence score
+        confidence = score.confidence
+        if confidence >= 70:
+            confidence_style = "green"
+        elif confidence >= 50:
+            confidence_style = "yellow"
+        else:
+            confidence_style = "red"
+
+        confidence_text = Text(f"{confidence:.1f}", style=confidence_style)
+
+        # Build row
+        row = [artifact_name, confidence_text, artifact_type]
+
+        if verbose:
+            # Add score breakdown
+            row.extend(
+                [
+                    f"{score.trust_score:.1f}",
+                    f"{score.quality_score:.1f}",
+                    f"{score.match_score:.1f}",
+                ]
+            )
+
+        table.add_row(*row)
+
+    console.print(table)
+
+    # Footer
+    console.print(f"\n[dim]Showing top {len(scores)} results[/dim]")
+    if not verbose:
+        console.print("[dim]Use --verbose to see score breakdown[/dim]")
+    console.print("[dim]Use --json for machine-readable output[/dim]")
+
+    # Legend
+    console.print("\n[dim]Confidence Score Legend:[/dim]")
+    console.print("  [green]Green (70-100):[/green] High confidence match")
+    console.print("  [yellow]Yellow (50-69):[/yellow] Medium confidence match")
+    console.print("  [red]Red (0-49):[/red] Low confidence match")
+
+
+@main.command()
+@click.argument("query")
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=5,
+    help="Maximum results to show (default: 5)",
+)
+@click.option(
+    "--min-confidence",
+    "-m",
+    type=float,
+    default=0.0,
+    help="Minimum confidence threshold (0-100, default: 0)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection to search (default: active collection)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show score breakdown",
+)
+def match(
+    query: str,
+    limit: int,
+    min_confidence: float,
+    collection: Optional[str],
+    output_json: bool,
+    verbose: bool,
+):
+    """Match artifacts against a query using confidence scoring.
+
+    Uses AI-powered semantic matching combined with keyword analysis to rank
+    artifacts by relevance. Results show confidence scores (0-100) and are
+    color-coded for quick assessment.
+
+    \b
+    Examples:
+      # Basic search
+      skillmeat match "pdf processor"
+
+      # Limit results
+      skillmeat match "authentication" --limit 3
+
+      # Filter by confidence threshold
+      skillmeat match "testing" --min-confidence 50
+
+      # Show detailed score breakdown
+      skillmeat match "database" --verbose
+
+      # JSON output for scripting
+      skillmeat match "api" --json
+    """
+    try:
+        from skillmeat.core.scoring.service import ScoringService
+
+        # Validate min_confidence range
+        if not 0 <= min_confidence <= 100:
+            console.print(
+                "[red]Error:[/red] min-confidence must be between 0 and 100",
+                err=True,
+            )
+            sys.exit(1)
+
+        # Load artifacts from collection
+        artifact_mgr = ArtifactManager()
+        artifacts = artifact_mgr.list_artifacts(collection_name=collection)
+
+        if not artifacts:
+            console.print("[yellow]No artifacts found in collection[/yellow]")
+            return
+
+        # Convert to format expected by ScoringService
+        # ScoringService expects: List[Tuple[str, ArtifactMetadata]]
+        artifacts_for_scoring = [(a.name, a.metadata) for a in artifacts]
+
+        # Create scoring service (will use keyword-only if no API key)
+        scoring_service = ScoringService(
+            enable_semantic=True,  # Try semantic, fall back to keyword
+            semantic_timeout=5.0,
+            fallback_to_keyword=True,
+        )
+
+        # Score artifacts
+        result = asyncio.run(
+            scoring_service.score_artifacts(query, artifacts_for_scoring)
+        )
+
+        # Filter by min_confidence
+        filtered_scores = [
+            score for score in result.scores if score.confidence >= min_confidence
+        ]
+
+        # Limit results
+        top_scores = filtered_scores[:limit]
+
+        if not top_scores:
+            console.print(
+                f"[yellow]No artifacts found matching '{query}' "
+                f"with confidence >= {min_confidence}[/yellow]"
+            )
+            return
+
+        # Record matches in history for analytics (P5-T2)
+        try:
+            from skillmeat.core.scoring.match_history import MatchHistoryTracker
+
+            tracker = MatchHistoryTracker()
+            for score in top_scores:
+                tracker.record_match(
+                    query=query,
+                    artifact_id=score.artifact_id,
+                    confidence=score.confidence,
+                )
+        except Exception as e:
+            # Don't fail the whole command if history recording fails
+            console.print(f"[dim]Warning: Could not record match history: {e}[/dim]")
+
+        # Display results
+        if output_json:
+            # Enhanced JSON output (P2-T6)
+            from datetime import datetime, timezone
+
+            # Build artifact lookup by ID for metadata
+            artifact_by_id = {}
+            for artifact in artifacts:
+                # artifact_id format: "type:name" (e.g., "skill:pdf-processor")
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+                artifact_by_id[artifact_id] = artifact
+
+            # Generate explanation for each score
+            def generate_explanation(score: "ArtifactScore") -> str:
+                """Generate human-readable explanation for a score."""
+                confidence = score.confidence
+                if confidence >= 70:
+                    category = "High match"
+                elif confidence >= 50:
+                    category = "Moderate match"
+                else:
+                    category = "Low relevance"
+
+                # Build reason based on component scores
+                reasons = []
+                if score.match_score >= 80:
+                    reasons.append(f"strong match score ({score.match_score:.1f}%)")
+                elif score.match_score >= 60:
+                    reasons.append(f"moderate match ({score.match_score:.1f}%)")
+
+                if score.trust_score >= 80:
+                    reasons.append(f"high trust ({score.trust_score:.1f}%)")
+                if score.quality_score >= 70:
+                    reasons.append(f"good quality ({score.quality_score:.1f}%)")
+
+                reason_str = ", ".join(reasons) if reasons else "see component scores"
+                return f"{category}: {reason_str}"
+
+            output = {
+                "schema_version": "1.0.0",
+                "query": query,
+                "scored_at": datetime.now(timezone.utc).isoformat(),
+                "used_semantic": result.used_semantic,
+                "degraded": result.degraded,
+                "degradation_reason": result.degradation_reason,
+                "duration_ms": result.duration_ms,
+                "total_artifacts": len(artifacts),
+                "result_count": len(top_scores),
+                "results": [
+                    {
+                        "artifact_id": score.artifact_id,
+                        "name": (
+                            artifact_by_id[score.artifact_id].name
+                            if score.artifact_id in artifact_by_id
+                            else score.artifact_id.split(":", 1)[1]
+                        ),
+                        "artifact_type": (
+                            artifact_by_id[score.artifact_id].type.value
+                            if score.artifact_id in artifact_by_id
+                            else score.artifact_id.split(":", 1)[0]
+                        ),
+                        "title": (
+                            artifact_by_id[score.artifact_id].metadata.title
+                            if score.artifact_id in artifact_by_id
+                            and artifact_by_id[score.artifact_id].metadata.title
+                            else None
+                        ),
+                        "confidence": score.confidence,
+                        "trust_score": score.trust_score,
+                        "quality_score": score.quality_score,
+                        "match_score": score.match_score,
+                        "explanation": generate_explanation(score),
+                    }
+                    for score in top_scores
+                ],
+            }
+            # Use print() directly for JSON to avoid Rich formatting
+            print(json.dumps(output, indent=2))
+        else:
+            # Rich table output
+            _display_match_results(top_scores, artifacts, query, result, verbose)
 
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}", err=True)
@@ -3961,12 +5147,20 @@ def _display_duplicates_json(duplicates, threshold: float) -> None:
     help="Collection to check against (default: from deployment metadata)",
 )
 @click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
     "--json",
     "output_json",
     is_flag=True,
-    help="Output results as JSON",
+    help="Output results as JSON (deprecated: use --format json)",
 )
-def sync_check_cmd(project_path, collection, output_json):
+@click.pass_context
+def sync_check_cmd(ctx, project_path, collection, output_format, output_json):
     """Check for drift between project and collection.
 
     Compares deployed artifacts in PROJECT_PATH with the source collection
@@ -3975,13 +5169,28 @@ def sync_check_cmd(project_path, collection, output_json):
     Examples:
         skillmeat sync-check /path/to/project
         skillmeat sync-check /path/to/project --collection my-collection
-        skillmeat sync-check /path/to/project --json
+        skillmeat sync-check /path/to/project --format json
+        claudectl sync-check /path/to/project --format table
     """
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
+    from skillmeat.defaults import SmartDefaults
 
     try:
+        # Apply smart defaults
+        params = {
+            "collection": collection,
+            "format": output_format,
+        }
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (backward compatibility with --json flag)
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        if output_json:  # Legacy --json flag takes precedence
+            resolved_format = "json"
+
         project_path = Path(project_path)
 
         # Initialize managers
@@ -3989,10 +5198,10 @@ def sync_check_cmd(project_path, collection, output_json):
         sync_mgr = SyncManager(collection_manager=collection_mgr)
 
         # Check for drift
-        drift_results = sync_mgr.check_drift(project_path, collection)
+        drift_results = sync_mgr.check_drift(project_path, params.get("collection"))
 
         # Display results
-        if output_json:
+        if resolved_format == "json":
             _display_sync_check_json(drift_results)
         else:
             _display_sync_check_results(drift_results, project_path)
@@ -4135,19 +5344,34 @@ def _display_sync_check_json(drift_results) -> None:
     "--collection",
     help="Collection to sync to (default: from deployment metadata)",
 )
-@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON (deprecated: use --format json)",
+)
 @click.option(
     "--with-rollback",
     is_flag=True,
     help="Create snapshot before sync and offer rollback on failure",
 )
+@click.pass_context
 def sync_pull_cmd(
+    ctx,
     project_path,
     artifacts,
     strategy,
     dry_run,
     no_interactive,
     collection,
+    output_format,
     output_json,
     with_rollback,
 ):
@@ -4162,13 +5386,28 @@ def sync_pull_cmd(
         skillmeat sync-pull /path/to/project --artifacts skill1,skill2
         skillmeat sync-pull /path/to/project --dry-run
         skillmeat sync-pull /path/to/project --strategy merge --no-interactive
-        skillmeat sync-pull /path/to/project --json
+        skillmeat sync-pull /path/to/project --format json
+        claudectl sync-pull /path/to/project --format table
     """
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
+    from skillmeat.defaults import SmartDefaults
 
     try:
+        # Apply smart defaults
+        params = {
+            "collection": collection,
+            "format": output_format,
+        }
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (backward compatibility with --json flag)
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        if output_json:  # Legacy --json flag takes precedence
+            resolved_format = "json"
+
         project_path = Path(project_path)
 
         # Parse artifact list
@@ -4211,7 +5450,7 @@ def sync_pull_cmd(
             )
 
         # Display results
-        if output_json:
+        if resolved_format == "json":
             _display_sync_pull_json(result)
         else:
             _display_sync_pull_results(result)
@@ -4247,8 +5486,23 @@ def sync_pull_cmd(
     "--collection",
     help="Collection to sync to (default: from deployment metadata)",
 )
-@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
-def sync_preview_cmd(project_path, artifacts, collection, output_json):
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON (deprecated: use --format json)",
+)
+@click.pass_context
+def sync_preview_cmd(
+    ctx, project_path, artifacts, collection, output_format, output_json
+):
     """Preview sync changes without applying them.
 
     Shows what would be synced from a project back to the collection
@@ -4258,7 +5512,7 @@ def sync_preview_cmd(project_path, artifacts, collection, output_json):
     Examples:
         skillmeat sync-preview /path/to/project
         skillmeat sync-preview /path/to/project --artifacts skill1,skill2
-        skillmeat sync-preview /path/to/project --json
+        skillmeat sync-preview /path/to/project --format json
     """
     # Delegate to sync-pull with dry_run=True
     ctx = click.get_current_context()
@@ -9767,6 +11021,950 @@ def context_deploy(name_or_id: str, to_project: str, overwrite: bool, dry_run: b
         console.print(f"[red]Error: {e}[/red]")
         logger.exception(f"Error in context deploy: {e}")
         sys.exit(1)
+
+
+# ====================
+# Scores Commands
+# ====================
+
+
+@main.group()
+def scores():
+    """Manage community scores and ratings.
+
+    Import scores from external sources (GitHub stars, registries) and
+    refresh stale data to maintain up-to-date quality metrics.
+
+    Examples:
+      skillmeat scores import              # Import from all sources
+      skillmeat scores refresh             # Refresh stale scores
+      skillmeat scores show canvas         # Show scores for artifact
+    """
+    pass
+
+
+@scores.command("import")
+@click.option(
+    "--source",
+    type=click.Choice(["github", "all"]),
+    default="all",
+    help="Source to import from (default: all)",
+)
+@click.option(
+    "--artifact",
+    "-a",
+    help="Import for specific artifact only (e.g., anthropics/skills/pdf)",
+)
+@click.option(
+    "--token",
+    envvar="GITHUB_TOKEN",
+    help="GitHub API token (or set GITHUB_TOKEN env var)",
+)
+@click.option(
+    "--concurrency",
+    default=5,
+    type=int,
+    help="Max concurrent requests (default: 5)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def import_scores(
+    source: str,
+    artifact: Optional[str],
+    token: Optional[str],
+    concurrency: int,
+    output_json: bool,
+):
+    """Import community scores from external sources.
+
+    Fetches GitHub stars and other quality signals for artifacts,
+    normalizes them to 0-100 scores, and caches results locally.
+
+    Examples:
+      skillmeat scores import
+      skillmeat scores import --source github
+      skillmeat scores import -a anthropics/skills/pdf
+      skillmeat scores import --token ghp_xxx
+      skillmeat scores import --json
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.github_stars_importer import (
+        GitHubStarsImporter,
+        GitHubAPIError,
+        RateLimitError,
+    )
+    from skillmeat.storage.rating_store import RatingManager
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    try:
+        # Get list of artifacts to import
+        artifact_mgr = ArtifactManager()
+        if artifact:
+            # Single artifact
+            artifacts = [artifact]
+        else:
+            # All artifacts from collection
+            collection_mgr = CollectionManager()
+            collections = collection_mgr.list_collections()
+            if not collections:
+                console.print(
+                    "[yellow]No collections found. Initialize one first.[/yellow]"
+                )
+                sys.exit(1)
+
+            # Use default collection or first available
+            default_collection = collections[0]
+            artifact_list = artifact_mgr.list_artifacts(
+                collection_name=default_collection
+            )
+            artifacts = []
+            for a in artifact_list:
+                # Extract owner/repo from upstream if available
+                if a.upstream:
+                    # upstream format: https://github.com/owner/repo or similar
+                    parts = a.upstream.rstrip("/").split("/")
+                    if len(parts) >= 2:
+                        owner_repo = f"{parts[-2]}/{parts[-1]}"
+                        if a.resolved_version:
+                            artifacts.append(
+                                f"{owner_repo}/{a.name}@{a.resolved_version}"
+                            )
+                        else:
+                            artifacts.append(f"{owner_repo}/{a.name}")
+                # Skip local artifacts (no upstream GitHub URL)
+
+        if not artifacts:
+            console.print("[yellow]No artifacts found to import scores for.[/yellow]")
+            sys.exit(0)
+
+        # Initialize importer
+        if source == "github" or source == "all":
+            importer = GitHubStarsImporter(token=token)
+
+            # Import with progress display
+            results = []
+            if not output_json:
+                console.print(
+                    f"[cyan]Importing scores for {len(artifacts)} artifact(s)...[/cyan]"
+                )
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+                disable=output_json,
+            ) as progress:
+                task = progress.add_task(
+                    "Importing GitHub stars...", total=len(artifacts)
+                )
+
+                # Run async batch import
+                import asyncio
+
+                async def _import():
+                    return await importer.batch_import(
+                        artifacts, concurrency=concurrency
+                    )
+
+                score_sources = asyncio.run(_import())
+                progress.advance(task, len(artifacts))
+
+                # Process results
+                for i, artifact_source in enumerate(artifacts):
+                    # Find matching score source
+                    score_source = next(
+                        (
+                            s
+                            for s in score_sources
+                            if artifact_source.startswith(
+                                s.source_name.replace("github_stars:", "")
+                            )
+                        ),
+                        None,
+                    )
+
+                    if score_source:
+                        results.append(
+                            {
+                                "artifact": artifact_source,
+                                "source": "github_stars",
+                                "score": score_source.score,
+                                "raw_stars": score_source.sample_size,
+                                "imported_at": score_source.last_updated.isoformat(),
+                                "status": "success",
+                            }
+                        )
+                    else:
+                        results.append(
+                            {
+                                "artifact": artifact_source,
+                                "source": "github_stars",
+                                "score": None,
+                                "raw_stars": None,
+                                "imported_at": None,
+                                "status": "failed",
+                            }
+                        )
+
+            # Output results
+            if output_json:
+                output = {
+                    "schema_version": "1",
+                    "command": "scores import",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "results": results,
+                    "summary": {
+                        "total": len(results),
+                        "success": len(
+                            [r for r in results if r["status"] == "success"]
+                        ),
+                        "failed": len([r for r in results if r["status"] == "failed"]),
+                        "skipped": 0,
+                    },
+                }
+                console.print(json.dumps(output, indent=2))
+            else:
+                # Human-readable table
+                table = Table(title="Import Results")
+                table.add_column("Artifact", style="cyan")
+                table.add_column("Score", justify="right")
+                table.add_column("Stars", justify="right")
+                table.add_column("Source", style="green")
+                table.add_column("Status")
+
+                for result in results:
+                    status_icon = "✓" if result["status"] == "success" else "✗"
+                    table.add_row(
+                        result["artifact"][:50],  # Truncate long names
+                        (
+                            f"{result['score']:.1f}"
+                            if result["score"] is not None
+                            else "N/A"
+                        ),
+                        (
+                            str(result["raw_stars"])
+                            if result["raw_stars"] is not None
+                            else "N/A"
+                        ),
+                        result["source"],
+                        (
+                            f"[green]{status_icon}[/green]"
+                            if result["status"] == "success"
+                            else f"[red]{status_icon}[/red]"
+                        ),
+                    )
+
+                console.print(table)
+
+                # Summary
+                success_count = len([r for r in results if r["status"] == "success"])
+                console.print(
+                    f"\n[green]Imported {success_count}/{len(results)} scores successfully[/green]"
+                )
+
+    except RateLimitError as e:
+        console.print(f"[red]Rate limit exceeded: {e}[/red]")
+        console.print(f"[dim]Resets at: {e.reset_at}[/dim]")
+        console.print("[yellow]Tip: Use --token to increase rate limits[/yellow]")
+        sys.exit(1)
+    except GitHubAPIError as e:
+        console.print(f"[red]GitHub API error: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error importing scores: {e}[/red]")
+        logger.exception(f"Error in scores import: {e}")
+        sys.exit(1)
+
+
+@scores.command("refresh")
+@click.option(
+    "--stale-days",
+    default=60,
+    type=int,
+    help="Refresh scores older than N days (default: 60)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force refresh all scores, ignoring staleness",
+)
+@click.option(
+    "--artifact",
+    "-a",
+    help="Refresh specific artifact only",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def refresh_scores(
+    stale_days: int,
+    force: bool,
+    artifact: Optional[str],
+    output_json: bool,
+):
+    """Refresh stale community scores.
+
+    Checks for scores older than the staleness threshold and re-imports
+    them from external sources. Uses ScoreDecay to determine which scores
+    need refreshing.
+
+    Examples:
+      skillmeat scores refresh
+      skillmeat scores refresh --stale-days 30
+      skillmeat scores refresh --force
+      skillmeat scores refresh -a anthropics/skills/pdf
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.score_decay import ScoreDecay
+    from skillmeat.core.scoring.github_stars_importer import GitHubStarsImporter
+    from skillmeat.cache.models import GitHubRepoCache, get_session
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    try:
+        # Initialize decay calculator
+        decay = ScoreDecay()
+
+        # Get cached scores
+        session = get_session()
+        try:
+            query = session.query(GitHubRepoCache)
+            if artifact:
+                # Parse artifact to owner/repo
+                parts = artifact.split("@")[0].split("/")
+                if len(parts) >= 2:
+                    cache_key = f"{parts[0]}/{parts[1]}"
+                    query = query.filter(GitHubRepoCache.cache_key == cache_key)
+
+            cached_entries = query.all()
+        finally:
+            session.close()
+
+        if not cached_entries:
+            console.print("[yellow]No cached scores found.[/yellow]")
+            console.print("[dim]Run 'skillmeat scores import' first.[/dim]")
+            sys.exit(0)
+
+        # Identify stale scores
+        stale_entries = []
+        for entry in cached_entries:
+            if force:
+                stale_entries.append(entry)
+            else:
+                # Check if should refresh
+                if decay.should_refresh(entry.fetched_at, threshold_days=stale_days):
+                    stale_entries.append(entry)
+
+        if not stale_entries:
+            if not output_json:
+                console.print("[green]All scores are up-to-date![/green]")
+            else:
+                output = {
+                    "schema_version": "1",
+                    "command": "scores refresh",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "results": [],
+                    "summary": {
+                        "total": 0,
+                        "refreshed": 0,
+                        "failed": 0,
+                        "skipped": len(cached_entries),
+                    },
+                }
+                console.print(json.dumps(output, indent=2))
+            sys.exit(0)
+
+        # Refresh stale scores
+        if not output_json:
+            console.print(
+                f"[cyan]Refreshing {len(stale_entries)} stale score(s)...[/cyan]"
+            )
+
+        config_mgr = ConfigManager()
+        token = config_mgr.get("github-token")
+        importer = GitHubStarsImporter(token=token)
+
+        results = []
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+            disable=output_json,
+        ) as progress:
+            task = progress.add_task("Refreshing scores...", total=len(stale_entries))
+
+            import asyncio
+
+            async def _refresh():
+                refreshed = []
+                for entry in stale_entries:
+                    # Parse cache key to owner/repo
+                    owner, repo = entry.cache_key.split("/")
+                    try:
+                        stats = await importer.fetch_repo_stats(owner, repo)
+                        score = importer.normalize_stars_to_score(stats.stars)
+                        refreshed.append(
+                            {
+                                "artifact": entry.cache_key,
+                                "score": score,
+                                "raw_stars": stats.stars,
+                                "refreshed_at": stats.fetched_at.isoformat(),
+                                "status": "success",
+                            }
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to refresh {entry.cache_key}: {e}")
+                        refreshed.append(
+                            {
+                                "artifact": entry.cache_key,
+                                "score": None,
+                                "raw_stars": None,
+                                "refreshed_at": None,
+                                "status": "failed",
+                            }
+                        )
+                    progress.advance(task)
+                return refreshed
+
+            results = asyncio.run(_refresh())
+
+        # Output results
+        if output_json:
+            output = {
+                "schema_version": "1",
+                "command": "scores refresh",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "results": results,
+                "summary": {
+                    "total": len(results),
+                    "refreshed": len([r for r in results if r["status"] == "success"]),
+                    "failed": len([r for r in results if r["status"] == "failed"]),
+                    "skipped": len(cached_entries) - len(stale_entries),
+                },
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable table
+            table = Table(title="Refresh Results")
+            table.add_column("Artifact", style="cyan")
+            table.add_column("Score", justify="right")
+            table.add_column("Stars", justify="right")
+            table.add_column("Status")
+
+            for result in results:
+                status_icon = "✓" if result["status"] == "success" else "✗"
+                table.add_row(
+                    result["artifact"],
+                    f"{result['score']:.1f}" if result["score"] is not None else "N/A",
+                    (
+                        str(result["raw_stars"])
+                        if result["raw_stars"] is not None
+                        else "N/A"
+                    ),
+                    (
+                        f"[green]{status_icon}[/green]"
+                        if result["status"] == "success"
+                        else f"[red]{status_icon}[/red]"
+                    ),
+                )
+
+            console.print(table)
+
+            # Summary
+            success_count = len([r for r in results if r["status"] == "success"])
+            console.print(
+                f"\n[green]Refreshed {success_count}/{len(results)} scores successfully[/green]"
+            )
+
+    except Exception as e:
+        console.print(f"[red]Error refreshing scores: {e}[/red]")
+        logger.exception(f"Error in scores refresh: {e}")
+        sys.exit(1)
+
+
+@scores.command("show")
+@click.argument("artifact")
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def show_scores(artifact: str, output_json: bool):
+    """Show detailed scores for an artifact.
+
+    Displays all available scores for an artifact, including GitHub stars,
+    user ratings, and aggregated quality metrics.
+
+    Examples:
+      skillmeat scores show anthropics/skills/pdf
+      skillmeat scores show canvas
+      skillmeat scores show canvas --json
+    """
+    from datetime import datetime, timezone
+
+    from skillmeat.core.scoring.github_stars_importer import GitHubStarsImporter
+    from skillmeat.cache.models import GitHubRepoCache, get_session
+    from rich.table import Table
+
+    try:
+        # Parse artifact to owner/repo
+        parts = artifact.split("@")[0].split("/")
+        if len(parts) < 2:
+            console.print(f"[red]Invalid artifact format: {artifact}[/red]")
+            console.print("[dim]Expected format: owner/repo/path or owner/repo[/dim]")
+            sys.exit(1)
+
+        cache_key = f"{parts[0]}/{parts[1]}"
+
+        # Get cached score
+        session = get_session()
+        try:
+            entry = (
+                session.query(GitHubRepoCache).filter_by(cache_key=cache_key).first()
+            )
+        finally:
+            session.close()
+
+        if not entry:
+            console.print(f"[yellow]No cached scores found for {artifact}[/yellow]")
+            console.print("[dim]Run 'skillmeat scores import' first.[/dim]")
+            sys.exit(0)
+
+        # Parse cached data
+        import json as json_lib
+
+        data = json_lib.loads(entry.data)
+        importer = GitHubStarsImporter()
+        score = importer.normalize_stars_to_score(data["stars"])
+
+        # Calculate age
+        from skillmeat.core.scoring.score_decay import ScoreDecay
+
+        decay = ScoreDecay()
+        age_days = (
+            datetime.now(timezone.utc) - entry.fetched_at.replace(tzinfo=timezone.utc)
+        ).total_seconds() / 86400
+
+        # Output results
+        if output_json:
+            output = {
+                "artifact": artifact,
+                "cache_key": cache_key,
+                "score": score,
+                "raw_stars": data["stars"],
+                "forks": data["forks"],
+                "watchers": data["watchers"],
+                "last_updated": data["last_updated"],
+                "fetched_at": data["fetched_at"],
+                "age_days": age_days,
+                "is_stale": decay.should_refresh(entry.fetched_at),
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable display
+            table = Table(title=f"Scores for {artifact}")
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", justify="right")
+
+            table.add_row("Normalized Score", f"{score:.1f}/100")
+            table.add_row("GitHub Stars", str(data["stars"]))
+            table.add_row("Forks", str(data["forks"]))
+            table.add_row("Watchers", str(data["watchers"]))
+            table.add_row("Last Updated", data["last_updated"])
+            table.add_row("Fetched At", data["fetched_at"])
+            table.add_row("Age (days)", f"{age_days:.1f}")
+
+            # Staleness indicator
+            if decay.should_refresh(entry.fetched_at):
+                table.add_row("Status", "[yellow]Stale (needs refresh)[/yellow]")
+            else:
+                table.add_row("Status", "[green]Fresh[/green]")
+
+            console.print(table)
+
+    except Exception as e:
+        console.print(f"[red]Error showing scores: {e}[/red]")
+        logger.exception(f"Error in scores show: {e}")
+        sys.exit(1)
+
+
+@scores.command("confirm")
+@click.argument("match_id", type=int)
+@click.option("--yes", "outcome", flag_value="confirmed", help="Match was helpful")
+@click.option("--no", "outcome", flag_value="rejected", help="Match was not helpful")
+def confirm_match(match_id: int, outcome: Optional[str]):
+    """Confirm or reject a previous match.
+
+    Records user feedback on whether a match result was helpful or not.
+    This data is used to improve the scoring algorithm over time.
+
+    Examples:
+      skillmeat scores confirm 123 --yes
+      skillmeat scores confirm 123 --no
+    """
+    from skillmeat.core.scoring.match_history import MatchHistoryTracker, MatchOutcome
+
+    try:
+        if not outcome:
+            console.print("[red]Error:[/red] Must specify --yes or --no")
+            sys.exit(1)
+
+        tracker = MatchHistoryTracker()
+        tracker.confirm_match(match_id, MatchOutcome(outcome))
+        console.print(f"[green]✓[/green] Match {match_id} marked as {outcome}")
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error confirming match: {e}[/red]")
+        logger.exception(f"Error in scores confirm: {e}")
+        sys.exit(1)
+
+
+@scores.command("stats")
+@click.option("--artifact", "-a", help="Show stats for specific artifact")
+@click.option("--query", "-q", help="Show stats for specific query")
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output JSON format instead of human-readable",
+)
+def show_stats(
+    artifact: Optional[str],
+    query: Optional[str],
+    output_json: bool,
+):
+    """Show match success statistics.
+
+    Displays statistics about match confirmations and success rates.
+    Use --artifact to see stats for a specific artifact, --query to see
+    stats for a specific search query, or neither for overall statistics.
+
+    Examples:
+      skillmeat scores stats
+      skillmeat scores stats --artifact skill:pdf
+      skillmeat scores stats --query "pdf processor"
+      skillmeat scores stats --json
+    """
+    from skillmeat.core.scoring.match_history import MatchHistoryTracker
+    from rich.table import Table
+
+    try:
+        tracker = MatchHistoryTracker()
+
+        # Get statistics based on filters
+        if artifact:
+            stats = tracker.get_artifact_stats(artifact)
+            title = f"Match Stats for {artifact}"
+        elif query:
+            stats = tracker.get_query_stats(query)
+            title = f"Match Stats for query: {query}"
+        else:
+            stats = tracker.get_overall_stats()
+            title = "Overall Match Statistics"
+
+        # Output results
+        if output_json:
+            output = {
+                "total_matches": stats.total_matches,
+                "confirmed": stats.confirmed,
+                "rejected": stats.rejected,
+                "ignored": stats.ignored,
+                "confirmation_rate": stats.confirmation_rate,
+                "average_confidence": stats.average_confidence,
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            # Human-readable table
+            table = Table(title=title)
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", justify="right")
+
+            table.add_row("Total Matches", str(stats.total_matches))
+            table.add_row("Confirmed", f"[green]{stats.confirmed}[/green]")
+            table.add_row("Rejected", f"[red]{stats.rejected}[/red]")
+            table.add_row("Ignored", f"[dim]{stats.ignored}[/dim]")
+            table.add_row("Confirmation Rate", f"{stats.confirmation_rate:.1%}")
+            table.add_row("Avg Confidence", f"{stats.average_confidence:.1f}")
+
+            console.print(table)
+
+            # Interpretation hint
+            if stats.total_matches > 0:
+                if stats.confirmation_rate >= 0.7:
+                    console.print("\n[green]Good match quality![/green]")
+                elif stats.confirmation_rate >= 0.5:
+                    console.print("\n[yellow]Moderate match quality[/yellow]")
+                else:
+                    console.print(
+                        "\n[red]Low match quality - algorithm may need tuning[/red]"
+                    )
+
+    except Exception as e:
+        console.print(f"[red]Error showing statistics: {e}[/red]")
+        logger.exception(f"Error in scores stats: {e}")
+        sys.exit(1)
+
+
+# ====================
+# Alias Management Commands
+# ====================
+
+
+@main.group()
+def alias():
+    """Manage claudectl alias and shell integration.
+
+    Install or uninstall the claudectl wrapper script and shell
+    completion files for a streamlined command-line experience.
+
+    Examples:
+      skillmeat alias install              # Install for bash
+      skillmeat alias install --shells bash zsh  # Install for multiple shells
+      skillmeat alias uninstall            # Remove all files
+    """
+    pass
+
+
+@alias.command()
+@click.option(
+    "--shells",
+    multiple=True,
+    default=["bash"],
+    type=click.Choice(["bash", "zsh", "fish"]),
+    help="Shells to install completion for (can specify multiple)",
+)
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+def install(shells, force):
+    """Install claudectl wrapper and shell completion.
+
+    Creates the claudectl wrapper script at ~/.local/bin/claudectl
+    and installs shell completion files for the specified shells.
+
+    Examples:
+      skillmeat alias install                    # Install for bash
+      skillmeat alias install --shells bash zsh  # Install for bash and zsh
+      skillmeat alias install --force            # Overwrite existing
+    """
+    from skillmeat.wrapper import get_wrapper_script, get_wrapper_path
+    from skillmeat.exit_codes import ExitCodes
+
+    try:
+        # Create wrapper script
+        wrapper_path = get_wrapper_path()
+
+        # Check if exists without force
+        if wrapper_path.exists() and not force:
+            if not Confirm.ask(f"Wrapper already exists at {wrapper_path}. Overwrite?"):
+                console.print("[yellow]Installation cancelled[/yellow]")
+                return
+
+        # Create directory if needed
+        wrapper_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write wrapper script
+        wrapper_path.write_text(get_wrapper_script())
+        wrapper_path.chmod(0o755)
+        console.print(f"[green]Created wrapper: {wrapper_path}[/green]")
+
+        # Install shell completions
+        completions_installed = []
+        completion_dir = Path(__file__).parent.parent  # skillmeat package root
+
+        for shell in shells:
+            try:
+                _install_shell_completion(shell, completion_dir, force)
+                completions_installed.append(shell)
+            except Exception as e:
+                console.print(
+                    f"[yellow]Warning: Could not install {shell} completion: {e}[/yellow]"
+                )
+
+        # Print success summary
+        console.print()
+        console.print("[green]claudectl installed successfully![/green]")
+        console.print()
+        console.print("Next steps:")
+        console.print(f"  1. Ensure ~/.local/bin is in your PATH:")
+        console.print(f'     export PATH="$HOME/.local/bin:$PATH"')
+        console.print()
+        if completions_installed:
+            console.print(f"  2. Source your shell config to enable completion:")
+            for shell in completions_installed:
+                if shell == "bash":
+                    console.print(f"     source ~/.bashrc")
+                elif shell == "zsh":
+                    console.print(f"     source ~/.zshrc")
+                elif shell == "fish":
+                    console.print(f"     # Fish completions are auto-loaded")
+        console.print()
+        console.print("  3. Start using claudectl:")
+        console.print("     claudectl --help")
+
+    except PermissionError as e:
+        console.print(f"[red]Permission denied: {e}[/red]")
+        console.print(
+            "Try running with appropriate permissions or check directory ownership."
+        )
+        sys.exit(ExitCodes.PERMISSION_DENIED)
+    except Exception as e:
+        console.print(f"[red]Installation failed: {e}[/red]")
+        sys.exit(ExitCodes.GENERAL_ERROR)
+
+
+@alias.command()
+@click.option(
+    "--all",
+    "-a",
+    "remove_all",
+    is_flag=True,
+    help="Remove wrapper and all shell completions",
+)
+def uninstall(remove_all):
+    """Remove claudectl wrapper and shell completion.
+
+    Removes the claudectl wrapper script and optionally all
+    shell completion files.
+
+    Examples:
+      skillmeat alias uninstall        # Remove wrapper only
+      skillmeat alias uninstall --all  # Remove wrapper and completions
+    """
+    from skillmeat.wrapper import get_wrapper_path
+    from skillmeat.exit_codes import ExitCodes
+
+    try:
+        removed = []
+
+        # Remove wrapper
+        wrapper_path = get_wrapper_path()
+        if wrapper_path.exists():
+            wrapper_path.unlink()
+            removed.append(str(wrapper_path))
+            console.print(f"[green]Removed: {wrapper_path}[/green]")
+        else:
+            console.print(f"[yellow]Wrapper not found: {wrapper_path}[/yellow]")
+
+        # Remove shell completions if --all
+        if remove_all:
+            for shell in ["bash", "zsh", "fish"]:
+                try:
+                    path = _uninstall_shell_completion(shell)
+                    if path:
+                        removed.append(path)
+                except Exception as e:
+                    console.print(
+                        f"[yellow]Warning: Could not remove {shell} completion: {e}[/yellow]"
+                    )
+
+        if removed:
+            console.print()
+            console.print("[green]claudectl uninstalled successfully[/green]")
+        else:
+            console.print("[yellow]Nothing to uninstall[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Uninstallation failed: {e}[/red]")
+        sys.exit(ExitCodes.GENERAL_ERROR)
+
+
+def _install_shell_completion(
+    shell: str, package_dir: Path, force: bool = False
+) -> None:
+    """Install shell completion file for specified shell."""
+    completion_sources = {
+        "bash": (
+            "bash/claudectl-completion.bash",
+            Path.home()
+            / ".local"
+            / "share"
+            / "bash-completion"
+            / "completions"
+            / "claudectl",
+        ),
+        "zsh": (
+            "zsh/_claudectl",
+            Path.home() / ".local" / "share" / "zsh" / "site-functions" / "_claudectl",
+        ),
+        "fish": (
+            "fish/claudectl.fish",
+            Path.home() / ".config" / "fish" / "completions" / "claudectl.fish",
+        ),
+    }
+
+    if shell not in completion_sources:
+        raise ValueError(f"Unknown shell: {shell}")
+
+    source_file, dest_path = completion_sources[shell]
+    source_path = package_dir / source_file  # Look in project root
+
+    if not source_path.exists():
+        raise FileNotFoundError(f"Completion file not found: {source_path}")
+
+    if dest_path.exists() and not force:
+        console.print(
+            f"[yellow]Skipping {shell} completion (already exists, use --force to overwrite)[/yellow]"
+        )
+        return
+
+    # Create destination directory
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Copy completion file
+    import shutil
+
+    shutil.copy2(source_path, dest_path)
+    console.print(f"[green]Installed {shell} completion: {dest_path}[/green]")
+
+    # For bash, also add source line to .bashrc if not present
+    if shell == "bash":
+        bashrc = Path.home() / ".bashrc"
+        source_line = f'source "{dest_path}"'
+        if bashrc.exists():
+            content = bashrc.read_text()
+            if str(dest_path) not in content:
+                with open(bashrc, "a") as f:
+                    f.write(f"\n# claudectl completion\n{source_line}\n")
+                console.print(f"[dim]Added source line to ~/.bashrc[/dim]")
+
+
+def _uninstall_shell_completion(shell: str) -> Optional[str]:
+    """Remove shell completion file for specified shell."""
+    completion_paths = {
+        "bash": Path.home()
+        / ".local"
+        / "share"
+        / "bash-completion"
+        / "completions"
+        / "claudectl",
+        "zsh": Path.home()
+        / ".local"
+        / "share"
+        / "zsh"
+        / "site-functions"
+        / "_claudectl",
+        "fish": Path.home() / ".config" / "fish" / "completions" / "claudectl.fish",
+    }
+
+    path = completion_paths.get(shell)
+    if path and path.exists():
+        path.unlink()
+        console.print(f"[green]Removed {shell} completion: {path}[/green]")
+        return str(path)
+    return None
 
 
 # ====================

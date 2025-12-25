@@ -7,8 +7,7 @@ from click.testing import CliRunner
 
 import pytest
 
-from skillman.cli import main
-from skillman.models import Skill
+from skillmeat.cli import main
 
 
 class TestCliMarketplaceIntegration:

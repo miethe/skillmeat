@@ -232,3 +232,54 @@ class ConfigManager:
         if custom_path:
             return Path(custom_path)
         return self.config_dir / "analytics.db"
+
+    def get_score_weights(self) -> Dict[str, float]:
+        """Get configured score weights or defaults.
+
+        Returns:
+            Dict with keys: trust, quality, match (floats summing to 1.0)
+
+        Example:
+            >>> config = ConfigManager()
+            >>> weights = config.get_score_weights()
+            >>> assert sum(weights.values()) == 1.0
+        """
+        weights = self.get("scoring.weights")
+        if weights is None:
+            # Return defaults from score_calculator
+            from skillmeat.core.scoring.score_calculator import DEFAULT_WEIGHTS
+
+            return DEFAULT_WEIGHTS.copy()
+        return weights
+
+    def set_score_weights(self, weights: Dict[str, float]) -> None:
+        """Set score weights in config.
+
+        Args:
+            weights: Dict with keys trust, quality, match (must sum to 1.0)
+
+        Raises:
+            ValueError: If weights invalid or don't sum to 1.0
+
+        Example:
+            >>> config = ConfigManager()
+            >>> config.set_score_weights({"trust": 0.3, "quality": 0.3, "match": 0.4})
+        """
+        # Validate required keys
+        required_keys = {"trust", "quality", "match"}
+        if set(weights.keys()) != required_keys:
+            raise ValueError(
+                f"Expected keys: {required_keys}, got: {set(weights.keys())}"
+            )
+
+        # Validate value ranges
+        for key, val in weights.items():
+            if not (0 <= val <= 1):
+                raise ValueError(f"Weight '{key}' must be 0-1, got {val}")
+
+        # Validate sum
+        total = sum(weights.values())
+        if not (0.99 <= total <= 1.01):
+            raise ValueError(f"Weights must sum to 1.0, got {total}")
+
+        self.set("scoring.weights", weights)

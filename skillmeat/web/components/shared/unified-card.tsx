@@ -28,6 +28,7 @@ import type { Artifact, ArtifactType } from '@/types/artifact';
 import { getEntityTypeConfig } from '@/types/entity';
 import { EntityActions } from '@/components/entity/entity-actions';
 import type { ArtifactDiffResponse } from '@/sdk';
+import { ScoreBadge, ScoreBadgeSkeleton } from '@/components/ScoreBadge';
 
 /**
  * Type guard to check if item is an Entity
@@ -61,6 +62,7 @@ interface NormalizedCardData {
   projectPath?: string;
   collection?: string;
   isOutdated?: boolean;
+  confidence?: number;
 }
 
 /**
@@ -82,6 +84,7 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
       updatedAt: item.updatedAt,
       usageCount: item.usageStats.usageCount,
       isOutdated: item.upstreamStatus.isOutdated,
+      confidence: item.score?.confidence,
     };
   } else {
     // Entity has flat properties
@@ -98,6 +101,7 @@ function normalizeCardData(item: Entity | Artifact): NormalizedCardData {
       updatedAt: item.modifiedAt,
       projectPath: item.projectPath,
       collection: item.collection,
+      confidence: undefined, // Entities don't have scores yet
     };
   }
 }
@@ -352,8 +356,11 @@ export const UnifiedCard = React.memo(
               </div>
             </div>
 
-            {/* Status badge and actions */}
+            {/* Status badge, score badge, and actions */}
             <div className="flex flex-shrink-0 items-center gap-2">
+              {data.confidence !== undefined && (
+                <ScoreBadge confidence={data.confidence} size="sm" />
+              )}
               {data.status && (
                 <Badge className={cn('flex-shrink-0', statusColors[data.status])} variant="outline">
                   {statusLabels[data.status] || data.status}
@@ -441,6 +448,7 @@ export const UnifiedCard = React.memo(
       prevData.status === nextData.status &&
       prevData.description === nextData.description &&
       prevData.tags?.join(',') === nextData.tags?.join(',') &&
+      prevData.confidence === nextData.confidence &&
       prevProps.selected === nextProps.selected &&
       prevProps.selectable === nextProps.selectable
     );
@@ -474,8 +482,9 @@ export function UnifiedCardSkeleton({ selectable = false }: { selectable?: boole
             </div>
           </div>
 
-          {/* Status badge and actions skeleton */}
+          {/* Score badge, status badge, and actions skeleton */}
           <div className="flex flex-shrink-0 items-center gap-2">
+            <ScoreBadgeSkeleton size="sm" />
             <Skeleton className="h-5 w-16 rounded-full" />
             <Skeleton className="h-8 w-8 rounded" />
           </div>

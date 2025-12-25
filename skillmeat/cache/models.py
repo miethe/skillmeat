@@ -16,6 +16,9 @@ Models:
     - MarketplaceEntry: Cached marketplace artifact listings
     - MarketplaceSource: GitHub repository sources for marketplace artifacts
     - MarketplaceCatalogEntry: Detected artifacts from marketplace sources
+    - UserRating: User ratings and feedback for artifacts
+    - CommunityScore: Aggregated scoring from external sources
+    - MatchHistory: Artifact matching query history for analytics
     - CacheMetadata: Cache system metadata
 
 Usage:
@@ -48,6 +51,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -1672,6 +1676,260 @@ class TemplateEntity(Base):
             f"artifact_id={self.artifact_id!r}, deploy_order={self.deploy_order}, "
             f"required={self.required})>"
         )
+
+
+class UserRating(Base):
+    """User ratings for artifacts.
+
+    Stores individual user ratings and feedback for artifacts. Supports
+    optional community sharing for aggregated scoring.
+
+    Attributes:
+        id: Unique rating identifier (primary key)
+        artifact_id: Artifact identifier (indexed, not FK - external artifacts allowed)
+        rating: Integer rating from 1-5 stars
+        feedback: Optional text feedback from user
+        share_with_community: Whether to include in community aggregation
+        rated_at: Timestamp when rating was submitted
+        artifacts: Related artifacts (if in local cache)
+
+    Indexes:
+        - idx_user_ratings_artifact_id: Fast lookup by artifact
+        - idx_user_ratings_artifact_id_rated_at: Composite for artifact+time queries
+
+    Constraints:
+        - check_valid_rating: Ensures rating is between 1-5
+    """
+
+    __tablename__ = "user_ratings"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Core fields
+    artifact_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    share_with_community: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+
+    # Timestamp
+    rated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("rating >= 1 AND rating <= 5", name="check_valid_rating"),
+        Index("idx_user_ratings_artifact_id", "artifact_id"),
+        Index("idx_user_ratings_artifact_id_rated_at", "artifact_id", "rated_at"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of UserRating."""
+        return (
+            f"<UserRating(id={self.id}, artifact_id={self.artifact_id!r}, "
+            f"rating={self.rating})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert UserRating to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the rating
+        """
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "rating": self.rating,
+            "feedback": self.feedback,
+            "share_with_community": self.share_with_community,
+            "rated_at": self.rated_at.isoformat() if self.rated_at else None,
+        }
+
+
+class CommunityScore(Base):
+    """Community scores from external sources.
+
+    Aggregates scoring data from multiple sources including GitHub stars,
+    registry popularity, and exported user ratings. Each artifact can have
+    multiple scores from different sources.
+
+    Attributes:
+        id: Unique score identifier (primary key)
+        artifact_id: Artifact identifier (indexed, not FK - external artifacts allowed)
+        source: Source identifier ("github_stars", "registry", "user_export")
+        score: Normalized score from 0-100
+        last_updated: Timestamp when score was last refreshed
+        imported_from: Optional source URL or identifier
+
+    Indexes:
+        - idx_community_scores_artifact_id: Fast lookup by artifact
+        - uq_community_score: Unique constraint on (artifact_id, source)
+
+    Constraints:
+        - uq_community_score: One score per artifact per source
+    """
+
+    __tablename__ = "community_scores"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Core fields
+    artifact_id: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    imported_from: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("artifact_id", "source", name="uq_community_score"),
+        Index("idx_community_scores_artifact_id", "artifact_id"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of CommunityScore."""
+        return (
+            f"<CommunityScore(id={self.id}, artifact_id={self.artifact_id!r}, "
+            f"source={self.source!r}, score={self.score})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert CommunityScore to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the score
+        """
+        return {
+            "id": self.id,
+            "artifact_id": self.artifact_id,
+            "source": self.source,
+            "score": self.score,
+            "last_updated": (
+                self.last_updated.isoformat() if self.last_updated else None
+            ),
+            "imported_from": self.imported_from,
+        }
+
+
+class MatchHistory(Base):
+    """History of match queries for analytics.
+
+    Tracks artifact matching queries and user behavior to improve future
+    matching algorithms. Records confidence scores and whether users
+    deployed the matched artifacts.
+
+    Attributes:
+        id: Unique history entry identifier (primary key)
+        query: Search query text
+        artifact_id: Matched artifact identifier (indexed, not FK)
+        confidence: Match confidence score (0.0-1.0)
+        user_confirmed: Whether user deployed the matched artifact (NULL=unknown)
+        matched_at: Timestamp when match was recorded
+
+    Indexes:
+        - idx_match_history_artifact_query: Composite for artifact+query analytics
+
+    Note:
+        artifact_id has no FK constraint to allow tracking matches for
+        external/marketplace artifacts not yet in local cache.
+    """
+
+    __tablename__ = "match_history"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Core fields
+    query: Mapped[str] = mapped_column(String, nullable=False)
+    artifact_id: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    user_confirmed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+    # Timestamp
+    matched_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints
+    __table_args__ = (
+        Index("idx_match_history_artifact_query", "artifact_id", "query"),
+    )
+
+    def __repr__(self) -> str:
+        """Return string representation of MatchHistory."""
+        return (
+            f"<MatchHistory(id={self.id}, query={self.query!r}, "
+            f"artifact_id={self.artifact_id!r}, confidence={self.confidence})>"
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert MatchHistory to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the match history entry
+        """
+        return {
+            "id": self.id,
+            "query": self.query,
+            "artifact_id": self.artifact_id,
+            "confidence": self.confidence,
+            "user_confirmed": self.user_confirmed,
+            "matched_at": self.matched_at.isoformat() if self.matched_at else None,
+        }
+
+
+class GitHubRepoCache(Base):
+    """Cached GitHub repository statistics.
+
+    Stores GitHub repository stats to minimize API calls and respect rate limits.
+    Cache entries expire after a configurable TTL (default: 24 hours).
+
+    Attributes:
+        cache_key: Repository identifier in format "owner/repo" (primary key)
+        data: JSON-serialized GitHubRepoStats data
+        fetched_at: Timestamp when data was fetched from GitHub
+
+    Indexes:
+        - idx_github_repo_cache_fetched_at: For TTL-based expiry queries
+    """
+
+    __tablename__ = "github_repo_cache"
+
+    # Primary key
+    cache_key: Mapped[str] = mapped_column(String, primary_key=True)
+
+    # Core fields
+    data: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Timestamp
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    # Constraints
+    __table_args__ = (Index("idx_github_repo_cache_fetched_at", "fetched_at"),)
+
+    def __repr__(self) -> str:
+        """Return string representation of GitHubRepoCache."""
+        return f"<GitHubRepoCache(cache_key={self.cache_key!r}, fetched_at={self.fetched_at})>"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert GitHubRepoCache to dictionary for JSON serialization.
+
+        Returns:
+            Dictionary representation of the cache entry
+        """
+        return {
+            "cache_key": self.cache_key,
+            "data": json.loads(self.data) if self.data else None,
+            "fetched_at": self.fetched_at.isoformat() if self.fetched_at else None,
+        }
 
 
 class CacheMetadata(Base):
