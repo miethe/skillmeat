@@ -3,10 +3,10 @@ type: progress
 prd: "PRD-003-claudectl-alias"
 phase: "2-3"
 phase_title: "Management Commands & Polish"
-status: not_started
-progress: 0
+status: completed
+progress: 100
 total_tasks: 14
-completed_tasks: 0
+completed_tasks: 14
 estimated_effort: "2 weeks"
 story_points: 28
 dependencies:
