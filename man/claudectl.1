@@ -1,0 +1,161 @@
+.TH CLAUDECTL 1 "December 2024" "claudectl 0.3.0" "User Commands"
+.SH NAME
+claudectl \- streamlined interface for SkillMeat artifact management
+.SH SYNOPSIS
+.B claudectl
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]
+.SH DESCRIPTION
+.B claudectl
+is a smart wrapper around the skillmeat CLI that provides sensible defaults
+for common operations. It automatically detects output format, artifact types,
+and project paths.
+.PP
+When running interactively, claudectl outputs human-readable tables.
+When piped, it outputs JSON for easy scripting.
+.SH GLOBAL OPTIONS
+.TP
+.B \-\-help
+Show help message and exit.
+.TP
+.B \-\-version
+Show version number and exit.
+.TP
+.B \-\-smart\-defaults
+Enable smart defaults mode (automatic when using claudectl wrapper).
+.SH COMMANDS
+.SS Core Operations
+.TP
+.B quick\-add \fISPEC\fR [\fIOPTIONS\fR]
+Add an artifact to the collection with automatic type detection.
+.TP
+.B deploy \fINAME\fR... [\fIOPTIONS\fR]
+Deploy one or more artifacts to a project's .claude/ directory.
+.TP
+.B remove \fINAME\fR [\fIOPTIONS\fR]
+Remove an artifact from the collection.
+.TP
+.B undeploy \fINAME\fR [\fIOPTIONS\fR]
+Remove a deployed artifact from a project.
+.SS Discovery
+.TP
+.B search \fIQUERY\fR [\fIOPTIONS\fR]
+Search for artifacts by name or description.
+.TP
+.B list [\fIOPTIONS\fR]
+List all artifacts in a collection.
+.TP
+.B status [\fIOPTIONS\fR]
+Show deployment status for the current project.
+.TP
+.B show \fINAME\fR [\fIOPTIONS\fR]
+Show detailed information about an artifact.
+.SS Synchronization
+.TP
+.B sync\-check \fINAME\fR [\fIOPTIONS\fR]
+Check for upstream changes without applying them.
+.TP
+.B sync\-pull \fINAME\fR [\fIOPTIONS\fR]
+Pull and apply upstream changes.
+.TP
+.B diff \fINAME\fR [\fIOPTIONS\fR]
+Show differences between local and upstream versions.
+.SS Management
+.TP
+.B bundle \fISUBCOMMAND\fR [\fIOPTIONS\fR]
+Manage artifact bundles (create, import, inspect).
+.TP
+.B config \fISUBCOMMAND\fR [\fIOPTIONS\fR]
+Manage configuration settings (get, set, list).
+.TP
+.B collection [\fINAME\fR] [\fIOPTIONS\fR]
+View or switch active collection.
+.TP
+.B alias \fISUBCOMMAND\fR [\fIOPTIONS\fR]
+Manage claudectl wrapper installation (install, uninstall).
+.SH COMMON OPTIONS
+Many commands support these options:
+.TP
+.B \-\-format \fIFORMAT\fR
+Output format: \fItable\fR or \fIjson\fR. Auto-detected if not specified.
+.TP
+.B \-\-force, \-f
+Skip confirmation prompts.
+.TP
+.B \-\-collection, \-c \fINAME\fR
+Specify collection (default: active collection).
+.TP
+.B \-\-type, \-t \fITYPE\fR
+Filter by artifact type: \fIskill\fR, \fIcommand\fR, or \fIagent\fR.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+General error.
+.TP
+.B 2
+Invalid usage (bad arguments or flags).
+.TP
+.B 3
+Resource not found (artifact, collection, or project).
+.TP
+.B 4
+Conflict (resource already exists).
+.TP
+.B 5
+Permission denied.
+.SH ENVIRONMENT
+.TP
+.B CLAUDECTL_JSON
+If set to 1, force JSON output regardless of terminal type.
+.TP
+.B CLAUDECTL_MODE
+Internal flag set by the claudectl wrapper script.
+.SH EXAMPLES
+.SS Adding Artifacts
+.nf
+# Add from GitHub (type auto-detected)
+claudectl quick-add anthropics/skills/canvas-design
+
+# Add command (detected from name)
+claudectl quick-add user/repo/my-cli
+
+# Add with explicit type
+claudectl quick-add my-skill --type skill
+.fi
+.SS Deploying
+.nf
+# Deploy to current directory
+claudectl deploy canvas-design
+
+# Deploy multiple artifacts
+claudectl deploy skill1 skill2 skill3
+
+# Deploy to specific project
+claudectl deploy my-skill --project /path/to/project
+.fi
+.SS Scripting with JSON
+.nf
+# Get artifact list as JSON
+claudectl list --format json | jq '.artifacts[].name'
+
+# Check if artifact exists
+claudectl show my-skill --format json 2>/dev/null && echo "Found"
+.fi
+.SH FILES
+.TP
+.I ~/.local/bin/claudectl
+Wrapper script (created by \fBskillmeat alias install\fR).
+.TP
+.I ~/.skillmeat/
+Default collection directory.
+.TP
+.I .claude/
+Project deployment directory.
+.SH SEE ALSO
+.BR skillmeat (1)
+.SH BUGS
+Report bugs at: https://github.com/skillmeat/skillmeat/issues
+.SH AUTHOR
+Written by the SkillMeat team.
