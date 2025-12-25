@@ -2881,31 +2881,81 @@ def config():
 
 
 @config.command(name="list")
-def config_list():
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def config_list(ctx, output_format):
     """List all configuration values.
 
     Examples:
       skillmeat config list
+      skillmeat config list --format json
     """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         config_mgr = ConfigManager()
         all_config = config_mgr.read()
 
         if not all_config:
-            console.print("[yellow]No configuration set[/yellow]")
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "config": {},
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print("[yellow]No configuration set[/yellow]")
             return
 
-        table = Table(title="Configuration")
-        table.add_column("Key", style="cyan")
-        table.add_column("Value", style="green")
+        if resolved_format == "json":
+            # Mask sensitive values in JSON too
+            safe_config = {}
+            for k, v in all_config.items():
+                if "token" in k.lower() and v:
+                    safe_config[k] = (
+                        str(v)[:4] + "****" + str(v)[-4:] if len(str(v)) > 8 else "****"
+                    )
+                else:
+                    safe_config[k] = v
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "config": safe_config,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            table = Table(title="Configuration")
+            table.add_column("Key", style="cyan")
+            table.add_column("Value", style="green")
 
-        for key, value in all_config.items():
-            # Mask GitHub tokens
-            if key == "github-token" and value:
-                value = value[:8] + "..." if len(value) > 8 else "***"
-            table.add_row(key, str(value))
+            for key, value in all_config.items():
+                # Mask GitHub tokens
+                if "token" in key.lower() and value:
+                    value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                table.add_row(key, str(value))
 
-        console.print(table)
+            console.print(table)
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -2914,24 +2964,76 @@ def config_list():
 
 @config.command(name="get")
 @click.argument("key")
-def config_get(key: str):
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def config_get(ctx, key: str, output_format):
     """Get a configuration value.
 
     Examples:
       skillmeat config get github-token
-      skillmeat config get default-collection
+      skillmeat config get active-collection
+      skillmeat config get default-collection --format json
     """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         config_mgr = ConfigManager()
         value = config_mgr.get(key)
 
-        if value is not None:
-            # Mask GitHub tokens
-            if key == "github-token" and value:
-                value = value[:8] + "..." if len(value) > 8 else "***"
-            console.print(f"{key} = {value}")
+        if resolved_format == "json":
+            if value is not None:
+                # Mask sensitive values
+                if "token" in key.lower() and value:
+                    display_value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                else:
+                    display_value = value
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "key": key,
+                            "value": display_value,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "key": key,
+                            "value": None,
+                        },
+                        indent=2,
+                    )
+                )
         else:
-            console.print(f"[yellow]{key} not set[/yellow]")
+            if value is not None:
+                # Mask GitHub tokens
+                if "token" in key.lower() and value:
+                    value = (
+                        str(value)[:4] + "****" + str(value)[-4:]
+                        if len(str(value)) > 8
+                        else "****"
+                    )
+                console.print(f"{key} = {value}")
+            else:
+                console.print(f"[yellow]{key} not set[/yellow]")
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -2999,6 +3101,103 @@ def config_set(key: str, value: str):
     except ValueError as e:
         console.print(f"[red]Invalid value: {e}[/red]")
         sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name="active-collection")
+@click.argument("name", required=False)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format",
+)
+@click.pass_context
+def active_collection_cmd(ctx, name, output_format):
+    """View or switch active collection.
+
+    Without arguments, shows the current active collection.
+    With a name, switches to that collection.
+
+    Examples:
+      skillmeat active-collection            # Show current
+      skillmeat active-collection work       # Switch to 'work'
+      skillmeat active-collection --format json
+    """
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
+    try:
+        config_mgr = ConfigManager()
+        collection_mgr = CollectionManager()
+
+        if name:
+            # Switch collection
+            collections = collection_mgr.list_collections()
+            if name not in collections:
+                if resolved_format == "json":
+                    click.echo(
+                        json.dumps(
+                            {
+                                "status": "error",
+                                "error": f"Collection '{name}' not found",
+                                "available": collections,
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    console.print(f"[red]Collection '{name}' not found[/red]")
+                    console.print(f"Available: {', '.join(collections)}")
+                sys.exit(3)  # NOT_FOUND
+
+            config_mgr.set("active_collection", name)
+
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "command": "active-collection",
+                            "active": name,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print(f"[green]Switched to collection: {name}[/green]")
+        else:
+            # Show current
+            current = (
+                config_mgr.get("active_collection")
+                or config_mgr.get("default-collection")
+                or "default"
+            )
+            collections = collection_mgr.list_collections()
+
+            if resolved_format == "json":
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "command": "active-collection",
+                            "active": current,
+                            "available": collections,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                console.print(f"Active collection: [cyan]{current}[/cyan]")
+                if len(collections) > 1:
+                    console.print(f"Available: {', '.join(collections)}")
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
@@ -3523,6 +3722,7 @@ def diff_three_way_cmd(
 )
 @click.option(
     "--summary-only",
+    "--stat",
     is_flag=True,
     help="Show only diff summary, not full file-by-file diff",
 )
@@ -3533,7 +3733,16 @@ def diff_three_way_cmd(
     type=int,
     help="Maximum number of changed files to show (default: 100)",
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected from TTY if not specified)",
+)
+@click.pass_context
 def diff_artifact_cmd(
+    ctx,
     name: str,
     upstream: bool,
     project: Optional[Path],
@@ -3541,6 +3750,7 @@ def diff_artifact_cmd(
     artifact_type: Optional[str],
     summary_only: bool,
     limit: int,
+    output_format: Optional[str],
 ):
     """Compare artifact versions and show differences.
 
@@ -3559,21 +3769,53 @@ def diff_artifact_cmd(
       skillmeat diff artifact my-skill --project /path/to/other/project
       skillmeat diff artifact my-skill --upstream --summary-only
       skillmeat diff artifact my-skill --upstream --limit 50
+      skillmeat diff artifact my-skill --upstream --format json
+      claudectl diff artifact my-skill --upstream --stat
     """
     try:
         from skillmeat.core.artifact import ArtifactManager, ArtifactType
+        from skillmeat.defaults import SmartDefaults
+        import json
+
+        # Apply smart defaults
+        params = {"format": output_format}
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (user override > smart defaults > auto-detect)
+        resolved_format = (
+            output_format
+            or params.get("format")
+            or SmartDefaults.detect_output_format()
+        )
 
         # Validate that exactly one comparison mode is specified
         if upstream and project:
-            console.print(
-                "[red]Error:[/red] Cannot specify both --upstream and --project"
-            )
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": "Cannot specify both --upstream and --project",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    "[red]Error:[/red] Cannot specify both --upstream and --project"
+                )
             sys.exit(1)
 
         if not upstream and not project:
-            console.print(
-                "[red]Error:[/red] Must specify either --upstream or --project"
-            )
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": "Must specify either --upstream or --project",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    "[red]Error:[/red] Must specify either --upstream or --project"
+                )
             sys.exit(1)
 
         # Initialize artifact manager
@@ -3583,7 +3825,8 @@ def diff_artifact_cmd(
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
         # Get local artifact
-        console.print(f"[cyan]Locating artifact '{name}'...[/cyan]")
+        if resolved_format != "json":
+            console.print(f"[cyan]Locating artifact '{name}'...[/cyan]")
         try:
             artifact = artifact_mgr.get_artifact(
                 name=name,
@@ -3591,7 +3834,15 @@ def diff_artifact_cmd(
                 collection_name=collection,
             )
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": str(e),
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
 
         # Get local artifact path
@@ -3602,13 +3853,24 @@ def diff_artifact_cmd(
         )
 
         if not local_path.exists():
-            console.print(f"[red]Error:[/red] Artifact path not found: {local_path}")
+            if resolved_format == "json":
+                error_output = {
+                    "status": "error",
+                    "command": "diff",
+                    "error": f"Artifact path not found: {local_path}",
+                }
+                click.echo(json.dumps(error_output, indent=2))
+            else:
+                console.print(
+                    f"[red]Error:[/red] Artifact path not found: {local_path}"
+                )
             sys.exit(1)
 
         # Determine comparison target
         if upstream:
             # Compare with upstream
-            console.print(f"[cyan]Fetching upstream version...[/cyan]")
+            if resolved_format != "json":
+                console.print(f"[cyan]Fetching upstream version...[/cyan]")
 
             # Check if artifact has upstream info
             if not artifact.origin or not artifact.origin.startswith(("http", "git")):
@@ -3675,7 +3937,8 @@ def diff_artifact_cmd(
             )
 
         # Perform diff
-        console.print("[cyan]Computing diff...[/cyan]")
+        if resolved_format != "json":
+            console.print("[cyan]Computing diff...[/cyan]")
         engine = DiffEngine()
 
         result = engine.diff_directories(
@@ -3685,8 +3948,55 @@ def diff_artifact_cmd(
         )
 
         # Display results
-        console.print()
-        _display_artifact_diff(result, name, limit, summary_only)
+        if resolved_format == "json":
+            # JSON output
+            output = {
+                "status": "success",
+                "command": "diff",
+                "artifact": name,
+                "comparison": (
+                    "upstream"
+                    if upstream
+                    else f'project:{project.name if project else "unknown"}'
+                ),
+                "has_changes": result.has_changes,
+                "summary": {
+                    "total_files": (
+                        len(result.files_added)
+                        + len(result.files_removed)
+                        + len(result.files_modified)
+                        + len(result.files_unchanged)
+                    ),
+                    "files_added": len(result.files_added),
+                    "files_removed": len(result.files_removed),
+                    "files_modified": len(result.files_modified),
+                    "files_unchanged": len(result.files_unchanged),
+                    "lines_added": result.total_lines_added,
+                    "lines_removed": result.total_lines_removed,
+                },
+            }
+
+            # Include detailed changes if not summary_only
+            if not summary_only and result.has_changes:
+                output["changes"] = {
+                    "added": [str(f) for f in result.files_added[:limit]],
+                    "removed": [str(f) for f in result.files_removed[:limit]],
+                    "modified": [
+                        {
+                            "path": str(f.path),
+                            "lines_added": f.lines_added,
+                            "lines_removed": f.lines_removed,
+                            "is_binary": f.status == "binary",
+                        }
+                        for f in result.files_modified[:limit]
+                    ],
+                }
+
+            click.echo(json.dumps(output, indent=2))
+        else:
+            # Table output (existing behavior)
+            console.print()
+            _display_artifact_diff(result, name, limit, summary_only)
 
         # Clean up temp workspace if we fetched upstream
         if upstream and fetch_result.temp_workspace:
@@ -4101,12 +4411,15 @@ def _display_artifact_diff(
     help="Disable cache for fresh results",
 )
 @click.option(
-    "--json",
-    "output_json",
-    is_flag=True,
-    help="Output results as JSON",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
 )
+@click.pass_context
 def search(
+    ctx,
     query: str,
     collection: Optional[str],
     artifact_type: Optional[str],
@@ -4116,7 +4429,7 @@ def search(
     projects: tuple,
     discover: bool,
     no_cache: bool,
-    output_json: bool,
+    output_format: Optional[str],
 ):
     """Search artifacts by metadata or content.
 
@@ -4135,8 +4448,16 @@ def search(
       skillmeat search "api" --discover
 
       # JSON output
-      skillmeat search "database" --json
+      skillmeat search "database" --format json
+      claudectl search "database"  # Auto-detects JSON format
     """
+    # Apply smart defaults
+    params = {"format": output_format}
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
         from skillmeat.core.search import SearchManager
 
@@ -4166,7 +4487,7 @@ def search(
             )
 
             # Display results
-            if output_json:
+            if resolved_format == "json":
                 _display_search_json(result, cross_project=True)
             else:
                 _display_search_results(result, cross_project=True)
@@ -4183,7 +4504,7 @@ def search(
             )
 
             # Display results
-            if output_json:
+            if resolved_format == "json":
                 _display_search_json(result, cross_project=False)
             else:
                 _display_search_results(result, cross_project=False)
@@ -4823,12 +5144,20 @@ def _display_duplicates_json(duplicates, threshold: float) -> None:
     help="Collection to check against (default: from deployment metadata)",
 )
 @click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
     "--json",
     "output_json",
     is_flag=True,
-    help="Output results as JSON",
+    help="Output results as JSON (deprecated: use --format json)",
 )
-def sync_check_cmd(project_path, collection, output_json):
+@click.pass_context
+def sync_check_cmd(ctx, project_path, collection, output_format, output_json):
     """Check for drift between project and collection.
 
     Compares deployed artifacts in PROJECT_PATH with the source collection
@@ -4837,13 +5166,28 @@ def sync_check_cmd(project_path, collection, output_json):
     Examples:
         skillmeat sync-check /path/to/project
         skillmeat sync-check /path/to/project --collection my-collection
-        skillmeat sync-check /path/to/project --json
+        skillmeat sync-check /path/to/project --format json
+        claudectl sync-check /path/to/project --format table
     """
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
+    from skillmeat.defaults import SmartDefaults
 
     try:
+        # Apply smart defaults
+        params = {
+            "collection": collection,
+            "format": output_format,
+        }
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (backward compatibility with --json flag)
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        if output_json:  # Legacy --json flag takes precedence
+            resolved_format = "json"
+
         project_path = Path(project_path)
 
         # Initialize managers
@@ -4851,10 +5195,10 @@ def sync_check_cmd(project_path, collection, output_json):
         sync_mgr = SyncManager(collection_manager=collection_mgr)
 
         # Check for drift
-        drift_results = sync_mgr.check_drift(project_path, collection)
+        drift_results = sync_mgr.check_drift(project_path, params.get("collection"))
 
         # Display results
-        if output_json:
+        if resolved_format == "json":
             _display_sync_check_json(drift_results)
         else:
             _display_sync_check_results(drift_results, project_path)
@@ -4997,19 +5341,34 @@ def _display_sync_check_json(drift_results) -> None:
     "--collection",
     help="Collection to sync to (default: from deployment metadata)",
 )
-@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON (deprecated: use --format json)",
+)
 @click.option(
     "--with-rollback",
     is_flag=True,
     help="Create snapshot before sync and offer rollback on failure",
 )
+@click.pass_context
 def sync_pull_cmd(
+    ctx,
     project_path,
     artifacts,
     strategy,
     dry_run,
     no_interactive,
     collection,
+    output_format,
     output_json,
     with_rollback,
 ):
@@ -5024,13 +5383,28 @@ def sync_pull_cmd(
         skillmeat sync-pull /path/to/project --artifacts skill1,skill2
         skillmeat sync-pull /path/to/project --dry-run
         skillmeat sync-pull /path/to/project --strategy merge --no-interactive
-        skillmeat sync-pull /path/to/project --json
+        skillmeat sync-pull /path/to/project --format json
+        claudectl sync-pull /path/to/project --format table
     """
     from pathlib import Path
     from skillmeat.core.collection import CollectionManager
     from skillmeat.core.sync import SyncManager
+    from skillmeat.defaults import SmartDefaults
 
     try:
+        # Apply smart defaults
+        params = {
+            "collection": collection,
+            "format": output_format,
+        }
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Resolve output format (backward compatibility with --json flag)
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+        if output_json:  # Legacy --json flag takes precedence
+            resolved_format = "json"
+
         project_path = Path(project_path)
 
         # Parse artifact list
@@ -5073,7 +5447,7 @@ def sync_pull_cmd(
             )
 
         # Display results
-        if output_json:
+        if resolved_format == "json":
             _display_sync_pull_json(result)
         else:
             _display_sync_pull_results(result)
@@ -5109,8 +5483,23 @@ def sync_pull_cmd(
     "--collection",
     help="Collection to sync to (default: from deployment metadata)",
 )
-@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
-def sync_preview_cmd(project_path, artifacts, collection, output_json):
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect based on TTY)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output results as JSON (deprecated: use --format json)",
+)
+@click.pass_context
+def sync_preview_cmd(
+    ctx, project_path, artifacts, collection, output_format, output_json
+):
     """Preview sync changes without applying them.
 
     Shows what would be synced from a project back to the collection
@@ -5120,7 +5509,7 @@ def sync_preview_cmd(project_path, artifacts, collection, output_json):
     Examples:
         skillmeat sync-preview /path/to/project
         skillmeat sync-preview /path/to/project --artifacts skill1,skill2
-        skillmeat sync-preview /path/to/project --json
+        skillmeat sync-preview /path/to/project --format json
     """
     # Delegate to sync-pull with dry_run=True
     ctx = click.get_current_context()
