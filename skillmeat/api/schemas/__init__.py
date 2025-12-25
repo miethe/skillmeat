@@ -113,6 +113,11 @@ from .tags import (
     TagListResponse,
     ArtifactTagRequest,
 )
+from .match import (
+    ScoreBreakdown,
+    MatchedArtifact,
+    MatchResponse,
+)
 
 __all__ = [
     # Common
@@ -211,4 +216,8 @@ __all__ = [
     "TagResponse",
     "TagListResponse",
     "ArtifactTagRequest",
+    # Match
+    "ScoreBreakdown",
+    "MatchedArtifact",
+    "MatchResponse",
 ]

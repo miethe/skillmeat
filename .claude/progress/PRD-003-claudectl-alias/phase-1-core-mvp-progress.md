@@ -3,10 +3,10 @@ type: progress
 prd: "PRD-003-claudectl-alias"
 phase: 1
 phase_title: "Core MVP"
-status: not_started
-progress: 0
+status: completed
+progress: 100
 total_tasks: 11
-completed_tasks: 0
+completed_tasks: 11
 estimated_effort: "2 weeks"
 story_points: 20
 

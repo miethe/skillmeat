@@ -263,6 +263,9 @@ export function CollectionToolbar({
             <DropdownMenuContent align="start">
               <DropdownMenuLabel>Sort By</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onSortChange('confidence', sortOrder)}>
+                Confidence {sortField === 'confidence' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onSortChange('name', sortOrder)}>
                 Name {sortField === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
               </DropdownMenuItem>
