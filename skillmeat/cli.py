@@ -32,6 +32,7 @@ from skillmeat.core.mcp import MCPDeploymentManager, MCPServerMetadata
 from skillmeat.sources.github import GitHubSource
 from skillmeat.sources.local import LocalSource
 from skillmeat.utils.validator import ArtifactValidator
+from skillmeat.defaults import SmartDefaults
 
 # Console for output
 console = Console(force_terminal=True, legacy_windows=False)
@@ -488,19 +489,69 @@ def rate(
     is_flag=True,
     help="Remove from collection but keep files on disk",
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Skip confirmation (required for scripts)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
+)
+@click.pass_context
 def remove(
-    name: str, artifact_type: Optional[str], collection: Optional[str], keep_files: bool
+    ctx,
+    name: str,
+    artifact_type: Optional[str],
+    collection: Optional[str],
+    keep_files: bool,
+    force: bool,
+    output_format: Optional[str],
 ):
     """Remove artifact from collection.
 
     By default, removes both the collection entry and the files.
     Use --keep-files to only remove from collection manifest.
 
+    Interactive mode requires confirmation. Use --force to skip in scripts.
+
     Examples:
-      skillmeat remove my-skill         # Remove completely
+      skillmeat remove my-skill         # Remove completely (with confirmation)
       skillmeat remove my-skill --keep-files  # Keep files
+      claudectl remove my-skill --force  # For scripts (skip confirmation)
     """
+    # Apply smart defaults
+    params = {
+        "name": name,
+        "collection": collection,
+        "format": output_format,
+    }
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
     try:
+        # Require confirmation for TTY unless --force
+        if sys.stdout.isatty() and not force:
+            action = "Remove from manifest only" if keep_files else "Remove completely"
+            if not Confirm.ask(f"{action}: '{name}'?"):
+                if resolved_format == "json":
+                    click.echo(json.dumps({"status": "cancelled", "command": "remove"}))
+                else:
+                    console.print("[yellow]Cancelled[/yellow]")
+                return
+        elif not force and not sys.stdout.isatty():
+            # Script mode without --force
+            console.print(
+                "[red]Error: Use --force flag for non-interactive removal[/red]"
+            )
+            sys.exit(2)  # Invalid usage
+
         artifact_mgr = ArtifactManager()
 
         # Convert type string to enum
@@ -510,7 +561,7 @@ def remove(
         artifact_mgr.remove(
             name=name,
             artifact_type=type_filter,
-            collection_name=collection,
+            collection_name=params.get("collection"),
             keep_files=keep_files,
         )
 
@@ -521,16 +572,39 @@ def remove(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
 
+        # Output
+        if resolved_format == "json":
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "command": "remove",
+                        "artifact": name,
+                        "keep_files": keep_files,
+                    }
+                )
+            )
+        else:
+            action = "Removed from manifest" if keep_files else "Removed"
+            console.print(f"[green]{action}: {name}[/green]")
+
     except ValueError as e:
-        console.print(f"[yellow]{e}[/yellow]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
@@ -570,6 +644,26 @@ def _security_warning():
     console.print()
 
 
+def _format_artifact_output(artifact, output_format: str = "table") -> None:
+    """Format artifact output based on output format preference."""
+    if output_format == "json":
+        output = {
+            "status": "success",
+            "command": "add",
+            "artifact": {
+                "name": artifact.name,
+                "type": artifact.artifact_type.value,
+                "collection": getattr(artifact, "collection_name", "default")
+                or "default",
+            },
+        }
+        click.echo(json.dumps(output, indent=2))
+    else:
+        console.print(
+            f"[green]Added {artifact.artifact_type.value}: {artifact.name}[/green]"
+        )
+
+
 def _add_artifact_from_spec(
     spec: str,
     artifact_type: ArtifactType,
@@ -578,6 +672,7 @@ def _add_artifact_from_spec(
     no_verify: bool,
     force: bool,
     dangerously_skip_permissions: bool,
+    output_format: str = "table",
 ):
     """Shared logic for adding artifacts from GitHub or local paths."""
     try:
@@ -593,7 +688,8 @@ def _add_artifact_from_spec(
         # Determine if spec is GitHub or local path
         if "/" in spec and not spec.startswith((".", "/")):
             # Likely GitHub spec
-            console.print(f"[cyan]Fetching from GitHub: {spec}...[/cyan]")
+            if output_format != "json":
+                console.print(f"[cyan]Fetching from GitHub: {spec}...[/cyan]")
 
             artifact = artifact_mgr.add_from_github(
                 spec=spec,
@@ -604,9 +700,7 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(
-                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
-            )
+            _format_artifact_output(artifact, output_format)
 
         else:
             # Local path
@@ -615,7 +709,8 @@ def _add_artifact_from_spec(
                 console.print(f"[red]Path not found: {spec}[/red]")
                 sys.exit(1)
 
-            console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
+            if output_format != "json":
+                console.print(f"[cyan]Adding from local path: {local_path}...[/cyan]")
 
             artifact = artifact_mgr.add_from_local(
                 path=str(local_path),
@@ -626,9 +721,7 @@ def _add_artifact_from_spec(
                 force=force,
             )
 
-            console.print(
-                f"[green]Added {artifact_type.value}: {artifact.name}[/green]"
-            )
+            _format_artifact_output(artifact, output_format)
 
         # Invalidate cache after successful add
         try:
@@ -829,6 +922,88 @@ def agent(
     )
 
 
+@main.command(name="quick-add")
+@click.argument("spec")
+@click.option(
+    "--type",
+    "-t",
+    "artifact_type",
+    type=click.Choice(["skill", "command", "agent"]),
+    default=None,
+    help="Artifact type (auto-detected from name if not specified)",
+)
+@click.option(
+    "--collection",
+    "-c",
+    default=None,
+    help="Collection name (default: active collection)",
+)
+@click.option("--name", "-n", default=None, help="Override artifact name")
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing")
+@click.option("--dangerously-skip-permissions", is_flag=True, hidden=True)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected if not specified)",
+)
+@click.pass_context
+def quick_add(
+    ctx,
+    spec,
+    artifact_type,
+    collection,
+    name,
+    force,
+    dangerously_skip_permissions,
+    output_format,
+):
+    """Add artifact with smart defaults (claudectl mode).
+
+    SPEC can be: user/repo/path[@version] or local path.
+    Type is auto-detected from name (-cli, -agent, etc).
+
+    Examples:
+      skillmeat --smart-defaults quick-add anthropics/skills/pdf
+      claudectl quick-add pdf-cli  # Auto-detects as command
+    """
+    from skillmeat.defaults import SmartDefaults
+
+    # Get artifact name from spec for type detection
+    artifact_name = spec.split("/")[-1].split("@")[0]
+
+    # Apply smart defaults
+    params = {
+        "name": artifact_name,  # For type detection
+        "collection": collection,
+        "format": output_format,
+    }
+
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    # Detect type from name if not specified
+    resolved_type = artifact_type
+    if not resolved_type:
+        resolved_type = SmartDefaults.detect_artifact_type(artifact_name)
+
+    # Get output format
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
+    # Call existing add logic
+    _add_artifact_from_spec(
+        spec=spec,
+        artifact_type=ArtifactType(resolved_type),
+        collection=params.get("collection"),
+        name=name,
+        no_verify=False,
+        force=force,
+        dangerously_skip_permissions=dangerously_skip_permissions,
+        output_format=resolved_format,
+    )
+
+
 # ====================
 # Deployment Commands
 # ====================
@@ -864,12 +1039,22 @@ def agent(
     default=False,
     help="Overwrite existing artifacts without prompting",
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (auto-detected if not specified)",
+)
+@click.pass_context
 def deploy(
+    ctx,
     names: List[str],
     collection: Optional[str],
     project: Optional[Path],
     artifact_type: Optional[str],
     overwrite: bool,
+    output_format: Optional[str],
 ):
     """Deploy artifacts to a project's .claude/ directory.
 
@@ -878,30 +1063,89 @@ def deploy(
 
     Examples:
       skillmeat deploy my-skill               # Deploy to current dir
+      claudectl deploy my-skill               # Same, using smart defaults
       skillmeat deploy skill1 skill2          # Deploy multiple
       skillmeat deploy my-skill --project /path/to/proj
       skillmeat deploy my-skill --overwrite   # Skip overwrite prompt
     """
+    from skillmeat.defaults import SmartDefaults
+
     try:
+        # Apply smart defaults if enabled
+        params = {
+            "names": names,
+            "collection": collection,
+            "project": project,
+            "artifact_type": artifact_type,
+            "format": output_format,
+        }
+
+        if ctx.obj and ctx.obj.get("smart_defaults"):
+            params = SmartDefaults.apply_defaults(ctx, params)
+
+        # Get resolved values
+        resolved_project = params.get("project") or Path.cwd()
+        resolved_collection = params.get("collection")
+        resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+
         deployment_mgr = DeploymentManager()
 
         # Convert type string to enum
         type_filter = ArtifactType(artifact_type) if artifact_type else None
 
         # Deploy artifacts
-        console.print(f"[cyan]Deploying {len(names)} artifact(s)...[/cyan]")
+        if resolved_format != "json":
+            console.print(f"[cyan]Deploying {len(names)} artifact(s)...[/cyan]")
 
-        deployments = deployment_mgr.deploy_artifacts(
-            artifact_names=list(names),
-            collection_name=collection,
-            project_path=project,
-            artifact_type=type_filter,
-            overwrite=overwrite,
-        )
+        # Suppress console output in JSON mode
+        if resolved_format == "json":
+            import io
+            import contextlib
 
-        console.print(f"[green]Deployed {len(deployments)} artifact(s)[/green]")
-        for deployment in deployments:
-            console.print(f"  {deployment.artifact_name} -> {deployment.artifact_path}")
+            # Redirect console to suppress Rich output
+            with (
+                contextlib.redirect_stderr(io.StringIO()),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                deployments = deployment_mgr.deploy_artifacts(
+                    artifact_names=list(names),
+                    collection_name=resolved_collection,
+                    project_path=resolved_project,
+                    artifact_type=type_filter,
+                    overwrite=overwrite,
+                )
+        else:
+            deployments = deployment_mgr.deploy_artifacts(
+                artifact_names=list(names),
+                collection_name=resolved_collection,
+                project_path=resolved_project,
+                artifact_type=type_filter,
+                overwrite=overwrite,
+            )
+
+        # Output based on format
+        if resolved_format == "json":
+            import json
+
+            output = {
+                "status": "success",
+                "command": "deploy",
+                "deployments": [
+                    {
+                        "artifact": d.artifact_name,
+                        "type": d.artifact_type,
+                        "path": str(d.artifact_path),
+                    }
+                    for d in deployments
+                ],
+            }
+            click.echo(json.dumps(output, indent=2))
+        else:
+            console.print(f"[green]Deployed {len(deployments)} artifact(s)[/green]")
+            for deployment in deployments:
+                console.print(
+                    f"  {deployment.artifact_name} -> {deployment.artifact_path}"
+                )
 
         # Auto-confirm recent matches (P5-T2)
         try:
@@ -917,10 +1161,11 @@ def deploy(
                 recent_match = tracker.get_recent_match(artifact_id, within_minutes=30)
                 if recent_match and not recent_match.outcome:
                     tracker.confirm_match(recent_match.id, MatchOutcome.CONFIRMED)
-                    console.print(
-                        f"[dim]Auto-confirmed match {recent_match.id} "
-                        f"for {deployment.artifact_name}[/dim]"
-                    )
+                    if resolved_format != "json":
+                        console.print(
+                            f"[dim]Auto-confirmed match {recent_match.id} "
+                            f"for {deployment.artifact_name}[/dim]"
+                        )
         except Exception as e:
             # Don't fail deployment if auto-confirmation fails
             logger.debug(f"Auto-confirmation failed: {e}")
@@ -932,7 +1177,8 @@ def deploy(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
@@ -962,21 +1208,70 @@ def deploy(
     default=None,
     help="Artifact type (required if name is ambiguous)",
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Skip confirmation (required for scripts)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default=None,
+    help="Output format (default: auto-detect)",
+)
+@click.pass_context
 def undeploy(
+    ctx,
     name: str,
     project: Optional[Path],
     artifact_type: Optional[str],
+    force: bool,
+    output_format: Optional[str],
 ):
     """Remove deployed artifact from project.
 
     Removes the artifact from the project's .claude/ directory and
     updates deployment tracking.
 
+    Interactive mode requires confirmation. Use --force to skip in scripts.
+
     Examples:
       skillmeat undeploy my-skill
       skillmeat undeploy my-skill --project /path/to/proj
+      claudectl undeploy my-skill --force  # For scripts
     """
+    # Apply smart defaults
+    params = {
+        "name": name,
+        "project": project,
+        "format": output_format,
+    }
+    if ctx.obj and ctx.obj.get("smart_defaults"):
+        params = SmartDefaults.apply_defaults(ctx, params)
+
+    resolved_format = params.get("format") or SmartDefaults.detect_output_format()
+    resolved_project = params.get("project") or Path.cwd()
+
     try:
+        # Require confirmation for TTY unless --force
+        if sys.stdout.isatty() and not force:
+            if not Confirm.ask(f"Undeploy '{name}' from {resolved_project}?"):
+                if resolved_format == "json":
+                    click.echo(
+                        json.dumps({"status": "cancelled", "command": "undeploy"})
+                    )
+                else:
+                    console.print("[yellow]Cancelled[/yellow]")
+                return
+        elif not force and not sys.stdout.isatty():
+            # Script mode without --force
+            console.print(
+                "[red]Error: Use --force flag for non-interactive undeploy[/red]"
+            )
+            sys.exit(2)  # Invalid usage
+
         deployment_mgr = DeploymentManager()
 
         # Convert type string to enum
@@ -985,7 +1280,7 @@ def undeploy(
         # Undeploy artifact
         deployment_mgr.undeploy(
             artifact_name=name,
-            project_path=project,
+            project_path=resolved_project,
             artifact_type=type_filter,
         )
 
@@ -996,16 +1291,38 @@ def undeploy(
             cache_mgr = CacheManager()
             cache_mgr.initialize_cache()
             cache_mgr.invalidate_cache()
-            console.print("[dim]Cache invalidated[/dim]")
+            if resolved_format != "json":
+                console.print("[dim]Cache invalidated[/dim]")
         except Exception as e:
             # Log but don't fail the command - cache is non-critical
             logger.debug(f"Cache invalidation failed: {e}")
 
+        # Output
+        if resolved_format == "json":
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "command": "undeploy",
+                        "artifact": name,
+                        "project": str(resolved_project),
+                    }
+                )
+            )
+        else:
+            console.print(f"[green]Undeployed: {name}[/green]")
+
     except ValueError as e:
-        console.print(f"[yellow]{e}[/yellow]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[yellow]{e}[/yellow]")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+        if resolved_format == "json":
+            click.echo(json.dumps({"status": "error", "message": str(e)}))
+        else:
+            console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
@@ -11008,6 +11325,254 @@ def show_stats(
         console.print(f"[red]Error showing statistics: {e}[/red]")
         logger.exception(f"Error in scores stats: {e}")
         sys.exit(1)
+
+
+# ====================
+# Alias Management Commands
+# ====================
+
+
+@main.group()
+def alias():
+    """Manage claudectl alias and shell integration.
+
+    Install or uninstall the claudectl wrapper script and shell
+    completion files for a streamlined command-line experience.
+
+    Examples:
+      skillmeat alias install              # Install for bash
+      skillmeat alias install --shells bash zsh  # Install for multiple shells
+      skillmeat alias uninstall            # Remove all files
+    """
+    pass
+
+
+@alias.command()
+@click.option(
+    "--shells",
+    multiple=True,
+    default=["bash"],
+    type=click.Choice(["bash", "zsh", "fish"]),
+    help="Shells to install completion for (can specify multiple)",
+)
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing files")
+def install(shells, force):
+    """Install claudectl wrapper and shell completion.
+
+    Creates the claudectl wrapper script at ~/.local/bin/claudectl
+    and installs shell completion files for the specified shells.
+
+    Examples:
+      skillmeat alias install                    # Install for bash
+      skillmeat alias install --shells bash zsh  # Install for bash and zsh
+      skillmeat alias install --force            # Overwrite existing
+    """
+    from skillmeat.wrapper import get_wrapper_script, get_wrapper_path
+    from skillmeat.exit_codes import ExitCodes
+
+    try:
+        # Create wrapper script
+        wrapper_path = get_wrapper_path()
+
+        # Check if exists without force
+        if wrapper_path.exists() and not force:
+            if not Confirm.ask(f"Wrapper already exists at {wrapper_path}. Overwrite?"):
+                console.print("[yellow]Installation cancelled[/yellow]")
+                return
+
+        # Create directory if needed
+        wrapper_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write wrapper script
+        wrapper_path.write_text(get_wrapper_script())
+        wrapper_path.chmod(0o755)
+        console.print(f"[green]Created wrapper: {wrapper_path}[/green]")
+
+        # Install shell completions
+        completions_installed = []
+        completion_dir = Path(__file__).parent.parent  # skillmeat package root
+
+        for shell in shells:
+            try:
+                _install_shell_completion(shell, completion_dir, force)
+                completions_installed.append(shell)
+            except Exception as e:
+                console.print(
+                    f"[yellow]Warning: Could not install {shell} completion: {e}[/yellow]"
+                )
+
+        # Print success summary
+        console.print()
+        console.print("[green]claudectl installed successfully![/green]")
+        console.print()
+        console.print("Next steps:")
+        console.print(f"  1. Ensure ~/.local/bin is in your PATH:")
+        console.print(f'     export PATH="$HOME/.local/bin:$PATH"')
+        console.print()
+        if completions_installed:
+            console.print(f"  2. Source your shell config to enable completion:")
+            for shell in completions_installed:
+                if shell == "bash":
+                    console.print(f"     source ~/.bashrc")
+                elif shell == "zsh":
+                    console.print(f"     source ~/.zshrc")
+                elif shell == "fish":
+                    console.print(f"     # Fish completions are auto-loaded")
+        console.print()
+        console.print("  3. Start using claudectl:")
+        console.print("     claudectl --help")
+
+    except PermissionError as e:
+        console.print(f"[red]Permission denied: {e}[/red]")
+        console.print(
+            "Try running with appropriate permissions or check directory ownership."
+        )
+        sys.exit(ExitCodes.PERMISSION_DENIED)
+    except Exception as e:
+        console.print(f"[red]Installation failed: {e}[/red]")
+        sys.exit(ExitCodes.GENERAL_ERROR)
+
+
+@alias.command()
+@click.option(
+    "--all",
+    "-a",
+    "remove_all",
+    is_flag=True,
+    help="Remove wrapper and all shell completions",
+)
+def uninstall(remove_all):
+    """Remove claudectl wrapper and shell completion.
+
+    Removes the claudectl wrapper script and optionally all
+    shell completion files.
+
+    Examples:
+      skillmeat alias uninstall        # Remove wrapper only
+      skillmeat alias uninstall --all  # Remove wrapper and completions
+    """
+    from skillmeat.wrapper import get_wrapper_path
+    from skillmeat.exit_codes import ExitCodes
+
+    try:
+        removed = []
+
+        # Remove wrapper
+        wrapper_path = get_wrapper_path()
+        if wrapper_path.exists():
+            wrapper_path.unlink()
+            removed.append(str(wrapper_path))
+            console.print(f"[green]Removed: {wrapper_path}[/green]")
+        else:
+            console.print(f"[yellow]Wrapper not found: {wrapper_path}[/yellow]")
+
+        # Remove shell completions if --all
+        if remove_all:
+            for shell in ["bash", "zsh", "fish"]:
+                try:
+                    path = _uninstall_shell_completion(shell)
+                    if path:
+                        removed.append(path)
+                except Exception as e:
+                    console.print(
+                        f"[yellow]Warning: Could not remove {shell} completion: {e}[/yellow]"
+                    )
+
+        if removed:
+            console.print()
+            console.print("[green]claudectl uninstalled successfully[/green]")
+        else:
+            console.print("[yellow]Nothing to uninstall[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Uninstallation failed: {e}[/red]")
+        sys.exit(ExitCodes.GENERAL_ERROR)
+
+
+def _install_shell_completion(
+    shell: str, package_dir: Path, force: bool = False
+) -> None:
+    """Install shell completion file for specified shell."""
+    completion_sources = {
+        "bash": (
+            "bash/claudectl-completion.bash",
+            Path.home()
+            / ".local"
+            / "share"
+            / "bash-completion"
+            / "completions"
+            / "claudectl",
+        ),
+        "zsh": (
+            "zsh/_claudectl",
+            Path.home() / ".local" / "share" / "zsh" / "site-functions" / "_claudectl",
+        ),
+        "fish": (
+            "fish/claudectl.fish",
+            Path.home() / ".config" / "fish" / "completions" / "claudectl.fish",
+        ),
+    }
+
+    if shell not in completion_sources:
+        raise ValueError(f"Unknown shell: {shell}")
+
+    source_file, dest_path = completion_sources[shell]
+    source_path = package_dir / source_file  # Look in project root
+
+    if not source_path.exists():
+        raise FileNotFoundError(f"Completion file not found: {source_path}")
+
+    if dest_path.exists() and not force:
+        console.print(
+            f"[yellow]Skipping {shell} completion (already exists, use --force to overwrite)[/yellow]"
+        )
+        return
+
+    # Create destination directory
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Copy completion file
+    import shutil
+
+    shutil.copy2(source_path, dest_path)
+    console.print(f"[green]Installed {shell} completion: {dest_path}[/green]")
+
+    # For bash, also add source line to .bashrc if not present
+    if shell == "bash":
+        bashrc = Path.home() / ".bashrc"
+        source_line = f'source "{dest_path}"'
+        if bashrc.exists():
+            content = bashrc.read_text()
+            if str(dest_path) not in content:
+                with open(bashrc, "a") as f:
+                    f.write(f"\n# claudectl completion\n{source_line}\n")
+                console.print(f"[dim]Added source line to ~/.bashrc[/dim]")
+
+
+def _uninstall_shell_completion(shell: str) -> Optional[str]:
+    """Remove shell completion file for specified shell."""
+    completion_paths = {
+        "bash": Path.home()
+        / ".local"
+        / "share"
+        / "bash-completion"
+        / "completions"
+        / "claudectl",
+        "zsh": Path.home()
+        / ".local"
+        / "share"
+        / "zsh"
+        / "site-functions"
+        / "_claudectl",
+        "fish": Path.home() / ".config" / "fish" / "completions" / "claudectl.fish",
+    }
+
+    path = completion_paths.get(shell)
+    if path and path.exists():
+        path.unlink()
+        console.print(f"[green]Removed {shell} completion: {path}[/green]")
+        return str(path)
+    return None
 
 
 # ====================
