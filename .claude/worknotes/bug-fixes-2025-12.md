@@ -600,3 +600,23 @@
   4. Applied in `filteredArtifacts` useMemo when viewing a specific collection
 - **Commit(s)**: 43350e0
 - **Status**: RESOLVED
+
+## 2025-12-25
+
+### claudectl Wrapper Fails with "No such option: --smart-defaults"
+
+**Issue**: After installing claudectl via `skillmeat alias install`, running any claudectl command fails with `Error: No such option: --smart-defaults`
+- **Location**: `skillmeat/cli.py:49-63` (main group definition)
+- **Root Cause**: PRD-003 Task P1-T2 specified adding `--smart-defaults` flag to the main CLI group, but the implementation was incomplete. The wrapper script at `~/.local/bin/claudectl` runs `exec skillmeat --smart-defaults "$@"`, but the `--smart-defaults` option was never defined on the `@click.group()` decorator. All subcommands checked `ctx.obj.get("smart_defaults")` but `ctx.obj` was never initialized with this value.
+- **Fix**: Added the missing option to the main group:
+  ```python
+  @click.group()
+  @click.version_option(version=__version__, prog_name="skillmeat")
+  @click.option("--smart-defaults", is_flag=True, hidden=True, help="Enable smart defaults mode (used by claudectl wrapper)")
+  @click.pass_context
+  def main(ctx, smart_defaults):
+      ctx.ensure_object(dict)
+      ctx.obj["smart_defaults"] = smart_defaults
+  ```
+- **Commit(s)**: fd53eba
+- **Status**: RESOLVED
