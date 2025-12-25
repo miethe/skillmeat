@@ -1,0 +1,165 @@
+#compdef claudectl skillmeat
+
+# claudectl/skillmeat zsh completion script
+# Install: Copy to ~/.local/share/zsh/site-functions/_claudectl
+
+_claudectl() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    local -a commands
+    commands=(
+        'quick-add:Add artifact with smart defaults'
+        'deploy:Deploy artifacts to project'
+        'remove:Remove artifact from collection'
+        'undeploy:Remove deployed artifact from project'
+        'search:Search artifacts in collection'
+        'list:List artifacts in collection'
+        'status:Show deployment status'
+        'show:Show artifact details'
+        'sync-check:Check for upstream changes'
+        'sync-pull:Pull upstream changes'
+        'sync-preview:Preview sync changes'
+        'diff:Show differences with upstream'
+        'bundle:Manage artifact bundles'
+        'config:Manage configuration'
+        'collection:View or switch collection'
+        'alias:Manage claudectl alias'
+        'init:Initialize a new collection'
+    )
+
+    local -a global_opts
+    global_opts=(
+        '--help[Show help message]'
+        '--version[Show version]'
+        '--smart-defaults[Enable claudectl smart defaults]'
+    )
+
+    _arguments -C \
+        $global_opts \
+        '1: :->command' \
+        '*::arg:->args'
+
+    case $state in
+        command)
+            _describe -t commands 'claudectl commands' commands
+            ;;
+        args)
+            case $line[1] in
+                quick-add)
+                    _arguments \
+                        '1:spec:_files' \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--collection[Collection name]:collection:_claudectl_collections' \
+                        '--name[Override name]:name:' \
+                        '--force[Overwrite existing]' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                deploy)
+                    _arguments \
+                        '*:artifact:_claudectl_artifacts' \
+                        '--collection[Collection name]:collection:_claudectl_collections' \
+                        '--project[Project path]:project:_files -/' \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--overwrite[Overwrite existing]' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                remove)
+                    _arguments \
+                        '1:artifact:_claudectl_artifacts' \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--collection[Collection name]:collection:_claudectl_collections' \
+                        '--keep-files[Keep artifact files]' \
+                        '--force[Skip confirmation]' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                undeploy)
+                    _arguments \
+                        '1:artifact:_claudectl_artifacts' \
+                        '--project[Project path]:project:_files -/' \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--force[Skip confirmation]' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                search)
+                    _arguments \
+                        '1:query:' \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--limit[Max results]:limit:' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                list)
+                    _arguments \
+                        '--type[Artifact type]:type:(skill command agent)' \
+                        '--collection[Collection name]:collection:_claudectl_collections' \
+                        '--tags[Show tags]' \
+                        '--no-cache[Bypass cache]' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                config)
+                    local -a config_cmds
+                    config_cmds=(
+                        'get:Get config value'
+                        'set:Set config value'
+                        'list:List all config'
+                    )
+                    _arguments '1: :->config_cmd' '*::arg:->config_args'
+                    case $state in
+                        config_cmd)
+                            _describe -t config_cmds 'config commands' config_cmds
+                            ;;
+                        config_args)
+                            case $line[1] in
+                                get|set)
+                                    _arguments '1:key:(github-token active-collection default-format)'
+                                    ;;
+                            esac
+                            ;;
+                    esac
+                    ;;
+                collection)
+                    _arguments \
+                        '1:collection:_claudectl_collections' \
+                        '--format[Output format]:format:(table json)'
+                    ;;
+                bundle)
+                    local -a bundle_cmds
+                    bundle_cmds=(
+                        'create:Create bundle from artifacts'
+                        'import:Import bundle'
+                        'inspect:Inspect bundle contents'
+                    )
+                    _describe -t bundle_cmds 'bundle commands' bundle_cmds
+                    ;;
+                alias)
+                    local -a alias_cmds
+                    alias_cmds=(
+                        'install:Install claudectl wrapper'
+                        'uninstall:Uninstall claudectl wrapper'
+                    )
+                    _describe -t alias_cmds 'alias commands' alias_cmds
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# Complete artifact names
+_claudectl_artifacts() {
+    local artifacts
+    artifacts=(${(f)"$(claudectl list --format json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(a.get('name','') for a in d.get('artifacts',[])))" 2>/dev/null)"})
+    _describe -t artifacts 'artifacts' artifacts
+}
+
+# Complete collection names
+_claudectl_collections() {
+    local collections
+    collections=(${(f)"$(skillmeat list --collections 2>/dev/null | grep -v '^$')"})
+    if [[ -z "$collections" ]]; then
+        collections=(default)
+    fi
+    _describe -t collections 'collections' collections
+}
+
+# Register for both command names
+compdef _claudectl claudectl skillmeat
