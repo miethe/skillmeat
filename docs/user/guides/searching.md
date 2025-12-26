@@ -1,3 +1,24 @@
+---
+title: Searching for Artifacts Guide
+description: Comprehensive guide to using SkillMeat search functionality, including metadata search, content search, cross-project search, and duplicate detection with practical examples and performance tips.
+audience: users, developers
+tags:
+  - search
+  - discovery
+  - duplicate-detection
+  - cli
+  - web-ui
+created: "2024-11-01"
+updated: "2025-12-25"
+category: user-guides
+status: current
+related_documents:
+  - docs/user/cli/commands.md
+  - docs/user/guides/web-ui-guide.md
+  - docs/user/guides/using-analytics.md
+  - docs/user/guides/updating-safely.md
+---
+
 # Searching for Artifacts Guide
 
 Learn how to find and discover artifacts in your SkillMeat collection using powerful search and duplicate detection capabilities.
