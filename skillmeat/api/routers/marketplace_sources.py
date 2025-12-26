@@ -114,6 +114,7 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         updated_at=source.updated_at,
         description=source.description,
         notes=source.notes,
+        enable_frontmatter_detection=source.enable_frontmatter_detection,
     )
 
 

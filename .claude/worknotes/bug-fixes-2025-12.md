@@ -643,3 +643,17 @@
 - **Fix**: Unable to fix - could not reproduce from code analysis
 - **Commit(s)**: N/A
 - **Status**: INVESTIGATION CLOSED (Could not reproduce)
+
+## 2025-12-26
+
+### Marketplace Sources Missing enable_frontmatter_detection Column
+
+**Issue**: `/marketplace/sources` page crashes with SQLAlchemy OperationalError: "no such column: marketplace_sources.enable_frontmatter_detection"
+- **Location**: `skillmeat/cache/models.py:1244` (MarketplaceSource model)
+- **Root Cause**: The `MarketplaceSource` model had `enable_frontmatter_detection` column defined but Alembic version tracking was out of sync - database stamped at `20251215_1400_add_collection_type_fields` while later migrations added columns but weren't tracked. Migration `20251226_1500_add_frontmatter_detection` never ran.
+- **Fix**:
+  1. Added missing column via direct SQLite ALTER TABLE
+  2. Stamped Alembic to latest revision `20251226_1500_add_frontmatter_detection`
+  3. Added `enable_frontmatter_detection` to `source_to_response()` function
+- **Commit(s)**: (pending)
+- **Status**: RESOLVED
