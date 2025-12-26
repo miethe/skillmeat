@@ -541,10 +541,25 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
                     error_message=None,
                 )
 
-                # For now, replace catalog entries
-                # TODO: Use diff engine for incremental updates
-                # Currently heuristic detector returns empty list, so this is a placeholder
-                new_entries: List[MarketplaceCatalogEntry] = []
+                # Convert detected artifacts to catalog entries
+                new_entries = []
+                for artifact in scan_result.artifacts:
+                    entry = MarketplaceCatalogEntry(
+                        id=str(uuid.uuid4()),
+                        source_id=source_id,
+                        artifact_type=artifact.artifact_type,
+                        name=artifact.name,
+                        path=artifact.path,
+                        upstream_url=artifact.upstream_url,
+                        confidence_score=artifact.confidence_score,
+                        detected_sha=artifact.detected_sha,
+                        detected_at=datetime.utcnow(),
+                        status="new",
+                    )
+                    new_entries.append(entry)
+
+                # Replace with new entries (full replacement for now)
+                # TODO: Implement incremental diff updates in future
                 ctx.replace_catalog_entries(new_entries)
 
             # Set source_id in result
