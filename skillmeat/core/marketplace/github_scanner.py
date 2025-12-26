@@ -173,7 +173,7 @@ class GitHubScanner:
                 # Count artifacts by type
                 artifact_counts = {}
                 for artifact in artifacts:
-                    artifact_type = artifact.get("artifact_type", "unknown")
+                    artifact_type = artifact.artifact_type if hasattr(artifact, 'artifact_type') else artifact.get("artifact_type", "unknown")
                     artifact_counts[artifact_type] = artifact_counts.get(artifact_type, 0) + 1
                     marketplace_scan_artifacts_total.labels(
                         source_id=source_id,
