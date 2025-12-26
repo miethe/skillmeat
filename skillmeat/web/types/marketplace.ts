@@ -131,6 +131,7 @@ export interface GitHubSource {
   updated_at: string;
   description?: string;
   notes?: string;
+  enable_frontmatter_detection?: boolean;
 }
 
 export interface GitHubSourceListResponse {
@@ -147,6 +148,7 @@ export interface CreateSourceRequest {
   trust_level?: TrustLevel;
   description?: string;
   notes?: string;
+  enable_frontmatter_detection?: boolean;
 }
 
 export interface UpdateSourceRequest {
@@ -156,6 +158,7 @@ export interface UpdateSourceRequest {
   manual_map?: Record<string, string[]>;
   description?: string;
   notes?: string;
+  enable_frontmatter_detection?: boolean;
 }
 
 export interface CatalogEntry {

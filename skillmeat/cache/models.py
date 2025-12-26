@@ -1240,6 +1240,15 @@ class MarketplaceSource(Base):
         String, nullable=False, default="public", server_default="public"
     )
 
+    # Detection settings
+    enable_frontmatter_detection: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Parse markdown frontmatter for artifact type hints",
+    )
+
     # Sync status
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1316,6 +1325,7 @@ class MarketplaceSource(Base):
             "access_token_id": self.access_token_id,
             "trust_level": self.trust_level,
             "visibility": self.visibility,
+            "enable_frontmatter_detection": self.enable_frontmatter_detection,
             "last_sync_at": (
                 self.last_sync_at.isoformat() if self.last_sync_at else None
             ),

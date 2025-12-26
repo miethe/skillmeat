@@ -525,6 +525,10 @@ class CreateSourceRequest(BaseModel):
         max_length=2000,
         examples=["Contact: team@example.com for access issues"],
     )
+    enable_frontmatter_detection: bool = Field(
+        default=False,
+        description="Enable parsing markdown frontmatter for artifact type hints",
+    )
 
     @field_validator("description")
     @classmethod
@@ -653,7 +657,11 @@ class UpdateSourceRequest(BaseModel):
         max_length=2000,
         examples=["Contains verified skills. Contact: team@example.com"],
     )
-    
+    enable_frontmatter_detection: Optional[bool] = Field(
+        default=None,
+        description="Enable parsing markdown frontmatter for artifact type hints",
+    )
+
     @field_validator("root_hint")
     @classmethod
     def validate_root_hint(cls, v: str | None) -> str | None:
@@ -818,6 +826,9 @@ class SourceResponse(BaseModel):
         description="Internal notes/documentation for this source",
         max_length=2000,
         examples=["Contains verified skills from Anthropic team. Updated weekly."],
+    )
+    enable_frontmatter_detection: bool = Field(
+        description="Whether frontmatter detection is enabled for this source",
     )
 
     class Config:
