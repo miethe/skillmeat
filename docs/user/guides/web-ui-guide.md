@@ -6,8 +6,10 @@ This guide covers the SkillMeat web interface, including launching the UI, manag
 
 - [Launching the Web UI](#launching-the-web-ui)
 - [Dashboard Overview](#dashboard-overview)
+- [Collections Navigation](#collections-navigation)
 - [Collections Browser](#collections-browser)
 - [Artifact Management](#artifact-management)
+- [Notification Center](#notification-center)
 - [Deploying to Projects](#deploying-to-projects)
 - [Analytics Dashboard](#analytics-dashboard)
 - [Settings and Configuration](#settings-and-configuration)
@@ -104,6 +106,88 @@ The dashboard appears when you first log in and provides an at-a-glance view of 
 - Database size
 - Last backup timestamp
 - API connectivity
+
+## Collections Navigation
+
+The Collections Navigation system allows you to manage multiple collections and organize artifacts into groups, with persistent memory of your selections across sessions.
+
+### Collection Switcher
+
+**Location:** Sidebar dropdown menu (top section)
+
+The Collection Switcher lets you switch between different collections:
+
+**How to Use:**
+
+1. Click the collection dropdown in the sidebar (shows current collection name)
+2. Browse available collections in the dropdown
+3. Click a collection name to switch to it
+4. Your selection is automatically saved and remembered the next time you log in
+
+**Features:**
+
+- **Persistent Selection**: Your last selected collection is remembered across browser sessions (via localStorage)
+- **Quick Access**: Switch between collections without page reload
+- **Visual Indicator**: Current collection is highlighted in the dropdown
+- **Fallback Handling**: If your previously selected collection no longer exists, the app automatically selects the first available collection
+
+### Groups Functionality
+
+**Location:** Within each collection (sidebar under selected collection)
+
+Groups allow you to organize artifacts within a collection for easier browsing and management.
+
+**Creating Groups:**
+
+1. Click the "Manage Groups" option in the sidebar or collection menu
+2. Click "Add Group" button
+3. Enter group name and optional description
+4. Click "Create"
+
+**Managing Groups:**
+
+1. Click "Manage Groups" to open the groups dialog
+2. **Edit**: Click edit icon next to any group to modify name/description
+3. **Delete**: Click delete icon to remove a group (artifacts are not deleted)
+4. **Reorder**: Drag and drop groups to change their order
+5. Click "Save" to apply changes
+
+**Viewing Grouped Artifacts:**
+
+1. Select a group from the sidebar to view artifacts in that group
+2. Artifacts within a group are displayed in a dedicated view
+3. All standard filtering, searching, and sorting options apply
+
+**Moving Artifacts Between Groups:**
+
+1. Click artifact card or open details drawer
+2. Select "Move to Group" option
+3. Choose destination group
+4. Changes sync automatically
+
+### Discovery Banner
+
+**Location:** Top of collections browser (when new artifacts are discovered)
+
+The Discovery Banner notifies you when SkillMeat finds new artifacts from configured sources (GitHub, local paths, marketplace).
+
+**How to Use:**
+
+1. When new artifacts are discovered, a blue banner appears at the top
+2. Click "View New Artifacts" to see the discovery results
+3. Select artifacts you want to import
+4. Click "Import Selected" to add them to your collection
+
+**Skipping Artifacts:**
+
+1. In the discovery view, click the skip (X) icon next to any artifact
+2. Click "Remember My Choices" to avoid seeing skipped artifacts again
+3. Your preferences are stored for future discoveries
+
+**Dismissing the Banner:**
+
+- Click the X button on the banner to dismiss it
+- The banner will reappear if new artifacts are discovered
 
 ## Collections Browser
 
@@ -287,6 +371,77 @@ Compares collection artifacts with deployed versions in projects:
 - **Pull/Deploy** - Apply changes to collection or project
 - **Review Details** - Expand file diffs for detailed review
 - **Merge** - Use merge workflow for complex changes
+
+## Notification Center
+
+The Notification Center keeps you informed about important events in SkillMeat, including imports, syncs, errors, and system messages.
+
+### Accessing Notifications
+
+**Location:** Bell icon in the header (top-right corner)
+
+The bell icon shows:
+
+- **Unread Badge**: Red badge with count of unread notifications
+- **Visual Indicator**: Bell icon highlights when new notifications arrive
+- **Quick Access**: Click bell icon to open notification drawer
+
+### Notification Types
+
+SkillMeat supports the following notification types:
+
+**Import Results**
+- Triggered when you import artifacts (bulk import, add from marketplace, etc.)
+- Shows number of successful and failed imports
+- Click to expand and see detailed import log
+
+**Sync Results**
+- Triggered after syncing your collection with upstream sources
+- Shows what was synced and any conflicts
+- Includes timestamp of sync completion
+
+**Error Notifications**
+- System errors, network issues, API failures
+- Shows error message and timestamp
+- May include "Retry" or "View Details" actions
+
+**Info Notifications**
+- General system messages and status updates
+- Tips and helpful information
+- Announcements about new features or maintenance
+
+### Working with Notifications
+
+**Expanding Details:**
+
+1. Click any notification to expand it
+2. For import results, see full list of imported artifacts and reasons for failures
+3. For errors, view detailed error message and troubleshooting suggestions
+4. Click again to collapse
+
+**Clearing Notifications:**
+
+1. **Individual**: Click X button on any notification to dismiss it
+2. **All**: Click "Clear All" button at bottom of notification drawer to dismiss everything
+
+**Maximum Notifications:**
+
+- The system keeps the 50 most recent notifications
+- Older notifications are automatically removed (FIFO)
+- Clearing manually doesn't affect this auto-cleanup
+
+**Notification Persistence:**
+
+- Notifications persist across browser sessions (stored in localStorage)
+- Even after closing and reopening the app, your notification history remains
+- This helps you catch up on what happened while you were away
+
+### Tips for Managing Notifications
+
+- **Review Imports**: Check import result notifications to ensure all artifacts imported correctly
+- **Monitor Errors**: Watch for error notifications and address issues promptly
+- **Sync Status**: After bulk operations, check sync results to verify completion
+- **Clear Clutter**: Remove old notifications to keep focus on recent activity
 
 ## Deploying to Projects
 
