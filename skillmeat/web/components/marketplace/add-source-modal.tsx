@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -45,6 +46,7 @@ export function AddSourceModal({
   const [ref, setRef] = useState('main');
   const [rootHint, setRootHint] = useState('');
   const [trustLevel, setTrustLevel] = useState<TrustLevel>('basic');
+  const [enableFrontmatterDetection, setEnableFrontmatterDetection] = useState(false);
 
   const createSource = useCreateSource();
 
@@ -57,6 +59,7 @@ export function AddSourceModal({
         ref,
         root_hint: rootHint || undefined,
         trust_level: trustLevel,
+        enable_frontmatter_detection: enableFrontmatterDetection,
       });
 
       // Reset form
@@ -64,6 +67,7 @@ export function AddSourceModal({
       setRef('main');
       setRootHint('');
       setTrustLevel('basic');
+      setEnableFrontmatterDetection(false);
 
       onSuccess?.();
     } catch (error) {
@@ -122,6 +126,22 @@ export function AddSourceModal({
               <p className="text-xs text-muted-foreground">
                 Subdirectory to start scanning from
               </p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="frontmatter-detection" className="text-base">
+                  Enable frontmatter detection
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Scan markdown files for artifact type hints in YAML frontmatter
+                </p>
+              </div>
+              <Switch
+                id="frontmatter-detection"
+                checked={enableFrontmatterDetection}
+                onCheckedChange={setEnableFrontmatterDetection}
+              />
             </div>
 
             <div className="grid gap-2">

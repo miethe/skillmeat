@@ -6,7 +6,7 @@ Uses multi-signal scoring to identify potential artifacts with confidence levels
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skillmeat.api.schemas.marketplace import DetectedArtifact, HeuristicMatch
 
@@ -66,6 +66,7 @@ class DetectionConfig:
     manifest_weight: int = 20
     extension_weight: int = 5
     parent_hint_weight: int = 15
+    frontmatter_weight: int = 15
 
 
 class HeuristicDetector:
@@ -79,19 +80,26 @@ class HeuristicDetector:
         ...         print(f"Found {match.artifact_type}: {match.path} ({match.confidence_score}%)")
     """
 
-    def __init__(self, config: Optional[DetectionConfig] = None):
+    def __init__(
+        self,
+        config: Optional[DetectionConfig] = None,
+        enable_frontmatter_detection: bool = False,
+    ):
         """Initialize detector with optional custom configuration.
 
         Args:
             config: Optional custom detection configuration
+            enable_frontmatter_detection: Enable frontmatter parsing for type detection
         """
         self.config = config or DetectionConfig()
+        self.enable_frontmatter_detection = enable_frontmatter_detection
 
     def analyze_paths(
         self,
         paths: List[str],
         base_url: str,
         root_hint: Optional[str] = None,
+        enable_frontmatter_detection: Optional[bool] = None,
     ) -> List[HeuristicMatch]:
         """Analyze a list of file paths and return heuristic matches.
 
@@ -99,10 +107,16 @@ class HeuristicDetector:
             paths: List of file paths relative to repository root
             base_url: Base URL for the repository (for upstream_url generation)
             root_hint: Optional subdirectory to focus scanning on
+            enable_frontmatter_detection: Override instance-level frontmatter detection
 
         Returns:
             List of HeuristicMatch objects sorted by confidence (highest first)
         """
+        use_frontmatter = (
+            enable_frontmatter_detection
+            if enable_frontmatter_detection is not None
+            else self.enable_frontmatter_detection
+        )
         # Group files by parent directory to identify potential artifact folders
         dir_to_files: Dict[str, Set[str]] = {}
         for path in paths:
@@ -135,7 +149,7 @@ class HeuristicDetector:
 
             # Detect artifact type and score
             artifact_type, confidence_score, match_reasons, score_breakdown = (
-                self._score_directory(dir_path, files, root_hint)
+                self._score_directory(dir_path, files, root_hint, use_frontmatter)
             )
 
             # Only include if above threshold
@@ -171,7 +185,11 @@ class HeuristicDetector:
         return artifact_type, score
 
     def _score_directory(
-        self, path: str, siblings: Set[str], root_hint: Optional[str] = None
+        self,
+        path: str,
+        siblings: Set[str],
+        root_hint: Optional[str] = None,
+        use_frontmatter: bool = False,
     ) -> Tuple[Optional[ArtifactType], int, List[str], Dict[str, int]]:
         """Score a directory based on all available signals.
 
@@ -179,6 +197,7 @@ class HeuristicDetector:
             path: Directory path to score
             siblings: Set of filenames in this directory
             root_hint: Optional root hint for parent matching
+            use_frontmatter: Enable frontmatter detection boost
 
         Returns:
             Tuple of (artifact_type, confidence_score, match_reasons, score_breakdown)
@@ -193,6 +212,7 @@ class HeuristicDetector:
             "manifest": 0,
             "extension": 0,
             "parent_hint": 0,
+            "frontmatter": 0,
             "depth_penalty": 0,
         }
 
@@ -238,6 +258,25 @@ class HeuristicDetector:
             breakdown["parent_hint"] = parent_hint_score
             match_reasons.append(f"Parent directory hint bonus (+{parent_hint_score})")
 
+        # Signal 5: Frontmatter detection (if enabled)
+        if use_frontmatter:
+            # Look for .md files that might contain frontmatter
+            md_files = [f for f in siblings if f.endswith(".md")]
+            for md_file in md_files:
+                # NOTE: We can only boost confidence here since we don't have file contents
+                # Full frontmatter parsing would require fetching file content
+                # For now, presence of README.md or SKILL.md boosts confidence when frontmatter is enabled
+                if md_file.lower() in (
+                    "readme.md",
+                    "skill.md",
+                    "command.md",
+                    "agent.md",
+                ):
+                    total_score += self.config.frontmatter_weight
+                    breakdown["frontmatter"] = self.config.frontmatter_weight
+                    match_reasons.append(f"frontmatter_candidate:{md_file}")
+                    break
+
         # Penalty: Directory depth
         depth_penalty = self._calculate_depth_penalty(path, root_hint)
         total_score -= depth_penalty
@@ -249,6 +288,34 @@ class HeuristicDetector:
         total_score = max(0, total_score)
 
         return artifact_type, total_score, match_reasons, breakdown
+
+    def _parse_frontmatter(self, content: str) -> Optional[Dict[str, Any]]:
+        """Parse YAML frontmatter from markdown content.
+
+        Looks for frontmatter delimited by --- markers at start of file.
+        Returns dict with keys like 'type', 'artifact-type', 'skill', etc.
+
+        Args:
+            content: File content string
+
+        Returns:
+            Parsed frontmatter dict or None if not found/invalid
+        """
+        import yaml
+
+        if not content.startswith("---"):
+            return None
+
+        # Find closing ---
+        end_idx = content.find("---", 3)
+        if end_idx == -1:
+            return None
+
+        frontmatter_str = content[3:end_idx].strip()
+        try:
+            return yaml.safe_load(frontmatter_str)
+        except yaml.YAMLError:
+            return None
 
     def _score_dir_name(self, path: str) -> Tuple[Optional[ArtifactType], int]:
         """Score based on directory name matching.
@@ -462,6 +529,7 @@ def detect_artifacts_in_tree(
     ref: str = "main",
     root_hint: Optional[str] = None,
     detected_sha: Optional[str] = None,
+    enable_frontmatter_detection: bool = False,
 ) -> List[DetectedArtifact]:
     """Convenience function to detect artifacts in a file tree.
 
@@ -471,6 +539,7 @@ def detect_artifacts_in_tree(
         ref: Branch/tag/SHA being scanned
         root_hint: Optional subdirectory to focus on
         detected_sha: Git commit SHA for version tracking
+        enable_frontmatter_detection: Enable frontmatter parsing for type detection
 
     Returns:
         List of detected artifacts with confidence scores
@@ -481,7 +550,7 @@ def detect_artifacts_in_tree(
         >>> print(artifacts[0].name, artifacts[0].confidence_score)
         my-skill 85
     """
-    detector = HeuristicDetector()
+    detector = HeuristicDetector(enable_frontmatter_detection=enable_frontmatter_detection)
     matches = detector.analyze_paths(file_tree, base_url=repo_url, root_hint=root_hint)
     return detector.matches_to_artifacts(
         matches, base_url=repo_url, detected_sha=detected_sha

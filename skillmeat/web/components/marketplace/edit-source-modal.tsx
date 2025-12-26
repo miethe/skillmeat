@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -48,6 +49,7 @@ export function EditSourceModal({
   const [trustLevel, setTrustLevel] = useState<TrustLevel>('basic');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
+  const [enableFrontmatterDetection, setEnableFrontmatterDetection] = useState(false);
 
   const updateSource = useUpdateSource(source?.id || '');
   const rescanSource = useRescanSource(source?.id || '');
@@ -60,6 +62,7 @@ export function EditSourceModal({
       setTrustLevel(source.trust_level);
       setDescription(source.description || '');
       setNotes(source.notes || '');
+      setEnableFrontmatterDetection(source.enable_frontmatter_detection || false);
     }
   }, [source]);
 
@@ -74,6 +77,7 @@ export function EditSourceModal({
         trust_level: trustLevel,
         description: description || undefined,
         notes: notes || undefined,
+        enable_frontmatter_detection: enableFrontmatterDetection,
       });
 
       // Auto-trigger rescan after successful edit
@@ -123,6 +127,22 @@ export function EditSourceModal({
               <p className="text-xs text-muted-foreground">
                 Subdirectory to start scanning from (optional)
               </p>
+            </div>
+
+            <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="frontmatter-detection" className="text-base">
+                  Enable frontmatter detection
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Scan markdown files for artifact type hints in YAML frontmatter
+                </p>
+              </div>
+              <Switch
+                id="frontmatter-detection"
+                checked={enableFrontmatterDetection}
+                onCheckedChange={setEnableFrontmatterDetection}
+              />
             </div>
 
             <div className="grid gap-2">
