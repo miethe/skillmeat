@@ -4,14 +4,24 @@ Handles the process of importing artifacts from marketplace catalog
 entries to the user's local collection.
 """
 
+import base64
 import logging
+import os
+import re
 import sys
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
+
+import requests
+
+from skillmeat.core.artifact import Artifact, ArtifactType, ArtifactMetadata
+from skillmeat.core.collection import Collection
+from skillmeat.storage.manifest import ManifestManager
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +93,15 @@ class ImportResult:
             "conflict": self.conflict_count,
             "error": self.error_count,
         }
+
+
+@dataclass
+class DownloadResult:
+    """Result of downloading an artifact from GitHub."""
+
+    success: bool
+    files_downloaded: int
+    error_message: Optional[str] = None
 
 
 class ImportCoordinator:
@@ -212,13 +231,39 @@ class ImportCoordinator:
         # Compute local path
         entry.local_path = self._compute_local_path(entry.artifact_type, entry.name)
 
-        # Mark as success (actual file operations would happen here)
-        # In a full implementation, this would:
-        # 1. Download artifact files from upstream_url
-        # 2. Write to local_path
-        # 3. Update manifest
-        entry.status = ImportStatus.SUCCESS
-        logger.debug(f"Imported {entry.name} to {entry.local_path}")
+        # Wire the actual download flow
+        try:
+            # Determine target directory for artifact files
+            target_dir = Path(entry.local_path)
+            if not target_dir.is_absolute():
+                target_dir = self.collection_path / target_dir
+
+            # Create parent directory if needed
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+
+            # Download artifact files from GitHub
+            download_result = self._download_artifact(entry, target_dir)
+
+            if not download_result.success:
+                entry.status = ImportStatus.ERROR
+                entry.error_message = download_result.error_message or "Download failed"
+                logger.error(f"Failed to download {entry.name}: {entry.error_message}")
+                return
+
+            # Update the collection manifest with the new artifact
+            self._update_manifest(
+                collection_path=self.collection_path,
+                entry=entry,
+                local_path=Path(entry.local_path),
+            )
+
+            entry.status = ImportStatus.SUCCESS
+            logger.info(f"Successfully imported {entry.name} ({download_result.files_downloaded} files) to {entry.local_path}")
+
+        except Exception as e:
+            entry.status = ImportStatus.ERROR
+            entry.error_message = str(e)
+            logger.exception(f"Error importing {entry.name}: {e}")
 
     def _get_existing_artifacts(self) -> Dict[str, str]:
         """Get existing artifacts in collection.
@@ -274,6 +319,338 @@ class ImportCoordinator:
         else:
             # Use old structure for backward compatibility
             return str(self.collection_path / type_dir / name)
+
+    def _update_manifest(
+        self,
+        collection_path: Path,
+        entry: ImportEntry,
+        local_path: Path,
+    ) -> None:
+        """Add imported artifact to collection manifest.
+
+        Args:
+            collection_path: Path to collection root (e.g., ~/.skillmeat/collection)
+            entry: Import entry with artifact metadata
+            local_path: Relative path where artifact was downloaded
+
+        Raises:
+            ValueError: If artifact type is invalid
+        """
+        manifest_mgr = ManifestManager()
+
+        # Load or create collection
+        if manifest_mgr.exists(collection_path):
+            collection = manifest_mgr.read(collection_path)
+        else:
+            # Create new collection if it doesn't exist
+            collection = Collection(
+                name="default",
+                version="1.0.0",
+                artifacts=[],
+                created=datetime.utcnow(),
+                updated=datetime.utcnow(),
+            )
+
+        # Convert artifact type string to ArtifactType enum
+        try:
+            artifact_type = ArtifactType(entry.artifact_type)
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid artifact type '{entry.artifact_type}': {e}"
+            ) from e
+
+        # Create artifact metadata (minimal for imported artifacts)
+        metadata = ArtifactMetadata(
+            title=entry.name,
+            description=f"Imported from marketplace",
+        )
+
+        # Create Artifact object
+        artifact = Artifact(
+            name=entry.name,
+            type=artifact_type,
+            path=str(local_path),
+            origin="github",  # Imported from marketplace (GitHub sources)
+            metadata=metadata,
+            added=datetime.utcnow(),
+            upstream=entry.upstream_url,
+            version_spec="latest",  # Default to latest
+            resolved_sha=None,  # Will be set after actual download
+            resolved_version=None,
+            last_updated=None,
+            tags=["marketplace", "imported"],
+        )
+
+        # Add artifact to collection
+        try:
+            collection.add_artifact(artifact)
+        except ValueError as e:
+            # Artifact already exists
+            logger.warning(f"Artifact {entry.name} already in manifest: {e}")
+            # If overwriting, remove and re-add
+            collection.remove_artifact(entry.name, artifact_type)
+            collection.add_artifact(artifact)
+
+        # Write updated manifest
+        manifest_mgr.write(collection_path, collection)
+
+    def _download_artifact(
+        self,
+        entry: ImportEntry,
+        target_path: Path,
+    ) -> DownloadResult:
+        """Download artifact files from GitHub to target directory.
+
+        Parses GitHub URLs and recursively downloads all files from the
+        specified repository path.
+
+        Args:
+            entry: Import entry with upstream_url
+            target_path: Local directory to download files into
+
+        Returns:
+            DownloadResult with success status and file count
+
+        Supported URL formats:
+            - https://github.com/{owner}/{repo}/tree/{ref}/{path}
+            - https://github.com/{owner}/{repo}/blob/{ref}/{path}
+            - https://github.com/{owner}/{repo}
+
+        Example:
+            >>> result = coordinator._download_artifact(entry, Path("/tmp/artifact"))
+            >>> if result.success:
+            ...     print(f"Downloaded {result.files_downloaded} files")
+        """
+        # Parse GitHub URL
+        url_parts = self._parse_github_url(entry.upstream_url)
+        if not url_parts:
+            return DownloadResult(
+                success=False,
+                files_downloaded=0,
+                error_message=f"Invalid GitHub URL: {entry.upstream_url}",
+            )
+
+        owner, repo, ref, path = url_parts
+
+        # Get GitHub token for API requests
+        github_token = os.environ.get("SKILLMEAT_GITHUB_TOKEN") or os.environ.get(
+            "GITHUB_TOKEN"
+        )
+
+        # Create session with auth
+        session = requests.Session()
+        if github_token:
+            session.headers["Authorization"] = f"token {github_token}"
+        session.headers["Accept"] = "application/vnd.github.v3+json"
+        session.headers["User-Agent"] = "SkillMeat/1.0"
+
+        # Download files
+        try:
+            files_downloaded = self._download_directory_recursive(
+                session=session,
+                owner=owner,
+                repo=repo,
+                ref=ref,
+                remote_path=path,
+                local_path=target_path,
+            )
+
+            return DownloadResult(
+                success=True,
+                files_downloaded=files_downloaded,
+            )
+
+        except Exception as e:
+            logger.error(f"Download failed for {entry.name}: {e}")
+            return DownloadResult(
+                success=False,
+                files_downloaded=0,
+                error_message=str(e),
+            )
+        finally:
+            session.close()
+
+    def _parse_github_url(self, url: str) -> Optional[Tuple[str, str, str, str]]:
+        """Parse GitHub URL to extract owner, repo, ref, and path.
+
+        Args:
+            url: GitHub URL
+
+        Returns:
+            Tuple of (owner, repo, ref, path) or None if invalid
+
+        Examples:
+            >>> _parse_github_url("https://github.com/user/repo/tree/main/skills/my-skill")
+            ("user", "repo", "main", "skills/my-skill")
+            >>> _parse_github_url("https://github.com/user/repo")
+            ("user", "repo", "main", "")
+        """
+        # Pattern: https://github.com/{owner}/{repo}/(tree|blob)/{ref}/{path}
+        pattern = r"https://github\.com/([^/]+)/([^/]+)(?:/(tree|blob)/([^/]+)/(.+))?"
+        match = re.match(pattern, url.rstrip("/"))
+
+        if not match:
+            logger.warning(f"Could not parse GitHub URL: {url}")
+            return None
+
+        owner = match.group(1)
+        repo = match.group(2)
+        ref = match.group(4) or "main"  # Default to main if not specified
+        path = match.group(5) or ""  # Empty string for root
+
+        return owner, repo, ref, path
+
+    def _download_directory_recursive(
+        self,
+        session: requests.Session,
+        owner: str,
+        repo: str,
+        ref: str,
+        remote_path: str,
+        local_path: Path,
+        retry_count: int = 3,
+    ) -> int:
+        """Recursively download directory contents from GitHub.
+
+        Uses GitHub Contents API to fetch directory listings and download files.
+
+        Args:
+            session: Requests session with auth headers
+            owner: Repository owner
+            repo: Repository name
+            ref: Git reference (branch, tag, SHA)
+            remote_path: Path within repository
+            local_path: Local directory to download into
+            retry_count: Number of retries for rate limiting
+
+        Returns:
+            Number of files downloaded
+
+        Raises:
+            requests.HTTPError: If API request fails
+            RuntimeError: If rate limited and retries exhausted
+        """
+        # Build API URL
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{remote_path}"
+        params = {"ref": ref}
+
+        # Make request with retry logic
+        for attempt in range(retry_count):
+            try:
+                response = session.get(api_url, params=params, timeout=30)
+
+                # Handle rate limiting
+                if response.status_code == 403:
+                    remaining = response.headers.get("X-RateLimit-Remaining", "0")
+                    if remaining == "0":
+                        reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+                        wait_time = max(reset_time - time.time(), 0)
+                        if wait_time < 60:  # Only wait if less than 1 minute
+                            logger.warning(f"Rate limited, waiting {wait_time:.0f}s")
+                            time.sleep(wait_time + 1)
+                            continue
+                        raise RuntimeError(f"Rate limited, reset in {wait_time:.0f}s")
+
+                response.raise_for_status()
+                break
+
+            except requests.exceptions.RequestException as e:
+                if attempt < retry_count - 1:
+                    wait_time = 2**attempt  # Exponential backoff
+                    logger.warning(
+                        f"Request failed (attempt {attempt + 1}), "
+                        f"retrying in {wait_time}s: {e}"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+        # Parse response
+        data = response.json()
+
+        # Handle single file (blob)
+        if isinstance(data, dict) and data.get("type") == "file":
+            return self._download_file(data, local_path)
+
+        # Handle directory (array of items)
+        if not isinstance(data, list):
+            logger.warning(f"Unexpected response type for {remote_path}: {type(data)}")
+            return 0
+
+        # Create local directory
+        local_path.mkdir(parents=True, exist_ok=True)
+
+        files_downloaded = 0
+
+        # Process each item in directory
+        for item in data:
+            item_name = item.get("name", "")
+            item_type = item.get("type", "")
+            item_path = item.get("path", "")
+
+            if item_type == "file":
+                # Download file
+                file_path = local_path / item_name
+                if self._download_file(item, file_path):
+                    files_downloaded += 1
+
+            elif item_type == "dir":
+                # Recurse into subdirectory
+                subdir_path = local_path / item_name
+                files_downloaded += self._download_directory_recursive(
+                    session=session,
+                    owner=owner,
+                    repo=repo,
+                    ref=ref,
+                    remote_path=item_path,
+                    local_path=subdir_path,
+                    retry_count=retry_count,
+                )
+
+        return files_downloaded
+
+    def _download_file(
+        self,
+        file_data: Dict,
+        local_path: Path,
+    ) -> bool:
+        """Download a single file from GitHub.
+
+        Args:
+            file_data: GitHub API file data with content or download_url
+            local_path: Local path to save file
+
+        Returns:
+            True if file was downloaded successfully
+
+        Note:
+            GitHub API returns base64-encoded content for files < 1MB.
+            For larger files, uses download_url.
+        """
+        try:
+            # Check if content is base64-encoded (files < 1MB)
+            if file_data.get("encoding") == "base64":
+                content_b64 = file_data.get("content", "")
+                content_bytes = base64.b64decode(content_b64)
+                local_path.write_bytes(content_bytes)
+                logger.debug(f"Downloaded (base64): {local_path.name}")
+                return True
+
+            # For larger files, use download_url
+            download_url = file_data.get("download_url")
+            if download_url:
+                response = requests.get(download_url, timeout=30)
+                response.raise_for_status()
+                local_path.write_bytes(response.content)
+                logger.debug(f"Downloaded (URL): {local_path.name}")
+                return True
+
+            logger.warning(f"No content or download_url for {local_path.name}")
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to download {local_path.name}: {e}")
+            return False
 
     def check_conflicts(
         self,
