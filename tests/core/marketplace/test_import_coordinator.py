@@ -10,11 +10,13 @@ Tests cover:
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
+    DownloadResult,
     ImportCoordinator,
     ImportEntry,
     ImportResult,
@@ -110,7 +112,7 @@ class TestImportResult:
         assert result.skipped_count == 0
         assert result.conflict_count == 0
         assert result.error_count == 0
-        assert result.total_changes == 0
+        assert result.summary["total"] == 0
 
     def test_result_counts(self):
         """Test count properties."""
@@ -181,6 +183,22 @@ class TestImportCoordinator:
         """Create an import coordinator with temp collection."""
         return ImportCoordinator(collection_path=temp_collection)
 
+    @pytest.fixture
+    def mock_download(self):
+        """Mock _download_artifact to return success without HTTP calls."""
+        with patch.object(
+            ImportCoordinator,
+            '_download_artifact',
+            return_value=DownloadResult(success=True, files_downloaded=3)
+        ) as mock:
+            yield mock
+
+    @pytest.fixture
+    def mock_manifest(self):
+        """Mock _update_manifest to avoid file operations."""
+        with patch.object(ImportCoordinator, '_update_manifest') as mock:
+            yield mock
+
     def test_init_default_path(self, monkeypatch, tmp_path):
         """Test initialization with default collection path."""
         home_dir = tmp_path / "home"
@@ -205,7 +223,7 @@ class TestImportCoordinator:
         assert len(result.entries) == 0
         assert result.success_count == 0
 
-    def test_import_entries_no_conflicts(self, coordinator):
+    def test_import_entries_no_conflicts(self, coordinator, mock_download, mock_manifest):
         """Test importing entries with no conflicts."""
         entries = [
             {
@@ -229,7 +247,7 @@ class TestImportCoordinator:
         assert result.error_count == 0
         assert len(result.entries) == 2
 
-    def test_import_entries_with_conflicts_skip(self, coordinator, temp_collection):
+    def test_import_entries_with_conflicts_skip(self, coordinator, temp_collection, mock_download, mock_manifest):
         """Test importing with conflicts using skip strategy."""
         # Create existing artifact (old structure)
         existing_skill = temp_collection / "skills" / "existing-skill"
@@ -264,7 +282,7 @@ class TestImportCoordinator:
         assert skipped_entry.name == "existing-skill"
         assert skipped_entry.conflict_with is not None
 
-    def test_import_entries_with_conflicts_rename(self, coordinator, temp_collection):
+    def test_import_entries_with_conflicts_rename(self, coordinator, temp_collection, mock_download, mock_manifest):
         """Test importing with conflicts using rename strategy."""
         # Create existing artifact
         existing_skill = temp_collection / "skills" / "existing-skill"
@@ -293,7 +311,7 @@ class TestImportCoordinator:
         assert renamed_entry.name != "existing-skill"
         assert "existing-skill" in renamed_entry.name  # Should be based on original
 
-    def test_import_entries_with_conflicts_overwrite(self, coordinator, temp_collection):
+    def test_import_entries_with_conflicts_overwrite(self, coordinator, temp_collection, mock_download, mock_manifest):
         """Test importing with conflicts using overwrite strategy."""
         # Create existing artifact
         existing_skill = temp_collection / "skills" / "existing-skill"
@@ -505,6 +523,16 @@ class TestImportCoordinator:
 class TestImportFromCatalog:
     """Test suite for import_from_catalog convenience function."""
 
+    @pytest.fixture(autouse=True)
+    def setup_mocks(self):
+        """Auto-apply mocks to all tests in this class."""
+        with patch.object(
+            ImportCoordinator,
+            '_download_artifact',
+            return_value=DownloadResult(success=True, files_downloaded=3)
+        ), patch.object(ImportCoordinator, '_update_manifest'):
+            yield
+
     def test_basic_import(self, tmp_path):
         """Test basic import using convenience function."""
         collection_path = tmp_path / "collection"
@@ -570,6 +598,16 @@ class TestImportFromCatalog:
 
 class TestEdgeCases:
     """Test suite for edge cases and boundary conditions."""
+
+    @pytest.fixture(autouse=True)
+    def setup_mocks(self):
+        """Auto-apply mocks to all tests in this class."""
+        with patch.object(
+            ImportCoordinator,
+            '_download_artifact',
+            return_value=DownloadResult(success=True, files_downloaded=3)
+        ), patch.object(ImportCoordinator, '_update_manifest'):
+            yield
 
     def test_empty_entry_id(self, tmp_path):
         """Test handling of entry with empty ID."""
