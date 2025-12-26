@@ -10,6 +10,7 @@ import type { FileDiff } from '@/sdk/models/FileDiff';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiRequest } from '@/lib/api';
 
 // Phase 1 components
 import { ArtifactFlowBanner } from './artifact-flow-banner';
@@ -261,9 +262,9 @@ export function SyncStatusTab({
   } = useQuery<ArtifactUpstreamDiffResponse>({
     queryKey: ['upstream-diff', entity.id],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/upstream-diff`);
-      if (!response.ok) throw new Error('Failed to fetch upstream diff');
-      return response.json();
+      return await apiRequest<ArtifactUpstreamDiffResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff`
+      );
     },
     enabled: !!entity.id && !!entity.source && entity.source !== 'local' && entity.collection !== 'discovered',
   });
@@ -277,9 +278,9 @@ export function SyncStatusTab({
     queryKey: ['project-diff', entity.id, projectPath],
     queryFn: async () => {
       const params = new URLSearchParams({ project_path: projectPath! });
-      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch project diff');
-      return response.json();
+      return await apiRequest<ArtifactDiffResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`
+      );
     },
     enabled: !!entity.id && !!projectPath && mode === 'project' && entity.collection !== 'discovered',
   });
@@ -329,19 +330,16 @@ export function SyncStatusTab({
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Empty body syncs from upstream source (not project)
-          // project_path is omitted to trigger upstream sync
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Sync failed' }));
-        throw new Error(errorData.detail || 'Sync failed');
-      }
-      return response.json();
+      return await apiRequest(
+        `/artifacts/${encodeURIComponent(entity.id)}/sync`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            // Empty body syncs from upstream source (not project)
+            // project_path is omitted to trigger upstream sync
+          }),
+        }
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
@@ -364,19 +362,16 @@ export function SyncStatusTab({
   // Deploy mutation (deploy to project)
   const deployMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_path: projectPath,
-          overwrite: false,
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Deploy failed' }));
-        throw new Error(errorData.detail || 'Deploy failed');
-      }
-      return response.json();
+      return await apiRequest(
+        `/artifacts/${encodeURIComponent(entity.id)}/deploy`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            project_path: projectPath,
+            overwrite: false,
+          }),
+        }
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
@@ -406,19 +401,16 @@ export function SyncStatusTab({
         return syncMutation.mutateAsync();
       } else {
         // Deploy from collection to project (overwrite)
-        const response = await fetch(`/api/v1/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            project_path: projectPath,
-            overwrite: true,
-          }),
-        });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: 'Failed to take upstream' }));
-          throw new Error(errorData.detail || 'Failed to take upstream');
-        }
-        return response.json();
+        return await apiRequest(
+          `/artifacts/${encodeURIComponent(entity.id)}/deploy`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              project_path: projectPath,
+              overwrite: true,
+            }),
+          }
+        );
       }
     },
     onSuccess: () => {

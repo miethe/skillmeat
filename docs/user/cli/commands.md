@@ -18,7 +18,7 @@ Complete reference for all SkillMeat CLI commands.
   - [Deployment](#deployment)
     - [deploy](#deploy)
     - [undeploy](#undeploy)
-  - [Updates \& Status](#updates--status)
+  - [Updates & Status](#updates--status)
     - [status](#status)
     - [update](#update)
   - [Versioning](#versioning)
@@ -33,6 +33,19 @@ Complete reference for all SkillMeat CLI commands.
     - [config list](#config-list)
     - [config get](#config-get)
     - [config set](#config-set)
+  - [Cache Management](#cache-management)
+    - [cache status](#cache-status)
+    - [cache refresh](#cache-refresh)
+    - [cache clear](#cache-clear)
+    - [cache config](#cache-config)
+  - [Scoring and Matching](#scoring-and-matching)
+    - [match](#match)
+    - [rate](#rate)
+    - [scores import](#scores-import)
+    - [scores refresh](#scores-refresh)
+    - [scores show](#scores-show)
+    - [scores stats](#scores-stats)
+    - [scores confirm](#scores-confirm)
   - [Phase 2: Diff Commands](#phase-2-diff-commands)
     - [diff files](#diff-files)
     - [diff dirs](#diff-dirs)
@@ -53,6 +66,62 @@ Complete reference for all SkillMeat CLI commands.
     - [analytics export](#analytics-export)
     - [analytics stats](#analytics-stats)
     - [analytics clear](#analytics-clear)
+  - [Web Interface](#web-interface)
+    - [web dev](#web-dev)
+    - [web build](#web-build)
+    - [web start](#web-start)
+    - [web doctor](#web-doctor)
+    - [web generate-sdk](#web-generate-sdk)
+    - [web token](#web-token)
+  - [MCP (Model Context Protocol) Servers](#mcp-model-context-protocol-servers)
+    - [mcp add](#mcp-add)
+    - [mcp list](#mcp-list)
+    - [mcp deploy](#mcp-deploy)
+    - [mcp undeploy](#mcp-undeploy)
+    - [mcp health](#mcp-health)
+  - [Context Management](#context-management)
+    - [context add](#context-add)
+    - [context list](#context-list)
+    - [context show](#context-show)
+    - [context deploy](#context-deploy)
+    - [context remove](#context-remove)
+  - [Bundle Management](#bundle-management)
+    - [bundle create](#bundle-create)
+    - [bundle inspect](#bundle-inspect)
+    - [bundle import](#bundle-import)
+  - [Vault Management](#vault-management)
+    - [vault add](#vault-add)
+    - [vault list](#vault-list)
+    - [vault push](#vault-push)
+    - [vault pull](#vault-pull)
+    - [vault ls](#vault-ls)
+    - [vault remove](#vault-remove)
+    - [vault set-default](#vault-set-default)
+    - [vault auth](#vault-auth)
+  - [Bundle Signing](#bundle-signing)
+    - [sign generate-key](#sign-generate-key)
+    - [sign list-keys](#sign-list-keys)
+    - [sign export-key](#sign-export-key)
+    - [sign import-key](#sign-import-key)
+    - [sign verify](#sign-verify)
+    - [sign revoke](#sign-revoke)
+  - [Marketplace](#marketplace)
+    - [marketplace-search](#marketplace-search)
+    - [marketplace-install](#marketplace-install)
+    - [marketplace-publish](#marketplace-publish)
+  - [Compliance](#compliance)
+    - [compliance-scan](#compliance-scan)
+    - [compliance-checklist](#compliance-checklist)
+    - [compliance-consent](#compliance-consent)
+    - [compliance-history](#compliance-history)
+  - [Project Operations](#project-operations)
+    - [project sync-context](#project-sync-context)
+  - [Migration](#migration)
+    - [migrate](#migrate)
+  - [Special Commands](#special-commands)
+    - [active-collection](#active-collection)
+    - [quick-add](#quick-add)
+    - [alias](#alias)
   - [Utilities](#utilities)
     - [verify](#verify)
   - [Exit Codes](#exit-codes)
@@ -943,6 +1012,449 @@ Set github-token
 
 - GitHub token format: `ghp_` followed by alphanumeric characters
 - [Create GitHub token](https://github.com/settings/tokens)
+
+---
+
+## Cache Management
+
+### cache status
+
+Show cache statistics and health information.
+
+**Syntax:**
+
+```bash
+skillmeat cache status
+```
+
+**Examples:**
+
+```bash
+skillmeat cache status
+```
+
+**Output:**
+
+```
+Cache Statistics
+
+Total Projects Cached:    5
+Cached Size:             2.4 MB
+Last Updated:            2024-01-15 10:30:00
+Cache TTL:               300 seconds
+
+Project Cache:
+  ~/projects/app1        ✓ Fresh   (updated 5m ago)
+  ~/projects/app2        ✓ Fresh   (updated 15m ago)
+  ~/projects/app3        ⚠ Stale   (updated 2h ago)
+
+Cache Health: 3/5 fresh, 2/5 stale
+```
+
+---
+
+### cache refresh
+
+Refresh cache data for projects or entire cache.
+
+**Syntax:**
+
+```bash
+skillmeat cache refresh [PROJECT_ID] [OPTIONS]
+```
+
+**Arguments:**
+
+- `PROJECT_ID` - Optional project ID to refresh (refreshes all if omitted)
+
+**Options:**
+
+- `--force` - Force refresh even if fresh
+
+**Examples:**
+
+```bash
+# Refresh all cached data
+skillmeat cache refresh
+
+# Refresh specific project
+skillmeat cache refresh proj-abc123
+
+# Force refresh
+skillmeat cache refresh --force
+```
+
+**Output:**
+
+```
+Refreshing cache...
+Updated 3 projects:
+  ~/projects/app1        ✓ 5ms
+  ~/projects/app2        ✓ 8ms
+  ~/projects/app3        ✓ 12ms
+```
+
+---
+
+### cache clear
+
+Clear all cached data.
+
+**Syntax:**
+
+```bash
+skillmeat cache clear [OPTIONS]
+```
+
+**Options:**
+
+- `--confirm` - Skip confirmation prompt
+- `--older-than-days INTEGER` - Only clear data older than N days
+
+**Examples:**
+
+```bash
+# Clear all cache with confirmation
+skillmeat cache clear
+
+# Clear without confirmation
+skillmeat cache clear --confirm
+
+# Clear data older than 30 days
+skillmeat cache clear --older-than-days 30
+```
+
+**Output:**
+
+```
+Cache cleared
+  Projects cleared: 5
+  Space freed: 2.4 MB
+```
+
+---
+
+### cache config
+
+Get or set cache configuration.
+
+**Syntax:**
+
+```bash
+skillmeat cache config [get|set] [KEY] [VALUE]
+```
+
+**Commands:**
+
+- `get KEY` - Get configuration value
+- `set KEY VALUE` - Set configuration value
+
+**Common Keys:**
+
+- `cache-ttl` - Cache time-to-live in seconds (default: 300)
+- `auto-refresh` - Auto-refresh on stale data (default: true)
+
+**Examples:**
+
+```bash
+# Get cache TTL
+skillmeat cache config get cache-ttl
+
+# Set cache TTL to 10 minutes
+skillmeat cache config set cache-ttl 600
+
+# Get auto-refresh setting
+skillmeat cache config get auto-refresh
+```
+
+**Output:**
+
+```
+cache-ttl = 300
+```
+
+---
+
+## Scoring and Matching
+
+### match
+
+Match artifacts against a query using confidence scoring.
+
+**Syntax:**
+
+```bash
+skillmeat match QUERY [OPTIONS]
+```
+
+**Arguments:**
+
+- `QUERY` - Search query or artifact description
+
+**Options:**
+
+- `-l, --limit INTEGER` - Maximum results to show (default: 5)
+- `-m, --min-confidence FLOAT` - Minimum confidence threshold (0-100, default: 0)
+- `-c, --collection TEXT` - Collection to search (default: active)
+- `-v, --verbose` - Show score breakdown
+- `--json` - Output results as JSON
+
+**Examples:**
+
+```bash
+# Basic semantic match
+skillmeat match "pdf processor"
+
+# Limit results
+skillmeat match "authentication" --limit 3
+
+# Filter by confidence
+skillmeat match "testing" --min-confidence 50
+
+# Show detailed breakdown
+skillmeat match "database" --verbose
+
+# Get JSON output
+skillmeat match "api" --json
+```
+
+**Output:**
+
+```
+Matching artifacts for 'pdf processor'
+
+Rank  Name              Type     Confidence   Score Details
+──────────────────────────────────────────────────────────
+1     pdf-extractor     skill    95           Semantic: 98, Keyword: 92
+2     document-parser   skill    87           Semantic: 85, Keyword: 89
+3     file-processor    skill    72           Semantic: 68, Keyword: 76
+```
+
+---
+
+### rate
+
+Rate an artifact from 1-5.
+
+**Syntax:**
+
+```bash
+skillmeat rate ARTIFACT RATING [OPTIONS]
+```
+
+**Arguments:**
+
+- `ARTIFACT` - Artifact name
+- `RATING` - Rating from 1-5
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-t, --type [skill|command|agent]` - Artifact type (if ambiguous)
+- `--note TEXT` - Optional feedback note
+
+**Examples:**
+
+```bash
+# Rate artifact
+skillmeat rate canvas 5
+
+# Rate with feedback
+skillmeat rate pdf-extractor 4 --note "Very useful but needs documentation"
+
+# Rate specific type
+skillmeat rate review 3 --type command
+```
+
+**Output:**
+
+```
+Rating recorded: canvas = 5/5
+```
+
+---
+
+### scores import
+
+Import community scores from external sources.
+
+**Syntax:**
+
+```bash
+skillmeat scores import [OPTIONS]
+```
+
+**Options:**
+
+- `--source [github|registry|all]` - Import source (default: all)
+- `--force` - Force re-import even if recent
+
+**Examples:**
+
+```bash
+# Import from all sources
+skillmeat scores import
+
+# Import GitHub stars only
+skillmeat scores import --source github
+
+# Force re-import
+skillmeat scores import --force
+```
+
+**Output:**
+
+```
+Importing scores...
+  From GitHub: 12 artifacts updated
+  From registry: 5 artifacts updated
+Total: 17 artifacts updated
+```
+
+---
+
+### scores refresh
+
+Refresh stale community scores.
+
+**Syntax:**
+
+```bash
+skillmeat scores refresh [OPTIONS]
+```
+
+**Options:**
+
+- `--stale-threshold-days INTEGER` - Age threshold in days (default: 30)
+
+**Examples:**
+
+```bash
+# Refresh all stale scores
+skillmeat scores refresh
+
+# Refresh scores older than 60 days
+skillmeat scores refresh --stale-threshold-days 60
+```
+
+**Output:**
+
+```
+Refreshing scores...
+Updated 8 artifacts with fresh data
+```
+
+---
+
+### scores show
+
+Show detailed scores for an artifact.
+
+**Syntax:**
+
+```bash
+skillmeat scores show ARTIFACT [OPTIONS]
+```
+
+**Arguments:**
+
+- `ARTIFACT` - Artifact name
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-t, --type [skill|command|agent]` - Artifact type (if ambiguous)
+
+**Examples:**
+
+```bash
+skillmeat scores show canvas
+skillmeat scores show pdf-extractor --type skill
+```
+
+**Output:**
+
+```
+Scores for 'canvas'
+
+Community Score:       4.8/5.0
+  GitHub Stars:        1,250
+  Downloads:           2,400
+  Community Ratings:   24 (4.8/5)
+  Usage Score:         0.92
+
+Breakdown:
+  Quality:             92
+  Popularity:          88
+  Maintenance:         85
+  Documentation:       90
+```
+
+---
+
+### scores stats
+
+Show match success statistics.
+
+**Syntax:**
+
+```bash
+skillmeat scores stats
+```
+
+**Examples:**
+
+```bash
+skillmeat scores stats
+```
+
+**Output:**
+
+```
+Match Statistics
+
+Successful Matches:    156
+Failed Matches:        12
+Success Rate:          92.9%
+
+Top Matching Artifacts:
+  canvas               (45 matches)
+  pdf-extractor        (32 matches)
+  code-reviewer        (28 matches)
+```
+
+---
+
+### scores confirm
+
+Confirm or reject a previous match.
+
+**Syntax:**
+
+```bash
+skillmeat scores confirm ARTIFACT [confirm|reject]
+```
+
+**Arguments:**
+
+- `ARTIFACT` - Artifact name
+- Action - `confirm` or `reject`
+
+**Examples:**
+
+```bash
+# Confirm match was correct
+skillmeat scores confirm canvas confirm
+
+# Reject match as incorrect
+skillmeat scores confirm incorrect-match reject
+```
+
+**Output:**
+
+```
+Match feedback recorded
+```
 
 ---
 
@@ -1858,6 +2370,1780 @@ skillmeat add skill user/repo/skill@abc123d
 skillmeat add skill user/repo/skill@main
 skillmeat add skill user/repo/skill
 ```
+
+## Web Interface
+
+### web dev
+
+Start development servers with auto-reload.
+
+**Syntax:**
+
+```bash
+skillmeat web dev [OPTIONS]
+```
+
+**Options:**
+
+- `--api-only` - Start only FastAPI backend server
+- `--web-only` - Start only Next.js frontend
+- `--port INTEGER` - API port (default: 8080)
+- `--web-port INTEGER` - Web port (default: 3000)
+- `--no-open` - Don't open browser automatically
+
+**Examples:**
+
+```bash
+# Start both servers
+skillmeat web dev
+
+# Start API only
+skillmeat web dev --api-only
+
+# Start Next.js only
+skillmeat web dev --web-only
+
+# Custom ports
+skillmeat web dev --port 8888 --web-port 3001
+```
+
+**Output:**
+
+```
+Starting development servers...
+
+FastAPI server: http://localhost:8080
+  API docs: http://localhost:8080/api/v1/docs
+
+Next.js server: http://localhost:3000
+  App ready: http://localhost:3000
+
+Press Ctrl+C to stop
+```
+
+---
+
+### web build
+
+Build Next.js application for production.
+
+**Syntax:**
+
+```bash
+skillmeat web build [OPTIONS]
+```
+
+**Options:**
+
+- `--analyze` - Analyze bundle size
+- `--debug` - Keep debug symbols
+
+**Examples:**
+
+```bash
+# Build for production
+skillmeat web build
+
+# Build and analyze
+skillmeat web build --analyze
+```
+
+**Output:**
+
+```
+Building Next.js application...
+
+Compiled successfully!
+  Routes:    42
+  Pages:     18
+  Bundle:    1.2 MB (gzipped: 385 KB)
+
+Ready to deploy: dist/
+```
+
+---
+
+### web start
+
+Start production servers.
+
+**Syntax:**
+
+```bash
+skillmeat web start [OPTIONS]
+```
+
+**Options:**
+
+- `--port INTEGER` - API port (default: 8080)
+- `--web-port INTEGER` - Web port (default: 3000)
+
+**Examples:**
+
+```bash
+# Start production
+skillmeat web start
+
+# Custom ports
+skillmeat web start --port 5000 --web-port 5001
+```
+
+**Output:**
+
+```
+Starting production servers...
+
+FastAPI: http://localhost:8080
+Next.js: http://localhost:3000
+
+Ready for requests
+```
+
+---
+
+### web doctor
+
+Diagnose web development environment.
+
+**Syntax:**
+
+```bash
+skillmeat web doctor
+```
+
+**Examples:**
+
+```bash
+skillmeat web doctor
+```
+
+**Output:**
+
+```
+Web Development Environment Check
+
+Python:            ✓ 3.11.0
+Node.js:           ✓ 18.14.2
+npm/pnpm:          ✓ pnpm 7.31.0
+FastAPI:           ✓ 0.104.1
+Next.js:           ✓ 14.0.0
+SQLite:            ✓ 3.44.0
+
+Database:          ✓ Connected
+Config:            ✓ Valid
+Dependencies:      ✓ All installed
+
+Status: Ready for development
+```
+
+---
+
+### web generate-sdk
+
+Generate TypeScript SDK from OpenAPI specification.
+
+**Syntax:**
+
+```bash
+skillmeat web generate-sdk [OUTPUT_PATH] [OPTIONS]
+```
+
+**Arguments:**
+
+- `OUTPUT_PATH` - Where to save generated SDK (default: ./sdk)
+
+**Options:**
+
+- `--api-url TEXT` - API URL for spec (default: http://localhost:8080)
+- `--watch` - Regenerate on spec changes
+
+**Examples:**
+
+```bash
+# Generate SDK
+skillmeat web generate-sdk
+
+# Custom output
+skillmeat web generate-sdk ./src/generated
+
+# Watch mode
+skillmeat web generate-sdk --watch
+```
+
+**Output:**
+
+```
+Generating TypeScript SDK...
+
+Fetching OpenAPI spec: http://localhost:8080/api/v1/openapi.json
+Generating SDK types and client...
+Generated: ./sdk
+  - types/
+  - client/
+  - models/
+
+Ready to import in your app!
+```
+
+---
+
+### web token
+
+Manage web authentication tokens.
+
+**Syntax:**
+
+```bash
+skillmeat web token [OPTIONS] COMMAND [ARGS]...
+```
+
+**Commands:**
+
+- `generate` - Generate new authentication token
+- `list` - List active tokens
+- `revoke TOKEN` - Revoke a token
+
+**Examples:**
+
+```bash
+# Generate token
+skillmeat web token generate
+
+# List tokens
+skillmeat web token list
+
+# Revoke token
+skillmeat web token revoke abc123
+```
+
+---
+
+## MCP (Model Context Protocol) Servers
+
+### mcp add
+
+Add MCP server to collection.
+
+**Syntax:**
+
+```bash
+skillmeat mcp add SPEC [OPTIONS]
+```
+
+**Arguments:**
+
+- `SPEC` - GitHub path or local path to MCP server
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-n, --name TEXT` - Override server name
+- `--no-verify` - Skip validation
+
+**Examples:**
+
+```bash
+# Add from GitHub
+skillmeat mcp add anthropics/mcp/postgres-server
+
+# Add from local
+skillmeat mcp add ./my-mcp-server
+
+# Custom name
+skillmeat mcp add ./server --name my-server
+```
+
+---
+
+### mcp list
+
+List MCP servers in collection.
+
+**Syntax:**
+
+```bash
+skillmeat mcp list [OPTIONS]
+```
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `--deployed` - Show only deployed servers
+
+**Examples:**
+
+```bash
+# List all MCP servers
+skillmeat mcp list
+
+# Show deployed only
+skillmeat mcp list --deployed
+```
+
+**Output:**
+
+```
+MCP Servers
+
+Name             Type      Status     Location
+──────────────────────────────────────────────
+postgres-server  database  ✓ Active   ~/.claude/mcp/postgres/
+slack-server     messaging ✓ Active   ~/.claude/mcp/slack/
+test-server      utility   ✗ Inactive ./my-server/
+```
+
+---
+
+### mcp deploy
+
+Deploy MCP server to Claude Desktop.
+
+**Syntax:**
+
+```bash
+skillmeat mcp deploy NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - MCP server name
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `--backup` - Create backup before deploying
+
+**Examples:**
+
+```bash
+# Deploy server
+skillmeat mcp deploy postgres-server
+
+# Deploy with backup
+skillmeat mcp deploy postgres-server --backup
+```
+
+**Output:**
+
+```
+Deploying postgres-server...
+  Added to Claude Desktop config
+  Ready to use in Claude
+```
+
+---
+
+### mcp undeploy
+
+Remove MCP server from Claude Desktop.
+
+**Syntax:**
+
+```bash
+skillmeat mcp undeploy NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - MCP server name
+
+**Options:**
+
+- `--backup` - Create backup before undeploying
+
+**Examples:**
+
+```bash
+# Undeploy server
+skillmeat mcp undeploy postgres-server
+
+# With backup
+skillmeat mcp undeploy postgres-server --backup
+```
+
+**Output:**
+
+```
+Undeployed postgres-server
+  Removed from Claude Desktop config
+```
+
+---
+
+### mcp health
+
+Check health of deployed MCP servers.
+
+**Syntax:**
+
+```bash
+skillmeat mcp health [NAME] [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Optional server name (checks all if omitted)
+
+**Options:**
+
+- `-t, --timeout INTEGER` - Health check timeout (default: 5)
+
+**Examples:**
+
+```bash
+# Check all servers
+skillmeat mcp health
+
+# Check specific server
+skillmeat mcp health postgres-server
+
+# Custom timeout
+skillmeat mcp health --timeout 10
+```
+
+**Output:**
+
+```
+MCP Server Health
+
+postgres-server   ✓ Healthy   (response: 45ms)
+slack-server      ✓ Healthy   (response: 120ms)
+test-server       ✗ Offline
+
+Status: 2/3 healthy
+```
+
+---
+
+## Context Management
+
+### context add
+
+Add a context entity from a local file or GitHub URL.
+
+**Syntax:**
+
+```bash
+skillmeat context add PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `PATH` - Local file path or GitHub URL
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-t, --type [spec|rule|config|context|template]` - Entity type
+- `-cat, --category TEXT` - Category for organization
+- `--auto-load` - Auto-load when deploying to projects
+
+**Examples:**
+
+```bash
+# Add local spec
+skillmeat context add ./.claude/specs/doc-policy.md --type spec
+
+# Add rule
+skillmeat context add ./.claude/rules/backend/api.md --type rule --category backend-rules
+
+# Add from GitHub
+skillmeat context add https://github.com/user/repo/rules/api.md
+
+# Auto-load configuration
+skillmeat context add ./CLAUDE.md --type config --auto-load
+```
+
+---
+
+### context list
+
+List all context entities with optional filtering.
+
+**Syntax:**
+
+```bash
+skillmeat context list [OPTIONS]
+```
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `-t, --type [spec|rule|config|context|template]` - Filter by type
+- `-cat, --category TEXT` - Filter by category
+- `--auto-load-only` - Show only auto-load entities
+
+**Examples:**
+
+```bash
+# List all entities
+skillmeat context list
+
+# List specs only
+skillmeat context list --type spec
+
+# List backend rules
+skillmeat context list --type rule --category backend-rules
+
+# Show auto-load entities
+skillmeat context list --auto-load-only
+```
+
+**Output:**
+
+```
+Context Entities (12)
+
+Name                  Type     Category         Auto-Load  Size
+──────────────────────────────────────────────────────────────
+doc-policy-spec      spec     documentation    ✓          8.2 KB
+api-rules             rule     backend-rules    ✓          15 KB
+python-guide         rule     backend-rules             12 KB
+CLAUDE.md            config   project                   6.5 KB
+```
+
+---
+
+### context show
+
+Show context entity details, metadata, and content.
+
+**Syntax:**
+
+```bash
+skillmeat context show NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Entity name or ID
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `--head INTEGER` - Show first N lines (default: 50)
+
+**Examples:**
+
+```bash
+# Show entity details
+skillmeat context show doc-policy-spec
+
+# Show full content
+skillmeat context show api-rules --head 999
+
+# Preview first 20 lines
+skillmeat context show CLAUDE.md --head 20
+```
+
+**Output:**
+
+```
+doc-policy-spec
+
+Type:          spec
+Category:      documentation
+Auto-load:     Yes
+Size:          8.2 KB
+Created:       2024-01-10
+Modified:      2024-01-15
+
+Content Preview:
+─────────────────────────
+# Documentation Policy
+
+Only create documentation when explicitly tasked...
+```
+
+---
+
+### context deploy
+
+Deploy context entity to a project directory.
+
+**Syntax:**
+
+```bash
+skillmeat context deploy NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Entity name
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `--to-project PATH` - Target project path (default: current directory)
+- `--force` - Overwrite existing files
+
+**Examples:**
+
+```bash
+# Deploy to current project
+skillmeat context deploy doc-policy-spec
+
+# Deploy to specific project
+skillmeat context deploy api-rules --to-project ~/projects/backend
+
+# Force overwrite
+skillmeat context deploy CLAUDE.md --to-project ~/myapp --force
+```
+
+**Output:**
+
+```
+Deploying doc-policy-spec...
+  Deployed to ~/projects/web-app/.claude/specs/doc-policy-spec.md
+```
+
+---
+
+### context remove
+
+Remove context entity from collection.
+
+**Syntax:**
+
+```bash
+skillmeat context remove NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Entity name
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection name (default: active)
+- `--force` - Skip confirmation
+
+**Examples:**
+
+```bash
+# Remove entity
+skillmeat context remove old-spec
+
+# Force remove
+skillmeat context remove experimental-rule --force
+```
+
+**Output:**
+
+```
+Removed: old-spec
+```
+
+---
+
+## Bundle Management
+
+### bundle create
+
+Create a new artifact bundle.
+
+**Syntax:**
+
+```bash
+skillmeat bundle create NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Bundle name
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection to bundle (default: active)
+- `-f, --filter TEXT` - Filter artifacts (pattern)
+- `--include-deps` - Include dependencies
+- `--sign` - Sign the bundle
+- `-o, --output PATH` - Output file path
+
+**Examples:**
+
+```bash
+# Create bundle from collection
+skillmeat bundle create my-bundle
+
+# Bundle specific artifacts
+skillmeat bundle create backend-bundle --filter "skill"
+
+# Create with signature
+skillmeat bundle create my-bundle --sign
+
+# Custom output
+skillmeat bundle create my-bundle --output ./builds/
+```
+
+**Output:**
+
+```
+Creating bundle...
+
+Bundle: my-bundle.skillmeat-pack
+  Artifacts: 12
+  Size: 2.4 MB
+  Signature: Signed with john@example.com
+
+Ready to share!
+```
+
+---
+
+### bundle inspect
+
+Inspect a bundle file.
+
+**Syntax:**
+
+```bash
+skillmeat bundle inspect BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `--json` - Output as JSON
+
+**Examples:**
+
+```bash
+# Inspect bundle
+skillmeat bundle inspect my-bundle.skillmeat-pack
+
+# Get JSON output
+skillmeat bundle inspect my-bundle.skillmeat-pack --json
+```
+
+**Output:**
+
+```
+Bundle: my-bundle.skillmeat-pack
+
+Metadata:
+  Created: 2024-01-15
+  Author: john@example.com
+  Version: 1.0.0
+
+Signature: ✓ Valid
+  Key ID: abc123
+
+Contents:
+  Skills:    8
+  Commands:  3
+  Agents:    1
+  Total:     12 artifacts
+
+Total Size: 2.4 MB
+```
+
+---
+
+### bundle import
+
+Import artifact bundle into collection.
+
+**Syntax:**
+
+```bash
+skillmeat bundle import BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `-c, --collection TEXT` - Target collection (default: active)
+- `--strategy [merge|overwrite|skip]` - Conflict strategy (default: merge)
+- `--verify-signature` - Verify bundle signature
+
+**Examples:**
+
+```bash
+# Import bundle
+skillmeat bundle import my-bundle.skillmeat-pack
+
+# Import with conflict resolution
+skillmeat bundle import my-bundle.skillmeat-pack --strategy overwrite
+
+# Verify signature
+skillmeat bundle import my-bundle.skillmeat-pack --verify-signature
+```
+
+**Output:**
+
+```
+Importing bundle...
+
+Imported 12 artifacts:
+  Skills:    8 ✓
+  Commands:  3 ✓
+  Agents:    1 ✓
+
+Conflicts resolved: 2
+  canvas: Merged changes
+  pdf-reader: Kept local version
+```
+
+---
+
+## Vault Management
+
+### vault add
+
+Add a new vault configuration.
+
+**Syntax:**
+
+```bash
+skillmeat vault add NAME TYPE LOCATION [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Vault identifier
+- `TYPE` - Vault type (git, s3, fs)
+- `LOCATION` - Vault location (URL or path)
+
+**Options:**
+
+- `--set-default` - Make default vault
+
+**Examples:**
+
+```bash
+# Add Git vault
+skillmeat vault add team-vault git git@github.com:team/vault.git
+
+# Add S3 vault
+skillmeat vault add prod-vault s3 s3://my-bucket/artifacts
+
+# Add local filesystem
+skillmeat vault add local-vault fs /data/vault
+```
+
+**Output:**
+
+```
+Vault 'team-vault' added
+  Type: git
+  Location: git@github.com:team/vault.git
+```
+
+---
+
+### vault list
+
+List all configured vaults.
+
+**Syntax:**
+
+```bash
+skillmeat vault list
+```
+
+**Examples:**
+
+```bash
+skillmeat vault list
+```
+
+**Output:**
+
+```
+Vaults
+
+Name          Type   Location                        Default
+───────────────────────────────────────────────────────────────
+team-vault    git    git@github.com:team/vault.git   ✓
+prod-vault    s3     s3://my-bucket/artifacts
+local-vault   fs     /data/vault
+```
+
+---
+
+### vault push
+
+Upload bundle to team vault.
+
+**Syntax:**
+
+```bash
+skillmeat vault push BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `--vault NAME` - Target vault (default: default)
+- `--tag TEXT` - Tag bundle version
+
+**Examples:**
+
+```bash
+# Push to default vault
+skillmeat vault push my-bundle.skillmeat-pack
+
+# Push to specific vault
+skillmeat vault push my-bundle.skillmeat-pack --vault prod-vault
+
+# With version tag
+skillmeat vault push my-bundle.skillmeat-pack --tag v1.0.0
+```
+
+**Output:**
+
+```
+Uploading to team-vault...
+my-bundle.skillmeat-pack [100%]
+Pushed successfully!
+```
+
+---
+
+### vault pull
+
+Download bundle from team vault.
+
+**Syntax:**
+
+```bash
+skillmeat vault pull BUNDLE_NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_NAME` - Bundle name or ID
+
+**Options:**
+
+- `--vault NAME` - Source vault (default: default)
+- `-o, --output PATH` - Output path (default: current dir)
+
+**Examples:**
+
+```bash
+# Pull from default vault
+skillmeat vault pull my-bundle
+
+# Pull from specific vault
+skillmeat vault pull my-bundle --vault team-vault
+
+# Save to location
+skillmeat vault pull my-bundle --output ./bundles/
+```
+
+**Output:**
+
+```
+Downloading from team-vault...
+my-bundle [100%]
+Downloaded to: ./my-bundle.skillmeat-pack
+```
+
+---
+
+### vault ls
+
+List bundles in team vault.
+
+**Syntax:**
+
+```bash
+skillmeat vault ls [OPTIONS]
+```
+
+**Options:**
+
+- `--vault NAME` - Vault to list (default: default)
+
+**Examples:**
+
+```bash
+skillmeat vault ls
+skillmeat vault ls --vault prod-vault
+```
+
+**Output:**
+
+```
+Bundles in team-vault
+
+Name                  Version  Date       Size
+─────────────────────────────────────────────
+my-bundle             1.0.0    2024-01-15  2.4 MB
+backend-tools         2.1.0    2024-01-10  5.2 MB
+shared-skills         1.5.0    2024-01-05  1.8 MB
+```
+
+---
+
+### vault remove
+
+Remove a vault configuration.
+
+**Syntax:**
+
+```bash
+skillmeat vault remove NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Vault name
+
+**Options:**
+
+- `--force` - Skip confirmation
+
+**Examples:**
+
+```bash
+skillmeat vault remove old-vault
+skillmeat vault remove test-vault --force
+```
+
+---
+
+### vault set-default
+
+Set default vault for push/pull operations.
+
+**Syntax:**
+
+```bash
+skillmeat vault set-default NAME
+```
+
+**Arguments:**
+
+- `NAME` - Vault name
+
+**Examples:**
+
+```bash
+skillmeat vault set-default team-vault
+```
+
+**Output:**
+
+```
+Default vault set to: team-vault
+```
+
+---
+
+### vault auth
+
+Configure authentication for a vault.
+
+**Syntax:**
+
+```bash
+skillmeat vault auth VAULT_NAME [OPTIONS]
+```
+
+**Arguments:**
+
+- `VAULT_NAME` - Vault name
+
+**Options:**
+
+- `--type [ssh|https|token|s3-creds]` - Auth type
+- `--key PATH` - SSH key path
+- `--token TEXT` - Auth token
+
+**Examples:**
+
+```bash
+# Configure SSH auth
+skillmeat vault auth team-vault --type ssh --key ~/.ssh/id_rsa
+
+# Configure token auth
+skillmeat vault auth team-vault --type token --token ghp_xxxxx
+```
+
+**Output:**
+
+```
+Authentication configured for team-vault
+```
+
+---
+
+## Bundle Signing
+
+### sign generate-key
+
+Generate a new Ed25519 signing key pair.
+
+**Syntax:**
+
+```bash
+skillmeat sign generate-key [OPTIONS]
+```
+
+**Options:**
+
+- `-n, --name TEXT` - Key owner name (required)
+- `-e, --email TEXT` - Key owner email (required)
+- `--force` - Overwrite existing key
+
+**Examples:**
+
+```bash
+skillmeat sign generate-key --name "John Doe" --email "john@example.com"
+```
+
+**Output:**
+
+```
+Generated signing key pair
+  Name: John Doe
+  Email: john@example.com
+  Key ID: abc123def456
+  Location: ~/.skillmeat/keys/abc123def456
+```
+
+---
+
+### sign list-keys
+
+List all signing and trusted keys.
+
+**Syntax:**
+
+```bash
+skillmeat sign list-keys [OPTIONS]
+```
+
+**Options:**
+
+- `--trusted` - Show only trusted keys
+- `--own` - Show only your own keys
+
+**Examples:**
+
+```bash
+skillmeat sign list-keys
+skillmeat sign list-keys --trusted
+skillmeat sign list-keys --own
+```
+
+**Output:**
+
+```
+Signing Keys
+
+Key ID           Name             Email
+──────────────────────────────────────────
+abc123def456     John Doe         john@example.com
+
+Trusted Keys
+
+Key ID           Name             Email
+──────────────────────────────────────────
+xyz789abc123     Jane Smith       jane@example.com
+```
+
+---
+
+### sign export-key
+
+Export public key for sharing.
+
+**Syntax:**
+
+```bash
+skillmeat sign export-key KEY_ID [OPTIONS]
+```
+
+**Arguments:**
+
+- `KEY_ID` - Key identifier
+
+**Options:**
+
+- `-o, --output PATH` - Output file path (default: stdout)
+
+**Examples:**
+
+```bash
+skillmeat sign export-key abc123def456
+skillmeat sign export-key abc123def456 --output my-key.pub
+```
+
+---
+
+### sign import-key
+
+Import a trusted public key.
+
+**Syntax:**
+
+```bash
+skillmeat sign import-key KEY_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `KEY_PATH` - Path to public key file
+
+**Examples:**
+
+```bash
+skillmeat sign import-key ./jane-key.pub
+```
+
+**Output:**
+
+```
+Imported trusted key
+  Name: Jane Smith
+  Email: jane@example.com
+  Key ID: xyz789abc123
+```
+
+---
+
+### sign verify
+
+Verify bundle signature.
+
+**Syntax:**
+
+```bash
+skillmeat sign verify BUNDLE_PATH
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Examples:**
+
+```bash
+skillmeat sign verify my-bundle.skillmeat-pack
+```
+
+**Output:**
+
+```
+Bundle signature: ✓ Valid
+
+Signed by: John Doe (john@example.com)
+Key ID: abc123def456
+Signed: 2024-01-15 10:30:00
+```
+
+---
+
+### sign revoke
+
+Revoke a signing or trusted key.
+
+**Syntax:**
+
+```bash
+skillmeat sign revoke KEY_ID [OPTIONS]
+```
+
+**Arguments:**
+
+- `KEY_ID` - Key identifier
+
+**Options:**
+
+- `--force` - Skip confirmation
+
+**Examples:**
+
+```bash
+skillmeat sign revoke abc123def456
+skillmeat sign revoke xyz789abc123 --force
+```
+
+---
+
+## Marketplace
+
+### marketplace-search
+
+Search marketplace for artifact bundles.
+
+**Syntax:**
+
+```bash
+skillmeat marketplace-search [QUERY] [OPTIONS]
+```
+
+**Arguments:**
+
+- `QUERY` - Search query (optional)
+
+**Options:**
+
+- `-b, --broker TEXT` - Specific broker to search (default: all)
+- `-t, --tags TEXT` - Filter by tags (comma-separated)
+- `-l, --license TEXT` - Filter by license
+- `-p, --page INTEGER` - Page number (default: 1)
+- `-s, --page-size INTEGER` - Results per page (default: 20)
+
+**Examples:**
+
+```bash
+# Search all brokers
+skillmeat marketplace-search python
+
+# Search specific broker
+skillmeat marketplace-search --broker skillmeat "code review"
+
+# Filter by tags and license
+skillmeat marketplace-search --tags productivity --license MIT
+
+# Pagination
+skillmeat marketplace-search python --page 2 --page-size 50
+```
+
+**Output:**
+
+```
+Marketplace Results (156 bundles)
+
+Name                  Author       Stars  Tags                Version
+──────────────────────────────────────────────────────────────────
+python-tools          anthropic    345    python,tools       v1.5.0
+py-analyzer           john-dev     128    analysis,coding    v2.0.0
+py-formatter          alex-tools   92     formatting         v1.2.0
+
+[Page 1 of 8]
+```
+
+---
+
+### marketplace-install
+
+Install bundle from marketplace.
+
+**Syntax:**
+
+```bash
+skillmeat marketplace-install BUNDLE_ID [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_ID` - Bundle identifier
+
+**Options:**
+
+- `-c, --collection TEXT` - Target collection (default: active)
+
+**Examples:**
+
+```bash
+skillmeat marketplace-install python-tools
+skillmeat marketplace-install python-tools --collection work
+```
+
+**Output:**
+
+```
+Installing from marketplace...
+
+python-tools (v1.5.0)
+  Importing 12 artifacts...
+  Configuring dependencies...
+
+Installed successfully!
+```
+
+---
+
+### marketplace-publish
+
+Publish bundle to marketplace.
+
+**Syntax:**
+
+```bash
+skillmeat marketplace-publish BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `--title TEXT` - Bundle title
+- `--description TEXT` - Bundle description
+- `--tags TEXT` - Tags (comma-separated)
+- `--license TEXT` - License type
+- `--public` - Make publicly available
+
+**Examples:**
+
+```bash
+skillmeat marketplace-publish my-bundle.skillmeat-pack --title "My Tools" --public
+```
+
+**Output:**
+
+```
+Publishing to marketplace...
+
+Bundle published!
+  ID: my-bundle-abc123
+  URL: https://marketplace.skillmeat.io/bundles/my-bundle-abc123
+```
+
+---
+
+## Compliance
+
+### compliance-scan
+
+Scan bundle for license compliance.
+
+**Syntax:**
+
+```bash
+skillmeat compliance-scan BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `--strict` - Fail on warnings (not just errors)
+- `--json` - Output as JSON
+
+**Examples:**
+
+```bash
+skillmeat compliance-scan my-bundle.skillmeat-pack
+skillmeat compliance-scan my-bundle.skillmeat-pack --strict
+```
+
+**Output:**
+
+```
+License Compliance Scan
+
+Bundle: my-bundle.skillmeat-pack
+Artifacts: 12
+
+Licenses Found:
+  MIT              8 artifacts ✓
+  Apache-2.0       3 artifacts ✓
+  Unknown          1 artifact  ⚠
+
+Conflicts: None detected ✓
+
+Status: PASS
+```
+
+---
+
+### compliance-checklist
+
+Generate compliance checklist for bundle.
+
+**Syntax:**
+
+```bash
+skillmeat compliance-checklist BUNDLE_PATH [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+
+**Options:**
+
+- `-o, --output PATH` - Output file path
+
+**Examples:**
+
+```bash
+skillmeat compliance-checklist my-bundle.skillmeat-pack
+skillmeat compliance-checklist my-bundle.skillmeat-pack --output checklist.md
+```
+
+**Output:**
+
+```
+Compliance Checklist
+
+Bundle: my-bundle.skillmeat-pack
+
+- [x] License headers present
+- [x] Copyright notices documented
+- [x] No conflicting licenses
+- [x] Dependencies validated
+- [x] Code review approved
+
+Status: Ready for release
+```
+
+---
+
+### compliance-consent
+
+Record compliance consent for checklist.
+
+**Syntax:**
+
+```bash
+skillmeat compliance-consent BUNDLE_PATH [CONSENT_LEVEL]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Path to bundle file
+- `CONSENT_LEVEL` - Consent level (approved/conditional/rejected)
+
+**Options:**
+
+- `--notes TEXT` - Consent notes
+
+**Examples:**
+
+```bash
+skillmeat compliance-consent my-bundle.skillmeat-pack approved
+skillmeat compliance-consent my-bundle.skillmeat-pack conditional --notes "Requires legal review"
+```
+
+**Output:**
+
+```
+Consent recorded
+  Bundle: my-bundle.skillmeat-pack
+  Level: approved
+  Date: 2024-01-15
+```
+
+---
+
+### compliance-history
+
+View compliance consent history.
+
+**Syntax:**
+
+```bash
+skillmeat compliance-history [BUNDLE_PATH] [OPTIONS]
+```
+
+**Arguments:**
+
+- `BUNDLE_PATH` - Optional bundle path (shows all if omitted)
+
+**Examples:**
+
+```bash
+skillmeat compliance-history
+skillmeat compliance-history my-bundle.skillmeat-pack
+```
+
+**Output:**
+
+```
+Compliance History
+
+Bundle                Date        Reviewer    Level      Notes
+──────────────────────────────────────────────────────────────
+my-bundle             2024-01-15  John Doe    approved
+backend-tools         2024-01-10  Jane Smith  approved   Legal cleared
+shared-skills         2024-01-05  Admin       approved
+```
+
+---
+
+## Project Operations
+
+### project sync-context
+
+Synchronize context entities between project and collection.
+
+**Syntax:**
+
+```bash
+skillmeat project sync-context [PROJECT_PATH] [OPTIONS]
+```
+
+**Arguments:**
+
+- `PROJECT_PATH` - Project directory (default: current)
+
+**Options:**
+
+- `-c, --collection TEXT` - Source collection (default: active)
+- `--direction [pull|push|both]` - Sync direction (default: both)
+
+**Examples:**
+
+```bash
+# Sync context in current directory
+skillmeat project sync-context
+
+# Sync specific project
+skillmeat project sync-context ~/myproject
+
+# Pull only from collection
+skillmeat project sync-context --direction pull
+
+# Push only to collection
+skillmeat project sync-context --direction push
+```
+
+**Output:**
+
+```
+Syncing context...
+
+Pulled from collection:
+  doc-policy-spec        ✓
+  backend-rules          ✓
+
+Project context in sync!
+```
+
+---
+
+## Migration
+
+### migrate
+
+Migrate from skillman to skillmeat.
+
+**Syntax:**
+
+```bash
+skillmeat migrate [OPTIONS]
+```
+
+**Options:**
+
+- `--from PATH` - skillman collection path
+- `--to PATH` - Target skillmeat path (default: ~/.skillmeat)
+
+**Examples:**
+
+```bash
+skillmeat migrate
+skillmeat migrate --from ~/.skillman --to ~/.skillmeat
+```
+
+**Output:**
+
+```
+Migrating from skillman...
+
+Artifacts migrated: 23
+Collections: 3
+Success!
+```
+
+---
+
+## Special Commands
+
+### active-collection
+
+View or switch active collection.
+
+**Syntax:**
+
+```bash
+skillmeat active-collection [NAME]
+```
+
+**Arguments:**
+
+- `NAME` - Collection name to switch to (optional)
+
+**Examples:**
+
+```bash
+# Show active collection
+skillmeat active-collection
+
+# Switch collection
+skillmeat active-collection work
+```
+
+**Output:**
+
+```
+Active collection: work
+```
+
+---
+
+### quick-add
+
+Add artifact with smart defaults (claudectl mode).
+
+**Syntax:**
+
+```bash
+skillmeat quick-add SPEC [OPTIONS]
+```
+
+**Arguments:**
+
+- `SPEC` - Artifact spec (GitHub or local)
+
+**Options:**
+
+- `-c, --collection TEXT` - Collection (default: active)
+- `--infer-type` - Auto-detect artifact type
+
+**Examples:**
+
+```bash
+skillmeat quick-add anthropics/skills/canvas
+skillmeat quick-add ./my-skill --infer-type
+```
+
+---
+
+### alias
+
+Manage claudectl alias and shell integration.
+
+**Syntax:**
+
+```bash
+skillmeat alias [OPTIONS] COMMAND [ARGS]...
+```
+
+**Commands:**
+
+- `install` - Install shell alias and completion
+- `uninstall` - Remove alias and completion
+
+**Examples:**
+
+```bash
+skillmeat alias install
+skillmeat alias uninstall
+```
+
+---
 
 ## Security
 
