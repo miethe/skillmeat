@@ -655,5 +655,5 @@
   1. Added missing column via direct SQLite ALTER TABLE
   2. Stamped Alembic to latest revision `20251226_1500_add_frontmatter_detection`
   3. Added `enable_frontmatter_detection` to `source_to_response()` function
-- **Commit(s)**: (pending)
+- **Commit(s)**: 9b608cb
 - **Status**: RESOLVED

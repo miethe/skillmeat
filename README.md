@@ -9,7 +9,7 @@
 
 ## What is SkillMeat?
 
-SkillMeat is the evolution of `skillman`, providing a unified system for managing all types of Claude Code artifacts:
+SkillMeat provides a unified system for managing all types of Claude Code artifacts:
 
 - **Skills** - Specialized capabilities for Claude
 - **Commands** - Custom slash commands
@@ -165,7 +165,6 @@ skillmeat update python
 - **[Analytics Guide](docs/user/guides/using-analytics.md)** - Track usage and trends
 
 ### Resources
-- **[Migration Guide](docs/user/migration/README.md)** - Migrate from skillman
 - **[Examples](docs/user/examples.md)** - Real-world workflows and patterns
 - **[Security Guide](docs/ops/security/SECURITY.md)** - Security best practices
 
@@ -272,15 +271,6 @@ SkillMeat takes security seriously. Artifacts can execute code and access system
 - Review what artifacts do before deploying
 
 See [Using Skills in Claude - Security](https://support.claude.com/en/articles/12512180-using-skills-in-claude#h_2746475e70) for more information.
-
-## Migrating from skillman
-
-If you're using the original `skillman` tool, see our [Migration Guide](docs/user/migration/README.md) for step-by-step instructions.
-
-Key changes:
-- `skillman add <spec>` → `skillmeat add skill <spec>`
-- Project-level `skills.toml` → Collection-level `collection.toml`
-- Install to scope → Deploy from collection to projects
 
 ## Development
 
@@ -405,14 +395,6 @@ Contributions are welcome! Please:
 - [ ] Enhanced filtering and tags
 
 ## FAQ
-
-**Q: What's the difference between skillman and skillmeat?**
-
-A: SkillMeat is the evolution of skillman with support for multiple artifact types (not just skills), collection-based organization, better versioning, and enhanced deployment tracking.
-
-**Q: Can I use both skillman and skillmeat?**
-
-A: Yes! They store data in different locations and won't conflict. See the [Migration Guide](docs/user/migration/README.md).
 
 **Q: Do artifacts get re-downloaded for each project?**
 
