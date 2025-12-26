@@ -1,6 +1,22 @@
+---
+title: Team Sharing Guide
+description: Guide for sharing artifact collections with teammates using bundles and vaults
+audience: users
+tags: [sharing, bundles, vaults, team-collaboration, security]
+created: 2025-12-25
+updated: 2025-12-25
+category: guides
+status: mostly-complete
+related:
+  - docs/user/guides/collections-guide.md
+  - docs/user/guides/publishing-to-marketplace.md
+---
+
 # Team Sharing Guide
 
 This guide covers sharing SkillMeat artifact collections with teammates securely using signed bundles, team vaults, and permission management.
+
+**Status Note**: Core bundle and vault functionality is fully implemented via CLI. Web UI support is in progress. Most examples below use CLI commands, which are production-ready.
 
 ## Table of Contents
 
@@ -428,6 +444,8 @@ skillmeat import my-pack.skillmeat-pack --strategy ask
 ```
 
 ## Team Vault Configuration
+
+**Implementation Status**: Vault system is fully implemented via CLI and API. Web UI for vault management is in development.
 
 ### Setting Up Git Vault
 

@@ -51,7 +51,7 @@ Collection 'default' initialized
 
 ### 2. Add Your First Artifact
 
-Add a skill from GitHub:
+Add a skill from GitHub using the `add skill` subcommand:
 
 ```bash
 skillmeat add skill anthropics/skills/canvas
@@ -115,9 +115,11 @@ skillmeat add skill ./my-custom-skill
 
 ```bash
 skillmeat add skill anthropics/skills/python
-skillmeat add command user/repo/commands/review.md
-skillmeat add agent user/repo/agents/code-reviewer.md
+skillmeat add command user/repo/commands/review
+skillmeat add agent user/repo/agents/code-reviewer
 ```
+
+Note: Use the `skill`, `command`, and `agent` subcommands to specify artifact type.
 
 ### Deploy Multiple Artifacts
 
@@ -176,9 +178,11 @@ After following this quickstart, you'll have:
     └── default/
         ├── collection.toml  # Collection manifest
         ├── collection.lock  # Version lock file
-        └── skills/
-            └── canvas/      # Installed skill
-                └── SKILL.md
+        ├── skills/
+        │   └── canvas/      # Installed skill
+        │       └── SKILL.md
+        ├── commands/        # Command artifacts (if added)
+        └── agents/          # Agent artifacts (if added)
 
 /path/to/your/project/
 └── .claude/
@@ -187,6 +191,8 @@ After following this quickstart, you'll have:
         └── canvas/               # Deployed skill
             └── SKILL.md
 ```
+
+Collections organize artifacts by type into separate directories (skills, commands, agents).
 
 ## Getting Help
 
@@ -227,6 +233,23 @@ Examples:
 - `user/repo/skill@v1.0.0` (specific version)
 - `user/repo/path/to/skill@abc123` (specific commit)
 
+## Web Interface (Optional)
+
+Manage your collection visually with the web UI:
+
+```bash
+skillmeat web dev
+```
+
+This starts both the FastAPI backend and Next.js frontend on:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8080
+
+**Other web commands:**
+- `skillmeat web build` - Build for production
+- `skillmeat web start` - Start production servers
+- `skillmeat web doctor` - Diagnose environment issues
+
 ## What's Next?
 
 You now know how to:
@@ -235,5 +258,11 @@ You now know how to:
 - Deploy artifacts to projects
 - View and manage your collection
 - Create snapshots for backup
+- Access the web UI for visual management
 
-Continue to the [Commands Reference](commands.md) to explore all capabilities.
+### Continue Learning
+
+- **[Commands Reference](commands.md)** - Complete list of all CLI commands
+- **[Web Interface Guide](web-guide.md)** - Using the visual interface
+- **[Integration Examples](examples.md)** - Real-world workflows
+- **[Troubleshooting Guide](troubleshooting.md)** - Common issues and solutions

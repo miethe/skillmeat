@@ -1096,3 +1096,42 @@ docs/project_plans/                    # Planning artifacts (internal)
 - Initial document created with policy violation inventory
 - Identified 25+ files for cleanup
 - Created priority phases for documentation work
+
+---
+
+## Tracking Plan (2025-12-20)
+
+### Completed
+
+- [x] Remove root-level, web frontend, and web test violation files (already deleted)
+- [x] Consolidate cache watcher into `docs/dev/cache/WATCHER.md`
+- [x] Consolidate bugs and ideas notes into backlogs
+  - [x] `docs/project_plans/bugs/README.md`
+  - [x] `docs/project_plans/ideas/README.md`
+- [x] Retire stale status docs in this plan folder
+  - [x] `EXPLORATION_REPORT.md`
+  - [x] `IMPLEMENTATION_QUICK_REFERENCE.md`
+  - [x] `README_EXPLORATION.md`
+- [x] Consolidate documentation tree into `docs/user/`, `docs/dev/`, `docs/ops/`
+- [x] Update internal links to new paths
+- [x] Remove empty legacy docs directories
+- [x] Add top-level docs indexes
+  - [x] `docs/project_plans/README.md`
+  - [x] `docs/user/README.md`
+  - [x] `docs/dev/README.md`
+  - [x] `docs/ops/README.md`
+
+### Remaining
+
+- [x] Update release notes: `docs/user/release-notes/v0.3.0-beta.md` (2025-12-25)
+- [x] Verify/update `docs/user/quickstart.md` (installation + first steps) (2025-12-25)
+- [x] Complete CLI reference in `docs/user/cli/commands.md` (all commands, examples, errors) (2025-12-25)
+- [x] Update `docs/user/guides/web-ui-guide.md` (Collections Navigation + screenshots) (2025-12-25)
+- [x] Verify feature guides (2025-12-25)
+  - [x] Marketplace guides - verified complete, missing frontmatter noted
+  - [x] MCP guides - verified complete, some CLI commands not implemented (documented)
+  - [x] Team sharing guide - verified complete, CLI vs web UI availability noted
+  - [x] Syncing guide - verified complete and current
+  - [x] Searching guide - verified complete, frontmatter added
+
+**All documentation cleanup tasks complete as of 2025-12-25.**
