@@ -27,11 +27,10 @@ from skillmeat.observability.metrics import (
     github_rate_limit_remaining,
 )
 
-# Note: This import will be available once SVC-002 (heuristic detector) is implemented
-# from skillmeat.core.marketplace.heuristic_detector import (
-#     HeuristicDetector,
-#     detect_artifacts_in_tree,
-# )
+from skillmeat.core.marketplace.heuristic_detector import (
+    HeuristicDetector,
+    detect_artifacts_in_tree,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +96,7 @@ class GitHubScanner:
         self.session.headers["Accept"] = "application/vnd.github.v3+json"
         self.session.headers["User-Agent"] = "SkillMeat/1.0"
 
-        # Will be initialized once heuristic detector is implemented
-        # self.detector = HeuristicDetector()
+        self.detector = HeuristicDetector()
 
     def scan_repository(
         self,
@@ -156,21 +154,13 @@ class GitHubScanner:
 
                 # 4. Apply heuristic detection
                 ctx.metadata["phase"] = "detect_artifacts"
-                # NOTE: This will be uncommented once SVC-002 (heuristic detector) is implemented
-                # base_url = f"https://github.com/{owner}/{repo}"
-                # artifacts = detect_artifacts_in_tree(
-                #     file_paths,
-                #     repo_url=base_url,
-                #     ref=ref,
-                #     root_hint=root_hint,
-                #     detected_sha=commit_sha,
-                # )
-
-                # Placeholder until heuristic detector is implemented
-                artifacts = []
-                logger.warning(
-                    "Heuristic detector not yet implemented (SVC-002). "
-                    "Returning empty artifact list."
+                base_url = f"https://github.com/{owner}/{repo}"
+                artifacts = detect_artifacts_in_tree(
+                    file_paths,
+                    repo_url=base_url,
+                    ref=ref,
+                    root_hint=root_hint,
+                    detected_sha=commit_sha,
                 )
 
                 # 5. Build result
@@ -461,20 +451,12 @@ def scan_github_source(
     file_paths = scanner._extract_file_paths(tree, root_hint)
     commit_sha = scanner._get_ref_sha(owner, repo, ref)
 
-    # NOTE: This will be uncommented once SVC-002 (heuristic detector) is implemented
-    # artifacts = detect_artifacts_in_tree(
-    #     file_paths,
-    #     repo_url=repo_url,
-    #     ref=ref,
-    #     root_hint=root_hint,
-    #     detected_sha=commit_sha,
-    # )
-
-    # Placeholder until heuristic detector is implemented
-    artifacts = []
-    logger.warning(
-        "Heuristic detector not yet implemented (SVC-002). "
-        "Returning empty artifact list."
+    artifacts = detect_artifacts_in_tree(
+        file_paths,
+        repo_url=repo_url,
+        ref=ref,
+        root_hint=root_hint,
+        detected_sha=commit_sha,
     )
 
     result = ScanResultDTO(
