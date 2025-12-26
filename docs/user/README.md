@@ -27,7 +27,6 @@ tags:
 
 - Guides: `docs/user/guides/`
 - Release notes: `docs/user/release-notes/`
-- Migration: `docs/user/migration/`
 - Examples: `docs/user/examples.md`
 
 ## Programs and Assets
