@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import {
   Github,
   RefreshCw,
-  ChevronRight,
+  ExternalLink,
   Clock,
   AlertTriangle,
   CheckCircle2,
@@ -237,6 +237,12 @@ export function SourceCard({
     onDelete?.(source);
   };
 
+  const handleSourceClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const githubUrl = `https://github.com/${source.owner}/${source.repo_name}`;
+    window.open(githubUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // Parse artifact counts from the single artifact_count field
   // TODO: Backend should return counts_by_type instead
   const artifactCounts = {
@@ -291,34 +297,6 @@ export function SourceCard({
           </div>
         </div>
 
-        {/* Hover Actions */}
-        {(onEdit || onDelete) && (
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleEdit}
-                aria-label="Edit source"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={handleDelete}
-                aria-label="Delete source"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-
         {/* Description (truncated) */}
         {source.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">
@@ -336,6 +314,29 @@ export function SourceCard({
             {lastSyncFormatted}
           </span>
           <div className="flex items-center gap-1">
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEdit}
+                aria-label="Edit source"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Edit</span>
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={handleDelete}
+                aria-label="Delete source"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Delete</span>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -351,9 +352,14 @@ export function SourceCard({
               />
               <span className="sr-only">Rescan</span>
             </Button>
-            <Button variant="ghost" size="sm" aria-label="View source details">
-              <span className="text-xs">Open</span>
-              <ChevronRight className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSourceClick}
+              aria-label="Open GitHub repository"
+            >
+              <span className="text-xs">Source</span>
+              <ExternalLink className="h-4 w-4" />
             </Button>
           </div>
         </div>
