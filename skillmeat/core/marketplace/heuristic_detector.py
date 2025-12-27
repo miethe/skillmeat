@@ -175,9 +175,13 @@ class HeuristicDetector:
                     continue
 
             # Detect artifact type and score
-            artifact_type, confidence_score, match_reasons, score_breakdown = (
-                self._score_directory(dir_path, files, root_hint, use_frontmatter)
+            artifact_type, match_reasons, score_breakdown = self._score_directory(
+                dir_path, files, root_hint, use_frontmatter
             )
+
+            # Normalize raw score to 0-100 scale
+            raw_score = score_breakdown["raw_total"]
+            confidence_score = normalize_score(raw_score)
 
             # Only include if above threshold
             if confidence_score >= self.config.min_confidence:
@@ -186,9 +190,9 @@ class HeuristicDetector:
                     artifact_type=artifact_type.value if artifact_type else None,
                     confidence_score=confidence_score,
                     match_reasons=match_reasons,
-                    dir_name_score=score_breakdown["dir_name"],
-                    manifest_score=score_breakdown["manifest"],
-                    extension_score=score_breakdown["extension"],
+                    dir_name_score=score_breakdown["dir_name_score"],
+                    manifest_score=score_breakdown["manifest_score"],
+                    extension_score=score_breakdown["extensions_score"],
                     depth_penalty=score_breakdown["depth_penalty"],
                 )
                 matches.append(match)
@@ -208,8 +212,10 @@ class HeuristicDetector:
             Tuple of (artifact_type, confidence_score)
         """
         # For single path, create a minimal analysis
-        artifact_type, score, _, _ = self._score_directory(path, set(), None)
-        return artifact_type, score
+        artifact_type, _, score_breakdown = self._score_directory(path, set(), None)
+        raw_score = score_breakdown["raw_total"]
+        confidence_score = normalize_score(raw_score)
+        return artifact_type, confidence_score
 
     def _score_directory(
         self,
@@ -217,7 +223,7 @@ class HeuristicDetector:
         siblings: Set[str],
         root_hint: Optional[str] = None,
         use_frontmatter: bool = False,
-    ) -> Tuple[Optional[ArtifactType], int, List[str], Dict[str, int]]:
+    ) -> Tuple[Optional[ArtifactType], List[str], Dict[str, int]]:
         """Score a directory based on all available signals.
 
         Args:
@@ -227,27 +233,29 @@ class HeuristicDetector:
             use_frontmatter: Enable frontmatter detection boost
 
         Returns:
-            Tuple of (artifact_type, confidence_score, match_reasons, score_breakdown)
+            Tuple of (artifact_type, match_reasons, score_breakdown)
+            where score_breakdown contains individual signal scores and raw_total
         """
         total_score = 0
         match_reasons: List[str] = []
         artifact_type: Optional[ArtifactType] = None
 
-        # Score breakdown for debugging
+        # Score breakdown for debugging and transparency
         breakdown = {
-            "dir_name": 0,
-            "manifest": 0,
-            "extension": 0,
-            "parent_hint": 0,
-            "frontmatter": 0,
+            "dir_name_score": 0,
+            "manifest_score": 0,
+            "extensions_score": 0,
+            "parent_hint_score": 0,
+            "frontmatter_score": 0,
             "depth_penalty": 0,
+            "raw_total": 0,
         }
 
         # Signal 1: Directory name matching
         dir_name_type, dir_name_score = self._score_dir_name(path)
         if dir_name_type:
             total_score += dir_name_score
-            breakdown["dir_name"] = dir_name_score
+            breakdown["dir_name_score"] = dir_name_score
             artifact_type = dir_name_type
             match_reasons.append(
                 f"Directory name matches {dir_name_type.value} pattern (+{dir_name_score})"
@@ -257,7 +265,7 @@ class HeuristicDetector:
         manifest_type, manifest_score = self._score_manifest(path, siblings)
         if manifest_type:
             total_score += manifest_score
-            breakdown["manifest"] = manifest_score
+            breakdown["manifest_score"] = manifest_score
             # Manifest is stronger signal - override artifact_type if different
             if artifact_type and artifact_type != manifest_type:
                 # Conflicting signals - use manifest as authoritative
@@ -273,7 +281,7 @@ class HeuristicDetector:
         extension_score = self._score_extensions(path, siblings)
         if extension_score > 0:
             total_score += extension_score
-            breakdown["extension"] = extension_score
+            breakdown["extensions_score"] = extension_score
             match_reasons.append(
                 f"Contains expected file extensions (+{extension_score})"
             )
@@ -282,7 +290,7 @@ class HeuristicDetector:
         parent_hint_score = self._score_parent_hint(path, artifact_type)
         if parent_hint_score > 0:
             total_score += parent_hint_score
-            breakdown["parent_hint"] = parent_hint_score
+            breakdown["parent_hint_score"] = parent_hint_score
             match_reasons.append(f"Parent directory hint bonus (+{parent_hint_score})")
 
         # Signal 5: Frontmatter detection (if enabled)
@@ -300,7 +308,7 @@ class HeuristicDetector:
                     "agent.md",
                 ):
                     total_score += self.config.frontmatter_weight
-                    breakdown["frontmatter"] = self.config.frontmatter_weight
+                    breakdown["frontmatter_score"] = self.config.frontmatter_weight
                     match_reasons.append(f"frontmatter_candidate:{md_file}")
                     break
 
@@ -314,7 +322,10 @@ class HeuristicDetector:
         # Ensure score is non-negative
         total_score = max(0, total_score)
 
-        return artifact_type, total_score, match_reasons, breakdown
+        # Add raw total to breakdown
+        breakdown["raw_total"] = total_score
+
+        return artifact_type, match_reasons, breakdown
 
     def _parse_frontmatter(self, content: str) -> Optional[Dict[str, Any]]:
         """Parse YAML frontmatter from markdown content.

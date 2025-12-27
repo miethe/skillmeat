@@ -51,6 +51,9 @@ from skillmeat.core.marketplace.import_coordinator import (
 
 logger = logging.getLogger(__name__)
 
+# Confidence threshold for hiding low-quality entries
+CONFIDENCE_THRESHOLD = 30
+
 router = APIRouter(
     prefix="/marketplace/sources",
     tags=["marketplace-sources"],
@@ -684,14 +687,30 @@ async def list_artifacts(
                 detail=f"Source with ID '{source_id}' not found",
             )
 
+        # Calculate effective minimum confidence based on threshold toggle
+        # Default behavior (include_below_threshold=False): hide entries below 30%
+        # When include_below_threshold=True: show ALL entries including those <30%
+        effective_min_confidence = min_confidence
+        if not include_below_threshold:
+            # Apply the 30% threshold by default
+            if effective_min_confidence is None:
+                effective_min_confidence = CONFIDENCE_THRESHOLD
+            else:
+                # If user provided min_confidence, take the stricter of the two
+                # Examples:
+                # - min=20, threshold=30 → effective=30 (threshold wins)
+                # - min=40, threshold=30 → effective=40 (min is stricter)
+                effective_min_confidence = max(effective_min_confidence, CONFIDENCE_THRESHOLD)
+
         # Apply filters using get_source_catalog for combined filtering
-        if artifact_type or status or min_confidence:
+        if artifact_type or status or effective_min_confidence or max_confidence:
             # Get filtered entries
             entries = catalog_repo.get_source_catalog(
                 source_id=source_id,
                 artifact_types=[artifact_type] if artifact_type else None,
                 statuses=[status] if status else None,
-                min_confidence=min_confidence,
+                min_confidence=effective_min_confidence,
+                max_confidence=max_confidence,
             )
 
             # Manual pagination for filtered results
