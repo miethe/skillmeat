@@ -1092,6 +1092,10 @@ class ScanResultDTO(BaseModel):
         ge=0,
         examples=[12],
     )
+    artifacts: List["DetectedArtifact"] = Field(
+        default_factory=list,
+        description="List of detected artifacts",
+    )
     new_count: int = Field(
         description="Number of new artifacts detected",
         ge=0,
@@ -1370,3 +1374,7 @@ class HeuristicMatch(BaseModel):
                 "depth_penalty": 5,
             }
         }
+
+
+# Rebuild models to resolve forward references
+ScanResultDTO.model_rebuild()
