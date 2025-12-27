@@ -956,6 +956,27 @@ class CatalogEntryResponse(BaseModel):
         description="Confidence score of detection (0-100)",
         examples=[95],
     )
+    raw_score: Optional[int] = Field(
+        default=None,
+        description="Raw score before normalization (0-65)",
+        examples=[60],
+    )
+    score_breakdown: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Detailed signal breakdown: dir_name_score (0-10), manifest_score (0-20), "
+                    "extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), "
+                    "depth_penalty (negative), raw_total, normalized_score (0-100)",
+        examples=[{
+            "dir_name_score": 10,
+            "manifest_score": 20,
+            "extensions_score": 5,
+            "parent_hint_score": 15,
+            "frontmatter_score": 15,
+            "depth_penalty": -5,
+            "raw_total": 60,
+            "normalized_score": 92,
+        }],
+    )
     status: Literal["new", "updated", "removed", "imported"] = Field(
         description="Lifecycle status of the catalog entry",
         examples=["new"],
@@ -985,6 +1006,17 @@ class CatalogEntryResponse(BaseModel):
                 "detected_sha": "abc123def456",
                 "detected_at": "2025-12-06T10:30:00Z",
                 "confidence_score": 95,
+                "raw_score": 60,
+                "score_breakdown": {
+                    "dir_name_score": 10,
+                    "manifest_score": 20,
+                    "extensions_score": 5,
+                    "parent_hint_score": 15,
+                    "frontmatter_score": 15,
+                    "depth_penalty": -5,
+                    "raw_total": 60,
+                    "normalized_score": 92,
+                },
                 "status": "new",
                 "import_date": None,
                 "import_id": None,
@@ -1029,6 +1061,17 @@ class CatalogListResponse(BaseModel):
                         "path": "skills/canvas-design",
                         "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
                         "confidence_score": 95,
+                        "raw_score": 60,
+                        "score_breakdown": {
+                            "dir_name_score": 10,
+                            "manifest_score": 20,
+                            "extensions_score": 5,
+                            "parent_hint_score": 15,
+                            "frontmatter_score": 15,
+                            "depth_penalty": -5,
+                            "raw_total": 60,
+                            "normalized_score": 92,
+                        },
                         "status": "new",
                         "detected_at": "2025-12-06T10:30:00Z",
                     }
