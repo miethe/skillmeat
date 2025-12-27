@@ -20,9 +20,9 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from skillmeat.api.config import APISettings, Environment
+from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.api.server import create_app
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
-from skillmeat.core.marketplace.github_scanner import ScanResult
 
 
 @pytest.fixture
@@ -136,7 +136,8 @@ def mock_transaction_handler():
 def mock_scanner():
     """Create mock GitHubScanner."""
     mock = MagicMock()
-    scan_result = ScanResult(
+    scan_result = ScanResultDTO(
+        source_id="src_test_123",
         status="success",
         artifacts_found=5,
         new_count=3,
@@ -842,6 +843,452 @@ class TestListArtifacts:
             )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# =============================================================================
+# Test Confidence Filtering (GET /marketplace/sources/{source_id}/artifacts)
+# =============================================================================
+
+
+class TestConfidenceFiltering:
+    """Test confidence score filtering functionality."""
+
+    @pytest.fixture
+    def mock_catalog_entries_with_scores(self, mock_source):
+        """Create mock catalog entries with various confidence scores."""
+        entries = []
+        scores = [
+            (95, 62, "high-confidence-skill"),
+            (75, 50, "medium-high-skill"),
+            (50, 35, "medium-skill"),
+            (40, 28, "low-medium-skill"),
+            (25, 18, "low-confidence-skill"),
+            (15, 10, "very-low-skill"),
+        ]
+
+        for idx, (confidence, raw_score, name) in enumerate(scores):
+            entry = MarketplaceCatalogEntry(
+                id=f"cat_test_{idx}",
+                source_id=mock_source.id,
+                artifact_type="skill",
+                name=name,
+                path=f"skills/{name}",
+                upstream_url=f"https://github.com/test/repo/tree/main/skills/{name}",
+                detected_version="1.0.0",
+                detected_sha=f"sha{idx}",
+                detected_at=datetime(2025, 12, 6, 10, 30, 0),
+                confidence_score=confidence,
+                raw_score=raw_score,
+                score_breakdown={
+                    "dir_name_score": 10,
+                    "manifest_score": 20 if confidence > 50 else 10,
+                    "extensions_score": 5,
+                    "parent_hint_score": 15 if confidence > 40 else 5,
+                    "frontmatter_score": 15 if confidence > 60 else 0,
+                    "depth_penalty": -5,
+                    "raw_total": raw_score,
+                    "normalized_score": confidence,
+                },
+                status="new",
+            )
+            entries.append(entry)
+
+        return entries
+
+    def test_filter_by_min_confidence(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test min_confidence parameter filters correctly."""
+        mock_catalog_repo = MagicMock()
+
+        # Filter entries >= 50
+        filtered_entries = [e for e in mock_catalog_entries_with_scores if e.confidence_score >= 50]
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=50"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify the repository was called with correct min_confidence parameter
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("min_confidence") == 50
+
+        # Should only return filtered entries
+        assert len(data["items"]) == 3  # 95, 75, 50
+        for item in data["items"]:
+            assert item["confidence_score"] >= 50
+
+    def test_filter_by_max_confidence(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test max_confidence parameter filters correctly."""
+        mock_catalog_repo = MagicMock()
+
+        # Filter entries <= 70
+        filtered_entries = [e for e in mock_catalog_entries_with_scores if e.confidence_score <= 70]
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=70"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify the repository was called with correct max_confidence parameter
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("max_confidence") == 70
+
+        # Should only return filtered entries
+        assert len(data["items"]) == 4  # 50, 40, 25, 15 <= 70
+        for item in data["items"]:
+            assert item["confidence_score"] <= 70
+
+    def test_filter_by_confidence_range(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test min and max confidence together."""
+        mock_catalog_repo = MagicMock()
+
+        # Filter entries 40 <= confidence <= 80
+        filtered_entries = [
+            e for e in mock_catalog_entries_with_scores
+            if 40 <= e.confidence_score <= 80
+        ]
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?min_confidence=40&max_confidence=80"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify the repository was called with both parameters
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("max_confidence") == 80
+        # Router applies max(min_confidence, threshold) since include_below_threshold defaults to False
+        assert call_kwargs.get("min_confidence") == 40
+
+        # Should only return filtered entries
+        assert len(data["items"]) == 3  # 75, 50, 40
+        for item in data["items"]:
+            assert 40 <= item["confidence_score"] <= 80
+
+    def test_include_below_threshold_false(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test default behavior hides entries < 30%."""
+        mock_catalog_repo = MagicMock()
+
+        # Default threshold = 30, filter entries >= 30
+        filtered_entries = [e for e in mock_catalog_entries_with_scores if e.confidence_score >= 30]
+        # When only threshold is applied (no other filters), router uses list_paginated
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=[], has_more=False  # Not used because get_source_catalog is called
+        )
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            # No parameters - should apply default threshold via get_source_catalog
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify threshold is applied via get_source_catalog (min_confidence should be 30)
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("min_confidence") == 30
+
+        # Should only return filtered entries
+        assert len(data["items"]) == 4  # 95, 75, 50, 40
+        for item in data["items"]:
+            assert item["confidence_score"] >= 30
+
+    def test_include_below_threshold_true(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test toggle shows hidden entries."""
+        mock_catalog_repo = MagicMock()
+
+        # include_below_threshold=True - show ALL entries
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=mock_catalog_entries_with_scores, has_more=False
+        )
+        mock_catalog_repo.count_by_status.return_value = {"new": len(mock_catalog_entries_with_scores)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(mock_catalog_entries_with_scores)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?include_below_threshold=true"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Should include ALL entries, even those < 30
+        assert len(data["items"]) == 6  # All entries
+        confidence_scores = [item["confidence_score"] for item in data["items"]]
+        assert min(confidence_scores) < 30  # Verify we have low-confidence entries
+
+    def test_response_includes_raw_score(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test API response includes raw_score field."""
+        mock_catalog_repo = MagicMock()
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=[mock_catalog_entries_with_scores[0]], has_more=False
+        )
+        mock_catalog_repo.count_by_status.return_value = {"new": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 1}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?include_below_threshold=true"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify raw_score field exists
+        assert "raw_score" in data["items"][0]
+        assert data["items"][0]["raw_score"] is not None
+        assert isinstance(data["items"][0]["raw_score"], int)
+
+    def test_response_includes_breakdown(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test API response includes score_breakdown field."""
+        mock_catalog_repo = MagicMock()
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=[mock_catalog_entries_with_scores[0]], has_more=False
+        )
+        mock_catalog_repo.count_by_status.return_value = {"new": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 1}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?include_below_threshold=true"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify score_breakdown field exists and has expected structure
+        assert "score_breakdown" in data["items"][0]
+        breakdown = data["items"][0]["score_breakdown"]
+        assert breakdown is not None
+        assert isinstance(breakdown, dict)
+
+        # Verify expected keys in breakdown
+        expected_keys = [
+            "dir_name_score",
+            "manifest_score",
+            "extensions_score",
+            "parent_hint_score",
+            "frontmatter_score",
+            "depth_penalty",
+            "raw_total",
+            "normalized_score",
+        ]
+        for key in expected_keys:
+            assert key in breakdown, f"Missing key: {key}"
+
+    def test_threshold_interaction_with_min_confidence(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test min_confidence=20 with include_below_threshold=False still applies 30 threshold."""
+        mock_catalog_repo = MagicMock()
+
+        # threshold=False means default threshold (30) applies
+        # Even though min_confidence=20, the effective min should be max(20, 30) = 30
+        filtered_entries = [e for e in mock_catalog_entries_with_scores if e.confidence_score >= 30]
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?min_confidence=20&include_below_threshold=false"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify effective min_confidence is 30 (threshold wins)
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("min_confidence") == 30  # max(20, 30) = 30
+
+        # Should apply threshold (30), not user's min_confidence (20)
+        assert len(data["items"]) == 4  # >= 30
+        for item in data["items"]:
+            assert item["confidence_score"] >= 30
+
+    def test_min_confidence_overrides_threshold(
+        self, client, mock_source_repo, mock_catalog_entries_with_scores
+    ):
+        """Test min_confidence=40 is stricter than 30 threshold."""
+        mock_catalog_repo = MagicMock()
+
+        # min_confidence=40 is stricter than threshold=30
+        # Effective min should be max(40, 30) = 40
+        filtered_entries = [e for e in mock_catalog_entries_with_scores if e.confidence_score >= 40]
+        mock_catalog_repo.get_source_catalog.return_value = filtered_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": len(filtered_entries)}
+        mock_catalog_repo.count_by_type.return_value = {"skill": len(filtered_entries)}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?min_confidence=40&include_below_threshold=false"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify effective min_confidence is 40 (user's value wins)
+        mock_catalog_repo.get_source_catalog.assert_called_once()
+        call_kwargs = mock_catalog_repo.get_source_catalog.call_args[1]
+        assert call_kwargs.get("min_confidence") == 40  # max(40, 30) = 40
+
+        # Should apply stricter min_confidence (40)
+        assert len(data["items"]) == 4  # >= 40
+        for item in data["items"]:
+            assert item["confidence_score"] >= 40
+
+    def test_confidence_validation_min_too_low(
+        self, client, mock_source_repo
+    ):
+        """Test min_confidence validation rejects values < 0."""
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=-1"
+            )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_confidence_validation_min_too_high(
+        self, client, mock_source_repo
+    ):
+        """Test min_confidence validation rejects values > 100."""
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?min_confidence=101"
+            )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_confidence_validation_max_too_low(
+        self, client, mock_source_repo
+    ):
+        """Test max_confidence validation rejects values < 0."""
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=-1"
+            )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_confidence_validation_max_too_high(
+        self, client, mock_source_repo
+    ):
+        """Test max_confidence validation rejects values > 100."""
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?max_confidence=101"
+            )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 # =============================================================================

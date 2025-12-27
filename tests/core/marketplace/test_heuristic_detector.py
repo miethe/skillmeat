@@ -6,7 +6,9 @@ from skillmeat.core.marketplace.heuristic_detector import (
     ArtifactType,
     DetectionConfig,
     HeuristicDetector,
+    MAX_RAW_SCORE,
     detect_artifacts_in_tree,
+    normalize_score,
 )
 
 
@@ -504,3 +506,240 @@ class TestMetadata:
         names = {a.name for a in artifacts}
         assert "my-skill" in names
         assert "deploy-cmd" in names
+
+
+class TestScoreNormalization:
+    """Test suite for score normalization function and breakdown structure."""
+
+    def test_normalize_score_max(self):
+        """Test that raw=65 normalizes to 100."""
+        assert normalize_score(65) == 100
+
+    def test_normalize_score_half(self):
+        """Test that raw=30 normalizes to ~46."""
+        # 30/65 * 100 = 46.15... rounds to 46
+        assert normalize_score(30) == 46
+
+    def test_normalize_score_zero(self):
+        """Test that raw=0 normalizes to 0."""
+        assert normalize_score(0) == 0
+
+    def test_normalize_score_negative(self):
+        """Test that negative values are clamped to 0."""
+        assert normalize_score(-10) == 0
+        assert normalize_score(-1) == 0
+        assert normalize_score(-100) == 0
+
+    def test_normalize_score_over_max(self):
+        """Test that values > 65 are clamped to 100."""
+        assert normalize_score(100) == 100
+        assert normalize_score(1000) == 100
+        assert normalize_score(MAX_RAW_SCORE + 1) == 100
+
+    def test_normalize_score_mid_range(self):
+        """Test normalization for various mid-range values."""
+        # Test a few known values
+        assert normalize_score(1) == 2  # 1/65 * 100 = 1.54... rounds to 2
+        assert normalize_score(10) == 15  # 10/65 * 100 = 15.38... rounds to 15
+        assert normalize_score(32) == 49  # 32/65 * 100 = 49.23... rounds to 49
+        assert normalize_score(50) == 77  # 50/65 * 100 = 76.92... rounds to 77
+
+    def test_breakdown_structure(self):
+        """Test that breakdown contains all required fields."""
+        detector = HeuristicDetector()
+
+        # Create a match with manifest and supporting files
+        files = [
+            "skills/my-skill/SKILL.md",
+            "skills/my-skill/index.ts",
+            "skills/my-skill/package.json",
+        ]
+
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        match = matches[0]
+
+        # Verify breakdown dictionary exists
+        assert hasattr(match, "breakdown")
+        breakdown = match.breakdown
+
+        # Check all required fields
+        assert "dir_name_score" in breakdown
+        assert "manifest_score" in breakdown
+        assert "extensions_score" in breakdown
+        assert "parent_hint_score" in breakdown
+        assert "frontmatter_score" in breakdown
+        assert "depth_penalty" in breakdown
+        assert "raw_total" in breakdown
+        assert "normalized_score" in breakdown
+
+    def test_breakdown_field_types(self):
+        """Test that all breakdown fields are integers."""
+        detector = HeuristicDetector()
+        files = ["skills/test/SKILL.md"]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # All fields should be integers
+        for key, value in breakdown.items():
+            assert isinstance(value, int), f"Field '{key}' should be int, got {type(value)}"
+
+    def test_breakdown_field_ranges(self):
+        """Test that breakdown fields are within expected ranges."""
+        detector = HeuristicDetector()
+        files = ["skills/test/SKILL.md", "skills/test/index.ts"]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Individual signals should be non-negative
+        assert breakdown["dir_name_score"] >= 0
+        assert breakdown["manifest_score"] >= 0
+        assert breakdown["extensions_score"] >= 0
+        assert breakdown["parent_hint_score"] >= 0
+        assert breakdown["frontmatter_score"] >= 0
+
+        # Depth penalty should be non-negative
+        assert breakdown["depth_penalty"] >= 0
+
+        # Raw total should be between 0 and MAX_RAW_SCORE
+        assert 0 <= breakdown["raw_total"] <= MAX_RAW_SCORE
+
+        # Normalized score should be 0-100
+        assert 0 <= breakdown["normalized_score"] <= 100
+
+    def test_breakdown_raw_total_calculation(self):
+        """Test that raw_total equals sum of all signals minus penalties."""
+        detector = HeuristicDetector()
+        files = ["skills/test/SKILL.md", "skills/test/index.ts"]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Calculate expected raw total
+        expected_raw = (
+            breakdown["dir_name_score"]
+            + breakdown["manifest_score"]
+            + breakdown["extensions_score"]
+            + breakdown["parent_hint_score"]
+            + breakdown["frontmatter_score"]
+            - breakdown["depth_penalty"]
+        )
+
+        assert breakdown["raw_total"] == expected_raw
+
+    def test_breakdown_normalization_consistency(self):
+        """Test that normalized_score matches normalize_score(raw_total)."""
+        detector = HeuristicDetector()
+        files = [".claude/skills/my-skill/SKILL.md"]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Normalized score should match the normalize_score function result
+        expected_normalized = normalize_score(breakdown["raw_total"])
+        assert breakdown["normalized_score"] == expected_normalized
+
+    def test_penalties_reduce_score(self):
+        """Test that depth penalty reduces the raw score."""
+        detector = HeuristicDetector()
+
+        # Shallow path
+        files_shallow = ["skills/test/SKILL.md"]
+        matches_shallow = detector.analyze_paths(
+            files_shallow, base_url="https://github.com/test/repo"
+        )
+
+        # Deep path (should have higher penalty)
+        files_deep = ["a/b/c/d/skills/test/SKILL.md"]
+        matches_deep = detector.analyze_paths(
+            files_deep, base_url="https://github.com/test/repo"
+        )
+
+        assert len(matches_shallow) == 1
+        assert len(matches_deep) == 1
+
+        shallow_breakdown = matches_shallow[0].breakdown
+        deep_breakdown = matches_deep[0].breakdown
+
+        # Deep path should have higher depth penalty
+        assert deep_breakdown["depth_penalty"] > shallow_breakdown["depth_penalty"]
+
+        # Deep path should have lower raw total
+        assert deep_breakdown["raw_total"] < shallow_breakdown["raw_total"]
+
+    def test_all_signals_within_config_weights(self):
+        """Test that individual signal scores don't exceed configured weights."""
+        detector = HeuristicDetector()
+        config = detector.config
+
+        files = [
+            ".claude/skills/test/SKILL.md",
+            ".claude/skills/test/index.ts",
+            ".claude/skills/test/package.json",
+        ]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Each signal should not exceed its configured weight
+        assert breakdown["dir_name_score"] <= config.dir_name_weight
+        assert breakdown["manifest_score"] <= config.manifest_weight
+        assert breakdown["extensions_score"] <= config.extension_weight
+        assert breakdown["parent_hint_score"] <= config.parent_hint_weight
+        assert breakdown["frontmatter_score"] <= config.frontmatter_weight
+
+    def test_edge_case_only_manifest(self):
+        """Test scoring with only a manifest file (no other signals)."""
+        detector = HeuristicDetector()
+        files = ["test/SKILL.md"]  # Minimal: just manifest, no directory hint
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Should have manifest score but minimal other signals
+        assert breakdown["manifest_score"] > 0
+        # May or may not have dir_name_score (depends on 'test' matching)
+        # extensions_score may be > 0 if .md is counted as an expected extension
+        assert breakdown["extensions_score"] >= 0
+        assert breakdown["raw_total"] >= 0
+        assert breakdown["normalized_score"] >= 0
+
+    def test_edge_case_max_signals(self):
+        """Test scoring with all signals maximized."""
+        detector = HeuristicDetector()
+
+        # Create optimal conditions:
+        # - In .claude/skills/ (parent hint)
+        # - Directory name 'skill' (matches pattern)
+        # - Has manifest
+        # - Has multiple expected extensions
+        files = [
+            ".claude/skills/skill/SKILL.md",
+            ".claude/skills/skill/index.ts",
+            ".claude/skills/skill/package.json",
+            ".claude/skills/skill/README.md",
+        ]
+        matches = detector.analyze_paths(files, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Should have high scores in most categories
+        assert breakdown["dir_name_score"] > 0
+        assert breakdown["manifest_score"] > 0
+        assert breakdown["extensions_score"] > 0
+        assert breakdown["parent_hint_score"] > 0
+
+        # Raw total should be relatively high
+        assert breakdown["raw_total"] > 30
+        # Normalized should also be high
+        assert breakdown["normalized_score"] > 45
