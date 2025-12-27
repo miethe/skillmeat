@@ -55,6 +55,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -1376,6 +1377,8 @@ class MarketplaceCatalogEntry(Base):
         detected_sha: Git commit SHA at detection time
         detected_at: Timestamp when artifact was detected
         confidence_score: Heuristic confidence 0-100
+        raw_score: Raw confidence score before normalization (optional)
+        score_breakdown: JSON breakdown of scoring components (optional)
         status: Import status ("new", "updated", "removed", "imported")
         import_date: When artifact was imported to collection
         import_id: Reference to imported artifact ID
@@ -1417,6 +1420,8 @@ class MarketplaceCatalogEntry(Base):
 
     # Detection quality
     confidence_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Import tracking
     status: Mapped[str] = mapped_column(
@@ -1490,6 +1495,8 @@ class MarketplaceCatalogEntry(Base):
             "detected_sha": self.detected_sha,
             "detected_at": self.detected_at.isoformat() if self.detected_at else None,
             "confidence_score": self.confidence_score,
+            "raw_score": self.raw_score,
+            "score_breakdown": self.score_breakdown,
             "status": self.status,
             "import_date": self.import_date.isoformat() if self.import_date else None,
             "import_id": self.import_id,
