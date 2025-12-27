@@ -185,15 +185,29 @@ class HeuristicDetector:
 
             # Only include if above threshold
             if confidence_score >= self.config.min_confidence:
+                # Build complete breakdown dict with all signals and normalized score
+                complete_breakdown = {
+                    "dir_name_score": score_breakdown["dir_name_score"],
+                    "manifest_score": score_breakdown["manifest_score"],
+                    "extensions_score": score_breakdown["extensions_score"],
+                    "parent_hint_score": score_breakdown["parent_hint_score"],
+                    "frontmatter_score": score_breakdown["frontmatter_score"],
+                    "depth_penalty": score_breakdown["depth_penalty"],
+                    "raw_total": raw_score,
+                    "normalized_score": confidence_score,
+                }
+
                 match = HeuristicMatch(
                     path=dir_path,
                     artifact_type=artifact_type.value if artifact_type else None,
                     confidence_score=confidence_score,
                     match_reasons=match_reasons,
-                    dir_name_score=score_breakdown["dir_name_score"],
-                    manifest_score=score_breakdown["manifest_score"],
-                    extension_score=score_breakdown["extensions_score"],
-                    depth_penalty=score_breakdown["depth_penalty"],
+                    dir_name_score=complete_breakdown["dir_name_score"],
+                    manifest_score=complete_breakdown["manifest_score"],
+                    extension_score=complete_breakdown["extensions_score"],
+                    depth_penalty=complete_breakdown["depth_penalty"],
+                    raw_score=raw_score,
+                    breakdown=complete_breakdown,
                 )
                 matches.append(match)
 

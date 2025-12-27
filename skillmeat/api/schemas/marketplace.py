@@ -1355,6 +1355,27 @@ class HeuristicMatch(BaseModel):
         description="Score penalty for being too deep in directory tree",
         examples=[5],
     )
+    raw_score: int = Field(
+        default=0,
+        ge=0,
+        le=65,
+        description="Raw score before normalization (0-65)",
+        examples=[60],
+    )
+    breakdown: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Detailed signal breakdown dictionary",
+        examples=[{
+            "dir_name_score": 10,
+            "manifest_score": 20,
+            "extensions_score": 5,
+            "parent_hint_score": 15,
+            "frontmatter_score": 15,
+            "depth_penalty": 5,
+            "raw_total": 60,
+            "normalized_score": 92,
+        }],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1372,6 +1393,17 @@ class HeuristicMatch(BaseModel):
                 "manifest_score": 50,
                 "extension_score": 10,
                 "depth_penalty": 5,
+                "raw_score": 60,
+                "breakdown": {
+                    "dir_name_score": 10,
+                    "manifest_score": 20,
+                    "extensions_score": 5,
+                    "parent_hint_score": 15,
+                    "frontmatter_score": 15,
+                    "depth_penalty": 5,
+                    "raw_total": 60,
+                    "normalized_score": 92,
+                },
             }
         }
 
