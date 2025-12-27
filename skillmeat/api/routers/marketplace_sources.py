@@ -624,6 +624,8 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     - artifact_type: skill, command, agent, etc.
     - status: new, updated, removed, imported
     - min_confidence: Minimum confidence score (0-100)
+    - max_confidence: Maximum confidence score (0-100)
+    - include_below_threshold: Include artifacts below 30% confidence threshold (default: False)
 
     Results are paginated using cursor-based pagination for efficiency.
 
@@ -639,7 +641,13 @@ async def list_artifacts(
         None, description="Filter by status (new, updated, removed, imported)"
     ),
     min_confidence: Optional[int] = Query(
-        None, ge=0, le=100, description="Minimum confidence score"
+        None, ge=0, le=100, description="Minimum confidence score (0-100)"
+    ),
+    max_confidence: Optional[int] = Query(
+        None, ge=0, le=100, description="Maximum confidence score (0-100)"
+    ),
+    include_below_threshold: bool = Query(
+        False, description="Include artifacts below 30% confidence threshold"
     ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
@@ -650,7 +658,9 @@ async def list_artifacts(
         source_id: Unique source identifier
         artifact_type: Optional artifact type filter
         status: Optional status filter
-        min_confidence: Optional minimum confidence score
+        min_confidence: Filter entries with confidence >= this value (0-100)
+        max_confidence: Filter entries with confidence <= this value (0-100)
+        include_below_threshold: If True, include entries <30% that are normally hidden
         limit: Maximum items per page
         cursor: Pagination cursor
 
