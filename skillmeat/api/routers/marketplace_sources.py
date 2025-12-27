@@ -141,6 +141,8 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         detected_sha=entry.detected_sha,
         detected_at=entry.detected_at,
         confidence_score=entry.confidence_score,
+        raw_score=entry.raw_score,
+        score_breakdown=entry.score_breakdown,
         status=entry.status,
         import_date=entry.import_date,
         import_id=entry.import_id,
