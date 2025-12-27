@@ -657,3 +657,18 @@
   3. Added `enable_frontmatter_detection` to `source_to_response()` function
 - **Commit(s)**: 9b608cb
 - **Status**: RESOLVED
+
+## 2025-12-27
+
+### Marketplace Source Scan Fails with ScanResultDTO Missing artifacts Attribute
+
+**Issue**: Scanning a marketplace source from `/marketplace/sources/` fails with error: `'ScanResultDTO' object has no attribute 'artifacts'`
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:547`, `skillmeat/api/schemas/marketplace.py:1076`, `skillmeat/core/marketplace/github_scanner.py:186-197`
+- **Root Cause**: `GitHubScanner.scan_repository()` returned `ScanResultDTO` which only had `artifacts_found` (integer count) but not `artifacts` (the list). The scanner created the artifacts list locally via `detect_artifacts_in_tree()` but never included it in the returned DTO. The router then tried to iterate over `scan_result.artifacts` which didn't exist.
+- **Fix**:
+  1. Added `artifacts: List["DetectedArtifact"]` field to `ScanResultDTO` schema with forward reference
+  2. Added `artifacts=artifacts` to success return in `GitHubScanner.scan_repository()`
+  3. Added `artifacts=[]` to error return in `GitHubScanner.scan_repository()`
+  4. Added `ScanResultDTO.model_rebuild()` call to resolve forward reference
+- **Commit(s)**: 011b01b
+- **Status**: RESOLVED

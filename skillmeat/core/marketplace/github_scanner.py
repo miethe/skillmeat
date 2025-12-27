@@ -187,6 +187,7 @@ class GitHubScanner:
                     source_id="",  # Set by caller
                     status="success",
                     artifacts_found=len(artifacts),
+                    artifacts=artifacts,
                     new_count=len(artifacts),  # All new on first scan
                     updated_count=0,
                     removed_count=0,
@@ -213,6 +214,7 @@ class GitHubScanner:
                     source_id="",
                     status="error",
                     artifacts_found=0,
+                    artifacts=[],
                     new_count=0,
                     updated_count=0,
                     removed_count=0,
