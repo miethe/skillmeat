@@ -10,6 +10,33 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skillmeat.api.schemas.marketplace import DetectedArtifact, HeuristicMatch
 
+# Maximum raw score from all signals (10+20+5+15+15 = 65)
+MAX_RAW_SCORE = 65
+
+
+def normalize_score(raw_score: int) -> int:
+    """Normalize raw score to 0-100 scale.
+
+    Args:
+        raw_score: Raw score from signal accumulation
+
+    Returns:
+        Normalized score clamped between 0 and 100
+
+    Examples:
+        >>> normalize_score(65)
+        100
+        >>> normalize_score(30)
+        46
+        >>> normalize_score(0)
+        0
+    """
+    if raw_score <= 0:
+        return 0
+    if raw_score >= MAX_RAW_SCORE:
+        return 100
+    return round((raw_score / MAX_RAW_SCORE) * 100)
+
 
 class ArtifactType(str, Enum):
     """Supported artifact types."""
