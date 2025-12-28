@@ -53,6 +53,8 @@ export interface FileContentResponse {
   sha: string;
   /** Whether content was truncated due to size limits */
   truncated?: boolean;
+  /** Original file size in bytes (present when truncated) */
+  original_size?: number;
   /** Whether the response was served from cache */
   cached: boolean;
   /** Age of cached data in seconds (if cached) */

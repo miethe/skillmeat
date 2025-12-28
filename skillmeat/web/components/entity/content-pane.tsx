@@ -1,17 +1,29 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { FileText, AlertCircle, Edit, ChevronRight, Save, X } from 'lucide-react';
+import { FileText, AlertCircle, AlertTriangle, Edit, ChevronRight, Save, X, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SplitPreview } from '@/components/editor/split-preview';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+/**
+ * Truncation information for large files
+ */
+export interface TruncationInfo {
+  /** Whether the content was truncated */
+  truncated: boolean;
+  /** Original file size in bytes (before truncation) */
+  originalSize?: number;
+  /** URL to view the full file (e.g., on GitHub) */
+  fullFileUrl?: string;
+}
 
 export interface ContentPaneProps {
   path: string | null;
@@ -24,6 +36,11 @@ export interface ContentPaneProps {
    * @default false
    */
   readOnly?: boolean;
+  /**
+   * Truncation information for large files.
+   * When provided and truncated is true, displays a warning banner.
+   */
+  truncationInfo?: TruncationInfo;
   // Lifted edit state from parent
   isEditing?: boolean;
   editedContent?: string;
@@ -36,6 +53,19 @@ export interface ContentPaneProps {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Format bytes to human-readable string (e.g., "1.2 MB")
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const size = bytes / Math.pow(k, i);
+  // Use 1 decimal place for KB and above, no decimals for bytes
+  return i === 0 ? `${bytes} B` : `${size.toFixed(1)} ${sizes[i]}`;
+}
 
 /**
  * Check if a file is editable based on its extension
@@ -126,6 +156,42 @@ function ErrorState({ error }: ErrorStateProps) {
         <AlertDescription className="text-sm">{error}</AlertDescription>
       </Alert>
     </div>
+  );
+}
+
+// ============================================================================
+// Truncation Banner
+// ============================================================================
+
+interface TruncationBannerProps {
+  originalSize?: number;
+  fullFileUrl?: string;
+}
+
+function TruncationBanner({ originalSize, fullFileUrl }: TruncationBannerProps) {
+  const sizeText = originalSize ? formatBytes(originalSize) : 'large file';
+
+  return (
+    <Alert className="mb-4 border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
+      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+      <AlertTitle className="text-amber-800 dark:text-amber-300">Large file truncated</AlertTitle>
+      <AlertDescription className="text-amber-700 dark:text-amber-400">
+        <span>
+          This file ({sizeText}) has been truncated. Showing first 10,000 lines.
+        </span>
+        {fullFileUrl && (
+          <a
+            href={fullFileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 inline-flex items-center gap-1 font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
+          >
+            View full file on GitHub
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+          </a>
+        )}
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -245,6 +311,7 @@ export function ContentPane({
   isLoading = false,
   error = null,
   readOnly = false,
+  truncationInfo,
   isEditing = false,
   editedContent = '',
   onEditStart,
@@ -257,6 +324,9 @@ export function ContentPane({
   // Editing is disabled in read-only mode
   const canEdit = !readOnly && path && (onEditStart || onSave) && isEditableFile(path);
   const isMarkdown = path && isMarkdownFile(path);
+
+  // Check if content is truncated
+  const isTruncated = truncationInfo?.truncated === true;
 
   // Handle edit button click
   const handleEditClick = () => {
@@ -368,6 +438,13 @@ export function ContentPane({
 
         {/* Split-view editor and preview - preview always shown for markdown */}
         <div className="min-h-0 min-w-0 flex-1 overflow-auto p-4">
+          {/* Truncation warning banner */}
+          {isTruncated && (
+            <TruncationBanner
+              originalSize={truncationInfo?.originalSize}
+              fullFileUrl={truncationInfo?.fullFileUrl}
+            />
+          )}
           <div className="min-w-0">
             <SplitPreview
               content={isEditing ? editedContent : content}
@@ -397,6 +474,13 @@ export function ContentPane({
       {/* Scrollable content area with horizontal scroll when needed */}
       <ScrollArea className="min-h-0 min-w-0 flex-1">
         <div className="p-4">
+          {/* Truncation warning banner */}
+          {isTruncated && (
+            <TruncationBanner
+              originalSize={truncationInfo?.originalSize}
+              fullFileUrl={truncationInfo?.fullFileUrl}
+            />
+          )}
           <div className="max-w-full overflow-x-auto">
             <ContentDisplay content={content} showLineNumbers={false} />
           </div>

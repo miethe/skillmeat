@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
-import { ContentPane } from '@/components/entity/content-pane';
+import { ContentPane, type TruncationInfo } from '@/components/entity/content-pane';
 import { useCatalogFileTree, useCatalogFileContent } from '@/hooks/use-catalog-files';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
@@ -171,6 +171,38 @@ function sortFileNodes(nodes: FileNode[]): void {
       sortFileNodes(node.children);
     }
   }
+}
+
+/**
+ * Build GitHub URL to view a specific file in a repository
+ *
+ * Constructs a URL like: https://github.com/{owner}/{repo}/blob/{sha}/{artifact_path}/{file_path}
+ *
+ * @param upstreamUrl - The upstream URL from the catalog entry (e.g., https://github.com/owner/repo/tree/main/path)
+ * @param artifactPath - Path to the artifact within the repository
+ * @param filePath - Path to the file within the artifact
+ * @param sha - Git SHA for the specific version (optional, defaults to HEAD)
+ * @returns Full GitHub URL to view the file
+ */
+function buildGitHubFileUrl(
+  upstreamUrl: string,
+  artifactPath: string,
+  filePath: string,
+  sha?: string
+): string {
+  // Parse the upstream URL to extract owner and repo
+  // Expected format: https://github.com/{owner}/{repo}/tree/{ref}/{path}
+  const match = upstreamUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+  if (!match) {
+    // Fallback: just append file path to upstream URL
+    return `${upstreamUrl}/${filePath}`;
+  }
+
+  const [, owner, repo] = match;
+  const ref = sha || 'HEAD';
+  const fullPath = artifactPath ? `${artifactPath}/${filePath}` : filePath;
+
+  return `https://github.com/${owner}/${repo}/blob/${ref}/${fullPath}`;
 }
 
 /**
@@ -575,6 +607,22 @@ export function CatalogEntryModal({
                     content={fileContentData?.content ?? null}
                     isLoading={isContentLoading}
                     readOnly
+                    truncationInfo={
+                      fileContentData?.truncated
+                        ? {
+                            truncated: true,
+                            originalSize: fileContentData.original_size,
+                            fullFileUrl: selectedFilePath
+                              ? buildGitHubFileUrl(
+                                  entry.upstream_url,
+                                  entry.path,
+                                  selectedFilePath,
+                                  entry.detected_sha
+                                )
+                              : undefined,
+                          }
+                        : undefined
+                    }
                   />
                 )}
               </div>
