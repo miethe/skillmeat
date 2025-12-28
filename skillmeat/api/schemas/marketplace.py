@@ -1325,6 +1325,14 @@ class DetectedArtifact(BaseModel):
         default=None,
         description="Additional metadata extracted during detection",
     )
+    raw_score: Optional[int] = Field(
+        default=None,
+        description="Raw unscaled confidence score before normalization (0-65)",
+    )
+    score_breakdown: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Detailed breakdown of heuristic signal scores",
+    )
 
     class Config:
         """Pydantic model configuration."""

@@ -561,6 +561,8 @@ class HeuristicDetector:
                 confidence_score=match.confidence_score,
                 detected_sha=detected_sha,
                 detected_version=None,  # Will be extracted later from manifest
+                raw_score=match.raw_score,
+                score_breakdown=match.breakdown,
                 metadata={
                     "match_reasons": match.match_reasons,
                     "dir_name_score": match.dir_name_score,

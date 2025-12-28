@@ -1,5 +1,28 @@
 # Bug Fixes - December 2025
 
+## 2025-12-28
+
+### Marketplace Score Breakdown Never Populated
+
+**Issue**: Marketplace catalog entry modal shows "Score breakdown not available for this entry" despite heuristic detector calculating the breakdown
+- **Location**: `skillmeat/api/schemas/marketplace.py`, `skillmeat/core/marketplace/heuristic_detector.py`, `skillmeat/core/marketplace/diff_engine.py`
+- **Root Cause**: Data flow broken in 4 places:
+  1. `HeuristicMatch` has complete breakdown in `match.breakdown` dict
+  2. `DetectedArtifact` schema lacked `raw_score` and `score_breakdown` fields
+  3. `_matches_to_artifacts()` put scores in `metadata` instead of dedicated fields
+  4. `_artifact_to_dict()` didn't include `raw_score` or `score_breakdown` in DB insert dict
+  5. Result: DB column `score_breakdown` stayed NULL for all entries
+- **Fix**:
+  1. Added `raw_score` and `score_breakdown` fields to `DetectedArtifact` schema
+  2. Modified `_matches_to_artifacts()` to populate new fields from `match.raw_score` and `match.breakdown`
+  3. Updated `_artifact_to_dict()` to include new fields in database dict
+- **Files Modified**:
+  - `skillmeat/api/schemas/marketplace.py` (added 2 fields to DetectedArtifact)
+  - `skillmeat/core/marketplace/heuristic_detector.py` (populate fields in artifact creation)
+  - `skillmeat/core/marketplace/diff_engine.py` (include fields in DB dict)
+- **Verification**: Rescanning a marketplace source now populates `score_breakdown` with complete signal details
+- **Status**: RESOLVED
+
 ## 2025-12-01
 
 ### CollectionManager get_collection Method Not Found
@@ -671,4 +694,68 @@
   3. Added `artifacts=[]` to error return in `GitHubScanner.scan_repository()`
   4. Added `ScanResultDTO.model_rebuild()` call to resolve forward reference
 - **Commit(s)**: 011b01b
+- **Status**: RESOLVED
+
+### Marketplace Catalog Entries Missing raw_score Column
+
+**Issue**: `/marketplace/sources` page fails with SQLAlchemy OperationalError: `no such column: marketplace_catalog_entries.raw_score`
+- **Location**: `skillmeat/cache/models.py:1411-1412` (MarketplaceCatalogEntry model)
+- **Root Cause**: The confidence-score-enhancements feature added `raw_score` and `score_breakdown` columns to the `MarketplaceCatalogEntry` model, with corresponding Alembic migrations created (`20251227_1000_add_raw_score_and_breakdown_to_catalog`, `20251227_1100_populate_raw_score_for_existing_entries`), but the migrations were never applied to the database. Database was at revision `20251226_1500_add_frontmatter_detection`.
+- **Fix**: Applied pending migrations via `run_migrations()` from `skillmeat.cache.migrations` module. This:
+  1. Added `raw_score` INTEGER column (nullable)
+  2. Added `score_breakdown` JSON column (nullable)
+  3. Populated existing entries with `raw_score = min(65, confidence_score)`
+- **Commit(s)**: N/A (database migration only, no code changes)
+- **Status**: RESOLVED
+
+## 2025-12-28
+
+### Marketplace Source Modal Header Shows Placeholder
+
+**Issue**: The CatalogEntryModal displayed placeholder text "Header section (name, type badge, source path) To be implemented in TASK-3.2" instead of actual artifact information.
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:108-117`
+- **Root Cause**: Stub code from initial implementation was never replaced with actual implementation.
+- **Fix**: Replaced placeholder with complete header section showing:
+  1. Entry name (large, bold heading)
+  2. Type badge with proper colors from `typeConfig`
+  3. Status badge with proper styling from `statusConfig`
+  4. Confidence score badge using `ScoreBadge` component
+  5. Source path in code style
+- **Commit(s)**: 217aabb
+- **Status**: RESOLVED
+
+### Confidence Score Breakdown Never Available in Modal
+
+**Issue**: The "Confidence Score Breakdown" section in CatalogEntryModal always showed "Score breakdown not available for this entry" despite the heuristic detector calculating breakdown data.
+
+- **Location**: `skillmeat/core/marketplace/heuristic_detector.py:556-571`, `skillmeat/core/marketplace/diff_engine.py:234-244`, `skillmeat/api/schemas/marketplace.py:1286`
+- **Root Cause**: Broken data flow chain:
+  1. `HeuristicMatch` calculated `breakdown` dict with all signal scores
+  2. `_matches_to_artifacts()` put individual scores into `metadata` but NOT into dedicated `score_breakdown` field
+  3. `DetectedArtifact` schema lacked `raw_score` and `score_breakdown` fields
+  4. `_artifact_to_dict()` didn't include breakdown data for DB insertion
+  5. Result: `score_breakdown` column stayed NULL for all catalog entries
+- **Fix**:
+  1. Added `raw_score: Optional[int]` and `score_breakdown: Optional[Dict[str, int]]` fields to `DetectedArtifact` schema
+  2. Modified `_matches_to_artifacts()` to set `raw_score=match.raw_score` and `score_breakdown=match.breakdown`
+  3. Updated `_artifact_to_dict()` to include `raw_score` and `score_breakdown` in dict for DB insertion
+- **Commit(s)**: 217aabb
+- **Status**: RESOLVED
+
+### Marketplace Source Modal Layout Issues
+
+**Issue**: The CatalogEntryModal had multiple layout problems:
+  1. Entire modal scrolled as one unit instead of sections having independent scroll
+  2. Modal could scroll horizontally
+  3. Footer buttons could scroll out of view
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:97-99`
+- **Root Cause**: Modal used `max-h-[90vh] overflow-y-auto` on DialogContent, causing entire modal to scroll. No bounded sections or sticky footer.
+- **Fix**:
+  1. Changed DialogContent to fixed height with flex layout: `h-[85vh] flex flex-col overflow-hidden`
+  2. Main content wrapper made scrollable: `flex-1 overflow-y-auto overflow-x-hidden min-h-0`
+  3. Confidence section bounded: `max-h-[200px] overflow-y-auto`
+  4. DialogFooter made sticky: `flex-shrink-0 border-t pt-4 mt-auto`
+- **Commit(s)**: 217aabb
 - **Status**: RESOLVED
