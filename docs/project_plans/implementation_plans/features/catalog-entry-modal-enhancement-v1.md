@@ -1,4 +1,4 @@
----
+ ---
 title: "Implementation Plan: Catalog Entry Modal Enhancement with File Contents Preview"
 description: "Detailed implementation plan for adding file tree and content preview to marketplace catalog modals"
 prd: "docs/project_plans/PRDs/features/catalog-entry-modal-enhancement-v1.md"
@@ -131,7 +131,7 @@ This implementation plan details the transformation of the simple catalog entry 
 | TASK-1.5 | Implement backend caching layer | LRU cache with max 1000 entries. TTL: 1hr (trees), 2hr (contents). Keys: `tree:{source_id}:{artifact_path}:{sha}`, `content:{source_id}:{artifact_path}:{file_path}:{sha}`. | 0.5d (2 pts) | python-backend-engineer | None |
 | TASK-1.6 | Add rate limit detection | Detect GitHub HTTP 403 with `X-RateLimit-Remaining: 0`. Return HTTP 429 with `Retry-After` header. | 0.25d (1 pt) | python-backend-engineer | TASK-1.3, TASK-1.4 |
 | TASK-1.7 | Unit tests for file endpoints | Test happy path, 404 errors, rate limits, cache hits/misses. Coverage >80%. | 0.25d (1 pt) | python-backend-engineer | TASK-1.3, TASK-1.4, TASK-1.6 |
-| TASK-1.8 | Update OpenAPI spec | Add `/files` and `/files/{file_path}` endpoints to OpenAPI schema with request/response models. | 0.25d (1 pt) | documentation-writer | TASK-1.3, TASK-1.4 |
+| TASK-1.8 | Update OpenAPI spec | Add `/files` and `/files/{file_path}` endpoints to OpenAPI schema with request/response models. | 0.25d (1 pt) | documentation-writer | TASK-1.3, TASK-1.4 | ✓ COMPLETE |
 
 **Phase 1 Total**: 3 days, 13 story points
 
