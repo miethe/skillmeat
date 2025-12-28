@@ -95,7 +95,7 @@ export function CatalogEntryModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="sm:max-w-2xl h-[85vh] flex flex-col overflow-hidden"
         aria-describedby="modal-description"
       >
         <DialogHeader>
@@ -105,102 +105,121 @@ export function CatalogEntryModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4">
-          {/* Header Section - TASK-3.2 */}
-          <div className="border-b pb-4">
-            <div className="text-sm text-muted-foreground">
-              Header section (name, type badge, source path)
-            </div>
-            <div className="text-sm text-muted-foreground">
-              To be implemented in TASK-3.2
-            </div>
-          </div>
-
-          {/* Confidence Section */}
-          <section
-            aria-label="Confidence score breakdown"
-            className="space-y-3 border-t pt-4"
-          >
-            <h3 className="text-sm font-medium">Confidence Score Breakdown</h3>
-            {entry.score_breakdown ? (
-              <HeuristicScoreBreakdown
-                breakdown={entry.score_breakdown}
-                variant="full"
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Score breakdown not available for this entry.
-              </p>
-            )}
-          </section>
-
-          {/* Metadata Section - TASK-3.5 */}
-          <section
-            aria-label="Artifact details"
-            className="space-y-4"
-          >
-            <h3 className="font-semibold text-sm">Metadata</h3>
-
-            {/* Path Details */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                <span className="text-muted-foreground font-medium">Path:</span>
-                <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 py-4">
+          <div className="grid gap-6">
+            {/* Header Section */}
+            <div className="border-b pb-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">{entry.name}</h2>
+                <div className="flex items-center gap-2">
+                  <Badge className={typeConfig[entry.artifact_type]?.color || 'bg-gray-100'}>
+                    {typeConfig[entry.artifact_type]?.label || entry.artifact_type}
+                  </Badge>
+                  <Badge variant="outline" className={statusConfig[entry.status]?.className}>
+                    {statusConfig[entry.status]?.label || entry.status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <ScoreBadge
+                  confidence={entry.confidence_score}
+                  size="md"
+                  breakdown={entry.score_breakdown}
+                />
+                <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                   {entry.path}
                 </code>
               </div>
-
-              <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                <span className="text-muted-foreground font-medium">Upstream URL:</span>
-                <a
-                  href={entry.upstream_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-1"
-                  aria-label={`View source repository for ${entry.name} on GitHub`}
-                >
-                  <span className="truncate">{entry.upstream_url}</span>
-                  <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                </a>
-              </div>
-
-              {entry.detected_version && (
-                <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                  <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
-                    <GitBranch className="h-3 w-3" aria-hidden="true" />
-                    Version:
-                  </span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {entry.detected_version}
-                  </code>
-                </div>
-              )}
-
-              {entry.detected_sha && (
-                <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                  <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
-                    <GitCommit className="h-3 w-3" aria-hidden="true" />
-                    SHA:
-                  </span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {shortenSha(entry.detected_sha)}
-                  </code>
-                </div>
-              )}
-
-              <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
-                  <Calendar className="h-3 w-3" aria-hidden="true" />
-                  Detected at:
-                </span>
-                <span>{formatDate(entry.detected_at)}</span>
-              </div>
             </div>
-          </section>
+
+            {/* Confidence Section */}
+            <section
+              aria-label="Confidence score breakdown"
+              className="space-y-3 border-t pt-4"
+            >
+              <h3 className="text-sm font-medium">Confidence Score Breakdown</h3>
+              <div className="max-h-[200px] overflow-y-auto">
+                {entry.score_breakdown ? (
+                  <HeuristicScoreBreakdown
+                    breakdown={entry.score_breakdown}
+                    variant="full"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Score breakdown not available for this entry.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* Metadata Section - TASK-3.5 */}
+            <section
+              aria-label="Artifact details"
+              className="space-y-4"
+            >
+              <h3 className="font-semibold text-sm">Metadata</h3>
+
+              {/* Path Details */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                  <span className="text-muted-foreground font-medium">Path:</span>
+                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                    {entry.path}
+                  </code>
+                </div>
+
+                <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                  <span className="text-muted-foreground font-medium">Upstream URL:</span>
+                  <a
+                    href={entry.upstream_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline inline-flex items-center gap-1"
+                    aria-label={`View source repository for ${entry.name} on GitHub`}
+                  >
+                    <span className="truncate">{entry.upstream_url}</span>
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                  </a>
+                </div>
+
+                {entry.detected_version && (
+                  <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                    <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                      <GitBranch className="h-3 w-3" aria-hidden="true" />
+                      Version:
+                    </span>
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                      {entry.detected_version}
+                    </code>
+                  </div>
+                )}
+
+                {entry.detected_sha && (
+                  <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                    <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                      <GitCommit className="h-3 w-3" aria-hidden="true" />
+                      SHA:
+                    </span>
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                      {shortenSha(entry.detected_sha)}
+                    </code>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
+                  <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                    <Calendar className="h-3 w-3" aria-hidden="true" />
+                    Detected at:
+                  </span>
+                  <span>{formatDate(entry.detected_at)}</span>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
 
         {/* Action Buttons - TASK-3.6 */}
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
           <Button
             variant="outline"
             onClick={() => window.open(entry.upstream_url, '_blank', 'noopener,noreferrer')}
