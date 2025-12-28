@@ -1583,3 +1583,827 @@ class TestErrorHandling:
         data = response.json()
         assert data["status"] == "error"
         assert len(data["errors"]) > 0
+
+
+# =============================================================================
+# Test Get File Tree (GET /marketplace/sources/{source_id}/artifacts/{path}/files)
+# =============================================================================
+
+
+class TestGetFileTree:
+    """Test GET /marketplace/sources/{source_id}/artifacts/{artifact_path}/files endpoint."""
+
+    @pytest.fixture
+    def mock_file_tree(self):
+        """Create mock file tree entries from GitHubScanner."""
+        return [
+            {"path": "SKILL.md", "type": "blob", "size": 2048, "sha": "abc123def456"},
+            {"path": "src", "type": "tree", "size": None, "sha": "def789abc123"},
+            {"path": "src/index.ts", "type": "blob", "size": 1024, "sha": "ghi456jkl789"},
+            {"path": "README.md", "type": "blob", "size": 512, "sha": "mno012pqr345"},
+        ]
+
+    @pytest.fixture
+    def mock_github_file_cache(self):
+        """Create a fresh mock cache for each test."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        cache = GitHubFileCache(max_entries=100)
+        return cache
+
+    def test_get_file_tree_success(
+        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+    ):
+        """Test successful file tree retrieval."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.return_value = mock_file_tree
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify response structure
+        assert "entries" in data
+        assert "artifact_path" in data
+        assert "source_id" in data
+
+        # Verify artifact metadata
+        assert data["artifact_path"] == "skills/canvas"
+        assert data["source_id"] == "src_test_123"
+
+        # Verify file tree entries
+        assert len(data["entries"]) == 4
+
+        # Check entry structure
+        skill_md = next(e for e in data["entries"] if e["path"] == "SKILL.md")
+        assert skill_md["type"] == "blob"
+        assert skill_md["size"] == 2048
+        assert skill_md["sha"] == "abc123def456"
+
+        # Check directory entry
+        src_dir = next(e for e in data["entries"] if e["path"] == "src")
+        assert src_dir["type"] == "tree"
+        assert src_dir["size"] is None
+
+    def test_get_file_tree_source_not_found(self, client, mock_source_repo):
+        """Test 404 for non-existent source."""
+        mock_source_repo.get_by_id.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/nonexistent/artifacts/skills/canvas/files"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_get_file_tree_artifact_not_found(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test 404 for non-existent artifact path."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.return_value = []  # Empty means not found
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/path/files"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_get_file_tree_cache_hit(
+        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+    ):
+        """Test cache is used on second request."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.return_value = mock_file_tree
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            # First request - cache miss
+            response1 = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+            assert response1.status_code == status.HTTP_200_OK
+
+            # GitHubScanner should be called once
+            assert mock_scanner.get_file_tree.call_count == 1
+
+            # Second request - cache hit (scanner should not be called again)
+            response2 = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+            assert response2.status_code == status.HTTP_200_OK
+
+            # Scanner should still have been called only once (cache hit)
+            assert mock_scanner.get_file_tree.call_count == 1
+
+            # Verify responses are identical
+            assert response1.json() == response2.json()
+
+    def test_get_file_tree_github_api_error(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test handling of GitHub API errors."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.side_effect = Exception("GitHub API rate limited")
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to retrieve file tree" in response.json()["detail"]
+
+    def test_get_file_tree_nested_artifact_path(
+        self, client, mock_source_repo, mock_file_tree, mock_github_file_cache
+    ):
+        """Test file tree retrieval for deeply nested artifact paths."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.return_value = mock_file_tree
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/deep/nested/path/artifact/files"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["artifact_path"] == "deep/nested/path/artifact"
+
+
+# =============================================================================
+# Test Get File Content (GET /marketplace/sources/{source_id}/artifacts/{path}/files/{file})
+# =============================================================================
+
+
+class TestGetFileContent:
+    """Test GET /marketplace/sources/{source_id}/artifacts/{artifact_path}/files/{file_path} endpoint."""
+
+    @pytest.fixture
+    def mock_text_file_content(self):
+        """Create mock text file content from GitHubScanner."""
+        return {
+            "content": "# Canvas Design Skill\n\nThis is a sample skill...",
+            "encoding": "none",
+            "size": 2048,
+            "sha": "abc123def456789abcdef0123456789abcdef01",
+            "name": "SKILL.md",
+            "path": "skills/canvas/SKILL.md",
+            "is_binary": False,
+        }
+
+    @pytest.fixture
+    def mock_binary_file_content(self):
+        """Create mock binary file content (base64 encoded)."""
+        import base64
+
+        binary_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        return {
+            "content": base64.b64encode(binary_data).decode("utf-8"),
+            "encoding": "base64",
+            "size": len(binary_data),
+            "sha": "binary123sha456",
+            "name": "logo.png",
+            "path": "skills/canvas/assets/logo.png",
+            "is_binary": True,
+        }
+
+    @pytest.fixture
+    def mock_github_file_cache(self):
+        """Create a fresh mock cache for each test."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        cache = GitHubFileCache(max_entries=100)
+        return cache
+
+    def test_get_file_content_success(
+        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+    ):
+        """Test successful file content retrieval."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.return_value = mock_text_file_content
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify response structure
+        assert "content" in data
+        assert "encoding" in data
+        assert "size" in data
+        assert "sha" in data
+        assert "name" in data
+        assert "path" in data
+        assert "is_binary" in data
+        assert "artifact_path" in data
+        assert "source_id" in data
+
+        # Verify content
+        assert data["content"] == "# Canvas Design Skill\n\nThis is a sample skill..."
+        assert data["encoding"] == "none"
+        assert data["size"] == 2048
+        assert data["name"] == "SKILL.md"
+        assert data["is_binary"] is False
+        assert data["artifact_path"] == "skills/canvas"
+        assert data["source_id"] == "src_test_123"
+
+    def test_get_file_content_binary_file(
+        self, client, mock_source_repo, mock_binary_file_content, mock_github_file_cache
+    ):
+        """Test binary file handling with base64 encoding."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.return_value = mock_binary_file_content
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/assets/logo.png"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify binary file handling
+        assert data["is_binary"] is True
+        assert data["encoding"] == "base64"
+        assert data["name"] == "logo.png"
+        # Content should be base64 encoded
+        assert len(data["content"]) > 0
+
+    def test_get_file_content_source_not_found(self, client, mock_source_repo):
+        """Test 404 for non-existent source."""
+        mock_source_repo.get_by_id.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/nonexistent/artifacts/skills/canvas/files/SKILL.md"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_get_file_content_file_not_found(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test 404 for non-existent file."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/nonexistent.md"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_get_file_content_cache_hit(
+        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+    ):
+        """Test cache is used on second request."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.return_value = mock_text_file_content
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            # First request - cache miss
+            response1 = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+            assert response1.status_code == status.HTTP_200_OK
+
+            # GitHubScanner should be called once
+            assert mock_scanner.get_file_content.call_count == 1
+
+            # Second request - cache hit
+            response2 = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+            assert response2.status_code == status.HTTP_200_OK
+
+            # Scanner should still have been called only once (cache hit)
+            assert mock_scanner.get_file_content.call_count == 1
+
+            # Verify responses are identical
+            assert response1.json() == response2.json()
+
+    def test_get_file_content_github_api_error(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test handling of GitHub API errors."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.side_effect = Exception("GitHub API error")
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to retrieve file content" in response.json()["detail"]
+
+    def test_get_file_content_nested_path(
+        self, client, mock_source_repo, mock_text_file_content, mock_github_file_cache
+    ):
+        """Test file content retrieval for deeply nested file paths."""
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.return_value = mock_text_file_content
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/src/components/deep/nested/file.tsx"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["artifact_path"] == "skills/canvas"
+
+    def test_get_file_content_different_file_types(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test content retrieval for various file types."""
+        file_types = [
+            ("main.py", "python"),
+            ("index.ts", "typescript"),
+            ("styles.css", "css"),
+            ("config.json", "json"),
+            ("schema.yaml", "yaml"),
+        ]
+
+        mock_scanner = MagicMock()
+
+        for filename, _ in file_types:
+            mock_content = {
+                "content": f"# Content of {filename}",
+                "encoding": "none",
+                "size": 100,
+                "sha": f"sha_{filename}",
+                "name": filename,
+                "path": f"skills/canvas/{filename}",
+                "is_binary": False,
+            }
+            mock_scanner.get_file_content.return_value = mock_content
+
+            with patch(
+                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+                return_value=mock_source_repo,
+            ), patch(
+                "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+                return_value=mock_scanner,
+            ), patch(
+                "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+                return_value=mock_github_file_cache,
+            ):
+                response = client.get(
+                    f"/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/{filename}"
+                )
+
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["name"] == filename
+
+
+# =============================================================================
+# Test GitHub Cache Integration
+# =============================================================================
+
+
+class TestGitHubCacheIntegration:
+    """Test GitHubFileCache integration with file endpoints."""
+
+    @pytest.fixture
+    def mock_github_file_cache(self):
+        """Create a fresh mock cache for each test."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        cache = GitHubFileCache(max_entries=100)
+        return cache
+
+    def test_cache_key_format_tree(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test cache key format for tree requests."""
+        from skillmeat.api.utils.github_cache import build_tree_key
+
+        source_id = "src_test_123"
+        artifact_path = "skills/canvas"
+        sha = "main"
+
+        expected_key = f"tree:{source_id}:{artifact_path}:{sha}"
+        actual_key = build_tree_key(source_id, artifact_path, sha)
+
+        assert actual_key == expected_key
+
+    def test_cache_key_format_content(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test cache key format for content requests."""
+        from skillmeat.api.utils.github_cache import build_content_key
+
+        source_id = "src_test_123"
+        artifact_path = "skills/canvas"
+        file_path = "SKILL.md"
+        sha = "main"
+
+        expected_key = f"content:{source_id}:{artifact_path}:{file_path}:{sha}"
+        actual_key = build_content_key(source_id, artifact_path, file_path, sha)
+
+        assert actual_key == expected_key
+
+    def test_cache_expiration(self, mock_github_file_cache):
+        """Test cache entry expiration."""
+        import time
+
+        # Set a very short TTL (1 second)
+        mock_github_file_cache.set("test_key", {"data": "value"}, ttl_seconds=1)
+
+        # Should be available immediately
+        assert mock_github_file_cache.get("test_key") is not None
+
+        # Wait for expiration
+        time.sleep(1.1)
+
+        # Should be expired now
+        assert mock_github_file_cache.get("test_key") is None
+
+    def test_cache_lru_eviction(self):
+        """Test LRU eviction when cache is full."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        # Create small cache
+        cache = GitHubFileCache(max_entries=3)
+
+        # Add entries
+        cache.set("key1", "value1", ttl_seconds=3600)
+        cache.set("key2", "value2", ttl_seconds=3600)
+        cache.set("key3", "value3", ttl_seconds=3600)
+
+        # Access key1 to make it recently used
+        cache.get("key1")
+
+        # Add new entry - should evict key2 (least recently used)
+        cache.set("key4", "value4", ttl_seconds=3600)
+
+        # key2 should be evicted
+        assert cache.get("key1") is not None  # Recently used
+        assert cache.get("key2") is None  # Evicted (LRU)
+        assert cache.get("key3") is not None  # Still present
+        assert cache.get("key4") is not None  # New entry
+
+    def test_cache_stats(self, mock_github_file_cache):
+        """Test cache statistics tracking."""
+        # Add entry
+        mock_github_file_cache.set("key1", "value1", ttl_seconds=3600)
+
+        # Hit
+        mock_github_file_cache.get("key1")
+
+        # Miss
+        mock_github_file_cache.get("nonexistent")
+
+        stats = mock_github_file_cache.stats()
+
+        assert stats["entries"] == 1
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
+        assert stats["hit_rate"] == 50.0
+
+    def test_cache_clear(self, mock_github_file_cache):
+        """Test clearing cache."""
+        mock_github_file_cache.set("key1", "value1", ttl_seconds=3600)
+        mock_github_file_cache.set("key2", "value2", ttl_seconds=3600)
+
+        assert len(mock_github_file_cache) == 2
+
+        mock_github_file_cache.clear()
+
+        assert len(mock_github_file_cache) == 0
+        assert mock_github_file_cache.get("key1") is None
+
+
+# =============================================================================
+# Test Delete Source (DELETE /marketplace/sources/{source_id})
+# =============================================================================
+
+
+class TestDeleteSource:
+    """Test DELETE /marketplace/sources/{source_id} endpoint."""
+
+    def test_delete_source_success(self, client, mock_source_repo):
+        """Test successful source deletion."""
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.delete("/api/v1/marketplace/sources/src_test_123")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_delete_source_not_found(self, client, mock_source_repo):
+        """Test deleting a non-existent source."""
+        mock_source_repo.delete.return_value = False
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ):
+            response = client.delete("/api/v1/marketplace/sources/nonexistent")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# =============================================================================
+# Test Rate Limit Handling for File Endpoints
+# =============================================================================
+
+
+class TestFileEndpointsRateLimiting:
+    """Test rate limit handling for file tree and content endpoints."""
+
+    @pytest.fixture
+    def mock_github_file_cache(self):
+        """Create a fresh mock cache for each test."""
+        from skillmeat.api.utils.github_cache import GitHubFileCache
+
+        cache = GitHubFileCache(max_entries=100)
+        return cache
+
+    def test_file_tree_rate_limit(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test 429 response with Retry-After header for file tree endpoint."""
+        from skillmeat.core.marketplace.github_scanner import RateLimitError
+
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.side_effect = RateLimitError(
+            "GitHub API rate limit exceeded (0 requests remaining). "
+            "Wait 3600 seconds before retrying."
+        )
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+
+        # Verify 429 status code
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+        # Verify Retry-After header is present
+        assert "Retry-After" in response.headers
+        retry_after = int(response.headers["Retry-After"])
+        assert retry_after > 0  # Should have a positive retry value
+
+        # Verify error detail
+        data = response.json()
+        assert "rate limit" in data["detail"].lower()
+
+    def test_file_content_rate_limit(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test 429 response with Retry-After header for file content endpoint."""
+        from skillmeat.core.marketplace.github_scanner import RateLimitError
+
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_content.side_effect = RateLimitError(
+            "GitHub API rate limit exceeded (0 requests remaining). "
+            "Wait 1800 seconds before retrying."
+        )
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+
+        # Verify 429 status code
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+        # Verify Retry-After header is present
+        assert "Retry-After" in response.headers
+        retry_after = int(response.headers["Retry-After"])
+        assert retry_after > 0
+
+        # Verify error detail
+        data = response.json()
+        assert "rate limit" in data["detail"].lower()
+
+    def test_file_tree_rate_limit_retry_after_parsing(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test that Retry-After value is correctly parsed from error message."""
+        from skillmeat.core.marketplace.github_scanner import RateLimitError
+
+        # Test with specific wait time - parser looks for pattern like "45s" or "60s"
+        wait_time = 7200
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.side_effect = RateLimitError(
+            f"GitHub API rate limit exceeded. Rate limited for {wait_time}s."
+        )
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        assert response.headers["Retry-After"] == str(wait_time)
+
+    def test_file_tree_rate_limit_default_retry_after(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test that default Retry-After is used when parsing fails."""
+        from skillmeat.core.marketplace.github_scanner import RateLimitError
+
+        # Error message without parseable wait time
+        mock_scanner = MagicMock()
+        mock_scanner.get_file_tree.side_effect = RateLimitError(
+            "GitHub API rate limit exceeded with no time info"
+        )
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files"
+            )
+
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        # Should use default value (typically 60 seconds)
+        retry_after = int(response.headers["Retry-After"])
+        assert retry_after > 0  # Default should be positive
+
+    def test_file_content_rate_limit_retry_after_parsing(
+        self, client, mock_source_repo, mock_github_file_cache
+    ):
+        """Test Retry-After parsing for file content endpoint."""
+        from skillmeat.core.marketplace.github_scanner import RateLimitError
+
+        wait_time = 300  # 5 minutes
+        mock_scanner = MagicMock()
+        # Parser looks for pattern like "45s" or "60s"
+        mock_scanner.get_file_content.side_effect = RateLimitError(
+            f"Rate limit exceeded, reset in {wait_time}s"
+        )
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.GitHubScanner",
+            return_value=mock_scanner,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.get_github_file_cache",
+            return_value=mock_github_file_cache,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/skills/canvas/files/SKILL.md"
+            )
+
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        assert response.headers["Retry-After"] == str(wait_time)
