@@ -2,15 +2,15 @@
 type: progress
 prd: "confidence-score-enhancements"
 phase: "3-5"
-status: pending
-progress: 0
+status: in-progress
+progress: 19
 total_tasks: 21
-completed_tasks: 0
+completed_tasks: 4
 
 tasks:
   - id: "TASK-3.1"
     name: "Create CatalogEntryModal component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "2h"
@@ -24,7 +24,7 @@ tasks:
 
   - id: "TASK-3.3"
     name: "Create reusable ScoreBreakdown component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "1h"
@@ -108,7 +108,7 @@ tasks:
 
   - id: "TASK-5.1"
     name: "Create ConfidenceFilter component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "1.5h"
@@ -136,7 +136,7 @@ tasks:
 
   - id: "TASK-5.5"
     name: "Update API client"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "0.5h"
@@ -341,3 +341,37 @@ Task("ui-engineer-enhanced", "TASK-5.7: Test filter shareable URLs. Verify filte
 - ScoreBreakdown component is shared between modal and tooltip (DRY principle)
 - Filter integration requires coordination with API client
 - Storybook stories document all component states for design review
+
+## Work Log
+
+### 2025-12-27: Batch 1 Components Created
+
+**TASK-3.1 COMPLETED**: CatalogEntryModal component
+- File: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/components/CatalogEntryModal.tsx`
+- React Dialog-based component for displaying marketplace entry details
+- Displays artifact metadata, description, file list, and confidence breakdown
+- Integrates with ScoreBreakdown component for transparency
+
+**TASK-3.3 COMPLETED**: HeuristicScoreBreakdown component
+- File: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/components/HeuristicScoreBreakdown.tsx`
+- Reusable component for displaying confidence score breakdown
+- Shows signal contributions, raw score, normalization factors, and final score
+- Can be imported in both modal and tooltip contexts
+
+**TASK-5.1 COMPLETED**: ConfidenceFilter component
+- File: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/components/ConfidenceFilter.tsx`
+- Filtering component with min/max confidence sliders and low-confidence toggle
+- Integrates with URL query parameters for shareability
+- Supports filtering marketplace entries by confidence thresholds
+
+**TASK-5.5 COMPLETED**: API client updates
+- File: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/lib/api/marketplace.ts`
+- Updated fetchCatalogEntries() to accept filter parameters
+- Supports min_confidence, max_confidence, and include_below_threshold query params
+- Type updates in `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/types/marketplace.ts`
+
+**Supporting updates**:
+- Updated `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/hooks/useMarketplaceSources.ts` to pass filter params
+- Type definitions added for CatalogFilterOptions and ScoreBreakdownData
+
+**Progress**: 4/21 tasks complete (19%). Batch 1 complete, ready for Batch 2 dependencies.

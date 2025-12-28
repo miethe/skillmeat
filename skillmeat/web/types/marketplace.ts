@@ -175,6 +175,17 @@ export interface CatalogEntry {
   status: CatalogStatus;
   import_date?: string;
   import_id?: string;
+  raw_score?: number;
+  score_breakdown?: {
+    dir_name_score: number;
+    manifest_score: number;
+    extensions_score: number;
+    parent_hint_score: number;
+    frontmatter_score: number;
+    depth_penalty: number;
+    raw_total: number;
+    normalized_score: number;
+  };
 }
 
 export interface CatalogListResponse {
@@ -188,6 +199,8 @@ export interface CatalogFilters {
   artifact_type?: ArtifactType;
   status?: CatalogStatus;
   min_confidence?: number;
+  max_confidence?: number;
+  include_below_threshold?: boolean;
   search?: string;
 }
 

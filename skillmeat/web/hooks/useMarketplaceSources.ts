@@ -233,6 +233,12 @@ export function useSourceCatalog(
       if (filters?.min_confidence !== undefined) {
         params.append('min_confidence', filters.min_confidence.toString());
       }
+      if (filters?.max_confidence !== undefined) {
+        params.append('max_confidence', filters.max_confidence.toString());
+      }
+      if (filters?.include_below_threshold !== undefined) {
+        params.append('include_below_threshold', filters.include_below_threshold.toString());
+      }
       // Note: search is client-side filter for now
       return apiRequest<CatalogListResponse>(
         `/marketplace/sources/${sourceId}/artifacts?${params}`
