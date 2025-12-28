@@ -94,13 +94,10 @@ export function CatalogEntryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-2xl h-[85vh] flex flex-col overflow-hidden"
-        aria-describedby="modal-description"
-      >
+      <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle id="modal-title">Catalog Entry Details</DialogTitle>
-          <DialogDescription id="modal-description" className="sr-only">
+          <DialogTitle>Catalog Entry Details</DialogTitle>
+          <DialogDescription className="sr-only">
             Detailed view of the {entry.name} artifact including confidence scores, metadata, and import options
           </DialogDescription>
         </DialogHeader>
@@ -120,15 +117,17 @@ export function CatalogEntryModal({
                   </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <ScoreBadge
                   confidence={entry.confidence_score}
                   size="md"
                   breakdown={entry.score_breakdown}
                 />
-                <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                  {entry.path}
-                </code>
+                <div className="overflow-x-auto flex-1 min-w-0">
+                  <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded whitespace-nowrap">
+                    {entry.path}
+                  </code>
+                </div>
               </div>
             </div>
 
@@ -145,9 +144,14 @@ export function CatalogEntryModal({
                     variant="full"
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Score breakdown not available for this entry.
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Score breakdown not available for this entry.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Rescan the source to generate detailed scoring breakdown for artifacts.
+                    </p>
+                  </div>
                 )}
               </div>
             </section>
@@ -163,23 +167,27 @@ export function CatalogEntryModal({
               <div className="space-y-2">
                 <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
                   <span className="text-muted-foreground font-medium">Path:</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {entry.path}
-                  </code>
+                  <div className="overflow-x-auto">
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                      {entry.path}
+                    </code>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
                   <span className="text-muted-foreground font-medium">Upstream URL:</span>
-                  <a
-                    href={entry.upstream_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline inline-flex items-center gap-1"
-                    aria-label={`View source repository for ${entry.name} on GitHub`}
-                  >
-                    <span className="truncate">{entry.upstream_url}</span>
-                    <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                  </a>
+                  <div className="overflow-x-auto">
+                    <a
+                      href={entry.upstream_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
+                      aria-label={`View source repository for ${entry.name} on GitHub`}
+                    >
+                      <span>{entry.upstream_url}</span>
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                    </a>
+                  </div>
                 </div>
 
                 {entry.detected_version && (
@@ -188,9 +196,11 @@ export function CatalogEntryModal({
                       <GitBranch className="h-3 w-3" aria-hidden="true" />
                       Version:
                     </span>
-                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                      {entry.detected_version}
-                    </code>
+                    <div className="overflow-x-auto">
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                        {entry.detected_version}
+                      </code>
+                    </div>
                   </div>
                 )}
 
@@ -200,9 +210,11 @@ export function CatalogEntryModal({
                       <GitCommit className="h-3 w-3" aria-hidden="true" />
                       SHA:
                     </span>
-                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                      {shortenSha(entry.detected_sha)}
-                    </code>
+                    <div className="overflow-x-auto">
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                        {shortenSha(entry.detected_sha)}
+                      </code>
+                    </div>
                   </div>
                 )}
 

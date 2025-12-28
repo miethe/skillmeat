@@ -759,3 +759,60 @@
   4. DialogFooter made sticky: `flex-shrink-0 border-t pt-4 mt-auto`
 - **Commit(s)**: 217aabb
 - **Status**: RESOLVED
+
+### Confidence Score Breakdown Still Shows "Not Available" (Follow-up)
+
+**Issue**: After fixing the data flow, existing catalog entries still showed "Score breakdown not available" because the backend fix only affects NEW scans.
+
+- **Location**: `skillmeat/cache/migrations/versions/20251227_1000_add_raw_score_and_breakdown_to_catalog.py`
+- **Root Cause**: The migration adds columns but explicitly notes: "Existing entries will have NULL values until they are rescanned with the new scoring system." Entries created before the fix have NULL score_breakdown.
+- **Fix**:
+  1. Added rescan hint in UI: "Rescan the source to generate detailed scoring breakdown for artifacts."
+  2. Users must click "Rescan" button on marketplace source to populate breakdown for existing entries
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED (User action required - rescan sources)
+
+### Metadata Fields Not Independently Horizontally Scrollable
+
+**Issue**: Long metadata values (path, upstream URL, version, SHA) were either truncated or caused modal horizontal scroll instead of each field being independently scrollable.
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:164-215`
+- **Root Cause**: Field values used `truncate` class or lacked scroll containers. No `overflow-x-auto` on individual field value wrappers.
+- **Fix**: Added `overflow-x-auto` wrapper divs with `whitespace-nowrap` to all metadata field values:
+  1. Header path display: `overflow-x-auto flex-1 min-w-0` wrapper
+  2. Metadata Path field: `overflow-x-auto` wrapper with `whitespace-nowrap` code
+  3. Upstream URL field: `overflow-x-auto` wrapper, removed `truncate`
+  4. Version field: `overflow-x-auto` wrapper
+  5. SHA field: `overflow-x-auto` wrapper
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### CatalogEntryModal DialogTitle Accessibility Warning
+
+**Issue**: Navigating to `/marketplace/sources/` page throws console error: "DialogContent requires a DialogTitle for the component to be accessible for screen reader users" at dialog.tsx (38:5).
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:97-103`
+- **Root Cause**: Custom ARIA attributes (`aria-describedby="modal-description"`) on DialogContent and `id` attributes on DialogTitle/DialogDescription were overriding Radix UI's automatic ARIA linking, making Radix think DialogTitle was missing. Same issue as previously fixed in BulkImportModal.tsx and ParameterEditorModal.tsx (commit 0abde84).
+- **Fix**: Removed custom ARIA/id attributes and let Radix UI handle accessibility automatically:
+  1. Removed `aria-describedby="modal-description"` from DialogContent
+  2. Removed `id="modal-title"` from DialogTitle
+  3. Removed `id="modal-description"` from DialogDescription
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### CommandDialog Missing DialogTitle Accessibility Warning
+
+**Issue**: The `CommandDialog` component lacked a DialogTitle, which would cause the same accessibility warning when used.
+
+- **Location**: `skillmeat/web/components/ui/command.tsx:26-36`
+- **Root Cause**: The `CommandDialog` component used `Dialog` and `DialogContent` but didn't include a `DialogTitle`, which is required by Radix UI for accessibility compliance.
+- **Fix**:
+  1. Imported `DialogTitle` from `@/components/ui/dialog`
+  2. Added `<DialogTitle className="sr-only">Command Palette</DialogTitle>` inside DialogContent
+  3. The `sr-only` class hides it visually while keeping it accessible to screen readers
+- **Files Modified**: `skillmeat/web/components/ui/command.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
