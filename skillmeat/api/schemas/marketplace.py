@@ -1459,5 +1459,161 @@ class HeuristicMatch(BaseModel):
         }
 
 
+# ============================================================================
+# File Tree DTOs
+# ============================================================================
+
+
+class FileTreeEntry(BaseModel):
+    """A single entry in a file tree (file or directory).
+
+    Represents a file or directory from the GitHub repository tree,
+    used for browsing artifact file structures in the catalog modal.
+    """
+
+    path: str = Field(
+        description="File path relative to artifact root",
+        examples=["README.md", "src/main.py"],
+    )
+    type: Literal["blob", "tree"] = Field(
+        description="Entry type: 'blob' for files, 'tree' for directories",
+        examples=["blob"],
+    )
+    size: Optional[int] = Field(
+        default=None,
+        description="File size in bytes (only for blobs/files)",
+        ge=0,
+        examples=[1024],
+    )
+    sha: str = Field(
+        description="Git SHA for the blob or tree",
+        examples=["abc123def456789"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "path": "SKILL.md",
+                "type": "blob",
+                "size": 2048,
+                "sha": "abc123def456789",
+            }
+        }
+
+
+class FileTreeResponse(BaseModel):
+    """Response containing file tree entries for an artifact.
+
+    Returns the list of files and directories within a marketplace
+    artifact, used for file browsing in the catalog entry modal.
+    """
+
+    entries: List[FileTreeEntry] = Field(
+        description="List of file and directory entries",
+    )
+    artifact_path: str = Field(
+        description="Path to artifact within repository",
+        examples=["skills/canvas-design"],
+    )
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_abc123"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "entries": [
+                    {
+                        "path": "SKILL.md",
+                        "type": "blob",
+                        "size": 2048,
+                        "sha": "abc123def456",
+                    },
+                    {
+                        "path": "src",
+                        "type": "tree",
+                        "size": None,
+                        "sha": "def789abc123",
+                    },
+                ],
+                "artifact_path": "skills/canvas-design",
+                "source_id": "src_anthropics_quickstarts",
+            }
+        }
+
+
+# ============================================================================
+# File Content DTOs
+# ============================================================================
+
+
+class FileContentResponse(BaseModel):
+    """Response model for file content from a marketplace artifact.
+
+    Contains the file content along with metadata for rendering in the UI.
+    Binary files will have base64-encoded content with is_binary=True.
+    """
+
+    content: str = Field(
+        description="File content (text or base64-encoded for binary files)",
+        examples=["# My Skill\n\nThis is a sample skill..."],
+    )
+    encoding: str = Field(
+        description="Content encoding: 'none' for text, 'base64' for binary",
+        examples=["none", "base64"],
+    )
+    size: int = Field(
+        description="File size in bytes",
+        ge=0,
+        examples=[1024],
+    )
+    sha: str = Field(
+        description="Git blob SHA",
+        examples=["abc123def456789..."],
+    )
+    name: str = Field(
+        description="File name",
+        examples=["SKILL.md"],
+    )
+    path: str = Field(
+        description="Full path within repository",
+        examples=["skills/canvas/SKILL.md"],
+    )
+    is_binary: bool = Field(
+        description="Whether the file is binary (content is base64)",
+        examples=[False],
+    )
+    artifact_path: str = Field(
+        description="Path to the artifact this file belongs to",
+        examples=["skills/canvas"],
+    )
+    source_id: str = Field(
+        description="ID of the marketplace source",
+        examples=["src_abc123"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "content": "# Canvas Design Skill\n\nA skill for designing...",
+                "encoding": "none",
+                "size": 2048,
+                "sha": "abc123def456789abcdef0123456789abcdef01",
+                "name": "SKILL.md",
+                "path": "skills/canvas/SKILL.md",
+                "is_binary": False,
+                "artifact_path": "skills/canvas",
+                "source_id": "src_anthropics_quickstarts",
+            }
+        }
+
+
 # Rebuild models to resolve forward references
 ScanResultDTO.model_rebuild()

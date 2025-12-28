@@ -13,6 +13,8 @@ API Endpoints:
     POST /marketplace/sources/{id}/rescan - Trigger rescan
     GET /marketplace/sources/{id}/artifacts - List artifacts with filters
     POST /marketplace/sources/{id}/import - Import artifacts to collection
+    GET /marketplace/sources/{id}/artifacts/{path}/files - Get file tree
+    GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
 """
 
 import logging
@@ -28,6 +30,9 @@ from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
+    FileContentResponse,
+    FileTreeEntry,
+    FileTreeResponse,
     ImportRequest,
     ImportResultDTO,
     ScanRequest,
@@ -35,6 +40,13 @@ from skillmeat.api.schemas.marketplace import (
     SourceListResponse,
     SourceResponse,
     UpdateSourceRequest,
+)
+from skillmeat.api.utils.github_cache import (
+    DEFAULT_CONTENT_TTL,
+    DEFAULT_TREE_TTL,
+    build_content_key,
+    build_tree_key,
+    get_github_file_cache,
 )
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
 from skillmeat.cache.repositories import (
@@ -942,4 +954,263 @@ async def import_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to import artifacts: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-005: File Tree Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/artifacts/{artifact_path:path}/files",
+    response_model=FileTreeResponse,
+    summary="Get file tree for artifact",
+    description="""
+    Retrieve the file tree for a marketplace artifact.
+
+    Returns a list of files and directories within the artifact, suitable
+    for displaying in a file browser UI. Each entry includes the path,
+    type (blob/tree), size (for files), and SHA.
+
+    Results are cached for 1 hour to reduce GitHub API calls.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - artifact_path: Path to the artifact within the repository (e.g., "skills/canvas")
+
+    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files
+    """,
+)
+async def get_artifact_file_tree(
+    source_id: str,
+    artifact_path: str,
+) -> FileTreeResponse:
+    """Get file tree for a marketplace artifact.
+
+    Args:
+        source_id: Unique source identifier
+        artifact_path: Path to the artifact within the repository
+
+    Returns:
+        File tree with entries for all files and directories
+
+    Raises:
+        HTTPException 404: If source or artifact path not found
+        HTTPException 500: If GitHub API call fails
+    """
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        # Get marketplace source
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Get cache and build cache key
+        cache = get_github_file_cache()
+
+        # Use source ref as SHA for cache key (or "HEAD" if not specified)
+        cache_sha = source.ref or "HEAD"
+        cache_key = build_tree_key(source_id, artifact_path, cache_sha)
+
+        # Check cache first
+        cached_tree = cache.get(cache_key)
+        if cached_tree is not None:
+            logger.debug(f"Cache hit for file tree: {artifact_path}")
+            return FileTreeResponse(
+                entries=[
+                    FileTreeEntry(
+                        path=entry["path"],
+                        type=entry["type"],
+                        size=entry.get("size"),
+                        sha=entry["sha"],
+                    )
+                    for entry in cached_tree
+                ],
+                artifact_path=artifact_path,
+                source_id=source_id,
+            )
+
+        # Cache miss - fetch from GitHub
+        logger.debug(f"Cache miss, fetching file tree: {artifact_path}")
+        scanner = GitHubScanner()
+
+        tree_entries = scanner.get_file_tree(
+            owner=source.owner,
+            repo=source.repo_name,
+            path=artifact_path,
+            sha=None,  # Will fetch default branch SHA
+        )
+
+        if not tree_entries:
+            logger.warning(f"Artifact path not found: {artifact_path} in source {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact path '{artifact_path}' not found in source",
+            )
+
+        # Cache the result
+        cache.set(cache_key, tree_entries, ttl_seconds=DEFAULT_TREE_TTL)
+        logger.debug(f"Cached file tree: {artifact_path} ({len(tree_entries)} entries)")
+
+        return FileTreeResponse(
+            entries=[
+                FileTreeEntry(
+                    path=entry["path"],
+                    type=entry["type"],
+                    size=entry.get("size"),
+                    sha=entry["sha"],
+                )
+                for entry in tree_entries
+            ],
+            artifact_path=artifact_path,
+            source_id=source_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get file tree for artifact {artifact_path} "
+            f"from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve file tree: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-006: File Content Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Get file content from artifact",
+    description="""
+    Retrieve the content of a specific file within a marketplace artifact.
+
+    Returns the file content with metadata including encoding, size, and SHA.
+    For binary files, content is base64-encoded with is_binary=True.
+
+    Results are cached for 2 hours to reduce GitHub API calls.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - artifact_path: Path to the artifact within the repository (e.g., "skills/canvas")
+    - file_path: Path to the file within the artifact (e.g., "SKILL.md" or "src/index.ts")
+
+    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files/SKILL.md
+    """,
+)
+async def get_artifact_file_content(
+    source_id: str,
+    artifact_path: str,
+    file_path: str,
+) -> FileContentResponse:
+    """Get content of a file within a marketplace artifact.
+
+    Args:
+        source_id: Unique source identifier
+        artifact_path: Path to the artifact within the repository
+        file_path: Path to the file within the artifact
+
+    Returns:
+        File content with metadata
+
+    Raises:
+        HTTPException 404: If source or file not found
+        HTTPException 500: If GitHub API call fails
+    """
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        # Get marketplace source
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Build full file path within repository
+        full_file_path = f"{artifact_path}/{file_path}"
+
+        # Get cache and build cache key
+        cache = get_github_file_cache()
+
+        # Use source ref as SHA for cache key (or "HEAD" if not specified)
+        cache_sha = source.ref or "HEAD"
+        cache_key = build_content_key(source_id, artifact_path, file_path, cache_sha)
+
+        # Check cache first
+        cached_content = cache.get(cache_key)
+        if cached_content is not None:
+            logger.debug(f"Cache hit for file content: {full_file_path}")
+            return FileContentResponse(
+                content=cached_content["content"],
+                encoding=cached_content["encoding"],
+                size=cached_content["size"],
+                sha=cached_content["sha"],
+                name=cached_content["name"],
+                path=cached_content["path"],
+                is_binary=cached_content["is_binary"],
+                artifact_path=artifact_path,
+                source_id=source_id,
+            )
+
+        # Cache miss - fetch from GitHub
+        logger.debug(f"Cache miss, fetching file content: {full_file_path}")
+        scanner = GitHubScanner()
+
+        file_content = scanner.get_file_content(
+            owner=source.owner,
+            repo=source.repo_name,
+            path=full_file_path,
+            ref=source.ref,
+        )
+
+        if file_content is None:
+            logger.warning(f"File not found: {full_file_path} in source {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{file_path}' not found in artifact '{artifact_path}'",
+            )
+
+        # Cache the result
+        cache.set(cache_key, file_content, ttl_seconds=DEFAULT_CONTENT_TTL)
+        logger.debug(f"Cached file content: {full_file_path}")
+
+        return FileContentResponse(
+            content=file_content["content"],
+            encoding=file_content["encoding"],
+            size=file_content["size"],
+            sha=file_content["sha"],
+            name=file_content["name"],
+            path=file_content["path"],
+            is_binary=file_content["is_binary"],
+            artifact_path=artifact_path,
+            source_id=source_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get file content for {file_path} in {artifact_path} "
+            f"from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve file content: {str(e)}",
         ) from e
