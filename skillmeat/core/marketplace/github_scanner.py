@@ -486,6 +486,10 @@ class GitHubScanner:
         # Get the SHA for the default branch
         return self._get_ref_sha(owner, repo, default_branch)
 
+    # File content truncation constants
+    MAX_FILE_SIZE = 1_048_576  # 1MB
+    MAX_LINES = 10_000
+
     def get_file_content(
         self,
         owner: str,
@@ -498,6 +502,11 @@ class GitHubScanner:
         Uses the GitHub Contents API to retrieve file content along with
         metadata like size, SHA, and encoding information.
 
+        Large text files (>1MB) are automatically truncated to the first
+        10,000 lines to prevent performance issues. When truncation occurs,
+        the returned dict includes 'truncated': True and 'original_size'
+        with the pre-truncation size.
+
         Args:
             owner: Repository owner/organization
             repo: Repository name
@@ -508,11 +517,13 @@ class GitHubScanner:
             Dict containing:
                 - content: Decoded file content (str for text, base64 for binary)
                 - encoding: Original encoding from API ("base64" or "none")
-                - size: File size in bytes
+                - size: File size in bytes (truncated size if truncated)
                 - sha: Git blob SHA
                 - name: File name
                 - path: Full path within repo
                 - is_binary: Whether file appears to be binary
+                - truncated: Whether content was truncated (default False)
+                - original_size: Original size before truncation (None if not truncated)
 
             Returns None if file not found (404).
 
@@ -622,14 +633,30 @@ class GitHubScanner:
         else:
             decoded_content = raw_content
 
+        # Apply truncation for large text files
+        truncated = False
+        original_size: int | None = None
+
+        if not is_binary and len(decoded_content) > self.MAX_FILE_SIZE:
+            original_size = len(decoded_content)
+            lines = decoded_content.split("\n")[: self.MAX_LINES]
+            decoded_content = "\n".join(lines)
+            truncated = True
+            logger.info(
+                f"Truncated large file {path}: {original_size} bytes -> "
+                f"{len(decoded_content)} bytes ({self.MAX_LINES} lines)"
+            )
+
         return {
             "content": decoded_content,
             "encoding": encoding,
-            "size": size,
+            "size": len(decoded_content) if truncated else size,
             "sha": sha,
             "name": name,
             "path": file_path,
             "is_binary": is_binary,
+            "truncated": truncated,
+            "original_size": original_size,
         }
 
 

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -265,6 +265,37 @@ export function CatalogEntryModal({
   const fileStructure = fileTreeData?.files
     ? buildFileStructure(fileTreeData.files)
     : [];
+
+  // Auto-select default file when file tree loads
+  // Priority: first .md file (case-insensitive), then first file alphabetically
+  useEffect(() => {
+    // Only auto-select if no file is currently selected and we have files
+    if (selectedFilePath !== null || !fileTreeData?.files?.length) {
+      return;
+    }
+
+    const files = fileTreeData.files;
+
+    // Find first markdown file (case-insensitive)
+    // Note: API returns 'file' for files and 'tree' for directories
+    const firstMdFile = files.find(
+      (f) => f.type === 'file' && f.path.toLowerCase().endsWith('.md')
+    );
+
+    if (firstMdFile) {
+      setSelectedFilePath(firstMdFile.path);
+      return;
+    }
+
+    // Fallback: first file alphabetically (by path)
+    const sortedFiles = files
+      .filter((f) => f.type === 'file')
+      .sort((a, b) => a.path.localeCompare(b.path));
+
+    if (sortedFiles.length > 0 && sortedFiles[0]) {
+      setSelectedFilePath(sortedFiles[0].path);
+    }
+  }, [fileTreeData?.files, selectedFilePath]);
 
   // Reset selected file when modal closes or entry changes
   const handleOpenChange = (newOpen: boolean) => {
