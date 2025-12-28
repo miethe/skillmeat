@@ -384,7 +384,16 @@ async def update_source(
         HTTPException 500: If database operation fails
     """
     # Check if any update parameters provided
-    if all(v is None for v in [request.ref, request.root_hint, request.trust_level, request.description, request.notes]):
+    if all(
+        v is None
+        for v in [
+            request.ref,
+            request.root_hint,
+            request.trust_level,
+            request.description,
+            request.notes,
+        ]
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one update parameter must be provided",
@@ -714,7 +723,9 @@ async def list_artifacts(
                 # Examples:
                 # - min=20, threshold=30 → effective=30 (threshold wins)
                 # - min=40, threshold=30 → effective=40 (min is stricter)
-                effective_min_confidence = max(effective_min_confidence, CONFIDENCE_THRESHOLD)
+                effective_min_confidence = max(
+                    effective_min_confidence, CONFIDENCE_THRESHOLD
+                )
 
         # Apply filters using get_source_catalog for combined filtering
         if artifact_type or status or effective_min_confidence or max_confidence:
@@ -1048,7 +1059,9 @@ async def get_artifact_file_tree(
         )
 
         if not tree_entries:
-            logger.warning(f"Artifact path not found: {artifact_path} in source {source_id}")
+            logger.warning(
+                f"Artifact path not found: {artifact_path} in source {source_id}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact path '{artifact_path}' not found in source",
