@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.marketplace import (
@@ -55,7 +56,11 @@ from skillmeat.cache.repositories import (
     MarketplaceTransactionHandler,
     NotFoundError,
 )
-from skillmeat.core.marketplace.github_scanner import GitHubScanner, scan_github_source
+from skillmeat.core.marketplace.github_scanner import (
+    GitHubScanner,
+    RateLimitError,
+    scan_github_source,
+)
 from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
     ImportCoordinator,
@@ -159,6 +164,31 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         import_date=entry.import_date,
         import_id=entry.import_id,
     )
+
+
+def parse_rate_limit_retry_after(error: RateLimitError) -> int:
+    """Extract retry-after seconds from RateLimitError message.
+
+    The RateLimitError message contains the wait time in seconds.
+    Examples:
+        - "Rate limited, reset in 45s"
+        - "Rate limited for 60s"
+
+    Args:
+        error: RateLimitError exception
+
+    Returns:
+        Number of seconds to wait before retrying. Defaults to 60 if
+        the time cannot be parsed from the error message.
+    """
+    import re
+
+    message = str(error)
+    # Match patterns like "45s" or "60s" in the message
+    match = re.search(r"(\d+)s", message)
+    if match:
+        return int(match.group(1))
+    return 60  # Default to 60 seconds if parsing fails
 
 
 # =============================================================================
@@ -1087,6 +1117,19 @@ async def get_artifact_file_tree(
 
     except HTTPException:
         raise
+    except RateLimitError as e:
+        retry_after = parse_rate_limit_retry_after(e)
+        logger.warning(
+            f"GitHub rate limit exceeded for file tree {artifact_path} "
+            f"from source {source_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": f"GitHub rate limit exceeded. Please retry after {retry_after} seconds."
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
     except Exception as e:
         logger.error(
             f"Failed to get file tree for artifact {artifact_path} "
@@ -1217,6 +1260,19 @@ async def get_artifact_file_content(
 
     except HTTPException:
         raise
+    except RateLimitError as e:
+        retry_after = parse_rate_limit_retry_after(e)
+        logger.warning(
+            f"GitHub rate limit exceeded for file content {file_path} in {artifact_path} "
+            f"from source {source_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": f"GitHub rate limit exceeded. Please retry after {retry_after} seconds."
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
     except Exception as e:
         logger.error(
             f"Failed to get file content for {file_path} in {artifact_path} "
