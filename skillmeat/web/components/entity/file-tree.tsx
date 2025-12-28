@@ -36,6 +36,12 @@ export interface FileTreeProps {
   onAddFile?: () => void;
   onDeleteFile?: (path: string) => void;
   isLoading?: boolean;
+  /**
+   * When true, hides create/delete buttons while keeping
+   * file selection and expand/collapse functionality.
+   * @default false
+   */
+  readOnly?: boolean;
 }
 
 // ============================================================================
@@ -239,15 +245,26 @@ function FileTreeSkeleton() {
  * - Keyboard navigation (arrow keys, enter)
  * - Optional context actions (delete)
  * - Loading skeleton state
+ * - Read-only mode (hides create/delete buttons)
  *
  * @example
  * ```tsx
+ * // Editable mode (default)
  * <FileTree
  *   entityId="skill-123"
  *   files={fileStructure}
  *   selectedPath={selectedPath}
  *   onSelect={(path) => setSelectedPath(path)}
  *   onDeleteFile={(path) => handleDelete(path)}
+ * />
+ *
+ * // Read-only mode (no create/delete buttons)
+ * <FileTree
+ *   entityId="skill-123"
+ *   files={fileStructure}
+ *   selectedPath={selectedPath}
+ *   onSelect={(path) => setSelectedPath(path)}
+ *   readOnly
  * />
  * ```
  */
@@ -259,6 +276,7 @@ export function FileTree({
   onAddFile,
   onDeleteFile,
   isLoading = false,
+  readOnly = false,
 }: FileTreeProps) {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
@@ -291,7 +309,7 @@ export function FileTree({
   return (
     <div className="flex h-full flex-col">
       {/* Header with optional actions */}
-      {onAddFile && (
+      {onAddFile && !readOnly && (
         <div className="flex items-center justify-between border-b p-2">
           <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">FILES</span>
           <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={onAddFile}>
@@ -311,7 +329,7 @@ export function FileTree({
             expandedPaths={expandedPaths}
             onSelect={onSelect}
             onToggle={handleToggle}
-            onDelete={onDeleteFile}
+            onDelete={readOnly ? undefined : onDeleteFile}
           />
         ))}
       </div>
