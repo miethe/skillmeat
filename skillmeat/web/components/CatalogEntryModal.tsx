@@ -559,6 +559,7 @@ export function CatalogEntryModal({
                     onSelect={setSelectedFilePath}
                     isLoading={isTreeLoading}
                     readOnly
+                    ariaLabel={`File browser for ${entry.name}`}
                   />
                 )}
               </div>

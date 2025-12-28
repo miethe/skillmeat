@@ -48,6 +48,11 @@ export interface ContentPaneProps {
   onEditChange?: (content: string) => void;
   onSave?: (content: string) => void | Promise<void>;
   onCancel?: () => void;
+  /**
+   * Accessible label for the content pane region.
+   * @default "File content viewer"
+   */
+  ariaLabel?: string;
 }
 
 // ============================================================================
@@ -201,22 +206,31 @@ function TruncationBanner({ originalSize, fullFileUrl }: TruncationBannerProps) 
 
 interface BreadcrumbProps {
   path: string;
+  /** Optional ID for aria-labelledby usage */
+  id?: string;
 }
 
-function Breadcrumb({ path }: BreadcrumbProps) {
+function Breadcrumb({ path, id }: BreadcrumbProps) {
   const segments = useMemo(() => pathToBreadcrumbs(path), [path]);
 
   return (
-    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+    <nav
+      id={id}
+      aria-label="File path"
+      className="flex items-center gap-1 text-sm text-muted-foreground"
+    >
       {segments.map((segment, index) => (
         <div key={index} className="flex items-center gap-1">
-          {index > 0 && <ChevronRight className="h-3 w-3" />}
-          <span className={cn(index === segments.length - 1 && 'font-medium text-foreground')}>
+          {index > 0 && <ChevronRight className="h-3 w-3" aria-hidden="true" />}
+          <span
+            className={cn(index === segments.length - 1 && 'font-medium text-foreground')}
+            aria-current={index === segments.length - 1 ? 'page' : undefined}
+          >
             {segment}
           </span>
         </div>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -318,7 +332,10 @@ export function ContentPane({
   onEditChange,
   onSave,
   onCancel,
+  ariaLabel,
 }: ContentPaneProps) {
+  // Generate unique ID for breadcrumb to use in aria-labelledby
+  const breadcrumbId = path ? `content-pane-breadcrumb-${path.replace(/[^a-zA-Z0-9]/g, '-')}` : undefined;
   const [isSaving, setIsSaving] = useState(false);
 
   // Editing is disabled in read-only mode
@@ -373,24 +390,30 @@ export function ContentPane({
   // Empty content - file is empty or couldn't be loaded
   if (content === null || content === '') {
     return (
-      <div className="flex h-full flex-col">
+      <div
+        className="flex h-full flex-col"
+        role="region"
+        aria-label={ariaLabel || `File content: ${path}`}
+        aria-labelledby={breadcrumbId}
+        data-testid="content-pane"
+      >
         {/* Header with breadcrumb */}
         <div className="flex items-center justify-between border-b bg-muted/20 p-4">
-          <Breadcrumb path={path} />
+          <Breadcrumb path={path} id={breadcrumbId} />
           {canEdit && !isEditing && (
-            <Button variant="ghost" size="sm" onClick={handleEditClick}>
-              <Edit className="mr-2 h-4 w-4" />
+            <Button variant="ghost" size="sm" onClick={handleEditClick} aria-label={`Edit ${path}`}>
+              <Edit className="mr-2 h-4 w-4" aria-hidden="true" />
               Edit
             </Button>
           )}
           {!readOnly && isEditing && (
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
-                <X className="mr-2 h-4 w-4" />
+                <X className="mr-2 h-4 w-4" aria-hidden="true" />
                 Cancel
               </Button>
               <Button variant="default" size="sm" onClick={handleSaveClick} disabled={isSaving}>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
             </div>
@@ -400,7 +423,7 @@ export function ContentPane({
         {/* Empty content message */}
         <div className="flex flex-1 items-center justify-center text-center">
           <div>
-            <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50" />
+            <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50" aria-hidden="true" />
             <p className="text-sm text-muted-foreground">This file is empty</p>
           </div>
         </div>
@@ -411,25 +434,31 @@ export function ContentPane({
   // Markdown file - always use split preview (shows rendered markdown)
   if (isMarkdown) {
     return (
-      <div className="flex h-full w-full flex-col overflow-hidden">
+      <div
+        className="flex h-full w-full flex-col overflow-hidden"
+        role="region"
+        aria-label={ariaLabel || `Markdown file: ${path}`}
+        aria-labelledby={breadcrumbId}
+        data-testid="content-pane"
+      >
         {/* Header with breadcrumb and actions */}
         <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/20 p-4">
-          <Breadcrumb path={path} />
+          <Breadcrumb path={path} id={breadcrumbId} />
           {!readOnly && isEditing ? (
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
-                <X className="mr-2 h-4 w-4" />
+                <X className="mr-2 h-4 w-4" aria-hidden="true" />
                 Cancel
               </Button>
               <Button variant="default" size="sm" onClick={handleSaveClick} disabled={isSaving}>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
             </div>
           ) : (
             canEdit && (
-              <Button variant="ghost" size="sm" onClick={handleEditClick}>
-                <Edit className="mr-2 h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={handleEditClick} aria-label={`Edit ${path}`}>
+                <Edit className="mr-2 h-4 w-4" aria-hidden="true" />
                 Edit
               </Button>
             )
@@ -459,13 +488,19 @@ export function ContentPane({
 
   // Content display (read-only mode for non-markdown files)
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      role="region"
+      aria-label={ariaLabel || `File content: ${path}`}
+      aria-labelledby={breadcrumbId}
+      data-testid="content-pane"
+    >
       {/* Header with breadcrumb and actions */}
       <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/20 p-4">
-        <Breadcrumb path={path} />
+        <Breadcrumb path={path} id={breadcrumbId} />
         {canEdit && !isEditing && (
-          <Button variant="ghost" size="sm" onClick={handleEditClick}>
-            <Edit className="mr-2 h-4 w-4" />
+          <Button variant="ghost" size="sm" onClick={handleEditClick} aria-label={`Edit ${path}`}>
+            <Edit className="mr-2 h-4 w-4" aria-hidden="true" />
             Edit
           </Button>
         )}

@@ -82,6 +82,102 @@ router = APIRouter(
 # =============================================================================
 
 
+def validate_file_path(path: str) -> str:
+    """Validate and sanitize file path to prevent path traversal attacks.
+
+    This function checks for common path traversal attack vectors including:
+    - Parent directory references (..)
+    - Absolute paths (starting with / or \\)
+    - Null byte injection
+    - URL-encoded traversal attempts
+
+    Args:
+        path: File path to validate
+
+    Returns:
+        Normalized, validated path with forward slashes
+
+    Raises:
+        HTTPException 400: If path contains traversal attempts or invalid characters
+    """
+    # Reject null bytes (can bypass validation in some systems)
+    if "\x00" in path:
+        logger.warning(f"Null byte injection attempt in path: {repr(path)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: null bytes not allowed",
+        )
+
+    # Normalize path separators (Windows to Unix)
+    normalized = path.replace("\\", "/")
+
+    # Reject absolute paths
+    if normalized.startswith("/"):
+        logger.warning(f"Absolute path attempt: {path}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: absolute paths not allowed",
+        )
+
+    # Reject path traversal attempts
+    # Check for ".." in various forms that could bypass basic checks
+    traversal_patterns = [
+        "..",  # Direct parent reference
+        "./.",  # Hidden traversal via current dir
+    ]
+
+    for pattern in traversal_patterns:
+        if pattern in normalized:
+            logger.warning(f"Path traversal attempt: {path}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path: path traversal not allowed",
+            )
+
+    # Additional check: split by / and verify no segment is ".."
+    segments = normalized.split("/")
+    for segment in segments:
+        if segment == "..":
+            logger.warning(f"Path traversal via segment: {path}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path: path traversal not allowed",
+            )
+
+    # Reject paths with URL-encoded traversal (e.g., %2e%2e)
+    # This handles cases where the framework might not have decoded yet
+    if re.search(r"%2e%2e|%252e%252e", path, re.IGNORECASE):
+        logger.warning(f"URL-encoded traversal attempt: {path}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: encoded traversal not allowed",
+        )
+
+    return normalized
+
+
+def validate_source_id(source_id: str) -> str:
+    """Validate source ID format.
+
+    Args:
+        source_id: Source identifier to validate
+
+    Returns:
+        Validated source ID
+
+    Raises:
+        HTTPException 400: If source ID format is invalid
+    """
+    # UUID format or alphanumeric with dashes
+    if not re.match(r"^[a-zA-Z0-9\-]+$", source_id):
+        logger.warning(f"Invalid source ID format: {source_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid source ID format",
+        )
+    return source_id
+
+
 def parse_repo_url(repo_url: str) -> tuple[str, str]:
     """Parse GitHub repository URL to extract owner and repo name.
 
@@ -1037,9 +1133,14 @@ async def get_artifact_file_tree(
         File tree with entries for all files and directories
 
     Raises:
+        HTTPException 400: If path validation fails (traversal, null bytes, etc.)
         HTTPException 404: If source or artifact path not found
         HTTPException 500: If GitHub API call fails
     """
+    # Security: Validate inputs to prevent path traversal attacks
+    validate_source_id(source_id)
+    artifact_path = validate_file_path(artifact_path)
+
     source_repo = MarketplaceSourceRepository()
 
     try:
@@ -1183,9 +1284,15 @@ async def get_artifact_file_content(
         File content with metadata
 
     Raises:
+        HTTPException 400: If path validation fails (traversal, null bytes, etc.)
         HTTPException 404: If source or file not found
         HTTPException 500: If GitHub API call fails
     """
+    # Security: Validate all path inputs to prevent path traversal attacks
+    validate_source_id(source_id)
+    artifact_path = validate_file_path(artifact_path)
+    file_path = validate_file_path(file_path)
+
     source_repo = MarketplaceSourceRepository()
 
     try:
