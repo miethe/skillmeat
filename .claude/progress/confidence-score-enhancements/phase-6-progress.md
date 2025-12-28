@@ -2,7 +2,9 @@
 type: progress
 prd: "confidence-score-enhancements"
 phase: "6"
-status: pending
+status: deferred
+deferred_at: "2025-12-28"
+deferred_reason: "E2E tests and visual polish deferred for future sprint"
 progress: 0
 total_tasks: 4
 completed_tasks: 0
@@ -10,28 +12,28 @@ completed_tasks: 0
 tasks:
   - id: "TASK-6.1"
     name: "E2E test: modal interactions"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "1h"
 
   - id: "TASK-6.2"
     name: "E2E test: tooltip display"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "1h"
 
   - id: "TASK-6.3"
     name: "E2E test: filter functionality"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "1h"
 
   - id: "TASK-6.4"
     name: "Visual polish and responsive design"
-    status: "pending"
+    status: "deferred"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-6.1", "TASK-6.2", "TASK-6.3"]
     estimate: "1.5h"
@@ -41,7 +43,9 @@ parallelization:
   batch_2: ["TASK-6.4"]
 ---
 
-# Phase 6: Testing & Polish
+# Phase 6: Testing & Polish (DEFERRED)
+
+> **Status**: Deferred on 2025-12-28. E2E tests and visual polish work postponed for future sprint. Core functionality (Phases 1-5) is complete and functional.
 
 ## Overview
 
