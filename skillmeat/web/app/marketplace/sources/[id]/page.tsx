@@ -7,8 +7,8 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   ArrowLeft,
   RefreshCw,
@@ -37,12 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   useSource,
@@ -52,6 +46,9 @@ import {
 } from '@/hooks/useMarketplaceSources';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
+import { CatalogEntryModal } from '@/components/CatalogEntryModal';
+import { ConfidenceFilter } from '@/components/ConfidenceFilter';
+import { ScoreBadge } from '@/components/ScoreBadge';
 import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
 
 // ============================================================================
@@ -64,6 +61,7 @@ interface CatalogCardProps {
   onSelect: (selected: boolean) => void;
   onImport: () => void;
   isImporting: boolean;
+  onClick?: () => void;
 }
 
 function CatalogCard({
@@ -72,6 +70,7 @@ function CatalogCard({
   onSelect,
   onImport,
   isImporting,
+  onClick,
 }: CatalogCardProps) {
   const statusConfig = {
     new: {
@@ -92,12 +91,6 @@ function CatalogCard({
     },
   }[entry.status];
 
-  const confidenceColor = entry.confidence_score >= 80
-    ? 'text-green-600'
-    : entry.confidence_score >= 50
-    ? 'text-yellow-600'
-    : 'text-red-600';
-
   const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
     skill: { label: 'Skill', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
     command: { label: 'Command', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
@@ -107,13 +100,16 @@ function CatalogCard({
   };
 
   return (
-    <Card className={cn(
-      'relative transition-shadow hover:shadow-md',
-      selected && 'ring-2 ring-primary'
-    )}>
+    <Card
+      className={cn(
+        'relative transition-shadow hover:shadow-md cursor-pointer',
+        selected && 'ring-2 ring-primary'
+      )}
+      onClick={onClick}
+    >
       <div className="p-4 space-y-3">
         {/* Selection checkbox */}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={selected}
             onCheckedChange={onSelect}
@@ -137,18 +133,11 @@ function CatalogCard({
 
         {/* Metadata */}
         <div className="flex items-center justify-between text-xs">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className={cn('font-medium', confidenceColor)}>
-                  {entry.confidence_score}% confidence
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Detection confidence score</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <ScoreBadge
+            confidence={entry.confidence_score}
+            size="sm"
+            breakdown={entry.score_breakdown}
+          />
 
           <a
             href={entry.upstream_url}
@@ -225,24 +214,78 @@ function CatalogCardSkeleton() {
 export default function SourceDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const sourceId = params.id as string;
 
-  // State
-  const [filters, setFilters] = useState<CatalogFilters>({});
+  // Initialize state from URL parameters
+  const [filters, setFilters] = useState<CatalogFilters>(() => ({
+    artifact_type: (searchParams.get('type') as ArtifactType) || undefined,
+    status: (searchParams.get('status') as CatalogStatus) || undefined,
+  }));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [confidenceFilters, setConfidenceFilters] = useState(() => ({
+    minConfidence: Number(searchParams.get('minConfidence')) || 50,
+    maxConfidence: Number(searchParams.get('maxConfidence')) || 100,
+    includeBelowThreshold: searchParams.get('includeBelowThreshold') === 'true',
+  }));
+
+  // Helper function to update URL parameters
+  const updateURLParams = (newConfidenceFilters: typeof confidenceFilters, newFilters: typeof filters) => {
+    const params = new URLSearchParams();
+
+    // Add confidence filters only if different from defaults
+    if (newConfidenceFilters.minConfidence !== 50) {
+      params.set('minConfidence', newConfidenceFilters.minConfidence.toString());
+    }
+    if (newConfidenceFilters.maxConfidence !== 100) {
+      params.set('maxConfidence', newConfidenceFilters.maxConfidence.toString());
+    }
+    if (newConfidenceFilters.includeBelowThreshold) {
+      params.set('includeBelowThreshold', 'true');
+    }
+
+    // Add type and status filters
+    if (newFilters.artifact_type) {
+      params.set('type', newFilters.artifact_type);
+    }
+    if (newFilters.status) {
+      params.set('status', newFilters.status);
+    }
+
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  };
+
+  // Sync URL when filters change
+  useEffect(() => {
+    updateURLParams(confidenceFilters, filters);
+  }, [confidenceFilters, filters]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
+
+  // Merge filters with confidence filters for API
+  const mergedFilters: CatalogFilters = {
+    ...filters,
+    min_confidence: confidenceFilters.minConfidence,
+    max_confidence: confidenceFilters.maxConfidence,
+    include_below_threshold: confidenceFilters.includeBelowThreshold,
+  };
+
   const {
     data: catalogData,
     isLoading: catalogLoading,
+    isFetching: catalogFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useSourceCatalog(sourceId, filters);
+  } = useSourceCatalog(sourceId, mergedFilters);
   const rescanMutation = useRescanSource(sourceId);
   const importMutation = useImportArtifacts(sourceId);
 
@@ -443,7 +486,15 @@ export default function SourceDetailPage() {
 
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 relative">
+          {/* Refetching indicator */}
+          {catalogFetching && !catalogLoading && (
+            <div className="absolute -top-6 left-0 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Updating results...</span>
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -478,12 +529,34 @@ export default function SourceDetailPage() {
             </SelectContent>
           </Select>
 
+          {/* Confidence filter */}
+          <ConfidenceFilter
+            minConfidence={confidenceFilters.minConfidence}
+            maxConfidence={confidenceFilters.maxConfidence}
+            includeBelowThreshold={confidenceFilters.includeBelowThreshold}
+            onMinChange={(v) => setConfidenceFilters(prev => ({ ...prev, minConfidence: v }))}
+            onMaxChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
+            onIncludeBelowThresholdChange={(v) =>
+              setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
+            }
+          />
+
           {/* Clear filters */}
-          {(filters.artifact_type || filters.status) && (
+          {(filters.artifact_type || filters.status ||
+            confidenceFilters.minConfidence !== 50 ||
+            confidenceFilters.maxConfidence !== 100 ||
+            confidenceFilters.includeBelowThreshold) && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setFilters({})}
+              onClick={() => {
+                setFilters({});
+                setConfidenceFilters({
+                  minConfidence: 50,
+                  maxConfidence: 100,
+                  includeBelowThreshold: false,
+                });
+              }}
             >
               Clear filters
             </Button>
@@ -567,6 +640,10 @@ export default function SourceDetailPage() {
                   onSelect={(selected) => handleSelectEntry(entry.id, selected)}
                   onImport={() => handleImportSingle(entry.id)}
                   isImporting={importMutation.isPending}
+                  onClick={() => {
+                    setSelectedEntry(entry);
+                    setModalOpen(true);
+                  }}
                 />
               ))}
             </div>
@@ -607,6 +684,15 @@ export default function SourceDetailPage() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onSuccess={() => router.push('/marketplace/sources')}
+      />
+
+      {/* Catalog Entry Modal */}
+      <CatalogEntryModal
+        entry={selectedEntry}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onImport={(entry) => handleImportSingle(entry.id)}
+        isImporting={importMutation.isPending}
       />
     </div>
   );

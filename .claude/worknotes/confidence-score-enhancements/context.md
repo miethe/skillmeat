@@ -96,13 +96,71 @@ if not include_below_threshold:
 
 ### URL Query Params
 
-Frontend syncs filter state with URL:
+Frontend syncs filter state with URL for shareable links.
 
+#### Supported Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `minConfidence` | int (0-100) | 50 | Minimum confidence score filter |
+| `maxConfidence` | int (0-100) | 100 | Maximum confidence score filter |
+| `includeBelowThreshold` | boolean | false | Show artifacts below 30% threshold |
+| `type` | ArtifactType | (none) | Filter by artifact type (skill, command, agent, mcp_server, hook) |
+| `status` | CatalogStatus | (none) | Filter by status (new, updated, imported, removed) |
+
+#### URL Sync Behavior
+
+**Default values NOT added to URL**:
+- `minConfidence=50` (default) → not in URL
+- `maxConfidence=100` (default) → not in URL
+- `includeBelowThreshold=false` (default) → not in URL
+
+**Non-default values added to URL**:
+- `minConfidence=70` → URL includes `?minConfidence=70`
+- `includeBelowThreshold=true` → URL includes `&includeBelowThreshold=true`
+
+**Examples**:
 ```
-/marketplace/sources/123?min_confidence=50&max_confidence=100&include_below_threshold=true
+# Fresh load (no filters)
+/marketplace/sources/123
+
+# High-confidence skills only
+/marketplace/sources/123?minConfidence=80&type=skill
+
+# Low-confidence artifacts
+/marketplace/sources/123?minConfidence=10&maxConfidence=30&includeBelowThreshold=true
+
+# New commands
+/marketplace/sources/123?type=command&status=new
+
+# All filters combined
+/marketplace/sources/123?minConfidence=60&maxConfidence=85&type=agent&status=updated
 ```
 
-URL changes trigger React Query refetch with new params; shareable links preserve filter state.
+#### Implementation Details
+
+**Location**: `skillmeat/web/app/marketplace/sources/[id]/page.tsx`
+
+**Initialization** (lines 222-236):
+- Read URL params on mount via `useSearchParams()`
+- Parse confidence filters (Number conversion)
+- Parse boolean flag (strict `=== 'true'` check)
+- Parse type/status filters (cast to enums)
+
+**URL Update Function** (`updateURLParams`, lines 239-263):
+- Build URLSearchParams from current filter state
+- Skip default values to keep URL clean
+- Call `router.replace()` with `scroll: false` to preserve scroll position
+
+**Sync on Change** (`useEffect`, lines 266-268):
+- Triggers whenever `confidenceFilters` or `filters` state changes
+- Updates URL without page reload
+- Preserves browser back/forward navigation
+
+**Clear Filters** (lines 552-559):
+- Resets all filters to defaults
+- Triggers useEffect → URL cleared to base path
+- No query string when all filters are defaults
 
 ## Files Changed
 
