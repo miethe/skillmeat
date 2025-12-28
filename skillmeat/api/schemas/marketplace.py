@@ -1570,6 +1570,7 @@ class FileContentResponse(BaseModel):
 
     Contains the file content along with metadata for rendering in the UI.
     Binary files will have base64-encoded content with is_binary=True.
+    Large files (>1MB) are truncated to 10,000 lines with truncated=True.
     """
 
     content: str = Field(
@@ -1581,7 +1582,7 @@ class FileContentResponse(BaseModel):
         examples=["none", "base64"],
     )
     size: int = Field(
-        description="File size in bytes",
+        description="File size in bytes (may be truncated size if truncated=True)",
         ge=0,
         examples=[1024],
     )
@@ -1609,6 +1610,17 @@ class FileContentResponse(BaseModel):
         description="ID of the marketplace source",
         examples=["src_abc123"],
     )
+    truncated: bool = Field(
+        default=False,
+        description="Whether the content was truncated due to size (>1MB)",
+        examples=[False],
+    )
+    original_size: Optional[int] = Field(
+        default=None,
+        description="Original file size in bytes (only set when truncated=True)",
+        ge=0,
+        examples=[2097152],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1624,6 +1636,8 @@ class FileContentResponse(BaseModel):
                 "is_binary": False,
                 "artifact_path": "skills/canvas",
                 "source_id": "src_anthropics_quickstarts",
+                "truncated": False,
+                "original_size": None,
             }
         }
 
