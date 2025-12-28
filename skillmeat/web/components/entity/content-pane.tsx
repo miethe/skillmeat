@@ -18,6 +18,12 @@ export interface ContentPaneProps {
   content: string | null;
   isLoading?: boolean;
   error?: string | null;
+  /**
+   * When true, hides edit/save buttons and disables editing.
+   * Content viewing with syntax highlighting remains functional.
+   * @default false
+   */
+  readOnly?: boolean;
   // Lifted edit state from parent
   isEditing?: boolean;
   editedContent?: string;
@@ -211,16 +217,25 @@ function ContentDisplay({ content, showLineNumbers = false }: ContentDisplayProp
  * - Split-view markdown editor with live preview for .md files
  * - Save and Cancel buttons in edit mode
  * - Optional line numbers (nice to have)
+ * - Read-only mode: hides edit controls while keeping viewing functional
  *
  * @example
  * ```tsx
+ * // Editable mode (default)
  * <ContentPane
  *   path="src/index.ts"
  *   content={fileContent}
  *   isLoading={isLoading}
  *   error={error}
- *   onEdit={() => handleEdit()}
+ *   onEditStart={() => handleEdit()}
  *   onSave={(content) => handleSave(content)}
+ * />
+ *
+ * // Read-only mode (no edit controls)
+ * <ContentPane
+ *   path="README.md"
+ *   content={fileContent}
+ *   readOnly={true}
  * />
  * ```
  */
@@ -229,6 +244,7 @@ export function ContentPane({
   content,
   isLoading = false,
   error = null,
+  readOnly = false,
   isEditing = false,
   editedContent = '',
   onEditStart,
@@ -238,7 +254,8 @@ export function ContentPane({
 }: ContentPaneProps) {
   const [isSaving, setIsSaving] = useState(false);
 
-  const canEdit = path && (onEditStart || onSave) && isEditableFile(path);
+  // Editing is disabled in read-only mode
+  const canEdit = !readOnly && path && (onEditStart || onSave) && isEditableFile(path);
   const isMarkdown = path && isMarkdownFile(path);
 
   // Handle edit button click
@@ -296,7 +313,7 @@ export function ContentPane({
               Edit
             </Button>
           )}
-          {isEditing && (
+          {!readOnly && isEditing && (
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
                 <X className="mr-2 h-4 w-4" />
@@ -328,7 +345,7 @@ export function ContentPane({
         {/* Header with breadcrumb and actions */}
         <div className="flex flex-shrink-0 items-center justify-between border-b bg-muted/20 p-4">
           <Breadcrumb path={path} />
-          {isEditing ? (
+          {!readOnly && isEditing ? (
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={handleCancelClick} disabled={isSaving}>
                 <X className="mr-2 h-4 w-4" />
