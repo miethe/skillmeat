@@ -622,15 +622,13 @@ class CreateSourceRequest(BaseModel):
         }
 
 
-
-
 class UpdateSourceRequest(BaseModel):
     """Request to update a GitHub repository source.
-    
+
     All fields are optional - only provided fields will be updated.
     Uses PATCH semantics for partial updates.
     """
-    
+
     ref: Optional[str] = Field(
         default=None,
         description="Branch, tag, or SHA to scan",
@@ -641,9 +639,11 @@ class UpdateSourceRequest(BaseModel):
         description="Subdirectory path within repository to start scanning",
         examples=["skills", "src/artifacts"],
     )
-    trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = Field(
-        default=None,
-        description="Trust level for artifacts from this source",
+    trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = (
+        Field(
+            default=None,
+            description="Trust level for artifacts from this source",
+        )
     )
     description: Optional[str] = Field(
         default=None,
@@ -702,36 +702,36 @@ class UpdateSourceRequest(BaseModel):
             raise ValueError("root_hint contains invalid characters")
 
         return v.strip()
-    
+
     @field_validator("description")
     @classmethod
     def validate_description_length(cls, v: str | None) -> str | None:
         """Validate description does not exceed maximum length.
-        
+
         Args:
             v: Description value to validate
-            
+
         Returns:
             Validated description
-            
+
         Raises:
             ValueError: If description exceeds 500 characters
         """
         if v is not None and len(v) > 500:
             raise ValueError("Description must be 500 characters or less")
         return v
-    
+
     @field_validator("notes")
     @classmethod
     def validate_notes_length(cls, v: str | None) -> str | None:
         """Validate notes do not exceed maximum length.
-        
+
         Args:
             v: Notes value to validate
-            
+
         Returns:
             Validated notes
-            
+
         Raises:
             ValueError: If notes exceed 2000 characters
         """
@@ -741,7 +741,7 @@ class UpdateSourceRequest(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
-        
+
         json_schema_extra = {
             "example": {
                 "ref": "v2.0.0",
@@ -749,6 +749,7 @@ class UpdateSourceRequest(BaseModel):
                 "notes": "Updated internal notes about this source",
             }
         }
+
 
 class SourceResponse(BaseModel):
     """Response model for a GitHub repository source.
@@ -934,7 +935,9 @@ class CatalogEntryResponse(BaseModel):
     )
     upstream_url: str = Field(
         description="Full URL to artifact in source repository",
-        examples=["https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"],
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
     )
     detected_version: Optional[str] = Field(
         default=None,
@@ -964,18 +967,20 @@ class CatalogEntryResponse(BaseModel):
     score_breakdown: Optional[Dict[str, int]] = Field(
         default=None,
         description="Detailed signal breakdown: dir_name_score (0-10), manifest_score (0-20), "
-                    "extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), "
-                    "depth_penalty (negative), raw_total, normalized_score (0-100)",
-        examples=[{
-            "dir_name_score": 10,
-            "manifest_score": 20,
-            "extensions_score": 5,
-            "parent_hint_score": 15,
-            "frontmatter_score": 15,
-            "depth_penalty": -5,
-            "raw_total": 60,
-            "normalized_score": 92,
-        }],
+        "extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), "
+        "depth_penalty (negative), raw_total, normalized_score (0-100)",
+        examples=[
+            {
+                "dir_name_score": 10,
+                "manifest_score": 20,
+                "extensions_score": 5,
+                "parent_hint_score": 15,
+                "frontmatter_score": 15,
+                "depth_penalty": -5,
+                "raw_total": 60,
+                "normalized_score": 92,
+            }
+        ],
     )
     status: Literal["new", "updated", "removed", "imported"] = Field(
         description="Lifecycle status of the catalog entry",
@@ -1258,7 +1263,9 @@ class ImportResultDTO(BaseModel):
     errors: List[Dict[str, str]] = Field(
         default_factory=list,
         description="List of {entry_id, error} for failed imports",
-        examples=[[{"entry_id": "cat_broken_skill", "error": "Invalid manifest format"}]],
+        examples=[
+            [{"entry_id": "cat_broken_skill", "error": "Invalid manifest format"}]
+        ],
     )
 
     class Config:
@@ -1303,7 +1310,9 @@ class DetectedArtifact(BaseModel):
     )
     upstream_url: str = Field(
         description="Full URL to artifact in source repository",
-        examples=["https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"],
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
     )
     confidence_score: int = Field(
         ge=0,
@@ -1375,7 +1384,9 @@ class HeuristicMatch(BaseModel):
     match_reasons: List[str] = Field(
         default_factory=list,
         description="List of reasons why this path matched",
-        examples=[["Directory name matches 'skill' pattern", "Contains skill.xml manifest"]],
+        examples=[
+            ["Directory name matches 'skill' pattern", "Contains skill.xml manifest"]
+        ],
     )
     # Scoring breakdown
     dir_name_score: int = Field(
@@ -1416,16 +1427,18 @@ class HeuristicMatch(BaseModel):
     breakdown: Dict[str, int] = Field(
         default_factory=dict,
         description="Detailed signal breakdown dictionary",
-        examples=[{
-            "dir_name_score": 10,
-            "manifest_score": 20,
-            "extensions_score": 5,
-            "parent_hint_score": 15,
-            "frontmatter_score": 15,
-            "depth_penalty": 5,
-            "raw_total": 60,
-            "normalized_score": 92,
-        }],
+        examples=[
+            {
+                "dir_name_score": 10,
+                "manifest_score": 20,
+                "extensions_score": 5,
+                "parent_hint_score": 15,
+                "frontmatter_score": 15,
+                "depth_penalty": 5,
+                "raw_total": 60,
+                "normalized_score": 92,
+            }
+        ],
     )
 
     class Config:
