@@ -168,16 +168,23 @@ class GitHubScanner:
                 duration_seconds = duration_ms / 1000
 
                 # Record metrics
-                marketplace_scan_duration_seconds.labels(source_id=source_id).observe(duration_seconds)
+                marketplace_scan_duration_seconds.labels(source_id=source_id).observe(
+                    duration_seconds
+                )
 
                 # Count artifacts by type
                 artifact_counts = {}
                 for artifact in artifacts:
-                    artifact_type = artifact.artifact_type if hasattr(artifact, 'artifact_type') else artifact.get("artifact_type", "unknown")
-                    artifact_counts[artifact_type] = artifact_counts.get(artifact_type, 0) + 1
+                    artifact_type = (
+                        artifact.artifact_type
+                        if hasattr(artifact, "artifact_type")
+                        else artifact.get("artifact_type", "unknown")
+                    )
+                    artifact_counts[artifact_type] = (
+                        artifact_counts.get(artifact_type, 0) + 1
+                    )
                     marketplace_scan_artifacts_total.labels(
-                        source_id=source_id,
-                        artifact_type=artifact_type
+                        source_id=source_id, artifact_type=artifact_type
                     ).inc()
 
                 ctx.metadata["artifact_counts"] = artifact_counts
@@ -203,8 +210,7 @@ class GitHubScanner:
 
                 # Record error metrics
                 marketplace_scan_errors_total.labels(
-                    source_id=source_id,
-                    error_type=error_type
+                    source_id=source_id, error_type=error_type
                 ).inc()
 
                 log_error(e, MarketplaceOperation.SCAN, source_id=source_id)
@@ -374,35 +380,257 @@ class GitHubScanner:
 
         raise GitHubAPIError("Max retries exceeded")
 
-    def get_file_content(
-        self, owner: str, repo: str, path: str, ref: str = "main"
-    ) -> str:
-        """Fetch content of a specific file.
+    def get_file_tree(
+        self,
+        owner: str,
+        repo: str,
+        path: str = "",
+        sha: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch file tree for a repository or subdirectory.
 
-        Useful for extracting metadata from manifest files.
+        Uses GitHub's Git Trees API to retrieve file listings. If no SHA is
+        provided, fetches the default branch SHA first.
 
         Args:
             owner: Repository owner
             repo: Repository name
-            path: File path within repository
-            ref: Git reference (branch, tag, SHA)
+            path: Path prefix to filter files (e.g., "src/components")
+            sha: Git tree SHA. If None, fetches default branch SHA.
 
         Returns:
-            Decoded file content
+            List of file entries with keys:
+                - path: File path relative to repository root
+                - type: "blob" for files, "tree" for directories
+                - size: File size in bytes (only for blobs)
+                - sha: Git blob/tree SHA
+
+        Raises:
+            GitHubAPIError: If API call fails
+            RateLimitError: If rate limited and retries exhausted
+
+        Example:
+            >>> scanner = GitHubScanner(token="ghp_...")
+            >>> files = scanner.get_file_tree(
+            ...     owner="anthropics",
+            ...     repo="anthropic-quickstarts",
+            ...     path="skills",
+            ... )
+            >>> for f in files:
+            ...     print(f"{f['type']}: {f['path']} ({f.get('size', 'dir')})")
+        """
+        # If no SHA provided, get the default branch SHA
+        if sha is None:
+            sha = self._get_default_branch_sha(owner, repo)
+
+        # Fetch recursive tree
+        url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{sha}?recursive=1"
+        response = self._request_with_retry(url)
+        data = response.json()
+
+        if "tree" not in data:
+            raise GitHubAPIError(f"Invalid tree response: missing 'tree' key")
+
+        tree = data["tree"]
+
+        # Filter by path prefix if provided
+        if path:
+            path_normalized = path.rstrip("/")
+            filtered_tree = []
+            for item in tree:
+                item_path = item.get("path", "")
+                # Include items that:
+                # 1. Start with the path prefix followed by /
+                # 2. Exactly match the path (for the directory itself)
+                if (
+                    item_path.startswith(f"{path_normalized}/")
+                    or item_path == path_normalized
+                ):
+                    filtered_tree.append(item)
+            tree = filtered_tree
+
+        # Return normalized entries
+        result = []
+        for item in tree:
+            entry = {
+                "path": item.get("path", ""),
+                "type": item.get("type", ""),
+                "sha": item.get("sha", ""),
+            }
+            # Only include size for blobs (files)
+            if item.get("type") == "blob" and "size" in item:
+                entry["size"] = item["size"]
+            result.append(entry)
+
+        return result
+
+    def _get_default_branch_sha(self, owner: str, repo: str) -> str:
+        """Get the SHA of the repository's default branch.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            SHA of the default branch HEAD commit
 
         Raises:
             GitHubAPIError: If API call fails
         """
-        import base64
-
-        url = f"{self.API_BASE}/repos/{owner}/{repo}/contents/{path}?ref={ref}"
+        url = f"{self.API_BASE}/repos/{owner}/{repo}"
         response = self._request_with_retry(url)
         data = response.json()
 
-        if data.get("encoding") == "base64":
-            return base64.b64decode(data["content"]).decode("utf-8")
+        default_branch = data.get("default_branch", "main")
 
-        return data.get("content", "")
+        # Get the SHA for the default branch
+        return self._get_ref_sha(owner, repo, default_branch)
+
+    def get_file_content(
+        self,
+        owner: str,
+        repo: str,
+        path: str,
+        ref: str | None = None,
+    ) -> Dict[str, Any] | None:
+        """Fetch content and metadata of a specific file from GitHub.
+
+        Uses the GitHub Contents API to retrieve file content along with
+        metadata like size, SHA, and encoding information.
+
+        Args:
+            owner: Repository owner/organization
+            repo: Repository name
+            path: File path within repository (e.g., "src/main.py")
+            ref: Git reference (branch, tag, SHA). Defaults to repo's default branch.
+
+        Returns:
+            Dict containing:
+                - content: Decoded file content (str for text, base64 for binary)
+                - encoding: Original encoding from API ("base64" or "none")
+                - size: File size in bytes
+                - sha: Git blob SHA
+                - name: File name
+                - path: Full path within repo
+                - is_binary: Whether file appears to be binary
+
+            Returns None if file not found (404).
+
+        Raises:
+            GitHubAPIError: If API call fails (non-404 errors)
+            RateLimitError: If rate limited and retries exhausted
+
+        Example:
+            >>> scanner = GitHubScanner(token="ghp_...")
+            >>> result = scanner.get_file_content(
+            ...     owner="anthropics",
+            ...     repo="anthropic-quickstarts",
+            ...     path="README.md",
+            ...     ref="main",
+            ... )
+            >>> if result:
+            ...     print(result["content"][:50])
+            '# Anthropic Quickstarts...'
+        """
+        import base64
+
+        # Build URL with optional ref parameter
+        url = f"{self.API_BASE}/repos/{owner}/{repo}/contents/{path}"
+        if ref:
+            url = f"{url}?ref={ref}"
+
+        try:
+            response = self._request_with_retry(url)
+        except GitHubAPIError as e:
+            # Check if this is a 404 error (file not found)
+            if "404" in str(e):
+                logger.debug(f"File not found: {owner}/{repo}/{path}")
+                return None
+            raise
+
+        # Handle 404 response that didn't raise (edge case)
+        if response.status_code == 404:
+            logger.debug(f"File not found: {owner}/{repo}/{path}")
+            return None
+
+        data = response.json()
+
+        # Ensure this is a file, not a directory
+        if data.get("type") != "file":
+            logger.warning(f"Path is not a file: {owner}/{repo}/{path}")
+            return None
+
+        encoding = data.get("encoding", "none")
+        raw_content = data.get("content", "")
+        size = data.get("size", 0)
+        sha = data.get("sha", "")
+        name = data.get("name", "")
+        file_path = data.get("path", path)
+
+        # Determine if file is binary based on common binary extensions
+        binary_extensions = {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".ico",
+            ".webp",
+            ".bmp",
+            ".pdf",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".rar",
+            ".7z",
+            ".exe",
+            ".dll",
+            ".so",
+            ".dylib",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".otf",
+            ".eot",
+            ".mp3",
+            ".mp4",
+            ".wav",
+            ".avi",
+            ".mov",
+            ".pyc",
+            ".class",
+            ".o",
+            ".obj",
+        }
+        file_ext = "." + name.split(".")[-1].lower() if "." in name else ""
+        is_binary = file_ext in binary_extensions
+
+        # Decode content
+        decoded_content: str
+        if encoding == "base64" and raw_content:
+            if is_binary:
+                # For binary files, keep as base64 to avoid encoding issues
+                decoded_content = raw_content.replace("\n", "")
+            else:
+                # For text files, decode to UTF-8 string
+                try:
+                    decoded_content = base64.b64decode(raw_content).decode("utf-8")
+                except UnicodeDecodeError:
+                    # File is binary despite extension, keep as base64
+                    logger.debug(f"Binary content detected for: {path}")
+                    is_binary = True
+                    decoded_content = raw_content.replace("\n", "")
+        else:
+            decoded_content = raw_content
+
+        return {
+            "content": decoded_content,
+            "encoding": encoding,
+            "size": size,
+            "sha": sha,
+            "name": name,
+            "path": file_path,
+            "is_binary": is_binary,
+        }
 
 
 class GitHubAPIError(Exception):
