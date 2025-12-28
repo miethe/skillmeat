@@ -121,6 +121,74 @@ class HeuristicDetector:
         self.config = config or DetectionConfig()
         self.enable_frontmatter_detection = enable_frontmatter_detection
 
+    def _is_plugin_directory(
+        self, dir_path: str, dir_to_files: Dict[str, Set[str]]
+    ) -> bool:
+        """Detect if a directory is a plugin (contains multiple entity-type subdirectories).
+
+        A plugin is a directory that contains 2 or more entity-type subdirectories
+        (commands/, agents/, skills/, hooks/, rules/, mcp/). This indicates the
+        directory is a collection of related artifacts rather than a single entity.
+
+        Example plugin structure::
+
+            my-plugin/
+            ├── commands/      <- entity-type directory
+            │   └── deploy/
+            └── agents/        <- entity-type directory
+                └── helper/
+
+        Args:
+            dir_path: Path to check (e.g., "my-plugin")
+            dir_to_files: Map of all directories to their files
+
+        Returns:
+            True if directory contains 2+ entity-type subdirectories
+        """
+        entity_type_names = {"commands", "agents", "skills", "hooks", "rules", "mcp"}
+
+        child_dirs: set[str] = set()
+        for path in dir_to_files.keys():
+            if path.startswith(dir_path + "/"):
+                relative = path[len(dir_path) + 1 :]
+                first_part = relative.split("/")[0].lower()
+                if first_part in entity_type_names:
+                    child_dirs.add(first_part)
+
+        return len(child_dirs) >= 2
+
+    def _is_container_directory(
+        self, dir_path: str, dir_to_files: Dict[str, Set[str]]  # noqa: ARG002
+    ) -> bool:
+        """Detect if a directory is an entity-type container (not an entity itself).
+
+        Entity-type directories (commands/, agents/, skills/, hooks/, rules/, mcp/)
+        are organizational containers that hold multiple entities. They should not
+        be detected as artifacts themselves.
+
+        Example::
+
+            skills/          <- container (should be skipped)
+            ├── my-skill/    <- actual entity (should be detected)
+            └── other-skill/ <- actual entity (should be detected)
+
+        Args:
+            dir_path: Path to check (e.g., "plugin/commands")
+            dir_to_files: Map of all directories to their files (reserved for future use)
+
+        Returns:
+            True if directory is a container (e.g., "commands/", "skills/")
+        """
+        # dir_to_files kept for API consistency with _is_plugin_directory
+        posix_path = PurePosixPath(dir_path)
+        dir_name = posix_path.name.lower()
+
+        entity_type_names = {"commands", "agents", "skills", "hooks", "rules", "mcp"}
+
+        # If the directory name is an entity-type name, it's always a container
+        # Entity-type directories hold entities, they are never entities themselves
+        return dir_name in entity_type_names
+
     def analyze_paths(
         self,
         paths: List[str],
@@ -161,6 +229,10 @@ class HeuristicDetector:
         for dir_path, files in dir_to_files.items():
             # Skip root directory
             if dir_path == ".":
+                continue
+
+            # Skip if container directory
+            if self._is_container_directory(dir_path, dir_to_files):
                 continue
 
             # Skip if too deep
@@ -604,7 +676,9 @@ def detect_artifacts_in_tree(
         >>> print(artifacts[0].name, artifacts[0].confidence_score)
         my-skill 85
     """
-    detector = HeuristicDetector(enable_frontmatter_detection=enable_frontmatter_detection)
+    detector = HeuristicDetector(
+        enable_frontmatter_detection=enable_frontmatter_detection
+    )
     matches = detector.analyze_paths(file_tree, base_url=repo_url, root_hint=root_hint)
     return detector.matches_to_artifacts(
         matches, base_url=repo_url, detected_sha=detected_sha

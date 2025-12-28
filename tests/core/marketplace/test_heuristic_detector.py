@@ -216,9 +216,10 @@ class TestScoringAlgorithm:
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
         assert len(artifacts) == 1
-        # Score includes: dir_name(+5) + manifest(+20) + extensions(+2) + parent_hint(+15) - depth(-3) = ~39
+        # Score includes: dir_name(+5) + manifest(+20) + extensions(+2) + parent_hint(+15) - depth(-3) = 39
+        # Normalized: 39/65 * 100 = 60%
         assert artifacts[0].confidence_score >= 30
-        assert artifacts[0].confidence_score <= 50
+        assert artifacts[0].confidence_score <= 65  # Normalized score
 
     def test_skills_manifest_root(self):
         """Test scoring for .claude/skills/manifest.toml pattern."""
@@ -282,7 +283,10 @@ class TestScoringAlgorithm:
         assert len(artifacts_complete) == 1
 
         # Complete skill should have higher score
-        assert artifacts_complete[0].confidence_score > artifacts_minimal[0].confidence_score
+        assert (
+            artifacts_complete[0].confidence_score
+            > artifacts_minimal[0].confidence_score
+        )
 
 
 class TestArtifactTypeDetection:
@@ -585,7 +589,9 @@ class TestScoreNormalization:
 
         # All fields should be integers
         for key, value in breakdown.items():
-            assert isinstance(value, int), f"Field '{key}' should be int, got {type(value)}"
+            assert isinstance(
+                value, int
+            ), f"Field '{key}' should be int, got {type(value)}"
 
     def test_breakdown_field_ranges(self):
         """Test that breakdown fields are within expected ranges."""
@@ -743,3 +749,206 @@ class TestScoreNormalization:
         assert breakdown["raw_total"] > 30
         # Normalized should also be high
         assert breakdown["normalized_score"] > 45
+
+
+class TestPluginDetection:
+    """Tests for plugin directory detection."""
+
+    def test_detect_plugin_with_multiple_entity_types(self):
+        """Test that plugin with commands/ and agents/ is recognized."""
+        files = [
+            "my-plugin/commands/deploy/COMMAND.md",
+            "my-plugin/agents/helper/AGENT.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect 2 entities (deploy command, helper agent)
+        assert len(artifacts) == 2
+        # Should NOT detect "commands" or "agents" as entities
+        names = {a.name for a in artifacts}
+        assert "commands" not in names
+        assert "agents" not in names
+        assert "deploy" in names
+        assert "helper" in names
+
+    def test_detect_plugin_with_three_entity_types(self):
+        """Test plugin with commands/, agents/, skills/."""
+        files = [
+            "plugin/commands/cmd1/COMMAND.md",
+            "plugin/agents/agent1/AGENT.md",
+            "plugin/skills/skill1/SKILL.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        assert len(artifacts) == 3
+        types = {a.artifact_type for a in artifacts}
+        assert types == {"command", "agent", "skill"}
+
+
+class TestContainerSkipping:
+    """Tests for container directory skipping."""
+
+    def test_skip_commands_container_in_plugin(self):
+        """Test that commands/ directory is skipped in plugin."""
+        files = [
+            "plugin/commands/deploy/COMMAND.md",
+            "plugin/commands/analyze/COMMAND.md",
+            "plugin/skills/helper/SKILL.md",  # Need 2 entity types for plugin
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect deploy, analyze, helper - NOT commands or skills
+        names = {a.name for a in artifacts}
+        assert "commands" not in names
+        assert "skills" not in names
+        assert "deploy" in names
+        assert "analyze" in names
+        assert "helper" in names
+
+    def test_skip_all_container_types(self):
+        """Test skipping of all entity-type containers."""
+        files = [
+            "plugin/commands/cmd/COMMAND.md",
+            "plugin/agents/agent/AGENT.md",
+            "plugin/skills/skill/SKILL.md",
+            "plugin/hooks/hook/hook.md",
+            "plugin/rules/rule/rule.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect entities, not containers
+        names = {a.name for a in artifacts}
+        assert "commands" not in names
+        assert "agents" not in names
+        assert "skills" not in names
+        assert "hooks" not in names
+        assert "rules" not in names
+
+    def test_top_level_container_skipped(self):
+        """Test that top-level entity-type directories are skipped."""
+        files = [
+            "skills/my-skill/SKILL.md",
+            "commands/my-command/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        names = {a.name for a in artifacts}
+        assert "skills" not in names
+        assert "commands" not in names
+        assert "my-skill" in names
+        assert "my-command" in names
+
+
+class TestBackwardCompatibility:
+    """Tests for backward compatibility with existing behavior."""
+
+    def test_non_plugin_repo_still_works(self):
+        """Test that non-plugin repos continue to work correctly."""
+        files = [
+            "skills/skill1/SKILL.md",
+            "commands/cmd1/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should still detect both entities
+        assert len(artifacts) == 2
+        names = {a.name for a in artifacts}
+        assert "skill1" in names
+        assert "cmd1" in names
+
+    def test_nested_skills_in_non_plugin(self):
+        """Test nested skills without plugin structure."""
+        files = [
+            "skills/skill1/SKILL.md",
+            "skills/skill2/SKILL.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect both skills
+        assert len(artifacts) == 2
+        names = {a.name for a in artifacts}
+        assert names == {"skill1", "skill2"}
+
+    def test_single_entity_type_not_plugin(self):
+        """Test that single entity-type directory is not a plugin."""
+        files = [
+            "commands/cmd1/COMMAND.md",
+            "commands/cmd2/COMMAND.md",
+            "commands/cmd3/COMMAND.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect all 3 commands
+        assert len(artifacts) == 3
+        # "commands" should not be detected as entity
+        names = {a.name for a in artifacts}
+        assert "commands" not in names
+
+    def test_direct_skill_at_root(self):
+        """Test skill directly at repository root."""
+        files = [
+            "my-skill/SKILL.md",
+            "my-skill/helper.py",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        assert len(artifacts) == 1
+        assert artifacts[0].name == "my-skill"
+
+
+class TestPluginEdgeCases:
+    """Tests for edge cases in plugin detection."""
+
+    def test_plugin_with_minimal_threshold(self):
+        """Test plugin detection with exactly 2 entity types."""
+        files = [
+            "plugin/commands/cmd/COMMAND.md",
+            "plugin/agents/agent/AGENT.md",
+        ]
+        # Should detect as plugin (threshold = 2)
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+        assert len(artifacts) == 2
+        names = {a.name for a in artifacts}
+        assert "commands" not in names
+        assert "agents" not in names
+
+    def test_mixed_container_and_direct_entities(self):
+        """Test plugin with both container and direct entities."""
+        files = [
+            "plugin/commands/cmd1/COMMAND.md",
+            "plugin/agents/agent1/AGENT.md",
+            "plugin/standalone-skill/SKILL.md",  # Direct entity
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        # Should detect all entities
+        assert len(artifacts) == 3
+        names = {a.name for a in artifacts}
+        assert names == {"cmd1", "agent1", "standalone-skill"}
+
+    def test_case_insensitive_container_detection(self):
+        """Test that container detection is case-insensitive."""
+        files = [
+            "plugin/Commands/deploy/COMMAND.md",  # Capital C
+            "plugin/AGENTS/helper/AGENT.md",  # All caps
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        names = {a.name for a in artifacts}
+        assert "Commands" not in names
+        assert "AGENTS" not in names
+        assert "deploy" in names
+        assert "helper" in names
+
+    def test_mcp_container_skipped(self):
+        """Test that mcp/ container directories are skipped."""
+        files = [
+            "plugin/mcp/my-server/MCP.md",
+            "plugin/skills/my-skill/SKILL.md",
+        ]
+        artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+
+        names = {a.name for a in artifacts}
+        assert "mcp" not in names
+        assert "my-server" in names
+        assert "my-skill" in names
