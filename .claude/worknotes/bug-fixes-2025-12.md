@@ -1,5 +1,24 @@
 # Bug Fixes - December 2025
 
+## 2025-12-29
+
+### Artifact Dropdown Edit/Delete Actions Non-Functional
+
+**Issue**: The "..." dropdown menu on artifact cards in the `/collection` page has Edit and Delete buttons that do nothing when clicked
+- **Location**: `skillmeat/web/app/collection/page.tsx` (lines 446-470)
+- **Root Cause**: `ArtifactGrid` and `ArtifactList` components accept `onEdit` and `onDelete` callback props, but the collection page was not passing these callbacks. The dropdown menus rendered correctly but had no handlers attached.
+- **Fix**:
+  1. Added state variables for tracking artifact to edit/delete and dialog visibility
+  2. Imported `ArtifactDeletionDialog`, `ParameterEditorModal`, and `useEditArtifactParameters`
+  3. Created `handleEditFromDropdown` and `handleDeleteFromDropdown` handlers
+  4. Created `handleSaveParameters` handler following pattern from `unified-entity-modal.tsx`
+  5. Passed `onEdit` and `onDelete` callbacks to all `ArtifactGrid` and `ArtifactList` instances
+  6. Added `ParameterEditorModal` and `ArtifactDeletionDialog` components at end of page
+- **Files Modified**: `skillmeat/web/app/collection/page.tsx`
+- **Verification**: Dropdown Edit opens ParameterEditorModal, Delete opens ArtifactDeletionDialog with full options
+- **Commit(s)**: bfb70bc
+- **Status**: RESOLVED
+
 ## 2025-12-28
 
 ### Marketplace Score Breakdown Never Populated
