@@ -255,6 +255,16 @@ function CollectionPageContent() {
 
       // Enrich each summary with full data from catalog
       artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts));
+
+      // Deduplicate by ID to prevent React key conflicts
+      const seen = new Set<string>();
+      artifacts = artifacts.filter(artifact => {
+        if (seen.has(artifact.id)) {
+          return false;
+        }
+        seen.add(artifact.id);
+        return true;
+      });
     } else if (!isSpecificCollection && data && 'artifacts' in data) {
       // All collections view: Already have full Artifact objects
       artifacts = data.artifacts ?? [];
