@@ -850,3 +850,17 @@
 - **Files Modified**: `skillmeat/web/app/collection/page.tsx`
 - **Commit(s)**: 4854a10
 - **Status**: RESOLVED
+
+### UnifiedEntityModal Crashes on Unsupported Entity Types
+
+**Issue**: Clicking an artifact in `/collection` view crashes with `TypeError: Cannot read properties of undefined (reading 'icon')` at unified-entity-modal.tsx:548
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx:547-548`
+- **Root Cause**: `ENTITY_TYPES[entity.type]` returns `undefined` when entity type is not one of the 5 supported types ('skill', 'command', 'agent', 'mcp', 'hook'). The backend supports 8 artifact types including context entities (project_config, spec_file, rule_file, context_file, progress_template), but the frontend `ENTITY_TYPES` config only defines 5. When a context entity is passed to the modal, `config` is undefined and accessing `config.icon` crashes.
+- **Fix**: Added defensive null check after `ENTITY_TYPES[entity.type]` lookup (line 549-592). When `config` is undefined, returns a fallback dialog that:
+  1. Shows warning icon with entity name in header
+  2. Displays alert explaining the entity type is not yet supported for detailed display
+  3. Shows basic entity info (name, type, description if available)
+  4. Provides close button
+- **Files Modified**: `skillmeat/web/components/entity/unified-entity-modal.tsx`
+- **Commit(s)**: d350e10
+- **Status**: RESOLVED
