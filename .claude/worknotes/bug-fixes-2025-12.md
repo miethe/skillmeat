@@ -816,3 +816,37 @@
 - **Files Modified**: `skillmeat/web/components/ui/command.tsx`
 - **Commit(s)**: pending
 - **Status**: RESOLVED
+
+## 2025-12-29
+
+### ArtifactList Crashes with "Element type is invalid" for Unknown Artifact Types
+
+**Issue**: Navigating to a collection page crashes with React error: "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. Check the render method of `ArtifactList`."
+- **Location**: `skillmeat/web/components/collection/artifact-list.tsx:287`
+- **Root Cause**: `const Icon = artifactTypeIcons[artifact.type]` returns `undefined` when `artifact.type` is not one of the valid ArtifactType keys ('skill', 'command', 'agent', 'mcp', 'hook'). Rendering `<Icon />` with undefined crashes React.
+- **Fix**: Added fallback handling for all Record lookups:
+  1. Imported `HelpCircle` from lucide-react as fallback icon
+  2. Added fallback for Icon: `artifactTypeIcons[artifact.type] || HelpCircle`
+  3. Added fallbacks for colors, tints, borders, and labels
+  4. Unknown types now render with gray `HelpCircle` icon and graceful styling
+- **Files Modified**: `skillmeat/web/components/collection/artifact-list.tsx`
+- **Commit(s)**: 4854a10
+- **Status**: RESOLVED
+
+### Duplicate React Key Error for Artifacts with Same ID
+
+**Issue**: Collection page throws React warning: "Encountered two children with the same key, `skill:test-skill`"
+- **Location**: `skillmeat/web/app/collection/page.tsx:257`
+- **Root Cause**: The `enrichArtifactSummary()` function maps `ArtifactSummary` objects to full `Artifact` objects. When the same artifact appears multiple times in the collection response (duplicate entries), the enrichment produces duplicate IDs, causing React key conflicts.
+- **Fix**: Added deduplication after enrichment in `filteredArtifacts` useMemo:
+  ```typescript
+  const seen = new Set<string>();
+  artifacts = artifacts.filter(artifact => {
+    if (seen.has(artifact.id)) return false;
+    seen.add(artifact.id);
+    return true;
+  });
+  ```
+- **Files Modified**: `skillmeat/web/app/collection/page.tsx`
+- **Commit(s)**: 4854a10
+- **Status**: RESOLVED
