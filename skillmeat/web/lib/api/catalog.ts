@@ -70,14 +70,14 @@ export interface FileContentResponse {
  *
  * @example
  * ```typescript
- * const tree = await fetchCatalogFileTree(1, 'skills/canvas-design');
+ * const tree = await fetchCatalogFileTree('source-uuid-123', 'skills/canvas-design');
  * tree.files.forEach(entry => {
  *   console.log(`${entry.type}: ${entry.path}`);
  * });
  * ```
  */
 export async function fetchCatalogFileTree(
-  sourceId: number,
+  sourceId: string,
   artifactPath: string
 ): Promise<FileTreeResponse> {
   // Encode the artifact path for URL safety
@@ -106,12 +106,12 @@ export async function fetchCatalogFileTree(
  *
  * @example
  * ```typescript
- * const content = await fetchCatalogFileContent(1, 'skills/canvas-design', 'skill.md');
+ * const content = await fetchCatalogFileContent('source-uuid-123', 'skills/canvas-design', 'skill.md');
  * console.log(content.content);
  * ```
  */
 export async function fetchCatalogFileContent(
-  sourceId: number,
+  sourceId: string,
   artifactPath: string,
   filePath: string
 ): Promise<FileContentResponse> {

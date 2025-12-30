@@ -1,5 +1,30 @@
 # Bug Fixes - December 2025
 
+## 2025-12-30
+
+### Marketplace Source Modal Contents Tab 404 Error
+
+**Issue**: Clicking the Contents tab in the Marketplace Source artifact modal shows "File tree not found" with 404 error despite the source and artifact existing
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:274`, `skillmeat/web/lib/api/catalog.ts:80,114`, `skillmeat/web/hooks/use-catalog-files.ts:30,68,114`
+- **Root Cause**: Type mismatch between frontend and backend. The `MarketplaceSource.id` is a **String** (UUID-like), but the frontend was:
+  1. Converting `source_id` to a number via `parseInt(entry.source_id, 10)` in the modal
+  2. Declaring `sourceId: number` in API client functions
+  3. Using `number` type in query key factories
+
+  When `parseInt("uuid-string")` is called on a non-numeric ID, it returns `NaN` or partial number, causing the backend lookup to fail with "Source not found".
+- **Fix**:
+  1. Changed `sourceId` parameter type from `number` to `string` in `fetchCatalogFileTree()` and `fetchCatalogFileContent()`
+  2. Removed `parseInt()` in `CatalogEntryModal.tsx`, using `entry?.source_id ?? null` directly
+  3. Updated `useCatalogFileTree` and `useCatalogFileContent` hooks to use `string | null | undefined` type
+  4. Updated query key factories to use `string` type
+- **Files Modified**:
+  - `skillmeat/web/lib/api/catalog.ts` (2 function signatures)
+  - `skillmeat/web/components/CatalogEntryModal.tsx` (removed parseInt)
+  - `skillmeat/web/hooks/use-catalog-files.ts` (2 hooks + 2 key factories)
+- **Verification**: Type check passes for modified files; Contents tab should now load file tree correctly
+- **Commit(s)**: TBD
+- **Status**: RESOLVED
+
 ## 2025-12-29
 
 ### Artifact Dropdown Edit/Delete Actions Non-Functional
