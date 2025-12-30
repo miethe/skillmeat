@@ -32,7 +32,7 @@ export interface FileTreeEntry {
  */
 export interface FileTreeResponse {
   /** List of files and directories */
-  files: FileTreeEntry[];
+  entries: FileTreeEntry[];
   /** Whether the response was served from cache */
   cached: boolean;
   /** Age of cached data in seconds (if cached) */
@@ -71,7 +71,7 @@ export interface FileContentResponse {
  * @example
  * ```typescript
  * const tree = await fetchCatalogFileTree('source-uuid-123', 'skills/canvas-design');
- * tree.files.forEach(entry => {
+ * tree.entries.forEach(entry => {
  *   console.log(`${entry.type}: ${entry.path}`);
  * });
  * ```

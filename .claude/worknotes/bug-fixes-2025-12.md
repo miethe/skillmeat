@@ -22,7 +22,26 @@
   - `skillmeat/web/components/CatalogEntryModal.tsx` (removed parseInt)
   - `skillmeat/web/hooks/use-catalog-files.ts` (2 hooks + 2 key factories)
 - **Verification**: Type check passes for modified files; Contents tab should now load file tree correctly
-- **Commit(s)**: TBD
+- **Commit(s)**: bb08a3c
+- **Status**: RESOLVED
+
+### Marketplace File Tree Shows "No Files Found" After Type Fix
+
+**Issue**: After fixing the source_id type mismatch (above), the Contents tab shows "No files found" even though the API returns data
+- **Location**: `skillmeat/web/lib/api/catalog.ts:35`, `skillmeat/web/components/CatalogEntryModal.tsx:297-330`
+- **Root Cause**: Field name mismatch between backend and frontend:
+  - Backend schema returns: `entries: List[FileTreeEntry]`
+  - Frontend type expects: `files: FileTreeEntry[]`
+
+  The frontend was looking for `fileTreeData.files` which is undefined since the API returns `entries`.
+- **Fix**:
+  1. Updated `FileTreeResponse` interface to use `entries` instead of `files`
+  2. Updated all usages in `CatalogEntryModal.tsx` from `fileTreeData?.files` to `fileTreeData?.entries`
+- **Files Modified**:
+  - `skillmeat/web/lib/api/catalog.ts` (interface field rename)
+  - `skillmeat/web/components/CatalogEntryModal.tsx` (4 usages updated)
+- **Verification**: Build passes; file tree should now display correctly
+- **Commit(s)**: 5f0f759
 - **Status**: RESOLVED
 
 ## 2025-12-29
