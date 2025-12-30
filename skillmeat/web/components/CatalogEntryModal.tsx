@@ -294,19 +294,19 @@ export function CatalogEntryModal({
   } = useCatalogFileContent(sourceId, artifactPath, selectedFilePath);
 
   // Transform flat file list to hierarchical structure for FileTree component
-  const fileStructure = fileTreeData?.files
-    ? buildFileStructure(fileTreeData.files)
+  const fileStructure = fileTreeData?.entries
+    ? buildFileStructure(fileTreeData.entries)
     : [];
 
   // Auto-select default file when file tree loads
   // Priority: first .md file (case-insensitive), then first file alphabetically
   useEffect(() => {
-    // Only auto-select if no file is currently selected and we have files
-    if (selectedFilePath !== null || !fileTreeData?.files?.length) {
+    // Only auto-select if no file is currently selected and we have entries
+    if (selectedFilePath !== null || !fileTreeData?.entries?.length) {
       return;
     }
 
-    const files = fileTreeData.files;
+    const files = fileTreeData.entries;
 
     // Find first markdown file (case-insensitive)
     // Note: API returns 'file' for files and 'tree' for directories
@@ -327,7 +327,7 @@ export function CatalogEntryModal({
     if (sortedFiles.length > 0 && sortedFiles[0]) {
       setSelectedFilePath(sortedFiles[0].path);
     }
-  }, [fileTreeData?.files, selectedFilePath]);
+  }, [fileTreeData?.entries, selectedFilePath]);
 
   // Reset selected file when modal closes or entry changes
   const handleOpenChange = (newOpen: boolean) => {
