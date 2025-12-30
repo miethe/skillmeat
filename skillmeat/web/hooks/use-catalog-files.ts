@@ -27,10 +27,10 @@ import {
 export const catalogKeys = {
   all: ['catalog'] as const,
   trees: () => [...catalogKeys.all, 'tree'] as const,
-  tree: (sourceId: number, artifactPath: string) =>
+  tree: (sourceId: string, artifactPath: string) =>
     [...catalogKeys.trees(), sourceId, artifactPath] as const,
   contents: () => [...catalogKeys.all, 'content'] as const,
-  content: (sourceId: number, artifactPath: string, filePath: string) =>
+  content: (sourceId: string, artifactPath: string, filePath: string) =>
     [...catalogKeys.contents(), sourceId, artifactPath, filePath] as const,
 };
 
@@ -65,7 +65,7 @@ export const catalogKeys = {
  * ```
  */
 export function useCatalogFileTree(
-  sourceId: number | null | undefined,
+  sourceId: string | null | undefined,
   artifactPath: string | null | undefined
 ) {
   return useQuery<FileTreeResponse, Error>({
@@ -111,7 +111,7 @@ export function useCatalogFileTree(
  * ```
  */
 export function useCatalogFileContent(
-  sourceId: number | null | undefined,
+  sourceId: string | null | undefined,
   artifactPath: string | null | undefined,
   filePath: string | null | undefined
 ) {

@@ -270,8 +270,8 @@ export function CatalogEntryModal({
   const [activeTab, setActiveTab] = useState<'overview' | 'contents'>('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 
-  // Parse source_id as number for API calls
-  const sourceId = entry ? parseInt(entry.source_id, 10) : null;
+  // Use source_id directly as string for API calls
+  const sourceId = entry?.source_id ?? null;
   const artifactPath = entry?.path ?? null;
 
   // Fetch file tree when Contents tab is active
