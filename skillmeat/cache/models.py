@@ -1365,6 +1365,8 @@ class MarketplaceCatalogEntry(Base):
 
     Represents an artifact discovered during GitHub repository scanning.
     Tracks detection metadata, import status, and relationship to source.
+    Supports user-driven exclusion for entries that are not actually artifacts
+    (e.g., documentation files, configuration templates mistakenly detected).
 
     Attributes:
         id: Unique catalog entry identifier (primary key)
@@ -1382,6 +1384,8 @@ class MarketplaceCatalogEntry(Base):
         status: Import status ("new", "updated", "removed", "imported")
         import_date: When artifact was imported to collection
         import_id: Reference to imported artifact ID
+        excluded_at: Timestamp when entry was marked as "not an artifact" (None if not excluded)
+        excluded_reason: User-provided reason for exclusion (optional, max 500 chars)
         metadata_json: Additional detection metadata as JSON
         created_at: Timestamp when entry was created
         updated_at: Timestamp when entry was last updated
@@ -1429,6 +1433,20 @@ class MarketplaceCatalogEntry(Base):
     )
     import_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     import_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Exclusion tracking (for entries that are not actually artifacts)
+    excluded_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=None,
+        doc="Timestamp when entry was marked as 'not an artifact'",
+    )
+    excluded_reason: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
+        doc="User-provided reason for exclusion (optional, max 500 chars)",
+    )
 
     # Additional metadata
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1500,6 +1518,8 @@ class MarketplaceCatalogEntry(Base):
             "status": self.status,
             "import_date": self.import_date.isoformat() if self.import_date else None,
             "import_id": self.import_id,
+            "excluded_at": self.excluded_at.isoformat() if self.excluded_at else None,
+            "excluded_reason": self.excluded_reason,
             "metadata": metadata_dict,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

@@ -111,7 +111,7 @@ export interface PublishFormData {
 
 export type TrustLevel = 'untrusted' | 'basic' | 'verified' | 'official';
 export type ScanStatus = 'pending' | 'scanning' | 'success' | 'error';
-export type CatalogStatus = 'new' | 'updated' | 'removed' | 'imported';
+export type CatalogStatus = 'new' | 'updated' | 'removed' | 'imported' | 'excluded';
 export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook';
 
 export interface GitHubSource {
@@ -175,6 +175,8 @@ export interface CatalogEntry {
   status: CatalogStatus;
   import_date?: string;
   import_id?: string;
+  excluded_at?: string | null;
+  excluded_reason?: string | null;
   raw_score?: number;
   score_breakdown?: {
     dir_name_score: number;

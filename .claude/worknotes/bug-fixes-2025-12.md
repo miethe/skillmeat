@@ -962,5 +962,5 @@
 - **Files Modified**:
   - `skillmeat/cache/manager.py` (added `upsert_project()` method, lines 400-466)
   - `skillmeat/api/routers/projects.py` (use `upsert_project()` in `create_project()`, lines 636-653)
-- **Commit(s)**: 1743cc5
+- **Commit(s)**: e95b218
 - **Status**: RESOLVED
