@@ -102,14 +102,3 @@ version_lineage = [
     "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656",
 ]
 collection_sha = "73d94649632b9b146bb9a745a31efcbc315a8916f14619a327f009b54d1be656"
-
-[[deployed]]
-artifact_name = "test-skill"
-artifact_type = "skill"
-from_collection = "default"
-deployed_at = "2025-12-24T21:26:33.559762"
-artifact_path = "skills/test-skill"
-content_hash = "fee842ec0ee3c8cb88824a1090ff3b8ec6edecd578b69cb2a9fc6a34d8743e9a"
-local_modifications = false
-merge_base_snapshot = "fee842ec0ee3c8cb88824a1090ff3b8ec6edecd578b69cb2a9fc6a34d8743e9a"
-collection_sha = "fee842ec0ee3c8cb88824a1090ff3b8ec6edecd578b69cb2a9fc6a34d8743e9a"
