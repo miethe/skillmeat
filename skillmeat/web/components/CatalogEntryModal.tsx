@@ -103,7 +103,8 @@ const statusConfig: Record<CatalogStatus, { label: string; className: string }> 
  * to nested structure: [{name: "src", type: "directory", children: [...]}]
  */
 function buildFileStructure(files: FileTreeEntry[]): FileNode[] {
-  const root: Map<string, FileNode> = new Map();
+  // Build a map of path -> node for quick lookup
+  const nodeMap = new Map<string, FileNode>();
 
   // Sort files to ensure directories are processed before their children
   const sortedFiles = [...files].sort((a, b) => {
@@ -115,9 +116,9 @@ function buildFileStructure(files: FileTreeEntry[]): FileNode[] {
     return a.path.localeCompare(b.path);
   });
 
+  // First pass: create all nodes
   for (const entry of sortedFiles) {
     const parts = entry.path.split('/');
-    let currentLevel = root;
     let currentPath = '';
 
     for (let i = 0; i < parts.length; i++) {
@@ -125,35 +126,41 @@ function buildFileStructure(files: FileTreeEntry[]): FileNode[] {
       currentPath = currentPath ? `${currentPath}/${part}` : part;
       const isLast = i === parts.length - 1;
 
-      if (!currentLevel.has(part)) {
+      if (!nodeMap.has(currentPath)) {
         const node: FileNode = {
           name: part,
           path: currentPath,
           type: isLast ? (entry.type === 'tree' ? 'directory' : 'file') : 'directory',
           children: isLast && entry.type !== 'tree' ? undefined : [],
         };
-        currentLevel.set(part, node);
+        nodeMap.set(currentPath, node);
       }
+    }
+  }
 
-      const existingNode = currentLevel.get(part);
-      if (existingNode && existingNode.children) {
-        // Convert children array to Map for next iteration
-        const childMap = new Map<string, FileNode>();
-        for (const child of existingNode.children) {
-          childMap.set(child.name, child);
-        }
-        currentLevel = childMap;
-
-        // Update the parent's children from the map (will be done at the end)
-        if (!isLast) {
-          existingNode.children = Array.from(childMap.values());
+  // Second pass: build parent-child relationships
+  for (const [path, node] of nodeMap) {
+    const lastSlashIndex = path.lastIndexOf('/');
+    if (lastSlashIndex > 0) {
+      const parentPath = path.substring(0, lastSlashIndex);
+      const parentNode = nodeMap.get(parentPath);
+      if (parentNode && parentNode.children) {
+        // Only add if not already present (avoid duplicates)
+        if (!parentNode.children.some(child => child.path === node.path)) {
+          parentNode.children.push(node);
         }
       }
     }
   }
 
-  // Convert root map to array and sort (directories first, then alphabetically)
-  const result = Array.from(root.values());
+  // Get root nodes (no parent path, i.e., no slash in path)
+  const result: FileNode[] = [];
+  for (const [path, node] of nodeMap) {
+    if (!path.includes('/')) {
+      result.push(node);
+    }
+  }
+
   sortFileNodes(result);
   return result;
 }
