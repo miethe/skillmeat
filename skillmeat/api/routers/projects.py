@@ -543,6 +543,7 @@ async def list_projects(
 async def create_project(
     request: ProjectCreateRequest,
     token: TokenDep,
+    cache_manager: CacheManagerDep,
 ) -> ProjectCreateResponse:
     """Create a new project.
 
@@ -550,10 +551,12 @@ async def create_project(
     1. Creating the project directory if it doesn't exist
     2. Creating the .claude subdirectory
     3. Storing project metadata
+    4. Adding project to persistent cache
 
     Args:
         request: Project creation request with name, path, and optional description
         token: Authentication token
+        cache_manager: CacheManager dependency for persistent cache updates
 
     Returns:
         Created project information
@@ -626,9 +629,28 @@ async def create_project(
 
         logger.info(f"Project created successfully: {request.name}")
 
-        # Invalidate cache so new project appears in list
+        # Invalidate in-memory cache so new project appears in list
         registry = await get_project_registry()
         await registry.refresh_entry(project_path)
+
+        # Add project to persistent SQLite cache (upsert preserves other projects)
+        if cache_manager is not None:
+            try:
+                new_project_data: dict[str, object] = {
+                    "id": encode_project_id(str(project_path)),
+                    "name": request.name,
+                    "path": str(project_path),
+                    "description": request.description,
+                    "artifacts": [],
+                }
+                cache_manager.upsert_project(new_project_data)
+                logger.info(f"Added project to persistent cache: {request.name}")
+            except Exception as e:
+                # Log error but don't fail - cache will be populated on next list
+                logger.error(
+                    f"Failed to add project to persistent cache: {e}",
+                    exc_info=True,
+                )
 
         return ProjectCreateResponse(
             id=encode_project_id(str(project_path)),
@@ -1047,7 +1069,10 @@ async def check_project_modifications(
 
         # Use sync manager to check drift - this provides proper change_origin detection
         from skillmeat.core.sync import SyncManager
-        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
+
+        sync_mgr = SyncManager(
+            collection_path=Path.home() / ".skillmeat" / "collection"
+        )
 
         try:
             drift_results = sync_mgr.check_drift(project_path=project_path)
@@ -1198,7 +1223,10 @@ async def get_modified_artifacts(
 
         # Use sync manager to check drift - provides proper change_origin
         from skillmeat.core.sync import SyncManager
-        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
+
+        sync_mgr = SyncManager(
+            collection_path=Path.home() / ".skillmeat" / "collection"
+        )
 
         try:
             drift_results = sync_mgr.check_drift(project_path=project_path)

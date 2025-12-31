@@ -949,3 +949,18 @@
   - `skillmeat/web/tests/e2e/catalog-preview.spec.ts` (mock data and route patterns)
 - **Commit(s)**: 3c6d2b9
 - **Status**: RESOLVED
+
+### Projects Disappear After Creating New Project (Critical)
+
+**Issue**: Adding a new Project from the web app causes all other Projects to disappear from the list. Only the newly added Project shows, and subsequent additions don't display.
+- **Location**: `skillmeat/api/routers/projects.py:636-653`, `skillmeat/cache/manager.py:400-466`
+- **Root Cause**: `cache_manager.populate_projects()` was called in `create_project()` with only ProjectRegistry data. This method **replaces** the entire persistent SQLite cache instead of merging. ProjectRegistry is an in-memory cache (5-min TTL) that may have incomplete data during a scan, so calling `populate_projects()` with incomplete data wiped all existing projects from the persistent cache.
+- **Fix**:
+  1. Added `upsert_project()` method to `CacheManager` that adds/updates a SINGLE project without touching others (uses existing repository's get/update/create pattern)
+  2. Modified `create_project()` router to call `cache_manager.upsert_project()` for just the new project instead of `populate_projects()` for all projects
+  3. Error handling: cache failure logs warning but doesn't break project creation
+- **Files Modified**:
+  - `skillmeat/cache/manager.py` (added `upsert_project()` method, lines 400-466)
+  - `skillmeat/api/routers/projects.py` (use `upsert_project()` in `create_project()`, lines 636-653)
+- **Commit(s)**: 1743cc5
+- **Status**: RESOLVED
