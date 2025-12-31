@@ -3,25 +3,30 @@ type: progress
 prd: "marketplace-source-enhancements-v1"
 phase: 1
 title: "Frontend Foundation"
-status: pending
-progress: 0
+status: in_progress
+progress: 75
 total_tasks: 8
-completed_tasks: 0
+completed_tasks: 6
 story_points: 13
+last_updated: "2025-12-31T21:30:00Z"
+session_note: "Batch 1-2 completed. Recovered from session interruption."
 
 tasks:
   - id: "TASK-1.1"
     title: "Create frontmatter parsing utility"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer"]
     dependencies: []
     estimate: "2h"
+    completed_at: "2025-12-31T21:00:00Z"
   - id: "TASK-1.2"
     title: "Create FrontmatterDisplay component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: ["TASK-1.1"]
     estimate: "3h"
+    completed_at: "2025-12-31T21:05:00Z"
+    agent_id: "a610b3c"
   - id: "TASK-1.3"
     title: "Integrate frontmatter into ContentPane"
     status: "pending"
@@ -36,34 +41,41 @@ tasks:
     estimate: "1h"
   - id: "TASK-1.5"
     title: "Create CatalogTabs component"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer-enhanced"]
     dependencies: []
     estimate: "3h"
+    completed_at: "2025-12-31T21:00:00Z"
   - id: "TASK-1.6"
     title: "Replace dropdown with tabs in source page"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer"]
     dependencies: ["TASK-1.5"]
     estimate: "2h"
+    completed_at: "2025-12-31T21:04:00Z"
+    agent_id: "af0ec2b"
   - id: "TASK-1.7"
     title: "Unit tests for frontmatter utility"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer"]
     dependencies: ["TASK-1.1"]
     estimate: "1h"
+    completed_at: "2025-12-31T21:05:00Z"
+    agent_id: "a39f2a9"
   - id: "TASK-1.8"
     title: "Unit tests for CatalogTabs"
-    status: "pending"
+    status: "completed"
     assigned_to: ["ui-engineer"]
     dependencies: ["TASK-1.5"]
     estimate: "1h"
+    completed_at: "2025-12-31T21:06:00Z"
+    agent_id: "a9935ea"
 
 parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.5"]
-  batch_2: ["TASK-1.2", "TASK-1.6", "TASK-1.7", "TASK-1.8"]
-  batch_3: ["TASK-1.3"]
-  batch_4: ["TASK-1.4"]
+  batch_1: ["TASK-1.1", "TASK-1.5"]  # COMPLETED
+  batch_2: ["TASK-1.2", "TASK-1.6", "TASK-1.7", "TASK-1.8"]  # COMPLETED
+  batch_3: ["TASK-1.3"]  # PENDING
+  batch_4: ["TASK-1.4"]  # PENDING
 
 blockers: []
 ---
