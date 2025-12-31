@@ -72,7 +72,7 @@ const mockCatalogResponse = {
 };
 
 const mockFileTree = {
-  files: [
+  entries: [
     { path: 'README.md', type: 'file', size: 1024 },
     { path: 'SKILL.md', type: 'file', size: 2048 },
     { path: 'examples', type: 'tree', size: 0 },
@@ -80,6 +80,7 @@ const mockFileTree = {
     { path: 'examples/advanced.md', type: 'file', size: 768 },
     { path: 'config.json', type: 'file', size: 256 },
   ],
+  cached: false,
 };
 
 const mockFileContent = {
@@ -121,14 +122,14 @@ async function setupMockApiRoutes(page: Page) {
   // Mock file tree endpoint
   await mockApiRoute(
     page,
-    `/api/v1/marketplace/sources/*/catalog/*/files`,
+    `/api/v1/marketplace/sources/*/artifacts/*/files`,
     mockFileTree
   );
 
   // Mock file content endpoint
   await mockApiRoute(
     page,
-    `/api/v1/marketplace/sources/*/catalog/*/files/content*`,
+    `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
     mockFileContent
   );
 }
@@ -297,7 +298,7 @@ test.describe('Catalog File Preview - Error Handling', () => {
     // Mock file tree to return error
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files`,
       { error: 'Failed to fetch file tree' },
       500
     );
@@ -323,7 +324,7 @@ test.describe('Catalog File Preview - Error Handling', () => {
     // Override content endpoint to fail
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files/content*`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
       { error: 'Failed to fetch file content' },
       500
     );
@@ -349,7 +350,7 @@ test.describe('Catalog File Preview - Error Handling', () => {
     // Override content endpoint to return rate limit error
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files/content*`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
       { error: 'Rate limit exceeded' },
       429
     );
@@ -388,12 +389,12 @@ test.describe('Catalog File Preview - Large File Handling', () => {
     );
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files`,
       mockFileTree
     );
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files/content*`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
       mockTruncatedFileContent
     );
 
@@ -597,8 +598,8 @@ test.describe('Catalog File Preview - Empty States', () => {
     );
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files`,
-      { files: [] }
+      `/api/v1/marketplace/sources/*/artifacts/*/files`,
+      { entries: [], cached: false }
     );
 
     await navigateToSourceDetailPage(page);
@@ -628,12 +629,13 @@ test.describe('Catalog File Preview - Empty States', () => {
     // Only directories, no files
     await mockApiRoute(
       page,
-      `/api/v1/marketplace/sources/*/catalog/*/files`,
+      `/api/v1/marketplace/sources/*/artifacts/*/files`,
       {
-        files: [
+        entries: [
           { path: 'folder1', type: 'tree', size: 0 },
           { path: 'folder2', type: 'tree', size: 0 },
         ],
+        cached: false,
       }
     );
 
