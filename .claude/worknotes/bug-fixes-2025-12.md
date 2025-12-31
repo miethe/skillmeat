@@ -41,7 +41,7 @@
   - `skillmeat/web/lib/api/catalog.ts` (interface field rename)
   - `skillmeat/web/components/CatalogEntryModal.tsx` (4 usages updated)
 - **Verification**: Build passes; file tree should now display correctly
-- **Commit(s)**: 5f0f759
+- **Commit(s)**: 8668f9f
 - **Status**: RESOLVED
 
 ## 2025-12-29
@@ -926,4 +926,26 @@
   4. Provides close button
 - **Files Modified**: `skillmeat/web/components/entity/unified-entity-modal.tsx`
 - **Commit(s)**: d350e10
+- **Status**: RESOLVED
+
+## 2025-12-31
+
+### Marketplace Contents Tab Shows Artifact Directory Instead of Files
+
+**Issue**: The Contents tab in CatalogEntryModal shows artifact path as a root directory (e.g., "cli-tool") instead of showing files directly. Files are never auto-selected, and no file content is displayed.
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:1167-1223`, `skillmeat/api/schemas/marketplace.py:1491`, `skillmeat/web/tests/e2e/catalog-preview.spec.ts:74-83,122-133`
+- **Root Cause**: Two bugs combined:
+  1. **Path prefix not stripped**: Backend returned full repository paths (e.g., "cli-tool/SKILL.md") instead of paths relative to artifact root (e.g., "SKILL.md"). This caused `buildFileStructure()` to create the artifact directory as a nested root.
+  2. **Type mismatch**: Backend returned GitHub's `type: "blob"` terminology but frontend expected `type: "file"`. This broke the auto-select logic which filters files by `f.type === 'file'`.
+- **Fix**:
+  1. Added path prefix stripping in both cached and non-cached response paths in `marketplace_sources.py`
+  2. Added type transformation: `"blob"` → `"file"` in response construction
+  3. Added filter to exclude the artifact directory itself from results
+  4. Updated `FileTreeEntry` schema to use `Literal["file", "tree"]` instead of `Literal["blob", "tree"]`
+  5. Updated E2E test mocks to use `entries` instead of `files`, and `/artifacts/` instead of `/catalog/` in route patterns
+- **Files Modified**:
+  - `skillmeat/api/routers/marketplace_sources.py` (cached + non-cached response paths)
+  - `skillmeat/api/schemas/marketplace.py` (FileTreeEntry type field)
+  - `skillmeat/web/tests/e2e/catalog-preview.spec.ts` (mock data and route patterns)
+- **Commit(s)**: 3c6d2b9
 - **Status**: RESOLVED

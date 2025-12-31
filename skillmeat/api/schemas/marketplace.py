@@ -1488,9 +1488,9 @@ class FileTreeEntry(BaseModel):
         description="File path relative to artifact root",
         examples=["README.md", "src/main.py"],
     )
-    type: Literal["blob", "tree"] = Field(
-        description="Entry type: 'blob' for files, 'tree' for directories",
-        examples=["blob"],
+    type: Literal["file", "tree"] = Field(
+        description="Entry type: 'file' for files, 'tree' for directories",
+        examples=["file"],
     )
     size: Optional[int] = Field(
         default=None,
@@ -1509,7 +1509,7 @@ class FileTreeEntry(BaseModel):
         json_schema_extra = {
             "example": {
                 "path": "SKILL.md",
-                "type": "blob",
+                "type": "file",
                 "size": 2048,
                 "sha": "abc123def456789",
             }

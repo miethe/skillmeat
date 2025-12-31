@@ -1164,15 +1164,20 @@ async def get_artifact_file_tree(
         cached_tree = cache.get(cache_key)
         if cached_tree is not None:
             logger.debug(f"Cache hit for file tree: {artifact_path}")
+            # Strip artifact path prefix from file paths
+            path_prefix = f"{artifact_path}/" if artifact_path else ""
+            prefix_len = len(path_prefix)
             return FileTreeResponse(
                 entries=[
                     FileTreeEntry(
-                        path=entry["path"],
-                        type=entry["type"],
+                        path=entry["path"][prefix_len:] if entry["path"].startswith(path_prefix) else entry["path"],
+                        type="file" if entry["type"] == "blob" else entry["type"],
                         size=entry.get("size"),
                         sha=entry["sha"],
                     )
                     for entry in cached_tree
+                    # Exclude the artifact directory itself
+                    if entry["path"] != artifact_path
                 ],
                 artifact_path=artifact_path,
                 source_id=source_id,
@@ -1202,15 +1207,21 @@ async def get_artifact_file_tree(
         cache.set(cache_key, tree_entries, ttl_seconds=DEFAULT_TREE_TTL)
         logger.debug(f"Cached file tree: {artifact_path} ({len(tree_entries)} entries)")
 
+        # Strip artifact path prefix from file paths
+        path_prefix = f"{artifact_path}/" if artifact_path else ""
+        prefix_len = len(path_prefix)
+
         return FileTreeResponse(
             entries=[
                 FileTreeEntry(
-                    path=entry["path"],
-                    type=entry["type"],
+                    path=entry["path"][prefix_len:] if entry["path"].startswith(path_prefix) else entry["path"],
+                    type="file" if entry["type"] == "blob" else entry["type"],
                     size=entry.get("size"),
                     sha=entry["sha"],
                 )
                 for entry in tree_entries
+                # Exclude the artifact directory itself (exact match with no remaining path)
+                if entry["path"] != artifact_path
             ],
             artifact_path=artifact_path,
             source_id=source_id,
