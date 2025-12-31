@@ -30,14 +30,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { CatalogTabs } from './components/catalog-tabs';
 import {
   useSource,
   useSourceCatalog,
@@ -507,27 +501,11 @@ export default function SourceDetailPage() {
           </div>
 
           {/* Type filter */}
-          <Select
-            value={filters.artifact_type || 'all'}
-            onValueChange={(v) =>
-              setFilters((prev) => ({
-                ...prev,
-                artifact_type: v === 'all' ? undefined : (v as ArtifactType),
-              }))
-            }
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="skill">Skills</SelectItem>
-              <SelectItem value="command">Commands</SelectItem>
-              <SelectItem value="agent">Agents</SelectItem>
-              <SelectItem value="mcp_server">MCP Servers</SelectItem>
-              <SelectItem value="hook">Hooks</SelectItem>
-            </SelectContent>
-          </Select>
+          <CatalogTabs
+            countsByType={catalogData?.pages?.[0]?.counts_by_type ?? {}}
+            selectedType={filters.artifact_type ?? null}
+            onTypeChange={(type) => setFilters(prev => ({ ...prev, artifact_type: type as ArtifactType | undefined }))}
+          />
 
           {/* Confidence filter */}
           <ConfidenceFilter

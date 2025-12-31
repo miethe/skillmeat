@@ -982,7 +982,7 @@ class CatalogEntryResponse(BaseModel):
             }
         ],
     )
-    status: Literal["new", "updated", "removed", "imported"] = Field(
+    status: Literal["new", "updated", "removed", "imported", "excluded"] = Field(
         description="Lifecycle status of the catalog entry",
         examples=["new"],
     )
@@ -993,6 +993,16 @@ class CatalogEntryResponse(BaseModel):
     import_id: Optional[str] = Field(
         default=None,
         description="ID of import operation if imported",
+    )
+    excluded_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when artifact was excluded from catalog",
+    )
+    excluded_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for excluding this artifact from catalog",
+        max_length=500,
+        examples=["Not a valid skill - documentation only"],
     )
 
     class Config:
@@ -1025,6 +1035,37 @@ class CatalogEntryResponse(BaseModel):
                 "status": "new",
                 "import_date": None,
                 "import_id": None,
+                "excluded_at": None,
+                "excluded_reason": None,
+            }
+        }
+
+
+class ExcludeArtifactRequest(BaseModel):
+    """Request body for excluding/restoring a catalog entry.
+
+    Used to mark artifacts as excluded from the catalog (e.g., false positives,
+    documentation files) or to restore previously excluded entries.
+    """
+
+    excluded: bool = Field(
+        description="True to mark as excluded, False to restore",
+        examples=[True],
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="User-provided reason for exclusion (optional)",
+        max_length=500,
+        examples=["Not a valid artifact - documentation file"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "excluded": True,
+                "reason": "This is a documentation file, not an actual skill",
             }
         }
 
@@ -1044,7 +1085,7 @@ class CatalogListResponse(BaseModel):
     counts_by_status: Dict[str, int] = Field(
         default_factory=dict,
         description="Count of entries by status",
-        examples=[{"new": 45, "updated": 12, "imported": 33}],
+        examples=[{"new": 45, "updated": 12, "imported": 33, "excluded": 5}],
     )
     counts_by_type: Dict[str, int] = Field(
         default_factory=dict,
@@ -1088,7 +1129,7 @@ class CatalogListResponse(BaseModel):
                     "end_cursor": "Y3Vyc29yOjE5",
                     "total_count": 90,
                 },
-                "counts_by_status": {"new": 45, "updated": 12, "imported": 33},
+                "counts_by_status": {"new": 45, "updated": 12, "imported": 33, "excluded": 5},
                 "counts_by_type": {"skill": 60, "command": 20, "agent": 10},
             }
         }
