@@ -1745,6 +1745,80 @@ async def get_project_drift_summary(
 
 
 @router.post(
+    "/cache/clear",
+    summary="Clear project cache",
+    description="Clear the persistent SQLite cache and force full project rediscovery",
+    responses={
+        200: {"description": "Cache cleared successfully"},
+        500: {"description": "Cache manager not available"},
+    },
+)
+async def clear_project_cache(
+    token: TokenDep,
+    cache_manager: CacheManagerDep,
+) -> dict:
+    """Clear persistent project cache and force rediscovery.
+
+    This clears the SQLite cache and triggers a full filesystem scan
+    to rediscover all projects. Use when cache is out of sync with disk.
+
+    Args:
+        token: Authentication token
+        cache_manager: CacheManager dependency
+
+    Returns:
+        Cache clear status with project count after rediscovery
+    """
+    if cache_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cache manager not available",
+        )
+
+    try:
+        # Clear SQLite project cache
+        cleared = cache_manager.clear_cache()
+        if not cleared:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to clear cache",
+            )
+
+        # Force ProjectRegistry refresh to rediscover projects
+        registry = await get_project_registry()
+        discovered = await registry.get_projects(force_refresh=True)
+
+        # Repopulate cache with fresh data
+        projects_data = [
+            {
+                "id": encode_project_id(str(entry.path)),
+                "name": entry.name,
+                "path": str(entry.path),
+                "description": None,
+                "artifacts": [],
+            }
+            for entry in discovered
+        ]
+        cache_manager.populate_projects(projects_data)
+
+        logger.info(f"Cleared project cache and rediscovered {len(discovered)} projects")
+
+        return {
+            "success": True,
+            "message": f"Cache cleared and {len(discovered)} projects rediscovered",
+            "projects_found": len(discovered),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to clear project cache: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear cache: {str(e)}",
+        )
+
+
+@router.post(
     "/cache/refresh",
     summary="Refresh project cache",
     description="Force a full refresh of the project discovery cache",
