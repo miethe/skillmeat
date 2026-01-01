@@ -1701,3 +1701,198 @@ class TestOrganizationPath:
             elif match.artifact_type == "skill":
                 # Container is "my-plugin/skills", org path is "core"
                 assert match.organization_path == "core"
+
+
+class TestSingleFileArtifacts:
+    """Test detection of single-file artifacts in containers."""
+
+    @pytest.fixture
+    def detector(self):
+        return HeuristicDetector()
+
+    def test_single_file_command_in_container(self, detector):
+        """commands/use-mcp.md -> COMMAND"""
+        paths = ["commands/use-mcp.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "command"
+        assert matches[0].path == "commands/use-mcp.md"
+        assert matches[0].organization_path is None
+
+    def test_single_file_agent_in_container(self, detector):
+        """agents/mcp-manager.md -> AGENT"""
+        paths = ["agents/mcp-manager.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "agent"
+        assert matches[0].path == "agents/mcp-manager.md"
+
+    def test_multiple_commands_in_grouping_dir(self, detector):
+        """commands/git/cm.md, cp.md, pr.md -> 3 COMMANDs"""
+        paths = [
+            "commands/git/cm.md",
+            "commands/git/cp.md",
+            "commands/git/pr.md",
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 3
+        assert all(m.artifact_type == "command" for m in matches)
+        assert all(m.organization_path == "git" for m in matches)
+
+    def test_nested_command_org_path(self, detector):
+        """commands/dev/subgroup/my-cmd.md -> organization_path='dev/subgroup'"""
+        paths = ["commands/dev/subgroup/my-cmd.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "command"
+        assert matches[0].organization_path == "dev/subgroup"
+
+    def test_excludes_readme_files(self, detector):
+        """README.md files should not be detected as artifacts"""
+        paths = [
+            "commands/README.md",
+            "commands/git/README.md",
+            "commands/git/cm.md",  # This should be detected
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].path == "commands/git/cm.md"
+
+    def test_excludes_manifest_files(self, detector):
+        """Directories with manifests handled by directory detection, not single-file"""
+        paths = [
+            "commands/deploy/COMMAND.md",  # Directory-based
+            "commands/deploy/helper.py",
+            "commands/quick.md",  # Single-file
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        # Should get 2 matches: deploy directory + quick.md single-file
+        assert len(matches) == 2
+        by_path = {m.path: m for m in matches}
+        assert "commands/deploy" in by_path or "commands/deploy/COMMAND.md" in by_path
+        assert "commands/quick.md" in by_path
+
+    def test_mixed_artifact_types(self, detector):
+        """Mix of single-file and directory-based across types"""
+        paths = [
+            "commands/use-mcp.md",  # Single-file command
+            "skills/aesthetic/SKILL.md",  # Directory-based skill
+            "agents/helper.md",  # Single-file agent
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 3
+        by_path = {m.path: m for m in matches}
+        assert by_path["commands/use-mcp.md"].artifact_type == "command"
+        assert by_path["skills/aesthetic"].artifact_type == "skill"
+        assert by_path["agents/helper.md"].artifact_type == "agent"
+
+    def test_claudekit_structure(self, detector):
+        """Real-world test: mrgoonie/claudekit-skills structure"""
+        paths = [
+            # Commands
+            "commands/git/cm.md",
+            "commands/git/cp.md",
+            "commands/git/pr.md",
+            "commands/skill/create.md",
+            "commands/use-mcp.md",
+            # Agent
+            "agents/mcp-manager.md",
+            # Skills (directory-based)
+            "skills/aesthetic/SKILL.md",
+            "skills/ai-multimodal/SKILL.md",
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+
+        # Should detect: 5 commands, 1 agent, 2 skills
+        commands = [m for m in matches if m.artifact_type == "command"]
+        agents = [m for m in matches if m.artifact_type == "agent"]
+        skills = [m for m in matches if m.artifact_type == "skill"]
+
+        assert len(commands) == 5, f"Expected 5 commands, got {len(commands)}"
+        assert len(agents) == 1, f"Expected 1 agent, got {len(agents)}"
+        assert len(skills) == 2, f"Expected 2 skills, got {len(skills)}"
+
+    def test_single_file_confidence_score(self, detector):
+        """Single-file artifacts should have appropriate confidence scores"""
+        # Direct in container - higher confidence
+        paths_direct = ["commands/deploy.md"]
+        matches_direct = detector.analyze_paths(
+            paths_direct, base_url="https://github.com/test/repo"
+        )
+        assert len(matches_direct) == 1
+        assert matches_direct[0].confidence_score == 80
+
+        # Nested in grouping directory - slightly lower
+        paths_nested = ["commands/git/deploy.md"]
+        matches_nested = detector.analyze_paths(
+            paths_nested, base_url="https://github.com/test/repo"
+        )
+        assert len(matches_nested) == 1
+        assert matches_nested[0].confidence_score == 75
+
+    def test_single_file_breakdown_structure(self, detector):
+        """Single-file artifacts should have proper breakdown structure"""
+        paths = ["commands/deploy.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+
+        assert len(matches) == 1
+        breakdown = matches[0].breakdown
+
+        # Should have single_file_detection flag (stored as truthy value)
+        assert breakdown.get("single_file_detection")
+
+        # Should have container hint score
+        assert breakdown["container_hint_score"] == 25  # default container_hint_weight
+
+        # Should have extension score for .md
+        assert breakdown["extensions_score"] == 5
+
+        # Should have no manifest score (single-file, not directory-based)
+        assert breakdown["manifest_score"] == 0
+
+    def test_single_file_not_detected_outside_container(self, detector):
+        """Single .md files outside containers should not be detected"""
+        paths = [
+            "src/docs/guide.md",
+            "misc/notes.md",
+        ]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        # Should not detect any artifacts (no container context)
+        assert len(matches) == 0
+
+    def test_single_file_hooks(self, detector):
+        """hooks/pre-commit.md -> HOOK"""
+        paths = ["hooks/pre-commit.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "hook"
+
+    def test_single_file_mcp(self, detector):
+        """mcp/slack-server.md -> MCP_SERVER"""
+        paths = ["mcp/slack-server.md"]
+        matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "mcp_server"
+
+    def test_artifact_name_from_single_file(self):
+        """Test that artifact name is extracted correctly from single-file path"""
+        paths = ["commands/use-mcp.md"]
+        artifacts = detect_artifacts_in_tree(paths, "https://github.com/test/repo")
+
+        assert len(artifacts) == 1
+        # Name should be the filename without extension
+        assert artifacts[0].name == "use-mcp.md"  # Full filename for single-file
+
+    def test_upstream_url_for_single_file(self):
+        """Test that upstream URL is correctly generated for single-file artifacts"""
+        paths = ["commands/use-mcp.md"]
+        artifacts = detect_artifacts_in_tree(
+            paths, "https://github.com/user/repo", detected_sha="abc123"
+        )
+
+        assert len(artifacts) == 1
+        assert (
+            artifacts[0].upstream_url
+            == "https://github.com/user/repo/tree/main/commands/use-mcp.md"
+        )
+        assert artifacts[0].detected_sha == "abc123"

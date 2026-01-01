@@ -280,6 +280,196 @@ class HeuristicDetector:
 
         return "/".join(organization_parts) if organization_parts else None
 
+    def _detect_single_file_artifacts(
+        self,
+        dir_to_files: Dict[str, Set[str]],
+        container_types: Dict[str, ArtifactType],
+        root_hint: Optional[str],
+    ) -> List[HeuristicMatch]:
+        """Detect single-file artifacts (.md files) directly in or nested under containers.
+
+        Claude Code conventions:
+        - Skills: Always directory-based (SKILL.md + supporting files)
+        - Commands: Often single .md file (the command prompt itself)
+        - Agents: Often single .md file (the agent definition)
+
+        Args:
+            dir_to_files: Mapping of directories to their files
+            container_types: Mapping of container paths to their artifact types
+            root_hint: Optional path filter
+
+        Returns:
+            List of HeuristicMatch for detected single-file artifacts
+        """
+        matches: List[HeuristicMatch] = []
+
+        # Skip files to exclude from single-file detection
+        excluded_files = {
+            "readme.md",
+            "changelog.md",
+            "license.md",
+            "contributing.md",
+            "skill.md",
+            "command.md",
+            "agent.md",
+            "mcp.md",
+            "hook.md",  # manifest files
+        }
+
+        # Process all directories to find single-file artifacts
+        for dir_path, files in dir_to_files.items():
+            # Apply root hint filtering
+            if root_hint and not dir_path.startswith(root_hint):
+                continue
+
+            # Find container context for this directory
+            container_type: Optional[ArtifactType] = None
+            container_dir: Optional[str] = None
+
+            # Check if this IS a container
+            if dir_path in container_types:
+                container_type = container_types[dir_path]
+                container_dir = dir_path
+            else:
+                # Check if inside a container
+                for c_path, c_type in container_types.items():
+                    if dir_path.startswith(c_path + "/"):
+                        container_type = c_type
+                        container_dir = c_path
+                        break
+
+            if container_type is None:
+                continue  # Not in a container context
+
+            # Check if directory has a manifest file (then it's directory-based, skip)
+            has_manifest = any(
+                f.lower() in {"skill.md", "command.md", "agent.md", "mcp.md", "hook.md"}
+                for f in files
+            )
+            if has_manifest:
+                continue  # Will be handled by directory-based detection
+
+            # Detect single-file artifacts
+            for filename in files:
+                if not filename.lower().endswith(".md"):
+                    continue
+                if filename.lower() in excluded_files:
+                    continue
+
+                artifact_path = f"{dir_path}/{filename}"
+
+                # Compute organization path for single-file artifact
+                # For single files, the artifact IS the file, not the directory
+                # So organization path is the path from container to the file's parent directory
+                if dir_path == container_dir:
+                    organization_path = None  # Directly in container
+                else:
+                    # For single-file: commands/git/cm.md
+                    # container_dir = "commands", dir_path = "commands/git"
+                    # organization_path should be "git"
+                    relative_path = dir_path[len(container_dir) + 1:]
+                    organization_path = relative_path if relative_path else None
+
+                # Determine confidence (higher if directly in container)
+                is_direct = dir_path == container_dir
+                confidence = 80 if is_direct else 75
+
+                match = HeuristicMatch(
+                    path=artifact_path,
+                    artifact_type=container_type.value,
+                    confidence_score=confidence,
+                    organization_path=organization_path,
+                    match_reasons=[
+                        f"Single-file {container_type.value} in container",
+                        f"Container: {container_dir}/",
+                        f"File: {filename}",
+                    ],
+                    # Score breakdown for single-file artifacts
+                    dir_name_score=0,
+                    manifest_score=0,
+                    extension_score=5,  # .md extension
+                    depth_penalty=0,
+                    raw_score=self.config.container_hint_weight + 5,
+                    breakdown={
+                        "dir_name_score": 0,
+                        "manifest_score": 0,
+                        "extensions_score": 5,
+                        "parent_hint_score": 0,
+                        "frontmatter_score": 0,
+                        "container_hint_score": self.config.container_hint_weight,
+                        "depth_penalty": 0,
+                        "raw_total": self.config.container_hint_weight + 5,
+                        "normalized_score": confidence,
+                        "single_file_detection": True,
+                    },
+                )
+                matches.append(match)
+
+        return matches
+
+    def _is_single_file_grouping_directory(
+        self,
+        dir_path: str,
+        files: Set[str],
+        container_types: Dict[str, ArtifactType],
+    ) -> bool:
+        """Check if a directory is a grouping directory for single-file artifacts.
+
+        A grouping directory is a non-container directory inside a typed container
+        that contains only .md files (single-file artifacts) and no manifest files.
+        Example: commands/git/ containing cm.md, cp.md, pr.md
+
+        These directories should not be detected as directory-based artifacts
+        because their contents are already detected as single-file artifacts.
+
+        Args:
+            dir_path: Path to check
+            files: Set of filenames in this directory
+            container_types: Mapping of container paths to artifact types
+
+        Returns:
+            True if this is a grouping directory for single-file artifacts
+        """
+        # Check if this directory is inside a container
+        is_inside_container = False
+        for c_path in container_types:
+            if dir_path.startswith(c_path + "/"):
+                is_inside_container = True
+                break
+
+        if not is_inside_container:
+            return False
+
+        # Check if it has any manifest files
+        manifest_files = {"skill.md", "command.md", "agent.md", "mcp.md", "hook.md"}
+        has_manifest = any(f.lower() in manifest_files for f in files)
+        if has_manifest:
+            return False  # Has manifest, treat as directory-based
+
+        # Check if all files (except excluded) are .md files
+        excluded_files = {
+            "readme.md", "changelog.md", "license.md", "contributing.md"
+        }
+
+        artifact_md_files = [
+            f for f in files
+            if f.lower().endswith(".md") and f.lower() not in excluded_files
+        ]
+
+        # If there are .md files that would be detected as single-file artifacts,
+        # and no other significant files, this is a grouping directory
+        if artifact_md_files:
+            # Check if there are any non-.md files (except common non-artifact files)
+            other_files = [
+                f for f in files
+                if not f.lower().endswith(".md")
+            ]
+            # If only .md files (or common non-artifact files), it's a grouping dir
+            if not other_files:
+                return True
+
+        return False
+
     def analyze_paths(
         self,
         paths: List[str],
@@ -339,6 +529,12 @@ class HeuristicDetector:
 
         matches: List[HeuristicMatch] = []
 
+        # Detect single-file artifacts inside containers
+        single_file_matches = self._detect_single_file_artifacts(
+            dir_to_files, container_types, root_hint
+        )
+        matches.extend(single_file_matches)
+
         # Analyze each directory
         for dir_path, files in dir_to_files.items():
             # Skip root directory
@@ -347,6 +543,12 @@ class HeuristicDetector:
 
             # Skip if container directory (containers themselves are not artifacts)
             if self._is_container_directory(dir_path, dir_to_files):
+                continue
+
+            # Skip if this is a "grouping directory" for single-file artifacts
+            # A grouping directory has no manifest but contains only .md files
+            # inside a typed container (e.g., commands/git/ with cm.md, cp.md)
+            if self._is_single_file_grouping_directory(dir_path, files, container_types):
                 continue
 
             # Skip if too deep
