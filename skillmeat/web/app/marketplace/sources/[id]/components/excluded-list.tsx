@@ -79,12 +79,13 @@ export function ExcludedArtifactsList({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={isOpen ? `Collapse excluded artifacts list (${entries.length} items)` : `Expand excluded artifacts list (${entries.length} items)`}
         >
           {isOpen ? (
-            <ChevronUp className="h-4 w-4" />
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
           )}
           Show Excluded Artifacts ({entries.length})
         </Button>
@@ -116,12 +117,13 @@ export function ExcludedArtifactsList({
                       size="sm"
                       onClick={() => restoreMutation.mutate(entry.id)}
                       disabled={restoreMutation.isPending}
+                      aria-label={`Restore ${entry.name} to catalog`}
                     >
                       {restoreMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                       ) : (
                         <>
-                          <RotateCcw className="mr-1 h-3 w-3" />
+                          <RotateCcw className="mr-1 h-3 w-3" aria-hidden="true" />
                           Restore
                         </>
                       )}

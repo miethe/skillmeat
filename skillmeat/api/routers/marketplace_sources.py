@@ -774,18 +774,44 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     "/{source_id}/artifacts",
     response_model=CatalogListResponse,
     summary="List artifacts from source",
+    operation_id="list_source_artifacts",
     description="""
     List all artifacts discovered from a specific source with optional filtering.
 
+    By default, excluded artifacts are hidden from results. Use `include_excluded=true`
+    to include them in listings (useful for reviewing or restoring excluded entries).
+
     Supports filtering by:
-    - artifact_type: skill, command, agent, etc.
-    - status: new, updated, removed, imported
-    - min_confidence: Minimum confidence score (0-100)
-    - max_confidence: Maximum confidence score (0-100)
-    - include_below_threshold: Include artifacts below 30% confidence threshold (default: False)
-    - include_excluded: Include excluded artifacts (default: False)
+    - `artifact_type`: skill, command, agent, etc.
+    - `status`: new, updated, removed, imported, excluded
+    - `min_confidence`: Minimum confidence score (0-100)
+    - `max_confidence`: Maximum confidence score (0-100)
+    - `include_below_threshold`: Include artifacts below 30% confidence threshold (default: false)
+    - `include_excluded`: Include excluded artifacts in results (default: false)
 
     Results are paginated using cursor-based pagination for efficiency.
+
+    **Examples**:
+
+    List only non-excluded artifacts (default):
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts"
+    ```
+
+    List including excluded artifacts:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true"
+    ```
+
+    Filter by artifact type with minimum confidence:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?artifact_type=skill&min_confidence=70"
+    ```
+
+    Pagination example:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?limit=25&cursor=abc123"
+    ```
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -793,10 +819,10 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
 async def list_artifacts(
     source_id: str,
     artifact_type: Optional[str] = Query(
-        None, description="Filter by artifact type (skill, command, etc.)"
+        None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
     status: Optional[str] = Query(
-        None, description="Filter by status (new, updated, removed, imported)"
+        None, description="Filter by status (new, updated, removed, imported, excluded)"
     ),
     min_confidence: Optional[int] = Query(
         None, ge=0, le=100, description="Minimum confidence score (0-100)"
@@ -805,33 +831,46 @@ async def list_artifacts(
         None, ge=0, le=100, description="Maximum confidence score (0-100)"
     ),
     include_below_threshold: bool = Query(
-        False, description="Include artifacts below 30% confidence threshold"
+        False, description="Include artifacts below 30% confidence threshold (default: false)"
     ),
     include_excluded: bool = Query(
-        False, description="Include excluded artifacts in results"
+        False, description="Include excluded artifacts in results (default: false)"
     ),
-    limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
-    cursor: Optional[str] = Query(None, description="Cursor for next page"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
+    cursor: Optional[str] = Query(None, description="Cursor for pagination (from previous response)"),
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters.
+
+    Retrieves catalog entries from a source with support for filtering and pagination.
+    By default, excluded artifacts are filtered out; set include_excluded=true to see them.
 
     Args:
         source_id: Unique source identifier
         artifact_type: Optional artifact type filter
-        status: Optional status filter
+        status: Optional status filter (new, updated, removed, imported, excluded)
         min_confidence: Filter entries with confidence >= this value (0-100)
         max_confidence: Filter entries with confidence <= this value (0-100)
         include_below_threshold: If True, include entries <30% that are normally hidden
         include_excluded: If True, include entries with status="excluded" (default: False)
-        limit: Maximum items per page
-        cursor: Pagination cursor
+        limit: Maximum items per page (1-100)
+        cursor: Pagination cursor from previous response
 
     Returns:
-        Paginated list of catalog entries with statistics
+        Paginated list of catalog entries with counts_by_status and counts_by_type statistics
 
     Raises:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
+
+    Example:
+        >>> # List artifacts including excluded
+        >>> response = await list_artifacts(
+        ...     source_id="src-123",
+        ...     include_excluded=True,
+        ...     limit=50
+        ... )
+        >>> # Count by status shows excluded entries
+        >>> assert response.counts_by_status.get("excluded", 0) >= 0
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
@@ -1133,19 +1172,43 @@ async def import_artifacts(
 @router.patch(
     "/{source_id}/artifacts/{entry_id}/exclude",
     response_model=CatalogEntryResponse,
-    summary="Mark catalog artifact as excluded",
+    summary="Mark or restore catalog artifact",
+    operation_id="exclude_or_restore_artifact",
     description="""
-    Mark a catalog entry as excluded from the catalog (e.g., false positive,
-    documentation file, not an actual artifact).
+    Mark a catalog entry as excluded from the catalog or restore a previously excluded entry.
 
-    This operation is idempotent - calling it on an already excluded entry
-    will return success with the current state.
+    Use this endpoint to mark artifacts that are false positives (not actually Claude artifacts),
+    documentation-only files, or other entries that shouldn't appear in the default catalog view.
+    Excluded artifacts are hidden unless explicitly requested with `include_excluded=True` when
+    listing artifacts.
 
-    To restore an excluded entry, use the same endpoint with excluded=False.
+    This operation is idempotent - calling it multiple times with the same parameters will
+    return success with the current state.
 
-    Path Parameters:
-    - source_id: Marketplace source identifier
-    - entry_id: Catalog entry identifier
+    **Request Body**:
+    - `excluded` (bool, required): True to mark as excluded, False to restore
+    - `reason` (string, optional): User-provided reason (max 500 chars)
+
+    **Response**: Updated catalog entry with `excluded_at` and `excluded_reason` fields
+
+    **Examples**:
+
+    Mark as excluded with reason:
+    ```bash
+    curl -X PATCH "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+           "excluded": true,
+           "reason": "Not a valid skill - documentation only"
+         }'
+    ```
+
+    Restore previously excluded:
+    ```bash
+    curl -X PATCH "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude" \\
+         -H "Content-Type: application/json" \\
+         -d '{"excluded": false}'
+    ```
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -1155,7 +1218,11 @@ async def exclude_artifact(
     entry_id: str,
     request: ExcludeArtifactRequest,
 ) -> CatalogEntryResponse:
-    """Mark or unmark a catalog entry as excluded.
+    """Mark or restore a catalog entry as excluded.
+
+    Marks artifacts that are false positives or not actual Claude artifacts as excluded.
+    Excluded artifacts are filtered from default catalog listings but can be restored.
+    This operation is idempotent - calling it on already excluded entries succeeds.
 
     Args:
         source_id: Unique source identifier
@@ -1163,12 +1230,22 @@ async def exclude_artifact(
         request: Exclusion request with excluded flag and optional reason
 
     Returns:
-        Updated catalog entry
+        Updated catalog entry with exclusion metadata
 
     Raises:
         HTTPException 404: If source or entry not found
         HTTPException 400: If entry does not belong to source
         HTTPException 500: If database operation fails
+
+    Example:
+        >>> # Mark as excluded
+        >>> request = ExcludeArtifactRequest(
+        ...     excluded=True,
+        ...     reason="Documentation file, not a skill"
+        ... )
+        >>> response = await exclude_artifact("src-123", "cat-456", request)
+        >>> assert response.excluded_at is not None
+        >>> assert response.status == "excluded"
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
@@ -1260,16 +1337,30 @@ async def exclude_artifact(
     "/{source_id}/artifacts/{entry_id}/exclude",
     response_model=CatalogEntryResponse,
     summary="Restore excluded catalog artifact",
+    operation_id="restore_excluded_artifact",
     description="""
     Remove the exclusion status from a catalog entry, restoring it to the catalog.
 
     This is a convenience endpoint that performs the same operation as calling
-    PATCH with excluded=False. It is idempotent - calling it on a non-excluded
+    PATCH with `excluded=False`. It is idempotent - calling it on a non-excluded
     entry will return success with the current state.
 
-    Path Parameters:
-    - source_id: Marketplace source identifier
-    - entry_id: Catalog entry identifier
+    Restored entries will be visible in the default catalog view and can be
+    imported to collections.
+
+    **Examples**:
+
+    Restore an excluded artifact:
+    ```bash
+    curl -X DELETE "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude"
+    ```
+
+    List artifacts including excluded (before restoring):
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true"
+    ```
+
+    After restore, the artifact will appear in both filtered and unfiltered listings.
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -1278,19 +1369,29 @@ async def restore_excluded_artifact(
     source_id: str,
     entry_id: str,
 ) -> CatalogEntryResponse:
-    """Restore an excluded catalog entry.
+    """Restore an excluded catalog entry to the catalog.
+
+    Removes exclusion status and makes the artifact visible in default catalog views.
+    This is idempotent - restoring a non-excluded entry succeeds without changes.
 
     Args:
         source_id: Unique source identifier
         entry_id: Unique catalog entry identifier
 
     Returns:
-        Updated catalog entry with exclusion removed
+        Updated catalog entry with exclusion removed (excluded_at=None, excluded_reason=None)
 
     Raises:
         HTTPException 404: If source or entry not found
         HTTPException 400: If entry does not belong to source
         HTTPException 500: If database operation fails
+
+    Example:
+        >>> # Restore previously excluded entry
+        >>> response = await restore_excluded_artifact("src-123", "cat-456")
+        >>> assert response.excluded_at is None
+        >>> assert response.excluded_reason is None
+        >>> assert response.status == "new"  # or "imported" if previously imported
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
