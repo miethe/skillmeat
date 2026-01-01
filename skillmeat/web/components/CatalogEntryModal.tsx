@@ -94,6 +94,10 @@ const statusConfig: Record<CatalogStatus, { label: string; className: string }> 
     label: 'Removed',
     className: 'border-red-500 text-red-700 bg-red-50 dark:bg-red-950 line-through',
   },
+  excluded: {
+    label: 'Excluded',
+    className: 'border-gray-400 text-gray-600 bg-gray-100 dark:bg-gray-800',
+  },
 };
 
 /**

@@ -18,6 +18,7 @@ import type {
   GitHubSourceListResponse,
   CreateSourceRequest,
   UpdateSourceRequest,
+  CatalogEntry,
   CatalogListResponse,
   CatalogFilters,
   ScanRequest,
@@ -321,4 +322,79 @@ export function useImportAllMatching(sourceId: string) {
     isLoading: importMutation.isPending,
     totalNew: data?.pages[0]?.counts_by_status.new || 0,
   };
+}
+
+// ============================================================================
+// Exclusion Operations
+// ============================================================================
+
+interface ExcludeEntryRequest {
+  excluded: boolean;
+  reason?: string;
+}
+
+/**
+ * Mark a catalog entry as excluded
+ */
+export function useExcludeCatalogEntry(sourceId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ entryId, reason }: { entryId: string; reason?: string }) =>
+      apiRequest<CatalogEntry>(
+        `/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ excluded: true, reason } as ExcludeEntryRequest),
+        }
+      ),
+    onSuccess: (entry) => {
+      queryClient.invalidateQueries({ queryKey: sourceKeys.catalog(sourceId) });
+      toast({
+        title: 'Entry excluded',
+        description: `${entry.name} has been excluded from the catalog`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to exclude entry',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Restore an excluded catalog entry
+ */
+export function useRestoreCatalogEntry(sourceId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (entryId: string) =>
+      apiRequest<CatalogEntry>(
+        `/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ excluded: false } as ExcludeEntryRequest),
+        }
+      ),
+    onSuccess: (entry) => {
+      queryClient.invalidateQueries({ queryKey: sourceKeys.catalog(sourceId) });
+      toast({
+        title: 'Entry restored',
+        description: `${entry.name} has been restored to the catalog`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to restore entry',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 }
