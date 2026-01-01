@@ -9,7 +9,7 @@
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import * as LucideIcons from 'lucide-react';
+import { Sparkles, Bot, Terminal, Server, Webhook } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /**
@@ -20,8 +20,8 @@ interface ArtifactTypeConfig {
   value: string;
   /** Display label (plural) */
   label: string;
-  /** Lucide icon name */
-  icon: string;
+  /** Icon component */
+  Icon: LucideIcon;
 }
 
 /**
@@ -29,11 +29,11 @@ interface ArtifactTypeConfig {
  * Maps API values to display configuration
  */
 const ARTIFACT_TYPE_TABS: ArtifactTypeConfig[] = [
-  { value: 'skill', label: 'Skills', icon: 'Sparkles' },
-  { value: 'agent', label: 'Agents', icon: 'Bot' },
-  { value: 'command', label: 'Commands', icon: 'Terminal' },
-  { value: 'mcp_server', label: 'MCP', icon: 'Server' },
-  { value: 'hook', label: 'Hooks', icon: 'Webhook' },
+  { value: 'skill', label: 'Skills', Icon: Sparkles },
+  { value: 'agent', label: 'Agents', Icon: Bot },
+  { value: 'command', label: 'Commands', Icon: Terminal },
+  { value: 'mcp_server', label: 'MCP', Icon: Server },
+  { value: 'hook', label: 'Hooks', Icon: Webhook },
 ];
 
 export interface CatalogTabsProps {
@@ -96,7 +96,7 @@ export function CatalogTabs({
         {ARTIFACT_TYPE_TABS.map((typeConfig) => {
           const count = getCount(typeConfig.value);
           const isZeroCount = count === 0;
-          const IconComponent = (LucideIcons as any)[typeConfig.icon] as LucideIcon;
+          const { Icon } = typeConfig;
 
           return (
             <TabsTrigger
@@ -112,7 +112,7 @@ export function CatalogTabs({
                 isZeroCount && 'opacity-50'
               )}
             >
-              {IconComponent && <IconComponent className="h-4 w-4" />}
+              {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
               <span className="hidden sm:inline">{typeConfig.label}</span>
               <span
                 className={cn(

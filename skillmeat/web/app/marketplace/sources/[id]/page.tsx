@@ -104,13 +104,25 @@ function CatalogCard({
     hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick?.();
+    }
+  };
+
   return (
     <Card
       className={cn(
         'relative transition-shadow hover:shadow-md cursor-pointer',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         selected && 'ring-2 ring-primary'
       )}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-label={`View details for ${entry.name} ${entry.artifact_type}`}
     >
       <div className="p-4 space-y-3">
         {/* Selection checkbox */}
@@ -119,6 +131,7 @@ function CatalogCard({
             checked={selected}
             onCheckedChange={onSelect}
             disabled={entry.status === 'removed'}
+            aria-label={`Select ${entry.name} for import`}
           />
         </div>
 
@@ -151,7 +164,7 @@ function CatalogCard({
             className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
             onClick={(e) => e.stopPropagation()}
           >
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
             View on GitHub
           </a>
         </div>
@@ -171,23 +184,24 @@ function CatalogCard({
             >
               {isImporting ? (
                 <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" aria-hidden="true" />
                   Importing...
                 </>
               ) : (
                 <>
-                  <Download className="mr-2 h-3 w-3" />
+                  <Download className="mr-2 h-3 w-3" aria-hidden="true" />
                   Import
                 </>
               )}
             </Button>
             <button
               type="button"
-              className="w-full text-sm text-muted-foreground hover:underline cursor-pointer mt-2"
+              className="w-full text-sm text-muted-foreground hover:underline cursor-pointer mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setExcludeDialogOpen(true);
               }}
+              aria-label={`Mark ${entry.name} as not an artifact`}
             >
               Not an artifact
             </button>

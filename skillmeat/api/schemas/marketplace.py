@@ -996,13 +996,20 @@ class CatalogEntryResponse(BaseModel):
     )
     excluded_at: Optional[datetime] = Field(
         default=None,
-        description="Timestamp when artifact was excluded from catalog",
+        description="ISO 8601 timestamp when artifact was marked as excluded from catalog. "
+        "Null if not excluded.",
+        examples=["2025-12-07T14:30:00Z", None],
     )
     excluded_reason: Optional[str] = Field(
         default=None,
-        description="Reason for excluding this artifact from catalog",
+        description="User-provided reason for exclusion (max 500 chars). "
+        "Null if not excluded or no reason provided.",
         max_length=500,
-        examples=["Not a valid skill - documentation only"],
+        examples=[
+            "Not a valid skill - documentation only",
+            "False positive detection",
+            "Duplicate artifact",
+        ],
     )
 
     class Config:
@@ -1042,21 +1049,34 @@ class CatalogEntryResponse(BaseModel):
 
 
 class ExcludeArtifactRequest(BaseModel):
-    """Request body for excluding/restoring a catalog entry.
+    """Request body for excluding or restoring a catalog entry.
 
     Used to mark artifacts as excluded from the catalog (e.g., false positives,
-    documentation files) or to restore previously excluded entries.
+    documentation files, non-Claude artifacts) or to restore previously excluded
+    entries.
+
+    When `excluded=True`: Marks the entry as excluded with optional reason.
+    Excluded artifacts are hidden from default catalog views but can be restored.
+
+    When `excluded=False`: Removes exclusion status and restores entry to default
+    view (status changes to "new" or "imported" depending on history).
+
+    Both operations are idempotent - calling multiple times succeeds.
     """
 
     excluded: bool = Field(
         description="True to mark as excluded, False to restore",
-        examples=[True],
+        examples=[True, False],
     )
     reason: Optional[str] = Field(
         default=None,
-        description="User-provided reason for exclusion (optional)",
+        description="User-provided reason for exclusion (max 500 chars, optional)",
         max_length=500,
-        examples=["Not a valid artifact - documentation file"],
+        examples=[
+            "Not a valid artifact - documentation file",
+            "False positive detection",
+            "Not a Claude artifact",
+        ],
     )
 
     class Config:
