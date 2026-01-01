@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   ArrowLeft,
@@ -32,11 +33,13 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { CatalogTabs } from './components/catalog-tabs';
+import { ExcludedArtifactsList } from './components/excluded-list';
 import {
   useSource,
   useSourceCatalog,
   useRescanSource,
   useImportArtifacts,
+  useExcludeCatalogEntry,
 } from '@/hooks/useMarketplaceSources';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
@@ -56,6 +59,7 @@ interface CatalogCardProps {
   onImport: () => void;
   isImporting: boolean;
   onClick?: () => void;
+  sourceId: string;
 }
 
 function CatalogCard({
@@ -65,7 +69,10 @@ function CatalogCard({
   onImport,
   isImporting,
   onClick,
+  sourceId,
 }: CatalogCardProps) {
+  const [excludeDialogOpen, setExcludeDialogOpen] = useState(false);
+  const excludeMutation = useExcludeCatalogEntry(sourceId);
   const statusConfig = {
     new: {
       label: 'New',
@@ -82,6 +89,10 @@ function CatalogCard({
     removed: {
       label: 'Removed',
       className: 'border-red-500 text-red-700 bg-red-50 dark:bg-red-950 line-through',
+    },
+    excluded: {
+      label: 'Excluded',
+      className: 'border-gray-400 text-gray-600 bg-gray-100 dark:bg-gray-800',
     },
   }[entry.status];
 
@@ -146,29 +157,41 @@ function CatalogCard({
         </div>
 
         {/* Actions */}
-        {entry.status !== 'imported' && entry.status !== 'removed' && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              onImport();
-            }}
-            disabled={isImporting}
-          >
-            {isImporting ? (
-              <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                Importing...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-3 w-3" />
-                Import
-              </>
-            )}
-          </Button>
+        {entry.status !== 'imported' && entry.status !== 'removed' && entry.status !== 'excluded' && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onImport();
+              }}
+              disabled={isImporting}
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-3 w-3" />
+                  Import
+                </>
+              )}
+            </Button>
+            <button
+              type="button"
+              className="w-full text-sm text-muted-foreground hover:underline cursor-pointer mt-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExcludeDialogOpen(true);
+              }}
+            >
+              Not an artifact
+            </button>
+          </>
         )}
 
         {entry.status === 'imported' && entry.import_date && (
@@ -177,6 +200,17 @@ function CatalogCard({
           </p>
         )}
       </div>
+
+      <ExcludeArtifactDialog
+        entry={entry}
+        open={excludeDialogOpen}
+        onOpenChange={setExcludeDialogOpen}
+        onConfirm={() => {
+          excludeMutation.mutate({ entryId: entry.id });
+          setExcludeDialogOpen(false);
+        }}
+        isLoading={excludeMutation.isPending}
+      />
     </Card>
   );
 }
@@ -299,9 +333,13 @@ export default function SourceDetailPage() {
     );
   }, [allEntries, searchQuery]);
 
+  // Separate excluded entries for the excluded list
+  const excludedEntries = useMemo(() => {
+    return allEntries.filter((entry) => entry.status === 'excluded');
+  }, [allEntries]);
+
   // Get counts from first page
   const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
-  const countsByType = catalogData?.pages[0]?.counts_by_type || {};
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -383,6 +421,10 @@ export default function SourceDetailPage() {
 
   const importableCount = filteredEntries.filter(
     (e) => e.status === 'new' || e.status === 'updated'
+  ).length;
+
+  const excludedCount = filteredEntries.filter(
+    (e) => e.status === 'excluded'
   ).length;
 
   return (
@@ -571,6 +613,11 @@ export default function SourceDetailPage() {
               )}
             </Button>
           )}
+          {excludedCount > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {excludedCount} excluded
+            </span>
+          )}
         </div>
       </div>
 
@@ -614,6 +661,7 @@ export default function SourceDetailPage() {
                 <CatalogCard
                   key={entry.id}
                   entry={entry}
+                  sourceId={sourceId}
                   selected={selectedEntries.has(entry.id)}
                   onSelect={(selected) => handleSelectEntry(entry.id, selected)}
                   onImport={() => handleImportSingle(entry.id)}
@@ -648,6 +696,12 @@ export default function SourceDetailPage() {
           )}
         </>
       )}
+
+      {/* Excluded Artifacts List */}
+      <ExcludedArtifactsList
+        entries={excludedEntries}
+        sourceId={sourceId}
+      />
 
       {/* Edit Modal */}
       <EditSourceModal
