@@ -2407,3 +2407,701 @@ class TestFileEndpointsRateLimiting:
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         assert response.headers["Retry-After"] == str(wait_time)
+
+
+# =============================================================================
+# Test Exclude Artifact (PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude)
+# =============================================================================
+
+
+class TestExcludeArtifact:
+    """Test PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude endpoint."""
+
+    @pytest.fixture
+    def mock_session(self):
+        """Create mock database session."""
+        mock = MagicMock()
+        mock.query.return_value.filter_by.return_value.first.return_value = None
+        mock.commit.return_value = None
+        mock.rollback.return_value = None
+        mock.refresh.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_catalog_entry_for_exclusion(self):
+        """Create a mock catalog entry for exclusion tests."""
+        entry = MarketplaceCatalogEntry(
+            id="cat_test_456",
+            source_id="src_test_123",
+            artifact_type="skill",
+            name="canvas-design",
+            path="skills/canvas-design",
+            upstream_url="https://github.com/anthropics/anthropic-quickstarts/tree/main/skills/canvas-design",
+            detected_version="1.2.0",
+            detected_sha="abc123def456",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=95,
+            status="new",
+            excluded_at=None,
+            excluded_reason=None,
+        )
+        return entry
+
+    @pytest.fixture
+    def mock_excluded_catalog_entry(self):
+        """Create a mock catalog entry that is already excluded."""
+        entry = MarketplaceCatalogEntry(
+            id="cat_test_789",
+            source_id="src_test_123",
+            artifact_type="skill",
+            name="excluded-skill",
+            path="skills/excluded-skill",
+            upstream_url="https://github.com/anthropics/repo/tree/main/skills/excluded-skill",
+            detected_version="1.0.0",
+            detected_sha="def456abc123",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=50,
+            status="excluded",
+            excluded_at=datetime(2025, 12, 7, 12, 0, 0),
+            excluded_reason="False positive - documentation only",
+        )
+        return entry
+
+    def test_exclude_artifact_success(
+        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+    ):
+        """Test excluding an artifact successfully."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_catalog_entry_for_exclusion
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude",
+                json={
+                    "excluded": True,
+                    "reason": "False positive - documentation file",
+                },
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify the entry was marked as excluded
+        assert data["id"] == "cat_test_456"
+        assert data["status"] == "excluded"
+        # The excluded_at should be set (we verify it's not None in the response)
+        assert data["excluded_at"] is not None
+        assert data["excluded_reason"] == "False positive - documentation file"
+
+    def test_exclude_artifact_without_reason(
+        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+    ):
+        """Test excluding an artifact without providing a reason."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_catalog_entry_for_exclusion
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude",
+                json={"excluded": True},
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "excluded"
+        # Reason should be None when not provided
+        assert data["excluded_reason"] is None
+
+    def test_exclude_artifact_idempotent(
+        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_catalog_entry
+    ):
+        """Test excluding an already excluded artifact returns success (idempotent)."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_excluded_catalog_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_789/exclude",
+                json={
+                    "excluded": True,
+                    "reason": "New reason",
+                },
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "excluded"
+        # The reason should be updated even on idempotent call
+        assert data["excluded_reason"] == "New reason"
+
+    def test_exclude_artifact_not_found(self, client, mock_source_repo, mock_catalog_repo):
+        """Test excluding a non-existent artifact returns 404."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/exclude",
+                json={"excluded": True},
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_exclude_artifact_wrong_source(
+        self, client, mock_source_repo, mock_catalog_repo, mock_catalog_entry_for_exclusion
+    ):
+        """Test excluding artifact that belongs to different source returns 400."""
+        # Create an entry that belongs to a different source
+        wrong_source_entry = MarketplaceCatalogEntry(
+            id="cat_test_999",
+            source_id="src_other_456",  # Different source
+            artifact_type="skill",
+            name="other-skill",
+            path="skills/other-skill",
+            upstream_url="https://github.com/other/repo/tree/main/skills/other-skill",
+            detected_version="1.0.0",
+            detected_sha="xyz789",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=80,
+            status="new",
+        )
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            wrong_source_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_999/exclude",
+                json={"excluded": True},
+            )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "does not belong to source" in response.json()["detail"]
+
+    def test_exclude_artifact_source_not_found(self, client, mock_source_repo, mock_catalog_repo):
+        """Test excluding artifact when source doesn't exist returns 404."""
+        mock_source_repo.get_by_id.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.patch(
+                "/api/v1/marketplace/sources/nonexistent/artifacts/cat_test_456/exclude",
+                json={"excluded": True},
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "source" in response.json()["detail"].lower()
+
+
+# =============================================================================
+# Test Restore Excluded Artifact (DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude)
+# =============================================================================
+
+
+class TestRestoreExcludedArtifact:
+    """Test DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude endpoint."""
+
+    @pytest.fixture
+    def mock_excluded_entry(self):
+        """Create a mock excluded catalog entry."""
+        return MarketplaceCatalogEntry(
+            id="cat_test_789",
+            source_id="src_test_123",
+            artifact_type="skill",
+            name="excluded-skill",
+            path="skills/excluded-skill",
+            upstream_url="https://github.com/anthropics/repo/tree/main/skills/excluded-skill",
+            detected_version="1.0.0",
+            detected_sha="def456abc123",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=50,
+            status="excluded",
+            excluded_at=datetime(2025, 12, 7, 12, 0, 0),
+            excluded_reason="False positive - documentation only",
+            import_date=None,
+        )
+
+    @pytest.fixture
+    def mock_excluded_imported_entry(self):
+        """Create a mock excluded catalog entry that was previously imported."""
+        return MarketplaceCatalogEntry(
+            id="cat_test_800",
+            source_id="src_test_123",
+            artifact_type="skill",
+            name="imported-then-excluded-skill",
+            path="skills/imported-then-excluded-skill",
+            upstream_url="https://github.com/anthropics/repo/tree/main/skills/imported-skill",
+            detected_version="1.0.0",
+            detected_sha="ghi789",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=75,
+            status="excluded",
+            excluded_at=datetime(2025, 12, 7, 12, 0, 0),
+            excluded_reason="Accidentally excluded",
+            import_date=datetime(2025, 12, 6, 11, 0, 0),  # Was imported before exclusion
+        )
+
+    def test_restore_excluded_artifact_success(
+        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_entry
+    ):
+        """Test restoring an excluded artifact successfully."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_excluded_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_789/exclude"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Verify the entry was restored
+        assert data["id"] == "cat_test_789"
+        # Status should be "new" since it was never imported
+        assert data["status"] == "new"
+        # Exclusion fields should be cleared
+        assert data["excluded_at"] is None
+        assert data["excluded_reason"] is None
+
+    def test_restore_excluded_artifact_restores_to_imported(
+        self, client, mock_source_repo, mock_catalog_repo, mock_excluded_imported_entry
+    ):
+        """Test restoring an artifact that was previously imported restores to 'imported' status."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_excluded_imported_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_800/exclude"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Status should be "imported" since it has an import_date
+        assert data["status"] == "imported"
+        assert data["excluded_at"] is None
+        assert data["excluded_reason"] is None
+
+    def test_restore_artifact_idempotent(
+        self, client, mock_source_repo, mock_catalog_repo
+    ):
+        """Test restoring a non-excluded artifact returns success (idempotent)."""
+        # Create entry that is NOT excluded
+        non_excluded_entry = MarketplaceCatalogEntry(
+            id="cat_test_456",
+            source_id="src_test_123",
+            artifact_type="skill",
+            name="active-skill",
+            path="skills/active-skill",
+            upstream_url="https://github.com/anthropics/repo/tree/main/skills/active-skill",
+            detected_version="1.0.0",
+            detected_sha="abc123",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=90,
+            status="new",
+            excluded_at=None,  # Not excluded
+            excluded_reason=None,
+        )
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            non_excluded_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_456/exclude"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        # Should still be "new", no change
+        assert data["status"] == "new"
+
+    def test_restore_artifact_not_found(self, client, mock_source_repo, mock_catalog_repo):
+        """Test restoring a non-existent artifact returns 404."""
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/nonexistent/exclude"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_restore_artifact_wrong_source(
+        self, client, mock_source_repo, mock_catalog_repo
+    ):
+        """Test restoring artifact that belongs to different source returns 400."""
+        wrong_source_entry = MarketplaceCatalogEntry(
+            id="cat_test_999",
+            source_id="src_other_456",  # Different source
+            artifact_type="skill",
+            name="other-skill",
+            path="skills/other-skill",
+            upstream_url="https://github.com/other/repo/tree/main/skills/other-skill",
+            detected_version="1.0.0",
+            detected_sha="xyz789",
+            detected_at=datetime(2025, 12, 6, 10, 30, 0),
+            confidence_score=80,
+            status="excluded",
+            excluded_at=datetime(2025, 12, 7, 12, 0, 0),
+            excluded_reason="Some reason",
+        )
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            wrong_source_entry
+        )
+        mock_catalog_repo._get_session.return_value = mock_session
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/src_test_123/artifacts/cat_test_999/exclude"
+            )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "does not belong to source" in response.json()["detail"]
+
+    def test_restore_artifact_source_not_found(self, client, mock_source_repo, mock_catalog_repo):
+        """Test restoring artifact when source doesn't exist returns 404."""
+        mock_source_repo.get_by_id.return_value = None
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.delete(
+                "/api/v1/marketplace/sources/nonexistent/artifacts/cat_test_456/exclude"
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# =============================================================================
+# Test List Artifacts Exclusion Filtering (GET /marketplace/sources/{source_id}/artifacts)
+# =============================================================================
+
+
+class TestListArtifactsExclusionFiltering:
+    """Test include_excluded parameter for GET /marketplace/sources/{source_id}/artifacts endpoint."""
+
+    @pytest.fixture
+    def mock_entries_with_excluded(self, mock_source):
+        """Create mock catalog entries including excluded ones."""
+        entries = [
+            MarketplaceCatalogEntry(
+                id="cat_active_1",
+                source_id=mock_source.id,
+                artifact_type="skill",
+                name="active-skill-1",
+                path="skills/active-skill-1",
+                upstream_url="https://github.com/test/repo/tree/main/skills/active-skill-1",
+                detected_version="1.0.0",
+                detected_sha="sha1",
+                detected_at=datetime(2025, 12, 6, 10, 30, 0),
+                confidence_score=90,
+                status="new",
+                excluded_at=None,
+                excluded_reason=None,
+            ),
+            MarketplaceCatalogEntry(
+                id="cat_active_2",
+                source_id=mock_source.id,
+                artifact_type="skill",
+                name="active-skill-2",
+                path="skills/active-skill-2",
+                upstream_url="https://github.com/test/repo/tree/main/skills/active-skill-2",
+                detected_version="1.0.0",
+                detected_sha="sha2",
+                detected_at=datetime(2025, 12, 6, 10, 30, 0),
+                confidence_score=85,
+                status="imported",
+                excluded_at=None,
+                excluded_reason=None,
+            ),
+            MarketplaceCatalogEntry(
+                id="cat_excluded_1",
+                source_id=mock_source.id,
+                artifact_type="skill",
+                name="excluded-skill",
+                path="skills/excluded-skill",
+                upstream_url="https://github.com/test/repo/tree/main/skills/excluded-skill",
+                detected_version="1.0.0",
+                detected_sha="sha3",
+                detected_at=datetime(2025, 12, 6, 10, 30, 0),
+                confidence_score=40,
+                status="excluded",
+                excluded_at=datetime(2025, 12, 7, 12, 0, 0),
+                excluded_reason="False positive",
+            ),
+        ]
+        return entries
+
+    def test_list_artifacts_excludes_excluded_by_default(
+        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+    ):
+        """Test that excluded artifacts are NOT returned by default."""
+        # Return all entries from the repo query
+        mock_catalog_repo.get_source_catalog.return_value = mock_entries_with_excluded
+        mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 3}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Should only return non-excluded entries (2 out of 3)
+        assert len(data["items"]) == 2
+        item_ids = [item["id"] for item in data["items"]]
+        assert "cat_active_1" in item_ids
+        assert "cat_active_2" in item_ids
+        assert "cat_excluded_1" not in item_ids
+
+    def test_list_artifacts_include_excluded_true(
+        self, client, mock_source_repo, mock_entries_with_excluded
+    ):
+        """Test that excluded artifacts ARE returned when include_excluded=true.
+
+        Note: include_below_threshold=true is also needed to avoid the 30% confidence
+        threshold filter, which would otherwise cause the router to use get_source_catalog
+        instead of list_paginated.
+        """
+        # Create a fresh mock catalog repo with correct data for this test
+        mock_catalog_repo = MagicMock()
+        # When include_excluded=true AND include_below_threshold=true AND no other filters,
+        # the router uses list_paginated for efficient pagination
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=mock_entries_with_excluded, has_more=False
+        )
+        mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 3}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?include_excluded=true&include_below_threshold=true"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Should return all entries including excluded (3 total)
+        assert len(data["items"]) == 3
+        item_ids = [item["id"] for item in data["items"]]
+        assert "cat_excluded_1" in item_ids
+
+    def test_list_artifacts_status_excluded_filter(
+        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+    ):
+        """Test filtering by status=excluded returns only excluded entries."""
+        # Filter to only excluded entries
+        excluded_entries = [e for e in mock_entries_with_excluded if e.status == "excluded"]
+        mock_catalog_repo.get_source_catalog.return_value = excluded_entries
+        mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 3}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?status=excluded"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Should return only the excluded entry
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == "cat_excluded_1"
+        assert data["items"][0]["status"] == "excluded"
+
+    def test_list_artifacts_include_excluded_false_explicit(
+        self, client, mock_source_repo, mock_catalog_repo, mock_entries_with_excluded
+    ):
+        """Test that explicitly setting include_excluded=false excludes entries."""
+        mock_catalog_repo.get_source_catalog.return_value = mock_entries_with_excluded
+        mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 3}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts?include_excluded=false"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Should exclude the excluded entry
+        assert len(data["items"]) == 2
+        item_ids = [item["id"] for item in data["items"]]
+        assert "cat_excluded_1" not in item_ids
+
+    def test_list_artifacts_excluded_entry_has_exclusion_fields(
+        self, client, mock_source_repo, mock_entries_with_excluded
+    ):
+        """Test that excluded entries include excluded_at and excluded_reason in response.
+
+        Note: include_below_threshold=true is also needed to avoid the 30% confidence
+        threshold filter, which would otherwise cause the router to use get_source_catalog
+        instead of list_paginated.
+        """
+        # Create a fresh mock catalog repo with correct data for this test
+        mock_catalog_repo = MagicMock()
+        # When include_excluded=true AND include_below_threshold=true AND no other filters,
+        # the router uses list_paginated for efficient pagination
+        mock_catalog_repo.list_paginated.return_value = MagicMock(
+            items=mock_entries_with_excluded, has_more=False
+        )
+        mock_catalog_repo.count_by_status.return_value = {"new": 1, "imported": 1, "excluded": 1}
+        mock_catalog_repo.count_by_type.return_value = {"skill": 3}
+
+        with patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+            return_value=mock_source_repo,
+        ), patch(
+            "skillmeat.api.routers.marketplace_sources.MarketplaceCatalogRepository",
+            return_value=mock_catalog_repo,
+        ):
+            response = client.get(
+                "/api/v1/marketplace/sources/src_test_123/artifacts"
+                "?include_excluded=true&include_below_threshold=true"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # Find the excluded entry
+        excluded_entry = next(
+            (item for item in data["items"] if item["id"] == "cat_excluded_1"), None
+        )
+        assert excluded_entry is not None
+        assert excluded_entry["excluded_at"] is not None
+        assert excluded_entry["excluded_reason"] == "False positive"
+
+        # Non-excluded entries should have None for these fields
+        active_entry = next(
+            (item for item in data["items"] if item["id"] == "cat_active_1"), None
+        )
+        assert active_entry is not None
+        assert active_entry["excluded_at"] is None
+        assert active_entry["excluded_reason"] is None

@@ -1472,7 +1472,7 @@ class MarketplaceCatalogEntry(Base):
             name="check_catalog_artifact_type",
         ),
         CheckConstraint(
-            "status IN ('new', 'updated', 'removed', 'imported')",
+            "status IN ('new', 'updated', 'removed', 'imported', 'excluded')",
             name="check_catalog_status",
         ),
         CheckConstraint(

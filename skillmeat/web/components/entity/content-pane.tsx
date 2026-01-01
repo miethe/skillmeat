@@ -8,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SplitPreview } from '@/components/editor/split-preview';
+import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
+import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
 
 // ============================================================================
 // Types
@@ -345,6 +347,18 @@ export function ContentPane({
   // Check if content is truncated
   const isTruncated = truncationInfo?.truncated === true;
 
+  // Parse frontmatter from content (memoized to avoid reparsing on every render)
+  const parsedContent = useMemo(() => {
+    if (!content || typeof content !== 'string') {
+      return { frontmatter: null, content: content || '' };
+    }
+    // Only parse if content appears to have frontmatter
+    if (!detectFrontmatter(content)) {
+      return { frontmatter: null, content };
+    }
+    return parseFrontmatter(content);
+  }, [content]);
+
   // Handle edit button click
   const handleEditClick = () => {
     onEditChange?.(content || '');
@@ -474,6 +488,14 @@ export function ContentPane({
               fullFileUrl={truncationInfo?.fullFileUrl}
             />
           )}
+          {/* Frontmatter display (collapsed by default) */}
+          {parsedContent.frontmatter && (
+            <FrontmatterDisplay
+              frontmatter={parsedContent.frontmatter}
+              defaultCollapsed={true}
+              className="mb-4"
+            />
+          )}
           <div className="min-w-0">
             <SplitPreview
               content={isEditing ? editedContent : content}
@@ -514,6 +536,14 @@ export function ContentPane({
             <TruncationBanner
               originalSize={truncationInfo?.originalSize}
               fullFileUrl={truncationInfo?.fullFileUrl}
+            />
+          )}
+          {/* Frontmatter display (collapsed by default) */}
+          {parsedContent.frontmatter && (
+            <FrontmatterDisplay
+              frontmatter={parsedContent.frontmatter}
+              defaultCollapsed={true}
+              className="mb-4"
             />
           )}
           <div className="max-w-full overflow-x-auto">

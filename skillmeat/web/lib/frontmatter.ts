@@ -64,7 +64,7 @@ export function parseFrontmatter(content: string): {
     return { frontmatter: null, content };
   }
 
-  const yamlContent = match[1];
+  const yamlContent = match[1] ?? '';
   const cleanContent = content.slice(match[0].length);
 
   try {
@@ -133,8 +133,8 @@ function parseYaml(yaml: string): Record<string, unknown> {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Skip empty lines and comments
-    if (!line.trim() || line.trim().startsWith('#')) {
+    // Skip empty lines and comments (line is always defined in this loop)
+    if (!line || !line.trim() || line.trim().startsWith('#')) {
       continue;
     }
 
@@ -145,9 +145,11 @@ function parseYaml(yaml: string): Record<string, unknown> {
     if (trimmedLine.startsWith('- ')) {
       if (currentArrayKey && indent > currentArrayIndent) {
         const arrayValue = trimmedLine.slice(2).trim();
-        const target = stack[stack.length - 1].obj;
-        const arr = target[currentArrayKey] as unknown[];
-        arr.push(parseValue(arrayValue));
+        const currentFrame = stack[stack.length - 1];
+        if (currentFrame) {
+          const arr = currentFrame.obj[currentArrayKey] as unknown[];
+          arr.push(parseValue(arrayValue));
+        }
         continue;
       }
     }
@@ -159,7 +161,9 @@ function parseYaml(yaml: string): Record<string, unknown> {
     }
 
     // Pop stack for decreased indent
-    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+    while (stack.length > 1) {
+      const topFrame = stack[stack.length - 1];
+      if (!topFrame || indent > topFrame.indent) break;
       stack.pop();
     }
 
@@ -176,7 +180,11 @@ function parseYaml(yaml: string): Record<string, unknown> {
       continue;
     }
 
-    const target = stack[stack.length - 1].obj;
+    const targetFrame = stack[stack.length - 1];
+    if (!targetFrame) {
+      continue;
+    }
+    const target = targetFrame.obj;
 
     if (rawValue === '') {
       // Check if next line starts an array or nested object
