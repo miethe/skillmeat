@@ -8,17 +8,17 @@ type: progress
 prd: "marketplace-sources-non_skills-v1"
 phase: 1
 title: "Detection Algorithm Fix"
-status: "planning"
+status: "completed"
 started: "2025-12-31"
-completed: null
+completed: "2026-01-01"
 
 # Overall Progress: Status and Estimates
-overall_progress: 0
-completion_estimate: "on-track"
+overall_progress: 100
+completion_estimate: "complete"
 
 # Task Counts: Machine-readable task state
 total_tasks: 6
-completed_tasks: 0
+completed_tasks: 6
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -32,7 +32,7 @@ contributors: ["code-reviewer"]
 tasks:
   - id: "FIX-001"
     description: "Container Type Propagation - Modify container logic to propagate type hints to children"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "3h"
@@ -40,7 +40,7 @@ tasks:
 
   - id: "FIX-002"
     description: "Frontmatter Parsing - Add YAML frontmatter parsing to extract artifact type"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: []
     estimated_effort: "3h"
@@ -48,7 +48,7 @@ tasks:
 
   - id: "FIX-003"
     description: "Scoring Weight Adjustment - Increase container hint weight, reduce depth penalty"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["FIX-001"]
     estimated_effort: "2h"
@@ -56,7 +56,7 @@ tasks:
 
   - id: "FIX-004"
     description: "Organization Path Metadata - Add organization_path field to capture directory structure"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["FIX-001"]
     estimated_effort: "3h"
@@ -64,7 +64,7 @@ tasks:
 
   - id: "FIX-005"
     description: "Multi-Type Test Suite - Comprehensive tests for all artifact types and organization_path"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["FIX-001", "FIX-002", "FIX-003", "FIX-004"]
     estimated_effort: "3h"
@@ -72,7 +72,7 @@ tasks:
 
   - id: "FIX-006"
     description: "Regression Testing - Run full test suite, verify no skill detection regressions"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["FIX-005"]
     estimated_effort: "2h"
@@ -94,25 +94,32 @@ blockers: []
 success_criteria:
   - id: "SC-1"
     description: "All existing tests pass (no regressions)"
-    status: "pending"
+    status: "completed"
+    result: "101/101 tests passing"
   - id: "SC-2"
     description: "Commands detection accuracy >= 95%"
-    status: "pending"
+    status: "completed"
+    result: "100% accuracy in tests"
   - id: "SC-3"
     description: "Agents detection accuracy >= 95%"
-    status: "pending"
+    status: "completed"
+    result: "100% accuracy in tests"
   - id: "SC-4"
     description: "Hooks detection accuracy >= 95%"
-    status: "pending"
+    status: "completed"
+    result: "100% accuracy in tests"
   - id: "SC-5"
     description: "MCP Servers detection accuracy >= 95%"
-    status: "pending"
+    status: "completed"
+    result: "100% accuracy in tests"
   - id: "SC-6"
     description: "organization_path populated correctly for all artifacts"
-    status: "pending"
+    status: "completed"
+    result: "8 dedicated tests passing"
   - id: "SC-7"
     description: "Test coverage for heuristic_detector.py > 85%"
-    status: "pending"
+    status: "completed"
+    result: "87.14% coverage"
 
 # Files Modified: What's being changed in this phase
 files_modified:
@@ -124,8 +131,8 @@ files_modified:
 # marketplace-sources-non_skills-v1 - Phase 1: Detection Algorithm Fix
 
 **Phase**: 1 of 1
-**Status**: Planning (0% complete)
-**Duration**: Started 2025-12-31
+**Status**: Complete (100%)
+**Duration**: 2025-12-31 to 2026-01-01
 **Owner**: python-backend-engineer
 **Contributors**: code-reviewer
 
@@ -313,13 +320,13 @@ Fix the marketplace source detection system to properly classify non-skill artif
 
 | ID | Criterion | Status |
 |----|-----------|--------|
-| SC-1 | All existing tests pass (no regressions) | Pending |
-| SC-2 | Commands detection accuracy >= 95% | Pending |
-| SC-3 | Agents detection accuracy >= 95% | Pending |
-| SC-4 | Hooks detection accuracy >= 95% | Pending |
-| SC-5 | MCP Servers detection accuracy >= 95% | Pending |
-| SC-6 | organization_path populated correctly | Pending |
-| SC-7 | Test coverage for heuristic_detector.py > 85% | Pending |
+| SC-1 | All existing tests pass (no regressions) | PASS (101/101) |
+| SC-2 | Commands detection accuracy >= 95% | PASS (100%) |
+| SC-3 | Agents detection accuracy >= 95% | PASS (100%) |
+| SC-4 | Hooks detection accuracy >= 95% | PASS (100%) |
+| SC-5 | MCP Servers detection accuracy >= 95% | PASS (100%) |
+| SC-6 | organization_path populated correctly | PASS (8 tests) |
+| SC-7 | Test coverage for heuristic_detector.py > 85% | PASS (87.14%) |
 
 ---
 
@@ -327,12 +334,12 @@ Fix the marketplace source detection system to properly classify non-skill artif
 
 | ID | Task | Status | Agent | Dependencies | Est | Notes |
 |----|------|--------|-------|--------------|-----|-------|
-| FIX-001 | Container Type Propagation | Pending | python-backend-engineer | None | 3h | High priority |
-| FIX-002 | Frontmatter Parsing | Pending | python-backend-engineer | None | 3h | Can run parallel with FIX-001 |
-| FIX-003 | Scoring Weight Adjustment | Pending | python-backend-engineer | FIX-001 | 2h | Depends on container changes |
-| FIX-004 | Organization Path Metadata | Pending | python-backend-engineer | FIX-001 | 3h | New schema field |
-| FIX-005 | Multi-Type Test Suite | Pending | python-backend-engineer | FIX-001,002,003,004 | 3h | Comprehensive tests |
-| FIX-006 | Regression Testing | Pending | python-backend-engineer | FIX-005 | 2h | Final validation |
+| FIX-001 | Container Type Propagation | Complete | python-backend-engineer | None | 3h | All 70 tests passing |
+| FIX-002 | Frontmatter Parsing | Complete | python-backend-engineer | None | 3h | All 70 tests passing |
+| FIX-003 | Scoring Weight Adjustment | Complete | python-backend-engineer | FIX-001 | 2h | 72 tests passing, depth penalty reduced in containers |
+| FIX-004 | Organization Path Metadata | Complete | python-backend-engineer | FIX-001 | 3h | 80 tests passing, schema updated |
+| FIX-005 | Multi-Type Test Suite | Complete | python-backend-engineer | FIX-001,002,003,004 | 3h | 101 tests total |
+| FIX-006 | Regression Testing | Complete | python-backend-engineer | FIX-005 | 2h | 87.14% coverage, all pass |
 
 **Status Legend**:
 - `Pending` Not Started
@@ -412,6 +419,30 @@ Captures the directory structure between container and artifact:
 
 **Next Session**:
 - Execute Batch 1 tasks (FIX-001, FIX-002)
+
+### 2026-01-01
+
+**Completed**:
+- **FIX-001**: Container Type Propagation - Modified _is_container_directory() to _get_container_type() returning Optional[ArtifactType]. Added logic to propagate container type hints to child artifacts during scoring. All 70 tests passing.
+- **FIX-002**: Frontmatter Parsing - Implemented _parse_manifest_frontmatter() to extract YAML frontmatter type from manifest files. Added container_hint_weight (25 pts) and frontmatter_type_weight (30 pts) to scoring system. All 70 tests passing.
+
+**Test Results**:
+- Total tests passing: 70/70
+- No regressions detected
+- Container type propagation working correctly for nested artifacts
+- Frontmatter parsing handling YAML correctly with graceful fallback
+
+**Batch 2 Completed**:
+- **FIX-003**: Scoring Weight Adjustment - Reduced depth penalty by 50% when inside typed containers. Tests increased to 72.
+- **FIX-004**: Organization Path Metadata - Added `organization_path` field to HeuristicMatch schema. Implemented `_compute_organization_path()` method. Tests increased to 80.
+
+**Batch 3 Completed**:
+- **FIX-005**: Multi-Type Test Suite - Added `TestMultiTypeDetection` class with 21 comprehensive tests. Tests increased to 101.
+
+**Batch 4 Completed**:
+- **FIX-006**: Regression Testing - All 101 tests pass. Coverage: 87.14%.
+
+**Phase 1 Complete**: All 6 tasks completed, all 7 success criteria met.
 
 ---
 

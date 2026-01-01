@@ -961,7 +961,7 @@ class CatalogEntryResponse(BaseModel):
     )
     raw_score: Optional[int] = Field(
         default=None,
-        description="Raw score before normalization (0-65)",
+        description="Raw score before normalization (0-120 typical)",
         examples=[60],
     )
     score_breakdown: Optional[Dict[str, int]] = Field(
@@ -1397,7 +1397,7 @@ class DetectedArtifact(BaseModel):
     )
     raw_score: Optional[int] = Field(
         default=None,
-        description="Raw unscaled confidence score before normalization (0-65)",
+        description="Raw unscaled confidence score before normalization (0-120 typical)",
     )
     score_breakdown: Optional[Dict[str, int]] = Field(
         default=None,
@@ -1442,6 +1442,11 @@ class HeuristicMatch(BaseModel):
         description="Overall confidence score (0-100)",
         examples=[95],
     )
+    organization_path: Optional[str] = Field(
+        default=None,
+        description="Path segments between container directory and artifact",
+        examples=["dev", "ui-ux", "dev/subgroup"],
+    )
     match_reasons: List[str] = Field(
         default_factory=list,
         description="List of reasons why this path matched",
@@ -1481,8 +1486,8 @@ class HeuristicMatch(BaseModel):
     raw_score: int = Field(
         default=0,
         ge=0,
-        le=65,
-        description="Raw score before normalization (0-65)",
+        le=150,  # Higher limit to accommodate container_hint + frontmatter_type signals
+        description="Raw score before normalization (0-120 typical)",
         examples=[60],
     )
     breakdown: Dict[str, int] = Field(
@@ -1507,12 +1512,13 @@ class HeuristicMatch(BaseModel):
 
         json_schema_extra = {
             "example": {
-                "path": "skills/canvas-design",
-                "artifact_type": "skill",
+                "path": "commands/dev/execute-phase",
+                "artifact_type": "command",
                 "confidence_score": 95,
+                "organization_path": "dev",
                 "match_reasons": [
-                    "Directory name matches 'skill' pattern",
-                    "Contains skill.xml manifest",
+                    "Directory name matches 'command' pattern",
+                    "Contains COMMAND.md manifest",
                 ],
                 "dir_name_score": 30,
                 "manifest_score": 50,
