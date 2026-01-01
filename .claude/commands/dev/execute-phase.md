@@ -130,6 +130,47 @@ Success criteria:
 
 **If subagent invocation fails:** Document in progress tracker and proceed with direct implementation.
 
+#### 2.2.3 Record Agent IDs for Recovery
+
+**Immediately after launching a batch**, record agent metadata for crash recovery:
+
+1. **Capture agent IDs** from Task() return values
+2. **Update progress YAML** with launch metadata:
+
+```yaml
+# Add to each task in the batch
+tasks:
+  - id: "TASK-1.2"
+    agent_id: "a610b3c"           # From Task() return
+    launched_at: "2025-12-31T21:02:39Z"
+
+# Add batch execution log
+execution_log:
+  - batch: 2
+    launched_at: "2025-12-31T21:02:30Z"
+    status: "in_progress"
+    agents:
+      - { task_id: "TASK-1.2", agent_id: "a610b3c" }
+      - { task_id: "TASK-1.6", agent_id: "af0ec2b" }
+```
+
+3. **Output launch summary** for visibility:
+
+```
+📋 Batch 2 Launched (4 tasks)
+| Task     | Agent   | Expected Files              |
+|----------|---------|------------------------------|
+| TASK-1.2 | a610b3c | frontmatter-display.tsx (create) |
+| TASK-1.6 | af0ec2b | page.tsx (modify)           |
+```
+
+**Why this matters:** If session crashes, recovery can:
+- Read `agent_id` directly from progress YAML (no log searching)
+- Check `expected_files` for instant completion verification
+- Resume agents by ID if needed
+
+See `.claude/skills/artifact-tracking/recovery-optimized-schema.md` for full schema.
+
 #### 2.3 Validate Task Completion
 
 After each major task, validate with the task-completion-validator:
