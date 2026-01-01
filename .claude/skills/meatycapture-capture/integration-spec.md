@@ -58,32 +58,25 @@ MeatyCapture provides two entry points optimized for different use cases:
 
 ## CLAUDE.md Integration
 
-Add to project's root CLAUDE.md under appropriate section:
+Add minimal section to project's root CLAUDE.md (~10 lines max):
 
 ```markdown
 ## Development Tracking
 
-Use `/mc` command for quick request-log operations (token-efficient):
+<!-- MeatyCapture Integration - Project: PROJECT_SLUG -->
 
-| Operation | Command | Example |
-|-----------|---------|---------|
-| List logs | `/mc list PROJECT` | `/mc list meatycapture` |
-| View log | `/mc view PATH` | `/mc view ~/.meatycapture/meatycapture/REQ-20251231.md` |
-| Search | `/mc search "query" PROJECT` | `/mc search "auth bug" meatycapture` |
-| Quick capture | `/mc capture {...}` | `/mc capture {"title": "Fix auth", "type": "bug"}` |
+Track bugs/enhancements via request-logs (replaces loose TODO comments):
 
-For batch capture or complex workflows, use `/meatycapture-capture` skill instead.
+| Entry Point | Use When | Tokens |
+|-------------|----------|--------|
+| `/mc` | Quick ops: list, search, single capture | ~150 |
+| `/meatycapture-capture` skill | Batch capture (3+ items), validation, templates | ~400 |
 
-| When | Action |
-|------|--------|
-| Bug found | `/mc capture {"title": "...", "type": "bug", "domain": "..."}` |
-| Enhancement idea | `/mc capture {"title": "...", "type": "enhancement"}` |
-| TODO needed | Capture instead of code comment (searchable, trackable) |
-| Starting logged work | Edit markdown: change `**Status:** triage` to `in-progress` |
-| Work complete | Edit markdown: change `**Status:**` to `done` |
-
-Search existing logs before creating duplicates: `/mc search "keyword" PROJECT`
+**Quick reference**: `/mc list PROJECT`, `/mc search "keyword" PROJECT`, `/mc capture {...}`
+<!-- End MeatyCapture Integration -->
 ```
+
+**Key principle**: Don't duplicate skill documentation in CLAUDE.md. The skill and /mc command handle details.
 
 ---
 
@@ -243,11 +236,27 @@ Scan for existing commands/skills that should integrate:
 | `fix/*` commands | Post-fix capture guidance | `/mc capture` |
 | `dev/*` commands | Context search + status update | `/mc search` |
 | `plan/*` commands | Discovery search | `/mc search` |
-| `review/*` commands | Bug capture for findings | `/mc capture` |
+| `review/*` commands | Bug capture for findings | `/mc` (1-2 issues) or skill (3+) |
 
 ### 5. Update Relevant Commands
 
-For each identified command, add appropriate integration snippet from patterns above. Always prefer `/mc` for simple operations.
+For each identified command, add integration snippet using HTML comment markers:
+
+```markdown
+<!-- MeatyCapture Integration - Project: PROJECT_SLUG -->
+## Section Title
+
+- Integration content here
+- Use `/mc` for single operations
+- Use skill for batch (3+ items)
+<!-- End MeatyCapture Integration -->
+```
+
+**Integration pattern benefits**:
+- Easy to find: `grep "MeatyCapture Integration" .claude/`
+- Easy to update: Project slug in one place
+- Clear boundaries: Start/end markers separate from other content
+- Minimal tokens: End marker is empty comment (optional for short sections)
 
 ---
 

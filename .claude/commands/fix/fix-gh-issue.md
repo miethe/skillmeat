@@ -82,4 +82,10 @@ Follow this structured approach to analyze and fix issues: **$ARGUMENTS**
     - Close the issue if not automatically closed
     - Monitor for any related issues or regressions
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+14. **Track for Patterns** (if bug warrants tracking)
+    - Search existing logs: `/mc search "related-keyword" skillmeat`
+    - Capture completed fix: `/mc capture {"title": "...", "type": "bug", "status": "done"}`
+    - Include: root cause, solution approach, affected files
+
 Remember to communicate clearly in both code and comments, and always prioritize maintainable solutions over quick fixes.

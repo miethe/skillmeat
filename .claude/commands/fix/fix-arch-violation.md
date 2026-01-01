@@ -11,3 +11,9 @@ Common violations to fix:
 - "offset-pagination": Convert to cursor pagination
 
 Identify violations in codebase and fix systematically.
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Post-Fix
+
+If violation pattern warrants tracking (recurring/significant):
+- `/mc capture {"title": "Fixed [violation-type]", "type": "task", "status": "done"}`

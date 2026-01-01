@@ -53,4 +53,11 @@ Follow these steps to conduct a thorough code review:
    - Suggest tools and practices for improvement
    - Create a summary report with next steps
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+9. **Capture Findings**
+
+- **1-2 issues**: `/mc capture {"title": "...", "type": "bug"}`
+- **3+ issues**: Use `/meatycapture-capture` skill for batch capture (more token-efficient)
+<!-- End MeatyCapture Integration -->
+
 Remember to be constructive and provide specific examples with file paths and line numbers where applicable.
