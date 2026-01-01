@@ -21,7 +21,7 @@ related:
 - **Key File**: `skillmeat/core/marketplace/heuristic_detector.py`
 
 **Complexity**: Medium
-**Total Estimated Effort**: 13 story points
+**Total Estimated Effort**: 16 story points
 **Target Timeline**: Single phase (bug fix)
 
 ## Executive Summary
@@ -32,7 +32,8 @@ The marketplace source detection system currently misclassifies non-skill artifa
 1. Improve container directory handling to propagate type hints to children
 2. Add frontmatter content parsing to validate artifact types
 3. Increase weight of directory structure signals for non-skill types
-4. Add comprehensive tests for multi-type detection scenarios
+4. Add `organization_path` field to capture directory structure between container and artifact
+5. Add comprehensive tests for multi-type detection scenarios
 
 ## Root Cause Analysis
 
@@ -71,9 +72,9 @@ From codebase exploration:
 
 | File | Changes | Priority |
 |------|---------|----------|
-| `skillmeat/core/marketplace/heuristic_detector.py` | Container logic, frontmatter parsing, scoring | P0 |
-| `tests/core/marketplace/test_heuristic_detector.py` | New test cases | P0 |
-| `skillmeat/api/schemas/marketplace.py` | Add frontmatter type field (if needed) | P1 |
+| `skillmeat/core/marketplace/heuristic_detector.py` | Container logic, frontmatter parsing, scoring, organization_path | P0 |
+| `skillmeat/api/schemas/marketplace.py` | Add `organization_path` field to HeuristicMatch | P0 |
+| `tests/core/marketplace/test_heuristic_detector.py` | New test cases including organization_path | P0 |
 
 ## Phase 1: Detection Algorithm Fix
 
@@ -88,8 +89,9 @@ From codebase exploration:
 | FIX-001 | Container Type Propagation | Modify `_is_container_directory` to return the implied type, propagate to child scoring | Children inherit parent container type as strong hint | 3 pts | python-backend-engineer | None |
 | FIX-002 | Frontmatter Parsing | Add `_parse_manifest_frontmatter` to read YAML frontmatter from manifest files and extract `type:` field | Type from frontmatter overrides heuristic detection | 3 pts | python-backend-engineer | None |
 | FIX-003 | Scoring Weight Adjustment | Increase parent_hint_weight from 15 to 25 for typed containers; reduce depth penalty when inside typed container | Non-skill types score correctly in their containers | 2 pts | python-backend-engineer | FIX-001 |
-| FIX-004 | Multi-Type Test Suite | Add comprehensive tests for Commands, Agents, Hooks, MCP in various directory structures | 100% pass rate for all artifact types | 3 pts | python-backend-engineer | FIX-001, FIX-002, FIX-003 |
-| FIX-005 | Regression Testing | Run full test suite, verify existing skill detection unchanged | No regressions in skill detection | 2 pts | python-backend-engineer | FIX-004 |
+| FIX-004 | Organization Path Metadata | Add `organization_path` field to HeuristicMatch schema; compute and populate with path segments between container and artifact | Field captures 'dev' for commands/dev/execute-phase.md | 3 pts | python-backend-engineer | FIX-001 |
+| FIX-005 | Multi-Type Test Suite | Add comprehensive tests for Commands, Agents, Hooks, MCP in various directory structures including organization_path | 100% pass rate for all artifact types, organization_path populated correctly | 3 pts | python-backend-engineer | FIX-001, FIX-002, FIX-003, FIX-004 |
+| FIX-006 | Regression Testing | Run full test suite, verify existing skill detection unchanged | No regressions in skill detection | 2 pts | python-backend-engineer | FIX-005 |
 
 ### Detailed Task Specifications
 
@@ -157,7 +159,61 @@ if container_type is not None:
     depth_penalty = 0  # or reduced penalty
 ```
 
-#### FIX-004: Multi-Type Test Suite
+#### FIX-004: Organization Path Metadata
+
+**Purpose**: Capture the directory structure between the container and the artifact for future filtering, auto-tagging, and organizational context.
+
+**Schema Addition** (in `skillmeat/api/schemas/marketplace.py`):
+```python
+class HeuristicMatch(BaseModel):
+    # ... existing fields ...
+    path: str  # Full path (unchanged)
+    organization_path: Optional[str] = Field(
+        default=None,
+        description="Path segments between container directory and artifact, e.g., 'dev' for commands/dev/execute-phase.md",
+        examples=["dev", "ui-ux", "dev/subgroup"],
+    )
+```
+
+**Computation Logic** (in `heuristic_detector.py`):
+```python
+def _compute_organization_path(
+    self,
+    artifact_path: str,
+    container_dir: str,
+    container_type: ArtifactType
+) -> Optional[str]:
+    """
+    Extract the path segments between container and artifact.
+
+    Examples:
+      - commands/dev/execute-phase.md → "dev"
+      - commands/test.md → None (directly in container)
+      - agents/ui-ux/ui-designer.md → "ui-ux"
+      - commands/dev/subgroup/my-cmd.md → "dev/subgroup"
+      - skills/planning/SKILL.md → None (planning IS the artifact)
+    """
+    # Get path relative to container
+    # Strip artifact name (file or artifact directory)
+    # Return intermediate path or None
+```
+
+**Examples**:
+
+| Full Path | Container | Artifact | organization_path |
+|-----------|-----------|----------|-------------------|
+| `commands/dev/execute-phase.md` | `commands/` | `execute-phase.md` | `dev` |
+| `commands/test.md` | `commands/` | `test.md` | `None` |
+| `commands/dev/subgroup/my-cmd.md` | `commands/` | `my-cmd.md` | `dev/subgroup` |
+| `agents/ui-ux/ui-designer.md` | `agents/` | `ui-designer.md` | `ui-ux` |
+| `skills/planning/SKILL.md` | `skills/` | `planning/` | `None` |
+
+**Integration Points**:
+- Compute during `_score_directory` when container_type is known
+- Store in HeuristicMatch result
+- Propagate to catalog entries for downstream use
+
+#### FIX-005: Multi-Type Test Suite
 
 **Test Scenarios to Add**:
 
@@ -213,6 +269,56 @@ if container_type is not None:
    ```
    Expected: Each detected correctly by manifest
 
+6. **Organization path - nested commands**:
+   ```
+   commands/
+     dev/
+       execute-phase.md
+       create-feature.md
+     test/
+       run-tests.md
+   ```
+   Expected:
+   - `execute-phase.md` → COMMAND, organization_path="dev"
+   - `create-feature.md` → COMMAND, organization_path="dev"
+   - `run-tests.md` → COMMAND, organization_path="test"
+
+7. **Organization path - deeply nested**:
+   ```
+   commands/
+     dev/
+       subgroup/
+         my-command.md
+   ```
+   Expected: `my-command.md` → COMMAND, organization_path="dev/subgroup"
+
+8. **Organization path - direct in container**:
+   ```
+   commands/
+     test.md
+   ```
+   Expected: `test.md` → COMMAND, organization_path=None
+
+9. **Organization path - agents with grouping**:
+   ```
+   agents/
+     ui-ux/
+       ui-designer.md
+       ux-researcher.md
+   ```
+   Expected:
+   - `ui-designer.md` → AGENT, organization_path="ui-ux"
+   - `ux-researcher.md` → AGENT, organization_path="ui-ux"
+
+10. **Organization path - skills (directory is artifact)**:
+    ```
+    skills/
+      planning/
+        SKILL.md
+        README.md
+    ```
+    Expected: `planning/` → SKILL, organization_path=None (planning IS the artifact)
+
 ### Quality Gates
 
 - [ ] All existing tests pass (no regressions)
@@ -221,6 +327,7 @@ if container_type is not None:
 - [ ] Agents detection accuracy ≥95%
 - [ ] Hooks detection accuracy ≥95%
 - [ ] MCP Servers detection accuracy ≥95%
+- [ ] `organization_path` field populated correctly for all detected artifacts
 - [ ] Test coverage for heuristic_detector.py >85%
 
 ---
@@ -258,17 +365,18 @@ if container_type is not None:
 ## Orchestration Quick Reference
 
 **Batch 1** (Parallel - no dependencies):
-- FIX-001 → `python-backend-engineer` (3 pts)
-- FIX-002 → `python-backend-engineer` (3 pts)
+- FIX-001 → `python-backend-engineer` (3 pts) - Container Type Propagation
+- FIX-002 → `python-backend-engineer` (3 pts) - Frontmatter Parsing
 
-**Batch 2** (After Batch 1):
-- FIX-003 → `python-backend-engineer` (2 pts) [depends: FIX-001]
+**Batch 2** (After Batch 1, parallel):
+- FIX-003 → `python-backend-engineer` (2 pts) [depends: FIX-001] - Scoring Weights
+- FIX-004 → `python-backend-engineer` (3 pts) [depends: FIX-001] - Organization Path
 
 **Batch 3** (After Batch 2):
-- FIX-004 → `python-backend-engineer` (3 pts) [depends: FIX-001, FIX-002, FIX-003]
+- FIX-005 → `python-backend-engineer` (3 pts) [depends: FIX-001, FIX-002, FIX-003, FIX-004] - Multi-Type Tests
 
 **Batch 4** (After Batch 3):
-- FIX-005 → `python-backend-engineer` (2 pts) [depends: FIX-004]
+- FIX-006 → `python-backend-engineer` (2 pts) [depends: FIX-005] - Regression Testing
 
 ### Task Delegation Commands
 
@@ -306,7 +414,7 @@ Add frontmatter parsing to skillmeat/core/marketplace/heuristic_detector.py:
 Reference lines: 483-486 (manifest scoring), 383-399 (extension handling)
 """)
 
-# Batch 2 (after Batch 1)
+# Batch 2 (after Batch 1, run in parallel)
 Task("python-backend-engineer", """FIX-003: Scoring Weight Adjustment
 
 Update scoring in skillmeat/core/marketplace/heuristic_detector.py:
@@ -326,14 +434,43 @@ Update scoring in skillmeat/core/marketplace/heuristic_detector.py:
 Reference: DetectionConfig class, _score_directory method, depth penalty logic
 """)
 
+Task("python-backend-engineer", """FIX-004: Organization Path Metadata
+
+Add organization_path field to capture directory structure between container and artifact.
+
+1. Update skillmeat/api/schemas/marketplace.py - Add to HeuristicMatch:
+   organization_path: Optional[str] = Field(
+       default=None,
+       description="Path segments between container directory and artifact",
+       examples=["dev", "ui-ux", "dev/subgroup"],
+   )
+
+2. Add method to skillmeat/core/marketplace/heuristic_detector.py:
+   def _compute_organization_path(self, artifact_path: str, container_dir: str) -> Optional[str]:
+       # Get path relative to container
+       # Strip artifact name (file or directory)
+       # Return intermediate path segments or None if directly in container
+
+3. Call _compute_organization_path when building HeuristicMatch results
+
+Examples:
+- commands/dev/execute-phase.md → organization_path="dev"
+- commands/test.md → organization_path=None
+- commands/dev/subgroup/my-cmd.md → organization_path="dev/subgroup"
+- agents/ui-ux/ui-designer.md → organization_path="ui-ux"
+- skills/planning/SKILL.md → organization_path=None (planning IS the artifact)
+
+Reference: HeuristicMatch class, analyze_paths method
+""")
+
 # Batch 3 (after Batch 2)
-Task("python-backend-engineer", """FIX-004: Multi-Type Test Suite
+Task("python-backend-engineer", """FIX-005: Multi-Type Test Suite
 
 Add tests to tests/core/marketplace/test_heuristic_detector.py:
 
 New test class: TestMultiTypeDetection
 
-Test cases:
+Test cases for type detection:
 1. test_commands_in_container - commands/git/COMMAND.md → COMMAND
 2. test_agents_in_container - agents/helper/AGENT.md → AGENT
 3. test_hooks_in_container - hooks/pre-commit/HOOK.md → HOOK
@@ -345,14 +482,22 @@ Test cases:
 9. test_case_insensitive_container - Commands/git/COMMAND.md → COMMAND
 10. test_malformed_frontmatter_fallback - bad YAML falls back to heuristic
 
+Test cases for organization_path:
+11. test_organization_path_nested - commands/dev/execute-phase.md → "dev"
+12. test_organization_path_direct - commands/test.md → None
+13. test_organization_path_deeply_nested - commands/dev/subgroup/my-cmd.md → "dev/subgroup"
+14. test_organization_path_agents - agents/ui-ux/ui-designer.md → "ui-ux"
+15. test_organization_path_skills - skills/planning/SKILL.md → None
+
 Each test should verify:
 - Correct artifact_type detection
+- Correct organization_path value
 - Confidence score ≥ 70 for typed containers
 - No false positives for other types
 """)
 
 # Batch 4 (after Batch 3)
-Task("python-backend-engineer", """FIX-005: Regression Testing
+Task("python-backend-engineer", """FIX-006: Regression Testing
 
 Run full test suite and verify no regressions:
 

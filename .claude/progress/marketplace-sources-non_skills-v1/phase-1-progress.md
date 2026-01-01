@@ -17,7 +17,7 @@ overall_progress: 0
 completion_estimate: "on-track"
 
 # Task Counts: Machine-readable task state
-total_tasks: 5
+total_tasks: 6
 completed_tasks: 0
 in_progress_tasks: 0
 blocked_tasks: 0
@@ -55,29 +55,37 @@ tasks:
     priority: "medium"
 
   - id: "FIX-004"
-    description: "Multi-Type Test Suite - Comprehensive tests for Commands, Agents, Hooks, MCP detection"
+    description: "Organization Path Metadata - Add organization_path field to capture directory structure"
     status: "pending"
     assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-001", "FIX-002", "FIX-003"]
+    dependencies: ["FIX-001"]
+    estimated_effort: "3h"
+    priority: "medium"
+
+  - id: "FIX-005"
+    description: "Multi-Type Test Suite - Comprehensive tests for all artifact types and organization_path"
+    status: "pending"
+    assigned_to: ["python-backend-engineer"]
+    dependencies: ["FIX-001", "FIX-002", "FIX-003", "FIX-004"]
     estimated_effort: "3h"
     priority: "high"
 
-  - id: "FIX-005"
+  - id: "FIX-006"
     description: "Regression Testing - Run full test suite, verify no skill detection regressions"
     status: "pending"
     assigned_to: ["python-backend-engineer"]
-    dependencies: ["FIX-004"]
+    dependencies: ["FIX-005"]
     estimated_effort: "2h"
     priority: "high"
 
 # Parallelization Strategy (computed from dependencies)
 parallelization:
   batch_1: ["FIX-001", "FIX-002"]
-  batch_2: ["FIX-003"]
-  batch_3: ["FIX-004"]
-  batch_4: ["FIX-005"]
-  critical_path: ["FIX-001", "FIX-003", "FIX-004", "FIX-005"]
-  estimated_total_time: "9h"
+  batch_2: ["FIX-003", "FIX-004"]
+  batch_3: ["FIX-005"]
+  batch_4: ["FIX-006"]
+  critical_path: ["FIX-001", "FIX-003", "FIX-005", "FIX-006"]
+  estimated_total_time: "10h"
 
 # Critical Blockers: None currently
 blockers: []
@@ -100,12 +108,16 @@ success_criteria:
     description: "MCP Servers detection accuracy >= 95%"
     status: "pending"
   - id: "SC-6"
+    description: "organization_path populated correctly for all artifacts"
+    status: "pending"
+  - id: "SC-7"
     description: "Test coverage for heuristic_detector.py > 85%"
     status: "pending"
 
 # Files Modified: What's being changed in this phase
 files_modified:
   - "skillmeat/core/marketplace/heuristic_detector.py"
+  - "skillmeat/api/schemas/marketplace.py"
   - "tests/core/marketplace/test_heuristic_detector.py"
 ---
 
@@ -129,16 +141,17 @@ files_modified:
 - FIX-001 → `python-backend-engineer` (3h) - Container type propagation
 - FIX-002 → `python-backend-engineer` (3h) - Frontmatter parsing
 
-**Batch 2** (Sequential - Depends on Batch 1):
-- FIX-003 → `python-backend-engineer` (2h) - **Blocked by**: FIX-001
+**Batch 2** (Parallel - Depends on Batch 1):
+- FIX-003 → `python-backend-engineer` (2h) - Scoring weights [needs FIX-001]
+- FIX-004 → `python-backend-engineer` (3h) - Organization path [needs FIX-001]
 
 **Batch 3** (Sequential - Depends on Batch 2):
-- FIX-004 → `python-backend-engineer` (3h) - **Blocked by**: FIX-001, FIX-002, FIX-003
+- FIX-005 → `python-backend-engineer` (3h) - Multi-type tests [needs FIX-001,002,003,004]
 
 **Batch 4** (Sequential - Depends on Batch 3):
-- FIX-005 → `python-backend-engineer` (2h) - **Blocked by**: FIX-004
+- FIX-006 → `python-backend-engineer` (2h) - Regression testing [needs FIX-005]
 
-**Critical Path**: FIX-001 → FIX-003 → FIX-004 → FIX-005 (9h total if serial)
+**Critical Path**: FIX-001 → FIX-003 → FIX-005 → FIX-006 (10h total)
 
 ### Task Delegation Commands
 
@@ -176,7 +189,7 @@ Add frontmatter parsing to skillmeat/core/marketplace/heuristic_detector.py:
 Reference lines: 483-486 (manifest scoring), 383-399 (extension handling)
 """)
 
-# Batch 2 (After Batch 1)
+# Batch 2 (After Batch 1, launch in parallel)
 Task("python-backend-engineer", """FIX-003: Scoring Weight Adjustment
 
 Update scoring in skillmeat/core/marketplace/heuristic_detector.py:
@@ -196,14 +209,43 @@ Update scoring in skillmeat/core/marketplace/heuristic_detector.py:
 Reference: DetectionConfig class, _score_directory method, depth penalty logic
 """)
 
+Task("python-backend-engineer", """FIX-004: Organization Path Metadata
+
+Add organization_path field to capture directory structure between container and artifact.
+
+1. Update skillmeat/api/schemas/marketplace.py - Add to HeuristicMatch:
+   organization_path: Optional[str] = Field(
+       default=None,
+       description="Path segments between container directory and artifact",
+       examples=["dev", "ui-ux", "dev/subgroup"],
+   )
+
+2. Add method to skillmeat/core/marketplace/heuristic_detector.py:
+   def _compute_organization_path(self, artifact_path: str, container_dir: str) -> Optional[str]:
+       # Get path relative to container
+       # Strip artifact name (file or directory)
+       # Return intermediate path segments or None if directly in container
+
+3. Call _compute_organization_path when building HeuristicMatch results
+
+Examples:
+- commands/dev/execute-phase.md → organization_path="dev"
+- commands/test.md → organization_path=None
+- commands/dev/subgroup/my-cmd.md → organization_path="dev/subgroup"
+- agents/ui-ux/ui-designer.md → organization_path="ui-ux"
+- skills/planning/SKILL.md → organization_path=None (planning IS the artifact)
+
+Reference: HeuristicMatch class, analyze_paths method
+""")
+
 # Batch 3 (After Batch 2)
-Task("python-backend-engineer", """FIX-004: Multi-Type Test Suite
+Task("python-backend-engineer", """FIX-005: Multi-Type Test Suite
 
 Add tests to tests/core/marketplace/test_heuristic_detector.py:
 
 New test class: TestMultiTypeDetection
 
-Test cases:
+Test cases for type detection:
 1. test_commands_in_container - commands/git/COMMAND.md → COMMAND
 2. test_agents_in_container - agents/helper/AGENT.md → AGENT
 3. test_hooks_in_container - hooks/pre-commit/HOOK.md → HOOK
@@ -215,14 +257,22 @@ Test cases:
 9. test_case_insensitive_container - Commands/git/COMMAND.md → COMMAND
 10. test_malformed_frontmatter_fallback - bad YAML falls back to heuristic
 
+Test cases for organization_path:
+11. test_organization_path_nested - commands/dev/execute-phase.md → "dev"
+12. test_organization_path_direct - commands/test.md → None
+13. test_organization_path_deeply_nested - commands/dev/subgroup/my-cmd.md → "dev/subgroup"
+14. test_organization_path_agents - agents/ui-ux/ui-designer.md → "ui-ux"
+15. test_organization_path_skills - skills/planning/SKILL.md → None
+
 Each test should verify:
 - Correct artifact_type detection
+- Correct organization_path value
 - Confidence score >= 70 for typed containers
 - No false positives for other types
 """)
 
 # Batch 4 (After Batch 3)
-Task("python-backend-engineer", """FIX-005: Regression Testing
+Task("python-backend-engineer", """FIX-006: Regression Testing
 
 Run full test suite and verify no regressions:
 
@@ -244,16 +294,18 @@ Report final test results and coverage numbers.
 
 ## Overview
 
-Fix the marketplace source detection system to properly classify non-skill artifacts (Commands, Agents, Hooks, MCP Servers) instead of misclassifying them as Skills.
+Fix the marketplace source detection system to properly classify non-skill artifacts (Commands, Agents, Hooks, MCP Servers) instead of misclassifying them as Skills. Additionally, capture organizational structure metadata via the new `organization_path` field.
 
 **Why This Phase**: The detection algorithm has a bias toward Skills because:
 1. Container directories (commands/, agents/) are skipped but type hints aren't propagated to children
 2. No frontmatter content validation to confirm artifact types
 3. Parent hint weights are too low compared to depth penalties
 
+**New Feature**: `organization_path` field captures directory structure for future filtering/tagging.
+
 **Scope**:
-- **IN SCOPE**: heuristic_detector.py algorithm fixes, comprehensive test coverage
-- **OUT OF SCOPE**: Schema changes, UI changes, database changes
+- **IN SCOPE**: heuristic_detector.py algorithm fixes, schema update, comprehensive test coverage
+- **OUT OF SCOPE**: UI changes, database changes beyond schema
 
 ---
 
@@ -266,7 +318,8 @@ Fix the marketplace source detection system to properly classify non-skill artif
 | SC-3 | Agents detection accuracy >= 95% | Pending |
 | SC-4 | Hooks detection accuracy >= 95% | Pending |
 | SC-5 | MCP Servers detection accuracy >= 95% | Pending |
-| SC-6 | Test coverage for heuristic_detector.py > 85% | Pending |
+| SC-6 | organization_path populated correctly | Pending |
+| SC-7 | Test coverage for heuristic_detector.py > 85% | Pending |
 
 ---
 
@@ -277,8 +330,9 @@ Fix the marketplace source detection system to properly classify non-skill artif
 | FIX-001 | Container Type Propagation | Pending | python-backend-engineer | None | 3h | High priority |
 | FIX-002 | Frontmatter Parsing | Pending | python-backend-engineer | None | 3h | Can run parallel with FIX-001 |
 | FIX-003 | Scoring Weight Adjustment | Pending | python-backend-engineer | FIX-001 | 2h | Depends on container changes |
-| FIX-004 | Multi-Type Test Suite | Pending | python-backend-engineer | FIX-001,002,003 | 3h | Comprehensive tests |
-| FIX-005 | Regression Testing | Pending | python-backend-engineer | FIX-004 | 2h | Final validation |
+| FIX-004 | Organization Path Metadata | Pending | python-backend-engineer | FIX-001 | 3h | New schema field |
+| FIX-005 | Multi-Type Test Suite | Pending | python-backend-engineer | FIX-001,002,003,004 | 3h | Comprehensive tests |
+| FIX-006 | Regression Testing | Pending | python-backend-engineer | FIX-005 | 2h | Final validation |
 
 **Status Legend**:
 - `Pending` Not Started
@@ -302,22 +356,20 @@ The heuristic detector uses a 5-signal scoring system:
 
 **Key Files**:
 - `skillmeat/core/marketplace/heuristic_detector.py` - Main detection logic (686 lines)
+- `skillmeat/api/schemas/marketplace.py` - HeuristicMatch schema
 - `tests/core/marketplace/test_heuristic_detector.py` - Existing test suite
 
-### Reference Patterns
+### New Field: organization_path
 
-**Container Detection** (lines 160-190):
-```python
-def _is_container_directory(self, dir_name: str) -> bool:
-    return dir_name.lower() in {"commands", "agents", "skills", "hooks", "rules", "mcp"}
-```
+Captures the directory structure between container and artifact:
 
-**Scoring Flow** (lines 306-414):
-1. Group files by parent directory
-2. Check if container directory (skip if true)
-3. Score each directory via 5 signals
-4. Apply depth penalty
-5. Normalize to 0-100 scale
+| Full Path | organization_path |
+|-----------|-------------------|
+| `commands/dev/execute-phase.md` | `"dev"` |
+| `commands/test.md` | `None` |
+| `commands/dev/subgroup/my-cmd.md` | `"dev/subgroup"` |
+| `agents/ui-ux/ui-designer.md` | `"ui-ux"` |
+| `skills/planning/SKILL.md` | `None` |
 
 ---
 
@@ -334,66 +386,15 @@ def _is_container_directory(self, dir_name: str) -> bool:
    - Add YAML frontmatter parser (handle `---` delimiters)
    - Extract `type:` field if present
    - Make this the highest-weight signal (30 pts)
-   - Override heuristic detection if frontmatter explicitly declares type
 
-3. **Scoring Adjustments**:
+3. **Organization Path**:
+   - Compute path segments between container and artifact
+   - Store in new `organization_path` field
+   - Return None for artifacts directly in container or skill directories
+
+4. **Scoring Adjustments**:
    - New MAX_RAW_SCORE = 120 (was 65)
-   - Reduce/eliminate depth penalty when inside typed container
-   - Frontmatter type wins over all other signals
-
-### Known Gotchas
-
-- **YAML parsing**: Must handle malformed frontmatter gracefully (return None)
-- **Case sensitivity**: Container names should be case-insensitive
-- **Backwards compatibility**: Skill detection must remain unchanged
-
----
-
-## Blockers
-
-### Active Blockers
-
-None currently.
-
-### Resolved Blockers
-
-None yet.
-
----
-
-## Dependencies
-
-### External Dependencies
-
-None - this is a self-contained backend fix.
-
-### Internal Integration Points
-
-- Detection results flow into `import_coordinator.py` which uses `artifact_type` directly
-- If detection is wrong, import creates wrongly-typed artifacts
-
----
-
-## Testing Strategy
-
-| Test Type | Scope | Coverage | Status |
-|-----------|-------|----------|--------|
-| Unit | Individual scoring functions | 85%+ | Pending |
-| Integration | Full detection pipeline | All artifact types | Pending |
-| Regression | Existing skill detection | All existing tests | Pending |
-
----
-
-## Next Session Agenda
-
-### Immediate Actions (Next Session)
-1. [ ] Execute Batch 1: FIX-001 and FIX-002 in parallel
-2. [ ] Execute Batch 2: FIX-003 after Batch 1 completes
-3. [ ] Execute Batch 3: FIX-004 comprehensive test suite
-
-### Context for Continuing Agent
-
-The implementation plan at `docs/project_plans/implementation_plans/bugs/marketplace-sources-non_skills-v1.md` contains detailed task specifications including exact code changes needed. Use the Task() delegation commands in the Quick Reference section above.
+   - Reduce/eliminate depth penalty inside typed containers
 
 ---
 
@@ -403,6 +404,7 @@ The implementation plan at `docs/project_plans/implementation_plans/bugs/marketp
 
 **Completed**:
 - Created implementation plan with root cause analysis
+- Added organization_path enhancement
 - Created progress tracking artifact
 
 **In Progress**:
@@ -418,3 +420,4 @@ The implementation plan at `docs/project_plans/implementation_plans/bugs/marketp
 - **Bug Report**: `docs/project_plans/bugs/marketplace-sources-non_skills-v1.md`
 - **Implementation Plan**: `docs/project_plans/implementation_plans/bugs/marketplace-sources-non_skills-v1.md`
 - **Key File**: `skillmeat/core/marketplace/heuristic_detector.py`
+- **Demo Script**: `test_detection_demo.py` (shows before/after comparison)
