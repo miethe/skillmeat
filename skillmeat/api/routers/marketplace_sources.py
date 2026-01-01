@@ -13,6 +13,8 @@ API Endpoints:
     POST /marketplace/sources/{id}/rescan - Trigger rescan
     GET /marketplace/sources/{id}/artifacts - List artifacts with filters
     POST /marketplace/sources/{id}/import - Import artifacts to collection
+    PATCH /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Mark artifact as excluded
+    DELETE /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Restore excluded artifact
     GET /marketplace/sources/{id}/artifacts/{path}/files - Get file tree
     GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
 """
@@ -20,7 +22,7 @@ API Endpoints:
 import logging
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -31,6 +33,7 @@ from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
+    ExcludeArtifactRequest,
     FileContentResponse,
     FileTreeEntry,
     FileTreeResponse,
@@ -259,6 +262,8 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         status=entry.status,
         import_date=entry.import_date,
         import_id=entry.import_id,
+        excluded_at=entry.excluded_at,
+        excluded_reason=entry.excluded_reason,
     )
 
 
@@ -778,6 +783,7 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     - min_confidence: Minimum confidence score (0-100)
     - max_confidence: Maximum confidence score (0-100)
     - include_below_threshold: Include artifacts below 30% confidence threshold (default: False)
+    - include_excluded: Include excluded artifacts (default: False)
 
     Results are paginated using cursor-based pagination for efficiency.
 
@@ -801,6 +807,9 @@ async def list_artifacts(
     include_below_threshold: bool = Query(
         False, description="Include artifacts below 30% confidence threshold"
     ),
+    include_excluded: bool = Query(
+        False, description="Include excluded artifacts in results"
+    ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
 ) -> CatalogListResponse:
@@ -813,6 +822,7 @@ async def list_artifacts(
         min_confidence: Filter entries with confidence >= this value (0-100)
         max_confidence: Filter entries with confidence <= this value (0-100)
         include_below_threshold: If True, include entries <30% that are normally hidden
+        include_excluded: If True, include entries with status="excluded" (default: False)
         limit: Maximum items per page
         cursor: Pagination cursor
 
@@ -853,16 +863,37 @@ async def list_artifacts(
                     effective_min_confidence, CONFIDENCE_THRESHOLD
                 )
 
-        # Apply filters using get_source_catalog for combined filtering
-        if artifact_type or status or effective_min_confidence or max_confidence:
-            # Get filtered entries
+        # Build status filter list
+        # When include_excluded=False (default), we exclude entries with status="excluded"
+        effective_statuses: Optional[List[str]] = None
+        if status:
+            # User specified a status filter - use it directly
+            effective_statuses = [status]
+
+        # Determine if we need filtered query
+        # When include_excluded=False and no status filter, we still need to filter
+        needs_filtered_query = (
+            artifact_type
+            or status
+            or effective_min_confidence
+            or max_confidence
+            or not include_excluded
+        )
+
+        if needs_filtered_query:
+            # Get filtered entries using get_source_catalog
             entries = catalog_repo.get_source_catalog(
                 source_id=source_id,
                 artifact_types=[artifact_type] if artifact_type else None,
-                statuses=[status] if status else None,
+                statuses=effective_statuses,
                 min_confidence=effective_min_confidence,
                 max_confidence=max_confidence,
             )
+
+            # Filter out excluded entries if not explicitly requested
+            # This handles the case where no status filter was provided
+            if not include_excluded and not status:
+                entries = [e for e in entries if e.status != "excluded"]
 
             # Manual pagination for filtered results
             # Convert to list and apply cursor
@@ -878,7 +909,7 @@ async def list_artifacts(
             has_more = len(entries) > limit
             items = entries[:limit]
         else:
-            # Use efficient paginated query
+            # Use efficient paginated query (only when include_excluded=True and no other filters)
             result = catalog_repo.list_paginated(
                 source_id=source_id,
                 limit=limit,
@@ -1095,6 +1126,250 @@ async def import_artifacts(
 
 
 # =============================================================================
+# API-004b: Exclude Artifact Endpoint
+# =============================================================================
+
+
+@router.patch(
+    "/{source_id}/artifacts/{entry_id}/exclude",
+    response_model=CatalogEntryResponse,
+    summary="Mark catalog artifact as excluded",
+    description="""
+    Mark a catalog entry as excluded from the catalog (e.g., false positive,
+    documentation file, not an actual artifact).
+
+    This operation is idempotent - calling it on an already excluded entry
+    will return success with the current state.
+
+    To restore an excluded entry, use the same endpoint with excluded=False.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - entry_id: Catalog entry identifier
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def exclude_artifact(
+    source_id: str,
+    entry_id: str,
+    request: ExcludeArtifactRequest,
+) -> CatalogEntryResponse:
+    """Mark or unmark a catalog entry as excluded.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+        request: Exclusion request with excluded flag and optional reason
+
+    Returns:
+        Updated catalog entry
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 400: If entry does not belong to source
+        HTTPException 500: If database operation fails
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for atomic update
+        session = catalog_repo._get_session()
+        try:
+            # Fetch catalog entry within same session for update
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry with ID '{entry_id}' not found",
+                )
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+                )
+
+            # Apply exclusion or restoration
+            if request.excluded:
+                # Mark as excluded (idempotent - skip if already excluded)
+                if entry.excluded_at is None:
+                    entry.excluded_at = datetime.now(timezone.utc)
+                entry.excluded_reason = request.reason
+                entry.status = "excluded"
+                logger.info(
+                    f"Marked catalog entry as excluded: {entry_id} "
+                    f"(reason: {request.reason or 'none provided'})"
+                )
+            else:
+                # Restore from exclusion
+                entry.excluded_at = None
+                entry.excluded_reason = None
+                # Restore to "new" status (or could check import_date to set "imported")
+                entry.status = "new" if entry.import_date is None else "imported"
+                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
+
+            # Commit changes
+            session.commit()
+
+            # Refresh to get updated timestamps
+            session.refresh(entry)
+
+            return entry_to_response(entry)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update exclusion status for entry {entry_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update exclusion status: {str(e)}",
+        ) from e
+
+
+@router.delete(
+    "/{source_id}/artifacts/{entry_id}/exclude",
+    response_model=CatalogEntryResponse,
+    summary="Restore excluded catalog artifact",
+    description="""
+    Remove the exclusion status from a catalog entry, restoring it to the catalog.
+
+    This is a convenience endpoint that performs the same operation as calling
+    PATCH with excluded=False. It is idempotent - calling it on a non-excluded
+    entry will return success with the current state.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - entry_id: Catalog entry identifier
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def restore_excluded_artifact(
+    source_id: str,
+    entry_id: str,
+) -> CatalogEntryResponse:
+    """Restore an excluded catalog entry.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+
+    Returns:
+        Updated catalog entry with exclusion removed
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 400: If entry does not belong to source
+        HTTPException 500: If database operation fails
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for atomic update
+        session = catalog_repo._get_session()
+        try:
+            # Fetch catalog entry within same session for update
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry with ID '{entry_id}' not found",
+                )
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+                )
+
+            # Restore from exclusion (idempotent - no-op if not excluded)
+            if entry.excluded_at is not None:
+                entry.excluded_at = None
+                entry.excluded_reason = None
+                # Restore to "new" status if never imported, otherwise "imported"
+                entry.status = "new" if entry.import_date is None else "imported"
+                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
+            else:
+                logger.debug(f"Entry {entry_id} was not excluded, no-op")
+
+            # Commit changes
+            session.commit()
+
+            # Refresh to get updated timestamps
+            session.refresh(entry)
+
+            return entry_to_response(entry)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to restore excluded entry {entry_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to restore excluded entry: {str(e)}",
+        ) from e
+
+
+# =============================================================================
 # API-005: File Tree Endpoint
 # =============================================================================
 
@@ -1170,7 +1445,11 @@ async def get_artifact_file_tree(
             return FileTreeResponse(
                 entries=[
                     FileTreeEntry(
-                        path=entry["path"][prefix_len:] if entry["path"].startswith(path_prefix) else entry["path"],
+                        path=(
+                            entry["path"][prefix_len:]
+                            if entry["path"].startswith(path_prefix)
+                            else entry["path"]
+                        ),
                         type="file" if entry["type"] == "blob" else entry["type"],
                         size=entry.get("size"),
                         sha=entry["sha"],
@@ -1214,7 +1493,11 @@ async def get_artifact_file_tree(
         return FileTreeResponse(
             entries=[
                 FileTreeEntry(
-                    path=entry["path"][prefix_len:] if entry["path"].startswith(path_prefix) else entry["path"],
+                    path=(
+                        entry["path"][prefix_len:]
+                        if entry["path"].startswith(path_prefix)
+                        else entry["path"]
+                    ),
                     type="file" if entry["type"] == "blob" else entry["type"],
                     size=entry.get("size"),
                     sha=entry["sha"],
