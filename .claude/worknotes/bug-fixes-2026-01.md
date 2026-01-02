@@ -77,3 +77,35 @@
 
 - **Commit(s)**: db1e595
 - **Status**: RESOLVED
+
+---
+
+## 2026-01-02
+
+### CHECK Constraint Violation When Marking Catalog Entry as Excluded
+
+**Issue**: Attempting to mark a marketplace catalog entry as "excluded" (via PATCH `/marketplace/sources/{id}/artifacts/{entry_id}/exclude`) failed with `IntegrityError: CHECK constraint failed: check_catalog_status`.
+
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:1288-1293` (exclude_artifact endpoint)
+- **Root Cause**: The migration `20251231_2103_add_exclusion_to_catalog` added `excluded_at` and `excluded_reason` columns to support marking entries as excluded, but it **did not update** the `check_catalog_status` CHECK constraint. The database still had the old constraint: `status IN ('new', 'updated', 'removed', 'imported')` which did not include `'excluded'`.
+
+  **Additionally**, `skillmeat/cache/schema.py` (line 257) also had the outdated constraint definition, meaning new databases created directly via schema.py would have the same issue.
+
+  **Constraint Mismatch**:
+  - SQLAlchemy model (`models.py:1474-1476`): ✅ Had `'excluded'` in constraint
+  - Database (from migration): ❌ Missing `'excluded'`
+  - schema.py: ❌ Missing `'excluded'`
+
+- **Fix**: Created migration `20260102_1000_update_catalog_status_constraint` to:
+  1. Drop the old `check_catalog_status` constraint
+  2. Create new constraint with `status IN ('new', 'updated', 'removed', 'imported', 'excluded')`
+  3. Used `batch_alter_table` for SQLite compatibility (SQLite requires table recreation to modify CHECK constraints)
+
+  **Also** updated `skillmeat/cache/schema.py` line 257 to include `'excluded'` for consistency with new databases.
+
+- **Files Modified**:
+  - `skillmeat/cache/migrations/versions/20260102_1000_update_catalog_status_constraint.py` (new)
+  - `skillmeat/cache/schema.py` (line 257 - added 'excluded')
+
+- **Commit(s)**: 7017495
+- **Status**: RESOLVED
