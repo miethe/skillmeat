@@ -16,7 +16,9 @@ from skillmeat.api.schemas.marketplace import DetectedArtifact, HeuristicMatch
 MAX_RAW_SCORE = 120
 
 # Mapping from container directory names to artifact types
-CONTAINER_TYPE_MAPPING: Dict[str, "ArtifactType"] = {}  # Populated after ArtifactType is defined
+CONTAINER_TYPE_MAPPING: Dict[str, "ArtifactType"] = (
+    {}
+)  # Populated after ArtifactType is defined
 
 
 def normalize_score(raw_score: int) -> int:
@@ -55,15 +57,17 @@ class ArtifactType(str, Enum):
 
 # Populate the container type mapping after ArtifactType is defined
 # Only plural forms are containers; singular forms can be artifact names
-CONTAINER_TYPE_MAPPING.update({
-    "commands": ArtifactType.COMMAND,
-    "agents": ArtifactType.AGENT,
-    "skills": ArtifactType.SKILL,
-    "hooks": ArtifactType.HOOK,
-    "mcp": ArtifactType.MCP_SERVER,
-    "mcp-servers": ArtifactType.MCP_SERVER,
-    "servers": ArtifactType.MCP_SERVER,
-})
+CONTAINER_TYPE_MAPPING.update(
+    {
+        "commands": ArtifactType.COMMAND,
+        "agents": ArtifactType.AGENT,
+        "skills": ArtifactType.SKILL,
+        "hooks": ArtifactType.HOOK,
+        "mcp": ArtifactType.MCP_SERVER,
+        "mcp-servers": ArtifactType.MCP_SERVER,
+        "servers": ArtifactType.MCP_SERVER,
+    }
+)
 
 
 @dataclass
@@ -113,7 +117,9 @@ class DetectionConfig:
     parent_hint_weight: int = 15
     frontmatter_weight: int = 15
     container_hint_weight: int = 25  # Bonus when detected type matches container hint
-    frontmatter_type_weight: int = 30  # Strong signal when frontmatter contains type field
+    frontmatter_type_weight: int = (
+        30  # Strong signal when frontmatter contains type field
+    )
 
 
 class HeuristicDetector:
@@ -336,7 +342,7 @@ class HeuristicDetector:
             for artifact_dir in artifact_dirs:
                 if dir_path.startswith(artifact_dir + "/"):
                     # Check if there's a container directory between artifact and this path
-                    relative = dir_path[len(artifact_dir) + 1:]
+                    relative = dir_path[len(artifact_dir) + 1 :]
                     first_segment = relative.split("/")[0].lower()
                     if first_segment not in CONTAINER_TYPE_MAPPING:
                         is_inside_artifact = True
@@ -390,13 +396,15 @@ class HeuristicDetector:
                     # For single-file: commands/git/cm.md
                     # container_dir = "commands", dir_path = "commands/git"
                     # organization_path should be "git"
-                    relative_path = dir_path[len(container_dir) + 1:]
+                    relative_path = dir_path[len(container_dir) + 1 :]
                     organization_path = relative_path if relative_path else None
 
                 # Bug Fix 2: Apply depth penalty to single-file confidence
                 # Calculate depth relative to container
                 depth = len(PurePosixPath(dir_path).parts)
-                container_depth = len(PurePosixPath(container_dir).parts) if container_dir else 0
+                container_depth = (
+                    len(PurePosixPath(container_dir).parts) if container_dir else 0
+                )
                 relative_depth = depth - container_depth
 
                 # Base confidence for single-file artifacts
@@ -411,7 +419,9 @@ class HeuristicDetector:
                     confidence = max(50, 70 - depth_penalty)
 
                 # Calculate depth penalty for breakdown
-                single_file_depth_penalty = max(0, (relative_depth - 1) * 5) if relative_depth > 1 else 0
+                single_file_depth_penalty = (
+                    max(0, (relative_depth - 1) * 5) if relative_depth > 1 else 0
+                )
 
                 match_reasons = [
                     f"Single-file {container_type.value} in container",
@@ -419,7 +429,9 @@ class HeuristicDetector:
                     f"File: {filename}",
                 ]
                 if single_file_depth_penalty > 0:
-                    match_reasons.append(f"Depth penalty (-{single_file_depth_penalty})")
+                    match_reasons.append(
+                        f"Depth penalty (-{single_file_depth_penalty})"
+                    )
 
                 match = HeuristicMatch(
                     path=artifact_path,
@@ -490,12 +502,11 @@ class HeuristicDetector:
             return False  # Has manifest, treat as directory-based
 
         # Check if all files (except excluded) are .md files
-        excluded_files = {
-            "readme.md", "changelog.md", "license.md", "contributing.md"
-        }
+        excluded_files = {"readme.md", "changelog.md", "license.md", "contributing.md"}
 
         artifact_md_files = [
-            f for f in files
+            f
+            for f in files
             if f.lower().endswith(".md") and f.lower() not in excluded_files
         ]
 
@@ -503,10 +514,7 @@ class HeuristicDetector:
         # and no other significant files, this is a grouping directory
         if artifact_md_files:
             # Check if there are any non-.md files (except common non-artifact files)
-            other_files = [
-                f for f in files
-                if not f.lower().endswith(".md")
-            ]
+            other_files = [f for f in files if not f.lower().endswith(".md")]
             # If only .md files (or common non-artifact files), it's a grouping dir
             if not other_files:
                 return True
@@ -591,7 +599,9 @@ class HeuristicDetector:
             # Skip if this is a "grouping directory" for single-file artifacts
             # A grouping directory has no manifest but contains only .md files
             # inside a typed container (e.g., commands/git/ with cm.md, cp.md)
-            if self._is_single_file_grouping_directory(dir_path, files, container_types):
+            if self._is_single_file_grouping_directory(
+                dir_path, files, container_types
+            ):
                 continue
 
             # Skip if too deep
@@ -608,7 +618,9 @@ class HeuristicDetector:
             # Determine container hint from parent directory
             # Check if any ancestor is a container directory
             container_hint: Optional[ArtifactType] = None
-            container_dir: Optional[str] = None  # Track the container path for organization_path
+            container_dir: Optional[str] = (
+                None  # Track the container path for organization_path
+            )
             posix_path = PurePosixPath(dir_path)
             for i in range(len(posix_path.parts) - 1, 0, -1):
                 # Build ancestor path
@@ -629,16 +641,26 @@ class HeuristicDetector:
 
             # Bug Fix 3: Validate flat structure for commands/hooks/agents
             # These artifact types should be flat - nested subdirs reduce confidence
-            if artifact_type in (ArtifactType.COMMAND, ArtifactType.HOOK, ArtifactType.AGENT):
+            if artifact_type in (
+                ArtifactType.COMMAND,
+                ArtifactType.HOOK,
+                ArtifactType.AGENT,
+            ):
                 allowed_nested = {"tests", "test", "__tests__", "lib", "dist", "build"}
                 for other_dir in dir_to_files.keys():
                     if other_dir.startswith(dir_path + "/"):
                         # This is a nested directory
-                        nested_name = other_dir[len(dir_path) + 1:].split("/")[0].lower()
+                        nested_name = (
+                            other_dir[len(dir_path) + 1 :].split("/")[0].lower()
+                        )
                         if nested_name not in allowed_nested:
                             # Apply penalty - this might not be a valid flat artifact
-                            confidence_score = max(self.config.min_confidence, confidence_score - 15)
-                            match_reasons.append(f"Unexpected nested directory: {nested_name} (-15)")
+                            confidence_score = max(
+                                self.config.min_confidence, confidence_score - 15
+                            )
+                            match_reasons.append(
+                                f"Unexpected nested directory: {nested_name} (-15)"
+                            )
                             break
 
             # Only include if above threshold
@@ -657,7 +679,9 @@ class HeuristicDetector:
                 }
 
                 # Compute organization path between container and artifact
-                organization_path = self._compute_organization_path(dir_path, container_dir)
+                organization_path = self._compute_organization_path(
+                    dir_path, container_dir
+                )
 
                 match = HeuristicMatch(
                     path=dir_path,
@@ -1000,7 +1024,11 @@ class HeuristicDetector:
         """
         # Start with basic scoring
         artifact_type, match_reasons, breakdown = self._score_directory(
-            path, siblings, root_hint, use_frontmatter=False, container_hint=container_hint
+            path,
+            siblings,
+            root_hint,
+            use_frontmatter=False,
+            container_hint=container_hint,
         )
 
         # Initialize frontmatter_type_score in breakdown
@@ -1150,8 +1178,10 @@ class HeuristicDetector:
         return 0
 
     def _calculate_depth_penalty(
-        self, path: str, root_hint: Optional[str] = None,
-        container_hint: Optional[ArtifactType] = None
+        self,
+        path: str,
+        root_hint: Optional[str] = None,
+        container_hint: Optional[ArtifactType] = None,
     ) -> int:
         """Calculate depth penalty for path.
 
@@ -1235,6 +1265,16 @@ class HeuristicDetector:
             # Extract artifact name from path
             posix_path = PurePosixPath(match.path)
             name = posix_path.name
+
+            # Strip .md extension for single-file artifact types (Commands, Agents, Hooks)
+            # These are often single .md files and should not include the extension in the name
+            single_file_types = (
+                ArtifactType.COMMAND,
+                ArtifactType.AGENT,
+                ArtifactType.HOOK,
+            )
+            if match.artifact_type in single_file_types and name.endswith(".md"):
+                name = name[:-3]
 
             # Construct upstream URL
             upstream_url = f"{base_url.rstrip('/')}/tree/main/{match.path}"

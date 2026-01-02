@@ -1886,8 +1886,8 @@ class TestSingleFileArtifacts:
         artifacts = detect_artifacts_in_tree(paths, "https://github.com/test/repo")
 
         assert len(artifacts) == 1
-        # Name should be the filename without extension
-        assert artifacts[0].name == "use-mcp.md"  # Full filename for single-file
+        # Name should be the filename without .md extension for single-file artifacts
+        assert artifacts[0].name == "use-mcp"  # Extension stripped for Commands/Agents/Hooks
 
     def test_upstream_url_for_single_file(self):
         """Test that upstream URL is correctly generated for single-file artifacts"""
