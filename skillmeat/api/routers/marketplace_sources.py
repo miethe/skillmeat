@@ -831,13 +831,16 @@ async def list_artifacts(
         None, ge=0, le=100, description="Maximum confidence score (0-100)"
     ),
     include_below_threshold: bool = Query(
-        False, description="Include artifacts below 30% confidence threshold (default: false)"
+        False,
+        description="Include artifacts below 30% confidence threshold (default: false)",
     ),
     include_excluded: bool = Query(
         False, description="Include excluded artifacts in results (default: false)"
     ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
-    cursor: Optional[str] = Query(None, description="Cursor for pagination (from previous response)"),
+    cursor: Optional[str] = Query(
+        None, description="Cursor for pagination (from previous response)"
+    ),
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters.
 
@@ -1543,22 +1546,42 @@ async def get_artifact_file_tree(
             # Strip artifact path prefix from file paths
             path_prefix = f"{artifact_path}/" if artifact_path else ""
             prefix_len = len(path_prefix)
+            entries = [
+                FileTreeEntry(
+                    path=(
+                        entry["path"][prefix_len:]
+                        if entry["path"].startswith(path_prefix)
+                        else entry["path"]
+                    ),
+                    type="file" if entry["type"] == "blob" else entry["type"],
+                    size=entry.get("size"),
+                    sha=entry["sha"],
+                )
+                for entry in cached_tree
+                # Exclude the artifact directory itself
+                if entry["path"] != artifact_path
+            ]
+
+            # Handle single-file artifacts (Commands, Agents, Hooks)
+            # If no child entries but path looks like a single file, return the file itself
+            if not entries and artifact_path.endswith(".md"):
+                from pathlib import PurePosixPath
+
+                for entry in cached_tree:
+                    if entry["path"] == artifact_path and entry["type"] == "blob":
+                        filename = PurePosixPath(artifact_path).name
+                        entries = [
+                            FileTreeEntry(
+                                path=filename,
+                                type="file",
+                                size=entry.get("size"),
+                                sha=entry["sha"],
+                            )
+                        ]
+                        break
+
             return FileTreeResponse(
-                entries=[
-                    FileTreeEntry(
-                        path=(
-                            entry["path"][prefix_len:]
-                            if entry["path"].startswith(path_prefix)
-                            else entry["path"]
-                        ),
-                        type="file" if entry["type"] == "blob" else entry["type"],
-                        size=entry.get("size"),
-                        sha=entry["sha"],
-                    )
-                    for entry in cached_tree
-                    # Exclude the artifact directory itself
-                    if entry["path"] != artifact_path
-                ],
+                entries=entries,
                 artifact_path=artifact_path,
                 source_id=source_id,
             )
@@ -1591,22 +1614,48 @@ async def get_artifact_file_tree(
         path_prefix = f"{artifact_path}/" if artifact_path else ""
         prefix_len = len(path_prefix)
 
+        # Build entries list, excluding the artifact directory/file itself
+        entries = [
+            FileTreeEntry(
+                path=(
+                    entry["path"][prefix_len:]
+                    if entry["path"].startswith(path_prefix)
+                    else entry["path"]
+                ),
+                type="file" if entry["type"] == "blob" else entry["type"],
+                size=entry.get("size"),
+                sha=entry["sha"],
+            )
+            for entry in tree_entries
+            # Exclude the artifact directory itself (exact match with no remaining path)
+            if entry["path"] != artifact_path
+        ]
+
+        # Handle single-file artifacts (Commands, Agents, Hooks)
+        # If no child entries but path looks like a single file, return the file itself
+        if not entries and artifact_path.endswith(".md"):
+            # Find the file entry in tree_entries (should be exact match)
+            for entry in tree_entries:
+                if entry["path"] == artifact_path and entry["type"] == "blob":
+                    # Extract just the filename for the entry path
+                    from pathlib import PurePosixPath
+
+                    filename = PurePosixPath(artifact_path).name
+                    entries = [
+                        FileTreeEntry(
+                            path=filename,
+                            type="file",
+                            size=entry.get("size"),
+                            sha=entry["sha"],
+                        )
+                    ]
+                    logger.debug(
+                        f"Single-file artifact detected: {artifact_path} -> {filename}"
+                    )
+                    break
+
         return FileTreeResponse(
-            entries=[
-                FileTreeEntry(
-                    path=(
-                        entry["path"][prefix_len:]
-                        if entry["path"].startswith(path_prefix)
-                        else entry["path"]
-                    ),
-                    type="file" if entry["type"] == "blob" else entry["type"],
-                    size=entry.get("size"),
-                    sha=entry["sha"],
-                )
-                for entry in tree_entries
-                # Exclude the artifact directory itself (exact match with no remaining path)
-                if entry["path"] != artifact_path
-            ],
+            entries=entries,
             artifact_path=artifact_path,
             source_id=source_id,
         )
