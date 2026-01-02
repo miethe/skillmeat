@@ -109,3 +109,36 @@
 
 - **Commit(s)**: 7017495
 - **Status**: RESOLVED
+
+---
+
+### Single-File Artifact Content Fetch 404 Error
+
+**Issue**: Clicking on a single-file artifact (Command, Agent) in the marketplace catalog and viewing the Contents tab resulted in a 404 error from GitHub API. The URL was malformed, duplicating the filename.
+
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:get_artifact_file_content()`
+- **Root Cause**: The file content endpoint concatenated `artifact_path` and `file_path` unconditionally:
+  ```python
+  full_file_path = f"{artifact_path}/{file_path}"
+  ```
+
+  For single-file artifacts:
+  - `artifact_path` = `.claude/commands/use-mcp.md` (the file itself)
+  - `file_path` = `use-mcp.md` (filename from file tree)
+  - Result: `.claude/commands/use-mcp.md/use-mcp.md` (WRONG!)
+
+  **API Error**:
+  ```
+  404 Client Error: Not Found for url: https://api.github.com/repos/mrgoonie/claudekit-skills/contents/.claude/commands/use-mcp.md/use-mcp.md?ref=main
+  ```
+
+- **Fix**: Added detection for single-file artifacts before constructing the full path:
+  ```python
+  if artifact_path.endswith(f"/{file_path}") or artifact_path == file_path:
+      full_file_path = artifact_path  # Single-file: use artifact_path directly
+  else:
+      full_file_path = f"{artifact_path}/{file_path}"  # Directory: concatenate
+  ```
+
+- **Commit(s)**: cacb26c
+- **Status**: RESOLVED

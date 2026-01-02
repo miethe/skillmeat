@@ -1750,7 +1750,15 @@ async def get_artifact_file_content(
             )
 
         # Build full file path within repository
-        full_file_path = f"{artifact_path}/{file_path}"
+        # Check if this is a single-file artifact (artifact_path ends with file_path)
+        # For single-file artifacts like Commands (.claude/commands/use-mcp.md),
+        # artifact_path IS the file, so we shouldn't concatenate
+        if artifact_path.endswith(f"/{file_path}") or artifact_path == file_path:
+            # Single-file artifact: artifact_path IS the file
+            full_file_path = artifact_path
+        else:
+            # Directory-based artifact: concatenate paths
+            full_file_path = f"{artifact_path}/{file_path}"
 
         # Get cache and build cache key
         cache = get_github_file_cache()
