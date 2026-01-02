@@ -1813,22 +1813,28 @@ class TestSingleFileArtifacts:
         assert len(skills) == 2, f"Expected 2 skills, got {len(skills)}"
 
     def test_single_file_confidence_score(self, detector):
-        """Single-file artifacts should have appropriate confidence scores"""
+        """Single-file artifacts should have appropriate confidence scores.
+
+        Bug Fix: Single-file artifacts now apply depth penalty:
+        - Directly in container: 75%
+        - One level deep (e.g., commands/git/cm.md): 70%
+        - Each additional level: -5% (minimum 50%)
+        """
         # Direct in container - higher confidence
         paths_direct = ["commands/deploy.md"]
         matches_direct = detector.analyze_paths(
             paths_direct, base_url="https://github.com/test/repo"
         )
         assert len(matches_direct) == 1
-        assert matches_direct[0].confidence_score == 80
+        assert matches_direct[0].confidence_score == 75
 
-        # Nested in grouping directory - slightly lower
+        # Nested in grouping directory - slightly lower (one level deep)
         paths_nested = ["commands/git/deploy.md"]
         matches_nested = detector.analyze_paths(
             paths_nested, base_url="https://github.com/test/repo"
         )
         assert len(matches_nested) == 1
-        assert matches_nested[0].confidence_score == 75
+        assert matches_nested[0].confidence_score == 70
 
     def test_single_file_breakdown_structure(self, detector):
         """Single-file artifacts should have proper breakdown structure"""
