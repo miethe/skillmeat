@@ -316,11 +316,34 @@ class HeuristicDetector:
             "hook.md",  # manifest files
         }
 
+        # Bug Fix 1: Identify artifact directories (directories with manifest files)
+        # Files inside these directories should NOT be detected as single-file artifacts
+        manifest_files = {"skill.md", "command.md", "agent.md", "hook.md", "mcp.md"}
+        artifact_dirs: Set[str] = set()
+        for dir_path, files in dir_to_files.items():
+            if any(f.lower() in manifest_files for f in files):
+                artifact_dirs.add(dir_path)
+
         # Process all directories to find single-file artifacts
         for dir_path, files in dir_to_files.items():
             # Apply root hint filtering
             if root_hint and not dir_path.startswith(root_hint):
                 continue
+
+            # Bug Fix 1: Skip if this directory is INSIDE an artifact directory
+            # (unless it's a nested container like skills/my-skill/commands/)
+            is_inside_artifact = False
+            for artifact_dir in artifact_dirs:
+                if dir_path.startswith(artifact_dir + "/"):
+                    # Check if there's a container directory between artifact and this path
+                    relative = dir_path[len(artifact_dir) + 1:]
+                    first_segment = relative.split("/")[0].lower()
+                    if first_segment not in CONTAINER_TYPE_MAPPING:
+                        is_inside_artifact = True
+                        break
+
+            if is_inside_artifact:
+                continue  # Skip - this is a file inside an artifact, not a standalone
 
             # Find container context for this directory
             container_type: Optional[ArtifactType] = None
@@ -370,25 +393,45 @@ class HeuristicDetector:
                     relative_path = dir_path[len(container_dir) + 1:]
                     organization_path = relative_path if relative_path else None
 
-                # Determine confidence (higher if directly in container)
-                is_direct = dir_path == container_dir
-                confidence = 80 if is_direct else 75
+                # Bug Fix 2: Apply depth penalty to single-file confidence
+                # Calculate depth relative to container
+                depth = len(PurePosixPath(dir_path).parts)
+                container_depth = len(PurePosixPath(container_dir).parts) if container_dir else 0
+                relative_depth = depth - container_depth
+
+                # Base confidence for single-file artifacts
+                # Direct in container gets higher score, deeper gets penalty
+                if relative_depth == 0:
+                    confidence = 75  # Directly in container
+                elif relative_depth == 1:
+                    confidence = 70  # One level deep (e.g., commands/git/cm.md)
+                else:
+                    # Each additional level reduces confidence
+                    depth_penalty = (relative_depth - 1) * 5
+                    confidence = max(50, 70 - depth_penalty)
+
+                # Calculate depth penalty for breakdown
+                single_file_depth_penalty = max(0, (relative_depth - 1) * 5) if relative_depth > 1 else 0
+
+                match_reasons = [
+                    f"Single-file {container_type.value} in container",
+                    f"Container: {container_dir}/",
+                    f"File: {filename}",
+                ]
+                if single_file_depth_penalty > 0:
+                    match_reasons.append(f"Depth penalty (-{single_file_depth_penalty})")
 
                 match = HeuristicMatch(
                     path=artifact_path,
                     artifact_type=container_type.value,
                     confidence_score=confidence,
                     organization_path=organization_path,
-                    match_reasons=[
-                        f"Single-file {container_type.value} in container",
-                        f"Container: {container_dir}/",
-                        f"File: {filename}",
-                    ],
+                    match_reasons=match_reasons,
                     # Score breakdown for single-file artifacts
                     dir_name_score=0,
                     manifest_score=0,
                     extension_score=5,  # .md extension
-                    depth_penalty=0,
+                    depth_penalty=single_file_depth_penalty,
                     raw_score=self.config.container_hint_weight + 5,
                     breakdown={
                         "dir_name_score": 0,
@@ -397,7 +440,7 @@ class HeuristicDetector:
                         "parent_hint_score": 0,
                         "frontmatter_score": 0,
                         "container_hint_score": self.config.container_hint_weight,
-                        "depth_penalty": 0,
+                        "depth_penalty": single_file_depth_penalty,
                         "raw_total": self.config.container_hint_weight + 5,
                         "normalized_score": confidence,
                         "single_file_detection": True,
@@ -583,6 +626,20 @@ class HeuristicDetector:
             # Normalize raw score to 0-100 scale
             raw_score = score_breakdown["raw_total"]
             confidence_score = normalize_score(raw_score)
+
+            # Bug Fix 3: Validate flat structure for commands/hooks/agents
+            # These artifact types should be flat - nested subdirs reduce confidence
+            if artifact_type in (ArtifactType.COMMAND, ArtifactType.HOOK, ArtifactType.AGENT):
+                allowed_nested = {"tests", "test", "__tests__", "lib", "dist", "build"}
+                for other_dir in dir_to_files.keys():
+                    if other_dir.startswith(dir_path + "/"):
+                        # This is a nested directory
+                        nested_name = other_dir[len(dir_path) + 1:].split("/")[0].lower()
+                        if nested_name not in allowed_nested:
+                            # Apply penalty - this might not be a valid flat artifact
+                            confidence_score = max(self.config.min_confidence, confidence_score - 15)
+                            match_reasons.append(f"Unexpected nested directory: {nested_name} (-15)")
+                            break
 
             # Only include if above threshold
             if confidence_score >= self.config.min_confidence:
