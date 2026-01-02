@@ -331,9 +331,17 @@ export default function SourceDetailPage() {
   const rescanMutation = useRescanSource(sourceId);
   const importMutation = useImportArtifacts(sourceId);
 
-  // Flatten catalog pages
+  // Flatten catalog pages with deduplication to prevent duplicate React keys
   const allEntries = useMemo(() => {
-    return catalogData?.pages.flatMap((page) => page.items) || [];
+    if (!catalogData?.pages) return [];
+    const seen = new Set<string>();
+    return catalogData.pages
+      .flatMap((page) => page.items)
+      .filter((entry) => {
+        if (seen.has(entry.id)) return false;
+        seen.add(entry.id);
+        return true;
+      });
   }, [catalogData]);
 
   // Filter by search (client-side)

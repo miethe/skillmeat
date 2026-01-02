@@ -40,5 +40,40 @@
   - No regressions in directory-based detection
   - `test_claudekit_structure` specifically tests the real-world repository structure
 
-- **Commit(s)**: 876a370
+- **Commit(s)**: fc5b735
+- **Status**: RESOLVED
+
+---
+
+### Duplicate React Keys When Loading More Marketplace Artifacts
+
+**Issue**: Clicking "Load More" on marketplace source detail page (`/marketplace/sources/{id}`) caused 50+ React warnings: "Encountered two children with the same key" and app crashes.
+
+- **Location**: `skillmeat/web/app/marketplace/sources/[id]/page.tsx:335-345`
+- **Root Cause**: The `allEntries` memoization used `flatMap()` without deduplication. When backend pagination returned overlapping cursor ranges, duplicate entry IDs accumulated across pages.
+
+  **Before**:
+  ```typescript
+  const allEntries = useMemo(() => {
+    return catalogData?.pages.flatMap((page) => page.items) || [];
+  }, [catalogData]);
+  ```
+
+- **Fix**: Added Set-based deduplication to filter duplicate entry IDs while preserving order:
+
+  ```typescript
+  const allEntries = useMemo(() => {
+    if (!catalogData?.pages) return [];
+    const seen = new Set<string>();
+    return catalogData.pages
+      .flatMap((page) => page.items)
+      .filter((entry) => {
+        if (seen.has(entry.id)) return false;
+        seen.add(entry.id);
+        return true;
+      });
+  }, [catalogData]);
+  ```
+
+- **Commit(s)**: db1e595
 - **Status**: RESOLVED
