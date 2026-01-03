@@ -622,15 +622,13 @@ class CreateSourceRequest(BaseModel):
         }
 
 
-
-
 class UpdateSourceRequest(BaseModel):
     """Request to update a GitHub repository source.
-    
+
     All fields are optional - only provided fields will be updated.
     Uses PATCH semantics for partial updates.
     """
-    
+
     ref: Optional[str] = Field(
         default=None,
         description="Branch, tag, or SHA to scan",
@@ -641,9 +639,11 @@ class UpdateSourceRequest(BaseModel):
         description="Subdirectory path within repository to start scanning",
         examples=["skills", "src/artifacts"],
     )
-    trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = Field(
-        default=None,
-        description="Trust level for artifacts from this source",
+    trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = (
+        Field(
+            default=None,
+            description="Trust level for artifacts from this source",
+        )
     )
     description: Optional[str] = Field(
         default=None,
@@ -702,36 +702,36 @@ class UpdateSourceRequest(BaseModel):
             raise ValueError("root_hint contains invalid characters")
 
         return v.strip()
-    
+
     @field_validator("description")
     @classmethod
     def validate_description_length(cls, v: str | None) -> str | None:
         """Validate description does not exceed maximum length.
-        
+
         Args:
             v: Description value to validate
-            
+
         Returns:
             Validated description
-            
+
         Raises:
             ValueError: If description exceeds 500 characters
         """
         if v is not None and len(v) > 500:
             raise ValueError("Description must be 500 characters or less")
         return v
-    
+
     @field_validator("notes")
     @classmethod
     def validate_notes_length(cls, v: str | None) -> str | None:
         """Validate notes do not exceed maximum length.
-        
+
         Args:
             v: Notes value to validate
-            
+
         Returns:
             Validated notes
-            
+
         Raises:
             ValueError: If notes exceed 2000 characters
         """
@@ -741,7 +741,7 @@ class UpdateSourceRequest(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
-        
+
         json_schema_extra = {
             "example": {
                 "ref": "v2.0.0",
@@ -749,6 +749,7 @@ class UpdateSourceRequest(BaseModel):
                 "notes": "Updated internal notes about this source",
             }
         }
+
 
 class SourceResponse(BaseModel):
     """Response model for a GitHub repository source.
@@ -934,7 +935,9 @@ class CatalogEntryResponse(BaseModel):
     )
     upstream_url: str = Field(
         description="Full URL to artifact in source repository",
-        examples=["https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"],
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
     )
     detected_version: Optional[str] = Field(
         default=None,
@@ -956,7 +959,30 @@ class CatalogEntryResponse(BaseModel):
         description="Confidence score of detection (0-100)",
         examples=[95],
     )
-    status: Literal["new", "updated", "removed", "imported"] = Field(
+    raw_score: Optional[int] = Field(
+        default=None,
+        description="Raw score before normalization (0-120 typical)",
+        examples=[60],
+    )
+    score_breakdown: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Detailed signal breakdown: dir_name_score (0-10), manifest_score (0-20), "
+        "extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), "
+        "depth_penalty (negative), raw_total, normalized_score (0-100)",
+        examples=[
+            {
+                "dir_name_score": 10,
+                "manifest_score": 20,
+                "extensions_score": 5,
+                "parent_hint_score": 15,
+                "frontmatter_score": 15,
+                "depth_penalty": -5,
+                "raw_total": 60,
+                "normalized_score": 92,
+            }
+        ],
+    )
+    status: Literal["new", "updated", "removed", "imported", "excluded"] = Field(
         description="Lifecycle status of the catalog entry",
         examples=["new"],
     )
@@ -967,6 +993,23 @@ class CatalogEntryResponse(BaseModel):
     import_id: Optional[str] = Field(
         default=None,
         description="ID of import operation if imported",
+    )
+    excluded_at: Optional[datetime] = Field(
+        default=None,
+        description="ISO 8601 timestamp when artifact was marked as excluded from catalog. "
+        "Null if not excluded.",
+        examples=["2025-12-07T14:30:00Z", None],
+    )
+    excluded_reason: Optional[str] = Field(
+        default=None,
+        description="User-provided reason for exclusion (max 500 chars). "
+        "Null if not excluded or no reason provided.",
+        max_length=500,
+        examples=[
+            "Not a valid skill - documentation only",
+            "False positive detection",
+            "Duplicate artifact",
+        ],
     )
 
     class Config:
@@ -985,9 +1028,64 @@ class CatalogEntryResponse(BaseModel):
                 "detected_sha": "abc123def456",
                 "detected_at": "2025-12-06T10:30:00Z",
                 "confidence_score": 95,
+                "raw_score": 60,
+                "score_breakdown": {
+                    "dir_name_score": 10,
+                    "manifest_score": 20,
+                    "extensions_score": 5,
+                    "parent_hint_score": 15,
+                    "frontmatter_score": 15,
+                    "depth_penalty": -5,
+                    "raw_total": 60,
+                    "normalized_score": 92,
+                },
                 "status": "new",
                 "import_date": None,
                 "import_id": None,
+                "excluded_at": None,
+                "excluded_reason": None,
+            }
+        }
+
+
+class ExcludeArtifactRequest(BaseModel):
+    """Request body for excluding or restoring a catalog entry.
+
+    Used to mark artifacts as excluded from the catalog (e.g., false positives,
+    documentation files, non-Claude artifacts) or to restore previously excluded
+    entries.
+
+    When `excluded=True`: Marks the entry as excluded with optional reason.
+    Excluded artifacts are hidden from default catalog views but can be restored.
+
+    When `excluded=False`: Removes exclusion status and restores entry to default
+    view (status changes to "new" or "imported" depending on history).
+
+    Both operations are idempotent - calling multiple times succeeds.
+    """
+
+    excluded: bool = Field(
+        description="True to mark as excluded, False to restore",
+        examples=[True, False],
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="User-provided reason for exclusion (max 500 chars, optional)",
+        max_length=500,
+        examples=[
+            "Not a valid artifact - documentation file",
+            "False positive detection",
+            "Not a Claude artifact",
+        ],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "excluded": True,
+                "reason": "This is a documentation file, not an actual skill",
             }
         }
 
@@ -1007,7 +1105,7 @@ class CatalogListResponse(BaseModel):
     counts_by_status: Dict[str, int] = Field(
         default_factory=dict,
         description="Count of entries by status",
-        examples=[{"new": 45, "updated": 12, "imported": 33}],
+        examples=[{"new": 45, "updated": 12, "imported": 33, "excluded": 5}],
     )
     counts_by_type: Dict[str, int] = Field(
         default_factory=dict,
@@ -1029,6 +1127,17 @@ class CatalogListResponse(BaseModel):
                         "path": "skills/canvas-design",
                         "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
                         "confidence_score": 95,
+                        "raw_score": 60,
+                        "score_breakdown": {
+                            "dir_name_score": 10,
+                            "manifest_score": 20,
+                            "extensions_score": 5,
+                            "parent_hint_score": 15,
+                            "frontmatter_score": 15,
+                            "depth_penalty": -5,
+                            "raw_total": 60,
+                            "normalized_score": 92,
+                        },
                         "status": "new",
                         "detected_at": "2025-12-06T10:30:00Z",
                     }
@@ -1040,7 +1149,7 @@ class CatalogListResponse(BaseModel):
                     "end_cursor": "Y3Vyc29yOjE5",
                     "total_count": 90,
                 },
-                "counts_by_status": {"new": 45, "updated": 12, "imported": 33},
+                "counts_by_status": {"new": 45, "updated": 12, "imported": 33, "excluded": 5},
                 "counts_by_type": {"skill": 60, "command": 20, "agent": 10},
             }
         }
@@ -1091,6 +1200,10 @@ class ScanResultDTO(BaseModel):
         description="Total number of artifacts detected",
         ge=0,
         examples=[12],
+    )
+    artifacts: List["DetectedArtifact"] = Field(
+        default_factory=list,
+        description="List of detected artifacts",
     )
     new_count: int = Field(
         description="Number of new artifacts detected",
@@ -1211,7 +1324,9 @@ class ImportResultDTO(BaseModel):
     errors: List[Dict[str, str]] = Field(
         default_factory=list,
         description="List of {entry_id, error} for failed imports",
-        examples=[[{"entry_id": "cat_broken_skill", "error": "Invalid manifest format"}]],
+        examples=[
+            [{"entry_id": "cat_broken_skill", "error": "Invalid manifest format"}]
+        ],
     )
 
     class Config:
@@ -1256,7 +1371,9 @@ class DetectedArtifact(BaseModel):
     )
     upstream_url: str = Field(
         description="Full URL to artifact in source repository",
-        examples=["https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"],
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
     )
     confidence_score: int = Field(
         ge=0,
@@ -1277,6 +1394,14 @@ class DetectedArtifact(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Additional metadata extracted during detection",
+    )
+    raw_score: Optional[int] = Field(
+        default=None,
+        description="Raw unscaled confidence score before normalization (0-120 typical)",
+    )
+    score_breakdown: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Detailed breakdown of heuristic signal scores",
     )
 
     class Config:
@@ -1317,10 +1442,17 @@ class HeuristicMatch(BaseModel):
         description="Overall confidence score (0-100)",
         examples=[95],
     )
+    organization_path: Optional[str] = Field(
+        default=None,
+        description="Path segments between container directory and artifact",
+        examples=["dev", "ui-ux", "dev/subgroup"],
+    )
     match_reasons: List[str] = Field(
         default_factory=list,
         description="List of reasons why this path matched",
-        examples=[["Directory name matches 'skill' pattern", "Contains skill.xml manifest"]],
+        examples=[
+            ["Directory name matches 'skill' pattern", "Contains skill.xml manifest"]
+        ],
     )
     # Scoring breakdown
     dir_name_score: int = Field(
@@ -1351,22 +1483,231 @@ class HeuristicMatch(BaseModel):
         description="Score penalty for being too deep in directory tree",
         examples=[5],
     )
+    raw_score: int = Field(
+        default=0,
+        ge=0,
+        le=150,  # Higher limit to accommodate container_hint + frontmatter_type signals
+        description="Raw score before normalization (0-120 typical)",
+        examples=[60],
+    )
+    breakdown: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Detailed signal breakdown dictionary",
+        examples=[
+            {
+                "dir_name_score": 10,
+                "manifest_score": 20,
+                "extensions_score": 5,
+                "parent_hint_score": 15,
+                "frontmatter_score": 15,
+                "depth_penalty": 5,
+                "raw_total": 60,
+                "normalized_score": 92,
+            }
+        ],
+    )
 
     class Config:
         """Pydantic model configuration."""
 
         json_schema_extra = {
             "example": {
-                "path": "skills/canvas-design",
-                "artifact_type": "skill",
+                "path": "commands/dev/execute-phase",
+                "artifact_type": "command",
                 "confidence_score": 95,
+                "organization_path": "dev",
                 "match_reasons": [
-                    "Directory name matches 'skill' pattern",
-                    "Contains skill.xml manifest",
+                    "Directory name matches 'command' pattern",
+                    "Contains COMMAND.md manifest",
                 ],
                 "dir_name_score": 30,
                 "manifest_score": 50,
                 "extension_score": 10,
                 "depth_penalty": 5,
+                "raw_score": 60,
+                "breakdown": {
+                    "dir_name_score": 10,
+                    "manifest_score": 20,
+                    "extensions_score": 5,
+                    "parent_hint_score": 15,
+                    "frontmatter_score": 15,
+                    "depth_penalty": 5,
+                    "raw_total": 60,
+                    "normalized_score": 92,
+                },
             }
         }
+
+
+# ============================================================================
+# File Tree DTOs
+# ============================================================================
+
+
+class FileTreeEntry(BaseModel):
+    """A single entry in a file tree (file or directory).
+
+    Represents a file or directory from the GitHub repository tree,
+    used for browsing artifact file structures in the catalog modal.
+    """
+
+    path: str = Field(
+        description="File path relative to artifact root",
+        examples=["README.md", "src/main.py"],
+    )
+    type: Literal["file", "tree"] = Field(
+        description="Entry type: 'file' for files, 'tree' for directories",
+        examples=["file"],
+    )
+    size: Optional[int] = Field(
+        default=None,
+        description="File size in bytes (only for blobs/files)",
+        ge=0,
+        examples=[1024],
+    )
+    sha: str = Field(
+        description="Git SHA for the blob or tree",
+        examples=["abc123def456789"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "path": "SKILL.md",
+                "type": "file",
+                "size": 2048,
+                "sha": "abc123def456789",
+            }
+        }
+
+
+class FileTreeResponse(BaseModel):
+    """Response containing file tree entries for an artifact.
+
+    Returns the list of files and directories within a marketplace
+    artifact, used for file browsing in the catalog entry modal.
+    """
+
+    entries: List[FileTreeEntry] = Field(
+        description="List of file and directory entries",
+    )
+    artifact_path: str = Field(
+        description="Path to artifact within repository",
+        examples=["skills/canvas-design"],
+    )
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_abc123"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "entries": [
+                    {
+                        "path": "SKILL.md",
+                        "type": "blob",
+                        "size": 2048,
+                        "sha": "abc123def456",
+                    },
+                    {
+                        "path": "src",
+                        "type": "tree",
+                        "size": None,
+                        "sha": "def789abc123",
+                    },
+                ],
+                "artifact_path": "skills/canvas-design",
+                "source_id": "src_anthropics_quickstarts",
+            }
+        }
+
+
+# ============================================================================
+# File Content DTOs
+# ============================================================================
+
+
+class FileContentResponse(BaseModel):
+    """Response model for file content from a marketplace artifact.
+
+    Contains the file content along with metadata for rendering in the UI.
+    Binary files will have base64-encoded content with is_binary=True.
+    Large files (>1MB) are truncated to 10,000 lines with truncated=True.
+    """
+
+    content: str = Field(
+        description="File content (text or base64-encoded for binary files)",
+        examples=["# My Skill\n\nThis is a sample skill..."],
+    )
+    encoding: str = Field(
+        description="Content encoding: 'none' for text, 'base64' for binary",
+        examples=["none", "base64"],
+    )
+    size: int = Field(
+        description="File size in bytes (may be truncated size if truncated=True)",
+        ge=0,
+        examples=[1024],
+    )
+    sha: str = Field(
+        description="Git blob SHA",
+        examples=["abc123def456789..."],
+    )
+    name: str = Field(
+        description="File name",
+        examples=["SKILL.md"],
+    )
+    path: str = Field(
+        description="Full path within repository",
+        examples=["skills/canvas/SKILL.md"],
+    )
+    is_binary: bool = Field(
+        description="Whether the file is binary (content is base64)",
+        examples=[False],
+    )
+    artifact_path: str = Field(
+        description="Path to the artifact this file belongs to",
+        examples=["skills/canvas"],
+    )
+    source_id: str = Field(
+        description="ID of the marketplace source",
+        examples=["src_abc123"],
+    )
+    truncated: bool = Field(
+        default=False,
+        description="Whether the content was truncated due to size (>1MB)",
+        examples=[False],
+    )
+    original_size: Optional[int] = Field(
+        default=None,
+        description="Original file size in bytes (only set when truncated=True)",
+        ge=0,
+        examples=[2097152],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "content": "# Canvas Design Skill\n\nA skill for designing...",
+                "encoding": "none",
+                "size": 2048,
+                "sha": "abc123def456789abcdef0123456789abcdef01",
+                "name": "SKILL.md",
+                "path": "skills/canvas/SKILL.md",
+                "is_binary": False,
+                "artifact_path": "skills/canvas",
+                "source_id": "src_anthropics_quickstarts",
+                "truncated": False,
+                "original_size": None,
+            }
+        }
+
+
+# Rebuild models to resolve forward references
+ScanResultDTO.model_rebuild()

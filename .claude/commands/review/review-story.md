@@ -120,3 +120,11 @@ Ensure all docs updated:
 ```
 
 Save to: `.claude/reports/${story_id}-qa.md`
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+### 8. Capture Review Findings
+
+- **1-2 issues**: `/mc capture {"title": "...", "type": "bug"}`
+- **3+ issues**: Use `/meatycapture-capture` skill for batch capture (more token-efficient)
+- Update resolved items: change `**Status:**` to `done`
+<!-- End MeatyCapture Integration -->

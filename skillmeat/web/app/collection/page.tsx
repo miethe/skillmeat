@@ -10,15 +10,19 @@ import { ArtifactList } from '@/components/collection/artifact-list';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
+import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
 import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
 import { useCollectionContext } from '@/hooks/use-collection-context';
 import { useArtifacts } from '@/hooks/useArtifacts';
 import { useCollectionArtifacts } from '@/hooks/use-collections';
+import { useEditArtifactParameters } from '@/hooks/useDiscovery';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { Entity } from '@/types/entity';
+import type { ArtifactParameters } from '@/types/discovery';
 
 type ViewMode = 'grid' | 'list' | 'grouped';
 
@@ -197,6 +201,54 @@ function CollectionPageContent() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
+  // State for artifact actions from dropdown menu
+  const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
+  const [artifactToEdit, setArtifactToEdit] = useState<Artifact | null>(null);
+  const [showDeletionDialog, setShowDeletionDialog] = useState(false);
+  const [showParameterEditor, setShowParameterEditor] = useState(false);
+
+  // Hook for editing artifact parameters
+  const { mutateAsync: updateParameters } = useEditArtifactParameters();
+
+  // Handler for Edit action from dropdown
+  const handleEditFromDropdown = (artifact: Artifact) => {
+    setArtifactToEdit(artifact);
+    setShowParameterEditor(true);
+  };
+
+  // Handler for Delete action from dropdown
+  const handleDeleteFromDropdown = (artifact: Artifact) => {
+    setArtifactToDelete(artifact);
+    setShowDeletionDialog(true);
+  };
+
+  // Handler to save parameters (same pattern as unified-entity-modal.tsx)
+  const handleSaveParameters = async (parameters: ArtifactParameters) => {
+    if (!artifactToEdit) return;
+
+    try {
+      await updateParameters({
+        artifactId: artifactToEdit.id,
+        parameters,
+      });
+
+      toast({
+        title: 'Parameters Updated',
+        description: `Successfully updated parameters for ${artifactToEdit.name}`,
+      });
+
+      setShowParameterEditor(false);
+      setArtifactToEdit(null);
+      refetch(); // Refresh artifact list
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update parameters',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Conditionally fetch artifacts based on selected collection
   // When a specific collection is selected, use collection-specific endpoint
   // When "All Collections" or no selection, use general artifacts endpoint
@@ -255,6 +307,16 @@ function CollectionPageContent() {
 
       // Enrich each summary with full data from catalog
       artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts));
+
+      // Deduplicate by ID to prevent React key conflicts
+      const seen = new Set<string>();
+      artifacts = artifacts.filter(artifact => {
+        if (seen.has(artifact.id)) {
+          return false;
+        }
+        seen.add(artifact.id);
+        return true;
+      });
     } else if (!isSpecificCollection && data && 'artifacts' in data) {
       // All collections view: Already have full Artifact objects
       artifacts = data.artifacts ?? [];
@@ -439,6 +501,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionBadge={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onEdit={handleEditFromDropdown}
+                onDelete={handleDeleteFromDropdown}
               />
             ) : viewMode === 'list' ? (
               <ArtifactList
@@ -447,6 +511,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionColumn={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onEdit={handleEditFromDropdown}
+                onDelete={handleDeleteFromDropdown}
               />
             ) : (
               // Grouped view placeholder for Phase 5
@@ -457,6 +523,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionBadge={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onEdit={handleEditFromDropdown}
+                onDelete={handleDeleteFromDropdown}
               />
             )}
           </>
@@ -486,6 +554,44 @@ function CollectionPageContent() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
       />
+
+      {/* Artifact Parameter Editor - triggered from dropdown */}
+      {artifactToEdit && (
+        <ParameterEditorModal
+          artifact={{
+            name: artifactToEdit.name,
+            type: artifactToEdit.type,
+            source: artifactToEdit.source,
+            version: artifactToEdit.version,
+            scope: artifactToEdit.scope,
+            tags: artifactToEdit.metadata?.tags,
+            aliases: artifactToEdit.aliases,
+          }}
+          open={showParameterEditor}
+          onClose={() => {
+            setShowParameterEditor(false);
+            setArtifactToEdit(null);
+          }}
+          onSave={handleSaveParameters}
+        />
+      )}
+
+      {/* Artifact Deletion Dialog - triggered from dropdown */}
+      {artifactToDelete && (
+        <ArtifactDeletionDialog
+          artifact={artifactToDelete}
+          open={showDeletionDialog}
+          onOpenChange={(open) => {
+            setShowDeletionDialog(open);
+            if (!open) setArtifactToDelete(null);
+          }}
+          onSuccess={() => {
+            setShowDeletionDialog(false);
+            setArtifactToDelete(null);
+            refetch(); // Refresh artifact list
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
  * API service module exports
  */
 export * from './artifacts';
+export * from './catalog';
 export * from './collections';
 export * from './groups';
 export * from './deployments';
