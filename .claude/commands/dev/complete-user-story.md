@@ -10,6 +10,12 @@ allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
 
 You are Claude Code implementing user story `$ARGUMENTS` following MeatyPrompts standards.
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Context Gathering
+
+Before implementation, search request-logs for related items:
+- `/mc search "story-keyword" skillmeat` - Find bugs/enhancements that may be resolved by this story
+
 Execute story ${ARGUMENTS} by:
 
 1. Create branch from main (eg feat/{story_id})
@@ -372,3 +378,11 @@ If ANY step fails:
 - [ ] Code reviewed by subagent
 - [ ] PR created and linked to story
 - [ ] Progress tracker shows "complete"
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Post-Completion
+
+After successful PR creation:
+- Update any request-log items addressed: change `**Status:**` to `done`
+- If issues arose during implementation: `/mc capture {"title": "...", "type": "bug"}`
+- Document recurring patterns for future reference

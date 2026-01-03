@@ -197,6 +197,22 @@ Task("python-pro", "TASK-1.2: Add API endpoint...")
 
 ---
 
+## Development Tracking
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+
+Track bugs/enhancements via request-logs (replaces loose TODO comments):
+
+| Entry Point | Use When | Tokens |
+|-------------|----------|--------|
+| `/mc` | Quick ops: list, search, single capture | ~150 |
+| `/meatycapture-capture` skill | Batch capture (3+ items), validation, templates | ~400 |
+
+**Quick reference**: `/mc list skillmeat`, `/mc search "keyword" skillmeat`, `/mc capture {...}`
+<!-- End MeatyCapture Integration -->
+
+---
+
 ## Architecture Overview
 
 **Full-Stack Web Application** (v0.3.0-beta)

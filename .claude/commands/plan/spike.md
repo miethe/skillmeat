@@ -6,6 +6,13 @@ argument-hint: [document-path-or-feature-description]
 
 Execute comprehensive SPIKE for "$ARGUMENTS" using MP architecture patterns:
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Phase 0: Discovery
+
+Search request-logs for related items to inform the SPIKE:
+- `/mc search "spike-keyword" skillmeat` - Find related bugs/enhancements
+- `/mc search "type:enhancement" skillmeat` - Find enhancements that may inform scope
+
 ## Phase 1: Input Analysis & Scope Definition
 
 1. **Analyze Input Source**

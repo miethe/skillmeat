@@ -8,6 +8,13 @@ allowed-tools: Read, Grep, Glob, Write
 
 You are Claude Code creating an implementation plan for story `$ARGUMENTS`.
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Discovery Phase
+
+Search request-logs for related items to incorporate into the plan:
+- `/mc search "story-keyword" skillmeat` - Find bugs/enhancements related to this story
+- `/mc search "type:bug status:backlog" skillmeat` - Find backlog bugs that may be resolved
+
 ## Purpose
 
 Generate a comprehensive, actionable plan WITHOUT implementing anything.

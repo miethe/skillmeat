@@ -13,10 +13,29 @@ from .error_handlers import (
     create_validation_error,
     validate_artifact_request,
 )
+from .github_cache import (
+    DEFAULT_CONTENT_TTL,
+    DEFAULT_TREE_TTL,
+    GitHubFileCache,
+    build_content_key,
+    build_tree_key,
+    get_github_file_cache,
+    reset_github_file_cache,
+)
 
 __all__ = [
+    # General cache utilities
     "CacheManager",
     "generate_etag",
+    # GitHub file cache
+    "GitHubFileCache",
+    "get_github_file_cache",
+    "reset_github_file_cache",
+    "build_tree_key",
+    "build_content_key",
+    "DEFAULT_TREE_TTL",
+    "DEFAULT_CONTENT_TTL",
+    # Error handlers
     "create_bad_request_error",
     "create_conflict_error",
     "create_internal_error",

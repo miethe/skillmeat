@@ -543,6 +543,7 @@ async def list_projects(
 async def create_project(
     request: ProjectCreateRequest,
     token: TokenDep,
+    cache_manager: CacheManagerDep,
 ) -> ProjectCreateResponse:
     """Create a new project.
 
@@ -550,10 +551,12 @@ async def create_project(
     1. Creating the project directory if it doesn't exist
     2. Creating the .claude subdirectory
     3. Storing project metadata
+    4. Adding project to persistent cache
 
     Args:
         request: Project creation request with name, path, and optional description
         token: Authentication token
+        cache_manager: CacheManager dependency for persistent cache updates
 
     Returns:
         Created project information
@@ -626,9 +629,28 @@ async def create_project(
 
         logger.info(f"Project created successfully: {request.name}")
 
-        # Invalidate cache so new project appears in list
+        # Invalidate in-memory cache so new project appears in list
         registry = await get_project_registry()
         await registry.refresh_entry(project_path)
+
+        # Add project to persistent SQLite cache (upsert preserves other projects)
+        if cache_manager is not None:
+            try:
+                new_project_data: dict[str, object] = {
+                    "id": encode_project_id(str(project_path)),
+                    "name": request.name,
+                    "path": str(project_path),
+                    "description": request.description,
+                    "artifacts": [],
+                }
+                cache_manager.upsert_project(new_project_data)
+                logger.info(f"Added project to persistent cache: {request.name}")
+            except Exception as e:
+                # Log error but don't fail - cache will be populated on next list
+                logger.error(
+                    f"Failed to add project to persistent cache: {e}",
+                    exc_info=True,
+                )
 
         return ProjectCreateResponse(
             id=encode_project_id(str(project_path)),
@@ -1047,7 +1069,10 @@ async def check_project_modifications(
 
         # Use sync manager to check drift - this provides proper change_origin detection
         from skillmeat.core.sync import SyncManager
-        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
+
+        sync_mgr = SyncManager(
+            collection_path=Path.home() / ".skillmeat" / "collection"
+        )
 
         try:
             drift_results = sync_mgr.check_drift(project_path=project_path)
@@ -1198,7 +1223,10 @@ async def get_modified_artifacts(
 
         # Use sync manager to check drift - provides proper change_origin
         from skillmeat.core.sync import SyncManager
-        sync_mgr = SyncManager(collection_path=Path.home() / ".skillmeat" / "collection")
+
+        sync_mgr = SyncManager(
+            collection_path=Path.home() / ".skillmeat" / "collection"
+        )
 
         try:
             drift_results = sync_mgr.check_drift(project_path=project_path)
@@ -1714,6 +1742,80 @@ async def get_project_drift_summary(
 # =============================================================================
 # Cache Management Endpoints
 # =============================================================================
+
+
+@router.post(
+    "/cache/clear",
+    summary="Clear project cache",
+    description="Clear the persistent SQLite cache and force full project rediscovery",
+    responses={
+        200: {"description": "Cache cleared successfully"},
+        500: {"description": "Cache manager not available"},
+    },
+)
+async def clear_project_cache(
+    token: TokenDep,
+    cache_manager: CacheManagerDep,
+) -> dict:
+    """Clear persistent project cache and force rediscovery.
+
+    This clears the SQLite cache and triggers a full filesystem scan
+    to rediscover all projects. Use when cache is out of sync with disk.
+
+    Args:
+        token: Authentication token
+        cache_manager: CacheManager dependency
+
+    Returns:
+        Cache clear status with project count after rediscovery
+    """
+    if cache_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cache manager not available",
+        )
+
+    try:
+        # Clear SQLite project cache
+        cleared = cache_manager.clear_cache()
+        if not cleared:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to clear cache",
+            )
+
+        # Force ProjectRegistry refresh to rediscover projects
+        registry = await get_project_registry()
+        discovered = await registry.get_projects(force_refresh=True)
+
+        # Repopulate cache with fresh data
+        projects_data = [
+            {
+                "id": encode_project_id(str(entry.path)),
+                "name": entry.name,
+                "path": str(entry.path),
+                "description": None,
+                "artifacts": [],
+            }
+            for entry in discovered
+        ]
+        cache_manager.populate_projects(projects_data)
+
+        logger.info(f"Cleared project cache and rediscovered {len(discovered)} projects")
+
+        return {
+            "success": True,
+            "message": f"Cache cleared and {len(discovered)} projects rediscovered",
+            "projects_found": len(discovered),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to clear project cache: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear cache: {str(e)}",
+        )
 
 
 @router.post(

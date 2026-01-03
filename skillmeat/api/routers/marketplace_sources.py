@@ -13,21 +13,30 @@ API Endpoints:
     POST /marketplace/sources/{id}/rescan - Trigger rescan
     GET /marketplace/sources/{id}/artifacts - List artifacts with filters
     POST /marketplace/sources/{id}/import - Import artifacts to collection
+    PATCH /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Mark artifact as excluded
+    DELETE /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Restore excluded artifact
+    GET /marketplace/sources/{id}/artifacts/{path}/files - Get file tree
+    GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
 """
 
 import logging
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
+    ExcludeArtifactRequest,
+    FileContentResponse,
+    FileTreeEntry,
+    FileTreeResponse,
     ImportRequest,
     ImportResultDTO,
     ScanRequest,
@@ -36,6 +45,13 @@ from skillmeat.api.schemas.marketplace import (
     SourceResponse,
     UpdateSourceRequest,
 )
+from skillmeat.api.utils.github_cache import (
+    DEFAULT_CONTENT_TTL,
+    DEFAULT_TREE_TTL,
+    build_content_key,
+    build_tree_key,
+    get_github_file_cache,
+)
 from skillmeat.cache.models import MarketplaceCatalogEntry, MarketplaceSource
 from skillmeat.cache.repositories import (
     MarketplaceCatalogRepository,
@@ -43,13 +59,20 @@ from skillmeat.cache.repositories import (
     MarketplaceTransactionHandler,
     NotFoundError,
 )
-from skillmeat.core.marketplace.github_scanner import GitHubScanner, scan_github_source
+from skillmeat.core.marketplace.github_scanner import (
+    GitHubScanner,
+    RateLimitError,
+    scan_github_source,
+)
 from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
     ImportCoordinator,
 )
 
 logger = logging.getLogger(__name__)
+
+# Confidence threshold for hiding low-quality entries
+CONFIDENCE_THRESHOLD = 30
 
 router = APIRouter(
     prefix="/marketplace/sources",
@@ -60,6 +83,102 @@ router = APIRouter(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def validate_file_path(path: str) -> str:
+    """Validate and sanitize file path to prevent path traversal attacks.
+
+    This function checks for common path traversal attack vectors including:
+    - Parent directory references (..)
+    - Absolute paths (starting with / or \\)
+    - Null byte injection
+    - URL-encoded traversal attempts
+
+    Args:
+        path: File path to validate
+
+    Returns:
+        Normalized, validated path with forward slashes
+
+    Raises:
+        HTTPException 400: If path contains traversal attempts or invalid characters
+    """
+    # Reject null bytes (can bypass validation in some systems)
+    if "\x00" in path:
+        logger.warning(f"Null byte injection attempt in path: {repr(path)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: null bytes not allowed",
+        )
+
+    # Normalize path separators (Windows to Unix)
+    normalized = path.replace("\\", "/")
+
+    # Reject absolute paths
+    if normalized.startswith("/"):
+        logger.warning(f"Absolute path attempt: {path}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: absolute paths not allowed",
+        )
+
+    # Reject path traversal attempts
+    # Check for ".." in various forms that could bypass basic checks
+    traversal_patterns = [
+        "..",  # Direct parent reference
+        "./.",  # Hidden traversal via current dir
+    ]
+
+    for pattern in traversal_patterns:
+        if pattern in normalized:
+            logger.warning(f"Path traversal attempt: {path}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path: path traversal not allowed",
+            )
+
+    # Additional check: split by / and verify no segment is ".."
+    segments = normalized.split("/")
+    for segment in segments:
+        if segment == "..":
+            logger.warning(f"Path traversal via segment: {path}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path: path traversal not allowed",
+            )
+
+    # Reject paths with URL-encoded traversal (e.g., %2e%2e)
+    # This handles cases where the framework might not have decoded yet
+    if re.search(r"%2e%2e|%252e%252e", path, re.IGNORECASE):
+        logger.warning(f"URL-encoded traversal attempt: {path}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path: encoded traversal not allowed",
+        )
+
+    return normalized
+
+
+def validate_source_id(source_id: str) -> str:
+    """Validate source ID format.
+
+    Args:
+        source_id: Source identifier to validate
+
+    Returns:
+        Validated source ID
+
+    Raises:
+        HTTPException 400: If source ID format is invalid
+    """
+    # UUID format or alphanumeric with dashes
+    if not re.match(r"^[a-zA-Z0-9\-]+$", source_id):
+        logger.warning(f"Invalid source ID format: {source_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid source ID format",
+        )
+    return source_id
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str]:
@@ -138,10 +257,39 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         detected_sha=entry.detected_sha,
         detected_at=entry.detected_at,
         confidence_score=entry.confidence_score,
+        raw_score=entry.raw_score,
+        score_breakdown=entry.score_breakdown,
         status=entry.status,
         import_date=entry.import_date,
         import_id=entry.import_id,
+        excluded_at=entry.excluded_at,
+        excluded_reason=entry.excluded_reason,
     )
+
+
+def parse_rate_limit_retry_after(error: RateLimitError) -> int:
+    """Extract retry-after seconds from RateLimitError message.
+
+    The RateLimitError message contains the wait time in seconds.
+    Examples:
+        - "Rate limited, reset in 45s"
+        - "Rate limited for 60s"
+
+    Args:
+        error: RateLimitError exception
+
+    Returns:
+        Number of seconds to wait before retrying. Defaults to 60 if
+        the time cannot be parsed from the error message.
+    """
+    import re
+
+    message = str(error)
+    # Match patterns like "45s" or "60s" in the message
+    match = re.search(r"(\d+)s", message)
+    if match:
+        return int(match.group(1))
+    return 60  # Default to 60 seconds if parsing fails
 
 
 # =============================================================================
@@ -367,7 +515,16 @@ async def update_source(
         HTTPException 500: If database operation fails
     """
     # Check if any update parameters provided
-    if all(v is None for v in [request.ref, request.root_hint, request.trust_level, request.description, request.notes]):
+    if all(
+        v is None
+        for v in [
+            request.ref,
+            request.root_hint,
+            request.trust_level,
+            request.description,
+            request.notes,
+        ]
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one update parameter must be provided",
@@ -617,15 +774,44 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     "/{source_id}/artifacts",
     response_model=CatalogListResponse,
     summary="List artifacts from source",
+    operation_id="list_source_artifacts",
     description="""
     List all artifacts discovered from a specific source with optional filtering.
 
+    By default, excluded artifacts are hidden from results. Use `include_excluded=true`
+    to include them in listings (useful for reviewing or restoring excluded entries).
+
     Supports filtering by:
-    - artifact_type: skill, command, agent, etc.
-    - status: new, updated, removed, imported
-    - min_confidence: Minimum confidence score (0-100)
+    - `artifact_type`: skill, command, agent, etc.
+    - `status`: new, updated, removed, imported, excluded
+    - `min_confidence`: Minimum confidence score (0-100)
+    - `max_confidence`: Maximum confidence score (0-100)
+    - `include_below_threshold`: Include artifacts below 30% confidence threshold (default: false)
+    - `include_excluded`: Include excluded artifacts in results (default: false)
 
     Results are paginated using cursor-based pagination for efficiency.
+
+    **Examples**:
+
+    List only non-excluded artifacts (default):
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts"
+    ```
+
+    List including excluded artifacts:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true"
+    ```
+
+    Filter by artifact type with minimum confidence:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?artifact_type=skill&min_confidence=70"
+    ```
+
+    Pagination example:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?limit=25&cursor=abc123"
+    ```
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -633,33 +819,61 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
 async def list_artifacts(
     source_id: str,
     artifact_type: Optional[str] = Query(
-        None, description="Filter by artifact type (skill, command, etc.)"
+        None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
     status: Optional[str] = Query(
-        None, description="Filter by status (new, updated, removed, imported)"
+        None, description="Filter by status (new, updated, removed, imported, excluded)"
     ),
     min_confidence: Optional[int] = Query(
-        None, ge=0, le=100, description="Minimum confidence score"
+        None, ge=0, le=100, description="Minimum confidence score (0-100)"
     ),
-    limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
-    cursor: Optional[str] = Query(None, description="Cursor for next page"),
+    max_confidence: Optional[int] = Query(
+        None, ge=0, le=100, description="Maximum confidence score (0-100)"
+    ),
+    include_below_threshold: bool = Query(
+        False,
+        description="Include artifacts below 30% confidence threshold (default: false)",
+    ),
+    include_excluded: bool = Query(
+        False, description="Include excluded artifacts in results (default: false)"
+    ),
+    limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
+    cursor: Optional[str] = Query(
+        None, description="Cursor for pagination (from previous response)"
+    ),
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters.
+
+    Retrieves catalog entries from a source with support for filtering and pagination.
+    By default, excluded artifacts are filtered out; set include_excluded=true to see them.
 
     Args:
         source_id: Unique source identifier
         artifact_type: Optional artifact type filter
-        status: Optional status filter
-        min_confidence: Optional minimum confidence score
-        limit: Maximum items per page
-        cursor: Pagination cursor
+        status: Optional status filter (new, updated, removed, imported, excluded)
+        min_confidence: Filter entries with confidence >= this value (0-100)
+        max_confidence: Filter entries with confidence <= this value (0-100)
+        include_below_threshold: If True, include entries <30% that are normally hidden
+        include_excluded: If True, include entries with status="excluded" (default: False)
+        limit: Maximum items per page (1-100)
+        cursor: Pagination cursor from previous response
 
     Returns:
-        Paginated list of catalog entries with statistics
+        Paginated list of catalog entries with counts_by_status and counts_by_type statistics
 
     Raises:
         HTTPException 404: If source not found
         HTTPException 500: If database operation fails
+
+    Example:
+        >>> # List artifacts including excluded
+        >>> response = await list_artifacts(
+        ...     source_id="src-123",
+        ...     include_excluded=True,
+        ...     limit=50
+        ... )
+        >>> # Count by status shows excluded entries
+        >>> assert response.counts_by_status.get("excluded", 0) >= 0
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
@@ -674,15 +888,54 @@ async def list_artifacts(
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Apply filters using get_source_catalog for combined filtering
-        if artifact_type or status or min_confidence:
-            # Get filtered entries
+        # Calculate effective minimum confidence based on threshold toggle
+        # Default behavior (include_below_threshold=False): hide entries below 30%
+        # When include_below_threshold=True: show ALL entries including those <30%
+        effective_min_confidence = min_confidence
+        if not include_below_threshold:
+            # Apply the 30% threshold by default
+            if effective_min_confidence is None:
+                effective_min_confidence = CONFIDENCE_THRESHOLD
+            else:
+                # If user provided min_confidence, take the stricter of the two
+                # Examples:
+                # - min=20, threshold=30 → effective=30 (threshold wins)
+                # - min=40, threshold=30 → effective=40 (min is stricter)
+                effective_min_confidence = max(
+                    effective_min_confidence, CONFIDENCE_THRESHOLD
+                )
+
+        # Build status filter list
+        # When include_excluded=False (default), we exclude entries with status="excluded"
+        effective_statuses: Optional[List[str]] = None
+        if status:
+            # User specified a status filter - use it directly
+            effective_statuses = [status]
+
+        # Determine if we need filtered query
+        # When include_excluded=False and no status filter, we still need to filter
+        needs_filtered_query = (
+            artifact_type
+            or status
+            or effective_min_confidence
+            or max_confidence
+            or not include_excluded
+        )
+
+        if needs_filtered_query:
+            # Get filtered entries using get_source_catalog
             entries = catalog_repo.get_source_catalog(
                 source_id=source_id,
                 artifact_types=[artifact_type] if artifact_type else None,
-                statuses=[status] if status else None,
-                min_confidence=min_confidence,
+                statuses=effective_statuses,
+                min_confidence=effective_min_confidence,
+                max_confidence=max_confidence,
             )
+
+            # Filter out excluded entries if not explicitly requested
+            # This handles the case where no status filter was provided
+            if not include_excluded and not status:
+                entries = [e for e in entries if e.status != "excluded"]
 
             # Manual pagination for filtered results
             # Convert to list and apply cursor
@@ -698,7 +951,7 @@ async def list_artifacts(
             has_more = len(entries) > limit
             items = entries[:limit]
         else:
-            # Use efficient paginated query
+            # Use efficient paginated query (only when include_excluded=True and no other filters)
             result = catalog_repo.list_paginated(
                 source_id=source_id,
                 limit=limit,
@@ -911,4 +1164,681 @@ async def import_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to import artifacts: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-004b: Exclude Artifact Endpoint
+# =============================================================================
+
+
+@router.patch(
+    "/{source_id}/artifacts/{entry_id}/exclude",
+    response_model=CatalogEntryResponse,
+    summary="Mark or restore catalog artifact",
+    operation_id="exclude_or_restore_artifact",
+    description="""
+    Mark a catalog entry as excluded from the catalog or restore a previously excluded entry.
+
+    Use this endpoint to mark artifacts that are false positives (not actually Claude artifacts),
+    documentation-only files, or other entries that shouldn't appear in the default catalog view.
+    Excluded artifacts are hidden unless explicitly requested with `include_excluded=True` when
+    listing artifacts.
+
+    This operation is idempotent - calling it multiple times with the same parameters will
+    return success with the current state.
+
+    **Request Body**:
+    - `excluded` (bool, required): True to mark as excluded, False to restore
+    - `reason` (string, optional): User-provided reason (max 500 chars)
+
+    **Response**: Updated catalog entry with `excluded_at` and `excluded_reason` fields
+
+    **Examples**:
+
+    Mark as excluded with reason:
+    ```bash
+    curl -X PATCH "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+           "excluded": true,
+           "reason": "Not a valid skill - documentation only"
+         }'
+    ```
+
+    Restore previously excluded:
+    ```bash
+    curl -X PATCH "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude" \\
+         -H "Content-Type: application/json" \\
+         -d '{"excluded": false}'
+    ```
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def exclude_artifact(
+    source_id: str,
+    entry_id: str,
+    request: ExcludeArtifactRequest,
+) -> CatalogEntryResponse:
+    """Mark or restore a catalog entry as excluded.
+
+    Marks artifacts that are false positives or not actual Claude artifacts as excluded.
+    Excluded artifacts are filtered from default catalog listings but can be restored.
+    This operation is idempotent - calling it on already excluded entries succeeds.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+        request: Exclusion request with excluded flag and optional reason
+
+    Returns:
+        Updated catalog entry with exclusion metadata
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 400: If entry does not belong to source
+        HTTPException 500: If database operation fails
+
+    Example:
+        >>> # Mark as excluded
+        >>> request = ExcludeArtifactRequest(
+        ...     excluded=True,
+        ...     reason="Documentation file, not a skill"
+        ... )
+        >>> response = await exclude_artifact("src-123", "cat-456", request)
+        >>> assert response.excluded_at is not None
+        >>> assert response.status == "excluded"
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for atomic update
+        session = catalog_repo._get_session()
+        try:
+            # Fetch catalog entry within same session for update
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry with ID '{entry_id}' not found",
+                )
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+                )
+
+            # Apply exclusion or restoration
+            if request.excluded:
+                # Mark as excluded (idempotent - skip if already excluded)
+                if entry.excluded_at is None:
+                    entry.excluded_at = datetime.now(timezone.utc)
+                entry.excluded_reason = request.reason
+                entry.status = "excluded"
+                logger.info(
+                    f"Marked catalog entry as excluded: {entry_id} "
+                    f"(reason: {request.reason or 'none provided'})"
+                )
+            else:
+                # Restore from exclusion
+                entry.excluded_at = None
+                entry.excluded_reason = None
+                # Restore to "new" status (or could check import_date to set "imported")
+                entry.status = "new" if entry.import_date is None else "imported"
+                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
+
+            # Commit changes
+            session.commit()
+
+            # Refresh to get updated timestamps
+            session.refresh(entry)
+
+            return entry_to_response(entry)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update exclusion status for entry {entry_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update exclusion status: {str(e)}",
+        ) from e
+
+
+@router.delete(
+    "/{source_id}/artifacts/{entry_id}/exclude",
+    response_model=CatalogEntryResponse,
+    summary="Restore excluded catalog artifact",
+    operation_id="restore_excluded_artifact",
+    description="""
+    Remove the exclusion status from a catalog entry, restoring it to the catalog.
+
+    This is a convenience endpoint that performs the same operation as calling
+    PATCH with `excluded=False`. It is idempotent - calling it on a non-excluded
+    entry will return success with the current state.
+
+    Restored entries will be visible in the default catalog view and can be
+    imported to collections.
+
+    **Examples**:
+
+    Restore an excluded artifact:
+    ```bash
+    curl -X DELETE "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude"
+    ```
+
+    List artifacts including excluded (before restoring):
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true"
+    ```
+
+    After restore, the artifact will appear in both filtered and unfiltered listings.
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def restore_excluded_artifact(
+    source_id: str,
+    entry_id: str,
+) -> CatalogEntryResponse:
+    """Restore an excluded catalog entry to the catalog.
+
+    Removes exclusion status and makes the artifact visible in default catalog views.
+    This is idempotent - restoring a non-excluded entry succeeds without changes.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+
+    Returns:
+        Updated catalog entry with exclusion removed (excluded_at=None, excluded_reason=None)
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 400: If entry does not belong to source
+        HTTPException 500: If database operation fails
+
+    Example:
+        >>> # Restore previously excluded entry
+        >>> response = await restore_excluded_artifact("src-123", "cat-456")
+        >>> assert response.excluded_at is None
+        >>> assert response.excluded_reason is None
+        >>> assert response.status == "new"  # or "imported" if previously imported
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for atomic update
+        session = catalog_repo._get_session()
+        try:
+            # Fetch catalog entry within same session for update
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry with ID '{entry_id}' not found",
+                )
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+                )
+
+            # Restore from exclusion (idempotent - no-op if not excluded)
+            if entry.excluded_at is not None:
+                entry.excluded_at = None
+                entry.excluded_reason = None
+                # Restore to "new" status if never imported, otherwise "imported"
+                entry.status = "new" if entry.import_date is None else "imported"
+                logger.info(f"Restored catalog entry from exclusion: {entry_id}")
+            else:
+                logger.debug(f"Entry {entry_id} was not excluded, no-op")
+
+            # Commit changes
+            session.commit()
+
+            # Refresh to get updated timestamps
+            session.refresh(entry)
+
+            return entry_to_response(entry)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to restore excluded entry {entry_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to restore excluded entry: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-005: File Tree Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/artifacts/{artifact_path:path}/files",
+    response_model=FileTreeResponse,
+    summary="Get file tree for artifact",
+    description="""
+    Retrieve the file tree for a marketplace artifact.
+
+    Returns a list of files and directories within the artifact, suitable
+    for displaying in a file browser UI. Each entry includes the path,
+    type (blob/tree), size (for files), and SHA.
+
+    Results are cached for 1 hour to reduce GitHub API calls.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - artifact_path: Path to the artifact within the repository (e.g., "skills/canvas")
+
+    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files
+    """,
+)
+async def get_artifact_file_tree(
+    source_id: str,
+    artifact_path: str,
+) -> FileTreeResponse:
+    """Get file tree for a marketplace artifact.
+
+    Args:
+        source_id: Unique source identifier
+        artifact_path: Path to the artifact within the repository
+
+    Returns:
+        File tree with entries for all files and directories
+
+    Raises:
+        HTTPException 400: If path validation fails (traversal, null bytes, etc.)
+        HTTPException 404: If source or artifact path not found
+        HTTPException 500: If GitHub API call fails
+    """
+    # Security: Validate inputs to prevent path traversal attacks
+    validate_source_id(source_id)
+    artifact_path = validate_file_path(artifact_path)
+
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        # Get marketplace source
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Get cache and build cache key
+        cache = get_github_file_cache()
+
+        # Use source ref as SHA for cache key (or "HEAD" if not specified)
+        cache_sha = source.ref or "HEAD"
+        cache_key = build_tree_key(source_id, artifact_path, cache_sha)
+
+        # Check cache first
+        cached_tree = cache.get(cache_key)
+        if cached_tree is not None:
+            logger.debug(f"Cache hit for file tree: {artifact_path}")
+            # Strip artifact path prefix from file paths
+            path_prefix = f"{artifact_path}/" if artifact_path else ""
+            prefix_len = len(path_prefix)
+            entries = [
+                FileTreeEntry(
+                    path=(
+                        entry["path"][prefix_len:]
+                        if entry["path"].startswith(path_prefix)
+                        else entry["path"]
+                    ),
+                    type="file" if entry["type"] == "blob" else entry["type"],
+                    size=entry.get("size"),
+                    sha=entry["sha"],
+                )
+                for entry in cached_tree
+                # Exclude the artifact directory itself
+                if entry["path"] != artifact_path
+            ]
+
+            # Handle single-file artifacts (Commands, Agents, Hooks)
+            # If no child entries but path looks like a single file, return the file itself
+            if not entries and artifact_path.endswith(".md"):
+                from pathlib import PurePosixPath
+
+                for entry in cached_tree:
+                    if entry["path"] == artifact_path and entry["type"] == "blob":
+                        filename = PurePosixPath(artifact_path).name
+                        entries = [
+                            FileTreeEntry(
+                                path=filename,
+                                type="file",
+                                size=entry.get("size"),
+                                sha=entry["sha"],
+                            )
+                        ]
+                        break
+
+            return FileTreeResponse(
+                entries=entries,
+                artifact_path=artifact_path,
+                source_id=source_id,
+            )
+
+        # Cache miss - fetch from GitHub
+        logger.debug(f"Cache miss, fetching file tree: {artifact_path}")
+        scanner = GitHubScanner()
+
+        tree_entries = scanner.get_file_tree(
+            owner=source.owner,
+            repo=source.repo_name,
+            path=artifact_path,
+            sha=None,  # Will fetch default branch SHA
+        )
+
+        if not tree_entries:
+            logger.warning(
+                f"Artifact path not found: {artifact_path} in source {source_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact path '{artifact_path}' not found in source",
+            )
+
+        # Cache the result
+        cache.set(cache_key, tree_entries, ttl_seconds=DEFAULT_TREE_TTL)
+        logger.debug(f"Cached file tree: {artifact_path} ({len(tree_entries)} entries)")
+
+        # Strip artifact path prefix from file paths
+        path_prefix = f"{artifact_path}/" if artifact_path else ""
+        prefix_len = len(path_prefix)
+
+        # Build entries list, excluding the artifact directory/file itself
+        entries = [
+            FileTreeEntry(
+                path=(
+                    entry["path"][prefix_len:]
+                    if entry["path"].startswith(path_prefix)
+                    else entry["path"]
+                ),
+                type="file" if entry["type"] == "blob" else entry["type"],
+                size=entry.get("size"),
+                sha=entry["sha"],
+            )
+            for entry in tree_entries
+            # Exclude the artifact directory itself (exact match with no remaining path)
+            if entry["path"] != artifact_path
+        ]
+
+        # Handle single-file artifacts (Commands, Agents, Hooks)
+        # If no child entries but path looks like a single file, return the file itself
+        if not entries and artifact_path.endswith(".md"):
+            # Find the file entry in tree_entries (should be exact match)
+            for entry in tree_entries:
+                if entry["path"] == artifact_path and entry["type"] == "blob":
+                    # Extract just the filename for the entry path
+                    from pathlib import PurePosixPath
+
+                    filename = PurePosixPath(artifact_path).name
+                    entries = [
+                        FileTreeEntry(
+                            path=filename,
+                            type="file",
+                            size=entry.get("size"),
+                            sha=entry["sha"],
+                        )
+                    ]
+                    logger.debug(
+                        f"Single-file artifact detected: {artifact_path} -> {filename}"
+                    )
+                    break
+
+        return FileTreeResponse(
+            entries=entries,
+            artifact_path=artifact_path,
+            source_id=source_id,
+        )
+
+    except HTTPException:
+        raise
+    except RateLimitError as e:
+        retry_after = parse_rate_limit_retry_after(e)
+        logger.warning(
+            f"GitHub rate limit exceeded for file tree {artifact_path} "
+            f"from source {source_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": f"GitHub rate limit exceeded. Please retry after {retry_after} seconds."
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to get file tree for artifact {artifact_path} "
+            f"from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve file tree: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-006: File Content Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+    response_model=FileContentResponse,
+    summary="Get file content from artifact",
+    description="""
+    Retrieve the content of a specific file within a marketplace artifact.
+
+    Returns the file content with metadata including encoding, size, and SHA.
+    For binary files, content is base64-encoded with is_binary=True.
+
+    Results are cached for 2 hours to reduce GitHub API calls.
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - artifact_path: Path to the artifact within the repository (e.g., "skills/canvas")
+    - file_path: Path to the file within the artifact (e.g., "SKILL.md" or "src/index.ts")
+
+    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files/SKILL.md
+    """,
+)
+async def get_artifact_file_content(
+    source_id: str,
+    artifact_path: str,
+    file_path: str,
+) -> FileContentResponse:
+    """Get content of a file within a marketplace artifact.
+
+    Args:
+        source_id: Unique source identifier
+        artifact_path: Path to the artifact within the repository
+        file_path: Path to the file within the artifact
+
+    Returns:
+        File content with metadata
+
+    Raises:
+        HTTPException 400: If path validation fails (traversal, null bytes, etc.)
+        HTTPException 404: If source or file not found
+        HTTPException 500: If GitHub API call fails
+    """
+    # Security: Validate all path inputs to prevent path traversal attacks
+    validate_source_id(source_id)
+    artifact_path = validate_file_path(artifact_path)
+    file_path = validate_file_path(file_path)
+
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        # Get marketplace source
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Build full file path within repository
+        # Check if this is a single-file artifact (artifact_path ends with file_path)
+        # For single-file artifacts like Commands (.claude/commands/use-mcp.md),
+        # artifact_path IS the file, so we shouldn't concatenate
+        if artifact_path.endswith(f"/{file_path}") or artifact_path == file_path:
+            # Single-file artifact: artifact_path IS the file
+            full_file_path = artifact_path
+        else:
+            # Directory-based artifact: concatenate paths
+            full_file_path = f"{artifact_path}/{file_path}"
+
+        # Get cache and build cache key
+        cache = get_github_file_cache()
+
+        # Use source ref as SHA for cache key (or "HEAD" if not specified)
+        cache_sha = source.ref or "HEAD"
+        cache_key = build_content_key(source_id, artifact_path, file_path, cache_sha)
+
+        # Check cache first
+        cached_content = cache.get(cache_key)
+        if cached_content is not None:
+            logger.debug(f"Cache hit for file content: {full_file_path}")
+            return FileContentResponse(
+                content=cached_content["content"],
+                encoding=cached_content["encoding"],
+                size=cached_content["size"],
+                sha=cached_content["sha"],
+                name=cached_content["name"],
+                path=cached_content["path"],
+                is_binary=cached_content["is_binary"],
+                artifact_path=artifact_path,
+                source_id=source_id,
+            )
+
+        # Cache miss - fetch from GitHub
+        logger.debug(f"Cache miss, fetching file content: {full_file_path}")
+        scanner = GitHubScanner()
+
+        file_content = scanner.get_file_content(
+            owner=source.owner,
+            repo=source.repo_name,
+            path=full_file_path,
+            ref=source.ref,
+        )
+
+        if file_content is None:
+            logger.warning(f"File not found: {full_file_path} in source {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File '{file_path}' not found in artifact '{artifact_path}'",
+            )
+
+        # Cache the result
+        cache.set(cache_key, file_content, ttl_seconds=DEFAULT_CONTENT_TTL)
+        logger.debug(f"Cached file content: {full_file_path}")
+
+        return FileContentResponse(
+            content=file_content["content"],
+            encoding=file_content["encoding"],
+            size=file_content["size"],
+            sha=file_content["sha"],
+            name=file_content["name"],
+            path=file_content["path"],
+            is_binary=file_content["is_binary"],
+            artifact_path=artifact_path,
+            source_id=source_id,
+        )
+
+    except HTTPException:
+        raise
+    except RateLimitError as e:
+        retry_after = parse_rate_limit_retry_after(e)
+        logger.warning(
+            f"GitHub rate limit exceeded for file content {file_path} in {artifact_path} "
+            f"from source {source_id}: {e}"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": f"GitHub rate limit exceeded. Please retry after {retry_after} seconds."
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to get file content for {file_path} in {artifact_path} "
+            f"from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve file content: {str(e)}",
         ) from e

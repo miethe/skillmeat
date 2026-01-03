@@ -95,6 +95,13 @@ skill: "artifact-tracking"
 
 Pass the full input to the skills - they will parse appropriately.
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Discovery Phase
+
+Before planning, search request-logs for related items:
+- `/mc search "feature-keyword" skillmeat` - Find related bugs/enhancements
+- `/mc search "type:bug domain:web" skillmeat` - Find domain-specific bugs to incorporate
+
 ## Critical Reminders
 
 - **Never write code directly** - delegate to specialized subagents

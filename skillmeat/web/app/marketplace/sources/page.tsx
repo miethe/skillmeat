@@ -15,7 +15,12 @@ import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
-import { useSources, useRescanSource } from '@/hooks/useMarketplaceSources';
+import { useSources } from '@/hooks/useMarketplaceSources';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
+import type { ScanResult } from '@/types/marketplace';
+import { sourceKeys } from '@/hooks/useMarketplaceSources';
 import type { GitHubSource } from '@/types/marketplace';
 
 export default function MarketplaceSourcesPage() {
@@ -24,6 +29,7 @@ export default function MarketplaceSourcesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<GitHubSource | null>(null);
+  const [rescanningSourceId, setRescanningSourceId] = useState<string | null>(null);
 
   // Fetch sources
   const {
@@ -35,6 +41,44 @@ export default function MarketplaceSourcesPage() {
     isFetchingNextPage,
     refetch,
   } = useSources();
+
+  // Rescan mutation (works for any source ID)
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const rescanMutation = useMutation({
+    mutationFn: ({ sourceId }: { sourceId: string }) =>
+      apiRequest<ScanResult>(`/marketplace/sources/${sourceId}/rescan`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    onSuccess: (result, { sourceId }) => {
+      queryClient.invalidateQueries({ queryKey: sourceKeys.detail(sourceId) });
+      queryClient.invalidateQueries({ queryKey: sourceKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: sourceKeys.catalogs() });
+
+      if (result.status === 'success') {
+        toast({
+          title: 'Scan complete',
+          description: `Found ${result.artifacts_found} artifacts (${result.new_count} new, ${result.updated_count} updated)`,
+        });
+      } else if (result.status === 'partial') {
+        toast({
+          title: 'Scan completed with warnings',
+          description: `Found ${result.artifacts_found} artifacts. ${result.errors.length} errors occurred.`,
+          variant: 'destructive',
+        });
+      }
+      setRescanningSourceId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Scan failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setRescanningSourceId(null);
+    },
+  });
 
   // Flatten pages
   const allSources = useMemo(() => {
@@ -61,6 +105,12 @@ export default function MarketplaceSourcesPage() {
   const handleDelete = (source: GitHubSource) => {
     setSelectedSource(source);
     setDeleteDialogOpen(true);
+  };
+
+  // Rescan handler
+  const handleRescan = (sourceId: string) => {
+    setRescanningSourceId(sourceId);
+    rescanMutation.mutate({ sourceId });
   };
 
   return (
@@ -180,6 +230,8 @@ export default function MarketplaceSourcesPage() {
                 source={source}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onRescan={handleRescan}
+                isRescanning={rescanningSourceId === source.id}
               />
             ))}
           </div>

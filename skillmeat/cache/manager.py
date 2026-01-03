@@ -397,6 +397,75 @@ class CacheManager:
     # Write Operations (Populate)
     # =========================================================================
 
+    def upsert_project(self, project_data: Dict[str, Any]) -> bool:
+        """Add or update a single project in the cache.
+
+        Unlike populate_projects(), this preserves existing entries and only
+        adds/updates the specified project. Use this for incremental updates
+        (e.g., after creating a new project).
+
+        Args:
+            project_data: Dict with keys:
+                - id (str): Project ID
+                - name (str): Project name
+                - path (str): Filesystem path
+                - description (str, optional): Project description
+                - artifacts (list, optional): List of artifact dicts
+
+        Returns:
+            True if upsert successful, False otherwise
+
+        Example:
+            >>> project_data = {
+            ...     "id": "proj-1",
+            ...     "name": "My Project",
+            ...     "path": "/path/to/project",
+            ...     "description": "A test project",
+            ...     "artifacts": [],
+            ... }
+            >>> success = manager.upsert_project(project_data)
+            >>> if success:
+            ...     print("Project added to cache")
+        """
+        try:
+            with self._lock:
+                # Extract artifacts if present (make a copy to avoid modifying input)
+                data = project_data.copy()
+                artifacts_data = data.pop("artifacts", [])
+
+                # Check if project exists
+                existing = self.repository.get_project(data["id"])
+
+                if existing:
+                    # Update existing project
+                    self.repository.update_project(
+                        data["id"],
+                        **{k: v for k, v in data.items() if k not in ["id"]},
+                    )
+                    logger.debug(f"Updated project in cache: {data['id']}")
+                else:
+                    # Create new project
+                    project_obj = Project(
+                        id=data["id"],
+                        name=data["name"],
+                        path=data["path"],
+                        description=data.get("description"),
+                        status="active",
+                        last_fetched=datetime.utcnow(),
+                    )
+                    self.repository.create_project(project_obj)
+                    logger.debug(f"Created project in cache: {data['id']}")
+
+                # Populate artifacts if provided
+                if artifacts_data:
+                    self.populate_artifacts(data["id"], artifacts_data)
+
+                logger.info(f"Upserted project: {data['id']}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to upsert project: {e}", exc_info=True)
+            return False
+
     def populate_projects(self, projects: List[Dict[str, Any]]) -> int:
         """Populate cache with project data.
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2 } from 'lucide-react';
+import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, HelpCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -284,11 +284,15 @@ export function ArtifactList({
           </TableHeader>
           <TableBody>
             {artifacts.map((artifact) => {
-              const Icon = artifactTypeIcons[artifact.type];
+              const Icon = artifactTypeIcons[artifact.type] || HelpCircle;
+              const iconColor = artifactTypeIconColors[artifact.type] || 'text-gray-500 dark:text-gray-400';
+              const rowTint = artifactTypeRowTints[artifact.type] || 'bg-gray-500/[0.02] dark:bg-gray-500/[0.03]';
+              const borderAccent = artifactTypeBorderAccents[artifact.type] || 'border-l-gray-400';
+              const typeLabel = artifactTypeLabels[artifact.type] || artifact.type || 'Unknown';
               return (
                 <TableRow
                   key={artifact.id}
-                  className={`cursor-pointer border-l-2 ${artifactTypeBorderAccents[artifact.type]} ${artifactTypeRowTints[artifact.type]}`}
+                  className={`cursor-pointer border-l-2 ${borderAccent} ${rowTint}`}
                   onClick={() => onArtifactClick(artifact)}
                   role="button"
                   tabIndex={0}
@@ -338,10 +342,10 @@ export function ArtifactList({
                   <TableCell>
                     <div className="flex items-center gap-2" data-testid="type-badge">
                       <Icon
-                        className={`h-4 w-4 ${artifactTypeIconColors[artifact.type]}`}
+                        className={`h-4 w-4 ${iconColor}`}
                         aria-hidden="true"
                       />
-                      <span className="text-sm">{artifactTypeLabels[artifact.type]}</span>
+                      <span className="text-sm">{typeLabel}</span>
                     </div>
                   </TableCell>
                   <TableCell>

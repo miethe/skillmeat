@@ -16,6 +16,12 @@ Scaffold new feature: $ARGUMENTS
 - Package info: @package.json or @Cargo.toml or @requirements.txt (if exists)
 - Architecture docs: @docs/architecture.md or @README.md (if exists)
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Context Gathering
+
+Before implementation, search request-logs for related items:
+- `/mc search "feature-keyword" skillmeat` - Find related bugs/enhancements
+
 ## Task
 
 Follow this systematic approach to create a new feature: $ARGUMENTS
@@ -126,5 +132,11 @@ Follow this systematic approach to create a new feature: $ARGUMENTS
     - Set up monitoring and alerting
     - Prepare rollback procedures
     - Schedule deployment and communication
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+19. **Post-Implementation Tracking**
+    - Update request-log items addressed: change `**Status:**` to `done`
+    - Capture any issues discovered: `/mc capture {"title": "...", "type": "bug"}`
+    - Document patterns worth tracking for future reference
 
 Remember to maintain code quality, follow project conventions, and prioritize user experience throughout the development process.

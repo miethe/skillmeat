@@ -1,5 +1,91 @@
 # Bug Fixes - December 2025
 
+## 2025-12-30
+
+### Marketplace Source Modal Contents Tab 404 Error
+
+**Issue**: Clicking the Contents tab in the Marketplace Source artifact modal shows "File tree not found" with 404 error despite the source and artifact existing
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:274`, `skillmeat/web/lib/api/catalog.ts:80,114`, `skillmeat/web/hooks/use-catalog-files.ts:30,68,114`
+- **Root Cause**: Type mismatch between frontend and backend. The `MarketplaceSource.id` is a **String** (UUID-like), but the frontend was:
+  1. Converting `source_id` to a number via `parseInt(entry.source_id, 10)` in the modal
+  2. Declaring `sourceId: number` in API client functions
+  3. Using `number` type in query key factories
+
+  When `parseInt("uuid-string")` is called on a non-numeric ID, it returns `NaN` or partial number, causing the backend lookup to fail with "Source not found".
+- **Fix**:
+  1. Changed `sourceId` parameter type from `number` to `string` in `fetchCatalogFileTree()` and `fetchCatalogFileContent()`
+  2. Removed `parseInt()` in `CatalogEntryModal.tsx`, using `entry?.source_id ?? null` directly
+  3. Updated `useCatalogFileTree` and `useCatalogFileContent` hooks to use `string | null | undefined` type
+  4. Updated query key factories to use `string` type
+- **Files Modified**:
+  - `skillmeat/web/lib/api/catalog.ts` (2 function signatures)
+  - `skillmeat/web/components/CatalogEntryModal.tsx` (removed parseInt)
+  - `skillmeat/web/hooks/use-catalog-files.ts` (2 hooks + 2 key factories)
+- **Verification**: Type check passes for modified files; Contents tab should now load file tree correctly
+- **Commit(s)**: bb08a3c
+- **Status**: RESOLVED
+
+### Marketplace File Tree Shows "No Files Found" After Type Fix
+
+**Issue**: After fixing the source_id type mismatch (above), the Contents tab shows "No files found" even though the API returns data
+- **Location**: `skillmeat/web/lib/api/catalog.ts:35`, `skillmeat/web/components/CatalogEntryModal.tsx:297-330`
+- **Root Cause**: Field name mismatch between backend and frontend:
+  - Backend schema returns: `entries: List[FileTreeEntry]`
+  - Frontend type expects: `files: FileTreeEntry[]`
+
+  The frontend was looking for `fileTreeData.files` which is undefined since the API returns `entries`.
+- **Fix**:
+  1. Updated `FileTreeResponse` interface to use `entries` instead of `files`
+  2. Updated all usages in `CatalogEntryModal.tsx` from `fileTreeData?.files` to `fileTreeData?.entries`
+- **Files Modified**:
+  - `skillmeat/web/lib/api/catalog.ts` (interface field rename)
+  - `skillmeat/web/components/CatalogEntryModal.tsx` (4 usages updated)
+- **Verification**: Build passes; file tree should now display correctly
+- **Commit(s)**: 8668f9f
+- **Status**: RESOLVED
+
+## 2025-12-29
+
+### Artifact Dropdown Edit/Delete Actions Non-Functional
+
+**Issue**: The "..." dropdown menu on artifact cards in the `/collection` page has Edit and Delete buttons that do nothing when clicked
+- **Location**: `skillmeat/web/app/collection/page.tsx` (lines 446-470)
+- **Root Cause**: `ArtifactGrid` and `ArtifactList` components accept `onEdit` and `onDelete` callback props, but the collection page was not passing these callbacks. The dropdown menus rendered correctly but had no handlers attached.
+- **Fix**:
+  1. Added state variables for tracking artifact to edit/delete and dialog visibility
+  2. Imported `ArtifactDeletionDialog`, `ParameterEditorModal`, and `useEditArtifactParameters`
+  3. Created `handleEditFromDropdown` and `handleDeleteFromDropdown` handlers
+  4. Created `handleSaveParameters` handler following pattern from `unified-entity-modal.tsx`
+  5. Passed `onEdit` and `onDelete` callbacks to all `ArtifactGrid` and `ArtifactList` instances
+  6. Added `ParameterEditorModal` and `ArtifactDeletionDialog` components at end of page
+- **Files Modified**: `skillmeat/web/app/collection/page.tsx`
+- **Verification**: Dropdown Edit opens ParameterEditorModal, Delete opens ArtifactDeletionDialog with full options
+- **Commit(s)**: bfb70bc
+- **Status**: RESOLVED
+
+## 2025-12-28
+
+### Marketplace Score Breakdown Never Populated
+
+**Issue**: Marketplace catalog entry modal shows "Score breakdown not available for this entry" despite heuristic detector calculating the breakdown
+- **Location**: `skillmeat/api/schemas/marketplace.py`, `skillmeat/core/marketplace/heuristic_detector.py`, `skillmeat/core/marketplace/diff_engine.py`
+- **Root Cause**: Data flow broken in 4 places:
+  1. `HeuristicMatch` has complete breakdown in `match.breakdown` dict
+  2. `DetectedArtifact` schema lacked `raw_score` and `score_breakdown` fields
+  3. `_matches_to_artifacts()` put scores in `metadata` instead of dedicated fields
+  4. `_artifact_to_dict()` didn't include `raw_score` or `score_breakdown` in DB insert dict
+  5. Result: DB column `score_breakdown` stayed NULL for all entries
+- **Fix**:
+  1. Added `raw_score` and `score_breakdown` fields to `DetectedArtifact` schema
+  2. Modified `_matches_to_artifacts()` to populate new fields from `match.raw_score` and `match.breakdown`
+  3. Updated `_artifact_to_dict()` to include new fields in database dict
+- **Files Modified**:
+  - `skillmeat/api/schemas/marketplace.py` (added 2 fields to DetectedArtifact)
+  - `skillmeat/core/marketplace/heuristic_detector.py` (populate fields in artifact creation)
+  - `skillmeat/core/marketplace/diff_engine.py` (include fields in DB dict)
+- **Verification**: Rescanning a marketplace source now populates `score_breakdown` with complete signal details
+- **Status**: RESOLVED
+
 ## 2025-12-01
 
 ### CollectionManager get_collection Method Not Found
@@ -656,4 +742,225 @@
   2. Stamped Alembic to latest revision `20251226_1500_add_frontmatter_detection`
   3. Added `enable_frontmatter_detection` to `source_to_response()` function
 - **Commit(s)**: 9b608cb
+- **Status**: RESOLVED
+
+## 2025-12-27
+
+### Marketplace Source Scan Fails with ScanResultDTO Missing artifacts Attribute
+
+**Issue**: Scanning a marketplace source from `/marketplace/sources/` fails with error: `'ScanResultDTO' object has no attribute 'artifacts'`
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:547`, `skillmeat/api/schemas/marketplace.py:1076`, `skillmeat/core/marketplace/github_scanner.py:186-197`
+- **Root Cause**: `GitHubScanner.scan_repository()` returned `ScanResultDTO` which only had `artifacts_found` (integer count) but not `artifacts` (the list). The scanner created the artifacts list locally via `detect_artifacts_in_tree()` but never included it in the returned DTO. The router then tried to iterate over `scan_result.artifacts` which didn't exist.
+- **Fix**:
+  1. Added `artifacts: List["DetectedArtifact"]` field to `ScanResultDTO` schema with forward reference
+  2. Added `artifacts=artifacts` to success return in `GitHubScanner.scan_repository()`
+  3. Added `artifacts=[]` to error return in `GitHubScanner.scan_repository()`
+  4. Added `ScanResultDTO.model_rebuild()` call to resolve forward reference
+- **Commit(s)**: 011b01b
+- **Status**: RESOLVED
+
+### Marketplace Catalog Entries Missing raw_score Column
+
+**Issue**: `/marketplace/sources` page fails with SQLAlchemy OperationalError: `no such column: marketplace_catalog_entries.raw_score`
+- **Location**: `skillmeat/cache/models.py:1411-1412` (MarketplaceCatalogEntry model)
+- **Root Cause**: The confidence-score-enhancements feature added `raw_score` and `score_breakdown` columns to the `MarketplaceCatalogEntry` model, with corresponding Alembic migrations created (`20251227_1000_add_raw_score_and_breakdown_to_catalog`, `20251227_1100_populate_raw_score_for_existing_entries`), but the migrations were never applied to the database. Database was at revision `20251226_1500_add_frontmatter_detection`.
+- **Fix**: Applied pending migrations via `run_migrations()` from `skillmeat.cache.migrations` module. This:
+  1. Added `raw_score` INTEGER column (nullable)
+  2. Added `score_breakdown` JSON column (nullable)
+  3. Populated existing entries with `raw_score = min(65, confidence_score)`
+- **Commit(s)**: N/A (database migration only, no code changes)
+- **Status**: RESOLVED
+
+## 2025-12-28
+
+### Marketplace Source Modal Header Shows Placeholder
+
+**Issue**: The CatalogEntryModal displayed placeholder text "Header section (name, type badge, source path) To be implemented in TASK-3.2" instead of actual artifact information.
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:108-117`
+- **Root Cause**: Stub code from initial implementation was never replaced with actual implementation.
+- **Fix**: Replaced placeholder with complete header section showing:
+  1. Entry name (large, bold heading)
+  2. Type badge with proper colors from `typeConfig`
+  3. Status badge with proper styling from `statusConfig`
+  4. Confidence score badge using `ScoreBadge` component
+  5. Source path in code style
+- **Commit(s)**: 217aabb
+- **Status**: RESOLVED
+
+### Confidence Score Breakdown Never Available in Modal
+
+**Issue**: The "Confidence Score Breakdown" section in CatalogEntryModal always showed "Score breakdown not available for this entry" despite the heuristic detector calculating breakdown data.
+
+- **Location**: `skillmeat/core/marketplace/heuristic_detector.py:556-571`, `skillmeat/core/marketplace/diff_engine.py:234-244`, `skillmeat/api/schemas/marketplace.py:1286`
+- **Root Cause**: Broken data flow chain:
+  1. `HeuristicMatch` calculated `breakdown` dict with all signal scores
+  2. `_matches_to_artifacts()` put individual scores into `metadata` but NOT into dedicated `score_breakdown` field
+  3. `DetectedArtifact` schema lacked `raw_score` and `score_breakdown` fields
+  4. `_artifact_to_dict()` didn't include breakdown data for DB insertion
+  5. Result: `score_breakdown` column stayed NULL for all catalog entries
+- **Fix**:
+  1. Added `raw_score: Optional[int]` and `score_breakdown: Optional[Dict[str, int]]` fields to `DetectedArtifact` schema
+  2. Modified `_matches_to_artifacts()` to set `raw_score=match.raw_score` and `score_breakdown=match.breakdown`
+  3. Updated `_artifact_to_dict()` to include `raw_score` and `score_breakdown` in dict for DB insertion
+- **Commit(s)**: 217aabb
+- **Status**: RESOLVED
+
+### Marketplace Source Modal Layout Issues
+
+**Issue**: The CatalogEntryModal had multiple layout problems:
+  1. Entire modal scrolled as one unit instead of sections having independent scroll
+  2. Modal could scroll horizontally
+  3. Footer buttons could scroll out of view
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:97-99`
+- **Root Cause**: Modal used `max-h-[90vh] overflow-y-auto` on DialogContent, causing entire modal to scroll. No bounded sections or sticky footer.
+- **Fix**:
+  1. Changed DialogContent to fixed height with flex layout: `h-[85vh] flex flex-col overflow-hidden`
+  2. Main content wrapper made scrollable: `flex-1 overflow-y-auto overflow-x-hidden min-h-0`
+  3. Confidence section bounded: `max-h-[200px] overflow-y-auto`
+  4. DialogFooter made sticky: `flex-shrink-0 border-t pt-4 mt-auto`
+- **Commit(s)**: 217aabb
+- **Status**: RESOLVED
+
+### Confidence Score Breakdown Still Shows "Not Available" (Follow-up)
+
+**Issue**: After fixing the data flow, existing catalog entries still showed "Score breakdown not available" because the backend fix only affects NEW scans.
+
+- **Location**: `skillmeat/cache/migrations/versions/20251227_1000_add_raw_score_and_breakdown_to_catalog.py`
+- **Root Cause**: The migration adds columns but explicitly notes: "Existing entries will have NULL values until they are rescanned with the new scoring system." Entries created before the fix have NULL score_breakdown.
+- **Fix**:
+  1. Added rescan hint in UI: "Rescan the source to generate detailed scoring breakdown for artifacts."
+  2. Users must click "Rescan" button on marketplace source to populate breakdown for existing entries
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED (User action required - rescan sources)
+
+### Metadata Fields Not Independently Horizontally Scrollable
+
+**Issue**: Long metadata values (path, upstream URL, version, SHA) were either truncated or caused modal horizontal scroll instead of each field being independently scrollable.
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:164-215`
+- **Root Cause**: Field values used `truncate` class or lacked scroll containers. No `overflow-x-auto` on individual field value wrappers.
+- **Fix**: Added `overflow-x-auto` wrapper divs with `whitespace-nowrap` to all metadata field values:
+  1. Header path display: `overflow-x-auto flex-1 min-w-0` wrapper
+  2. Metadata Path field: `overflow-x-auto` wrapper with `whitespace-nowrap` code
+  3. Upstream URL field: `overflow-x-auto` wrapper, removed `truncate`
+  4. Version field: `overflow-x-auto` wrapper
+  5. SHA field: `overflow-x-auto` wrapper
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### CatalogEntryModal DialogTitle Accessibility Warning
+
+**Issue**: Navigating to `/marketplace/sources/` page throws console error: "DialogContent requires a DialogTitle for the component to be accessible for screen reader users" at dialog.tsx (38:5).
+
+- **Location**: `skillmeat/web/components/CatalogEntryModal.tsx:97-103`
+- **Root Cause**: Custom ARIA attributes (`aria-describedby="modal-description"`) on DialogContent and `id` attributes on DialogTitle/DialogDescription were overriding Radix UI's automatic ARIA linking, making Radix think DialogTitle was missing. Same issue as previously fixed in BulkImportModal.tsx and ParameterEditorModal.tsx (commit 0abde84).
+- **Fix**: Removed custom ARIA/id attributes and let Radix UI handle accessibility automatically:
+  1. Removed `aria-describedby="modal-description"` from DialogContent
+  2. Removed `id="modal-title"` from DialogTitle
+  3. Removed `id="modal-description"` from DialogDescription
+- **Files Modified**: `skillmeat/web/components/CatalogEntryModal.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+### CommandDialog Missing DialogTitle Accessibility Warning
+
+**Issue**: The `CommandDialog` component lacked a DialogTitle, which would cause the same accessibility warning when used.
+
+- **Location**: `skillmeat/web/components/ui/command.tsx:26-36`
+- **Root Cause**: The `CommandDialog` component used `Dialog` and `DialogContent` but didn't include a `DialogTitle`, which is required by Radix UI for accessibility compliance.
+- **Fix**:
+  1. Imported `DialogTitle` from `@/components/ui/dialog`
+  2. Added `<DialogTitle className="sr-only">Command Palette</DialogTitle>` inside DialogContent
+  3. The `sr-only` class hides it visually while keeping it accessible to screen readers
+- **Files Modified**: `skillmeat/web/components/ui/command.tsx`
+- **Commit(s)**: pending
+- **Status**: RESOLVED
+
+## 2025-12-29
+
+### ArtifactList Crashes with "Element type is invalid" for Unknown Artifact Types
+
+**Issue**: Navigating to a collection page crashes with React error: "Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. Check the render method of `ArtifactList`."
+- **Location**: `skillmeat/web/components/collection/artifact-list.tsx:287`
+- **Root Cause**: `const Icon = artifactTypeIcons[artifact.type]` returns `undefined` when `artifact.type` is not one of the valid ArtifactType keys ('skill', 'command', 'agent', 'mcp', 'hook'). Rendering `<Icon />` with undefined crashes React.
+- **Fix**: Added fallback handling for all Record lookups:
+  1. Imported `HelpCircle` from lucide-react as fallback icon
+  2. Added fallback for Icon: `artifactTypeIcons[artifact.type] || HelpCircle`
+  3. Added fallbacks for colors, tints, borders, and labels
+  4. Unknown types now render with gray `HelpCircle` icon and graceful styling
+- **Files Modified**: `skillmeat/web/components/collection/artifact-list.tsx`
+- **Commit(s)**: 4854a10
+- **Status**: RESOLVED
+
+### Duplicate React Key Error for Artifacts with Same ID
+
+**Issue**: Collection page throws React warning: "Encountered two children with the same key, `skill:test-skill`"
+- **Location**: `skillmeat/web/app/collection/page.tsx:257`
+- **Root Cause**: The `enrichArtifactSummary()` function maps `ArtifactSummary` objects to full `Artifact` objects. When the same artifact appears multiple times in the collection response (duplicate entries), the enrichment produces duplicate IDs, causing React key conflicts.
+- **Fix**: Added deduplication after enrichment in `filteredArtifacts` useMemo:
+  ```typescript
+  const seen = new Set<string>();
+  artifacts = artifacts.filter(artifact => {
+    if (seen.has(artifact.id)) return false;
+    seen.add(artifact.id);
+    return true;
+  });
+  ```
+- **Files Modified**: `skillmeat/web/app/collection/page.tsx`
+- **Commit(s)**: 4854a10
+- **Status**: RESOLVED
+
+### UnifiedEntityModal Crashes on Unsupported Entity Types
+
+**Issue**: Clicking an artifact in `/collection` view crashes with `TypeError: Cannot read properties of undefined (reading 'icon')` at unified-entity-modal.tsx:548
+- **Location**: `skillmeat/web/components/entity/unified-entity-modal.tsx:547-548`
+- **Root Cause**: `ENTITY_TYPES[entity.type]` returns `undefined` when entity type is not one of the 5 supported types ('skill', 'command', 'agent', 'mcp', 'hook'). The backend supports 8 artifact types including context entities (project_config, spec_file, rule_file, context_file, progress_template), but the frontend `ENTITY_TYPES` config only defines 5. When a context entity is passed to the modal, `config` is undefined and accessing `config.icon` crashes.
+- **Fix**: Added defensive null check after `ENTITY_TYPES[entity.type]` lookup (line 549-592). When `config` is undefined, returns a fallback dialog that:
+  1. Shows warning icon with entity name in header
+  2. Displays alert explaining the entity type is not yet supported for detailed display
+  3. Shows basic entity info (name, type, description if available)
+  4. Provides close button
+- **Files Modified**: `skillmeat/web/components/entity/unified-entity-modal.tsx`
+- **Commit(s)**: d350e10
+- **Status**: RESOLVED
+
+## 2025-12-31
+
+### Marketplace Contents Tab Shows Artifact Directory Instead of Files
+
+**Issue**: The Contents tab in CatalogEntryModal shows artifact path as a root directory (e.g., "cli-tool") instead of showing files directly. Files are never auto-selected, and no file content is displayed.
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:1167-1223`, `skillmeat/api/schemas/marketplace.py:1491`, `skillmeat/web/tests/e2e/catalog-preview.spec.ts:74-83,122-133`
+- **Root Cause**: Two bugs combined:
+  1. **Path prefix not stripped**: Backend returned full repository paths (e.g., "cli-tool/SKILL.md") instead of paths relative to artifact root (e.g., "SKILL.md"). This caused `buildFileStructure()` to create the artifact directory as a nested root.
+  2. **Type mismatch**: Backend returned GitHub's `type: "blob"` terminology but frontend expected `type: "file"`. This broke the auto-select logic which filters files by `f.type === 'file'`.
+- **Fix**:
+  1. Added path prefix stripping in both cached and non-cached response paths in `marketplace_sources.py`
+  2. Added type transformation: `"blob"` → `"file"` in response construction
+  3. Added filter to exclude the artifact directory itself from results
+  4. Updated `FileTreeEntry` schema to use `Literal["file", "tree"]` instead of `Literal["blob", "tree"]`
+  5. Updated E2E test mocks to use `entries` instead of `files`, and `/artifacts/` instead of `/catalog/` in route patterns
+- **Files Modified**:
+  - `skillmeat/api/routers/marketplace_sources.py` (cached + non-cached response paths)
+  - `skillmeat/api/schemas/marketplace.py` (FileTreeEntry type field)
+  - `skillmeat/web/tests/e2e/catalog-preview.spec.ts` (mock data and route patterns)
+- **Commit(s)**: 3c6d2b9
+- **Status**: RESOLVED
+
+### Projects Disappear After Creating New Project (Critical)
+
+**Issue**: Adding a new Project from the web app causes all other Projects to disappear from the list. Only the newly added Project shows, and subsequent additions don't display.
+- **Location**: `skillmeat/api/routers/projects.py:636-653`, `skillmeat/cache/manager.py:400-466`
+- **Root Cause**: `cache_manager.populate_projects()` was called in `create_project()` with only ProjectRegistry data. This method **replaces** the entire persistent SQLite cache instead of merging. ProjectRegistry is an in-memory cache (5-min TTL) that may have incomplete data during a scan, so calling `populate_projects()` with incomplete data wiped all existing projects from the persistent cache.
+- **Fix**:
+  1. Added `upsert_project()` method to `CacheManager` that adds/updates a SINGLE project without touching others (uses existing repository's get/update/create pattern)
+  2. Modified `create_project()` router to call `cache_manager.upsert_project()` for just the new project instead of `populate_projects()` for all projects
+  3. Error handling: cache failure logs warning but doesn't break project creation
+- **Files Modified**:
+  - `skillmeat/cache/manager.py` (added `upsert_project()` method, lines 400-466)
+  - `skillmeat/api/routers/projects.py` (use `upsert_project()` in `create_project()`, lines 636-653)
+- **Commit(s)**: e95b218
 - **Status**: RESOLVED

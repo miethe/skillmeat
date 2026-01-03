@@ -183,8 +183,8 @@ class TestGitHubScanner:
         """Test retry on transient failure."""
         # First call fails, second succeeds
         failed_response = Mock()
-        failed_response.raise_for_status.side_effect = requests.exceptions.RequestException(
-            "Timeout"
+        failed_response.raise_for_status.side_effect = (
+            requests.exceptions.RequestException("Timeout")
         )
 
         success_response = Mock()
@@ -232,34 +232,109 @@ class TestGitHubScanner:
         assert mock_session.get.call_count == 2
 
     def test_get_file_content_success(self, scanner, mock_session):
-        """Test successful file content retrieval."""
+        """Test successful file content retrieval with metadata."""
         import base64
 
         content = "# Test Skill\nThis is a skill."
         encoded = base64.b64encode(content.encode("utf-8")).decode("utf-8")
 
         mock_response = Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "content": encoded,
             "encoding": "base64",
+            "type": "file",
+            "size": 31,
+            "sha": "abc123def456",
+            "name": "SKILL.md",
+            "path": "skills/test/SKILL.md",
         }
         mock_session.get.return_value = mock_response
 
         result = scanner.get_file_content("user", "repo", "skills/test/SKILL.md")
 
-        assert result == content
+        assert result is not None
+        assert result["content"] == content
+        assert result["encoding"] == "base64"
+        assert result["size"] == 31
+        assert result["sha"] == "abc123def456"
+        assert result["name"] == "SKILL.md"
+        assert result["path"] == "skills/test/SKILL.md"
+        assert result["is_binary"] is False
 
     def test_get_file_content_no_encoding(self, scanner, mock_session):
-        """Test file content retrieval without encoding."""
+        """Test file content retrieval without base64 encoding."""
         mock_response = Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "content": "plain text content",
+            "type": "file",
+            "size": 18,
+            "sha": "xyz789",
+            "name": "README.md",
+            "path": "README.md",
         }
         mock_session.get.return_value = mock_response
 
         result = scanner.get_file_content("user", "repo", "README.md")
 
-        assert result == "plain text content"
+        assert result is not None
+        assert result["content"] == "plain text content"
+        assert result["size"] == 18
+        assert result["is_binary"] is False
+
+    def test_get_file_content_binary_file(self, scanner, mock_session):
+        """Test binary file content is kept as base64."""
+        import base64
+
+        binary_data = b"\x89PNG\r\n\x1a\n"
+        encoded = base64.b64encode(binary_data).decode("utf-8")
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "content": encoded,
+            "encoding": "base64",
+            "type": "file",
+            "size": 8,
+            "sha": "img123",
+            "name": "icon.png",
+            "path": "assets/icon.png",
+        }
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_content("user", "repo", "assets/icon.png")
+
+        assert result is not None
+        assert result["is_binary"] is True
+        # Binary content should remain as base64
+        assert result["content"] == encoded.replace("\n", "")
+        assert result["name"] == "icon.png"
+
+    def test_get_file_content_not_found(self, scanner, mock_session):
+        """Test file not found returns None."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_content("user", "repo", "nonexistent.txt")
+
+        assert result is None
+
+    def test_get_file_content_directory(self, scanner, mock_session):
+        """Test directory path returns None."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "type": "dir",
+            "name": "src",
+            "path": "src",
+        }
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_content("user", "repo", "src")
+
+        assert result is None
 
     def test_scan_repository_empty_repo(self, scanner, mock_session):
         """Test scanning an empty repository."""
@@ -526,3 +601,204 @@ class TestEdgeCases:
         paths = scanner._extract_file_paths(tree)
 
         assert len(paths) == 2
+
+
+class TestGetFileTree:
+    """Test suite for get_file_tree method."""
+
+    @pytest.fixture
+    def mock_session(self):
+        """Create a mock requests session."""
+        session = MagicMock()
+        session.headers = {}
+        return session
+
+    @pytest.fixture
+    def scanner(self, mock_session):
+        """Create a scanner with mocked session."""
+        scanner = GitHubScanner(token="test_token")
+        scanner.session = mock_session
+        return scanner
+
+    def test_get_file_tree_with_sha(self, scanner, mock_session):
+        """Test fetching file tree with explicit SHA."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "sha": "abc123",
+            "tree": [
+                {"path": "README.md", "type": "blob", "size": 1024, "sha": "blob1"},
+                {"path": "src", "type": "tree", "sha": "tree1"},
+                {"path": "src/main.py", "type": "blob", "size": 2048, "sha": "blob2"},
+            ],
+        }
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_tree("owner", "repo", sha="abc123")
+
+        assert len(result) == 3
+        assert result[0]["path"] == "README.md"
+        assert result[0]["type"] == "blob"
+        assert result[0]["size"] == 1024
+        assert result[0]["sha"] == "blob1"
+        # Tree entries don't have size
+        assert result[1]["type"] == "tree"
+        assert "size" not in result[1]
+        mock_session.get.assert_called_once()
+        call_url = mock_session.get.call_args[0][0]
+        assert "git/trees/abc123" in call_url
+        assert "recursive=1" in call_url
+
+    def test_get_file_tree_without_sha_fetches_default_branch(
+        self, scanner, mock_session
+    ):
+        """Test that without SHA, default branch is fetched first."""
+        # First call: get repo info for default branch
+        repo_response = Mock()
+        repo_response.json.return_value = {"default_branch": "main"}
+        repo_response.status_code = 200
+
+        # Second call: get commit SHA for main
+        commit_response = Mock()
+        commit_response.json.return_value = {"sha": "commit_sha_123"}
+        commit_response.status_code = 200
+
+        # Third call: get tree
+        tree_response = Mock()
+        tree_response.json.return_value = {
+            "tree": [{"path": "file.txt", "type": "blob", "size": 100, "sha": "blob1"}]
+        }
+        tree_response.status_code = 200
+
+        mock_session.get.side_effect = [repo_response, commit_response, tree_response]
+
+        result = scanner.get_file_tree("owner", "repo")
+
+        assert len(result) == 1
+        assert result[0]["path"] == "file.txt"
+        assert mock_session.get.call_count == 3
+
+    def test_get_file_tree_with_path_filter(self, scanner, mock_session):
+        """Test filtering tree by path prefix."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "tree": [
+                {"path": "README.md", "type": "blob", "size": 100, "sha": "blob1"},
+                {"path": "src", "type": "tree", "sha": "tree1"},
+                {"path": "src/main.py", "type": "blob", "size": 200, "sha": "blob2"},
+                {"path": "src/utils.py", "type": "blob", "size": 150, "sha": "blob3"},
+                {
+                    "path": "tests/test_main.py",
+                    "type": "blob",
+                    "size": 300,
+                    "sha": "blob4",
+                },
+            ],
+        }
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_tree("owner", "repo", path="src", sha="abc123")
+
+        assert len(result) == 3  # src directory + 2 files
+        paths = [item["path"] for item in result]
+        assert "src" in paths
+        assert "src/main.py" in paths
+        assert "src/utils.py" in paths
+        assert "README.md" not in paths
+        assert "tests/test_main.py" not in paths
+
+    def test_get_file_tree_path_filter_with_trailing_slash(self, scanner, mock_session):
+        """Test path filter handles trailing slashes correctly."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "tree": [
+                {"path": "skills/canvas", "type": "tree", "sha": "tree1"},
+                {
+                    "path": "skills/canvas/SKILL.md",
+                    "type": "blob",
+                    "size": 500,
+                    "sha": "blob1",
+                },
+                {
+                    "path": "skills/canvas/index.ts",
+                    "type": "blob",
+                    "size": 1000,
+                    "sha": "blob2",
+                },
+                {"path": "skills/other", "type": "tree", "sha": "tree2"},
+            ],
+        }
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        # Test with trailing slash
+        result = scanner.get_file_tree(
+            "owner", "repo", path="skills/canvas/", sha="abc123"
+        )
+
+        assert len(result) == 3
+        paths = [item["path"] for item in result]
+        assert "skills/canvas" in paths
+        assert "skills/canvas/SKILL.md" in paths
+        assert "skills/canvas/index.ts" in paths
+        assert "skills/other" not in paths
+
+    def test_get_file_tree_empty_result(self, scanner, mock_session):
+        """Test empty tree response."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"tree": []}
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_tree("owner", "repo", sha="abc123")
+
+        assert result == []
+
+    def test_get_file_tree_invalid_response(self, scanner, mock_session):
+        """Test handling of invalid tree response."""
+        mock_response = Mock()
+        mock_response.json.return_value = {"not_tree": []}
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        with pytest.raises(GitHubAPIError) as exc_info:
+            scanner.get_file_tree("owner", "repo", sha="abc123")
+
+        assert "missing 'tree' key" in str(exc_info.value)
+
+    def test_get_file_tree_rate_limit_error(self, scanner, mock_session):
+        """Test rate limit error is properly raised."""
+        mock_response = Mock()
+        mock_response.status_code = 403
+        mock_response.headers = {
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": str(int(time.time()) + 3600),  # 1 hour from now
+        }
+        mock_session.get.return_value = mock_response
+
+        with pytest.raises(RateLimitError):
+            scanner.get_file_tree("owner", "repo", sha="abc123")
+
+    def test_get_file_tree_blob_has_size_tree_does_not(self, scanner, mock_session):
+        """Test that blob entries have size but tree entries do not."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "tree": [
+                {"path": "file.txt", "type": "blob", "size": 123, "sha": "blob1"},
+                {"path": "directory", "type": "tree", "sha": "tree1"},
+            ],
+        }
+        mock_response.status_code = 200
+        mock_session.get.return_value = mock_response
+
+        result = scanner.get_file_tree("owner", "repo", sha="abc123")
+
+        # Blob should have size
+        blob_entry = next(e for e in result if e["type"] == "blob")
+        assert "size" in blob_entry
+        assert blob_entry["size"] == 123
+
+        # Tree should not have size
+        tree_entry = next(e for e in result if e["type"] == "tree")
+        assert "size" not in tree_entry

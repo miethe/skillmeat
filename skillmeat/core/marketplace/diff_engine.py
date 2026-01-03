@@ -240,6 +240,8 @@ class CatalogDiffEngine:
             "detected_version": artifact.detected_version,
             "detected_sha": artifact.detected_sha,
             "confidence_score": artifact.confidence_score,
+            "raw_score": artifact.raw_score,
+            "score_breakdown": artifact.score_breakdown,
             "metadata": artifact.metadata,
         }
 

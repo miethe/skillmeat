@@ -10,6 +10,12 @@ allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
 
 You are Claude Code executing an approved implementation plan for story `$ARGUMENTS`.
 
+<!-- MeatyCapture Integration - Project: skillmeat -->
+## Context Gathering
+
+Before implementation, search for related request-log items:
+- `/mc search "story-keyword" skillmeat` - Find related bugs/enhancements
+
 ## Prerequisites
 
 - Plan must exist at `.claude/plans/${story_id}-plan.md`
@@ -142,6 +148,13 @@ pnpm --filter "./packages/ui" test:a11y
 update_progress "complete" "validated"
 echo "✅ Implementation complete and validated"
 ```
+
+<!-- MeatyCapture Integration - Project: skillmeat -->
+### 6. Post-Implementation
+
+Update status of any request-log items addressed by this story:
+- Edit markdown files: change `**Status:** triage` → `**Status:** done`
+- If issues arose during implementation: `/mc capture {"title": "...", "type": "bug"}`
 
 ## Rollback Protocol
 

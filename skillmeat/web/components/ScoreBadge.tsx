@@ -15,6 +15,7 @@
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ScoreBreakdownTooltip } from '@/components/ScoreBreakdownTooltip';
 
 export interface ScoreBadgeProps {
   /** Confidence score (0-100) */
@@ -23,6 +24,17 @@ export interface ScoreBadgeProps {
   size?: 'sm' | 'md' | 'lg';
   /** Additional CSS classes */
   className?: string;
+  /** Optional score breakdown for tooltip */
+  breakdown?: {
+    dir_name_score: number;
+    manifest_score: number;
+    extensions_score: number;
+    parent_hint_score: number;
+    frontmatter_score: number;
+    depth_penalty: number;
+    raw_total: number;
+    normalized_score: number;
+  };
 }
 
 /**
@@ -73,13 +85,29 @@ function getSizeClasses(size: 'sm' | 'md' | 'lg'): string {
  *
  * @example
  * ```tsx
+ * // Basic usage
  * <ScoreBadge confidence={87} size="md" />
+ *
+ * // With score breakdown tooltip
+ * <ScoreBadge
+ *   confidence={87}
+ *   breakdown={{
+ *     dir_name_score: 30,
+ *     manifest_score: 25,
+ *     extensions_score: 20,
+ *     parent_hint_score: 10,
+ *     frontmatter_score: 5,
+ *     depth_penalty: -3,
+ *     raw_total: 87,
+ *     normalized_score: 87,
+ *   }}
+ * />
  * ```
  *
  * @param props - ScoreBadgeProps configuration
  * @returns Badge component with score and color-coded styling
  */
-export function ScoreBadge({ confidence, size = 'md', className }: ScoreBadgeProps) {
+export function ScoreBadge({ confidence, size = 'md', className, breakdown }: ScoreBadgeProps) {
   // Clamp confidence to 0-100 range
   const clampedConfidence = Math.max(0, Math.min(100, confidence));
 
@@ -102,7 +130,8 @@ export function ScoreBadge({ confidence, size = 'md', className }: ScoreBadgePro
     confidenceLevel = 'low';
   }
 
-  return (
+  // Create the badge element
+  const badge = (
     <Badge
       className={cn(
         'font-semibold tabular-nums',
@@ -112,11 +141,22 @@ export function ScoreBadge({ confidence, size = 'md', className }: ScoreBadgePro
       )}
       colorStyle={hexColor}
       aria-label={`Confidence score: ${displayScore} percent, ${confidenceLevel} confidence`}
-      title={`${confidenceLevel.charAt(0).toUpperCase() + confidenceLevel.slice(1)} confidence: ${displayScore}%`}
+      title={breakdown ? undefined : `${confidenceLevel.charAt(0).toUpperCase() + confidenceLevel.slice(1)} confidence: ${displayScore}%`}
     >
       {displayScore}%
     </Badge>
   );
+
+  // Wrap in tooltip if breakdown is provided
+  if (breakdown) {
+    return (
+      <ScoreBreakdownTooltip breakdown={breakdown}>
+        {badge}
+      </ScoreBreakdownTooltip>
+    );
+  }
+
+  return badge;
 }
 
 /**
