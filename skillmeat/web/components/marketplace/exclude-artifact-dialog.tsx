@@ -64,19 +64,19 @@ export function ExcludeArtifactDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent onCloseAutoFocus={(e) => e.preventDefault()}>
         <AlertDialogHeader>
           <AlertDialogTitle>Mark as Not an Artifact?</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
-            <p>
+            <span className="block">
               Are you sure you want to mark{' '}
               <strong className="text-foreground">{entry.name}</strong> as
               excluded?
-            </p>
-            <p>
+            </span>
+            <span className="block">
               This will hide it from the catalog. You can restore it later from
               the Excluded Artifacts list.
-            </p>
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -84,6 +84,7 @@ export function ExcludeArtifactDialog({
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               onConfirm();
             }}
             disabled={isLoading}

@@ -142,3 +142,31 @@
 
 - **Commit(s)**: cacb26c
 - **Status**: RESOLVED
+
+---
+
+## 2026-01-03
+
+### Modal Opens After Excluding Artifact
+
+**Issue**: After clicking "Mark as Excluded" in the ExcludeArtifactDialog, the artifact detail modal would open unexpectedly.
+
+- **Location**: `skillmeat/web/components/marketplace/exclude-artifact-dialog.tsx:84-89`
+- **Root Cause**: The AlertDialogAction's onClick handler only called `e.preventDefault()` but not `e.stopPropagation()`. Additionally, when the dialog closed, focus would return to the underlying card element which could trigger a click.
+- **Fix**:
+  1. Added `e.stopPropagation()` to AlertDialogAction's onClick handler
+  2. Added `onCloseAutoFocus={(e) => e.preventDefault()}` to AlertDialogContent to prevent focus from returning to the card
+- **Commit(s)**: 8079341
+- **Status**: RESOLVED
+
+---
+
+### Nested `<p>` Hydration Error in ExcludeArtifactDialog
+
+**Issue**: Console errors appeared when clicking "Not an artifact" button: "In HTML, `<p>` cannot be a descendant of `<p>`" causing hydration errors.
+
+- **Location**: `skillmeat/web/components/marketplace/exclude-artifact-dialog.tsx:70-80`
+- **Root Cause**: `AlertDialogDescription` is a Radix UI primitive that renders as a `<p>` element. The description content used `<p>` tags inside it, creating invalid nested paragraph elements in HTML.
+- **Fix**: Changed inner `<p>` tags to `<span className="block">` elements which render as block-level elements but are valid inside a `<p>` parent.
+- **Commit(s)**: 8079341
+- **Status**: RESOLVED
