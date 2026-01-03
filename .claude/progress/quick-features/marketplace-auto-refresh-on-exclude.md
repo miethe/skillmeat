@@ -2,7 +2,8 @@
 type: quick-feature-plan
 feature_slug: marketplace-auto-refresh-on-exclude
 request_log_id: null
-status: in-progress
+status: completed
+completed_at: 2026-01-03T00:00:00Z
 created: 2026-01-03T00:00:00Z
 estimated_scope: small
 ---
@@ -57,6 +58,6 @@ This produces `['marketplace-sources', 'catalog', sourceId]` which matches ALL q
 
 ## Completion Criteria
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [ ] Manual testing verified
-- [ ] Build succeeds
+- [x] Build succeeds
