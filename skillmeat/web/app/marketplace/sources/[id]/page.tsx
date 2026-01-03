@@ -24,6 +24,8 @@ import {
   Pencil,
   Trash2,
   StickyNote,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -276,9 +278,13 @@ export default function SourceDetailPage() {
     maxConfidence: Number(searchParams.get('maxConfidence')) || 100,
     includeBelowThreshold: searchParams.get('includeBelowThreshold') === 'true',
   }));
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+    const param = searchParams.get('sortOrder');
+    return param === 'asc' ? 'asc' : 'desc'; // default to desc (high confidence first)
+  });
 
   // Helper function to update URL parameters
-  const updateURLParams = (newConfidenceFilters: typeof confidenceFilters, newFilters: typeof filters) => {
+  const updateURLParams = (newConfidenceFilters: typeof confidenceFilters, newFilters: typeof filters, newSortOrder: typeof sortOrder) => {
     const params = new URLSearchParams();
 
     // Add confidence filters only if different from defaults
@@ -300,14 +306,19 @@ export default function SourceDetailPage() {
       params.set('status', newFilters.status);
     }
 
+    // Add sort order only if different from default
+    if (newSortOrder !== 'desc') {
+      params.set('sortOrder', newSortOrder);
+    }
+
     const query = params.toString();
     router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
   };
 
   // Sync URL when filters change
   useEffect(() => {
-    updateURLParams(confidenceFilters, filters);
-  }, [confidenceFilters, filters]);
+    updateURLParams(confidenceFilters, filters, sortOrder);
+  }, [confidenceFilters, filters, sortOrder]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -344,16 +355,27 @@ export default function SourceDetailPage() {
       });
   }, [catalogData]);
 
-  // Filter by search (client-side)
+  // Filter by search and sort by confidence (client-side)
   const filteredEntries = useMemo(() => {
-    if (!searchQuery.trim()) return allEntries;
-    const query = searchQuery.toLowerCase();
-    return allEntries.filter(
-      (entry) =>
-        entry.name.toLowerCase().includes(query) ||
-        entry.path.toLowerCase().includes(query)
-    );
-  }, [allEntries, searchQuery]);
+    let entries = allEntries;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      entries = entries.filter(
+        (entry) =>
+          entry.name.toLowerCase().includes(query) ||
+          entry.path.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort by confidence score
+    return [...entries].sort((a, b) => {
+      return sortOrder === 'desc'
+        ? b.confidence_score - a.confidence_score
+        : a.confidence_score - b.confidence_score;
+    });
+  }, [allEntries, searchQuery, sortOrder]);
 
   // Separate excluded entries for the excluded list
   const excludedEntries = useMemo(() => {
@@ -583,11 +605,27 @@ export default function SourceDetailPage() {
             }
           />
 
+          {/* Sort by confidence */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="gap-1"
+          >
+            {sortOrder === 'desc' ? (
+              <ArrowDown className="h-4 w-4" />
+            ) : (
+              <ArrowUp className="h-4 w-4" />
+            )}
+            Confidence
+          </Button>
+
           {/* Clear filters */}
           {(filters.artifact_type || filters.status ||
             confidenceFilters.minConfidence !== 50 ||
             confidenceFilters.maxConfidence !== 100 ||
-            confidenceFilters.includeBelowThreshold) && (
+            confidenceFilters.includeBelowThreshold ||
+            sortOrder !== 'desc') && (
             <Button
               variant="ghost"
               size="sm"
@@ -598,6 +636,7 @@ export default function SourceDetailPage() {
                   maxConfidence: 100,
                   includeBelowThreshold: false,
                 });
+                setSortOrder('desc');
               }}
             >
               Clear filters
