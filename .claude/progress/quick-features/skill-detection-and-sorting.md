@@ -2,7 +2,8 @@
 type: quick-feature-plan
 feature_slug: skill-detection-and-sorting
 request_log_id: null
-status: in-progress
+status: completed
+completed_at: 2026-01-02T00:00:00Z
 created: 2026-01-02T00:00:00Z
 estimated_scope: small
 ---
@@ -57,7 +58,7 @@ In `_detect_single_file_artifacts()` (lines 289-463):
 
 ## Completion Criteria
 
-- [ ] Single-file .md files are NOT detected as skills
-- [ ] Source detail page auto-sorts by confidence (high to low)
-- [ ] Sort toggle allows reversing order
-- [ ] Tests pass
+- [x] Single-file .md files are NOT detected as skills
+- [x] Source detail page auto-sorts by confidence (high to low)
+- [x] Sort toggle allows reversing order
+- [x] Tests pass (116/116 backend tests)
