@@ -320,6 +320,83 @@ Recovered via session-recovery skill"
 4. **Sequential dependencies** - Don't parallelize dependent work
 5. **Background execution** - Use for large batches with timeouts
 
+## Practical Lessons (2025-12-31)
+
+Key insights from real recovery sessions:
+
+### 1. File-First Verification is Faster
+
+**Problem**: Complex jq/grep parsing of JSONL logs is fragile and slow.
+
+**Solution**: Check if expected files exist BEFORE parsing logs in detail.
+
+```bash
+# FAST: Check file exists and has content
+if [ -f "$expected_file" ] && [ -s "$expected_file" ]; then
+  echo "✓ COMPLETE: $expected_file ($(wc -l < "$expected_file") lines)"
+fi
+```
+
+### 2. Count Both Write AND Edit Operations
+
+**Problem**: Only checking for `Write` misses agents that modify existing files.
+
+**Solution**: Always check for both:
+
+```bash
+# Count file operations (both types)
+echo "Write ops: $(grep -c '"Write"' "$LOG" 2>/dev/null || echo 0)"
+echo "Edit ops: $(grep -c '"Edit"' "$LOG" 2>/dev/null || echo 0)"
+```
+
+Agents completing via Edit only are common (3 of 6 in one session).
+
+### 3. Simple Grep Beats Complex jq
+
+**Problem**: jq pipelines fail on macOS or with nested content blocks.
+
+**Solution**: Use simple grep patterns that work everywhere:
+
+```bash
+# Reliable cross-platform pattern
+grep -c 'Write' "$LOG"      # Count Write operations
+tail -1 "$LOG" | grep -o '"type":"[^"]*"'  # Last message type
+```
+
+### 4. Log Structure Has Metadata
+
+The JSONL format includes useful top-level fields:
+
+```json
+{
+  "agentId": "a610b3c",
+  "sessionId": "758467e4-...",
+  "type": "user|assistant",
+  "message": { ... }
+}
+```
+
+Use `agentId` for correlation with progress tracking.
+
+### 5. git status is the Source of Truth
+
+**Best workflow**:
+1. Run `git status --short` first
+2. New files (`??`) = likely agent output
+3. Modified files (`M`) = likely edits applied
+4. Cross-reference with expected deliverables
+5. Only parse logs for ambiguous cases
+
+### 6. macOS Command Differences
+
+Some commands behave differently on macOS (BSD) vs Linux (GNU):
+
+| Command | macOS Issue | Workaround |
+|---------|-------------|------------|
+| `stat` | Different flags | Use `stat -f "%Sm"` on macOS |
+| `uniq -c` | May need `sort` first | Always `sort \| uniq -c` |
+| `sed -i` | Requires backup arg | Use `sed -i ''` or avoid |
+
 ## Example Recovery Session
 
 ```

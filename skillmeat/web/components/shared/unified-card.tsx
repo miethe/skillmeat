@@ -381,15 +381,17 @@ export const UnifiedCard = React.memo(
           </div>
         </div>
 
-        {/* Content */}
-        <div className="space-y-3 px-4 pb-4">
-          {/* Description */}
-          {truncatedDescription && (
-            <p className="line-clamp-2 text-sm text-muted-foreground">{truncatedDescription}</p>
-          )}
+        {/* Content - Fixed-height rows for consistent card heights */}
+        <div className="flex min-h-[140px] flex-col px-4 pb-4">
+          {/* Description - flex-grow to fill available space */}
+          <div className="min-h-[40px] flex-grow">
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {truncatedDescription || '\u00A0'}
+            </p>
+          </div>
 
-          {/* Metadata row */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {/* Metadata row - fixed height */}
+          <div className="flex h-5 items-center gap-4 text-xs text-muted-foreground">
             {data.version && (
               <div className="flex items-center gap-1" title="Version">
                 <LucideIcons.Package className="h-3 w-3" />
@@ -410,29 +412,33 @@ export const UnifiedCard = React.memo(
             )}
           </div>
 
-          {/* Tags */}
-          {displayTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {displayTags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {remainingTagsCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{remainingTagsCount}
-                </Badge>
-              )}
-            </div>
-          )}
+          {/* Tags - fixed height, always render container */}
+          <div className="mt-2 flex h-6 flex-wrap items-center gap-1">
+            {displayTags.length > 0 && (
+              <>
+                {displayTags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                {remainingTagsCount > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    +{remainingTagsCount}
+                  </Badge>
+                )}
+              </>
+            )}
+          </div>
 
-          {/* Warnings */}
-          {data.isOutdated && (
-            <div className="flex items-center gap-1 text-xs text-yellow-600">
-              <LucideIcons.AlertCircle className="h-3 w-3" />
-              <span>Update available</span>
-            </div>
-          )}
+          {/* Warnings - fixed height, always render container */}
+          <div className="flex h-4 items-center">
+            {data.isOutdated && (
+              <div className="flex items-center gap-1 text-xs text-yellow-600">
+                <LucideIcons.AlertCircle className="h-3 w-3" />
+                <span>Update available</span>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
     );
@@ -490,22 +496,30 @@ export function UnifiedCardSkeleton({ selectable = false }: { selectable?: boole
           </div>
         </div>
       </div>
-      <div className="space-y-3 px-4 pb-4">
-        {/* Description skeleton */}
-        <Skeleton className="h-10 w-full" />
+      {/* Content - Fixed-height rows matching UnifiedCard layout */}
+      <div className="flex min-h-[140px] flex-col px-4 pb-4">
+        {/* Description skeleton - flex-grow */}
+        <div className="min-h-[40px] flex-grow">
+          <Skeleton className="h-10 w-full" />
+        </div>
 
-        {/* Metadata skeleton */}
-        <div className="flex gap-4">
+        {/* Metadata skeleton - fixed height */}
+        <div className="flex h-5 items-center gap-4">
           <Skeleton className="h-3 w-16" />
           <Skeleton className="h-3 w-16" />
           <Skeleton className="h-3 w-16" />
         </div>
 
-        {/* Tags skeleton */}
-        <div className="flex gap-1">
+        {/* Tags skeleton - fixed height */}
+        <div className="mt-2 flex h-6 items-center gap-1">
           <Skeleton className="h-5 w-12 rounded-full" />
           <Skeleton className="h-5 w-16 rounded-full" />
           <Skeleton className="h-5 w-14 rounded-full" />
+        </div>
+
+        {/* Warnings skeleton - fixed height */}
+        <div className="flex h-4 items-center">
+          {/* Empty to match potential warning space */}
         </div>
       </div>
     </Card>

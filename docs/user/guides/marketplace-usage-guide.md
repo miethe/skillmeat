@@ -8,6 +8,7 @@ Complete guide to discovering, installing, and managing artifacts from the Skill
 - [Browsing the Marketplace](#browsing-the-marketplace)
 - [Searching and Filtering](#searching-and-filtering)
 - [Reviewing Listings](#reviewing-listings)
+- [Previewing Catalog Artifacts](#previewing-catalog-artifacts)
 - [Installing Bundles](#installing-bundles)
 - [Managing Marketplace Artifacts](#managing-marketplace-artifacts)
 - [Publishing Your Own Bundles](#publishing-your-own-bundles)
@@ -289,6 +290,127 @@ Review security and trust information:
 - Number of bundles published
 - Community contributions
 - Verification badge (if applicable)
+
+## Previewing Catalog Artifacts
+
+Before installing a marketplace artifact, you can browse and preview its file contents directly in the web UI. This allows you to examine the code and documentation without importing anything into your collection.
+
+### How to Preview Files
+
+**Access the Contents Tab:**
+1. Open the marketplace at `http://localhost:3000/marketplace`
+2. Find and click on any marketplace source
+3. Click on a catalog entry (artifact listing) to open the modal
+4. Click the **Contents** tab
+
+[Screenshot: Contents tab showing file tree and preview]
+
+### File Browser Features
+
+**File Tree:**
+- View complete directory structure of the artifact
+- Click any file to preview its contents
+- Expandable folders for easy navigation
+
+**Preview Panel:**
+- Displays file contents in read-only mode
+- Syntax highlighting for code files (Python, TypeScript, JSON, etc.)
+- Line numbers for reference
+- Cannot edit until after import
+
+**Auto-Selection:**
+- README files are automatically selected if available
+- Falls back to first markdown file if no README
+- Helps you quickly understand the artifact purpose
+
+### Working with Large Files
+
+**File Size Limits:**
+- Files up to 1MB are fully displayed
+- Large files over 1MB are truncated to 10,000 lines
+- Truncated content is clearly marked
+
+**View Full File on GitHub:**
+- Click **"View on GitHub"** button for large files
+- Opens repository in your browser
+- See complete file with GitHub's rendering
+
+### GitHub Rate Limits
+
+The contents feature fetches file data directly from GitHub. Rate limits may apply:
+
+**Rate Limiting:**
+- GitHub allows 60 requests/hour for unauthenticated users
+- Shows error message if limit is reached
+- Wait 1-2 hours before retrying
+
+**Increase Rate Limits:**
+To fetch more files without waiting, use a personal GitHub access token:
+
+1. Create token at: https://github.com/settings/tokens
+2. Scopes needed: `public_repo` (for public artifacts only)
+3. Set in SkillMeat:
+   ```bash
+   skillmeat config set github-token YOUR_TOKEN_HERE
+   ```
+4. Rate limit increases to 5,000 requests/hour (authenticated)
+
+### Preview Tips
+
+**Review Before Import:**
+- Check artifact structure and organization
+- Look for README or documentation
+- Verify code quality and style
+- Check dependencies and requirements
+
+**Common Files to Review:**
+- `README.md` - Overview and instructions
+- `requirements.txt` or `package.json` - Dependencies
+- License files (LICENSE, COPYING)
+- Configuration files (setup.py, pyproject.toml, etc.)
+- Source code organization
+
+**Example Workflow:**
+1. Search marketplace for Python automation tools
+2. Click on a candidate artifact
+3. Preview the Contents tab
+4. Read README to understand capabilities
+5. Check requirements.txt to see dependencies
+6. If satisfied, click Install to add to collection
+
+### Limitations
+
+**Cannot Edit in Preview:**
+- All files are read-only in preview mode
+- Editing is only possible after importing
+- This prevents accidental modifications
+
+**Network Dependent:**
+- Requires GitHub connectivity
+- Large artifacts may take time to load
+- Rate limits may prevent previews if exceeded
+
+### Troubleshooting Preview Issues
+
+**"Rate limit exceeded" Error**
+
+If you see this error, GitHub rate limit was hit:
+- Wait 1-2 hours and retry
+- Or, set up authentication with personal token (see above)
+
+**File content won't load**
+
+If a file fails to load:
+- Check GitHub connectivity
+- Try clicking "View on GitHub" instead
+- Refresh and try again
+
+**Large files load slowly**
+
+If preview is taking time:
+- File size may be large (over 500KB)
+- Consider viewing truncated version
+- Use "View on GitHub" for full file
 
 ### Ratings and Reviews
 

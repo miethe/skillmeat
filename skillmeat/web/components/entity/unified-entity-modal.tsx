@@ -545,6 +545,52 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   }
 
   const config = ENTITY_TYPES[entity.type];
+
+  // Fallback UI for unsupported entity types (e.g., context entities)
+  if (!config) {
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              {entity.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Entity type "{entity.type}" is not yet supported for detailed display.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Name:</span>
+                <span className="font-medium">{entity.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Type:</span>
+                <span className="font-mono text-xs">{entity.type}</span>
+              </div>
+              {entity.description && (
+                <div className="pt-2">
+                  <span className="text-muted-foreground">Description:</span>
+                  <p className="mt-1 text-sm">{entity.description}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const IconComponent = (LucideIcons as any)[config.icon] as LucideIcon;
 
   // ============================================================================

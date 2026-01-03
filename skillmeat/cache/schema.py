@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS marketplace_catalog_entries (
     detected_sha TEXT,
     detected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     confidence_score INTEGER NOT NULL CHECK(confidence_score >= 0 AND confidence_score <= 100),
-    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'updated', 'removed', 'imported')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'updated', 'removed', 'imported', 'excluded')),
     import_date TIMESTAMP,
     import_id TEXT,
     metadata_json TEXT,
