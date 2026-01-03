@@ -370,6 +370,11 @@ class HeuristicDetector:
             if container_type is None:
                 continue  # Not in a container context
 
+            # Skills cannot be single-file artifacts - they must be directories with SKILL.md
+            # See Claude Code conventions (lines 297-299): Skills are ALWAYS directory-based
+            if container_type == ArtifactType.SKILL:
+                continue
+
             # Check if directory has a manifest file (then it's directory-based, skip)
             has_manifest = any(
                 f.lower() in {"skill.md", "command.md", "agent.md", "mcp.md", "hook.md"}
