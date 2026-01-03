@@ -17,25 +17,22 @@ import {
   ExternalLink,
   Filter,
   Download,
-  CheckSquare,
   Loader2,
   AlertTriangle,
-  Search as SearchIcon,
   Pencil,
   Trash2,
   StickyNote,
-  ArrowDown,
-  ArrowUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { CatalogTabs } from './components/catalog-tabs';
 import { ExcludedArtifactsList } from './components/excluded-list';
+import { SourceToolbar, useViewMode } from './components/source-toolbar';
+import { CatalogList } from './components/catalog-list';
+import type { SortOption, ViewMode } from './components/source-toolbar';
 import {
   useSource,
   useSourceCatalog,
@@ -46,7 +43,6 @@ import {
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';
-import { ConfidenceFilter } from '@/components/ConfidenceFilter';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
 
@@ -278,13 +274,24 @@ export default function SourceDetailPage() {
     maxConfidence: Number(searchParams.get('maxConfidence')) || 100,
     includeBelowThreshold: searchParams.get('includeBelowThreshold') === 'true',
   }));
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
-    const param = searchParams.get('sortOrder');
-    return param === 'asc' ? 'asc' : 'desc'; // default to desc (high confidence first)
+  const [sortOption, setSortOption] = useState<SortOption>(() => {
+    const param = searchParams.get('sort');
+    if (param === 'confidence-asc' || param === 'confidence-desc' ||
+        param === 'name-asc' || param === 'name-desc' || param === 'date-added') {
+      return param;
+    }
+    return 'confidence-desc'; // default to high confidence first
   });
 
+  // View mode with localStorage persistence
+  const [viewMode, setViewMode] = useViewMode();
+
   // Helper function to update URL parameters
-  const updateURLParams = (newConfidenceFilters: typeof confidenceFilters, newFilters: typeof filters, newSortOrder: typeof sortOrder) => {
+  const updateURLParams = (
+    newConfidenceFilters: typeof confidenceFilters,
+    newFilters: typeof filters,
+    newSortOption: SortOption
+  ) => {
     const params = new URLSearchParams();
 
     // Add confidence filters only if different from defaults
@@ -306,9 +313,9 @@ export default function SourceDetailPage() {
       params.set('status', newFilters.status);
     }
 
-    // Add sort order only if different from default
-    if (newSortOrder !== 'desc') {
-      params.set('sortOrder', newSortOrder);
+    // Add sort option only if different from default
+    if (newSortOption !== 'confidence-desc') {
+      params.set('sort', newSortOption);
     }
 
     const query = params.toString();
@@ -317,8 +324,8 @@ export default function SourceDetailPage() {
 
   // Sync URL when filters change
   useEffect(() => {
-    updateURLParams(confidenceFilters, filters, sortOrder);
-  }, [confidenceFilters, filters, sortOrder]);
+    updateURLParams(confidenceFilters, filters, sortOption);
+  }, [confidenceFilters, filters, sortOption]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -355,7 +362,7 @@ export default function SourceDetailPage() {
       });
   }, [catalogData]);
 
-  // Filter by search and sort by confidence (client-side)
+  // Filter by search and sort (client-side)
   const filteredEntries = useMemo(() => {
     let entries = allEntries;
 
@@ -369,13 +376,24 @@ export default function SourceDetailPage() {
       );
     }
 
-    // Sort by confidence score
+    // Sort based on sortOption
     return [...entries].sort((a, b) => {
-      return sortOrder === 'desc'
-        ? b.confidence_score - a.confidence_score
-        : a.confidence_score - b.confidence_score;
+      switch (sortOption) {
+        case 'confidence-desc':
+          return b.confidence_score - a.confidence_score;
+        case 'confidence-asc':
+          return a.confidence_score - b.confidence_score;
+        case 'name-asc':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'date-added':
+          return new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime();
+        default:
+          return b.confidence_score - a.confidence_score;
+      }
     });
-  }, [allEntries, searchQuery, sortOrder]);
+  }, [allEntries, searchQuery, sortOption]);
 
   // Separate excluded entries for the excluded list
   const excludedEntries = useMemo(() => {
@@ -564,123 +582,85 @@ export default function SourceDetailPage() {
         ))}
       </div>
 
-      {/* Filters Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2 relative">
-          {/* Refetching indicator */}
-          {catalogFetching && !catalogLoading && (
-            <div className="absolute -top-6 left-0 flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Updating results...</span>
-            </div>
-          )}
+      {/* Source Toolbar */}
+      <SourceToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        selectedType={filters.artifact_type ?? null}
+        onTypeChange={(type) => setFilters(prev => ({ ...prev, artifact_type: type as ArtifactType | undefined }))}
+        countsByType={catalogData?.pages?.[0]?.counts_by_type ?? {}}
+        sortOption={sortOption}
+        onSortChange={setSortOption}
+        minConfidence={confidenceFilters.minConfidence}
+        maxConfidence={confidenceFilters.maxConfidence}
+        onMinConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, minConfidence: v }))}
+        onMaxConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
+        includeBelowThreshold={confidenceFilters.includeBelowThreshold}
+        onIncludeBelowThresholdChange={(v) =>
+          setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
+        }
+        selectedCount={selectedEntries.size}
+        totalSelectableCount={importableCount}
+        allSelected={selectedEntries.size === importableCount && importableCount > 0}
+        onSelectAll={handleSelectAll}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        hasActiveFilters={
+          !!filters.artifact_type ||
+          !!filters.status ||
+          confidenceFilters.minConfidence !== 50 ||
+          confidenceFilters.maxConfidence !== 100 ||
+          confidenceFilters.includeBelowThreshold ||
+          sortOption !== 'confidence-desc' ||
+          searchQuery.trim() !== ''
+        }
+        onClearFilters={() => {
+          setFilters({});
+          setConfidenceFilters({
+            minConfidence: 50,
+            maxConfidence: 100,
+            includeBelowThreshold: false,
+          });
+          setSortOption('confidence-desc');
+          setSearchQuery('');
+        }}
+      />
 
-          {/* Search */}
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search artifacts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 pl-9"
-            />
-          </div>
-
-          {/* Type filter */}
-          <CatalogTabs
-            countsByType={catalogData?.pages?.[0]?.counts_by_type ?? {}}
-            selectedType={filters.artifact_type ?? null}
-            onTypeChange={(type) => setFilters(prev => ({ ...prev, artifact_type: type as ArtifactType | undefined }))}
-          />
-
-          {/* Confidence filter */}
-          <ConfidenceFilter
-            minConfidence={confidenceFilters.minConfidence}
-            maxConfidence={confidenceFilters.maxConfidence}
-            includeBelowThreshold={confidenceFilters.includeBelowThreshold}
-            onMinChange={(v) => setConfidenceFilters(prev => ({ ...prev, minConfidence: v }))}
-            onMaxChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
-            onIncludeBelowThresholdChange={(v) =>
-              setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
-            }
-          />
-
-          {/* Sort by confidence */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="gap-1"
-          >
-            {sortOrder === 'desc' ? (
-              <ArrowDown className="h-4 w-4" />
-            ) : (
-              <ArrowUp className="h-4 w-4" />
-            )}
-            Confidence
-          </Button>
-
-          {/* Clear filters */}
-          {(filters.artifact_type || filters.status ||
-            confidenceFilters.minConfidence !== 50 ||
-            confidenceFilters.maxConfidence !== 100 ||
-            confidenceFilters.includeBelowThreshold ||
-            sortOrder !== 'desc') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFilters({});
-                setConfidenceFilters({
-                  minConfidence: 50,
-                  maxConfidence: 100,
-                  includeBelowThreshold: false,
-                });
-                setSortOrder('desc');
-              }}
-            >
-              Clear filters
-            </Button>
-          )}
+      {/* Refetching indicator */}
+      {catalogFetching && !catalogLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-4">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>Updating results...</span>
         </div>
+      )}
 
-        {/* Bulk actions */}
-        <div className="flex items-center gap-2">
+      {/* Bulk import action (shown when items selected) */}
+      {selectedEntries.size > 0 && (
+        <div className="flex items-center gap-2 px-4">
           <Button
-            variant="outline"
             size="sm"
-            onClick={handleSelectAll}
-            disabled={importableCount === 0}
+            onClick={handleImportSelected}
+            disabled={importMutation.isPending}
           >
-            <CheckSquare className="mr-2 h-4 w-4" />
-            {selectedEntries.size === importableCount ? 'Deselect All' : 'Select All'}
+            {importMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Import {selectedEntries.size} selected
+              </>
+            )}
           </Button>
-          {selectedEntries.size > 0 && (
-            <Button
-              size="sm"
-              onClick={handleImportSelected}
-              disabled={importMutation.isPending}
-            >
-              {importMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Import {selectedEntries.size} selected
-                </>
-              )}
-            </Button>
-          )}
           {excludedCount > 0 && (
             <span className="text-sm text-muted-foreground">
               {excludedCount} excluded
             </span>
           )}
         </div>
-      </div>
+      )}
 
       {/* Notes Section */}
       {source.notes && (
@@ -697,13 +677,29 @@ export default function SourceDetailPage() {
         </Card>
       )}
 
-      {/* Catalog Grid */}
+      {/* Catalog Grid/List */}
       {catalogLoading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <CatalogCardSkeleton key={i} />
-          ))}
-        </div>
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <CatalogCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <CatalogList
+            entries={[]}
+            sourceId={sourceId}
+            selectedEntries={selectedEntries}
+            onSelectEntry={handleSelectEntry}
+            onImportSingle={handleImportSingle}
+            onEntryClick={(entry) => {
+              setSelectedEntry(entry);
+              setModalOpen(true);
+            }}
+            isImporting={importMutation.isPending}
+            isLoading={true}
+          />
+        )
       ) : filteredEntries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Filter className="mb-4 h-12 w-12 text-muted-foreground" />
@@ -717,23 +713,38 @@ export default function SourceDetailPage() {
       ) : (
         <>
           <div className="max-h-[600px] overflow-y-auto">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredEntries.map((entry) => (
-                <CatalogCard
-                  key={entry.id}
-                  entry={entry}
-                  sourceId={sourceId}
-                  selected={selectedEntries.has(entry.id)}
-                  onSelect={(selected) => handleSelectEntry(entry.id, selected)}
-                  onImport={() => handleImportSingle(entry.id)}
-                  isImporting={importMutation.isPending}
-                  onClick={() => {
-                    setSelectedEntry(entry);
-                    setModalOpen(true);
-                  }}
-                />
-              ))}
-            </div>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredEntries.map((entry) => (
+                  <CatalogCard
+                    key={entry.id}
+                    entry={entry}
+                    sourceId={sourceId}
+                    selected={selectedEntries.has(entry.id)}
+                    onSelect={(selected) => handleSelectEntry(entry.id, selected)}
+                    onImport={() => handleImportSingle(entry.id)}
+                    isImporting={importMutation.isPending}
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setModalOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <CatalogList
+                entries={filteredEntries}
+                sourceId={sourceId}
+                selectedEntries={selectedEntries}
+                onSelectEntry={handleSelectEntry}
+                onImportSingle={handleImportSingle}
+                onEntryClick={(entry) => {
+                  setSelectedEntry(entry);
+                  setModalOpen(true);
+                }}
+                isImporting={importMutation.isPending}
+              />
+            )}
           </div>
 
           {/* Load More */}
