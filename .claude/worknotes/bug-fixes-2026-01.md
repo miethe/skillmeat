@@ -156,7 +156,7 @@
 - **Fix**:
   1. Added `e.stopPropagation()` to AlertDialogAction's onClick handler
   2. Added `onCloseAutoFocus={(e) => e.preventDefault()}` to AlertDialogContent to prevent focus from returning to the card
-- **Commit(s)**: 8079341
+- **Commit(s)**: 4eb6d8a
 - **Status**: RESOLVED
 
 ---
@@ -168,5 +168,5 @@
 - **Location**: `skillmeat/web/components/marketplace/exclude-artifact-dialog.tsx:70-80`
 - **Root Cause**: `AlertDialogDescription` is a Radix UI primitive that renders as a `<p>` element. The description content used `<p>` tags inside it, creating invalid nested paragraph elements in HTML.
 - **Fix**: Changed inner `<p>` tags to `<span className="block">` elements which render as block-level elements but are valid inside a `<p>` parent.
-- **Commit(s)**: 8079341
+- **Commit(s)**: 4eb6d8a
 - **Status**: RESOLVED
