@@ -2,7 +2,8 @@
 type: quick-feature-plan
 feature_slug: marketplace-source-filter-bar
 request_log_id: null
-status: in-progress
+status: completed
+completed_at: 2026-01-03T00:00:00Z
 created: 2026-01-03T00:00:00Z
 estimated_scope: medium
 ---

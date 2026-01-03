@@ -350,7 +350,7 @@ export function useExcludeCatalogEntry(sourceId: string) {
         }
       ),
     onSuccess: (entry) => {
-      queryClient.invalidateQueries({ queryKey: sourceKeys.catalog(sourceId) });
+      queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       toast({
         title: 'Entry excluded',
         description: `${entry.name} has been excluded from the catalog`,
@@ -383,7 +383,7 @@ export function useRestoreCatalogEntry(sourceId: string) {
         }
       ),
     onSuccess: (entry) => {
-      queryClient.invalidateQueries({ queryKey: sourceKeys.catalog(sourceId) });
+      queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       toast({
         title: 'Entry restored',
         description: `${entry.name} has been restored to the catalog`,
