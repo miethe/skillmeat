@@ -35,7 +35,7 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 
 **When you catch yourself about to edit a file**: STOP. Delegate instead.
 
-**File context for subagents**: Provide file paths, not file contents. Subagents can read files themselves at Haiku/Sonnet cost (~96% savings vs Opus reading). Only read files directly when planning decisions require understanding current state.
+**File context for subagents**: Provide file paths, not file contents. Subagents read files themselves. Only read files directly when planning decisions require understanding current state.
 
 ## Documentation Policy
 
@@ -62,32 +62,59 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 
 **Mandatory**: All implementation work MUST be delegated. Opus orchestrates only.
 
+### Model Selection Philosophy
+
+**Default: Opus** — Use Opus for subagents unless criteria below indicate otherwise.
+
+| Model | Use When | Examples |
+|-------|----------|----------|
+| **Opus** (default) | Complex reasoning, architecture decisions, multi-file changes, nuanced judgment | Feature implementation, refactoring, debugging, cross-cutting concerns |
+| **Sonnet** | Moderate complexity, well-scoped tasks, cost-sensitive batches | Single-file fixes, straightforward CRUD, bulk operations |
+| **Haiku** | Simple/mechanical tasks, high-volume ops, quick discovery | File search, status queries, simple doc updates, progress tracking |
+
 ### Exploration & Analysis
 
-| Task | Agent | Model | Use When |
-|------|-------|-------|----------|
-| Find files/patterns | codebase-explorer | Haiku | Quick discovery |
-| Deep analysis | explore | Haiku | Full context needed |
-| Debug investigation | ultrathink-debugger | Sonnet | Complex bugs |
-| Progress tracking | artifact-tracker | Haiku | Create/update progress |
-| Query status | artifact-query | Haiku | Find blockers, pending tasks |
+| Task | Agent | Model | Rationale |
+|------|-------|-------|-----------|
+| Find files/patterns | codebase-explorer | Haiku | Mechanical search, high volume |
+| Deep analysis | explore | Opus | Complex reasoning needed |
+| Debug investigation | ultrathink-debugger | Opus | Root cause analysis requires depth |
+| Progress tracking | artifact-tracker | Haiku | Structured updates, low complexity |
+| Query status | artifact-query | Haiku | Simple data retrieval |
 
 ### Implementation
 
-| Task | Agent | Model | Use When |
-|------|-------|-------|----------|
-| Backend Python | python-backend-engineer | Sonnet | FastAPI, SQLAlchemy, Alembic |
-| Frontend React | ui-engineer | Sonnet | Components, hooks, pages |
-| Full-stack TS | backend-typescript-architect | Sonnet | Node/TS backend |
-| UI components | ui-engineer-enhanced | Sonnet | Design system, Radix |
+| Task | Agent | Model | Rationale |
+|------|-------|-------|-----------|
+| Backend Python | python-backend-engineer | Opus | Architecture awareness, multi-layer changes |
+| Frontend React | ui-engineer | Opus | Component design, state management |
+| Full-stack TS | backend-typescript-architect | Opus | System-wide considerations |
+| UI components | ui-engineer-enhanced | Opus | Design system coherence |
+| Simple bug fixes | python-backend-engineer | Sonnet | Well-scoped, single-file changes |
+| Bulk/batch ops | (any) | Sonnet | Cost efficiency for repetitive tasks |
 
 ### Documentation
 
-| Task | Agent | Model | Use When |
-|------|-------|-------|----------|
-| Most docs (90%) | documentation-writer | Haiku | READMEs, API docs, guides |
-| Complex docs | documentation-complex | Sonnet | Multi-system integration |
-| AI artifacts | ai-artifacts-engineer | Sonnet | Skills, agents, commands |
+| Task | Agent | Model | Rationale |
+|------|-------|-------|-----------|
+| Simple docs | documentation-writer | Haiku | Structured, template-based |
+| Feature docs | documentation-writer | Sonnet | Moderate analysis needed |
+| Complex docs | documentation-complex | Opus | Multi-system synthesis |
+| AI artifacts | ai-artifacts-engineer | Opus | Prompt engineering requires nuance |
+
+### Model Override Guidelines
+
+**Downgrade to Sonnet** when:
+- Task is well-defined with clear boundaries
+- Single file or limited scope
+- Following established patterns (no design decisions)
+- Running 3+ similar tasks in parallel (cost optimization)
+
+**Downgrade to Haiku** when:
+- Task is purely mechanical (search, copy, format)
+- High-volume operations (10+ items)
+- Simple status updates or queries
+- Template-based output
 
 ### Background Execution
 
@@ -116,10 +143,10 @@ Subagents can run in the background, allowing parallel work:
 ```text
 # Bug: API returns 422 error
 
-1. DELEGATE exploration:
-   Task("codebase-explorer", "Find ListItemCreate schema and where it's used")
+1. DELEGATE exploration (Haiku - mechanical search):
+   Task("codebase-explorer", "Find ListItemCreate schema and where it's used", model="haiku")
 
-2. DELEGATE fix:
+2. DELEGATE fix (Opus default - requires understanding context):
    Task("python-backend-engineer", "Fix ListItemCreate schema - make list_id optional.
         File: services/api/app/schemas/list_item.py
         Change: list_id from required to optional (int | None = None)
@@ -127,6 +154,11 @@ Subagents can run in the background, allowing parallel work:
 
 3. COMMIT (Opus does this directly):
    git add ... && git commit
+
+# Feature: Add 5 similar CRUD endpoints (use Sonnet for batch efficiency)
+Task("python-backend-engineer", "Add GET /widgets endpoint", model="sonnet")
+Task("python-backend-engineer", "Add POST /widgets endpoint", model="sonnet")
+# ... parallel batch
 ```
 
 ---
@@ -151,6 +183,7 @@ tasks:
   - id: "TASK-1.1"
     status: "pending"
     assigned_to: ["ui-engineer-enhanced"]  # REQUIRED
+    model: "opus"                           # Optional: opus (default), sonnet, haiku
     dependencies: []                        # REQUIRED
 
 parallelization:
@@ -161,6 +194,7 @@ parallelization:
 **Key Fields** (REQUIRED for every task):
 - `assigned_to`: Array of agents to delegate to
 - `dependencies`: Array of task IDs that must complete first
+- `model`: Optional - defaults to "opus", use "sonnet"/"haiku" per Model Override Guidelines
 
 ### Orchestration Quick Reference
 
