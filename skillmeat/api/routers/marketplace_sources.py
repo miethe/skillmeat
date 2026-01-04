@@ -39,6 +39,8 @@ from skillmeat.api.schemas.marketplace import (
     FileTreeResponse,
     ImportRequest,
     ImportResultDTO,
+    InferUrlRequest,
+    InferUrlResponse,
     ScanRequest,
     ScanResultDTO,
     SourceListResponse,
@@ -293,6 +295,198 @@ def parse_rate_limit_retry_after(error: RateLimitError) -> int:
 
 
 # =============================================================================
+# Shared Scan Logic
+# =============================================================================
+
+
+async def _perform_scan(
+    source: MarketplaceSource,
+    source_repo: MarketplaceSourceRepository,
+    catalog_repo: MarketplaceCatalogRepository,
+    transaction_handler: MarketplaceTransactionHandler,
+) -> ScanResultDTO:
+    """Perform repository scan and update source + catalog atomically.
+
+    Shared by create_source() and rescan_source() endpoints.
+
+    Args:
+        source: MarketplaceSource ORM instance
+        source_repo: Source repository for updates
+        catalog_repo: Catalog repository (unused currently, for future)
+        transaction_handler: Transaction handler for atomic updates
+
+    Returns:
+        ScanResultDTO with scan statistics
+
+    Note:
+        Handles scan errors gracefully - sets source status to "error"
+        and returns error result instead of raising.
+    """
+    source_id = source.id
+
+    # Mark as scanning
+    source.scan_status = "scanning"
+    source_repo.update(source)
+
+    # Perform scan
+    logger.info(f"Scanning repository: {source.repo_url} (ref={source.ref})")
+    scanner = GitHubScanner()
+
+    try:
+        scan_result = scanner.scan_repository(
+            owner=source.owner,
+            repo=source.repo_name,
+            ref=source.ref,
+            root_hint=source.root_hint,
+        )
+
+        # Update source and catalog atomically
+        with transaction_handler.scan_update_transaction(source_id) as ctx:
+            # Update source status
+            ctx.update_source_status(
+                status="success",
+                artifact_count=scan_result.artifacts_found,
+                error_message=None,
+            )
+
+            # Convert detected artifacts to catalog entries
+            new_entries = []
+            for artifact in scan_result.artifacts:
+                entry = MarketplaceCatalogEntry(
+                    id=str(uuid.uuid4()),
+                    source_id=source_id,
+                    artifact_type=artifact.artifact_type,
+                    name=artifact.name,
+                    path=artifact.path,
+                    upstream_url=artifact.upstream_url,
+                    confidence_score=artifact.confidence_score,
+                    detected_sha=artifact.detected_sha,
+                    detected_at=datetime.utcnow(),
+                    status="new",
+                )
+                new_entries.append(entry)
+
+            # Replace with new entries (full replacement for now)
+            # TODO: Implement incremental diff updates in future
+            ctx.replace_catalog_entries(new_entries)
+
+        # Set source_id in result
+        scan_result.source_id = source_id
+
+        logger.info(
+            f"Scan completed for {source.repo_url}: "
+            f"{scan_result.artifacts_found} artifacts found"
+        )
+        return scan_result
+
+    except Exception as scan_error:
+        # Mark as error
+        with transaction_handler.scan_update_transaction(source_id) as ctx:
+            ctx.update_source_status(
+                status="error",
+                error_message=str(scan_error),
+            )
+
+        logger.error(
+            f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True
+        )
+
+        # Return error result (don't raise - let caller decide)
+        return ScanResultDTO(
+            source_id=source_id,
+            status="error",
+            artifacts_found=0,
+            new_count=0,
+            updated_count=0,
+            removed_count=0,
+            unchanged_count=0,
+            scan_duration_ms=0,
+            errors=[str(scan_error)],
+            scanned_at=datetime.utcnow(),
+        )
+
+
+# =============================================================================
+# API-000: URL Inference Utility
+# =============================================================================
+
+
+@router.post("/infer-url", response_model=InferUrlResponse)
+async def infer_github_url(request: InferUrlRequest) -> InferUrlResponse:
+    """Infer GitHub repository structure from a full URL.
+
+    Parses GitHub URLs to extract repository URL, branch/tag, and subdirectory path.
+    Supports various GitHub URL formats:
+    - https://github.com/owner/repo
+    - https://github.com/owner/repo/tree/branch
+    - https://github.com/owner/repo/tree/branch/path/to/dir
+    - https://github.com/owner/repo/blob/ref/path/to/file
+
+    Args:
+        request: URL to parse
+
+    Returns:
+        Inferred repository structure or error message
+
+    Example:
+        Input: https://github.com/davila7/claude-code-templates/tree/main/cli-tool/components
+        Output: {
+            "success": true,
+            "repo_url": "https://github.com/davila7/claude-code-templates",
+            "ref": "main",
+            "root_hint": "cli-tool/components"
+        }
+    """
+    url = request.url.strip()
+
+    # Pattern for GitHub URLs
+    # Matches: github.com/owner/repo[.git][/(tree|blob)/ref[/path...]]
+    github_pattern = re.compile(
+        r"^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/(tree|blob)/([^/]+)(?:/(.*))?)?$"
+    )
+
+    match = github_pattern.match(url)
+
+    if not match:
+        logger.info(f"Failed to parse GitHub URL: {url}")
+        return InferUrlResponse(
+            success=False,
+            error="Invalid GitHub URL format. Expected: https://github.com/owner/repo[/tree/branch[/path]]",
+        )
+
+    owner, repo, url_type, ref, path = match.groups()
+
+    # Build base repo URL (without .git suffix)
+    repo_url = f"https://github.com/{owner}/{repo}"
+
+    # Default ref to "main" if not specified
+    ref = ref or "main"
+
+    # For blob URLs (file links), extract directory path by removing filename
+    root_hint = None
+    if path:
+        if url_type == "blob":
+            # Remove filename from path (e.g., "path/to/file.py" -> "path/to")
+            path_parts = path.rsplit("/", 1)
+            root_hint = path_parts[0] if len(path_parts) > 1 else None
+        else:
+            # Tree URL - use path as-is
+            root_hint = path
+
+    logger.info(
+        f"Successfully parsed GitHub URL: {url} -> repo={repo_url}, ref={ref}, root_hint={root_hint}"
+    )
+
+    return InferUrlResponse(
+        success=True,
+        repo_url=repo_url,
+        ref=ref,
+        root_hint=root_hint,
+        error=None,
+    )
+
+
+# =============================================================================
 # API-001: Sources CRUD
 # =============================================================================
 
@@ -306,7 +500,11 @@ def parse_rate_limit_retry_after(error: RateLimitError) -> int:
     Add a new GitHub repository as a marketplace source for artifact scanning.
 
     The repository URL must be a valid GitHub URL (https://github.com/owner/repo).
-    After creation, use the /rescan endpoint to trigger the initial scan.
+    An initial scan is automatically triggered upon creation. The response includes
+    the scan status and artifact count.
+
+    If the initial scan fails, the source is still created with scan_status="error".
+    You can retry scanning using the /rescan endpoint.
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -371,6 +569,27 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     try:
         created = source_repo.create(source)
         logger.info(f"Created marketplace source: {created.id} ({created.repo_url})")
+
+        # Trigger initial scan
+        logger.info(f"Triggering initial scan for source: {created.id}")
+        catalog_repo = MarketplaceCatalogRepository()
+        transaction_handler = MarketplaceTransactionHandler()
+
+        scan_result = await _perform_scan(
+            source=created,
+            source_repo=source_repo,
+            catalog_repo=catalog_repo,
+            transaction_handler=transaction_handler,
+        )
+
+        # Refresh source to get updated scan_status and artifact_count
+        created = source_repo.get_by_id(created.id)
+
+        logger.info(
+            f"Initial scan completed for {created.id}: "
+            f"status={scan_result.status}, artifacts={scan_result.artifacts_found}"
+        )
+
         return source_to_response(created)
     except Exception as e:
         logger.error(f"Failed to create source: {e}", exc_info=True)
@@ -674,86 +893,15 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
                 detail=f"Source with ID '{source_id}' not found",
             )
 
-        # Mark as scanning
-        source.scan_status = "scanning"
-        source_repo.update(source)
+        # Perform scan using shared helper
+        scan_result = await _perform_scan(
+            source=source,
+            source_repo=source_repo,
+            catalog_repo=catalog_repo,
+            transaction_handler=transaction_handler,
+        )
 
-        # Perform scan
-        logger.info(f"Scanning repository: {source.repo_url} (ref={source.ref})")
-        scanner = GitHubScanner()
-
-        try:
-            scan_result = scanner.scan_repository(
-                owner=source.owner,
-                repo=source.repo_name,
-                ref=source.ref,
-                root_hint=source.root_hint,
-            )
-
-            # Update source and catalog atomically
-            with transaction_handler.scan_update_transaction(source_id) as ctx:
-                # Update source status
-                ctx.update_source_status(
-                    status="success",
-                    artifact_count=scan_result.artifacts_found,
-                    error_message=None,
-                )
-
-                # Convert detected artifacts to catalog entries
-                new_entries = []
-                for artifact in scan_result.artifacts:
-                    entry = MarketplaceCatalogEntry(
-                        id=str(uuid.uuid4()),
-                        source_id=source_id,
-                        artifact_type=artifact.artifact_type,
-                        name=artifact.name,
-                        path=artifact.path,
-                        upstream_url=artifact.upstream_url,
-                        confidence_score=artifact.confidence_score,
-                        detected_sha=artifact.detected_sha,
-                        detected_at=datetime.utcnow(),
-                        status="new",
-                    )
-                    new_entries.append(entry)
-
-                # Replace with new entries (full replacement for now)
-                # TODO: Implement incremental diff updates in future
-                ctx.replace_catalog_entries(new_entries)
-
-            # Set source_id in result
-            scan_result.source_id = source_id
-
-            logger.info(
-                f"Scan completed for {source.repo_url}: "
-                f"{scan_result.artifacts_found} artifacts found"
-            )
-            return scan_result
-
-        except Exception as scan_error:
-            # Mark as error
-            with transaction_handler.scan_update_transaction(source_id) as ctx:
-                ctx.update_source_status(
-                    status="error",
-                    error_message=str(scan_error),
-                )
-
-            logger.error(
-                f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True
-            )
-
-            # Return error result
-            return ScanResultDTO(
-                source_id=source_id,
-                status="error",
-                artifacts_found=0,
-                new_count=0,
-                updated_count=0,
-                removed_count=0,
-                unchanged_count=0,
-                scan_duration_ms=0,
-                errors=[str(scan_error)],
-                scanned_at=datetime.utcnow(),
-            )
+        return scan_result
 
     except HTTPException:
         raise
