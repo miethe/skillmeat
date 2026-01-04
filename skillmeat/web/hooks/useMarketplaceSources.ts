@@ -26,7 +26,6 @@ import type {
   ScanResult,
   ImportRequest,
   ImportResult,
-  InferUrlResponse,
 } from '@/types/marketplace';
 
 // Query keys factory
