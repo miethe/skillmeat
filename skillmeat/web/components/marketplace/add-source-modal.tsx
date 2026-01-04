@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCreateSource, useInferUrl } from '@/hooks/useMarketplaceSources';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { TrustLevel } from '@/types/marketplace';
@@ -57,7 +57,13 @@ export function AddSourceModal({
   const createSource = useCreateSource();
   const inferUrl = useInferUrl();
 
-  // Debounced inference
+  // Stable reference to mutation function to avoid infinite loop
+  const inferUrlRef = useRef(inferUrl.mutateAsync);
+  useEffect(() => {
+    inferUrlRef.current = inferUrl.mutateAsync;
+  });
+
+  // Debounced inference - only triggers when quickImportUrl changes
   useEffect(() => {
     if (!quickImportUrl) {
       setInferError(null);
@@ -67,7 +73,7 @@ export function AddSourceModal({
     const timer = setTimeout(async () => {
       try {
         setInferError(null);
-        const result = await inferUrl.mutateAsync(quickImportUrl);
+        const result = await inferUrlRef.current(quickImportUrl);
 
         if (result.success && result.repo_url) {
           // Auto-populate manual fields
@@ -83,7 +89,7 @@ export function AddSourceModal({
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [quickImportUrl, inferUrl]);
+  }, [quickImportUrl]);
 
   const handleQuickImport = async () => {
     if (!repoUrl) return;
