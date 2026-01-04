@@ -170,3 +170,47 @@
 - **Fix**: Changed inner `<p>` tags to `<span className="block">` elements which render as block-level elements but are valid inside a `<p>` parent.
 - **Commit(s)**: 4eb6d8a
 - **Status**: RESOLVED
+
+---
+
+## 2026-01-04
+
+### Infinite API Calls on Quick Import URL Field (Modal Flickering)
+
+**Issue**: Adding a URL to the Quick Import field in the Add Source modal caused constant flickering. The app repeatedly hit `POST /api/v1/marketplace/sources/infer-url` in an infinite loop rather than once per URL change.
+
+- **Location**: `skillmeat/web/components/marketplace/add-source-modal.tsx:61-86`
+- **Root Cause**: The `useEffect` that handles debounced URL inference included `inferUrl` (the mutation object from `useMutation`) in its dependency array:
+
+  ```typescript
+  useEffect(() => {
+    // ... debounce logic calling inferUrl.mutateAsync
+  }, [quickImportUrl, inferUrl]);  // ← Problem: inferUrl in deps
+  ```
+
+  When `mutateAsync` is called, the mutation state changes (`isPending` becomes true, then false, etc.), creating a new object reference. This causes the effect to re-run, triggering another debounce, which calls the API again... creating an infinite loop.
+
+  **Cycle**: `inferUrl.mutateAsync()` → state changes → new `inferUrl` ref → effect re-runs → repeat
+
+- **Fix**: Removed `inferUrl` from the dependency array and used a `useRef` to hold a stable reference to the mutation function:
+
+  ```typescript
+  // Stable reference to mutation function
+  const inferUrlRef = useRef(inferUrl.mutateAsync);
+  useEffect(() => {
+    inferUrlRef.current = inferUrl.mutateAsync;
+  });
+
+  // Debounce effect now only depends on quickImportUrl
+  useEffect(() => {
+    // ... uses inferUrlRef.current instead of inferUrl.mutateAsync
+  }, [quickImportUrl]);  // ← Only depends on URL
+  ```
+
+  The first effect (no deps) keeps the ref updated on every render. The debounce effect only re-runs when the URL actually changes.
+
+- **Files Modified**:
+  - `skillmeat/web/components/marketplace/add-source-modal.tsx` (added useRef import, ref pattern, updated deps)
+
+- **Commit(s)**: 30b0565
+- **Status**: RESOLVED
