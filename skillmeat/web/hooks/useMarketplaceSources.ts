@@ -271,7 +271,7 @@ export function useImportArtifacts(sourceId: string) {
         body: JSON.stringify(data),
       }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: sourceKeys.catalog(sourceId) });
+      queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] }); // Invalidate collection
 
       const message = [
