@@ -363,11 +363,35 @@ class TestCreateSource:
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "already exists" in response.json()["detail"]
 
-    def test_create_source_default_values(self, client, mock_source_repo):
+    def test_create_source_default_values(self, client, mock_source_repo, mock_source):
         """Test creating source uses default values for optional fields."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
+        # Mock the scan function to avoid complex dependencies
+        async def mock_perform_scan(*args, **kwargs):
+            # Update mock source to success status
+            mock_source.scan_status = "success"
+            mock_source.artifact_count = 0
+            return ScanResultDTO(
+                source_id="src_test_123",
+                status="success",
+                artifacts_found=0,
+                new_count=0,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                scan_duration_ms=100.0,
+                errors=[],
+                scanned_at=datetime(2025, 12, 6, 10, 35, 0),
+            )
+
+        with (
+            patch(
+                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+                return_value=mock_source_repo,
+            ),
+            patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ),
         ):
             response = client.post(
                 "/api/v1/marketplace/sources",
@@ -514,8 +538,23 @@ class TestUpdateSource:
 
     def test_update_source_ref(self, client, mock_source_repo, mock_source):
         """Test updating source ref (branch/tag/SHA)."""
-        updated_source = MarketplaceSource(**mock_source.__dict__)
-        updated_source.ref = "v1.0.0"
+        # Create a copy by extracting only the data attributes (not SQLAlchemy state)
+        updated_source = MarketplaceSource(
+            id=mock_source.id,
+            repo_url=mock_source.repo_url,
+            owner=mock_source.owner,
+            repo_name=mock_source.repo_name,
+            ref="v1.0.0",  # Updated value
+            root_hint=mock_source.root_hint,
+            trust_level=mock_source.trust_level,
+            visibility=mock_source.visibility,
+            scan_status=mock_source.scan_status,
+            artifact_count=mock_source.artifact_count,
+            last_sync_at=mock_source.last_sync_at,
+            created_at=mock_source.created_at,
+            updated_at=mock_source.updated_at,
+            enable_frontmatter_detection=mock_source.enable_frontmatter_detection,
+        )
         mock_source_repo.update.return_value = updated_source
 
         with patch(
@@ -523,7 +562,8 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123?ref=v1.0.0"
+                "/api/v1/marketplace/sources/src_test_123",
+                json={"ref": "v1.0.0"}
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -532,8 +572,22 @@ class TestUpdateSource:
 
     def test_update_source_root_hint(self, client, mock_source_repo, mock_source):
         """Test updating source root_hint."""
-        updated_source = MarketplaceSource(**mock_source.__dict__)
-        updated_source.root_hint = "artifacts"
+        updated_source = MarketplaceSource(
+            id=mock_source.id,
+            repo_url=mock_source.repo_url,
+            owner=mock_source.owner,
+            repo_name=mock_source.repo_name,
+            ref=mock_source.ref,
+            root_hint="artifacts",  # Updated value
+            trust_level=mock_source.trust_level,
+            visibility=mock_source.visibility,
+            scan_status=mock_source.scan_status,
+            artifact_count=mock_source.artifact_count,
+            last_sync_at=mock_source.last_sync_at,
+            created_at=mock_source.created_at,
+            updated_at=mock_source.updated_at,
+            enable_frontmatter_detection=mock_source.enable_frontmatter_detection,
+        )
         mock_source_repo.update.return_value = updated_source
 
         with patch(
@@ -541,7 +595,8 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123?root_hint=artifacts"
+                "/api/v1/marketplace/sources/src_test_123",
+                json={"root_hint": "artifacts"}
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -550,8 +605,22 @@ class TestUpdateSource:
 
     def test_update_source_trust_level(self, client, mock_source_repo, mock_source):
         """Test updating source trust level."""
-        updated_source = MarketplaceSource(**mock_source.__dict__)
-        updated_source.trust_level = "official"
+        updated_source = MarketplaceSource(
+            id=mock_source.id,
+            repo_url=mock_source.repo_url,
+            owner=mock_source.owner,
+            repo_name=mock_source.repo_name,
+            ref=mock_source.ref,
+            root_hint=mock_source.root_hint,
+            trust_level="official",  # Updated value
+            visibility=mock_source.visibility,
+            scan_status=mock_source.scan_status,
+            artifact_count=mock_source.artifact_count,
+            last_sync_at=mock_source.last_sync_at,
+            created_at=mock_source.created_at,
+            updated_at=mock_source.updated_at,
+            enable_frontmatter_detection=mock_source.enable_frontmatter_detection,
+        )
         mock_source_repo.update.return_value = updated_source
 
         with patch(
@@ -559,7 +628,8 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123?trust_level=official"
+                "/api/v1/marketplace/sources/src_test_123",
+                json={"trust_level": "official"}
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -568,9 +638,22 @@ class TestUpdateSource:
 
     def test_update_source_multiple_fields(self, client, mock_source_repo, mock_source):
         """Test updating multiple source fields at once."""
-        updated_source = MarketplaceSource(**mock_source.__dict__)
-        updated_source.ref = "develop"
-        updated_source.trust_level = "verified"
+        updated_source = MarketplaceSource(
+            id=mock_source.id,
+            repo_url=mock_source.repo_url,
+            owner=mock_source.owner,
+            repo_name=mock_source.repo_name,
+            ref="develop",  # Updated value
+            root_hint=mock_source.root_hint,
+            trust_level="verified",  # Updated value
+            visibility=mock_source.visibility,
+            scan_status=mock_source.scan_status,
+            artifact_count=mock_source.artifact_count,
+            last_sync_at=mock_source.last_sync_at,
+            created_at=mock_source.created_at,
+            updated_at=mock_source.updated_at,
+            enable_frontmatter_detection=mock_source.enable_frontmatter_detection,
+        )
         mock_source_repo.update.return_value = updated_source
 
         with patch(
@@ -578,7 +661,8 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/src_test_123?ref=develop&trust_level=verified"
+                "/api/v1/marketplace/sources/src_test_123",
+                json={"ref": "develop", "trust_level": "verified"}
             )
 
         assert response.status_code == status.HTTP_200_OK
@@ -592,7 +676,10 @@ class TestUpdateSource:
             "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
             return_value=mock_source_repo,
         ):
-            response = client.patch("/api/v1/marketplace/sources/src_test_123")
+            response = client.patch(
+                "/api/v1/marketplace/sources/src_test_123",
+                json={}  # Empty body - no update parameters
+            )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "At least one update parameter" in response.json()["detail"]
@@ -606,7 +693,8 @@ class TestUpdateSource:
             return_value=mock_source_repo,
         ):
             response = client.patch(
-                "/api/v1/marketplace/sources/nonexistent?ref=main"
+                "/api/v1/marketplace/sources/nonexistent",
+                json={"ref": "main"}
             )
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
