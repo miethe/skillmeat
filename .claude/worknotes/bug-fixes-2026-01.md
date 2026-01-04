@@ -212,5 +212,5 @@
 - **Files Modified**:
   - `skillmeat/web/components/marketplace/add-source-modal.tsx` (added useRef import, ref pattern, updated deps)
 
-- **Commit(s)**: 30b0565
+- **Commit(s)**: c1fc781
 - **Status**: RESOLVED
