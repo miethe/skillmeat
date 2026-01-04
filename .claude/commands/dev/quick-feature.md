@@ -77,7 +77,7 @@ estimated_scope: small|medium
 
 ## Affected Files
 - {file1}: {change description}
-- {file2}: {change description}
+- {file2}: {change description} 
 
 ## Implementation Steps
 1. {step} → @{agent-name}
