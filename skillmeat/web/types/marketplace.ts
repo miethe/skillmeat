@@ -236,3 +236,11 @@ export interface ImportResult {
   skipped_ids: string[];
   errors: Array<{ entry_id: string; error: string }>;
 }
+
+export interface InferUrlResponse {
+  success: boolean;
+  repo_url: string | null;
+  ref: string | null;
+  root_hint: string | null;
+  error: string | null;
+}

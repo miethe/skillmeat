@@ -13,6 +13,7 @@ import {
 } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 import { apiRequest } from '@/lib/api';
+import { inferUrl } from '@/lib/api/marketplace';
 import type {
   GitHubSource,
   GitHubSourceListResponse,
@@ -25,6 +26,7 @@ import type {
   ScanResult,
   ImportRequest,
   ImportResult,
+  InferUrlResponse,
 } from '@/types/marketplace';
 
 // Query keys factory
@@ -396,5 +398,18 @@ export function useRestoreCatalogEntry(sourceId: string) {
         variant: 'destructive',
       });
     },
+  });
+}
+
+// ============================================================================
+// URL Inference Operations
+// ============================================================================
+
+/**
+ * Infer repository structure from GitHub URL
+ */
+export function useInferUrl() {
+  return useMutation({
+    mutationFn: async (url: string) => inferUrl(url),
   });
 }

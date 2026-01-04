@@ -622,6 +622,76 @@ class CreateSourceRequest(BaseModel):
         }
 
 
+class InferUrlRequest(BaseModel):
+    """Request to infer GitHub source structure from a full URL.
+
+    Supports parsing GitHub URLs to extract repository, ref, and subdirectory.
+    """
+
+    url: str = Field(
+        description="GitHub URL to parse (full URL with branch/path or basic repo URL)",
+        examples=[
+            "https://github.com/owner/repo",
+            "https://github.com/owner/repo/tree/main",
+            "https://github.com/owner/repo/tree/main/path/to/dir",
+        ],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "url": "https://github.com/davila7/claude-code-templates/tree/main/cli-tool/components"
+            }
+        }
+
+
+class InferUrlResponse(BaseModel):
+    """Response containing inferred GitHub source structure.
+
+    Returns parsed components or error message if parsing failed.
+    """
+
+    success: bool = Field(
+        description="Whether URL was successfully parsed",
+        examples=[True],
+    )
+    repo_url: Optional[str] = Field(
+        default=None,
+        description="Base repository URL (e.g., https://github.com/owner/repo)",
+        examples=["https://github.com/owner/repo"],
+    )
+    ref: Optional[str] = Field(
+        default=None,
+        description="Branch, tag, or SHA extracted from URL (defaults to 'main' if not specified)",
+        examples=["main", "v1.0.0", "abc123"],
+    )
+    root_hint: Optional[str] = Field(
+        default=None,
+        description="Subdirectory path within repository (None if URL points to repo root)",
+        examples=["cli-tool/components", "skills"],
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if parsing failed (None on success)",
+        examples=["Invalid GitHub URL format"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "repo_url": "https://github.com/davila7/claude-code-templates",
+                "ref": "main",
+                "root_hint": "cli-tool/components",
+                "error": None,
+            }
+        }
+
+
 class UpdateSourceRequest(BaseModel):
     """Request to update a GitHub repository source.
 

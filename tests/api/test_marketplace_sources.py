@@ -72,6 +72,7 @@ def mock_source():
         last_sync_at=datetime(2025, 12, 6, 10, 30, 0),
         created_at=datetime(2025, 12, 5, 9, 0, 0),
         updated_at=datetime(2025, 12, 6, 10, 30, 0),
+        enable_frontmatter_detection=False,
     )
 
 
@@ -201,11 +202,35 @@ def mock_import_coordinator():
 class TestCreateSource:
     """Test POST /marketplace/sources endpoint."""
 
-    def test_create_source_success(self, client, mock_source_repo):
-        """Test creating a new GitHub source with valid URL."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
+    def test_create_source_success(self, client, mock_source_repo, mock_source):
+        """Test creating a new GitHub source with valid URL and auto-scan."""
+        # Mock the scan function to avoid complex dependencies
+        async def mock_perform_scan(*args, **kwargs):
+            # Update mock source to success status
+            mock_source.scan_status = "success"
+            mock_source.artifact_count = 5
+            return ScanResultDTO(
+                source_id="src_test_123",
+                status="success",
+                artifacts_found=5,
+                new_count=5,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                scan_duration_ms=1234.56,
+                errors=[],
+                scanned_at=datetime(2025, 12, 6, 10, 35, 0),
+            )
+
+        with (
+            patch(
+                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+                return_value=mock_source_repo,
+            ),
+            patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ),
         ):
             response = client.post(
                 "/api/v1/marketplace/sources",
@@ -229,12 +254,35 @@ class TestCreateSource:
         assert data["root_hint"] == "skills"
         assert data["trust_level"] == "verified"
         assert data["scan_status"] == "success"
+        assert data["artifact_count"] == 5
 
-    def test_create_source_with_manual_map(self, client, mock_source_repo):
+    def test_create_source_with_manual_map(self, client, mock_source_repo, mock_source):
         """Test creating source with manual artifact mapping."""
-        with patch(
-            "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
-            return_value=mock_source_repo,
+        # Mock the scan function
+        async def mock_perform_scan(*args, **kwargs):
+            mock_source.scan_status = "success"
+            return ScanResultDTO(
+                source_id="src_test_123",
+                status="success",
+                artifacts_found=2,
+                new_count=2,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                scan_duration_ms=1000.0,
+                errors=[],
+                scanned_at=datetime(2025, 12, 6, 10, 35, 0),
+            )
+
+        with (
+            patch(
+                "skillmeat.api.routers.marketplace_sources.MarketplaceSourceRepository",
+                return_value=mock_source_repo,
+            ),
+            patch(
+                "skillmeat.api.routers.marketplace_sources._perform_scan",
+                side_effect=mock_perform_scan,
+            ),
         ):
             response = client.post(
                 "/api/v1/marketplace/sources",
