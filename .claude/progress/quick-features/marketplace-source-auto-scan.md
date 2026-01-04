@@ -2,8 +2,9 @@
 type: quick-feature-plan
 feature_slug: marketplace-source-auto-scan
 request_log_id: REQ-20260104-skillmeat-01
-status: in-progress
+status: completed
 created: 2026-01-04T19:30:00Z
+completed_at: 2026-01-04T20:15:00Z
 estimated_scope: medium
 ---
 
@@ -56,9 +57,9 @@ Two enhancements to /marketplace/sources/ flow:
 - Test fallback to manual entry when inference fails
 
 ## Completion Criteria
-- [ ] Adding source via auto-import triggers immediate scan
-- [ ] UI updates automatically when scan completes
-- [ ] URL inference works for standard GitHub tree URLs
-- [ ] Manual entry fields still work as before
-- [ ] Error handling for failed inference shows helpful message
-- [ ] Build and tests pass
+- [x] Adding source via auto-import triggers immediate scan
+- [x] UI updates automatically when scan completes
+- [x] URL inference works for standard GitHub tree URLs
+- [x] Manual entry fields still work as before
+- [x] Error handling for failed inference shows helpful message
+- [x] Build and tests pass
