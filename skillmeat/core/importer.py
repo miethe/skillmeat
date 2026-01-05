@@ -3,10 +3,23 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from skillmeat.api.schemas.discovery import ImportStatus
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
+
+if TYPE_CHECKING:
+    from skillmeat.api.schemas.discovery import ImportStatus
+
+
+# Local ImportStatus enum to avoid circular import
+class ImportStatus(str, Enum):
+    """Status of an import operation (local definition to avoid circular import)."""
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 from skillmeat.core.collection import CollectionManager
 from skillmeat.core.discovery_metrics import (
     bulk_import_artifacts_total,
@@ -48,6 +61,7 @@ class ImportResultData:
     error: Optional[str] = None
     status: Optional[ImportStatus] = None
     skip_reason: Optional[str] = None
+    tags_applied: int = 0  # Count of tags applied from path segments
 
 
 @dataclass
@@ -59,6 +73,7 @@ class BulkImportResultData:
     total_failed: int
     results: List[ImportResultData]
     duration_ms: float
+    total_tags_applied: int = 0  # Sum of tags applied across all imports
 
 
 class ArtifactImporter:
@@ -126,6 +141,7 @@ class ArtifactImporter:
         artifacts: List[BulkImportArtifactData],
         collection_name: str = "default",
         auto_resolve_conflicts: bool = False,
+        apply_path_tags: bool = True,
     ) -> BulkImportResultData:
         """
         Import multiple artifacts with atomic transaction.
@@ -234,6 +250,16 @@ class ArtifactImporter:
 
                 # Import the artifact
                 result = self._import_single(artifact, collection_name)
+
+                # Apply path tags if enabled and import succeeded
+                if apply_path_tags and result.success:
+                    try:
+                        tags_count = self._apply_path_tags(artifact, collection_name)
+                        result.tags_applied = tags_count
+                    except Exception as e:
+                        logger.warning(f"Failed to apply path tags for {artifact.name}: {e}")
+                        # Don't fail the import, just log the warning
+
                 results.append(result)
                 if result.success:
                     imported_count += 1
@@ -289,13 +315,99 @@ class ArtifactImporter:
             }
         )
 
+        # Calculate total tags applied
+        total_tags = sum(r.tags_applied for r in results)
+
         return BulkImportResultData(
             total_requested=len(artifacts),
             total_imported=imported_count,
             total_failed=failed_count,
             results=results,
             duration_ms=duration_ms,
+            total_tags_applied=total_tags,
         )
+
+    def _apply_path_tags(
+        self,
+        artifact: BulkImportArtifactData,
+        collection_name: str,
+    ) -> int:
+        """Apply path-based tags to an imported artifact.
+
+        Extracts path segments from the artifact's source path,
+        finds approved/pending segments, and adds them as tags.
+
+        Args:
+            artifact: The imported artifact data
+            collection_name: Target collection name
+
+        Returns:
+            Number of tags applied
+
+        Note:
+            Only applies segments with status='approved' or 'pending'.
+            Skips if artifact has no path or path extraction fails.
+        """
+        from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
+
+        # Need a path to extract from
+        source_path = artifact.path or artifact.source
+        if not source_path:
+            return 0
+
+        # Extract segments
+        extractor = PathSegmentExtractor(PathTagConfig.defaults())
+        segments = extractor.extract(source_path)
+
+        # Filter to approved/pending segments (not excluded)
+        # For initial import, "pending" is treated as approved since user selected them
+        approved_segments = [
+            seg.normalized for seg in segments
+            if seg.status in ("approved", "pending") and seg.status != "excluded"
+        ]
+
+        if not approved_segments:
+            return 0
+
+        # Get artifact name for tagging
+        artifact_name = artifact.name or artifact.source.split("/")[-1].split("@")[0]
+        artifact_type_str = artifact.artifact_type
+
+        # Add tags to artifact in collection
+        try:
+            artifact_type = ArtifactType(artifact_type_str)
+
+            # Load collection and find the artifact
+            collection = self.collection_manager.load_collection(collection_name)
+            target_artifact = collection.find_artifact(artifact_name, artifact_type)
+
+            if not target_artifact:
+                logger.warning(f"Could not find artifact {artifact_name} to apply tags")
+                return 0
+
+            # Add each unique tag
+            tags_added = 0
+            existing_tags = set(target_artifact.tags or [])
+
+            for tag_name in approved_segments:
+                if tag_name not in existing_tags:
+                    existing_tags.add(tag_name)
+                    tags_added += 1
+
+            # Update artifact tags if any were added
+            if tags_added > 0:
+                target_artifact.tags = list(existing_tags)
+                self.collection_manager.save_collection(collection, collection_name)
+                logger.info(
+                    f"Applied {tags_added} path tags to {artifact_name}: "
+                    f"{approved_segments[:3]}{'...' if len(approved_segments) > 3 else ''}"
+                )
+
+            return tags_added
+
+        except Exception as e:
+            logger.warning(f"Error applying path tags to {artifact_name}: {e}")
+            return 0
 
     def _get_artifact_id(self, artifact: BulkImportArtifactData) -> str:
         """Generate artifact ID from artifact data.

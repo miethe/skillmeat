@@ -864,6 +864,7 @@ async def bulk_import_artifacts(
             artifacts=artifacts_data,
             collection_name=collection_name,
             auto_resolve_conflicts=request.auto_resolve_conflicts,
+            apply_path_tags=request.apply_path_tags,
         )
 
         logger.info(
@@ -881,6 +882,7 @@ async def bulk_import_artifacts(
                 message=r.message,
                 error=r.error,
                 skip_reason=r.skip_reason,
+                tags_applied=r.tags_applied,
             )
             for r in result_data.results
         ]
@@ -986,6 +988,7 @@ async def bulk_import_artifacts(
             total_failed=result_data.total_failed,
             imported_to_collection=result_data.total_imported,  # All successful imports go to collection
             added_to_project=0,  # TODO: Track project deployments separately
+            total_tags_applied=result_data.total_tags_applied,
             results=results,
             duration_ms=result_data.duration_ms,
         )
