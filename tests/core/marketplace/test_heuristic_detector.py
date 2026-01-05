@@ -1902,3 +1902,182 @@ class TestSingleFileArtifacts:
             == "https://github.com/user/repo/tree/main/commands/use-mcp.md"
         )
         assert artifacts[0].detected_sha == "abc123"
+
+
+class TestManualMappings:
+    """Test suite for manual directory-to-type mappings (P2.1a/P2.1b)."""
+
+    def test_string_to_artifact_type(self):
+        """Test _string_to_artifact_type converts strings correctly."""
+        detector = HeuristicDetector()
+
+        assert detector._string_to_artifact_type("skill") == ArtifactType.SKILL
+        assert detector._string_to_artifact_type("SKILL") == ArtifactType.SKILL
+        assert detector._string_to_artifact_type("command") == ArtifactType.COMMAND
+        assert detector._string_to_artifact_type("agent") == ArtifactType.AGENT
+        assert detector._string_to_artifact_type("mcp_server") == ArtifactType.MCP_SERVER
+        assert detector._string_to_artifact_type("mcp-server") == ArtifactType.MCP_SERVER
+        assert detector._string_to_artifact_type("hook") == ArtifactType.HOOK
+        assert detector._string_to_artifact_type("invalid") is None
+        assert detector._string_to_artifact_type("") is None
+
+    def test_exact_match(self):
+        """Test exact path matching."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill", "cmds": "command"})
+
+        result = detector._check_manual_mapping("skills")
+        assert result == (ArtifactType.SKILL, "exact")
+
+        result = detector._check_manual_mapping("cmds")
+        assert result == (ArtifactType.COMMAND, "exact")
+
+    def test_prefix_match(self):
+        """Test prefix path matching with / separator."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+
+        result = detector._check_manual_mapping("skills/canvas")
+        assert result == (ArtifactType.SKILL, "prefix")
+
+        result = detector._check_manual_mapping("skills/canvas/deep/nested")
+        assert result == (ArtifactType.SKILL, "prefix")
+
+    def test_no_partial_name_match(self):
+        """Test that partial name matches are NOT allowed."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+
+        # These should NOT match (partial name, not prefix with /)
+        assert detector._check_manual_mapping("my-skills") is None
+        assert detector._check_manual_mapping("skillset") is None
+        assert detector._check_manual_mapping("other/skills") is None
+
+    def test_no_match_when_unmapped(self):
+        """Test that unmapped paths return None."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+
+        assert detector._check_manual_mapping("commands") is None
+        assert detector._check_manual_mapping("agents/helper") is None
+
+    def test_no_mappings_returns_none(self):
+        """Test that no mappings always returns None."""
+        detector = HeuristicDetector()
+        assert detector._check_manual_mapping("skills") is None
+        assert detector._check_manual_mapping("anything") is None
+
+    def test_trailing_slash_normalization(self):
+        """Test that trailing slashes are normalized."""
+        detector = HeuristicDetector(manual_mappings={"skills/": "skill"})
+
+        # Should still match exact
+        result = detector._check_manual_mapping("skills")
+        assert result == (ArtifactType.SKILL, "exact")
+
+        # Should still match prefix
+        result = detector._check_manual_mapping("skills/canvas")
+        assert result == (ArtifactType.SKILL, "prefix")
+
+    def test_integration_exact_match(self):
+        """Test manual mapping integration with analyze_paths (exact match)."""
+        files = [
+            "custom/path/SKILL.md",
+            "custom/path/index.ts",
+        ]
+        detector = HeuristicDetector(manual_mappings={"custom/path": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].path == "custom/path"
+        assert matches[0].artifact_type == "skill"
+        assert matches[0].confidence_score == 95
+        assert matches[0].metadata is not None
+        assert matches[0].metadata.get("is_manual_mapping") is True
+        assert matches[0].metadata.get("match_type") == "exact"
+        assert "Manual mapping (exact match)" in matches[0].match_reasons[0]
+
+    def test_integration_prefix_match(self):
+        """Test manual mapping integration with analyze_paths (prefix match)."""
+        files = [
+            "my-artifacts/subdir/SKILL.md",
+            "my-artifacts/subdir/index.ts",
+        ]
+        detector = HeuristicDetector(manual_mappings={"my-artifacts": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].path == "my-artifacts/subdir"
+        assert matches[0].artifact_type == "skill"
+        assert matches[0].confidence_score == 95
+        assert matches[0].metadata is not None
+        assert matches[0].metadata.get("is_manual_mapping") is True
+        assert matches[0].metadata.get("match_type") == "prefix"
+
+    def test_non_matching_paths_use_heuristics(self):
+        """Test that non-matching paths still use heuristic detection."""
+        files = [
+            "skills/my-skill/SKILL.md",
+            "skills/my-skill/index.ts",
+        ]
+        # Manual mapping for different path
+        detector = HeuristicDetector(manual_mappings={"custom": "command"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        # Should detect via heuristics
+        assert len(matches) == 1
+        assert matches[0].artifact_type == "skill"
+        # Should NOT have manual mapping metadata
+        assert matches[0].metadata is None
+
+    def test_manual_mapping_enables_non_standard_locations(self):
+        """Test that manual mapping enables detection in non-standard locations."""
+        files = [
+            "weird/custom/path/SKILL.md",
+            "weird/custom/path/index.ts",
+        ]
+        # Without manual mapping - won't be detected
+        artifacts_without = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+        assert len(artifacts_without) == 0
+
+        # With manual mapping - will be detected
+        artifacts_with = detect_artifacts_in_tree(
+            files,
+            "https://github.com/test/repo",
+            manual_mappings={"weird": "skill"},
+        )
+        assert len(artifacts_with) == 1
+        assert artifacts_with[0].artifact_type == "skill"
+        assert artifacts_with[0].confidence_score == 95
+
+    def test_invalid_mapping_type_logged(self):
+        """Test that invalid artifact types in mappings are logged and ignored."""
+        # Should not raise, but should log warning
+        detector = HeuristicDetector(manual_mappings={"path": "invalid_type"})
+
+        # The invalid mapping should be ignored
+        assert "path" not in detector._normalized_mappings
+
+    def test_multiple_mappings(self):
+        """Test multiple manual mappings work together."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "lib/skills": "skill",
+                "lib/commands": "command",
+                "lib/agents": "agent",
+            }
+        )
+
+        assert detector._check_manual_mapping("lib/skills") == (ArtifactType.SKILL, "exact")
+        assert detector._check_manual_mapping("lib/skills/canvas") == (ArtifactType.SKILL, "prefix")
+        assert detector._check_manual_mapping("lib/commands") == (ArtifactType.COMMAND, "exact")
+        assert detector._check_manual_mapping("lib/commands/deploy") == (ArtifactType.COMMAND, "prefix")
+        assert detector._check_manual_mapping("lib/agents/helper") == (ArtifactType.AGENT, "prefix")
+
+    def test_case_sensitive_matching(self):
+        """Test that path matching is case-sensitive."""
+        detector = HeuristicDetector(manual_mappings={"Skills": "skill"})
+
+        # Exact case should match
+        assert detector._check_manual_mapping("Skills") == (ArtifactType.SKILL, "exact")
+        assert detector._check_manual_mapping("Skills/canvas") == (ArtifactType.SKILL, "prefix")
+
+        # Different case should NOT match
+        assert detector._check_manual_mapping("skills") is None
+        assert detector._check_manual_mapping("SKILLS") is None
