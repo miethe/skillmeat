@@ -4,6 +4,10 @@ This module provides services for discovering and cataloging Claude Code artifac
 from GitHub repositories.
 """
 
+from .content_hash import (
+    compute_artifact_hash,
+    compute_file_hash,
+)
 from .diff_engine import (
     CatalogDiffEngine,
     ChangeType,
@@ -55,6 +59,10 @@ from .observability import (
 )
 
 __all__ = [
+    # Content hashing
+    "compute_file_hash",
+    "compute_artifact_hash",
+    # GitHub scanning
     "GitHubScanner",
     "ScanConfig",
     "GitHubAPIError",

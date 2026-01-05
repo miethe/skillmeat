@@ -3,12 +3,15 @@
 Uses multi-signal scoring to identify potential artifacts with confidence levels.
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skillmeat.api.schemas.marketplace import DetectedArtifact, HeuristicMatch
+
+logger = logging.getLogger(__name__)
 
 # Maximum raw score from all signals (10+20+5+15+15+25+30 = 120)
 # dir_name(10) + manifest(20) + extensions(5) + parent_hint(15) + frontmatter(15)
@@ -137,15 +140,29 @@ class HeuristicDetector:
         self,
         config: Optional[DetectionConfig] = None,
         enable_frontmatter_detection: bool = False,
+        manual_mappings: Optional[Dict[str, str]] = None,
     ):
         """Initialize detector with optional custom configuration.
 
         Args:
             config: Optional custom detection configuration
             enable_frontmatter_detection: Enable frontmatter parsing for type detection
+            manual_mappings: Optional directory-to-artifact-type mappings for manual
+                override. Format: {"path/to/dir": "skill", "another/path": "command"}.
+                Valid artifact types: "skill", "command", "agent", "mcp_server", "hook".
+                When provided, directories matching these paths will use the specified
+                artifact type with high confidence (95), bypassing heuristic detection.
         """
         self.config = config or DetectionConfig()
         self.enable_frontmatter_detection = enable_frontmatter_detection
+        self.manual_mappings = manual_mappings or {}
+
+        if self.manual_mappings:
+            logger.debug(
+                "HeuristicDetector initialized with %d manual mapping(s): %s",
+                len(self.manual_mappings),
+                list(self.manual_mappings.keys()),
+            )
 
     def _is_plugin_directory(
         self, dir_path: str, dir_to_files: Dict[str, Set[str]]
@@ -1315,6 +1332,7 @@ def detect_artifacts_in_tree(
     root_hint: Optional[str] = None,
     detected_sha: Optional[str] = None,
     enable_frontmatter_detection: bool = False,
+    manual_mappings: Optional[Dict[str, str]] = None,
 ) -> List[DetectedArtifact]:
     """Convenience function to detect artifacts in a file tree.
 
@@ -1325,6 +1343,11 @@ def detect_artifacts_in_tree(
         root_hint: Optional subdirectory to focus on
         detected_sha: Git commit SHA for version tracking
         enable_frontmatter_detection: Enable frontmatter parsing for type detection
+        manual_mappings: Optional directory-to-artifact-type mappings for manual
+            override. Format: {"path/to/dir": "skill", "another/path": "command"}.
+            Valid artifact types: "skill", "command", "agent", "mcp_server", "hook".
+            When provided, directories matching these paths will use the specified
+            artifact type with high confidence (95), bypassing heuristic detection.
 
     Returns:
         List of detected artifacts with confidence scores
@@ -1334,9 +1357,17 @@ def detect_artifacts_in_tree(
         >>> artifacts = detect_artifacts_in_tree(files, "https://github.com/user/repo")
         >>> print(artifacts[0].name, artifacts[0].confidence_score)
         my-skill 85
+
+        >>> # With manual mappings
+        >>> artifacts = detect_artifacts_in_tree(
+        ...     files,
+        ...     "https://github.com/user/repo",
+        ...     manual_mappings={"custom/path": "skill"}
+        ... )
     """
     detector = HeuristicDetector(
-        enable_frontmatter_detection=enable_frontmatter_detection
+        enable_frontmatter_detection=enable_frontmatter_detection,
+        manual_mappings=manual_mappings,
     )
     matches = detector.analyze_paths(file_tree, base_url=repo_url, root_hint=root_hint)
     return detector.matches_to_artifacts(
