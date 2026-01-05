@@ -30,6 +30,7 @@ import {
   List,
   AlertCircle,
   RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
@@ -37,6 +38,7 @@ import { ContentPane, type TruncationInfo } from '@/components/entity/content-pa
 import { useCatalogFileTree, useCatalogFileContent } from '@/hooks/use-catalog-files';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
+import { PathTagReview } from '@/components/marketplace/path-tag-review';
 
 interface CatalogEntryModalProps {
   entry: CatalogEntry | null;
@@ -278,7 +280,7 @@ export function CatalogEntryModal({
   onImport,
   isImporting = false,
 }: CatalogEntryModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'contents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'contents' | 'tags'>('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 
   // Use source_id directly as string for API calls
@@ -370,7 +372,7 @@ export function CatalogEntryModal({
         {/* Tabs Section */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'overview' | 'contents')}
+          onValueChange={(value) => setActiveTab(value as 'overview' | 'contents' | 'tags')}
           className="flex h-full min-h-0 flex-1 flex-col px-6"
         >
           <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
@@ -387,6 +389,13 @@ export function CatalogEntryModal({
             >
               <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
               Contents
+            </TabsTrigger>
+            <TabsTrigger
+              value="tags"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+            >
+              <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
+              Suggested Tags
             </TabsTrigger>
           </TabsList>
 
@@ -638,6 +647,19 @@ export function CatalogEntryModal({
                   />
                 )}
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Suggested Tags Tab */}
+          <TabsContent value="tags" className="mt-0 flex-1 overflow-y-auto min-h-0 py-4">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium">Path-Based Tag Suggestions</h3>
+                <p className="text-xs text-muted-foreground">
+                  Review and approve tags extracted from the artifact path. Approved tags will be applied when importing.
+                </p>
+              </div>
+              <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
             </div>
           </TabsContent>
         </Tabs>
