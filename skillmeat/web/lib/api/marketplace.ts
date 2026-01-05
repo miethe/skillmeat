@@ -38,7 +38,7 @@ export async function getPathTags(
   entryId: string
 ): Promise<PathSegmentsResponse> {
   const response = await fetch(
-    buildUrl(`/marketplace-sources/${sourceId}/catalog/${entryId}/path-tags`)
+    buildUrl(`/marketplace/sources/${sourceId}/catalog/${entryId}/path-tags`)
   );
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
@@ -57,7 +57,7 @@ export async function updatePathTagStatus(
   status: 'approved' | 'rejected'
 ): Promise<PathSegmentsResponse> {
   const response = await fetch(
-    buildUrl(`/marketplace-sources/${sourceId}/catalog/${entryId}/path-tags`),
+    buildUrl(`/marketplace/sources/${sourceId}/catalog/${entryId}/path-tags`),
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

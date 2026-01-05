@@ -214,3 +214,62 @@
 
 - **Commit(s)**: c1fc781
 - **Status**: RESOLVED
+
+---
+
+## 2026-01-05
+
+### Missing path_tag_config Column on Marketplace Sources Page
+
+**Issue**: The `/marketplace/sources` page failed to load with SQLAlchemy error: `sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: marketplace_sources.path_tag_config`.
+
+- **Location**: `skillmeat/cache/models.py:1252-1256` (MarketplaceSource model)
+- **Root Cause**: The path-based tag extraction feature (v1) added a `path_tag_config` column to the `MarketplaceSource` SQLAlchemy model, but the corresponding Alembic migration (`20260104_1000_add_path_based_tag_extraction`) had not been applied to the user's database.
+
+  **Migration file existed** at: `skillmeat/cache/migrations/versions/20260104_1000_add_path_based_tag_extraction.py`
+
+  This is a common issue after feature development - the developer's database has migrations applied, but end users need to run `run_migrations()` to update their databases.
+
+- **Fix**: Applied the pending migration using the Python API:
+  ```python
+  from skillmeat.cache.migrations import run_migrations
+  run_migrations()
+  ```
+
+  **Note**: Running `alembic upgrade head` directly fails because the CLI doesn't have the database URL configured. The `run_migrations()` helper automatically sets `sqlalchemy.url` to `~/.skillmeat/cache/cache.db`.
+
+- **Prevention**: Auto-migration should be triggered on API startup. Consider adding migration check to `skillmeat/api/server.py` startup event.
+
+- **Commit(s)**: N/A (no code change, just migration applied)
+- **Status**: RESOLVED
+
+---
+
+### Path Tags API Returns 404 on Suggested Tags Tab
+
+**Issue**: The new "Suggested Tags" tab on the Catalog Entry modal (from path-based tag extraction v1 feature) failed to load path segments with a 404 error from the `/path-tags` API endpoint.
+
+- **Location**: `skillmeat/web/lib/api/marketplace.ts:41,60`
+- **Root Cause**: URL mismatch between frontend and backend:
+
+  | Component | URL Format |
+  |-----------|------------|
+  | Backend router prefix | `/marketplace/sources` (slash) |
+  | Frontend API calls | `/marketplace-sources` (hyphen) |
+
+  The `getPathTags` and `updatePathTagStatus` functions used `/marketplace-sources/...` but the backend router is registered at `/marketplace/sources/...`.
+
+- **Fix**: Updated both API client functions to use the correct URL format:
+  ```typescript
+  // Before (WRONG)
+  buildUrl(`/marketplace-sources/${sourceId}/catalog/${entryId}/path-tags`)
+
+  // After (CORRECT)
+  buildUrl(`/marketplace/sources/${sourceId}/catalog/${entryId}/path-tags`)
+  ```
+
+- **Files Modified**:
+  - `skillmeat/web/lib/api/marketplace.ts` (lines 41, 60)
+
+- **Commit(s)**: 835fa7c
+- **Status**: RESOLVED
