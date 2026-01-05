@@ -1779,5 +1779,172 @@ class FileContentResponse(BaseModel):
         }
 
 
+# ============================================================================
+# Path Tag Extraction DTOs
+# ============================================================================
+
+
+class ExtractedSegmentResponse(BaseModel):
+    """Single extracted path segment with approval status.
+
+    Represents a single segment from an artifact path with its normalized
+    value and approval/rejection status for tag creation.
+    """
+
+    segment: str = Field(
+        description="Original segment from path",
+        examples=["canvas-design", "UI-UX", "test_utils"],
+    )
+    normalized: str = Field(
+        description="Normalized segment value",
+        examples=["canvas-design", "ui-ux", "test-utils"],
+    )
+    status: Literal["pending", "approved", "rejected", "excluded"] = Field(
+        description="Approval status",
+        examples=["pending"],
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Reason if excluded",
+        examples=["Excluded: too generic"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "segment": "canvas-design",
+                "normalized": "canvas-design",
+                "status": "pending",
+                "reason": None,
+            }
+        }
+
+
+class PathSegmentsResponse(BaseModel):
+    """All path segments for a catalog entry.
+
+    Contains the full path and all extracted segments with their approval
+    status for tag management.
+    """
+
+    entry_id: str = Field(
+        description="Catalog entry ID",
+        examples=["cat_canvas_design"],
+    )
+    raw_path: str = Field(
+        description="Full artifact path",
+        examples=["skills/ui-ux/canvas-design"],
+    )
+    extracted: list[ExtractedSegmentResponse] = Field(
+        description="Extracted segments with status",
+    )
+    extracted_at: datetime = Field(
+        description="Extraction timestamp",
+        examples=["2025-12-07T14:30:00Z"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "entry_id": "cat_canvas_design",
+                "raw_path": "skills/ui-ux/canvas-design",
+                "extracted": [
+                    {
+                        "segment": "ui-ux",
+                        "normalized": "ui-ux",
+                        "status": "pending",
+                        "reason": None,
+                    },
+                    {
+                        "segment": "canvas-design",
+                        "normalized": "canvas-design",
+                        "status": "pending",
+                        "reason": None,
+                    },
+                ],
+                "extracted_at": "2025-12-07T14:30:00Z",
+            }
+        }
+
+
+class UpdateSegmentStatusRequest(BaseModel):
+    """Request to update a segment's approval status.
+
+    Used to approve or reject a path segment for tag creation.
+    """
+
+    segment: str = Field(
+        description="Original segment value to update",
+        min_length=1,
+        examples=["ui-ux", "canvas-design"],
+    )
+    status: Literal["approved", "rejected"] = Field(
+        description="New status (approved or rejected)",
+        examples=["approved"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "segment": "ui-ux",
+                "status": "approved",
+            }
+        }
+
+
+class UpdateSegmentStatusResponse(BaseModel):
+    """Response after updating segment status.
+
+    Returns the updated entry with all segments and their new statuses.
+    """
+
+    entry_id: str = Field(
+        description="Catalog entry ID",
+        examples=["cat_canvas_design"],
+    )
+    raw_path: str = Field(
+        description="Full artifact path",
+        examples=["skills/ui-ux/canvas-design"],
+    )
+    extracted: list[ExtractedSegmentResponse] = Field(
+        description="Updated segments with status",
+    )
+    updated_at: datetime = Field(
+        description="Update timestamp",
+        examples=["2025-12-07T15:00:00Z"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "entry_id": "cat_canvas_design",
+                "raw_path": "skills/ui-ux/canvas-design",
+                "extracted": [
+                    {
+                        "segment": "ui-ux",
+                        "normalized": "ui-ux",
+                        "status": "approved",
+                        "reason": None,
+                    },
+                    {
+                        "segment": "canvas-design",
+                        "normalized": "canvas-design",
+                        "status": "pending",
+                        "reason": None,
+                    },
+                ],
+                "updated_at": "2025-12-07T15:00:00Z",
+            }
+        }
+
+
 # Rebuild models to resolve forward references
 ScanResultDTO.model_rebuild()

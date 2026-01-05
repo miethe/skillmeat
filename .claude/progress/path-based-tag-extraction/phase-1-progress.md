@@ -2,15 +2,16 @@
 prd: path-based-tag-extraction-v1
 phase: 1
 name: "Backend Foundation & API"
-status: pending
+status: completed
 created: 2026-01-04
 updated: 2026-01-04
-completion: 0
+completed_at: 2026-01-04T21:15:00Z
+completion: 100
 
 tasks:
   - id: "TASK-1.1"
     name: "Database Migration"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     model: "sonnet"
     dependencies: []
@@ -18,7 +19,7 @@ tasks:
 
   - id: "TASK-1.2"
     name: "Update Models"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.1"]
@@ -26,7 +27,7 @@ tasks:
 
   - id: "TASK-1.3"
     name: "PathTagConfig & ExtractedSegment Dataclasses"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "opus"
     dependencies: []
@@ -34,7 +35,7 @@ tasks:
 
   - id: "TASK-1.4"
     name: "PathSegmentExtractor Service"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "opus"
     dependencies: ["TASK-1.3"]
@@ -42,7 +43,7 @@ tasks:
 
   - id: "TASK-1.5"
     name: "Scanner Integration"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.2", "TASK-1.4"]
@@ -50,7 +51,7 @@ tasks:
 
   - id: "TASK-1.6"
     name: "API Schemas"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.3"]
@@ -58,7 +59,7 @@ tasks:
 
   - id: "TASK-1.7"
     name: "GET Path Tags Endpoint"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.2", "TASK-1.6"]
@@ -66,7 +67,7 @@ tasks:
 
   - id: "TASK-1.8"
     name: "PATCH Path Tags Endpoint"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.7"]
@@ -74,7 +75,7 @@ tasks:
 
   - id: "TASK-1.9"
     name: "Unit Tests - Extractor"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.4"]
@@ -82,7 +83,7 @@ tasks:
 
   - id: "TASK-1.10"
     name: "Unit Tests - API"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.7", "TASK-1.8"]
@@ -90,7 +91,7 @@ tasks:
 
   - id: "TASK-1.11"
     name: "Integration Tests"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     model: "sonnet"
     dependencies: ["TASK-1.5", "TASK-1.8"]
@@ -98,7 +99,7 @@ tasks:
 
   - id: "TASK-1.12"
     name: "Documentation"
-    status: "pending"
+    status: "completed"
     assigned_to: ["documentation-writer"]
     model: "haiku"
     dependencies: ["TASK-1.11"]

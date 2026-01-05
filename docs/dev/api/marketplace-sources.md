@@ -28,6 +28,8 @@ Complete API reference for SkillMeat's Marketplace Sources endpoints that manage
   - [POST /marketplace/sources/{source_id}/rescan](#post-marketplacesourcessource_idrescan)
   - [GET /marketplace/sources/{source_id}/artifacts](#get-marketplacesourcessource_idartifacts)
   - [POST /marketplace/sources/{source_id}/import](#post-marketplacesourcessource_idimport)
+  - [GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags](#get-marketplacesourcessource_idcatalogentry_idpath-tags)
+  - [PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags](#patch-marketplacesourcessource_idcatalogentry_idpath-tags)
 - [Status Codes](#status-codes)
 - [Error Handling](#error-handling)
 - [Data Models](#data-models)
@@ -1120,6 +1122,307 @@ if result['errors']:
     print("\nErrors:")
     for error in result['errors']:
         print(f"  ✗ {error['entry_id']}: {error['error']}")
+```
+
+---
+
+### GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags
+
+**Description:** Retrieve extracted path segments and their approval status for a catalog entry.
+
+**Purpose:** View suggested tags extracted from the artifact's path in the repository.
+
+#### Request
+
+```http
+GET /api/v1/marketplace/sources/src_anthropics_quickstarts/catalog/cat_canvas_design/path-tags
+Authorization: Bearer <token>
+```
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `source_id` | string | Yes | Unique source identifier |
+| `entry_id` | string | Yes | Unique catalog entry identifier |
+
+#### Response
+
+**Status Code:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "entry_id": "cat_canvas_design",
+  "raw_path": "skills/ui-ux/canvas-design",
+  "extracted": [
+    {
+      "segment": "ui-ux",
+      "normalized": "ui-ux",
+      "status": "pending",
+      "reason": null
+    },
+    {
+      "segment": "canvas-design",
+      "normalized": "canvas-design",
+      "status": "pending",
+      "reason": null
+    }
+  ],
+  "extracted_at": "2025-12-07T14:30:00Z"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `entry_id` | string | Catalog entry identifier |
+| `raw_path` | string | Full artifact path in repository |
+| `extracted` | array | List of extracted segments with approval status |
+| `extracted_at` | string | ISO 8601 timestamp of extraction |
+
+**Extracted Segment Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `segment` | string | Original segment value from path (e.g., "05-ui-ux") |
+| `normalized` | string | Normalized value (e.g., "ui-ux") |
+| `status` | string | Status: pending, approved, rejected, excluded |
+| `reason` | string or null | Reason if excluded (e.g., matched exclude pattern) |
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 200 | OK | Path tags retrieved successfully |
+| 404 | Not Found | Source or entry not found |
+| 400 | Bad Request | Entry has no path_segments (not extracted yet) |
+| 500 | Internal Server Error | Malformed path_segments JSON |
+
+#### Error Examples
+
+**Entry not extracted yet:**
+
+```json
+{
+  "detail": "Entry 'cat_canvas_design' has no path_segments (not extracted yet)"
+}
+```
+
+#### Examples
+
+**Get path-based tag suggestions:**
+
+```bash
+curl http://localhost:8000/api/v1/marketplace/sources/src_anthropics_quickstarts/catalog/cat_canvas_design/path-tags \
+  -H "Authorization: Bearer sk_test_abc123" | jq '.extracted[] | {segment, normalized, status}'
+```
+
+#### Python Example
+
+```python
+import requests
+
+api_token = "sk_test_abc123"
+headers = {"Authorization": f"Bearer {api_token}"}
+
+source_id = "src_anthropics_quickstarts"
+entry_id = "cat_canvas_design"
+
+response = requests.get(
+    f"http://localhost:8000/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+    headers=headers
+)
+
+if response.status_code == 200:
+    result = response.json()
+    print(f"Artifact Path: {result['raw_path']}")
+    print("\nExtracted Tags:")
+    for seg in result['extracted']:
+        print(f"  - {seg['normalized']} (status: {seg['status']})")
+        if seg['reason']:
+            print(f"    Reason: {seg['reason']}")
+elif response.status_code == 400:
+    print("Entry not yet extracted. Rescan the source.")
+else:
+    print(f"Error: {response.json()}")
+```
+
+---
+
+### PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags
+
+**Description:** Approve or reject a suggested path-based tag.
+
+**Purpose:** Update the approval status of an extracted path segment.
+
+#### Request
+
+```http
+PATCH /api/v1/marketplace/sources/src_anthropics_quickstarts/catalog/cat_canvas_design/path-tags
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `source_id` | string | Yes | Unique source identifier |
+| `entry_id` | string | Yes | Unique catalog entry identifier |
+
+**Request Body:**
+
+```json
+{
+  "segment": "ui-ux",
+  "status": "approved"
+}
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description | Options |
+|-------|------|----------|-------------|---------|
+| `segment` | string | Yes | Original segment value to update | — |
+| `status` | string | Yes | New approval status | `approved`, `rejected` |
+
+**Status Transitions:**
+
+- Only `pending` segments can be changed
+- Cannot change `excluded` segments (filtered by configuration)
+- Cannot change already approved/rejected segments (409 Conflict)
+
+#### Response
+
+**Status Code:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "entry_id": "cat_canvas_design",
+  "raw_path": "skills/ui-ux/canvas-design",
+  "extracted": [
+    {
+      "segment": "ui-ux",
+      "normalized": "ui-ux",
+      "status": "approved",
+      "reason": null
+    },
+    {
+      "segment": "canvas-design",
+      "normalized": "canvas-design",
+      "status": "pending",
+      "reason": null
+    }
+  ],
+  "updated_at": "2025-12-07T15:00:00Z"
+}
+```
+
+#### Status Codes
+
+| Code | Meaning | Reason |
+|------|---------|--------|
+| 200 | OK | Segment status updated successfully |
+| 404 | Not Found | Source, entry, or segment not found |
+| 409 | Conflict | Segment already approved/rejected or is excluded |
+| 400 | Bad Request | Entry has no path_segments (not extracted yet) |
+| 500 | Internal Server Error | Malformed path_segments JSON |
+
+#### Error Examples
+
+**Segment already approved:**
+
+```json
+{
+  "detail": "Segment 'ui-ux' already has status 'approved'"
+}
+```
+
+**Cannot change excluded segment:**
+
+```json
+{
+  "detail": "Cannot change status of excluded segment 'src'"
+}
+```
+
+**Segment not found:**
+
+```json
+{
+  "detail": "Segment 'nonexistent' not found in entry 'cat_canvas_design'"
+}
+```
+
+#### Examples
+
+**Approve a segment:**
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/marketplace/sources/src_anthropics_quickstarts/catalog/cat_canvas_design/path-tags \
+  -H "Authorization: Bearer sk_test_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"segment": "ui-ux", "status": "approved"}'
+```
+
+**Reject a segment:**
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/marketplace/sources/src_anthropics_quickstarts/catalog/cat_canvas_design/path-tags \
+  -H "Authorization: Bearer sk_test_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"segment": "canvas-design", "status": "rejected"}'
+```
+
+#### Python Example
+
+```python
+import requests
+
+api_token = "sk_test_abc123"
+headers = {
+    "Authorization": f"Bearer {api_token}",
+    "Content-Type": "application/json"
+}
+
+source_id = "src_anthropics_quickstarts"
+entry_id = "cat_canvas_design"
+
+# Approve a segment
+response = requests.patch(
+    f"http://localhost:8000/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+    headers=headers,
+    json={"segment": "ui-ux", "status": "approved"}
+)
+
+if response.status_code == 200:
+    result = response.json()
+    print(f"Updated segment status")
+    print(f"\nAll segments for {result['raw_path']}:")
+    for seg in result['extracted']:
+        status_symbol = "✓" if seg['status'] == "approved" else "○"
+        print(f"  [{status_symbol}] {seg['normalized']} ({seg['status']})")
+else:
+    error = response.json()
+    print(f"Error: {error['detail']}")
+
+# Batch-approve multiple segments (via multiple requests)
+segments_to_approve = ["data-ai", "python"]
+for segment in segments_to_approve:
+    response = requests.patch(
+        f"http://localhost:8000/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+        headers=headers,
+        json={"segment": segment, "status": "approved"}
+    )
+    if response.status_code == 200:
+        print(f"✓ Approved: {segment}")
+    else:
+        print(f"✗ Failed to approve: {segment}")
 ```
 
 ---

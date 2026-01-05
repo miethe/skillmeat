@@ -15,13 +15,17 @@ API Endpoints:
     POST /marketplace/sources/{id}/import - Import artifacts to collection
     PATCH /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Mark artifact as excluded
     DELETE /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Restore excluded artifact
+    GET /marketplace/sources/{id}/catalog/{entry_id}/path-tags - Get path-based tag suggestions
+    PATCH /marketplace/sources/{id}/catalog/{entry_id}/path-tags - Update path segment approval status
     GET /marketplace/sources/{id}/artifacts/{path}/files - Get file tree
     GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
 """
 
+import json
 import logging
 import re
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
@@ -34,6 +38,7 @@ from skillmeat.api.schemas.marketplace import (
     CatalogListResponse,
     CreateSourceRequest,
     ExcludeArtifactRequest,
+    ExtractedSegmentResponse,
     FileContentResponse,
     FileTreeEntry,
     FileTreeResponse,
@@ -41,10 +46,13 @@ from skillmeat.api.schemas.marketplace import (
     ImportResultDTO,
     InferUrlRequest,
     InferUrlResponse,
+    PathSegmentsResponse,
     ScanRequest,
     ScanResultDTO,
     SourceListResponse,
     SourceResponse,
+    UpdateSegmentStatusRequest,
+    UpdateSegmentStatusResponse,
     UpdateSourceRequest,
 )
 from skillmeat.api.utils.github_cache import (
@@ -70,6 +78,7 @@ from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
     ImportCoordinator,
 )
+from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +349,21 @@ async def _perform_scan(
             root_hint=source.root_hint,
         )
 
+        # Load path tag config from source (or use defaults)
+        config = PathTagConfig.defaults()
+        if source.path_tag_config:
+            try:
+                config = PathTagConfig.from_json(source.path_tag_config)
+            except ValueError as e:
+                logger.warning(
+                    f"Invalid path_tag_config for source {source.id}: {e}. "
+                    "Using defaults."
+                )
+                config = PathTagConfig.defaults()
+
+        # Create extractor if enabled
+        extractor = PathSegmentExtractor(config) if config.enabled else None
+
         # Update source and catalog atomically
         with transaction_handler.scan_update_transaction(source_id) as ctx:
             # Update source status
@@ -352,6 +376,22 @@ async def _perform_scan(
             # Convert detected artifacts to catalog entries
             new_entries = []
             for artifact in scan_result.artifacts:
+                # Extract path segments if enabled
+                path_segments_json = None
+                if extractor:
+                    try:
+                        segments = extractor.extract(artifact.path)
+                        path_segments_json = json.dumps({
+                            "raw_path": artifact.path,
+                            "extracted": [asdict(s) for s in segments],
+                            "extracted_at": datetime.utcnow().isoformat()
+                        })
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to extract path segments for {artifact.path}: {e}"
+                        )
+                        # Continue without path_segments; extraction is non-blocking
+
                 entry = MarketplaceCatalogEntry(
                     id=str(uuid.uuid4()),
                     source_id=source_id,
@@ -363,6 +403,7 @@ async def _perform_scan(
                     detected_sha=artifact.detected_sha,
                     detected_at=datetime.utcnow(),
                     status="new",
+                    path_segments=path_segments_json,
                 )
                 new_entries.append(entry)
 
@@ -1618,6 +1659,353 @@ async def restore_excluded_artifact(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restore excluded entry: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-004c: Path Tags Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/catalog/{entry_id}/path-tags",
+    response_model=PathSegmentsResponse,
+    summary="Get path-based tag suggestions for catalog entry",
+    description="""
+    Retrieve extracted path segments and their approval status for a catalog entry.
+
+    Returns all extracted segments with their current approval status (pending, approved,
+    rejected, excluded). Only includes entries that have been scanned with path extraction
+    enabled.
+
+    The path_segments field contains a JSON object with:
+    - raw_path: Original artifact path
+    - extracted: Array of {segment, normalized, status, reason} objects
+    - extracted_at: ISO timestamp of extraction
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - entry_id: Catalog entry identifier
+
+    Example: GET /marketplace/sources/src-123/catalog/cat-456/path-tags
+    """,
+    responses={
+        404: {"description": "Source or entry not found"},
+        400: {"description": "Entry has no path_segments (not extracted yet)"},
+    },
+)
+async def get_path_tags(
+    source_id: str,
+    entry_id: str,
+) -> PathSegmentsResponse:
+    """Get extracted path segments for a catalog entry.
+
+    Returns all extracted segments with their current approval status.
+    Only includes entries that have been scanned with path extraction enabled.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+
+    Returns:
+        PathSegmentsResponse with raw_path and extracted segments
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 400: If entry has no path_segments (not extracted yet)
+        HTTPException 500: If path_segments JSON is malformed
+
+    Example:
+        >>> response = await get_path_tags("src-123", "cat-456")
+        >>> assert response.raw_path == "skills/ui-ux/canvas-design"
+        >>> assert len(response.extracted) == 2
+        >>> assert response.extracted[0].segment == "ui-ux"
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for query
+        session = catalog_repo._get_session()
+        try:
+            # Find the catalog entry
+            entry = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    MarketplaceCatalogEntry.source_id == source_id,
+                    MarketplaceCatalogEntry.id == entry_id,
+                )
+                .first()
+            )
+
+            if not entry:
+                logger.warning(
+                    f"Catalog entry '{entry_id}' not found in source '{source_id}'"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
+                )
+
+            # Check if path_segments exists
+            if not entry.path_segments:
+                logger.info(
+                    f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
+                )
+
+            # Parse path_segments JSON
+            try:
+                data = json.loads(entry.path_segments)
+
+                # Build ExtractedSegmentResponse list
+                extracted_segments = [
+                    ExtractedSegmentResponse(
+                        segment=seg["segment"],
+                        normalized=seg["normalized"],
+                        status=seg["status"],
+                        reason=seg.get("reason"),
+                    )
+                    for seg in data["extracted"]
+                ]
+
+                return PathSegmentsResponse(
+                    entry_id=entry_id,
+                    raw_path=data["raw_path"],
+                    extracted=extracted_segments,
+                    extracted_at=datetime.fromisoformat(data["extracted_at"]),
+                )
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.error(f"Malformed path_segments for entry {entry_id}: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Internal error parsing path_segments",
+                ) from e
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get path tags for entry {entry_id} in source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve path tags: {str(e)}",
+        ) from e
+
+
+@router.patch(
+    "/{source_id}/catalog/{entry_id}/path-tags",
+    response_model=UpdateSegmentStatusResponse,
+    summary="Update approval status of a path segment",
+    description="""
+    Approve or reject a suggested path-based tag.
+
+    Updates the status field in path_segments JSON for a single segment.
+    Only "pending" status segments can be changed. Cannot modify "excluded"
+    segments (filtered by extraction rules).
+
+    Status values:
+    - "pending": Segment awaiting approval/rejection (default)
+    - "approved": Segment will be applied as tag during import
+    - "rejected": Segment will not be applied as tag
+    - "excluded": Segment filtered by rules (cannot be changed)
+
+    Path Parameters:
+    - source_id: Marketplace source identifier
+    - entry_id: Catalog entry identifier
+
+    Request Body:
+    - segment: Original segment value to update (e.g., "ui-ux")
+    - status: New status ("approved" or "rejected")
+
+    Example: PATCH /marketplace/sources/src-123/catalog/cat-456/path-tags
+    """,
+    responses={
+        404: {"description": "Source, entry, or segment not found"},
+        409: {"description": "Segment already approved/rejected or is excluded"},
+        500: {"description": "Malformed path_segments JSON"},
+    },
+)
+async def update_path_tag_status(
+    source_id: str,
+    entry_id: str,
+    request: UpdateSegmentStatusRequest,
+) -> UpdateSegmentStatusResponse:
+    """Update approval status of a single path segment.
+
+    Modifies the status field in path_segments JSON for the specified segment.
+    Only "pending" segments can be updated. Attempting to change an already
+    approved/rejected segment or an excluded segment will raise a 409 Conflict.
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+        request: Request body with segment name and new status
+
+    Returns:
+        UpdateSegmentStatusResponse with updated segments and timestamp
+
+    Raises:
+        HTTPException 404: If source, entry, or segment not found
+        HTTPException 409: If segment already has status or is excluded
+        HTTPException 500: If path_segments JSON is malformed
+
+    Example:
+        >>> request = UpdateSegmentStatusRequest(segment="ui-ux", status="approved")
+        >>> response = await update_path_tag_status("src-123", "cat-456", request)
+        >>> assert response.extracted[0].status == "approved"
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Use catalog_repo's session for atomic update
+        session = catalog_repo._get_session()
+        try:
+            # Find the catalog entry
+            entry = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    MarketplaceCatalogEntry.source_id == source_id,
+                    MarketplaceCatalogEntry.id == entry_id,
+                )
+                .first()
+            )
+
+            if not entry:
+                logger.warning(
+                    f"Catalog entry '{entry_id}' not found in source '{source_id}'"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry '{entry_id}' not found in source '{source_id}'",
+                )
+
+            # Check if path_segments exists
+            if not entry.path_segments:
+                logger.info(
+                    f"Entry '{entry_id}' has no path_segments (not extracted yet)"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' has no path_segments (not extracted yet)",
+                )
+
+            # Parse path_segments JSON
+            try:
+                segments_data = json.loads(entry.path_segments)
+            except json.JSONDecodeError:
+                logger.error(f"Malformed path_segments for entry {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Internal error: malformed path_segments JSON",
+                )
+
+            # Find and update the segment
+            segment_found = False
+            for seg in segments_data["extracted"]:
+                if seg["segment"] == request.segment:
+                    segment_found = True
+
+                    # Cannot change "excluded" segments
+                    if seg["status"] == "excluded":
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Cannot change status of excluded segment '{request.segment}'",
+                        )
+
+                    # Cannot double-approve/reject
+                    if seg["status"] in ["approved", "rejected"]:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Segment '{request.segment}' already has status '{seg['status']}'",
+                        )
+
+                    # Update status
+                    seg["status"] = request.status
+                    logger.info(
+                        f"Updated segment '{request.segment}' to status '{request.status}' "
+                        f"in entry '{entry_id}'"
+                    )
+                    break
+
+            if not segment_found:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Segment '{request.segment}' not found in entry '{entry_id}'",
+                )
+
+            # Save back to DB
+            entry.path_segments = json.dumps(segments_data)
+            session.commit()
+
+            # Build response
+            extracted_segments = [
+                ExtractedSegmentResponse(
+                    segment=seg["segment"],
+                    normalized=seg["normalized"],
+                    status=seg["status"],
+                    reason=seg.get("reason"),
+                )
+                for seg in segments_data["extracted"]
+            ]
+
+            return UpdateSegmentStatusResponse(
+                entry_id=entry_id,
+                raw_path=segments_data["raw_path"],
+                extracted=extracted_segments,
+                updated_at=datetime.utcnow(),
+            )
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update path tag status for entry {entry_id} in source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update path tag status: {str(e)}",
         ) from e
 
 
