@@ -1249,6 +1249,11 @@ class MarketplaceSource(Base):
         server_default="false",
         comment="Parse markdown frontmatter for artifact type hints",
     )
+    path_tag_config: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON config for path-based tag extraction rules",
+    )
 
     # Sync status
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -1446,6 +1451,11 @@ class MarketplaceCatalogEntry(Base):
         nullable=True,
         default=None,
         doc="User-provided reason for exclusion (optional, max 500 chars)",
+    )
+    path_segments: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON array of extracted path segments with approval status",
     )
 
     # Additional metadata
