@@ -90,7 +90,7 @@ function StatusBadge({ status, reason }: StatusBadgeProps) {
           <TooltipTrigger asChild>
             <Badge variant="outline" className={cn('gap-1 text-xs', config.className)}>
               {config.label}
-              <Info className="h-3 w-3" />
+              <Info className="h-3 w-3" aria-hidden="true" />
             </Badge>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
@@ -141,7 +141,7 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
           </code>
           {segment.segment !== segment.normalized && (
             <>
-              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden="true" />
               <span className="text-sm text-muted-foreground">
                 {segment.normalized}
               </span>
@@ -171,9 +171,9 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
                     aria-label="Approve segment"
                   >
                     {isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Check className="h-4 w-4" />
+                      <Check className="h-4 w-4" aria-hidden="true" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -193,9 +193,9 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
                     aria-label="Reject segment"
                   >
                     {isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4" aria-hidden="true" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -277,7 +277,7 @@ interface ErrorStateProps {
 function ErrorState({ error, onRetry }: ErrorStateProps) {
   return (
     <Alert variant="destructive">
-      <AlertCircle className="h-4 w-4" />
+      <AlertCircle className="h-4 w-4" aria-hidden="true" />
       <AlertTitle>Failed to load path segments</AlertTitle>
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{error.message || 'An unexpected error occurred'}</span>
@@ -287,7 +287,7 @@ function ErrorState({ error, onRetry }: ErrorStateProps) {
           onClick={onRetry}
           className="flex-shrink-0"
         >
-          <RefreshCw className="h-4 w-4 mr-1" />
+          <RefreshCw className="h-4 w-4 mr-1" aria-hidden="true" />
           Retry
         </Button>
       </AlertDescription>
@@ -299,7 +299,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <div className="rounded-full bg-muted p-3 mb-3">
-        <Info className="h-6 w-6 text-muted-foreground" />
+        <Info className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
       </div>
       <h3 className="text-sm font-medium text-foreground">No segments extracted</h3>
       <p className="text-sm text-muted-foreground mt-1">
@@ -370,17 +370,18 @@ export function PathTagReview({ sourceId, entryId, className }: PathTagReviewPro
       )}
 
       {/* Segment list */}
-      <div className="space-y-2">
+      <ul className="space-y-2 list-none">
         {data.extracted.map((segment) => (
-          <SegmentRow
-            key={segment.segment}
-            segment={segment}
-            isPending={updateStatus.isPending}
-            onApprove={() => handleApprove(segment.segment)}
-            onReject={() => handleReject(segment.segment)}
-          />
+          <li key={segment.segment}>
+            <SegmentRow
+              segment={segment}
+              isPending={updateStatus.isPending}
+              onApprove={() => handleApprove(segment.segment)}
+              onReject={() => handleReject(segment.segment)}
+            />
+          </li>
         ))}
-      </div>
+      </ul>
 
       {/* Summary footer */}
       <PathTagSummary segments={data.extracted} />
