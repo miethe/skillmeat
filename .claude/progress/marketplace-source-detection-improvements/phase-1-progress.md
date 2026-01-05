@@ -3,13 +3,14 @@ type: progress
 prd: "marketplace-source-detection-improvements"
 phase: 1
 phase_name: "Database & Schema"
-status: not_started
-progress: 0
+status: completed
+progress: 100
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 4
 effort: "5-8 pts"
 created: 2026-01-05
 updated: 2026-01-05
+completed_at: 2026-01-05
 
 assigned_to: ["data-layer-expert"]
 dependencies: []
@@ -17,28 +18,28 @@ dependencies: []
 tasks:
   - id: "P1.1"
     name: "Validate manual_map column"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: []
     effort: "2 pts"
 
   - id: "P1.2"
     name: "Validate metadata_json column"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: []
     effort: "2 pts"
 
   - id: "P1.3"
     name: "Document manual_map schema"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: []
     effort: "2 pts"
 
   - id: "P1.4"
     name: "Create Pydantic validation schemas"
-    status: "pending"
+    status: "completed"
     assigned_to: ["data-layer-expert"]
     dependencies: ["P1.1", "P1.2", "P1.3"]
     effort: "3 pts"

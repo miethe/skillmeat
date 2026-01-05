@@ -1946,5 +1946,197 @@ class UpdateSegmentStatusResponse(BaseModel):
         }
 
 
+# ============================================================================
+# Manual Mapping and Deduplication DTOs (Phase 1-3)
+# ============================================================================
+
+
+class ManualMapEntry(BaseModel):
+    """Single directory to artifact type mapping.
+
+    Used for manual override of artifact type detection in GitHub repositories.
+    Validates that both directory path and artifact type are valid.
+    """
+
+    directory_path: str = Field(
+        description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
+        examples=["skills/python", "commands/dev", "agents/research"],
+    )
+    artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"] = Field(
+        description="Artifact type for this directory",
+        examples=["skill"],
+    )
+
+    @field_validator("directory_path")
+    @classmethod
+    def validate_directory_path(cls, v: str) -> str:
+        """Validate directory path format.
+
+        Args:
+            v: Directory path value
+
+        Returns:
+            Normalized directory path
+
+        Raises:
+            ValueError: If path format is invalid
+        """
+        if not v or not v.strip():
+            raise ValueError("directory_path cannot be empty")
+
+        # Normalize: strip leading/trailing slashes
+        normalized = v.strip().strip("/")
+
+        # Block absolute paths
+        if normalized.startswith("/"):
+            raise ValueError("directory_path must be a relative path (no leading /)")
+
+        # Block path traversal
+        if ".." in normalized:
+            raise ValueError(
+                "directory_path cannot contain parent directory references (..)"
+            )
+
+        # Block double slashes
+        if "//" in normalized:
+            raise ValueError("directory_path cannot contain double slashes (//)")
+
+        return normalized
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "directory_path": "skills/python",
+                "artifact_type": "skill",
+            }
+        }
+
+
+class ManualMapRequest(BaseModel):
+    """Request to set manual directory mappings for a source.
+
+    Allows overriding automatic artifact type detection by mapping
+    specific directory paths to artifact types.
+    """
+
+    manual_map: Dict[str, str] = Field(
+        description="Mapping of directory paths to artifact types",
+        examples=[
+            {
+                "skills/python": "skill",
+                "commands": "command",
+                "agents/research": "agent",
+            }
+        ],
+    )
+
+    @field_validator("manual_map")
+    @classmethod
+    def validate_manual_map(cls, v: Dict[str, str]) -> Dict[str, str]:
+        """Validate manual_map structure and values.
+
+        Args:
+            v: Manual map dictionary to validate
+
+        Returns:
+            Validated and normalized manual map
+
+        Raises:
+            ValueError: If map contains invalid paths or types
+        """
+        valid_types = {"skill", "command", "agent", "mcp_server", "hook"}
+        normalized = {}
+
+        for path, artifact_type in v.items():
+            # Validate path
+            if not path or not path.strip():
+                raise ValueError("Directory paths cannot be empty")
+
+            # Normalize path (strip leading/trailing slashes)
+            normalized_path = path.strip().strip("/")
+
+            # Block absolute paths
+            if normalized_path.startswith("/"):
+                raise ValueError(
+                    f"Path '{path}' must be relative (no leading /)"
+                )
+
+            # Block path traversal
+            if ".." in normalized_path:
+                raise ValueError(
+                    f"Path '{path}' cannot contain parent directory references (..)"
+                )
+
+            # Block double slashes
+            if "//" in normalized_path:
+                raise ValueError(
+                    f"Path '{path}' cannot contain double slashes (//)"
+                )
+
+            # Validate artifact type
+            if artifact_type not in valid_types:
+                raise ValueError(
+                    f"Invalid artifact type '{artifact_type}' for path '{path}'. "
+                    f"Must be one of: {', '.join(sorted(valid_types))}"
+                )
+
+            normalized[normalized_path] = artifact_type
+
+        return normalized
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "manual_map": {
+                    "skills/python": "skill",
+                    "commands": "command",
+                    "agents/research": "agent",
+                }
+            }
+        }
+
+
+class DeduplicationStats(BaseModel):
+    """Statistics from deduplication process.
+
+    Tracks how many artifacts were excluded as duplicates during
+    repository scanning, both within the source and across sources.
+    """
+
+    duplicates_within_source: int = Field(
+        default=0,
+        ge=0,
+        description="Number of duplicates found within this source",
+        examples=[3],
+    )
+    cross_source_duplicates: int = Field(
+        default=0,
+        ge=0,
+        description="Number of duplicates matching other sources/collection",
+        examples=[5],
+    )
+    total_excluded: int = Field(
+        default=0,
+        ge=0,
+        description="Total artifacts excluded as duplicates",
+        examples=[8],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "duplicates_within_source": 3,
+                "cross_source_duplicates": 5,
+                "total_excluded": 8,
+            }
+        }
+
+
 # Rebuild models to resolve forward references
 ScanResultDTO.model_rebuild()
