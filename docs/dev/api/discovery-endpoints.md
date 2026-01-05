@@ -292,23 +292,25 @@ Content-Type: application/json
       "scope": "local"
     }
   ],
-  "auto_resolve_conflicts": false
+  "auto_resolve_conflicts": false,
+  "apply_path_tags": true
 }
 ```
 
 **Parameters:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `artifacts` | array | Yes | List of artifacts to import (min 1) |
-| `artifacts[].source` | string | Yes | GitHub source or local path (user/repo/path[@version] or full URL) |
-| `artifacts[].artifact_type` | string | Yes | Type: skill, command, agent, hook, mcp |
-| `artifacts[].name` | string | No | Artifact identifier (auto-derived from source if omitted) |
-| `artifacts[].description` | string | No | Artifact description |
-| `artifacts[].author` | string | No | Artifact author |
-| `artifacts[].tags` | array | No | Tags/categories to apply |
-| `artifacts[].scope` | string | No | Scope: "user" or "local" (default: "user") |
-| `auto_resolve_conflicts` | boolean | No | Overwrite existing artifacts (default: false) |
+| Field | Type | Required | Description | Default |
+|-------|------|----------|-------------|---------|
+| `artifacts` | array | Yes | List of artifacts to import (min 1) | - |
+| `artifacts[].source` | string | Yes | GitHub source or local path (user/repo/path[@version] or full URL) | - |
+| `artifacts[].artifact_type` | string | Yes | Type: skill, command, agent, hook, mcp | - |
+| `artifacts[].name` | string | No | Artifact identifier (auto-derived from source if omitted) | auto-derived |
+| `artifacts[].description` | string | No | Artifact description | None |
+| `artifacts[].author` | string | No | Artifact author | None |
+| `artifacts[].tags` | array | No | Tags/categories to apply | [] |
+| `artifacts[].scope` | string | No | Scope: "user" or "local" | "user" |
+| `auto_resolve_conflicts` | boolean | No | Overwrite existing artifacts | false |
+| `apply_path_tags` | boolean | No | Apply approved path-based tags extracted from artifact paths to imported artifacts | true |
 
 #### Response
 
@@ -324,6 +326,7 @@ Content-Type: application/json
   "total_failed": 1,
   "imported_to_collection": 1,
   "added_to_project": 1,
+  "total_tags_applied": 5,
   "results": [
     {
       "artifact_id": "skill:canvas-design",
@@ -331,6 +334,7 @@ Content-Type: application/json
       "message": "Artifact 'canvas-design' imported successfully",
       "error": null,
       "skip_reason": null,
+      "tags_applied": 3,
       "success": true
     },
     {
@@ -339,6 +343,7 @@ Content-Type: application/json
       "message": "Artifact already exists",
       "error": null,
       "skip_reason": "Artifact already exists in collection",
+      "tags_applied": 0,
       "success": false
     },
     {
@@ -347,6 +352,7 @@ Content-Type: application/json
       "message": "Import failed",
       "error": "Artifact already exists and auto_resolve_conflicts is false",
       "skip_reason": null,
+      "tags_applied": 0,
       "success": false
     }
   ],
@@ -365,12 +371,14 @@ Content-Type: application/json
 | `total_failed` | integer | Number that failed |
 | `imported_to_collection` | integer | Number added to the Collection |
 | `added_to_project` | integer | Number deployed to the Project |
+| `total_tags_applied` | integer | Total number of path-based tags applied across all artifacts (sum of per-artifact `tags_applied`) |
 | `results` | array | Per-artifact import results |
 | `results[].artifact_id` | string | Artifact identifier (type:name) |
 | `results[].status` | string | Import status: "success", "skipped", or "failed" |
 | `results[].message` | string | Human-readable status message |
 | `results[].error` | string or null | Error message if status=failed |
 | `results[].skip_reason` | string or null | Reason for skip if status=skipped |
+| `results[].tags_applied` | integer | Number of path-based tags applied to this specific artifact (only non-zero when apply_path_tags=true) |
 | `results[].success` | boolean | Backward compatibility: true if status=success |
 | `duration_ms` | number | Total import duration in milliseconds |
 | `summary` | string | Human-readable summary of import results |
@@ -387,7 +395,7 @@ Content-Type: application/json
 
 #### Examples
 
-**Basic bulk import:**
+**Basic bulk import with path tags:**
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/artifacts/discover/import \
@@ -407,7 +415,8 @@ curl -X POST http://localhost:8000/api/v1/artifacts/discover/import \
         "scope": "local"
       }
     ],
-    "auto_resolve_conflicts": false
+    "auto_resolve_conflicts": false,
+    "apply_path_tags": true
   }'
 ```
 
@@ -453,7 +462,8 @@ import_data = {
             "scope": "local"
         }
     ],
-    "auto_resolve_conflicts": False
+    "auto_resolve_conflicts": False,
+    "apply_path_tags": True
 }
 
 response = requests.post(
@@ -466,10 +476,12 @@ result = response.json()
 print(f"Requested: {result['total_requested']}")
 print(f"Imported: {result['total_imported']}")
 print(f"Failed: {result['total_failed']}")
+print(f"Tags applied: {result['total_tags_applied']}")
 
 for artifact_result in result['results']:
     if artifact_result['success']:
-        print(f"✓ {artifact_result['artifact_id']}")
+        tags_msg = f" ({artifact_result['tags_applied']} tags)" if artifact_result['tags_applied'] > 0 else ""
+        print(f"✓ {artifact_result['artifact_id']}{tags_msg}")
     else:
         print(f"✗ {artifact_result['artifact_id']}: {artifact_result['error']}")
 ```
@@ -1242,12 +1254,19 @@ class SkillMeatClient:
         response = requests.post(url, headers=self.headers, json=data)
         return response.json()
 
-    def import_artifacts(self, artifacts, auto_resolve=False):
-        """Bulk import artifacts."""
+    def import_artifacts(self, artifacts, auto_resolve=False, apply_path_tags=True):
+        """Bulk import artifacts.
+
+        Args:
+            artifacts: List of artifact specifications to import
+            auto_resolve: Whether to overwrite existing artifacts
+            apply_path_tags: Whether to apply path-based tags during import
+        """
         url = f"{self.base_url}/artifacts/discover/import"
         data = {
             "artifacts": artifacts,
-            "auto_resolve_conflicts": auto_resolve
+            "auto_resolve_conflicts": auto_resolve,
+            "apply_path_tags": apply_path_tags
         }
 
         response = requests.post(url, headers=self.headers, json=data)
