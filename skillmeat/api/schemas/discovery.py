@@ -426,6 +426,15 @@ class BulkImportRequest(BaseModel):
         description="List of artifact keys to mark as skipped (format: type:name)",
         examples=[["skill:canvas-design", "command:my-command"]],
     )
+    apply_path_tags: bool = Field(
+        default=True,
+        description=(
+            "Apply approved path-based tags to imported artifacts. "
+            "If true, segments with status='approved' in entry.path_segments "
+            "will be created/found and linked as tags to the imported artifact."
+        ),
+        examples=[True],
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -448,6 +457,7 @@ class BulkImportRequest(BaseModel):
                 ],
                 "auto_resolve_conflicts": False,
                 "skip_list": ["skill:existing-skill"],
+                "apply_path_tags": True,
             }
         }
     }
@@ -488,6 +498,15 @@ class ImportResult(BaseModel):
         description="Reason artifact was skipped (if status=skipped)",
         examples=["Artifact already exists in collection"],
     )
+    tags_applied: int = Field(
+        default=0,
+        description=(
+            "Number of path-based tags applied to this artifact during import. "
+            "Only non-zero when apply_path_tags=True and approved segments exist."
+        ),
+        ge=0,
+        examples=[3],
+    )
 
     model_config = ConfigDict(
         use_enum_values=True,
@@ -498,6 +517,7 @@ class ImportResult(BaseModel):
                 "message": "Artifact 'canvas-design' imported successfully",
                 "error": None,
                 "skip_reason": None,
+                "tags_applied": 3,
             }
         }
     )
@@ -550,6 +570,15 @@ class BulkImportResult(BaseModel):
         ge=0,
         examples=[7],
     )
+    total_tags_applied: int = Field(
+        default=0,
+        description=(
+            "Total number of path-based tags applied across all artifacts. "
+            "Sum of tags_applied from all ImportResult entries."
+        ),
+        ge=0,
+        examples=[15],
+    )
 
     results: List[ImportResult] = Field(
         default_factory=list,
@@ -584,6 +613,7 @@ class BulkImportResult(BaseModel):
                 "total_failed": 1,
                 "imported_to_collection": 5,
                 "added_to_project": 7,
+                "total_tags_applied": 15,
                 "results": [
                     {
                         "artifact_id": "skill:canvas-design",
@@ -591,6 +621,7 @@ class BulkImportResult(BaseModel):
                         "message": "Artifact 'canvas-design' imported successfully",
                         "error": None,
                         "skip_reason": None,
+                        "tags_applied": 3,
                     },
                     {
                         "artifact_id": "skill:existing-skill",
@@ -598,6 +629,7 @@ class BulkImportResult(BaseModel):
                         "message": "Artifact already exists",
                         "error": None,
                         "skip_reason": "Artifact already exists in collection",
+                        "tags_applied": 0,
                     },
                 ],
                 "duration_ms": 1250.5,

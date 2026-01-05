@@ -52,6 +52,7 @@ export interface BulkImportRequest {
   artifacts: BulkImportArtifact[];
   auto_resolve_conflicts?: boolean;
   skip_list?: string[];
+  apply_path_tags?: boolean;
 }
 
 /**
@@ -69,6 +70,7 @@ export interface ImportResult {
   message: string;
   error?: string;
   skip_reason?: string;
+  tags_applied?: number;
 }
 
 /**
@@ -85,6 +87,7 @@ export interface BulkImportResult {
   results: ImportResult[];
   duration_ms: number;
   summary?: string;
+  total_tags_applied?: number;
 }
 
 /**

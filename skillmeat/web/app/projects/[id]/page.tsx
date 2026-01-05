@@ -172,7 +172,11 @@ function ProjectDetailPageContent() {
   };
 
   // Handle bulk import from discovery
-  const handleImport = async (selected: DiscoveredArtifact[]) => {
+  const handleImport = async (
+    selected: DiscoveredArtifact[],
+    skipList?: string[],
+    applyPathTags?: boolean
+  ) => {
     try {
       const result = await bulkImport({
         artifacts: selected.map((a) => ({
@@ -184,6 +188,8 @@ function ProjectDetailPageContent() {
           scope: a.scope || 'user',
           path: a.path,
         })),
+        skip_list: skipList,
+        apply_path_tags: applyPathTags,
       });
 
       if (result.total_imported > 0) {

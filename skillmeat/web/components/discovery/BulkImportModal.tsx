@@ -48,7 +48,11 @@ export interface BulkImportModalProps {
   artifacts: DiscoveredArtifact[];
   open: boolean;
   onClose: () => void;
-  onImport: (selected: DiscoveredArtifact[], skipList?: string[]) => Promise<BulkImportResult>;
+  onImport: (
+    selected: DiscoveredArtifact[],
+    skipList?: string[],
+    applyPathTags?: boolean
+  ) => Promise<BulkImportResult>;
 }
 
 /**
@@ -82,6 +86,7 @@ function getStatusLabel(status?: ImportStatus): string {
 export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImportModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [skippedArtifacts, setSkippedArtifacts] = useState<Set<string>>(new Set());
+  const [applyPathTags, setApplyPathTags] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const tracking = useTrackDiscovery();
   const { showImportResult, showError } = useToastNotification();
@@ -135,7 +140,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     try {
       const selectedArtifacts = artifacts.filter((a) => selected.has(a.path));
       const skipList = Array.from(skippedArtifacts);
-      const result = await onImport(selectedArtifacts, skipList);
+      const result = await onImport(selectedArtifacts, skipList, applyPathTags);
 
       const duration = Date.now() - startTime;
 
@@ -333,6 +338,25 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
         </div>
 
         <DialogFooter>
+          {/* Path Tags Option */}
+          <div className="flex items-center gap-2 py-2 border-t">
+            <Checkbox
+              id="apply-path-tags"
+              checked={applyPathTags}
+              onCheckedChange={(checked) => setApplyPathTags(checked === true)}
+              disabled={isImporting}
+            />
+            <Label
+              htmlFor="apply-path-tags"
+              className="text-sm cursor-pointer"
+            >
+              Apply approved path tags
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              Automatically tag artifacts based on their source path
+            </span>
+          </div>
+
           <div className="flex items-center justify-between w-full">
             <div className="text-sm text-muted-foreground">
               {selected.size > 0 && `${selected.size} selected`}
