@@ -24,3 +24,6 @@ export * from './deployments';
 
 // Context entities (Agent Context Entities v1)
 export * from './context-entity';
+
+// Path-based tag extraction (Phase 1)
+export * from './path-tags';
