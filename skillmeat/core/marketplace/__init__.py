@@ -7,6 +7,8 @@ from GitHub repositories.
 from .content_hash import (
     compute_artifact_hash,
     compute_file_hash,
+    ContentHashCache,
+    MAX_HASH_FILE_SIZE,
 )
 from .diff_engine import (
     CatalogDiffEngine,
@@ -62,6 +64,8 @@ __all__ = [
     # Content hashing
     "compute_file_hash",
     "compute_artifact_hash",
+    "ContentHashCache",
+    "MAX_HASH_FILE_SIZE",
     # GitHub scanning
     "GitHubScanner",
     "ScanConfig",

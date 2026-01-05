@@ -157,12 +157,105 @@ class HeuristicDetector:
         self.enable_frontmatter_detection = enable_frontmatter_detection
         self.manual_mappings = manual_mappings or {}
 
+        # Normalize manual mappings: strip trailing slashes, use forward slashes
+        self._normalized_mappings: Dict[str, ArtifactType] = {}
+        for path, type_str in self.manual_mappings.items():
+            normalized_path = path.rstrip("/").replace("\\", "/")
+            artifact_type = self._string_to_artifact_type(type_str)
+            if artifact_type:
+                self._normalized_mappings[normalized_path] = artifact_type
+            else:
+                logger.warning(
+                    "Invalid artifact type '%s' in manual mapping for path '%s'",
+                    type_str,
+                    path,
+                )
+
         if self.manual_mappings:
             logger.debug(
                 "HeuristicDetector initialized with %d manual mapping(s): %s",
                 len(self.manual_mappings),
                 list(self.manual_mappings.keys()),
             )
+
+    def _string_to_artifact_type(self, type_str: str) -> Optional[ArtifactType]:
+        """Convert string to ArtifactType enum.
+
+        Args:
+            type_str: String representation of artifact type (case-insensitive)
+
+        Returns:
+            ArtifactType enum value or None if invalid
+
+        Examples:
+            >>> detector._string_to_artifact_type("skill")
+            ArtifactType.SKILL
+            >>> detector._string_to_artifact_type("mcp_server")
+            ArtifactType.MCP_SERVER
+            >>> detector._string_to_artifact_type("invalid")
+            None
+        """
+        type_mapping = {
+            "skill": ArtifactType.SKILL,
+            "command": ArtifactType.COMMAND,
+            "agent": ArtifactType.AGENT,
+            "mcp_server": ArtifactType.MCP_SERVER,
+            "mcp-server": ArtifactType.MCP_SERVER,
+            "hook": ArtifactType.HOOK,
+        }
+        return type_mapping.get(type_str.lower().strip())
+
+    def _check_manual_mapping(
+        self, dir_path: str
+    ) -> Optional[Tuple[ArtifactType, str]]:
+        """Check if a directory path matches any manual mapping.
+
+        Supports two types of matching:
+        1. Exact match: path exactly equals a mapping key
+        2. Prefix match: path starts with a mapping key followed by "/"
+
+        Matching is case-sensitive and uses forward slashes for paths.
+
+        Args:
+            dir_path: Directory path to check (e.g., "skills/my-skill")
+
+        Returns:
+            Tuple of (ArtifactType, match_type) if matched, where match_type is
+            "exact" or "prefix". Returns None if no match.
+
+        Examples:
+            With mapping {"skills": "skill"}:
+            >>> detector._check_manual_mapping("skills")
+            (ArtifactType.SKILL, "exact")
+            >>> detector._check_manual_mapping("skills/canvas")
+            (ArtifactType.SKILL, "prefix")
+            >>> detector._check_manual_mapping("skills/canvas/deep")
+            (ArtifactType.SKILL, "prefix")
+            >>> detector._check_manual_mapping("my-skills")
+            None
+            >>> detector._check_manual_mapping("skillset")
+            None
+            >>> detector._check_manual_mapping("other/skills")
+            None
+        """
+        if not self._normalized_mappings:
+            return None
+
+        # Normalize input path
+        normalized_path = dir_path.rstrip("/").replace("\\", "/")
+
+        # Check for exact match first (higher priority)
+        if normalized_path in self._normalized_mappings:
+            return (self._normalized_mappings[normalized_path], "exact")
+
+        # Check for prefix match
+        # Path must start with mapping key + "/" to be a valid prefix match
+        for mapping_path, artifact_type in self._normalized_mappings.items():
+            prefix = mapping_path + "/"
+            if normalized_path.startswith(prefix):
+                return (artifact_type, "prefix")
+
+        return None
 
     def _is_plugin_directory(
         self, dir_path: str, dir_to_files: Dict[str, Set[str]]
@@ -652,14 +745,49 @@ class HeuristicDetector:
                     container_dir = ancestor
                     break
 
-            # Detect artifact type and score
-            artifact_type, match_reasons, score_breakdown = self._score_directory(
-                dir_path, files, root_hint, use_frontmatter, container_hint
-            )
+            # Check for manual mapping override FIRST
+            manual_mapping_result = self._check_manual_mapping(dir_path)
+            manual_mapping_info: Optional[Dict[str, Any]] = None
+            if manual_mapping_result is not None:
+                mapped_type, match_type = manual_mapping_result
+                # Manual mapping overrides heuristic detection
+                artifact_type = mapped_type
+                confidence_score = 95  # High confidence for manual mappings
+                raw_score = MAX_RAW_SCORE  # Max raw score for manual mappings
+                match_reasons = [
+                    f"Manual mapping ({match_type} match): {mapped_type.value}"
+                ]
+                score_breakdown = {
+                    "dir_name_score": 0,
+                    "manifest_score": 0,
+                    "extensions_score": 0,
+                    "parent_hint_score": 0,
+                    "frontmatter_score": 0,
+                    "container_hint_score": 0,
+                    "depth_penalty": 0,
+                    "raw_total": raw_score,
+                }
+                # Store manual mapping info separately (not in breakdown which requires int values)
+                manual_mapping_info = {
+                    "is_manual_mapping": True,
+                    "match_type": match_type,
+                }
+                logger.debug(
+                    "Manual mapping applied to %s: type=%s, match=%s",
+                    dir_path,
+                    mapped_type.value,
+                    match_type,
+                )
+            else:
+                # No manual mapping - use heuristic detection
+                # Detect artifact type and score
+                artifact_type, match_reasons, score_breakdown = self._score_directory(
+                    dir_path, files, root_hint, use_frontmatter, container_hint
+                )
 
-            # Normalize raw score to 0-100 scale
-            raw_score = score_breakdown["raw_total"]
-            confidence_score = normalize_score(raw_score)
+                # Normalize raw score to 0-100 scale
+                raw_score = score_breakdown["raw_total"]
+                confidence_score = normalize_score(raw_score)
 
             # Bug Fix 3: Validate flat structure for commands/hooks/agents
             # These artifact types should be flat - nested subdirs reduce confidence
@@ -717,6 +845,7 @@ class HeuristicDetector:
                     depth_penalty=complete_breakdown["depth_penalty"],
                     raw_score=raw_score,
                     breakdown=complete_breakdown,
+                    metadata=manual_mapping_info,  # None if not manually mapped
                 )
                 matches.append(match)
 

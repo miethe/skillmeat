@@ -1576,6 +1576,11 @@ class HeuristicMatch(BaseModel):
             }
         ],
     )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional metadata about the match, including manual mapping info",
+        examples=[{"is_manual_mapping": True, "match_type": "exact"}],
+    )
 
     class Config:
         """Pydantic model configuration."""
