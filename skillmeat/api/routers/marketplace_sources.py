@@ -624,11 +624,41 @@ async def infer_github_url(request: InferUrlRequest) -> InferUrlResponse:
     An initial scan is automatically triggered upon creation. The response includes
     the scan status and artifact count.
 
+    **Manual Directory Mappings** (Optional):
+    You can provide manual_map during creation to override automatic type detection.
+    This is useful when you know the repository structure in advance.
+
+    **Example Request**:
+    ```json
+    {
+        "repo_url": "https://github.com/user/claude-templates",
+        "ref": "main",
+        "root_hint": "artifacts",
+        "trust_level": "trusted",
+        "manual_map": {
+            "skills/advanced": "skill",
+            "tools/cli": "command",
+            "agents/research": "agent"
+        },
+        "enable_frontmatter_detection": true
+    }
+    ```
+
+    **Validation**: All manual_map directory paths are validated against the repository
+    tree during creation. Invalid paths will cause a 422 error.
+
     If the initial scan fails, the source is still created with scan_status="error".
     You can retry scanning using the /rescan endpoint.
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
+    responses={
+        201: {"description": "Source created and initial scan triggered"},
+        400: {"description": "Bad request - invalid repository URL format"},
+        409: {"description": "Conflict - repository URL already exists"},
+        422: {"description": "Validation error - invalid manual_map directory paths"},
+        500: {"description": "Internal server error"},
+    },
 )
 async def create_source(request: CreateSourceRequest) -> SourceResponse:
     """Create a new GitHub repository source.
@@ -785,8 +815,42 @@ async def list_sources(
     description="""
     Retrieve a specific GitHub repository source by its unique identifier.
 
+    Returns all source configuration including manual_map if configured.
+
+    **Response Example**:
+    ```json
+    {
+        "id": "src-abc123",
+        "repo_url": "https://github.com/user/templates",
+        "owner": "user",
+        "repo_name": "templates",
+        "ref": "main",
+        "root_hint": "claude-artifacts",
+        "trust_level": "trusted",
+        "visibility": "public",
+        "scan_status": "success",
+        "artifact_count": 42,
+        "manual_map": {
+            "advanced-skills/python-backend": "skill",
+            "cli-tools/scaffold": "command"
+        },
+        "enable_frontmatter_detection": true,
+        "last_sync_at": "2025-01-06T12:00:00Z",
+        "created_at": "2025-01-06T10:00:00Z",
+        "updated_at": "2025-01-06T11:30:00Z"
+    }
+    ```
+
+    **manual_map field**: Dictionary mapping directory paths to artifact types.
+    Empty dictionary or null if no manual mappings configured.
+
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
+    responses={
+        200: {"description": "Source details retrieved successfully"},
+        404: {"description": "Source not found"},
+        500: {"description": "Internal server error"},
+    },
 )
 async def get_source(source_id: str) -> SourceResponse:
     """Get a marketplace source by ID.
@@ -834,25 +898,46 @@ async def get_source(source_id: str) -> SourceResponse:
     description, notes, and frontmatter detection settings.
     Changes take effect on the next scan.
 
-    **Manual Mapping**: Use `manual_map` to override automatic artifact type detection
-    for specific directories. Provide a dictionary mapping directory paths to artifact types.
+    **Manual Directory Mappings**:
+    Use `manual_map` to override automatic artifact type detection for specific directories.
+    This is useful when heuristic detection fails or when you want to force a directory
+    to be treated as a specific artifact type.
 
-    Example PATCH request with manual_map:
+    **Supported artifact types**: `skill`, `command`, `agent`, `mcp_server`, `hook`
+
+    **Example Request with manual_map**:
     ```json
     {
         "manual_map": {
-            "skills/python": "skill",
-            "commands/dev": "command",
-            "agents/qa": "agent"
+            "advanced-skills/python-backend": "skill",
+            "cli-tools/scaffold": "command",
+            "research-agents/market-analysis": "agent"
         }
     }
     ```
 
-    **Path Validation**: All directory paths in `manual_map` are validated against the
-    repository tree. If a path doesn't exist, the request will fail with 422 status.
+    **Validation**:
+    - All directory paths must exist in the repository (validated against GitHub tree)
+    - Artifact types must be one of: skill, command, agent, mcp_server, hook
+    - Invalid paths or types will return 422 Unprocessable Entity
+
+    **Clear Mapping**:
+    To remove all manual mappings, send an empty dictionary:
+    ```json
+    {
+        "manual_map": {}
+    }
+    ```
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
+    responses={
+        200: {"description": "Source updated successfully"},
+        400: {"description": "Bad request - no update parameters provided"},
+        404: {"description": "Source not found"},
+        422: {"description": "Validation error - invalid directory path or artifact type"},
+        500: {"description": "Internal server error - GitHub API failure or database error"},
+    },
 )
 async def update_source(
     source_id: str,
@@ -1034,13 +1119,20 @@ async def delete_source(source_id: str) -> None:
     For large repositories, this may take several seconds. Future versions may
     support asynchronous background jobs.
 
-    The scan will:
+    **Scan Process**:
     1. Fetch the repository tree from GitHub
     2. Apply heuristic detection to identify artifacts
-    3. Deduplicate artifacts within the source (same content, different paths)
-    4. Deduplicate artifacts against existing collection (already imported)
-    5. Update the catalog with discovered unique artifacts
-    6. Update source metadata (artifact_count, last_sync_at, etc.)
+    3. **Apply manual_map overrides** (if configured on source)
+    4. Deduplicate artifacts within the source (same content, different paths)
+    5. Deduplicate artifacts against existing collection (already imported)
+    6. Update the catalog with discovered unique artifacts
+    7. Update source metadata (artifact_count, last_sync_at, etc.)
+
+    **Manual Mappings**:
+    The scan uses any manual_map configured on the source to override automatic type
+    detection. For example, if manual_map contains `{"advanced-skills": "skill"}`,
+    all artifacts in the `advanced-skills` directory will be treated as skills
+    regardless of heuristic detection results.
 
     **Response includes deduplication statistics**:
     - `duplicates_within_source`: Duplicate artifacts found in this repo scan
@@ -1048,8 +1140,32 @@ async def delete_source(source_id: str) -> None:
     - `total_detected`: Total artifacts before deduplication
     - `total_unique`: Unique artifacts added to catalog
 
+    **Example Response**:
+    ```json
+    {
+        "source_id": "src-abc123",
+        "status": "success",
+        "artifacts_found": 42,
+        "new_count": 5,
+        "updated_count": 2,
+        "removed_count": 1,
+        "unchanged_count": 34,
+        "scan_duration_ms": 3421,
+        "scanned_at": "2025-01-06T12:00:00Z",
+        "duplicates_within_source": 3,
+        "duplicates_cross_source": 2,
+        "total_detected": 52,
+        "total_unique": 47
+    }
+    ```
+
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
+    responses={
+        200: {"description": "Scan completed successfully"},
+        404: {"description": "Source not found"},
+        500: {"description": "Scan failed - check error message in response"},
+    },
 )
 async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResultDTO:
     """Trigger a rescan of a marketplace source.
