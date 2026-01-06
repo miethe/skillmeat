@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 69
+progress: 77
 total_tasks: 13
-completed_tasks: 9
+completed_tasks: 10
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -110,10 +110,13 @@ tasks:
 
   - id: "P3.3c"
     name: "Update response schema"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.3b"]
     effort: "2 pts"
+    completed_by: "a5ef7b9"
+    completed_at: 2026-01-06
+    note: "Enhanced ScanResultDTO schema descriptions for dedup fields, updated rescan endpoint docs with deduplication process explanation"
 
   - id: "P3.3d"
     name: "Integration test"

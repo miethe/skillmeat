@@ -1346,25 +1346,32 @@ class ScanResultDTO(BaseModel):
     )
     duplicates_within_source: int = Field(
         default=0,
-        description="Number of duplicates found within this source",
+        description="Number of duplicate artifacts detected within this source and "
+        "excluded from catalog. These are artifacts with identical content (same SHA256 "
+        "hash) found multiple times in the same repository scan.",
         ge=0,
         examples=[2],
     )
     duplicates_cross_source: int = Field(
         default=0,
-        description="Number of duplicates found against existing collection",
+        description="Number of duplicate artifacts detected that already exist in the "
+        "collection (from other sources or previous scans) and excluded from catalog. "
+        "These are artifacts matching existing collection entries by content hash.",
         ge=0,
         examples=[3],
     )
     total_detected: int = Field(
         default=0,
-        description="Original detection count before deduplication",
+        description="Total number of artifacts initially detected before deduplication. "
+        "Equals: total_unique + duplicates_within_source + duplicates_cross_source",
         ge=0,
         examples=[15],
     )
     total_unique: int = Field(
         default=0,
-        description="Final count of unique artifacts after deduplication",
+        description="Number of unique artifacts after deduplication that were added to "
+        "the catalog. These are new artifacts not previously seen in this source or the "
+        "existing collection.",
         ge=0,
         examples=[10],
     )
