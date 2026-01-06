@@ -1926,20 +1926,25 @@ class TestManualMappings:
         detector = HeuristicDetector(manual_mappings={"skills": "skill", "cmds": "command"})
 
         result = detector._check_manual_mapping("skills")
-        assert result == (ArtifactType.SKILL, "exact")
+        assert result == (ArtifactType.SKILL, "exact", 0)
 
         result = detector._check_manual_mapping("cmds")
-        assert result == (ArtifactType.COMMAND, "exact")
+        assert result == (ArtifactType.COMMAND, "exact", 0)
 
-    def test_prefix_match(self):
-        """Test prefix path matching with / separator."""
+    def test_inherited_match(self):
+        """Test hierarchical inheritance matching with depth tracking."""
         detector = HeuristicDetector(manual_mappings={"skills": "skill"})
 
+        # Direct child inherits from parent (depth 1)
         result = detector._check_manual_mapping("skills/canvas")
-        assert result == (ArtifactType.SKILL, "prefix")
+        assert result == (ArtifactType.SKILL, "inherited", 1)
+
+        # Deeper nested paths inherit with increasing depth
+        result = detector._check_manual_mapping("skills/canvas/deep")
+        assert result == (ArtifactType.SKILL, "inherited", 2)
 
         result = detector._check_manual_mapping("skills/canvas/deep/nested")
-        assert result == (ArtifactType.SKILL, "prefix")
+        assert result == (ArtifactType.SKILL, "inherited", 3)
 
     def test_no_partial_name_match(self):
         """Test that partial name matches are NOT allowed."""
@@ -1969,11 +1974,11 @@ class TestManualMappings:
 
         # Should still match exact
         result = detector._check_manual_mapping("skills")
-        assert result == (ArtifactType.SKILL, "exact")
+        assert result == (ArtifactType.SKILL, "exact", 0)
 
-        # Should still match prefix
+        # Should still match inherited
         result = detector._check_manual_mapping("skills/canvas")
-        assert result == (ArtifactType.SKILL, "prefix")
+        assert result == (ArtifactType.SKILL, "inherited", 1)
 
     def test_integration_exact_match(self):
         """Test manual mapping integration with analyze_paths (exact match)."""
@@ -1991,10 +1996,11 @@ class TestManualMappings:
         assert matches[0].metadata is not None
         assert matches[0].metadata.get("is_manual_mapping") is True
         assert matches[0].metadata.get("match_type") == "exact"
-        assert "Manual mapping (exact match)" in matches[0].match_reasons[0]
+        assert matches[0].metadata.get("inheritance_depth") == 0
+        assert "Manual mapping (exact match, depth=0)" in matches[0].match_reasons[0]
 
-    def test_integration_prefix_match(self):
-        """Test manual mapping integration with analyze_paths (prefix match)."""
+    def test_integration_inherited_match(self):
+        """Test manual mapping integration with analyze_paths (inherited match)."""
         files = [
             "my-artifacts/subdir/SKILL.md",
             "my-artifacts/subdir/index.ts",
@@ -2008,7 +2014,8 @@ class TestManualMappings:
         assert matches[0].confidence_score == 95
         assert matches[0].metadata is not None
         assert matches[0].metadata.get("is_manual_mapping") is True
-        assert matches[0].metadata.get("match_type") == "prefix"
+        assert matches[0].metadata.get("match_type") == "inherited"
+        assert matches[0].metadata.get("inheritance_depth") == 1
 
     def test_non_matching_paths_use_heuristics(self):
         """Test that non-matching paths still use heuristic detection."""
@@ -2064,20 +2071,62 @@ class TestManualMappings:
             }
         )
 
-        assert detector._check_manual_mapping("lib/skills") == (ArtifactType.SKILL, "exact")
-        assert detector._check_manual_mapping("lib/skills/canvas") == (ArtifactType.SKILL, "prefix")
-        assert detector._check_manual_mapping("lib/commands") == (ArtifactType.COMMAND, "exact")
-        assert detector._check_manual_mapping("lib/commands/deploy") == (ArtifactType.COMMAND, "prefix")
-        assert detector._check_manual_mapping("lib/agents/helper") == (ArtifactType.AGENT, "prefix")
+        assert detector._check_manual_mapping("lib/skills") == (ArtifactType.SKILL, "exact", 0)
+        assert detector._check_manual_mapping("lib/skills/canvas") == (ArtifactType.SKILL, "inherited", 1)
+        assert detector._check_manual_mapping("lib/commands") == (ArtifactType.COMMAND, "exact", 0)
+        assert detector._check_manual_mapping("lib/commands/deploy") == (ArtifactType.COMMAND, "inherited", 1)
+        assert detector._check_manual_mapping("lib/agents/helper") == (ArtifactType.AGENT, "inherited", 1)
 
     def test_case_sensitive_matching(self):
         """Test that path matching is case-sensitive."""
         detector = HeuristicDetector(manual_mappings={"Skills": "skill"})
 
         # Exact case should match
-        assert detector._check_manual_mapping("Skills") == (ArtifactType.SKILL, "exact")
-        assert detector._check_manual_mapping("Skills/canvas") == (ArtifactType.SKILL, "prefix")
+        assert detector._check_manual_mapping("Skills") == (ArtifactType.SKILL, "exact", 0)
+        assert detector._check_manual_mapping("Skills/canvas") == (ArtifactType.SKILL, "inherited", 1)
 
         # Different case should NOT match
         assert detector._check_manual_mapping("skills") is None
         assert detector._check_manual_mapping("SKILLS") is None
+
+    def test_hierarchical_inheritance_most_specific_wins(self):
+        """Test that most specific (longest) parent mapping wins."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "skills": "skill",
+                "skills/canvas": "command",  # More specific mapping
+            }
+        )
+
+        # Exact matches
+        assert detector._check_manual_mapping("skills") == (ArtifactType.SKILL, "exact", 0)
+        assert detector._check_manual_mapping("skills/canvas") == (ArtifactType.COMMAND, "exact", 0)
+
+        # skills/canvas/nested should match skills/canvas (depth 1), not skills (depth 2)
+        result = detector._check_manual_mapping("skills/canvas/nested")
+        assert result == (ArtifactType.COMMAND, "inherited", 1)
+        assert result[0] == ArtifactType.COMMAND  # Not SKILL!
+
+        # skills/canvas/nested/deep should also match skills/canvas (depth 2)
+        result = detector._check_manual_mapping("skills/canvas/nested/deep")
+        assert result == (ArtifactType.COMMAND, "inherited", 2)
+
+        # skills/other should match skills (depth 1) since no skills/other mapping
+        result = detector._check_manual_mapping("skills/other")
+        assert result == (ArtifactType.SKILL, "inherited", 1)
+
+        # skills/other/nested should match skills (depth 2)
+        result = detector._check_manual_mapping("skills/other/nested")
+        assert result == (ArtifactType.SKILL, "inherited", 2)
+
+    def test_hierarchical_inheritance_deep_nesting(self):
+        """Test inheritance depth tracking for deeply nested paths."""
+        detector = HeuristicDetector(manual_mappings={"root": "skill"})
+
+        # Test various depths
+        assert detector._check_manual_mapping("root") == (ArtifactType.SKILL, "exact", 0)
+        assert detector._check_manual_mapping("root/a") == (ArtifactType.SKILL, "inherited", 1)
+        assert detector._check_manual_mapping("root/a/b") == (ArtifactType.SKILL, "inherited", 2)
+        assert detector._check_manual_mapping("root/a/b/c") == (ArtifactType.SKILL, "inherited", 3)
+        assert detector._check_manual_mapping("root/a/b/c/d") == (ArtifactType.SKILL, "inherited", 4)
+        assert detector._check_manual_mapping("root/a/b/c/d/e") == (ArtifactType.SKILL, "inherited", 5)

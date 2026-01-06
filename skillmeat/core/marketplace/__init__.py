@@ -10,6 +10,7 @@ from .content_hash import (
     ContentHashCache,
     MAX_HASH_FILE_SIZE,
 )
+from .deduplication_engine import DeduplicationEngine
 from .diff_engine import (
     CatalogDiffEngine,
     ChangeType,
@@ -66,6 +67,8 @@ __all__ = [
     "compute_artifact_hash",
     "ContentHashCache",
     "MAX_HASH_FILE_SIZE",
+    # Deduplication
+    "DeduplicationEngine",
     # GitHub scanning
     "GitHubScanner",
     "ScanConfig",

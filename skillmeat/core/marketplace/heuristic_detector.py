@@ -207,30 +207,44 @@ class HeuristicDetector:
 
     def _check_manual_mapping(
         self, dir_path: str
-    ) -> Optional[Tuple[ArtifactType, str]]:
-        """Check if a directory path matches any manual mapping.
+    ) -> Optional[Tuple[ArtifactType, str, int]]:
+        """Check if a directory path matches any manual mapping with hierarchical inheritance.
 
-        Supports two types of matching:
-        1. Exact match: path exactly equals a mapping key
-        2. Prefix match: path starts with a mapping key followed by "/"
+        Supports hierarchical matching with inheritance depth tracking:
+        1. Exact match: path exactly equals a mapping key (depth 0)
+        2. Parent match: path's parent matches a mapping key (depth 1)
+        3. Grandparent match: path's grandparent matches (depth 2)
+        4. And so on up the hierarchy...
+
+        The MOST SPECIFIC (longest) matching path is returned. For example, if both
+        "skills" and "skills/canvas" are mapped, path "skills/canvas/nested" will
+        match "skills/canvas" (depth 1), not "skills" (depth 2).
 
         Matching is case-sensitive and uses forward slashes for paths.
 
         Args:
-            dir_path: Directory path to check (e.g., "skills/my-skill")
+            dir_path: Directory path to check (e.g., "skills/my-skill/nested")
 
         Returns:
-            Tuple of (ArtifactType, match_type) if matched, where match_type is
-            "exact" or "prefix". Returns None if no match.
+            Tuple of (ArtifactType, match_type, inheritance_depth) if matched:
+            - match_type: "exact" or "inherited"
+            - inheritance_depth: 0 for exact match, 1+ for parent/ancestor matches
+            Returns None if no match.
 
         Examples:
-            With mapping {"skills": "skill"}:
+            With mappings {"skills": "skill", "skills/canvas": "command"}:
             >>> detector._check_manual_mapping("skills")
-            (ArtifactType.SKILL, "exact")
+            (ArtifactType.SKILL, "exact", 0)
             >>> detector._check_manual_mapping("skills/canvas")
-            (ArtifactType.SKILL, "prefix")
-            >>> detector._check_manual_mapping("skills/canvas/deep")
-            (ArtifactType.SKILL, "prefix")
+            (ArtifactType.COMMAND, "exact", 0)
+            >>> detector._check_manual_mapping("skills/canvas/nested")
+            (ArtifactType.COMMAND, "inherited", 1)
+            >>> detector._check_manual_mapping("skills/canvas/nested/deep")
+            (ArtifactType.COMMAND, "inherited", 2)
+            >>> detector._check_manual_mapping("skills/other")
+            (ArtifactType.SKILL, "inherited", 1)
+            >>> detector._check_manual_mapping("skills/other/nested")
+            (ArtifactType.SKILL, "inherited", 2)
             >>> detector._check_manual_mapping("my-skills")
             None
             >>> detector._check_manual_mapping("skillset")
@@ -244,16 +258,27 @@ class HeuristicDetector:
         # Normalize input path
         normalized_path = dir_path.rstrip("/").replace("\\", "/")
 
-        # Check for exact match first (higher priority)
+        # Check for exact match first (highest priority, depth 0)
         if normalized_path in self._normalized_mappings:
-            return (self._normalized_mappings[normalized_path], "exact")
+            return (self._normalized_mappings[normalized_path], "exact", 0)
 
-        # Check for prefix match
-        # Path must start with mapping key + "/" to be a valid prefix match
-        for mapping_path, artifact_type in self._normalized_mappings.items():
-            prefix = mapping_path + "/"
-            if normalized_path.startswith(prefix):
-                return (artifact_type, "prefix")
+        # Walk up the path hierarchy to find the most specific (longest) parent match
+        # Split path into parts and progressively check shorter prefixes
+        path_parts = normalized_path.split("/")
+
+        # Start from immediate parent (len - 1) down to root (1 part)
+        # This ensures we find the MOST SPECIFIC match first
+        for depth in range(1, len(path_parts)):
+            # Build ancestor path by taking all parts except the last 'depth' parts
+            ancestor_parts = path_parts[: len(path_parts) - depth]
+            ancestor_path = "/".join(ancestor_parts)
+
+            if ancestor_path in self._normalized_mappings:
+                return (
+                    self._normalized_mappings[ancestor_path],
+                    "inherited",
+                    depth,
+                )
 
         return None
 
@@ -749,13 +774,14 @@ class HeuristicDetector:
             manual_mapping_result = self._check_manual_mapping(dir_path)
             manual_mapping_info: Optional[Dict[str, Any]] = None
             if manual_mapping_result is not None:
-                mapped_type, match_type = manual_mapping_result
+                mapped_type, match_type, inheritance_depth = manual_mapping_result
                 # Manual mapping overrides heuristic detection
                 artifact_type = mapped_type
                 confidence_score = 95  # High confidence for manual mappings
                 raw_score = MAX_RAW_SCORE  # Max raw score for manual mappings
                 match_reasons = [
-                    f"Manual mapping ({match_type} match): {mapped_type.value}"
+                    f"Manual mapping ({match_type} match, depth={inheritance_depth}): "
+                    f"{mapped_type.value}"
                 ]
                 score_breakdown = {
                     "dir_name_score": 0,
@@ -768,15 +794,18 @@ class HeuristicDetector:
                     "raw_total": raw_score,
                 }
                 # Store manual mapping info separately (not in breakdown which requires int values)
+                # inheritance_depth is used by P2.1d for confidence scoring adjustments
                 manual_mapping_info = {
                     "is_manual_mapping": True,
                     "match_type": match_type,
+                    "inheritance_depth": inheritance_depth,
                 }
                 logger.debug(
-                    "Manual mapping applied to %s: type=%s, match=%s",
+                    "Manual mapping applied to %s: type=%s, match=%s, depth=%d",
                     dir_path,
                     mapped_type.value,
                     match_type,
+                    inheritance_depth,
                 )
             else:
                 # No manual mapping - use heuristic detection
