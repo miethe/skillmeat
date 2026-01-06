@@ -150,8 +150,11 @@ class HeuristicDetector:
             manual_mappings: Optional directory-to-artifact-type mappings for manual
                 override. Format: {"path/to/dir": "skill", "another/path": "command"}.
                 Valid artifact types: "skill", "command", "agent", "mcp_server", "hook".
-                When provided, directories matching these paths will use the specified
-                artifact type with high confidence (95), bypassing heuristic detection.
+                When provided, directories matching these paths (or inheriting from them)
+                will use the specified artifact type, bypassing heuristic detection.
+                Confidence scores vary by inheritance depth: exact match=95, depth=1=92,
+                depth=2=89, depth=3+=86 (minimum). This ensures manual mappings always
+                beat heuristic detection (max ~80) while still reflecting match quality.
         """
         self.config = config or DetectionConfig()
         self.enable_frontmatter_detection = enable_frontmatter_detection
@@ -777,11 +780,29 @@ class HeuristicDetector:
                 mapped_type, match_type, inheritance_depth = manual_mapping_result
                 # Manual mapping overrides heuristic detection
                 artifact_type = mapped_type
-                confidence_score = 95  # High confidence for manual mappings
+
+                # Calculate confidence based on match type and inheritance depth
+                # Formula: confidence = max(86, 95 - (inheritance_depth * 3))
+                # - Exact match (depth=0): 95
+                # - Inherited depth=1: 92
+                # - Inherited depth=2: 89
+                # - Inherited depth=3+: 86 (minimum for manual mapping)
+                confidence_score = max(86, 95 - (inheritance_depth * 3))
+
+                # Build confidence reason for transparency
+                if match_type == "exact":
+                    confidence_reason = "Manual mapping exact match (95)"
+                else:
+                    confidence_reason = (
+                        f"Manual mapping inherited from ancestor "
+                        f"(depth={inheritance_depth}, score={confidence_score})"
+                    )
+
                 raw_score = MAX_RAW_SCORE  # Max raw score for manual mappings
                 match_reasons = [
                     f"Manual mapping ({match_type} match, depth={inheritance_depth}): "
-                    f"{mapped_type.value}"
+                    f"{mapped_type.value}",
+                    confidence_reason,
                 ]
                 score_breakdown = {
                     "dir_name_score": 0,
@@ -794,18 +815,19 @@ class HeuristicDetector:
                     "raw_total": raw_score,
                 }
                 # Store manual mapping info separately (not in breakdown which requires int values)
-                # inheritance_depth is used by P2.1d for confidence scoring adjustments
                 manual_mapping_info = {
                     "is_manual_mapping": True,
                     "match_type": match_type,
                     "inheritance_depth": inheritance_depth,
+                    "confidence_reason": confidence_reason,
                 }
                 logger.debug(
-                    "Manual mapping applied to %s: type=%s, match=%s, depth=%d",
+                    "Manual mapping applied to %s: type=%s, match=%s, depth=%d, confidence=%d",
                     dir_path,
                     mapped_type.value,
                     match_type,
                     inheritance_depth,
+                    confidence_score,
                 )
             else:
                 # No manual mapping - use heuristic detection
@@ -1504,8 +1526,9 @@ def detect_artifacts_in_tree(
         manual_mappings: Optional directory-to-artifact-type mappings for manual
             override. Format: {"path/to/dir": "skill", "another/path": "command"}.
             Valid artifact types: "skill", "command", "agent", "mcp_server", "hook".
-            When provided, directories matching these paths will use the specified
-            artifact type with high confidence (95), bypassing heuristic detection.
+            When provided, directories matching these paths (or inheriting from them)
+            will use the specified artifact type, bypassing heuristic detection.
+            Confidence scores: exact match=95, depth=1=92, depth=2=89, depth=3+=86.
 
     Returns:
         List of detected artifacts with confidence scores
