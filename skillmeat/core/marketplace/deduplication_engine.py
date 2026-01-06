@@ -331,6 +331,122 @@ class DeduplicationEngine:
 
         return kept_artifacts, excluded_artifacts
 
+    def deduplicate_cross_source(
+        self,
+        new_artifacts: list[dict[str, Any]],
+        existing_hashes: set[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Deduplicate new artifacts against existing collection hashes.
+
+        Stage 2 deduplication: identifies artifacts from a marketplace scan
+        that already exist in the user's collection (from other sources).
+        This runs AFTER deduplicate_within_source().
+
+        Args:
+            new_artifacts: List of artifact dictionaries from current scan,
+                typically the "kept" output from deduplicate_within_source().
+                Expected to have metadata.content_hash set from prior processing.
+                Structure:
+                {
+                    "path": str,
+                    "files": dict[str, str],
+                    "confidence_score": float,
+                    "artifact_type": str,
+                    "metadata": {"content_hash": str, ...},
+                }
+            existing_hashes: Set of content hashes from artifacts already
+                in the user's collection. These represent artifacts from
+                other marketplace sources or manual additions.
+
+        Returns:
+            Tuple of (unique_artifacts, cross_source_duplicates):
+            - unique_artifacts: Artifacts with hashes not in existing_hashes
+            - cross_source_duplicates: Artifacts marked with exclusion metadata:
+                - excluded = True
+                - excluded_reason = "duplicate_cross_source"
+                - content_hash = hash value for reference
+
+        Note:
+            Unlike within-source dedup, cross-source duplicates do not have
+            a `duplicate_of` field because we only know the hash exists,
+            not which specific existing artifact it matches.
+
+        Example:
+            >>> engine = DeduplicationEngine()
+            >>> # After within-source dedup, we have kept artifacts
+            >>> kept = [
+            ...     {"path": "skills/a", "files": {"SKILL.md": "content A"},
+            ...      "confidence_score": 0.9, "metadata": {"content_hash": "abc123"}},
+            ...     {"path": "skills/b", "files": {"SKILL.md": "content B"},
+            ...      "confidence_score": 0.8, "metadata": {"content_hash": "def456"}},
+            ... ]
+            >>> # Existing collection already has hash "abc123"
+            >>> existing = {"abc123", "xyz789"}
+            >>> unique, dupes = engine.deduplicate_cross_source(kept, existing)
+            >>> len(unique)  # Only skills/b is unique
+            1
+            >>> len(dupes)  # skills/a is duplicate of existing
+            1
+            >>> dupes[0]["excluded_reason"]
+            'duplicate_cross_source'
+        """
+        if not new_artifacts:
+            logger.debug("No new artifacts to check against existing collection")
+            return [], []
+
+        if not existing_hashes:
+            logger.debug(
+                f"No existing hashes to check against, "
+                f"all {len(new_artifacts)} artifacts are unique"
+            )
+            return list(new_artifacts), []
+
+        unique_artifacts: list[dict[str, Any]] = []
+        cross_source_duplicates: list[dict[str, Any]] = []
+
+        for artifact in new_artifacts:
+            # Get content hash from metadata, or compute if not present
+            metadata = artifact.get("metadata", {})
+            content_hash = metadata.get("content_hash")
+
+            if content_hash is None:
+                # Hash not computed yet - compute it now
+                files = artifact.get("files", {})
+                content_hash = self.compute_hash(files)
+
+                # Store in metadata for future reference
+                if "metadata" not in artifact:
+                    artifact["metadata"] = {}
+                artifact["metadata"]["content_hash"] = content_hash
+
+            # Check if this hash exists in the collection
+            if content_hash in existing_hashes:
+                # Mark as cross-source duplicate
+                artifact["excluded"] = True
+                artifact["excluded_reason"] = "duplicate_cross_source"
+                artifact["content_hash"] = content_hash
+                cross_source_duplicates.append(artifact)
+            else:
+                unique_artifacts.append(artifact)
+
+        # Log summary
+        total = len(new_artifacts)
+        unique_count = len(unique_artifacts)
+        duplicate_count = len(cross_source_duplicates)
+
+        logger.info(
+            f"Cross-source dedup: {total} new artifacts, "
+            f"{duplicate_count} duplicates of existing collection"
+        )
+
+        if duplicate_count > 0:
+            logger.debug(
+                f"Cross-source duplicates: "
+                f"{[a.get('path', 'unknown') for a in cross_source_duplicates]}"
+            )
+
+        return unique_artifacts, cross_source_duplicates
+
 
 if __name__ == "__main__":
     # Self-test examples
@@ -526,6 +642,148 @@ if __name__ == "__main__":
     kept_all, excluded_none = engine2.deduplicate_within_source(unique_artifacts)
     print(f"    All unique: kept={len(kept_all)}, excluded={len(excluded_none)}")
     assert len(kept_all) == 3 and len(excluded_none) == 0
+
+    # Test 12: Cross-source deduplication
+    print("\n12. Cross-source deduplication:")
+    engine3 = DeduplicationEngine()
+
+    # Simulate artifacts from a new source scan (after within-source dedup)
+    new_scan_artifacts = [
+        {
+            "path": "skills/canvas",
+            "files": {"SKILL.md": "canvas content"},
+            "confidence_score": 0.9,
+            "metadata": {},  # Hash will be computed
+        },
+        {
+            "path": "skills/unique-new",
+            "files": {"SKILL.md": "unique new content"},
+            "confidence_score": 0.85,
+            "metadata": {},
+        },
+        {
+            "path": "skills/another-existing",
+            "files": {"SKILL.md": "existing content"},
+            "confidence_score": 0.8,
+            "metadata": {},
+        },
+    ]
+
+    # Compute hashes for existing collection simulation
+    existing_canvas_hash = engine3.compute_hash({"SKILL.md": "canvas content"})
+    existing_other_hash = engine3.compute_hash({"SKILL.md": "existing content"})
+    existing_unrelated_hash = engine3.compute_hash({"SKILL.md": "unrelated"})
+
+    existing_hashes = {existing_canvas_hash, existing_other_hash, existing_unrelated_hash}
+
+    unique, cross_dupes = engine3.deduplicate_cross_source(new_scan_artifacts, existing_hashes)
+
+    print(f"   New artifacts: {len(new_scan_artifacts)}")
+    print(f"   Existing hashes: {len(existing_hashes)}")
+    print(f"   Unique (new to collection): {len(unique)}")
+    print(f"   Cross-source duplicates: {len(cross_dupes)}")
+
+    print("\n   Unique artifacts:")
+    for a in unique:
+        print(f"      - {a['path']}")
+
+    print("\n   Cross-source duplicates:")
+    for a in cross_dupes:
+        print(f"      - {a['path']}")
+        print(f"        excluded={a.get('excluded')}")
+        print(f"        excluded_reason={a.get('excluded_reason')}")
+        print(f"        content_hash={a.get('content_hash', 'N/A')[:12]}...")
+
+    # Verify results
+    unique_paths = [a["path"] for a in unique]
+    assert "skills/unique-new" in unique_paths, "Unique artifact should be kept"
+    assert len(unique) == 1, f"Expected 1 unique, got {len(unique)}"
+    assert len(cross_dupes) == 2, f"Expected 2 cross-source dupes, got {len(cross_dupes)}"
+
+    for dupe in cross_dupes:
+        assert dupe.get("excluded") is True
+        assert dupe.get("excluded_reason") == "duplicate_cross_source"
+        assert dupe.get("content_hash") is not None
+        # Note: No duplicate_of field for cross-source
+
+    print("\n   Verification: All assertions passed!")
+
+    # Test 13: Cross-source with pre-computed hashes
+    print("\n13. Cross-source with pre-computed hashes:")
+    pre_hashed_artifacts = [
+        {
+            "path": "skills/a",
+            "files": {"SKILL.md": "content A"},
+            "confidence_score": 0.9,
+            "metadata": {"content_hash": "abc123def456"},  # Pre-computed
+        },
+        {
+            "path": "skills/b",
+            "files": {"SKILL.md": "content B"},
+            "confidence_score": 0.8,
+            "metadata": {"content_hash": "xyz789uvw012"},  # Pre-computed
+        },
+    ]
+    existing_set = {"abc123def456"}  # Only matches first artifact
+
+    unique_pre, dupes_pre = engine3.deduplicate_cross_source(pre_hashed_artifacts, existing_set)
+    print(f"   Pre-hashed artifacts: {len(pre_hashed_artifacts)}")
+    print(f"   Unique: {len(unique_pre)}, Duplicates: {len(dupes_pre)}")
+    assert len(unique_pre) == 1 and unique_pre[0]["path"] == "skills/b"
+    assert len(dupes_pre) == 1 and dupes_pre[0]["path"] == "skills/a"
+    print("   Verification: Pre-computed hashes used correctly!")
+
+    # Test 14: Cross-source empty inputs
+    print("\n14. Cross-source empty inputs:")
+    empty_unique, empty_dupes = engine3.deduplicate_cross_source([], {"hash1"})
+    print(f"   Empty artifacts: unique={len(empty_unique)}, dupes={len(empty_dupes)}")
+    assert empty_unique == [] and empty_dupes == []
+
+    all_unique, no_dupes = engine3.deduplicate_cross_source(
+        [{"path": "a", "files": {"f.md": "content"}, "metadata": {}}],
+        set()  # Empty existing hashes
+    )
+    print(f"   Empty existing hashes: unique={len(all_unique)}, dupes={len(no_dupes)}")
+    assert len(all_unique) == 1 and len(no_dupes) == 0
+
+    # Test 15: Full pipeline - within-source then cross-source
+    print("\n15. Full deduplication pipeline:")
+    engine4 = DeduplicationEngine()
+
+    # Simulate raw scan with internal duplicates
+    raw_scan = [
+        {"path": "a", "files": {"f.md": "content1"}, "confidence_score": 0.9},
+        {"path": "b", "files": {"f.md": "content1"}, "confidence_score": 0.8},  # Dup of a
+        {"path": "c", "files": {"f.md": "content2"}, "confidence_score": 0.85},
+        {"path": "d", "files": {"f.md": "content3"}, "confidence_score": 0.7},
+    ]
+
+    # Existing collection has content2
+    existing_content2_hash = engine4.compute_hash({"f.md": "content2"})
+    collection_hashes = {existing_content2_hash}
+
+    # Stage 1: Within-source
+    stage1_kept, stage1_excluded = engine4.deduplicate_within_source(raw_scan)
+    print(f"   Raw scan: {len(raw_scan)} artifacts")
+    print(f"   After within-source: {len(stage1_kept)} kept, {len(stage1_excluded)} excluded")
+
+    # Stage 2: Cross-source
+    final_unique, cross_excluded = engine4.deduplicate_cross_source(
+        stage1_kept, collection_hashes
+    )
+    print(f"   After cross-source: {len(final_unique)} unique, {len(cross_excluded)} excluded")
+
+    # Verify
+    final_paths = [a["path"] for a in final_unique]
+    assert "a" in final_paths, "Best within-source dup should survive"
+    assert "d" in final_paths, "Unique artifact should survive"
+    assert len(final_unique) == 2, f"Expected 2 final unique, got {len(final_unique)}"
+    assert len(cross_excluded) == 1, "c should be cross-source duplicate"
+    assert cross_excluded[0]["path"] == "c"
+
+    total_excluded = len(stage1_excluded) + len(cross_excluded)
+    print(f"   Total excluded: {total_excluded} (within: {len(stage1_excluded)}, cross: {len(cross_excluded)})")
+    print("   Verification: Full pipeline works correctly!")
 
     print("\n" + "=" * 50)
     print("All tests passed!")

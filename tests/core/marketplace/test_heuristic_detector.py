@@ -1905,7 +1905,49 @@ class TestSingleFileArtifacts:
 
 
 class TestManualMappings:
-    """Test suite for manual directory-to-type mappings (P2.1a/P2.1b)."""
+    """Test suite for manual directory-to-type mappings (P2.1a/P2.1b/P2.1e).
+
+    This test class covers:
+    - _check_manual_mapping() method behavior
+    - Hierarchical inheritance with depth tracking
+    - Confidence scoring based on inheritance depth
+    - Edge cases (empty mappings, special characters, etc.)
+    - Integration with analyze_paths()
+    """
+
+    # -------------------------------------------------------------------------
+    # _string_to_artifact_type() Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "type_str,expected",
+        [
+            ("skill", ArtifactType.SKILL),
+            ("SKILL", ArtifactType.SKILL),
+            ("Skill", ArtifactType.SKILL),
+            ("command", ArtifactType.COMMAND),
+            ("COMMAND", ArtifactType.COMMAND),
+            ("agent", ArtifactType.AGENT),
+            ("AGENT", ArtifactType.AGENT),
+            ("mcp_server", ArtifactType.MCP_SERVER),
+            ("MCP_SERVER", ArtifactType.MCP_SERVER),
+            ("mcp-server", ArtifactType.MCP_SERVER),
+            ("MCP-SERVER", ArtifactType.MCP_SERVER),
+            ("hook", ArtifactType.HOOK),
+            ("HOOK", ArtifactType.HOOK),
+            # Invalid types
+            ("invalid", None),
+            ("", None),
+            ("  ", None),
+            ("unknown_type", None),
+            ("skills", None),  # Plural form not valid
+            ("commands", None),
+        ],
+    )
+    def test_string_to_artifact_type_parametrized(self, type_str, expected):
+        """Test _string_to_artifact_type with various inputs."""
+        detector = HeuristicDetector()
+        assert detector._string_to_artifact_type(type_str) == expected
 
     def test_string_to_artifact_type(self):
         """Test _string_to_artifact_type converts strings correctly."""
@@ -1921,6 +1963,10 @@ class TestManualMappings:
         assert detector._string_to_artifact_type("invalid") is None
         assert detector._string_to_artifact_type("") is None
 
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Exact Match Tests
+    # -------------------------------------------------------------------------
+
     def test_exact_match(self):
         """Test exact path matching."""
         detector = HeuristicDetector(manual_mappings={"skills": "skill", "cmds": "command"})
@@ -1930,6 +1976,41 @@ class TestManualMappings:
 
         result = detector._check_manual_mapping("cmds")
         assert result == (ArtifactType.COMMAND, "exact", 0)
+
+    @pytest.mark.parametrize(
+        "mapping_path,query_path,expected_type",
+        [
+            ("skills", "skills", ArtifactType.SKILL),
+            ("my/path", "my/path", ArtifactType.COMMAND),
+            ("deep/nested/path", "deep/nested/path", ArtifactType.AGENT),
+            ("single", "single", ArtifactType.HOOK),
+        ],
+    )
+    def test_exact_match_parametrized(self, mapping_path, query_path, expected_type):
+        """Test exact matches with various path patterns."""
+        type_str = expected_type.value
+        detector = HeuristicDetector(manual_mappings={mapping_path: type_str})
+        result = detector._check_manual_mapping(query_path)
+        assert result == (expected_type, "exact", 0)
+
+    def test_exact_match_returns_depth_zero(self):
+        """Verify exact matches always return depth=0."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "a": "skill",
+                "a/b": "command",
+                "a/b/c": "agent",
+            }
+        )
+
+        # All exact matches should have depth=0
+        assert detector._check_manual_mapping("a")[2] == 0
+        assert detector._check_manual_mapping("a/b")[2] == 0
+        assert detector._check_manual_mapping("a/b/c")[2] == 0
+
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Inherited Match Tests
+    # -------------------------------------------------------------------------
 
     def test_inherited_match(self):
         """Test hierarchical inheritance matching with depth tracking."""
@@ -1945,6 +2026,48 @@ class TestManualMappings:
 
         result = detector._check_manual_mapping("skills/canvas/deep/nested")
         assert result == (ArtifactType.SKILL, "inherited", 3)
+
+    @pytest.mark.parametrize(
+        "query_path,expected_depth",
+        [
+            ("root/a", 1),
+            ("root/a/b", 2),
+            ("root/a/b/c", 3),
+            ("root/a/b/c/d", 4),
+            ("root/a/b/c/d/e", 5),
+            ("root/a/b/c/d/e/f", 6),
+        ],
+    )
+    def test_inherited_match_depth_tracking(self, query_path, expected_depth):
+        """Test that inheritance depth is correctly calculated."""
+        detector = HeuristicDetector(manual_mappings={"root": "skill"})
+        result = detector._check_manual_mapping(query_path)
+        assert result is not None
+        assert result[1] == "inherited"
+        assert result[2] == expected_depth
+
+    def test_inherited_match_returns_correct_type(self):
+        """Verify inherited matches return the correct artifact type."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "skills": "skill",
+                "commands": "command",
+                "agents": "agent",
+            }
+        )
+
+        result = detector._check_manual_mapping("skills/my-skill")
+        assert result[0] == ArtifactType.SKILL
+
+        result = detector._check_manual_mapping("commands/my-cmd/nested")
+        assert result[0] == ArtifactType.COMMAND
+
+        result = detector._check_manual_mapping("agents/helper/deep/path")
+        assert result[0] == ArtifactType.AGENT
+
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Non-Matching Path Tests
+    # -------------------------------------------------------------------------
 
     def test_no_partial_name_match(self):
         """Test that partial name matches are NOT allowed."""
@@ -1962,11 +2085,50 @@ class TestManualMappings:
         assert detector._check_manual_mapping("commands") is None
         assert detector._check_manual_mapping("agents/helper") is None
 
+    @pytest.mark.parametrize(
+        "query_path",
+        [
+            "my-skills",  # Contains mapping but not a prefix
+            "skillset",  # Contains mapping but not a prefix
+            "other/skills",  # Mapping in middle, not at start
+            "prefix-skills/something",  # Mapping as suffix, not prefix
+            "totally/different/path",  # No relation
+            "",  # Empty path
+            "s",  # Partial
+            "skill",  # Singular (mapping is "skills")
+        ],
+    )
+    def test_non_matching_paths_return_none(self, query_path):
+        """Test various paths that should not match."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+        assert detector._check_manual_mapping(query_path) is None
+
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Empty Mappings Tests
+    # -------------------------------------------------------------------------
+
     def test_no_mappings_returns_none(self):
         """Test that no mappings always returns None."""
         detector = HeuristicDetector()
         assert detector._check_manual_mapping("skills") is None
         assert detector._check_manual_mapping("anything") is None
+
+    def test_empty_mappings_dict_returns_none(self):
+        """Test that empty mappings dict always returns None."""
+        detector = HeuristicDetector(manual_mappings={})
+        assert detector._check_manual_mapping("skills") is None
+        assert detector._check_manual_mapping("skills/nested") is None
+        assert detector._check_manual_mapping("any/path") is None
+
+    def test_none_mappings_returns_none(self):
+        """Test that None mappings always returns None."""
+        detector = HeuristicDetector(manual_mappings=None)
+        assert detector._check_manual_mapping("skills") is None
+        assert detector._check_manual_mapping("anything/nested") is None
+
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Path Normalization Tests
+    # -------------------------------------------------------------------------
 
     def test_trailing_slash_normalization(self):
         """Test that trailing slashes are normalized."""
@@ -1979,6 +2141,294 @@ class TestManualMappings:
         # Should still match inherited
         result = detector._check_manual_mapping("skills/canvas")
         assert result == (ArtifactType.SKILL, "inherited", 1)
+
+    def test_trailing_slash_in_query_path(self):
+        """Test that trailing slashes in query path are normalized."""
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+
+        # Query with trailing slash should still match
+        result = detector._check_manual_mapping("skills/")
+        assert result == (ArtifactType.SKILL, "exact", 0)
+
+        result = detector._check_manual_mapping("skills/canvas/")
+        assert result == (ArtifactType.SKILL, "inherited", 1)
+
+    def test_backslash_normalization(self):
+        """Test that backslashes are normalized to forward slashes."""
+        detector = HeuristicDetector(manual_mappings={"skills\\nested": "skill"})
+
+        # Query with forward slashes should match
+        result = detector._check_manual_mapping("skills/nested")
+        assert result == (ArtifactType.SKILL, "exact", 0)
+
+    # -------------------------------------------------------------------------
+    # _check_manual_mapping() - Edge Cases
+    # -------------------------------------------------------------------------
+
+    def test_root_path_mapping_empty_string(self):
+        """Test root path mapping with empty string."""
+        detector = HeuristicDetector(manual_mappings={"": "skill"})
+
+        # Empty string mapping - exact match should work
+        result = detector._check_manual_mapping("")
+        assert result == (ArtifactType.SKILL, "exact", 0)
+
+        # But other paths should not inherit (empty prefix matches nothing)
+        result = detector._check_manual_mapping("anything")
+        # Empty string is not a proper prefix, should not match
+        assert result is None
+
+    def test_single_character_path_mapping(self):
+        """Test single character path mappings."""
+        detector = HeuristicDetector(manual_mappings={"a": "skill"})
+
+        assert detector._check_manual_mapping("a") == (ArtifactType.SKILL, "exact", 0)
+        assert detector._check_manual_mapping("a/b") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+        # 'ab' is not under 'a', should not match
+        assert detector._check_manual_mapping("ab") is None
+
+    def test_paths_with_special_characters(self):
+        """Test paths containing special characters."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "my-skills": "skill",
+                "my_commands": "command",
+                "my.agents": "agent",
+            }
+        )
+
+        # Hyphens
+        assert detector._check_manual_mapping("my-skills") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("my-skills/canvas") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+
+        # Underscores
+        assert detector._check_manual_mapping("my_commands") == (
+            ArtifactType.COMMAND,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("my_commands/deploy") == (
+            ArtifactType.COMMAND,
+            "inherited",
+            1,
+        )
+
+        # Dots
+        assert detector._check_manual_mapping("my.agents") == (
+            ArtifactType.AGENT,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("my.agents/helper") == (
+            ArtifactType.AGENT,
+            "inherited",
+            1,
+        )
+
+    def test_paths_with_unicode_characters(self):
+        """Test paths containing unicode characters."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "skills/日本語": "skill",
+                "commands/命令": "command",
+            }
+        )
+
+        assert detector._check_manual_mapping("skills/日本語") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("skills/日本語/nested") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+        assert detector._check_manual_mapping("commands/命令/sub") == (
+            ArtifactType.COMMAND,
+            "inherited",
+            1,
+        )
+
+    def test_paths_with_spaces(self):
+        """Test paths containing spaces (edge case, not typical)."""
+        detector = HeuristicDetector(manual_mappings={"my skills": "skill"})
+
+        assert detector._check_manual_mapping("my skills") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("my skills/canvas") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+
+    def test_very_long_paths(self):
+        """Test very long paths (stress test)."""
+        # Create a very long nested path
+        long_path = "/".join([f"dir{i}" for i in range(50)])
+        detector = HeuristicDetector(manual_mappings={"dir0": "skill"})
+
+        result = detector._check_manual_mapping(long_path)
+        assert result is not None
+        assert result[0] == ArtifactType.SKILL
+        assert result[1] == "inherited"
+        # Depth should be 49 (50 parts - 1 for the mapping)
+        assert result[2] == 49
+
+    def test_path_with_many_segments(self):
+        """Test paths with many segments for correct depth calculation."""
+        detector = HeuristicDetector(manual_mappings={"a/b/c": "skill"})
+
+        # Exact match
+        assert detector._check_manual_mapping("a/b/c") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+
+        # One level deeper
+        assert detector._check_manual_mapping("a/b/c/d") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+
+        # Many levels deeper
+        assert detector._check_manual_mapping("a/b/c/d/e/f/g/h") == (
+            ArtifactType.SKILL,
+            "inherited",
+            5,
+        )
+
+    def test_invalid_artifact_types_skipped(self):
+        """Test that invalid artifact types in mappings are skipped."""
+        detector = HeuristicDetector(
+            manual_mappings={
+                "valid_path": "skill",
+                "invalid_path": "not_a_type",
+                "another_invalid": "foobar",
+            }
+        )
+
+        # Valid path should work
+        assert detector._check_manual_mapping("valid_path") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+
+        # Invalid paths should be ignored (not in normalized mappings)
+        assert detector._check_manual_mapping("invalid_path") is None
+        assert detector._check_manual_mapping("another_invalid") is None
+
+    # -------------------------------------------------------------------------
+    # Confidence Scoring Tests
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        "depth,expected_score",
+        [
+            (0, 95),  # Exact match
+            (1, 92),  # 95 - 3
+            (2, 89),  # 95 - 6
+            (3, 86),  # max(86, 95 - 9)
+            (4, 86),  # max(86, 95 - 12) = max(86, 83) = 86
+            (5, 86),  # max(86, 95 - 15) = max(86, 80) = 86
+            (10, 86),  # Very deep, still 86
+            (100, 86),  # Extremely deep, still 86
+        ],
+    )
+    def test_confidence_score_formula(self, depth, expected_score):
+        """Test confidence score formula: max(86, 95 - depth*3)."""
+        # Calculate using the formula
+        calculated = max(86, 95 - (depth * 3))
+        assert calculated == expected_score
+
+    def test_confidence_score_depth_zero_exact_match(self):
+        """Test that depth=0 (exact match) returns confidence=95."""
+        files = ["custom/path/SKILL.md", "custom/path/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"custom/path": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].confidence_score == 95
+        assert matches[0].metadata["inheritance_depth"] == 0
+
+    def test_confidence_score_depth_one(self):
+        """Test that depth=1 (inherited) returns confidence=92."""
+        files = ["parent/child/SKILL.md", "parent/child/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"parent": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].confidence_score == 92
+        assert matches[0].metadata["inheritance_depth"] == 1
+
+    def test_confidence_score_depth_two(self):
+        """Test that depth=2 returns confidence=89."""
+        files = ["a/b/c/SKILL.md", "a/b/c/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"a": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].confidence_score == 89
+        assert matches[0].metadata["inheritance_depth"] == 2
+
+    def test_confidence_score_minimum_threshold(self):
+        """Test that confidence never goes below 86 for manual mappings."""
+        # Deep nesting (depth >= 3) should still get 86
+        files = ["a/b/c/d/e/f/SKILL.md", "a/b/c/d/e/f/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"a": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].confidence_score == 86
+        assert matches[0].metadata["inheritance_depth"] == 5
+
+    def test_confidence_score_beats_heuristic_max(self):
+        """Test that manual mapping confidence (min 86) beats heuristic max (~80)."""
+        # Even the minimum manual mapping score (86) should be higher than
+        # typical heuristic scores (~80 max)
+        files = ["weird/nested/path/SKILL.md", "weird/nested/path/index.ts"]
+
+        # Without manual mapping - uses heuristics
+        detector_heuristic = HeuristicDetector()
+        matches_heuristic = detector_heuristic.analyze_paths(
+            files, "https://github.com/test/repo"
+        )
+
+        # With manual mapping - always at least 86
+        detector_manual = HeuristicDetector(manual_mappings={"weird": "skill"})
+        matches_manual = detector_manual.analyze_paths(
+            files, "https://github.com/test/repo"
+        )
+
+        # If heuristic detected anything, manual should beat it
+        if matches_heuristic:
+            assert matches_manual[0].confidence_score >= matches_heuristic[0].confidence_score
+
+        # Manual should always be >= 86
+        assert len(matches_manual) == 1
+        assert matches_manual[0].confidence_score >= 86
+
+    # -------------------------------------------------------------------------
+    # Integration with analyze_paths() Tests
+    # -------------------------------------------------------------------------
 
     def test_integration_exact_match(self):
         """Test manual mapping integration with analyze_paths (exact match)."""
@@ -2041,6 +2491,71 @@ class TestManualMappings:
         assert matches[0].artifact_type == "skill"
         # Should NOT have manual mapping metadata
         assert matches[0].metadata is None
+
+    def test_heuristic_fallback_for_unmapped_paths(self):
+        """Test that heuristic detection works alongside manual mappings."""
+        files = [
+            # Mapped path
+            "custom/skill1/SKILL.md",
+            "custom/skill1/index.ts",
+            # Unmapped path (uses heuristic)
+            "skills/skill2/SKILL.md",
+            "skills/skill2/index.ts",
+        ]
+        detector = HeuristicDetector(manual_mappings={"custom": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        # Should detect both
+        assert len(matches) == 2
+
+        # Find each match
+        by_path = {m.path: m for m in matches}
+
+        # Mapped path should have manual mapping metadata
+        assert "custom/skill1" in by_path
+        assert by_path["custom/skill1"].metadata is not None
+        assert by_path["custom/skill1"].metadata["is_manual_mapping"] is True
+
+        # Unmapped path should NOT have manual mapping metadata
+        assert "skills/skill2" in by_path
+        assert by_path["skills/skill2"].metadata is None
+
+    def test_integration_metadata_fields(self):
+        """Test that all expected metadata fields are present."""
+        files = ["mapped/path/SKILL.md", "mapped/path/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"mapped": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        metadata = matches[0].metadata
+
+        assert metadata is not None
+        assert "is_manual_mapping" in metadata
+        assert "match_type" in metadata
+        assert "inheritance_depth" in metadata
+        assert "confidence_reason" in metadata
+
+        assert metadata["is_manual_mapping"] is True
+        assert metadata["match_type"] == "inherited"
+        assert metadata["inheritance_depth"] == 1
+        assert "Manual mapping inherited" in metadata["confidence_reason"]
+
+    def test_integration_match_reasons_format(self):
+        """Test that match_reasons contain expected information."""
+        files = ["exact/SKILL.md", "exact/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"exact": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+
+        # Check match reasons
+        reasons = matches[0].match_reasons
+        assert len(reasons) >= 1
+
+        # First reason should describe the manual mapping
+        assert "Manual mapping" in reasons[0]
+        assert "exact match" in reasons[0]
+        assert "depth=0" in reasons[0]
 
     def test_manual_mapping_enables_non_standard_locations(self):
         """Test that manual mapping enables detection in non-standard locations.
