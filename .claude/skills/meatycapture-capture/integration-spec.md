@@ -10,7 +10,7 @@ MeatyCapture provides two entry points optimized for different use cases:
 
 | Entry Point | Use Case | Tokens | When to Use |
 |-------------|----------|-------:|-------------|
-| `/mc` command | list, view, search, quick capture | ~150 | Simple operations (95% of use cases) |
+| `/mc` command | list, view, search, capture, note add, update | ~150 | Simple operations (95% of use cases) |
 | `meatycapture-capture` skill | batch capture, complex workflows | ~400 | Batch operations, validation, templates |
 
 **Default to `/mc`** for all simple operations. Only invoke the full skill when you need:
@@ -45,38 +45,49 @@ MeatyCapture provides two entry points optimized for different use cases:
 
 ## Integration Points
 
-| Trigger | Action | Status Update |
-|---------|--------|---------------|
-| Bug discovered during development | Capture as type:bug | triage |
-| Enhancement identified | Capture as type:enhancement | backlog |
-| Technical debt noted | Capture as type:task | backlog |
-| Work started on logged item | Update status | in-progress |
-| Work completed | Update status | done |
-| Item won't be fixed | Update status + note reason | wontfix |
+| Trigger | Action | Command |
+|---------|--------|---------|
+| Bug discovered | Capture as type:bug | `/mc capture {...}` |
+| Enhancement identified | Capture as type:enhancement | `/mc capture {...}` |
+| Technical debt noted | Capture as type:task | `/mc capture {...}` |
+| Work started | Update status to in-progress | `meatycapture log item update DOC ITEM --status in-progress` |
+| Work completed | Update status to done | `meatycapture log item update DOC ITEM --status done` |
+| Item won't be fixed | Update + add note | `meatycapture log item update DOC ITEM --status wontfix` + `log note add` |
+| Progress update | Add note to item | `meatycapture log note add DOC ITEM -c "..."` |
 
 ---
 
 ## CLAUDE.md Integration
 
-Add minimal section to project's root CLAUDE.md (~10 lines max):
+Add to project's root CLAUDE.md under appropriate section:
 
 ```markdown
 ## Development Tracking
 
-<!-- MeatyCapture Integration - Project: PROJECT_SLUG -->
+Use `/mc` command for quick request-log operations (token-efficient):
 
-Track bugs/enhancements via request-logs (replaces loose TODO comments):
+| Operation | Command | Example |
+|-----------|---------|---------|
+| List logs | `/mc list PROJECT` | `/mc list meatycapture` |
+| View log | `/mc view PATH` | `/mc view ~/.meatycapture/meatycapture/REQ-20251231.md` |
+| Search | `/mc search "query" PROJECT` | `/mc search "auth bug" meatycapture` |
+| Quick capture | `/mc capture {...}` | `/mc capture {"title": "Fix auth", "type": "bug"}` |
+| Add note | `/mc note DOC ITEM -c "text"` | `/mc note doc.md ITEM-01 -c "Fixed in PR #123"` |
+| Update item | `/mc update DOC ITEM [opts]` | `/mc update doc.md ITEM-01 --status done` |
 
-| Entry Point | Use When | Tokens |
-|-------------|----------|--------|
-| `/mc` | Quick ops: list, search, single capture | ~150 |
-| `/meatycapture-capture` skill | Batch capture (3+ items), validation, templates | ~400 |
+For batch capture or complex workflows, use `/meatycapture-capture` skill instead.
 
-**Quick reference**: `/mc list PROJECT`, `/mc search "keyword" PROJECT`, `/mc capture {...}`
-<!-- End MeatyCapture Integration -->
+| When | Action |
+|------|--------|
+| Bug found | `/mc capture {"title": "...", "type": "bug", "domain": "..."}` |
+| Enhancement idea | `/mc capture {"title": "...", "type": "enhancement"}` |
+| TODO needed | Capture instead of code comment (searchable, trackable) |
+| Starting logged work | `/mc update DOC ITEM --status in-progress` |
+| Work complete | `/mc update DOC ITEM --status done` |
+| Add context | `/mc note DOC ITEM -c "progress update..."` |
+
+Search existing logs before creating duplicates: `/mc search "keyword" PROJECT`
 ```
-
-**Key principle**: Don't duplicate skill documentation in CLAUDE.md. The skill and /mc command handle details.
 
 ---
 
@@ -113,7 +124,8 @@ Reference existing items when relevant to current work.
 ## Post-Implementation
 
 Update status of any request-log items addressed by this work:
-- Edit markdown file: change `**Status:** triage` to `**Status:** done`
+- `/mc update DOC ITEM --status done`
+- Add resolution note: `/mc note DOC ITEM -c "Fixed in PR #XXX"`
 - For workflow docs, see `./workflows/updating.md`
 ```
 
@@ -190,8 +202,9 @@ For batch capture of multiple items, invoke the full skill:
 ### Update (during/after work)
 
 Update item status as work progresses:
-- Edit markdown file directly
-- Change `**Status:** triage` to `**Status:** in-progress` or `done`
+- `/mc update DOC ITEM --status in-progress` (when starting)
+- `/mc update DOC ITEM --status done` (when complete)
+- `/mc note DOC ITEM -c "progress update"` (add context)
 ```
 
 ---
@@ -236,27 +249,11 @@ Scan for existing commands/skills that should integrate:
 | `fix/*` commands | Post-fix capture guidance | `/mc capture` |
 | `dev/*` commands | Context search + status update | `/mc search` |
 | `plan/*` commands | Discovery search | `/mc search` |
-| `review/*` commands | Bug capture for findings | `/mc` (1-2 issues) or skill (3+) |
+| `review/*` commands | Bug capture for findings | `/mc capture` |
 
 ### 5. Update Relevant Commands
 
-For each identified command, add integration snippet using HTML comment markers:
-
-```markdown
-<!-- MeatyCapture Integration - Project: PROJECT_SLUG -->
-## Section Title
-
-- Integration content here
-- Use `/mc` for single operations
-- Use skill for batch (3+ items)
-<!-- End MeatyCapture Integration -->
-```
-
-**Integration pattern benefits**:
-- Easy to find: `grep "MeatyCapture Integration" .claude/`
-- Easy to update: Project slug in one place
-- Clear boundaries: Start/end markers separate from other content
-- Minimal tokens: End marker is empty comment (optional for short sections)
+For each identified command, add appropriate integration snippet from patterns above. Always prefer `/mc` for simple operations.
 
 ---
 
