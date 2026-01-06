@@ -1037,8 +1037,16 @@ async def delete_source(source_id: str) -> None:
     The scan will:
     1. Fetch the repository tree from GitHub
     2. Apply heuristic detection to identify artifacts
-    3. Update the catalog with discovered artifacts
-    4. Update source metadata (artifact_count, last_sync_at, etc.)
+    3. Deduplicate artifacts within the source (same content, different paths)
+    4. Deduplicate artifacts against existing collection (already imported)
+    5. Update the catalog with discovered unique artifacts
+    6. Update source metadata (artifact_count, last_sync_at, etc.)
+
+    **Response includes deduplication statistics**:
+    - `duplicates_within_source`: Duplicate artifacts found in this repo scan
+    - `duplicates_cross_source`: Artifacts already in collection from other sources
+    - `total_detected`: Total artifacts before deduplication
+    - `total_unique`: Unique artifacts added to catalog
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
