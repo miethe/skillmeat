@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 77
+progress: 85
 total_tasks: 13
-completed_tasks: 10
+completed_tasks: 11
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -120,10 +120,13 @@ tasks:
 
   - id: "P3.3d"
     name: "Integration test"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.3c"]
     effort: "2 pts"
+    completed_by: "a049cb6"
+    completed_at: 2026-01-06
+    note: "Created 8 comprehensive integration tests for rescan endpoint covering manual_map usage, dedup counts, end-to-end flow, and error cases"
 
   # Error Handling & Docs (2 tasks)
   - id: "P3.4a"
