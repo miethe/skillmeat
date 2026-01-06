@@ -190,9 +190,26 @@ export function useRescanSource(sourceId: string) {
       queryClient.invalidateQueries({ queryKey: sourceKeys.catalogs() });
 
       if (result.status === 'success') {
+        // Build description with dedup counts (P4.4a)
+        const parts = [`${result.new_count} new, ${result.updated_count} updated`];
+
+        // Add deduplication info if present
+        if (result.duplicates_within_source || result.duplicates_cross_source) {
+          const dedupParts = [];
+          if (result.duplicates_within_source) {
+            dedupParts.push(`${result.duplicates_within_source} within-source duplicates`);
+          }
+          if (result.duplicates_cross_source) {
+            dedupParts.push(`${result.duplicates_cross_source} cross-source duplicates`);
+          }
+          parts.push(dedupParts.join(', '));
+        }
+
+        const description = `Found ${result.artifacts_found} artifacts (${parts.join('; ')})`;
+
         toast({
           title: 'Scan complete',
-          description: `Found ${result.artifacts_found} artifacts (${result.new_count} new, ${result.updated_count} updated)`,
+          description,
         });
       } else if (result.status === 'partial') {
         toast({

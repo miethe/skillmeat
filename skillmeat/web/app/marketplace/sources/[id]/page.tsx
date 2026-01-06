@@ -9,6 +9,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
+import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   ArrowLeft,
@@ -39,6 +40,7 @@ import {
   useRescanSource,
   useImportArtifacts,
   useExcludeCatalogEntry,
+  useUpdateSource,
 } from '@/hooks/useMarketplaceSources';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
@@ -135,13 +137,29 @@ function CatalogCard({
 
         {/* Header */}
         <div className="pr-8">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge variant="outline" className={typeConfig[entry.artifact_type].color}>
               {typeConfig[entry.artifact_type].label}
             </Badge>
             <Badge variant="outline" className={statusConfig.className}>
               {statusConfig.label}
             </Badge>
+            {/* Duplicate Badge (P4.3c) */}
+            {entry.status === 'excluded' && entry.is_duplicate && (
+              <Badge
+                variant="outline"
+                className="border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950"
+                title={
+                  entry.duplicate_reason === 'within_source'
+                    ? `Duplicate within this source${entry.duplicate_of ? `: ${entry.duplicate_of}` : ''}`
+                    : entry.duplicate_reason === 'cross_source'
+                    ? 'Duplicate from another source or collection'
+                    : 'Marked as duplicate'
+                }
+              >
+                Duplicate
+              </Badge>
+            )}
           </div>
           <h3 className="font-semibold truncate">{entry.name}</h3>
           <p className="text-xs text-muted-foreground truncate">{entry.path}</p>
@@ -269,11 +287,18 @@ export default function SourceDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [directoryMapModalOpen, setDirectoryMapModalOpen] = useState(false);
+  const [treeData, setTreeData] = useState<any[]>([]);
+  const [isLoadingTree, setIsLoadingTree] = useState(false);
+  const [treeError, setTreeError] = useState<string>();
   const [confidenceFilters, setConfidenceFilters] = useState(() => ({
     minConfidence: Number(searchParams.get('minConfidence')) || 50,
     maxConfidence: Number(searchParams.get('maxConfidence')) || 100,
     includeBelowThreshold: searchParams.get('includeBelowThreshold') === 'true',
   }));
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(() =>
+    searchParams.get('showOnlyDuplicates') === 'true'
+  );
   const [sortOption, setSortOption] = useState<SortOption>(() => {
     const param = searchParams.get('sort');
     if (param === 'confidence-asc' || param === 'confidence-desc' ||
@@ -282,6 +307,7 @@ export default function SourceDetailPage() {
     }
     return 'confidence-desc'; // default to high confidence first
   });
+  const [lastScanResult, setLastScanResult] = useState<any>(null);
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useViewMode();
@@ -290,7 +316,8 @@ export default function SourceDetailPage() {
   const updateURLParams = (
     newConfidenceFilters: typeof confidenceFilters,
     newFilters: typeof filters,
-    newSortOption: SortOption
+    newSortOption: SortOption,
+    newShowOnlyDuplicates: boolean
   ) => {
     const params = new URLSearchParams();
 
@@ -303,6 +330,11 @@ export default function SourceDetailPage() {
     }
     if (newConfidenceFilters.includeBelowThreshold) {
       params.set('includeBelowThreshold', 'true');
+    }
+
+    // Add duplicate filter (P4.4b)
+    if (newShowOnlyDuplicates) {
+      params.set('showOnlyDuplicates', 'true');
     }
 
     // Add type and status filters
@@ -324,8 +356,8 @@ export default function SourceDetailPage() {
 
   // Sync URL when filters change
   useEffect(() => {
-    updateURLParams(confidenceFilters, filters, sortOption);
-  }, [confidenceFilters, filters, sortOption]);
+    updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates);
+  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -348,6 +380,7 @@ export default function SourceDetailPage() {
   } = useSourceCatalog(sourceId, mergedFilters);
   const rescanMutation = useRescanSource(sourceId);
   const importMutation = useImportArtifacts(sourceId);
+  const updateSourceMutation = useUpdateSource(sourceId);
 
   // Flatten catalog pages with deduplication to prevent duplicate React keys
   const allEntries = useMemo(() => {
@@ -395,10 +428,17 @@ export default function SourceDetailPage() {
     });
   }, [allEntries, searchQuery, sortOption]);
 
-  // Separate excluded entries for the excluded list
+  // Separate excluded entries for the excluded list (P4.4b: filter duplicates)
   const excludedEntries = useMemo(() => {
-    return allEntries.filter((entry) => entry.status === 'excluded');
-  }, [allEntries]);
+    const excluded = allEntries.filter((entry) => entry.status === 'excluded');
+
+    // Apply duplicate filter if enabled
+    if (showOnlyDuplicates) {
+      return excluded.filter((entry) => entry.is_duplicate === true);
+    }
+
+    return excluded;
+  }, [allEntries, showOnlyDuplicates]);
 
   // Get counts from first page
   const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
@@ -443,6 +483,55 @@ export default function SourceDetailPage() {
       entry_ids: [entryId],
       conflict_strategy: 'skip',
     });
+  };
+
+  // Directory mapping handlers
+  const handleOpenDirectoryMap = async () => {
+    if (!source) return;
+
+    setDirectoryMapModalOpen(true);
+    setIsLoadingTree(true);
+    setTreeError(undefined);
+
+    try {
+      // Fetch GitHub tree data
+      const response = await fetch(
+        `https://api.github.com/repos/${source.owner}/${source.repo_name}/git/trees/${source.ref}?recursive=1`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch repository tree: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setTreeData(data.tree || []);
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : 'Failed to load directory tree');
+    } finally {
+      setIsLoadingTree(false);
+    }
+  };
+
+  const handleConfirmMappings = async (mappings: Record<string, string>) => {
+    await updateSourceMutation.mutateAsync({
+      manual_map: mappings,
+    });
+  };
+
+  const handleConfirmAndRescan = async (mappings: Record<string, string>) => {
+    await updateSourceMutation.mutateAsync({
+      manual_map: mappings,
+    });
+    const result = await rescanMutation.mutateAsync({
+      manual_map: mappings,
+    });
+    setLastScanResult(result);
+  };
+
+  // Store scan result when rescan completes (P4.3b)
+  const handleRescan = async () => {
+    const result = await rescanMutation.mutateAsync({});
+    setLastScanResult(result);
   };
 
   // Loading state
@@ -526,7 +615,7 @@ export default function SourceDetailPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => rescanMutation.mutate({})}
+            onClick={handleRescan}
             disabled={rescanMutation.isPending}
           >
             <RefreshCw className={cn('mr-2 h-4 w-4', rescanMutation.isPending && 'animate-spin')} />
@@ -582,6 +671,117 @@ export default function SourceDetailPage() {
         ))}
       </div>
 
+      {/* Manual Mappings Display (P4.3a) */}
+      {source.manual_map && Object.keys(source.manual_map).length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="font-medium mb-1">Directory Mappings</h3>
+              <p className="text-sm text-muted-foreground">
+                Manual artifact type mappings for specific directories
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenDirectoryMap}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Mappings
+            </Button>
+          </div>
+          <div className="grid gap-2">
+            {Object.entries(source.manual_map).map(([directory, artifactType]) => (
+              <div
+                key={directory}
+                className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+              >
+                <code className="text-sm font-mono">{directory}</code>
+                <Badge variant="secondary">{artifactType}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Scan Result with Dedup Stats (P4.3b) */}
+      {lastScanResult && (
+        <Card className="p-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+          <div className="space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <h3 className="font-medium mb-1">Scan Completed Successfully</h3>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(lastScanResult.scanned_at).toLocaleString()}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLastScanResult(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {lastScanResult.artifacts_found}
+                </div>
+                <div className="text-xs text-muted-foreground">Total Found</div>
+              </div>
+              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {lastScanResult.new_count}
+                </div>
+                <div className="text-xs text-muted-foreground">New</div>
+              </div>
+              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {lastScanResult.updated_count}
+                </div>
+                <div className="text-xs text-muted-foreground">Updated</div>
+              </div>
+              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                  {lastScanResult.unchanged_count}
+                </div>
+                <div className="text-xs text-muted-foreground">Unchanged</div>
+              </div>
+            </div>
+
+            {/* Deduplication Stats */}
+            {(lastScanResult.duplicates_within_source > 0 || lastScanResult.duplicates_cross_source > 0) && (
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-medium mb-2">Deduplication</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {lastScanResult.duplicates_within_source > 0 && (
+                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+                      <div className="text-xl font-bold text-yellow-700 dark:text-yellow-400">
+                        {lastScanResult.duplicates_within_source}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Within-Source Duplicates</div>
+                    </div>
+                  )}
+                  {lastScanResult.duplicates_cross_source > 0 && (
+                    <div className="text-center p-2 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded">
+                      <div className="text-xl font-bold text-purple-700 dark:text-purple-400">
+                        {lastScanResult.duplicates_cross_source}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Cross-Source Duplicates</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {lastScanResult.total_detected} total detected, {lastScanResult.total_unique} unique artifacts added to catalog
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Source Toolbar */}
       <SourceToolbar
         searchQuery={searchQuery}
@@ -599,6 +799,8 @@ export default function SourceDetailPage() {
         onIncludeBelowThresholdChange={(v) =>
           setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
         }
+        showOnlyDuplicates={showOnlyDuplicates}
+        onShowOnlyDuplicatesChange={setShowOnlyDuplicates}
         selectedCount={selectedEntries.size}
         totalSelectableCount={importableCount}
         allSelected={selectedEntries.size === importableCount && importableCount > 0}
@@ -611,6 +813,7 @@ export default function SourceDetailPage() {
           confidenceFilters.minConfidence !== 50 ||
           confidenceFilters.maxConfidence !== 100 ||
           confidenceFilters.includeBelowThreshold ||
+          showOnlyDuplicates ||
           sortOption !== 'confidence-desc' ||
           searchQuery.trim() !== ''
         }
@@ -621,9 +824,11 @@ export default function SourceDetailPage() {
             maxConfidence: 100,
             includeBelowThreshold: false,
           });
+          setShowOnlyDuplicates(false);
           setSortOption('confidence-desc');
           setSearchQuery('');
         }}
+        onMapDirectories={handleOpenDirectoryMap}
       />
 
       {/* Refetching indicator */}
@@ -797,6 +1002,24 @@ export default function SourceDetailPage() {
         onOpenChange={setModalOpen}
         onImport={(entry) => handleImportSingle(entry.id)}
         isImporting={importMutation.isPending}
+      />
+
+      {/* Directory Map Modal */}
+      <DirectoryMapModal
+        open={directoryMapModalOpen}
+        onOpenChange={setDirectoryMapModalOpen}
+        sourceId={sourceId}
+        repoInfo={source ? {
+          owner: source.owner,
+          repo: source.repo_name,
+          ref: source.ref,
+        } : undefined}
+        treeData={treeData}
+        isLoadingTree={isLoadingTree}
+        treeError={treeError}
+        initialMappings={source?.manual_map || {}}
+        onConfirm={handleConfirmMappings}
+        onConfirmAndRescan={handleConfirmAndRescan}
       />
     </div>
   );

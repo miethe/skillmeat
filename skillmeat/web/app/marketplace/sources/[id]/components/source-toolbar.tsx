@@ -25,6 +25,7 @@ import {
   Terminal,
   Server,
   Webhook,
+  FolderTree,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +79,10 @@ export interface SourceToolbarProps {
   includeBelowThreshold: boolean;
   onIncludeBelowThresholdChange: (value: boolean) => void;
 
+  // Duplicate filter (P4.4b)
+  showOnlyDuplicates: boolean;
+  onShowOnlyDuplicatesChange: (value: boolean) => void;
+
   // Selection
   selectedCount: number;
   totalSelectableCount: number;
@@ -91,6 +96,9 @@ export interface SourceToolbarProps {
   // Clear filters
   hasActiveFilters: boolean;
   onClearFilters: () => void;
+
+  // Directory mapping
+  onMapDirectories?: () => void;
 }
 
 // ============================================================================
@@ -156,6 +164,8 @@ export function SourceToolbar({
   onMaxConfidenceChange,
   includeBelowThreshold,
   onIncludeBelowThresholdChange,
+  showOnlyDuplicates,
+  onShowOnlyDuplicatesChange,
   selectedCount,
   totalSelectableCount,
   allSelected,
@@ -164,6 +174,7 @@ export function SourceToolbar({
   onViewModeChange,
   hasActiveFilters,
   onClearFilters,
+  onMapDirectories,
 }: SourceToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -342,11 +353,35 @@ export function SourceToolbar({
             </Label>
           </div>
 
+          {/* Show Only Duplicates Toggle (P4.4b) */}
+          <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5">
+            <Switch
+              id="show-only-duplicates"
+              checked={showOnlyDuplicates}
+              onCheckedChange={onShowOnlyDuplicatesChange}
+              aria-describedby="duplicates-filter-help"
+            />
+            <Label
+              htmlFor="show-only-duplicates"
+              className="text-sm font-medium cursor-pointer whitespace-nowrap"
+            >
+              Only duplicates
+            </Label>
+          </div>
+
           {/* Clear Filters */}
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={onClearFilters} className="h-9 gap-2">
               <X className="h-4 w-4" />
               Clear
+            </Button>
+          )}
+
+          {/* Map Directories Button */}
+          {onMapDirectories && (
+            <Button variant="outline" size="sm" onClick={onMapDirectories} className="h-9 gap-2">
+              <FolderTree className="h-4 w-4" />
+              <span className="hidden sm:inline">Map Directories</span>
             </Button>
           )}
 
