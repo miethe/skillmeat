@@ -9,7 +9,7 @@ import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .common import PageInfo
 
@@ -1334,6 +1334,35 @@ class ScanResultDTO(BaseModel):
         examples=["2025-12-06T10:35:00Z"],
     )
 
+    @model_validator(mode="after")
+    def validate_dedup_counts(self) -> "ScanResultDTO":
+        """Validate that deduplication counts add up correctly.
+
+        The relationship should be:
+        total_detected = total_unique + duplicates_within_source + duplicates_cross_source
+
+        Returns:
+            Validated model instance
+
+        Raises:
+            ValueError: If counts don't add up correctly
+        """
+        expected = (
+            self.total_unique
+            + self.duplicates_within_source
+            + self.duplicates_cross_source
+        )
+
+        if self.total_detected != expected:
+            raise ValueError(
+                f"Deduplication counts mismatch: total_detected={self.total_detected}, but "
+                f"total_unique ({self.total_unique}) + duplicates_within_source "
+                f"({self.duplicates_within_source}) + duplicates_cross_source "
+                f"({self.duplicates_cross_source}) = {expected}"
+            )
+
+        return self
+
     class Config:
         """Pydantic model configuration."""
 
@@ -1346,6 +1375,10 @@ class ScanResultDTO(BaseModel):
                 "updated_count": 2,
                 "removed_count": 1,
                 "unchanged_count": 6,
+                "duplicates_within_source": 2,
+                "duplicates_cross_source": 3,
+                "total_detected": 15,
+                "total_unique": 10,
                 "scan_duration_ms": 1234.56,
                 "errors": [],
                 "scanned_at": "2025-12-06T10:35:00Z",

@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from skillmeat.api.schemas.marketplace import ScanResultDTO
 from skillmeat.core.marketplace.deduplication_engine import (
     EXCLUDED_DUPLICATE_CROSS_SOURCE,
     EXCLUDED_DUPLICATE_WITHIN_SOURCE,
@@ -1164,3 +1165,100 @@ class TestEdgeCases:
         assert len(kept) == 1
         assert len(excluded) == 99
         assert kept[0]["path"] == "artifact_99"  # Highest confidence
+
+
+# ============================================================================
+# ScanResultDTO Count Validation Tests
+# ============================================================================
+
+
+class TestScanResultDTOValidation:
+    """Test ScanResultDTO count validation."""
+
+    def test_valid_dedup_counts(self):
+        """Test that valid deduplication counts pass validation."""
+        result = ScanResultDTO(
+            source_id="test_source",
+            status="success",
+            artifacts_found=10,
+            new_count=5,
+            updated_count=0,
+            removed_count=0,
+            unchanged_count=0,
+            duplicates_within_source=3,
+            duplicates_cross_source=2,
+            total_detected=10,  # 5 + 3 + 2 = 10
+            total_unique=5,
+            scan_duration_ms=100.0,
+            scanned_at=datetime.now(timezone.utc),
+        )
+
+        assert result.total_detected == 10
+        assert result.total_unique == 5
+        assert result.duplicates_within_source == 3
+        assert result.duplicates_cross_source == 2
+
+    def test_invalid_dedup_counts_raises_error(self):
+        """Test that invalid deduplication counts raise validation error."""
+        with pytest.raises(ValueError, match="Deduplication counts mismatch"):
+            ScanResultDTO(
+                source_id="test_source",
+                status="success",
+                artifacts_found=10,
+                new_count=5,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                duplicates_within_source=3,
+                duplicates_cross_source=2,
+                total_detected=15,  # Wrong! Should be 10 (5 + 3 + 2)
+                total_unique=5,
+                scan_duration_ms=100.0,
+                scanned_at=datetime.now(timezone.utc),
+            )
+
+    def test_zero_dedup_counts(self):
+        """Test that zero deduplication counts work correctly."""
+        result = ScanResultDTO(
+            source_id="test_source",
+            status="success",
+            artifacts_found=5,
+            new_count=5,
+            updated_count=0,
+            removed_count=0,
+            unchanged_count=0,
+            duplicates_within_source=0,
+            duplicates_cross_source=0,
+            total_detected=5,  # 5 + 0 + 0 = 5
+            total_unique=5,
+            scan_duration_ms=100.0,
+            scanned_at=datetime.now(timezone.utc),
+        )
+
+        assert result.total_detected == 5
+        assert result.total_unique == 5
+        assert result.duplicates_within_source == 0
+        assert result.duplicates_cross_source == 0
+
+    def test_all_duplicates(self):
+        """Test when all artifacts are duplicates."""
+        result = ScanResultDTO(
+            source_id="test_source",
+            status="success",
+            artifacts_found=0,
+            new_count=0,
+            updated_count=0,
+            removed_count=0,
+            unchanged_count=0,
+            duplicates_within_source=5,
+            duplicates_cross_source=3,
+            total_detected=8,  # 0 + 5 + 3 = 8
+            total_unique=0,
+            scan_duration_ms=100.0,
+            scanned_at=datetime.now(timezone.utc),
+        )
+
+        assert result.total_detected == 8
+        assert result.total_unique == 0
+        assert result.duplicates_within_source == 5
+        assert result.duplicates_cross_source == 3
