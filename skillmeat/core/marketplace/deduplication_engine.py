@@ -224,6 +224,113 @@ class DeduplicationEngine:
 
         return best
 
+    def deduplicate_within_source(
+        self, artifacts: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Deduplicate artifacts within a single source scan.
+
+        Stage 1 deduplication: removes duplicates found within the same
+        marketplace source. For each group of duplicates (same content hash),
+        keeps the best artifact and marks others for exclusion.
+
+        Args:
+            artifacts: List of artifact dictionaries from a single source scan.
+                Expected structure:
+                {
+                    "path": str,
+                    "files": dict[str, str],
+                    "confidence_score": float,
+                    "artifact_type": str,
+                    "metadata": dict,  # optional
+                }
+
+        Returns:
+            Tuple of (kept_artifacts, excluded_artifacts):
+            - kept_artifacts: Unique artifacts + best from each duplicate group
+            - excluded_artifacts: Duplicates marked with exclusion metadata:
+                - excluded = True
+                - excluded_reason = "duplicate_within_source"
+                - duplicate_of = path of the kept artifact
+                - content_hash = hash value for reference
+
+        Example:
+            >>> engine = DeduplicationEngine()
+            >>> artifacts = [
+            ...     {"path": "skills/a", "files": {"SKILL.md": "same"}, "confidence_score": 0.8},
+            ...     {"path": "skills/b", "files": {"SKILL.md": "same"}, "confidence_score": 0.9},
+            ...     {"path": "other/c", "files": {"SKILL.md": "different"}, "confidence_score": 0.7},
+            ... ]
+            >>> kept, excluded = engine.deduplicate_within_source(artifacts)
+            >>> len(kept)  # skills/b (winner) + other/c (unique)
+            2
+            >>> len(excluded)  # skills/a (duplicate of skills/b)
+            1
+            >>> excluded[0]["excluded"]
+            True
+            >>> excluded[0]["duplicate_of"]
+            'skills/b'
+        """
+        if not artifacts:
+            logger.debug("No artifacts to deduplicate")
+            return [], []
+
+        # Build hash groups for all artifacts (including unique ones)
+        hash_groups: dict[str, list[dict[str, Any]]] = {}
+
+        for artifact in artifacts:
+            files = artifact.get("files", {})
+            content_hash = self.compute_hash(files)
+
+            # Store hash in artifact metadata
+            if "metadata" not in artifact:
+                artifact["metadata"] = {}
+            artifact["metadata"]["content_hash"] = content_hash
+
+            if content_hash not in hash_groups:
+                hash_groups[content_hash] = []
+            hash_groups[content_hash].append(artifact)
+
+        kept_artifacts: list[dict[str, Any]] = []
+        excluded_artifacts: list[dict[str, Any]] = []
+
+        for content_hash, group in hash_groups.items():
+            if len(group) == 1:
+                # Unique artifact - keep as-is
+                kept_artifacts.append(group[0])
+            else:
+                # Duplicate group - select best, exclude others
+                best = self.get_best_artifact(group)
+                best_path = best.get("path", "unknown")
+
+                kept_artifacts.append(best)
+
+                # Mark others as excluded
+                for artifact in group:
+                    if artifact is not best:
+                        artifact["excluded"] = True
+                        artifact["excluded_reason"] = "duplicate_within_source"
+                        artifact["duplicate_of"] = best_path
+                        artifact["content_hash"] = content_hash
+                        excluded_artifacts.append(artifact)
+
+        # Log summary
+        total = len(artifacts)
+        kept_count = len(kept_artifacts)
+        excluded_count = len(excluded_artifacts)
+
+        logger.info(
+            f"Deduplicated {total} artifacts within source, "
+            f"kept {kept_count}, excluded {excluded_count}"
+        )
+
+        if excluded_count > 0:
+            logger.debug(
+                f"Excluded duplicates: "
+                f"{[a.get('path', 'unknown') for a in excluded_artifacts]}"
+            )
+
+        return kept_artifacts, excluded_artifacts
+
 
 if __name__ == "__main__":
     # Self-test examples
@@ -341,6 +448,84 @@ if __name__ == "__main__":
     ]
     duplicates_missing = engine.find_duplicates(artifacts_missing)
     print(f"   Handled missing keys gracefully: {len(duplicates_missing)} duplicate groups")
+
+    # Test 9: deduplicate_within_source
+    print("\n9. Within-source deduplication:")
+    engine2 = DeduplicationEngine()  # Fresh engine
+    source_artifacts = [
+        {
+            "path": "skills/a",
+            "files": {"SKILL.md": "same content"},
+            "confidence_score": 0.8,
+            "artifact_type": "skill",
+        },
+        {
+            "path": "skills/b",
+            "files": {"SKILL.md": "same content"},  # Duplicate of a
+            "confidence_score": 0.9,  # Higher score - should win
+            "artifact_type": "skill",
+        },
+        {
+            "path": "other/c",
+            "files": {"SKILL.md": "different content"},  # Unique
+            "confidence_score": 0.7,
+            "artifact_type": "skill",
+        },
+        {
+            "path": "nested/d",
+            "files": {"SKILL.md": "same content"},  # Third duplicate
+            "confidence_score": 0.85,
+            "artifact_type": "skill",
+        },
+    ]
+
+    kept, excluded = engine2.deduplicate_within_source(source_artifacts)
+    print(f"   Input: {len(source_artifacts)} artifacts")
+    print(f"   Kept: {len(kept)} artifacts")
+    print(f"   Excluded: {len(excluded)} artifacts")
+
+    print("\n   Kept artifacts:")
+    for a in kept:
+        print(f"      - {a['path']} (confidence={a['confidence_score']})")
+
+    print("\n   Excluded artifacts:")
+    for a in excluded:
+        print(f"      - {a['path']}")
+        print(f"        excluded={a.get('excluded')}")
+        print(f"        excluded_reason={a.get('excluded_reason')}")
+        print(f"        duplicate_of={a.get('duplicate_of')}")
+        print(f"        content_hash={a.get('content_hash', 'N/A')[:12]}...")
+
+    # Verify expected results
+    kept_paths = [a["path"] for a in kept]
+    assert "skills/b" in kept_paths, "Best duplicate should be kept"
+    assert "other/c" in kept_paths, "Unique artifact should be kept"
+    assert len(excluded) == 2, f"Expected 2 excluded, got {len(excluded)}"
+
+    for excl in excluded:
+        assert excl.get("excluded") is True
+        assert excl.get("excluded_reason") == "duplicate_within_source"
+        assert excl.get("duplicate_of") == "skills/b"
+        assert excl.get("content_hash") is not None
+
+    print("\n   Verification: All assertions passed!")
+
+    # Test 10: Empty input
+    print("\n10. Empty input handling:")
+    kept_empty, excluded_empty = engine2.deduplicate_within_source([])
+    print(f"    Empty list returns: kept={len(kept_empty)}, excluded={len(excluded_empty)}")
+    assert kept_empty == [] and excluded_empty == []
+
+    # Test 11: All unique
+    print("\n11. All unique artifacts:")
+    unique_artifacts = [
+        {"path": "a", "files": {"f.md": "content1"}, "confidence_score": 0.9},
+        {"path": "b", "files": {"f.md": "content2"}, "confidence_score": 0.8},
+        {"path": "c", "files": {"f.md": "content3"}, "confidence_score": 0.7},
+    ]
+    kept_all, excluded_none = engine2.deduplicate_within_source(unique_artifacts)
+    print(f"    All unique: kept={len(kept_all)}, excluded={len(excluded_none)}")
+    assert len(kept_all) == 3 and len(excluded_none) == 0
 
     print("\n" + "=" * 50)
     print("All tests passed!")

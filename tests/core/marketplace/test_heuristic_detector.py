@@ -2000,7 +2000,14 @@ class TestManualMappings:
         assert "Manual mapping (exact match, depth=0)" in matches[0].match_reasons[0]
 
     def test_integration_inherited_match(self):
-        """Test manual mapping integration with analyze_paths (inherited match)."""
+        """Test manual mapping integration with analyze_paths (inherited match).
+
+        Confidence scores vary by inheritance depth:
+        - Exact match (depth=0): 95
+        - Inherited depth=1: 92
+        - Inherited depth=2: 89
+        - Inherited depth=3+: 86 (minimum)
+        """
         files = [
             "my-artifacts/subdir/SKILL.md",
             "my-artifacts/subdir/index.ts",
@@ -2011,11 +2018,13 @@ class TestManualMappings:
         assert len(matches) == 1
         assert matches[0].path == "my-artifacts/subdir"
         assert matches[0].artifact_type == "skill"
-        assert matches[0].confidence_score == 95
+        # depth=1 -> confidence = 95 - (1 * 3) = 92
+        assert matches[0].confidence_score == 92
         assert matches[0].metadata is not None
         assert matches[0].metadata.get("is_manual_mapping") is True
         assert matches[0].metadata.get("match_type") == "inherited"
         assert matches[0].metadata.get("inheritance_depth") == 1
+        assert matches[0].metadata.get("confidence_reason") == "Manual mapping inherited from ancestor (depth=1, score=92)"
 
     def test_non_matching_paths_use_heuristics(self):
         """Test that non-matching paths still use heuristic detection."""
@@ -2034,7 +2043,13 @@ class TestManualMappings:
         assert matches[0].metadata is None
 
     def test_manual_mapping_enables_non_standard_locations(self):
-        """Test that manual mapping enables detection in non-standard locations."""
+        """Test that manual mapping enables detection in non-standard locations.
+
+        Note: Confidence varies by inheritance depth:
+        - weird (depth=0): 95
+        - weird/custom (depth=1): 92
+        - weird/custom/path (depth=2): 89
+        """
         files = [
             "weird/custom/path/SKILL.md",
             "weird/custom/path/index.ts",
@@ -2043,7 +2058,7 @@ class TestManualMappings:
         artifacts_without = detect_artifacts_in_tree(files, "https://github.com/test/repo")
         assert len(artifacts_without) == 0
 
-        # With manual mapping - will be detected
+        # With manual mapping at "weird" - artifact at depth=2 gets confidence=89
         artifacts_with = detect_artifacts_in_tree(
             files,
             "https://github.com/test/repo",
@@ -2051,7 +2066,8 @@ class TestManualMappings:
         )
         assert len(artifacts_with) == 1
         assert artifacts_with[0].artifact_type == "skill"
-        assert artifacts_with[0].confidence_score == 95
+        # depth=2 -> confidence = 95 - (2 * 3) = 89
+        assert artifacts_with[0].confidence_score == 89
 
     def test_invalid_mapping_type_logged(self):
         """Test that invalid artifact types in mappings are logged and ignored."""
@@ -2130,3 +2146,76 @@ class TestManualMappings:
         assert detector._check_manual_mapping("root/a/b/c") == (ArtifactType.SKILL, "inherited", 3)
         assert detector._check_manual_mapping("root/a/b/c/d") == (ArtifactType.SKILL, "inherited", 4)
         assert detector._check_manual_mapping("root/a/b/c/d/e") == (ArtifactType.SKILL, "inherited", 5)
+
+    def test_confidence_score_by_inheritance_depth(self):
+        """Test confidence scores based on inheritance depth.
+
+        Formula: confidence = max(86, 95 - (inheritance_depth * 3))
+        - Exact match (depth=0): 95
+        - Inherited depth=1: 92
+        - Inherited depth=2: 89
+        - Inherited depth=3: 86
+        - Inherited depth=4+: 86 (minimum)
+
+        This ensures manual mappings always beat heuristic detection (~80 max)
+        while still reflecting match quality.
+        """
+        files = [
+            "skills/SKILL.md",  # depth=0 (exact match)
+            "skills/canvas/SKILL.md",  # depth=1
+            "skills/canvas/nested/SKILL.md",  # depth=2
+            "skills/canvas/nested/deep/SKILL.md",  # depth=3
+            "skills/canvas/nested/deep/deeper/SKILL.md",  # depth=4
+        ]
+        detector = HeuristicDetector(manual_mappings={"skills": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        # Sort by path for predictable order
+        matches_by_path = {m.path: m for m in matches}
+
+        # depth=0 (exact match) -> "skills" is a container, won't be detected as artifact
+        # depth=1 -> 95 - 3 = 92
+        assert matches_by_path["skills/canvas"].confidence_score == 92
+        assert matches_by_path["skills/canvas"].metadata["confidence_reason"] == \
+            "Manual mapping inherited from ancestor (depth=1, score=92)"
+
+        # depth=2 -> 95 - 6 = 89
+        assert matches_by_path["skills/canvas/nested"].confidence_score == 89
+        assert matches_by_path["skills/canvas/nested"].metadata["confidence_reason"] == \
+            "Manual mapping inherited from ancestor (depth=2, score=89)"
+
+        # depth=3 -> 95 - 9 = 86
+        assert matches_by_path["skills/canvas/nested/deep"].confidence_score == 86
+        assert matches_by_path["skills/canvas/nested/deep"].metadata["confidence_reason"] == \
+            "Manual mapping inherited from ancestor (depth=3, score=86)"
+
+        # depth=4 -> max(86, 95 - 12) = max(86, 83) = 86
+        assert matches_by_path["skills/canvas/nested/deep/deeper"].confidence_score == 86
+        assert matches_by_path["skills/canvas/nested/deep/deeper"].metadata["confidence_reason"] == \
+            "Manual mapping inherited from ancestor (depth=4, score=86)"
+
+    def test_confidence_score_exact_match(self):
+        """Test exact match gets confidence=95 with correct reason."""
+        files = ["custom/path/SKILL.md", "custom/path/index.ts"]
+        detector = HeuristicDetector(manual_mappings={"custom/path": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        assert matches[0].confidence_score == 95
+        assert matches[0].metadata["confidence_reason"] == "Manual mapping exact match (95)"
+
+    def test_confidence_score_always_beats_heuristic(self):
+        """Test that even minimum manual mapping confidence (86) beats max heuristic (~80)."""
+        # Deep inheritance should still be >= 86
+        files = [
+            "root/a/b/c/d/e/SKILL.md",  # depth=5
+            "root/a/b/c/d/e/index.ts",
+        ]
+        detector = HeuristicDetector(manual_mappings={"root": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        # max(86, 95 - 15) = max(86, 80) = 86
+        assert matches[0].confidence_score == 86
+        # Verify it's still above heuristic max (~80)
+        assert matches[0].confidence_score > 80
