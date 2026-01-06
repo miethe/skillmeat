@@ -61,7 +61,7 @@ class TestHeuristicDetector:
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
         assert len(artifacts) == 1
-        assert artifacts[0].artifact_type == "mcp_server"
+        assert artifacts[0].artifact_type == "mcp"
         assert artifacts[0].name == "server-tools"
 
     def test_no_detection_without_manifest(self):
@@ -125,7 +125,7 @@ class TestHeuristicDetector:
 
         assert len(artifacts) == 4
         types = {a.artifact_type for a in artifacts}
-        assert types == {"skill", "command", "agent", "mcp_server"}
+        assert types == {"skill", "command", "agent", "mcp"}
 
     def test_upstream_url_generation(self):
         """Test that upstream URLs are correctly generated."""
@@ -306,7 +306,7 @@ class TestArtifactTypeDetection:
 
         assert len(artifacts) == 5
         types = {a.artifact_type for a in artifacts}
-        assert types == {"skill", "command", "agent", "mcp_server", "hook"}
+        assert types == {"skill", "command", "agent", "mcp", "hook"}
 
     def test_manifest_overrides_dir_name(self):
         """Test that manifest type takes precedence over directory name."""
@@ -339,7 +339,7 @@ class TestArtifactTypeDetection:
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
         assert len(artifacts) == 1
-        assert artifacts[0].artifact_type == "mcp_server"
+        assert artifacts[0].artifact_type == "mcp"
 
 
 class TestEdgeCases:
@@ -1165,7 +1165,7 @@ class TestMultiTypeDetection:
 
         assert len(artifacts) == 1
         artifact = artifacts[0]
-        assert artifact.artifact_type == "mcp_server"
+        assert artifact.artifact_type == "mcp"
         assert artifact.name == "server"
         assert artifact.confidence_score >= 30
 
@@ -1682,7 +1682,7 @@ class TestOrganizationPath:
 
         assert len(matches) == 1
         assert matches[0].organization_path == "integrations"
-        assert matches[0].artifact_type == "mcp_server"
+        assert matches[0].artifact_type == "mcp"
 
     def test_organization_path_with_nested_plugin_structure(self):
         """Test organization_path with nested plugin structure."""
@@ -1874,11 +1874,11 @@ class TestSingleFileArtifacts:
         assert matches[0].artifact_type == "hook"
 
     def test_single_file_mcp(self, detector):
-        """mcp/slack-server.md -> MCP_SERVER"""
+        """mcp/slack-server.md -> MCP"""
         paths = ["mcp/slack-server.md"]
         matches = detector.analyze_paths(paths, base_url="https://github.com/test/repo")
         assert len(matches) == 1
-        assert matches[0].artifact_type == "mcp_server"
+        assert matches[0].artifact_type == "mcp"
 
     def test_artifact_name_from_single_file(self):
         """Test that artifact name is extracted correctly from single-file path"""
@@ -1929,10 +1929,10 @@ class TestManualMappings:
             ("COMMAND", ArtifactType.COMMAND),
             ("agent", ArtifactType.AGENT),
             ("AGENT", ArtifactType.AGENT),
-            ("mcp_server", ArtifactType.MCP_SERVER),
-            ("MCP_SERVER", ArtifactType.MCP_SERVER),
-            ("mcp-server", ArtifactType.MCP_SERVER),
-            ("MCP-SERVER", ArtifactType.MCP_SERVER),
+            ("mcp_server", ArtifactType.MCP),
+            ("mcp", ArtifactType.MCP),
+            ("mcp-server", ArtifactType.MCP),
+            ("MCP", ArtifactType.MCP),
             ("hook", ArtifactType.HOOK),
             ("HOOK", ArtifactType.HOOK),
             # Invalid types
@@ -1957,8 +1957,8 @@ class TestManualMappings:
         assert detector._string_to_artifact_type("SKILL") == ArtifactType.SKILL
         assert detector._string_to_artifact_type("command") == ArtifactType.COMMAND
         assert detector._string_to_artifact_type("agent") == ArtifactType.AGENT
-        assert detector._string_to_artifact_type("mcp_server") == ArtifactType.MCP_SERVER
-        assert detector._string_to_artifact_type("mcp-server") == ArtifactType.MCP_SERVER
+        assert detector._string_to_artifact_type("mcp_server") == ArtifactType.MCP
+        assert detector._string_to_artifact_type("mcp-server") == ArtifactType.MCP
         assert detector._string_to_artifact_type("hook") == ArtifactType.HOOK
         assert detector._string_to_artifact_type("invalid") is None
         assert detector._string_to_artifact_type("") is None
@@ -2820,12 +2820,12 @@ class TestManualMappingNonSkillTypes:
             assert match.artifact_type == "hook"
 
     def test_manual_mapping_mcp_server_directory_not_artifact(self):
-        """Test that directories mapped to 'mcp_server' are not detected as artifacts."""
+        """Test that directories mapped to 'mcp' are not detected as artifacts."""
         files = [
             "servers/database.md",
             "servers/api.md",
         ]
-        detector = HeuristicDetector(manual_mappings={"servers": "mcp_server"})
+        detector = HeuristicDetector(manual_mappings={"servers": "mcp"})
         matches = detector.analyze_paths(files, "https://github.com/test/repo")
 
         paths = {m.path for m in matches}
@@ -2835,7 +2835,7 @@ class TestManualMappingNonSkillTypes:
         assert "servers/api.md" in paths
 
         for match in matches:
-            assert match.artifact_type == "mcp_server"
+            assert match.artifact_type == "mcp"
 
     def test_manual_mapping_skill_directory_is_artifact(self):
         """Test that directories mapped to 'skill' WITH SKILL.md are detected as artifacts."""
