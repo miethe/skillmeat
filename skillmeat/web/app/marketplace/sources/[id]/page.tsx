@@ -23,6 +23,8 @@ import {
   Pencil,
   Trash2,
   StickyNote,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +32,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { ExcludedArtifactsList } from './components/excluded-list';
 import { SourceToolbar, useViewMode } from './components/source-toolbar';
 import { CatalogList } from './components/catalog-list';
@@ -308,6 +315,7 @@ export default function SourceDetailPage() {
     return 'confidence-desc'; // default to high confidence first
   });
   const [lastScanResult, setLastScanResult] = useState<any>(null);
+  const [isMappingsOpen, setIsMappingsOpen] = useState(false);
 
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useViewMode();
@@ -671,37 +679,57 @@ export default function SourceDetailPage() {
         ))}
       </div>
 
-      {/* Manual Mappings Display (P4.3a) */}
+      {/* Manual Mappings Display (P4.3a) - Collapsible */}
       {source.manual_map && Object.keys(source.manual_map).length > 0 && (
-        <Card className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="font-medium mb-1">Directory Mappings</h3>
-              <p className="text-sm text-muted-foreground">
-                Manual artifact type mappings for specific directories
-              </p>
-            </div>
+        <Collapsible open={isMappingsOpen} onOpenChange={setIsMappingsOpen}>
+          <CollapsibleTrigger asChild>
             <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenDirectoryMap}
+              variant="ghost"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              aria-label={isMappingsOpen ? 'Collapse directory mappings' : 'Expand directory mappings'}
             >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Mappings
+              {isMappingsOpen ? (
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              )}
+              View Mappings ({Object.keys(source.manual_map).length})
             </Button>
-          </div>
-          <div className="grid gap-2">
-            {Object.entries(source.manual_map).map(([directory, artifactType]) => (
-              <div
-                key={directory}
-                className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-              >
-                <code className="text-sm font-mono">{directory}</code>
-                <Badge variant="secondary">{artifactType}</Badge>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <Card className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-medium mb-1">Directory Mappings</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Manual artifact type mappings for specific directories
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenDirectoryMap}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Mappings
+                  </Button>
+                </div>
               </div>
-            ))}
-          </div>
-        </Card>
+              <div className="grid gap-2">
+                {Object.entries(source.manual_map).map(([directory, artifactType]) => (
+                  <div
+                    key={directory}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                  >
+                    <code className="text-sm font-mono">{directory}</code>
+                    <Badge variant="secondary">{artifactType}</Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       {/* Scan Result with Dedup Stats (P4.3b) */}
