@@ -21,6 +21,7 @@ class TestUpdateSourceManualMapValidation:
     def mock_source(self):
         """Mock marketplace source."""
         from datetime import datetime
+        import json
 
         source = Mock(spec=MarketplaceSource)
         source.id = "test-source-123"
@@ -33,7 +34,7 @@ class TestUpdateSourceManualMapValidation:
         source.description = "Test repository"
         source.notes = None
         source.enable_frontmatter_detection = False
-        source.manual_map_json = None
+        source.manual_map = None
         source.visibility = "public"
         source.scan_status = "success"
         source.artifact_count = 0
@@ -41,6 +42,12 @@ class TestUpdateSourceManualMapValidation:
         source.last_error = None
         source.created_at = datetime(2025, 1, 6, 12, 0, 0)
         source.updated_at = datetime(2025, 1, 6, 12, 0, 0)
+
+        # Add set_manual_map_dict method to mock
+        def set_manual_map_dict(manual_map_dict):
+            source.manual_map = json.dumps(manual_map_dict)
+
+        source.set_manual_map_dict = set_manual_map_dict
         return source
 
     @pytest.fixture
@@ -95,7 +102,7 @@ class TestUpdateSourceManualMapValidation:
             )
 
             # Verify manual_map was stored
-            assert mock_source.manual_map_json is not None
+            assert mock_source.manual_map is not None
 
     @pytest.mark.asyncio
     async def test_update_source_with_invalid_manual_map(

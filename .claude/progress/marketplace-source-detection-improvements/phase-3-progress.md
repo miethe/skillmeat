@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 23
+progress: 31
 total_tasks: 13
-completed_tasks: 3
+completed_tasks: 4
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -48,10 +48,13 @@ tasks:
 
   - id: "P3.1d"
     name: "Persist mappings"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.1b", "P3.1c"]
     effort: "2 pts"
+    completed_by: "a24e6bb"
+    completed_at: 2026-01-06
+    note: "Persisting manual_map to database using set_manual_map_dict() method, handles None/empty to clear mapping"
 
   - id: "P3.1e"
     name: "Update PATCH route handler"

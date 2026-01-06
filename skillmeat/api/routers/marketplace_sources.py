@@ -889,8 +889,12 @@ async def update_source(
         if request.root_hint is not None:
             source.root_hint = request.root_hint
         if request.manual_map is not None:
-            # Store as JSON string in database
-            source.manual_map_json = json.dumps(request.manual_map)
+            # Store as JSON string in database (use set_manual_map_dict helper)
+            if request.manual_map:
+                source.set_manual_map_dict(request.manual_map)
+            else:
+                # Clear mapping if empty dict or None
+                source.manual_map = None
         if request.trust_level is not None:
             source.trust_level = request.trust_level
         if request.description is not None:
