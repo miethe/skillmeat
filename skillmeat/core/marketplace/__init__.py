@@ -10,7 +10,14 @@ from .content_hash import (
     ContentHashCache,
     MAX_HASH_FILE_SIZE,
 )
-from .deduplication_engine import DeduplicationEngine
+from .deduplication_engine import (
+    DeduplicationEngine,
+    EXCLUDED_DUPLICATE_CROSS_SOURCE,
+    EXCLUDED_DUPLICATE_WITHIN_SOURCE,
+    EXCLUDED_USER_MANUAL,
+    mark_as_excluded,
+    mark_for_restore,
+)
 from .diff_engine import (
     CatalogDiffEngine,
     ChangeType,
@@ -69,6 +76,11 @@ __all__ = [
     "MAX_HASH_FILE_SIZE",
     # Deduplication
     "DeduplicationEngine",
+    "EXCLUDED_DUPLICATE_WITHIN_SOURCE",
+    "EXCLUDED_DUPLICATE_CROSS_SOURCE",
+    "EXCLUDED_USER_MANUAL",
+    "mark_as_excluded",
+    "mark_for_restore",
     # GitHub scanning
     "GitHubScanner",
     "ScanConfig",
