@@ -1,51 +1,37 @@
-# Updating Item Status
+# Updating Items
 
-How to update the status of captured request-log items. Direct file editing is required until a CLI update command exists.
-
----
-
-## Workflow
-
-1. **Find the item** - Search or list to locate the item
-2. **View the document** - Confirm item details and current status
-3. **Edit the markdown** - Update the `**Status:**` field directly
+How to update request-log items: change status, add notes, modify fields.
 
 ---
 
-## Find the Item
+## CLI Commands
+
+Two commands for updating items:
+
+| Command | Purpose |
+|---------|---------|
+| `log note add` | Add a note to an item |
+| `log item update` | Update item fields (status, priority, tags, etc.) |
+
+---
+
+## Update Item Status
+
+The most common operation - changing item status as work progresses:
 
 ```bash
-# Search by keyword
-meatycapture log search "validation" PROJECT_NAME --json
+# Mark as in-progress when starting work
+meatycapture log item update REQ-20260105-project.md ITEM-01 --status in-progress
 
-# Search by item ID
-meatycapture log search "REQ-20251229-project-01" PROJECT_NAME --json
+# Mark as done when complete
+meatycapture log item update REQ-20260105-project.md ITEM-01 --status done
 
-# List documents then view
-meatycapture log list PROJECT_NAME --json
+# Mark as wontfix (add note explaining why)
+meatycapture log item update doc.md ITEM-01 --status wontfix
+meatycapture log note add doc.md ITEM-01 -c "Duplicate of ITEM-03"
 ```
 
-Get the document path from search results:
-
-```bash
-DOC_PATH=$(meatycapture log search "validation" PROJECT_NAME --json | jq -r '.matches[0].doc_path')
-```
-
----
-
-## View Current Status
-
-```bash
-# View full document
-meatycapture log view "$DOC_PATH" --json
-
-# Get specific item
-meatycapture log view "$DOC_PATH" --json | jq '.items[] | select(.id == "REQ-20251229-project-01")'
-```
-
----
-
-## Status Values
+### Status Values
 
 | Status | Description |
 |--------|-------------|
@@ -56,82 +42,183 @@ meatycapture log view "$DOC_PATH" --json | jq '.items[] | select(.id == "REQ-202
 | `done` | Completed |
 | `wontfix` | Closed without action (duplicate, invalid, deferred) |
 
----
-
-## Typical Transitions
+### Typical Transitions
 
 ```
 triage -> backlog -> planned -> in-progress -> done
                  \-> wontfix (at any stage)
 ```
 
-- **triage -> backlog**: After review, confirmed valid
-- **backlog -> planned**: Scheduled for a sprint/milestone
-- **planned -> in-progress**: Work started
-- **in-progress -> done**: Work completed
-- **any -> wontfix**: Closed without implementation
-
 ---
 
-## Edit Status in Markdown
+## Add Notes
 
-The status field appears in the item header:
-
-```markdown
-**Type:** bug | **Domain:** core | **Priority:** medium | **Status:** triage
-```
-
-### Before
-
-```markdown
-### REQ-20251229-project-01 - Sanitize user input
-
-**Type:** bug | **Domain:** core | **Priority:** critical | **Status:** triage
-**Tags:** security, input-validation
-
-- Problem: Project names not sanitized.
-- Goal: Add validation regex.
-```
-
-### After
-
-```markdown
-### REQ-20251229-project-01 - Sanitize user input
-
-**Type:** bug | **Domain:** core | **Priority:** critical | **Status:** done
-**Tags:** security, input-validation
-
-- Problem: Project names not sanitized.
-- Goal: Add validation regex.
-```
-
----
-
-## Batch Status Updates
-
-For multiple items, use pattern matching with your editor or sed:
+Add context, updates, or resolution info to items:
 
 ```bash
-# Update all triage items to backlog in a document
-sed -i '' 's/\*\*Status:\*\* triage/**Status:** backlog/g' "$DOC_PATH"
+# Basic note
+meatycapture log note add doc.md ITEM-01 --content "Investigating root cause"
+
+# Short form
+meatycapture log note add doc.md ITEM-01 -c "Fixed in PR #456"
+
+# With note type
+meatycapture log note add doc.md ITEM-01 -c "Attempted fix but tests fail" -t "Bug Fix Attempt"
+meatycapture log note add doc.md ITEM-01 -c "Verified fix in staging" -t "Validation"
 ```
 
-**Caution**: Review changes before committing. Batch updates may affect unintended items.
+### Note Types
+
+| Type | Use For |
+|------|---------|
+| `General` | Default - general updates, context |
+| `Bug Fix Attempt` | Recording fix attempts (successful or not) |
+| `Validation` | Verification, testing notes |
+| `Other` | Anything else |
+
+---
+
+## Update Other Fields
+
+### Priority
+
+```bash
+meatycapture log item update doc.md ITEM-01 --priority critical
+meatycapture log item update doc.md ITEM-01 --priority high
+meatycapture log item update doc.md ITEM-01 --priority medium
+meatycapture log item update doc.md ITEM-01 --priority low
+```
+
+### Type
+
+```bash
+meatycapture log item update doc.md ITEM-01 --type bug
+meatycapture log item update doc.md ITEM-01 --type enhancement
+meatycapture log item update doc.md ITEM-01 --type task
+```
+
+### Tags
+
+```bash
+# Replace all tags
+meatycapture log item update doc.md ITEM-01 --tags "security,critical"
+
+# Add tags (preserves existing)
+meatycapture log item update doc.md ITEM-01 --add-tags "reviewed,approved"
+
+# Remove tags
+meatycapture log item update doc.md ITEM-01 --remove-tags "triage,needs-review"
+```
+
+### Title, Domain, Context
+
+```bash
+meatycapture log item update doc.md ITEM-01 --title "Updated title here"
+meatycapture log item update doc.md ITEM-01 --domain api
+meatycapture log item update doc.md ITEM-01 --context "auth-service"
+```
+
+---
+
+## Multiple Updates at Once
+
+Combine options in a single command:
+
+```bash
+meatycapture log item update doc.md ITEM-01 \
+  --status in-progress \
+  --priority high \
+  --add-tags "sprint-5"
+```
+
+---
+
+## Path Resolution
+
+Commands support project-aware path resolution. For files matching `REQ-YYYYMMDD-<project>.md`:
+
+```bash
+# These are equivalent if project is configured:
+meatycapture log item update REQ-20260105-meatycapture.md ITEM-01 --status done
+meatycapture log item update ~/.meatycapture/docs/meatycapture/REQ-20260105-meatycapture.md ITEM-01 --status done
+```
+
+---
+
+## Common Workflows
+
+### Bug Resolution
+
+```bash
+# 1. Start working on bug
+meatycapture log item update doc.md ITEM-01 --status in-progress
+
+# 2. Note your progress
+meatycapture log note add doc.md ITEM-01 -c "Root cause: missing null check in parser"
+
+# 3. Note the fix
+meatycapture log note add doc.md ITEM-01 -c "Fixed in commit abc123, PR #456" -t "Bug Fix Attempt"
+
+# 4. Mark as done
+meatycapture log item update doc.md ITEM-01 --status done
+```
+
+### Triage Review
+
+```bash
+# Promote from triage to backlog after review
+meatycapture log item update doc.md ITEM-01 --status backlog --priority medium
+
+# Or close as wontfix
+meatycapture log item update doc.md ITEM-01 --status wontfix
+meatycapture log note add doc.md ITEM-01 -c "Out of scope for MVP"
+```
+
+### Sprint Planning
+
+```bash
+# Move items to planned for next sprint
+meatycapture log item update doc.md ITEM-01 --status planned --add-tags "sprint-6"
+meatycapture log item update doc.md ITEM-02 --status planned --add-tags "sprint-6"
+```
+
+---
+
+## Output Formats
+
+```bash
+# Default human-readable output
+meatycapture log item update doc.md ITEM-01 --status done
+
+# JSON output for scripting
+meatycapture log item update doc.md ITEM-01 --status done --json
+
+# YAML output
+meatycapture log item update doc.md ITEM-01 --status done --yaml
+```
 
 ---
 
 ## Verification
 
-After editing, verify the change:
+After updating, verify the change:
 
 ```bash
-meatycapture log view "$DOC_PATH" --json | jq '.items[] | {id: .id, status: .status}'
+# View updated item
+meatycapture log view doc.md --json | jq '.items[] | select(.id == "ITEM-01")'
+
+# Check item status
+meatycapture log view doc.md --json | jq '.items[] | {id: .id, status: .status}'
 ```
 
 ---
 
-## Notes
+## Backup
 
-- Direct file editing required until CLI `update` command is implemented
-- Status changes do not auto-update document `updated_at` metadata (CLI append does)
-- Consider adding a note when closing as `wontfix` explaining the reason
+By default, commands create a `.bak` backup before modifying files:
+
+```bash
+# Disable backup (use with caution)
+meatycapture log item update doc.md ITEM-01 --status done --no-backup
+meatycapture log note add doc.md ITEM-01 -c "Note" --no-backup
+```

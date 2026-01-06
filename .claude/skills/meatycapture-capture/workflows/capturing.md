@@ -223,12 +223,16 @@ Context:
 |---------|---------|
 | `meatycapture log create [file] --json` | Create new document |
 | `meatycapture log append <doc> [file] --json` | Append to existing |
+| `meatycapture log note add <doc> <item> -c "text"` | Add note to item |
+| `meatycapture log item update <doc> <item> [options]` | Update item fields |
 | `meatycapture create [file] --json` | Alias for log create |
 | `meatycapture append <doc> [file] --json` | Alias for log append |
 
 **Stdin Support**: Use `-` or omit file argument to read from stdin.
 
 **Output Formats**: `--json`, `--yaml`, `--csv`, `--table`
+
+**Update Options**: `--status`, `--priority`, `--type`, `--title`, `--tags`, `--add-tags`, `--remove-tags`, `--domain`, `--context`
 
 ---
 
