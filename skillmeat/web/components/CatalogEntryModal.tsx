@@ -31,14 +31,17 @@ import {
   AlertCircle,
   RefreshCw,
   Tag,
+  Pencil,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
 import { ContentPane, type TruncationInfo } from '@/components/entity/content-pane';
 import { useCatalogFileTree, useCatalogFileContent } from '@/hooks/use-catalog-files';
+import { useUpdateCatalogEntryName } from '@/hooks/useMarketplaceSources';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
+import { Input } from '@/components/ui/input';
 
 interface CatalogEntryModalProps {
   entry: CatalogEntry | null;
@@ -46,6 +49,7 @@ interface CatalogEntryModalProps {
   onOpenChange: (open: boolean) => void;
   onImport?: (entry: CatalogEntry) => void;
   isImporting?: boolean;
+  onEntryUpdated?: (entry: CatalogEntry) => void;
 }
 
 /**
@@ -279,13 +283,20 @@ export function CatalogEntryModal({
   onOpenChange,
   onImport,
   isImporting = false,
+  onEntryUpdated,
 }: CatalogEntryModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'contents' | 'tags'>('overview');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Use source_id directly as string for API calls
   const sourceId = entry?.source_id ?? null;
+  const nameSourceId = entry?.source_id ?? '';
   const artifactPath = entry?.path ?? null;
+
+  const updateNameMutation = useUpdateCatalogEntryName(nameSourceId);
 
   // Fetch file tree when Contents tab is active
   const {
@@ -342,19 +353,73 @@ export function CatalogEntryModal({
     }
   }, [fileTreeData?.entries, selectedFilePath]);
 
+  useEffect(() => {
+    if (!entry) {
+      return;
+    }
+
+    if (!isEditingName) {
+      setDraftName(entry.name);
+      setNameError(null);
+    }
+  }, [entry, isEditingName]);
+
   // Reset selected file when modal closes or entry changes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setSelectedFilePath(null);
       setActiveTab('overview');
+      setIsEditingName(false);
+      setNameError(null);
     }
     onOpenChange(newOpen);
   };
 
   if (!entry) return null;
 
+  const handleStartEditName = () => {
+    setDraftName(entry.name);
+    setNameError(null);
+    setIsEditingName(true);
+  };
+
+  const handleCancelEditName = () => {
+    setDraftName(entry.name);
+    setNameError(null);
+    setIsEditingName(false);
+  };
+
+  const handleSaveName = async () => {
+    const trimmedName = draftName.trim();
+    if (!trimmedName) {
+      setNameError('Name is required.');
+      return;
+    }
+
+    if (trimmedName === entry.name) {
+      setIsEditingName(false);
+      setNameError(null);
+      return;
+    }
+
+    try {
+      const updatedEntry = await updateNameMutation.mutateAsync({
+        entryId: entry.id,
+        name: trimmedName,
+      });
+      setIsEditingName(false);
+      setNameError(null);
+      onEntryUpdated?.(updatedEntry);
+    } catch (error) {
+      setNameError(error instanceof Error ? error.message : 'Failed to update name');
+    }
+  };
+
   // Determine if import button should be disabled
   const isImportDisabled = entry.status === 'imported' || entry.status === 'removed' || isImporting;
+  const isSavingName = updateNameMutation.isPending;
+  const isSaveDisabled =
+    isSavingName || !draftName.trim() || draftName.trim() === entry.name;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -404,8 +469,70 @@ export function CatalogEntryModal({
             <div className="grid gap-6">
               {/* Header Section */}
               <div className="border-b pb-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">{entry.name}</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    {isEditingName ? (
+                      <form
+                        className="flex w-full flex-wrap items-center gap-2"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          handleSaveName();
+                        }}
+                      >
+                        <Input
+                          value={draftName}
+                          onChange={(event) => {
+                            setDraftName(event.target.value);
+                            setNameError(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              handleCancelEditName();
+                            }
+                          }}
+                          maxLength={100}
+                          className="min-w-[220px] flex-1"
+                          aria-label="Artifact name"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={isSaveDisabled}
+                        >
+                          {isSavingName ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Saving
+                            </>
+                          ) : (
+                            'Save'
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEditName}
+                          disabled={isSavingName}
+                        >
+                          Cancel
+                        </Button>
+                      </form>
+                    ) : (
+                      <>
+                        <h2 className="text-xl font-semibold truncate">{entry.name}</h2>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleStartEditName}
+                          aria-label={`Edit name for ${entry.name}`}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <Badge className={typeConfig[entry.artifact_type]?.color || 'bg-gray-100'}>
                       {typeConfig[entry.artifact_type]?.label || entry.artifact_type}
@@ -415,6 +542,11 @@ export function CatalogEntryModal({
                     </Badge>
                   </div>
                 </div>
+                {nameError && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {nameError}
+                  </p>
+                )}
                 <div className="flex items-center gap-3 min-w-0">
                   <ScoreBadge
                     confidence={entry.confidence_score}

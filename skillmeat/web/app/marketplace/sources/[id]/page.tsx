@@ -1030,6 +1030,7 @@ export default function SourceDetailPage() {
         onOpenChange={setModalOpen}
         onImport={(entry) => handleImportSingle(entry.id)}
         isImporting={importMutation.isPending}
+        onEntryUpdated={(updatedEntry) => setSelectedEntry(updatedEntry)}
       />
 
       {/* Directory Map Modal */}

@@ -2734,3 +2734,246 @@ class TestManualMappings:
         assert matches[0].confidence_score == 86
         # Verify it's still above heuristic max (~80)
         assert matches[0].confidence_score > 80
+
+
+class TestManualMappingNonSkillTypes:
+    """Test that manual mappings work correctly for non-Skill artifact types.
+
+    Claude Code convention:
+    - Skills: Always directories containing SKILL.md (entire directory is the artifact)
+    - All other types (Agent, Command, Hook, MCP Server): Always single markdown files
+    """
+
+    def test_manual_mapping_agent_directory_not_artifact(self):
+        """Test that directories mapped to 'agent' are not detected as artifacts.
+
+        When a user maps a directory to 'agent', the directory itself should NOT
+        be an artifact. Only .md files inside should be detected as agents.
+        """
+        files = [
+            "categories/ai-engineer/prompt.md",
+            "categories/ai-engineer/README.md",
+            "categories/code-review/review.md",
+        ]
+        detector = HeuristicDetector(manual_mappings={"categories": "agent"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        # Should detect individual .md files as agents, not the directories
+        paths = {m.path for m in matches}
+
+        # Directories should NOT be detected
+        assert "categories" not in paths
+        assert "categories/ai-engineer" not in paths
+        assert "categories/code-review" not in paths
+
+        # .md files (except README) should be detected as agents
+        assert "categories/ai-engineer/prompt.md" in paths
+        assert "categories/code-review/review.md" in paths
+
+        # README.md should be excluded
+        assert "categories/ai-engineer/README.md" not in paths
+
+        # All detected artifacts should be agents
+        for match in matches:
+            assert match.artifact_type == "agent"
+
+    def test_manual_mapping_command_directory_not_artifact(self):
+        """Test that directories mapped to 'command' are not detected as artifacts."""
+        files = [
+            "my-commands/deploy.md",
+            "my-commands/build.md",
+            "my-commands/nested/test.md",
+        ]
+        detector = HeuristicDetector(manual_mappings={"my-commands": "command"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        # Directory should NOT be detected
+        assert "my-commands" not in paths
+        assert "my-commands/nested" not in paths
+
+        # .md files should be detected as commands
+        assert "my-commands/deploy.md" in paths
+        assert "my-commands/build.md" in paths
+        assert "my-commands/nested/test.md" in paths
+
+        for match in matches:
+            assert match.artifact_type == "command"
+
+    def test_manual_mapping_hook_directory_not_artifact(self):
+        """Test that directories mapped to 'hook' are not detected as artifacts."""
+        files = [
+            "git-hooks/pre-commit.md",
+            "git-hooks/post-checkout.md",
+        ]
+        detector = HeuristicDetector(manual_mappings={"git-hooks": "hook"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        assert "git-hooks" not in paths
+        assert "git-hooks/pre-commit.md" in paths
+        assert "git-hooks/post-checkout.md" in paths
+
+        for match in matches:
+            assert match.artifact_type == "hook"
+
+    def test_manual_mapping_mcp_server_directory_not_artifact(self):
+        """Test that directories mapped to 'mcp_server' are not detected as artifacts."""
+        files = [
+            "servers/database.md",
+            "servers/api.md",
+        ]
+        detector = HeuristicDetector(manual_mappings={"servers": "mcp_server"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        assert "servers" not in paths
+        assert "servers/database.md" in paths
+        assert "servers/api.md" in paths
+
+        for match in matches:
+            assert match.artifact_type == "mcp_server"
+
+    def test_manual_mapping_skill_directory_is_artifact(self):
+        """Test that directories mapped to 'skill' WITH SKILL.md are detected as artifacts."""
+        files = [
+            "my-skills/canvas/SKILL.md",
+            "my-skills/canvas/index.ts",
+            "my-skills/planning/SKILL.md",
+            "my-skills/planning/plan.py",
+        ]
+        detector = HeuristicDetector(manual_mappings={"my-skills": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        # Skill directories with SKILL.md should be detected
+        assert "my-skills/canvas" in paths
+        assert "my-skills/planning" in paths
+
+        # Container should not be detected
+        assert "my-skills" not in paths
+
+        for match in matches:
+            assert match.artifact_type == "skill"
+
+    def test_manual_mapping_skill_directory_without_manifest_not_artifact(self):
+        """Test that skill directories without SKILL.md are not detected."""
+        files = [
+            "my-skills/incomplete/index.ts",  # No SKILL.md
+            "my-skills/incomplete/helpers.py",
+        ]
+        detector = HeuristicDetector(manual_mappings={"my-skills": "skill"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        # Without SKILL.md, should not be detected
+        assert "my-skills/incomplete" not in paths
+        assert len(matches) == 0
+
+    def test_manual_mapping_agent_confidence_scores(self):
+        """Test that manually-mapped single-file agents get proper confidence scores."""
+        files = [
+            "agents/helper.md",  # depth=0 from mapping
+            "agents/nested/reviewer.md",  # depth=1 from mapping
+            "agents/deep/nested/tester.md",  # depth=2 from mapping
+        ]
+        detector = HeuristicDetector(manual_mappings={"agents": "agent"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        matches_by_path = {m.path: m for m in matches}
+
+        # Direct in container: depth=0 -> 95
+        assert matches_by_path["agents/helper.md"].confidence_score == 95
+
+        # One level nested: depth=1 -> 92
+        assert matches_by_path["agents/nested/reviewer.md"].confidence_score == 92
+
+        # Two levels nested: depth=2 -> 89
+        assert matches_by_path["agents/deep/nested/tester.md"].confidence_score == 89
+
+    def test_manual_mapping_agent_metadata(self):
+        """Test that manually-mapped single-file agents have correct metadata."""
+        files = ["my-agents/helper.md"]
+        detector = HeuristicDetector(manual_mappings={"my-agents": "agent"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        assert len(matches) == 1
+        match = matches[0]
+
+        assert match.metadata is not None
+        assert match.metadata["is_manual_mapping"] is True
+        assert "match_type" in match.metadata
+        assert "inheritance_depth" in match.metadata
+        assert "confidence_reason" in match.metadata
+
+    def test_manual_mapping_mixed_skill_and_agent(self):
+        """Test manual mappings with both skill and agent types."""
+        files = [
+            "skills/canvas/SKILL.md",
+            "skills/canvas/index.ts",
+            "agents/helper.md",
+            "agents/reviewer.md",
+        ]
+        detector = HeuristicDetector(
+            manual_mappings={"skills": "skill", "agents": "agent"}
+        )
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        matches_by_path = {m.path: m for m in matches}
+
+        # Skill directory with SKILL.md
+        assert "skills/canvas" in matches_by_path
+        assert matches_by_path["skills/canvas"].artifact_type == "skill"
+
+        # Agent single files
+        assert "agents/helper.md" in matches_by_path
+        assert matches_by_path["agents/helper.md"].artifact_type == "agent"
+        assert "agents/reviewer.md" in matches_by_path
+        assert matches_by_path["agents/reviewer.md"].artifact_type == "agent"
+
+        # Directories should not be artifacts
+        assert "skills" not in matches_by_path
+        assert "agents" not in matches_by_path
+
+    def test_awesome_subagents_scenario(self):
+        """Test the VoltAgent/awesome-claude-code-subagents scenario from the bug report.
+
+        User imports with manual mapping: {"categories": "agent"}
+        Each .md file under categories should be an Agent, not the directories.
+        """
+        files = [
+            "categories/ai-engineer/prompt.md",
+            "categories/ai-engineer/example.md",
+            "categories/code-review/review-prompt.md",
+            "categories/debugging/debugger.md",
+            "categories/README.md",
+        ]
+        detector = HeuristicDetector(manual_mappings={"categories": "agent"})
+        matches = detector.analyze_paths(files, "https://github.com/test/repo")
+
+        paths = {m.path for m in matches}
+
+        # Directories should NOT be detected
+        assert "categories" not in paths
+        assert "categories/ai-engineer" not in paths
+        assert "categories/code-review" not in paths
+        assert "categories/debugging" not in paths
+
+        # .md files should be detected as agents
+        assert "categories/ai-engineer/prompt.md" in paths
+        assert "categories/ai-engineer/example.md" in paths
+        assert "categories/code-review/review-prompt.md" in paths
+        assert "categories/debugging/debugger.md" in paths
+
+        # README should be excluded
+        assert "categories/README.md" not in paths
+
+        # All should be agents with proper confidence
+        for match in matches:
+            assert match.artifact_type == "agent"
+            assert match.confidence_score >= 86  # Manual mapping minimum
