@@ -6,11 +6,142 @@ duplicate detection.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from .content_hash import compute_artifact_hash, ContentHashCache
 
 logger = logging.getLogger(__name__)
+
+# Standardized exclusion reason constants
+# These align with MarketplaceCatalogEntry.excluded_reason field
+EXCLUDED_DUPLICATE_WITHIN_SOURCE = "duplicate_within_source"
+EXCLUDED_DUPLICATE_CROSS_SOURCE = "duplicate_cross_source"
+EXCLUDED_USER_MANUAL = "user_excluded"
+
+
+def mark_as_excluded(
+    artifact: dict[str, Any],
+    reason: str,
+    duplicate_of: str | None = None,
+) -> dict[str, Any]:
+    """Mark an artifact dict as excluded with standardized metadata.
+
+    Sets exclusion fields compatible with MarketplaceCatalogEntry model.
+    The artifact is modified in-place and also returned for convenience.
+
+    Args:
+        artifact: Artifact dictionary to mark as excluded.
+            Expected structure:
+            {
+                "path": str,
+                "files": dict[str, str],  # optional
+                "metadata": dict,  # optional, will be created if missing
+                ...
+            }
+        reason: Exclusion reason string. Use constants:
+            - EXCLUDED_DUPLICATE_WITHIN_SOURCE
+            - EXCLUDED_DUPLICATE_CROSS_SOURCE
+            - EXCLUDED_USER_MANUAL
+        duplicate_of: Path of the artifact this is a duplicate of.
+            Only applicable for within-source duplicates.
+
+    Returns:
+        Modified artifact dict with exclusion fields set:
+        - excluded = True
+        - excluded_reason = reason
+        - excluded_at = ISO 8601 timestamp
+        - duplicate_of = path (if provided)
+        - content_hash = hash (preserved from metadata if present)
+        - status = "excluded" (for MarketplaceCatalogEntry compatibility)
+
+    Example:
+        >>> artifact = {"path": "skills/canvas", "files": {"SKILL.md": "content"}}
+        >>> result = mark_as_excluded(artifact, EXCLUDED_DUPLICATE_WITHIN_SOURCE, "skills/main")
+        >>> result["excluded"]
+        True
+        >>> result["excluded_reason"]
+        'duplicate_within_source'
+        >>> result["duplicate_of"]
+        'skills/main'
+    """
+    # Ensure metadata dict exists
+    if "metadata" not in artifact:
+        artifact["metadata"] = {}
+
+    # Set exclusion fields
+    artifact["excluded"] = True
+    artifact["excluded_reason"] = reason
+    artifact["excluded_at"] = datetime.now(timezone.utc).isoformat()
+    artifact["status"] = "excluded"  # MarketplaceCatalogEntry status enum value
+
+    # Set duplicate_of if provided (for within-source duplicates)
+    if duplicate_of is not None:
+        artifact["duplicate_of"] = duplicate_of
+
+    # Ensure content_hash is at top level (copy from metadata if present)
+    if "content_hash" not in artifact:
+        content_hash = artifact.get("metadata", {}).get("content_hash")
+        if content_hash:
+            artifact["content_hash"] = content_hash
+
+    return artifact
+
+
+def mark_for_restore(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Clear exclusion metadata from an artifact, preparing it for restore.
+
+    Removes exclusion-related fields while preserving content_hash in metadata
+    for future reference. The artifact is modified in-place and also returned.
+
+    Args:
+        artifact: Artifact dictionary with exclusion metadata to clear.
+
+    Returns:
+        Modified artifact dict with exclusion fields removed:
+        - Clears: excluded, excluded_reason, excluded_at, duplicate_of
+        - Sets: status = "new" (reset to unimported state)
+        - Preserves: metadata.content_hash (for future deduplication)
+
+    Example:
+        >>> artifact = {
+        ...     "path": "skills/canvas",
+        ...     "excluded": True,
+        ...     "excluded_reason": "duplicate_within_source",
+        ...     "excluded_at": "2024-01-01T00:00:00Z",
+        ...     "duplicate_of": "skills/main",
+        ...     "content_hash": "abc123",
+        ...     "metadata": {"content_hash": "abc123"},
+        ... }
+        >>> result = mark_for_restore(artifact)
+        >>> result.get("excluded")  # None - field removed
+        >>> result.get("status")
+        'new'
+        >>> result["metadata"]["content_hash"]  # Preserved
+        'abc123'
+    """
+    # Preserve content_hash in metadata before clearing
+    content_hash = artifact.get("content_hash") or artifact.get("metadata", {}).get(
+        "content_hash"
+    )
+    if content_hash:
+        if "metadata" not in artifact:
+            artifact["metadata"] = {}
+        artifact["metadata"]["content_hash"] = content_hash
+
+    # Clear exclusion fields
+    artifact.pop("excluded", None)
+    artifact.pop("excluded_reason", None)
+    artifact.pop("excluded_at", None)
+    artifact.pop("duplicate_of", None)
+
+    # Clear top-level content_hash (keep only in metadata)
+    artifact.pop("content_hash", None)
+
+    # Reset status to new (can be re-evaluated for import)
+    artifact["status"] = "new"
+
+    return artifact
 
 
 class DeduplicationEngine:
@@ -304,12 +435,15 @@ class DeduplicationEngine:
 
                 kept_artifacts.append(best)
 
-                # Mark others as excluded
+                # Mark others as excluded using helper
                 for artifact in group:
                     if artifact is not best:
-                        artifact["excluded"] = True
-                        artifact["excluded_reason"] = "duplicate_within_source"
-                        artifact["duplicate_of"] = best_path
+                        mark_as_excluded(
+                            artifact,
+                            reason=EXCLUDED_DUPLICATE_WITHIN_SOURCE,
+                            duplicate_of=best_path,
+                        )
+                        # Ensure content_hash is set (may not be in metadata yet)
                         artifact["content_hash"] = content_hash
                         excluded_artifacts.append(artifact)
 
@@ -421,9 +555,13 @@ class DeduplicationEngine:
 
             # Check if this hash exists in the collection
             if content_hash in existing_hashes:
-                # Mark as cross-source duplicate
-                artifact["excluded"] = True
-                artifact["excluded_reason"] = "duplicate_cross_source"
+                # Mark as cross-source duplicate using helper
+                mark_as_excluded(
+                    artifact,
+                    reason=EXCLUDED_DUPLICATE_CROSS_SOURCE,
+                    duplicate_of=None,  # Unknown which specific artifact it duplicates
+                )
+                # Ensure content_hash is at top level
                 artifact["content_hash"] = content_hash
                 cross_source_duplicates.append(artifact)
             else:
@@ -620,9 +758,11 @@ if __name__ == "__main__":
 
     for excl in excluded:
         assert excl.get("excluded") is True
-        assert excl.get("excluded_reason") == "duplicate_within_source"
+        assert excl.get("excluded_reason") == EXCLUDED_DUPLICATE_WITHIN_SOURCE
         assert excl.get("duplicate_of") == "skills/b"
         assert excl.get("content_hash") is not None
+        assert excl.get("excluded_at") is not None  # New: timestamp set
+        assert excl.get("status") == "excluded"  # New: status set
 
     print("\n   Verification: All assertions passed!")
 
@@ -702,8 +842,10 @@ if __name__ == "__main__":
 
     for dupe in cross_dupes:
         assert dupe.get("excluded") is True
-        assert dupe.get("excluded_reason") == "duplicate_cross_source"
+        assert dupe.get("excluded_reason") == EXCLUDED_DUPLICATE_CROSS_SOURCE
         assert dupe.get("content_hash") is not None
+        assert dupe.get("excluded_at") is not None  # New: timestamp set
+        assert dupe.get("status") == "excluded"  # New: status set
         # Note: No duplicate_of field for cross-source
 
     print("\n   Verification: All assertions passed!")
@@ -784,6 +926,97 @@ if __name__ == "__main__":
     total_excluded = len(stage1_excluded) + len(cross_excluded)
     print(f"   Total excluded: {total_excluded} (within: {len(stage1_excluded)}, cross: {len(cross_excluded)})")
     print("   Verification: Full pipeline works correctly!")
+
+    # Test 16: mark_as_excluded helper function
+    print("\n16. mark_as_excluded helper function:")
+    test_artifact = {
+        "path": "skills/test",
+        "files": {"SKILL.md": "content"},
+        "confidence_score": 0.9,
+        "metadata": {"content_hash": "abc123"},
+    }
+    result = mark_as_excluded(
+        test_artifact,
+        reason=EXCLUDED_DUPLICATE_WITHIN_SOURCE,
+        duplicate_of="skills/original",
+    )
+    print(f"   Input artifact path: {test_artifact['path']}")
+    print(f"   After mark_as_excluded:")
+    print(f"      excluded={result.get('excluded')}")
+    print(f"      excluded_reason={result.get('excluded_reason')}")
+    print(f"      excluded_at={result.get('excluded_at')[:19]}...")  # Truncate tz
+    print(f"      duplicate_of={result.get('duplicate_of')}")
+    print(f"      status={result.get('status')}")
+    print(f"      content_hash={result.get('content_hash')}")
+
+    assert result is test_artifact, "Should modify in-place and return same dict"
+    assert result["excluded"] is True
+    assert result["excluded_reason"] == EXCLUDED_DUPLICATE_WITHIN_SOURCE
+    assert result["excluded_at"] is not None
+    assert result["duplicate_of"] == "skills/original"
+    assert result["status"] == "excluded"
+    assert result["content_hash"] == "abc123"
+    print("   Verification: mark_as_excluded works correctly!")
+
+    # Test 17: mark_as_excluded without duplicate_of (cross-source case)
+    print("\n17. mark_as_excluded for cross-source (no duplicate_of):")
+    cross_artifact = {
+        "path": "skills/cross",
+        "metadata": {"content_hash": "xyz789"},
+    }
+    result2 = mark_as_excluded(cross_artifact, reason=EXCLUDED_DUPLICATE_CROSS_SOURCE)
+    print(f"   excluded_reason={result2.get('excluded_reason')}")
+    print(f"   duplicate_of={result2.get('duplicate_of', 'NOT_SET')}")
+
+    assert result2["excluded"] is True
+    assert result2["excluded_reason"] == EXCLUDED_DUPLICATE_CROSS_SOURCE
+    assert "duplicate_of" not in result2  # Should not be set
+    print("   Verification: Cross-source marking works correctly!")
+
+    # Test 18: mark_for_restore helper function
+    print("\n18. mark_for_restore helper function:")
+    excluded_artifact = {
+        "path": "skills/restore-me",
+        "excluded": True,
+        "excluded_reason": EXCLUDED_DUPLICATE_WITHIN_SOURCE,
+        "excluded_at": "2024-01-01T00:00:00Z",
+        "duplicate_of": "skills/original",
+        "content_hash": "hash123",
+        "status": "excluded",
+        "metadata": {"content_hash": "hash123", "other_data": "preserved"},
+    }
+    restored = mark_for_restore(excluded_artifact)
+    print(f"   After mark_for_restore:")
+    print(f"      excluded={restored.get('excluded', 'NOT_SET')}")
+    print(f"      excluded_reason={restored.get('excluded_reason', 'NOT_SET')}")
+    print(f"      excluded_at={restored.get('excluded_at', 'NOT_SET')}")
+    print(f"      duplicate_of={restored.get('duplicate_of', 'NOT_SET')}")
+    print(f"      status={restored.get('status')}")
+    print(f"      content_hash (top)={restored.get('content_hash', 'NOT_SET')}")
+    print(f"      metadata.content_hash={restored.get('metadata', {}).get('content_hash')}")
+    print(f"      metadata.other_data={restored.get('metadata', {}).get('other_data')}")
+
+    assert restored is excluded_artifact, "Should modify in-place and return same dict"
+    assert "excluded" not in restored
+    assert "excluded_reason" not in restored
+    assert "excluded_at" not in restored
+    assert "duplicate_of" not in restored
+    assert "content_hash" not in restored  # Cleared from top level
+    assert restored["status"] == "new"
+    assert restored["metadata"]["content_hash"] == "hash123"  # Preserved in metadata
+    assert restored["metadata"]["other_data"] == "preserved"  # Other metadata preserved
+    print("   Verification: mark_for_restore works correctly!")
+
+    # Test 19: Constants
+    print("\n19. Exclusion reason constants:")
+    print(f"   EXCLUDED_DUPLICATE_WITHIN_SOURCE = '{EXCLUDED_DUPLICATE_WITHIN_SOURCE}'")
+    print(f"   EXCLUDED_DUPLICATE_CROSS_SOURCE = '{EXCLUDED_DUPLICATE_CROSS_SOURCE}'")
+    print(f"   EXCLUDED_USER_MANUAL = '{EXCLUDED_USER_MANUAL}'")
+
+    assert EXCLUDED_DUPLICATE_WITHIN_SOURCE == "duplicate_within_source"
+    assert EXCLUDED_DUPLICATE_CROSS_SOURCE == "duplicate_cross_source"
+    assert EXCLUDED_USER_MANUAL == "user_excluded"
+    print("   Verification: Constants defined correctly!")
 
     print("\n" + "=" * 50)
     print("All tests passed!")
