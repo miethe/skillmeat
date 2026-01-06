@@ -31,8 +31,47 @@ from skillmeat.core.marketplace.heuristic_detector import (
     HeuristicDetector,
     detect_artifacts_in_tree,
 )
+from skillmeat.core.marketplace.deduplication_engine import DeduplicationEngine
 
 logger = logging.getLogger(__name__)
+
+
+def get_existing_collection_hashes(session) -> Set[str]:
+    """Query existing artifact hashes from the marketplace catalog.
+
+    Args:
+        session: SQLAlchemy database session
+
+    Returns:
+        Set of content hashes from non-excluded catalog entries
+
+    Note:
+        Hashes are expected to be in metadata.content_hash field.
+        Handles None/missing hashes gracefully.
+    """
+    from skillmeat.cache.models import MarketplaceCatalogEntry
+    import json
+
+    hashes = set()
+
+    # Query all non-excluded entries
+    entries = session.query(MarketplaceCatalogEntry).filter(
+        MarketplaceCatalogEntry.excluded_at.is_(None)
+    ).all()
+
+    for entry in entries:
+        if entry.metadata_json:
+            try:
+                metadata = json.loads(entry.metadata_json)
+                content_hash = metadata.get("content_hash")
+                if content_hash:
+                    hashes.add(content_hash)
+            except (json.JSONDecodeError, AttributeError):
+                # Skip entries with invalid JSON or missing metadata
+                continue
+
+    logger.debug(f"Loaded {len(hashes)} existing content hashes from collection")
+    return hashes
 
 
 @dataclass
@@ -105,6 +144,8 @@ class GitHubScanner:
         ref: str = "main",
         root_hint: Optional[str] = None,
         source_id: Optional[str] = None,
+        session=None,
+        manual_mappings: Optional[Dict[str, str]] = None,
     ) -> ScanResultDTO:
         """Scan a GitHub repository for artifacts.
 
@@ -114,6 +155,9 @@ class GitHubScanner:
             ref: Branch, tag, or SHA to scan
             root_hint: Optional subdirectory to focus on
             source_id: Optional source ID for metrics tracking
+            session: Optional SQLAlchemy session for cross-source deduplication
+            manual_mappings: Optional directory-to-artifact-type mappings for manual
+                override. Format: {"path/to/dir": "skill", "another/path": "command"}.
 
         Returns:
             ScanResultDTO with scan results and statistics
@@ -155,15 +199,62 @@ class GitHubScanner:
                 # 4. Apply heuristic detection
                 ctx.metadata["phase"] = "detect_artifacts"
                 base_url = f"https://github.com/{owner}/{repo}"
-                artifacts = detect_artifacts_in_tree(
+                detected_artifacts = detect_artifacts_in_tree(
                     file_paths,
                     repo_url=base_url,
                     ref=ref,
                     root_hint=root_hint,
                     detected_sha=commit_sha,
+                    manual_mappings=manual_mappings,
+                )
+                ctx.metadata["detected_count"] = len(detected_artifacts)
+                logger.info(f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}")
+
+                # 5. Deduplicate within source
+                ctx.metadata["phase"] = "deduplicate_within_source"
+                engine = DeduplicationEngine()
+
+                # Convert DetectedArtifact Pydantic models to dicts for deduplication
+                artifacts_dicts = [a.model_dump() for a in detected_artifacts]
+
+                kept_dicts, within_excluded_dicts = engine.deduplicate_within_source(
+                    artifacts_dicts
+                )
+                ctx.metadata["within_source_duplicates"] = len(within_excluded_dicts)
+                logger.info(
+                    f"Within-source dedup: {len(kept_dicts)} kept, "
+                    f"{len(within_excluded_dicts)} duplicates"
                 )
 
-                # 5. Build result
+                # 6. Deduplicate against existing collection
+                ctx.metadata["phase"] = "deduplicate_cross_source"
+                cross_excluded_dicts = []
+                if session is not None:
+                    existing_hashes = get_existing_collection_hashes(session)
+                    unique_dicts, cross_excluded_dicts = engine.deduplicate_cross_source(
+                        kept_dicts, existing_hashes
+                    )
+                    kept_dicts = unique_dicts
+                    ctx.metadata["cross_source_duplicates"] = len(cross_excluded_dicts)
+                    logger.info(
+                        f"Cross-source dedup: {len(unique_dicts)} unique, "
+                        f"{len(cross_excluded_dicts)} duplicates against "
+                        f"{len(existing_hashes)} existing"
+                    )
+                else:
+                    logger.debug("No session provided, skipping cross-source deduplication")
+
+                # Convert dicts back to DetectedArtifact models
+                from skillmeat.api.schemas.marketplace import DetectedArtifact
+
+                kept = [DetectedArtifact(**d) for d in kept_dicts]
+                within_excluded = [DetectedArtifact(**d) for d in within_excluded_dicts]
+                cross_excluded = [DetectedArtifact(**d) for d in cross_excluded_dicts]
+
+                # Combine all artifacts (unique + excluded)
+                artifacts = kept + within_excluded + cross_excluded
+
+                # 7. Build result
                 duration_ms = (time.time() - start_time) * 1000
                 duration_seconds = duration_ms / 1000
 
@@ -195,10 +286,14 @@ class GitHubScanner:
                     status="success",
                     artifacts_found=len(artifacts),
                     artifacts=artifacts,
-                    new_count=len(artifacts),  # All new on first scan
+                    new_count=len(kept),  # Unique artifacts
                     updated_count=0,
                     removed_count=0,
                     unchanged_count=0,
+                    duplicates_within_source=len(within_excluded),
+                    duplicates_cross_source=len(cross_excluded),
+                    total_detected=len(detected_artifacts),
+                    total_unique=len(kept),
                     scan_duration_ms=duration_ms,
                     errors=errors,
                     scanned_at=datetime.utcnow(),
