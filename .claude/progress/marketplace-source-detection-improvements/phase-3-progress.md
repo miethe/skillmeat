@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 62
+progress: 69
 total_tasks: 13
-completed_tasks: 8
+completed_tasks: 9
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -100,10 +100,13 @@ tasks:
 
   - id: "P3.3b"
     name: "Return dedup counts"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.3a"]
     effort: "2 pts"
+    completed_by: "a5fbe50"
+    completed_at: 2026-01-06
+    note: "Added database session to scan_repository call to enable cross-source deduplication, dedup counts auto-included in ScanResultDTO response"
 
   - id: "P3.3c"
     name: "Update response schema"
