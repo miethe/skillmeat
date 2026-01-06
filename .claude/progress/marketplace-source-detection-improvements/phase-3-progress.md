@@ -3,13 +3,14 @@ type: progress
 prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
-status: in_progress
-progress: 85
+status: completed
+progress: 100
 total_tasks: 13
-completed_tasks: 11
+completed_tasks: 13
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
+completed_at: 2026-01-06
 
 assigned_to: ["python-backend-engineer"]
 dependencies: [2]
@@ -131,17 +132,23 @@ tasks:
   # Error Handling & Docs (2 tasks)
   - id: "P3.4a"
     name: "Add error responses"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.3d"]
     effort: "2 pts"
+    completed_by: "a890d52"
+    completed_at: 2026-01-06
+    note: "Created 13 comprehensive error tests, verified 422 responses for invalid paths/types, documented all error codes"
 
   - id: "P3.4b"
     name: "Update OpenAPI docs"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.4a"]
     effort: "2 pts"
+    completed_by: "a926f74"
+    completed_at: 2026-01-06
+    note: "Enhanced OpenAPI docs for all endpoints with manual_map examples, validation rules, and complete error documentation"
 
 parallelization:
   batch_1: ["P3.1a"]
