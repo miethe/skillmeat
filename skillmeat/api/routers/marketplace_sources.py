@@ -314,6 +314,7 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         description=source.description,
         notes=source.notes,
         enable_frontmatter_detection=source.enable_frontmatter_detection,
+        manual_map=source.get_manual_map_dict(),
     )
 
 
