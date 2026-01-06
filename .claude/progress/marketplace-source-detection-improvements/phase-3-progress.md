@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 31
+progress: 38
 total_tasks: 13
-completed_tasks: 4
+completed_tasks: 5
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -58,10 +58,13 @@ tasks:
 
   - id: "P3.1e"
     name: "Update PATCH route handler"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.1d"]
     effort: "2 pts"
+    completed_by: "a6ac07c"
+    completed_at: 2026-01-06
+    note: "Completed PATCH endpoint integration with OpenAPI docs, docstring examples, and verified all validation/persistence flows"
 
   # GET Endpoint (2 tasks)
   - id: "P3.2a"

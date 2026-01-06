@@ -819,8 +819,26 @@ async def get_source(source_id: str) -> SourceResponse:
     description="""
     Update a GitHub repository source configuration.
 
-    Allows updating ref (branch/tag/SHA), root_hint, trust_level, description, and notes.
+    Allows updating ref (branch/tag/SHA), root_hint, manual_map, trust_level,
+    description, notes, and frontmatter detection settings.
     Changes take effect on the next scan.
+
+    **Manual Mapping**: Use `manual_map` to override automatic artifact type detection
+    for specific directories. Provide a dictionary mapping directory paths to artifact types.
+
+    Example PATCH request with manual_map:
+    ```json
+    {
+        "manual_map": {
+            "skills/python": "skill",
+            "commands/dev": "command",
+            "agents/qa": "agent"
+        }
+    }
+    ```
+
+    **Path Validation**: All directory paths in `manual_map` are validated against the
+    repository tree. If a path doesn't exist, the request will fail with 422 status.
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -830,6 +848,15 @@ async def update_source(
     request: UpdateSourceRequest,
 ) -> SourceResponse:
     """Update a marketplace source.
+
+    Supports partial updates to source configuration including:
+    - ref: Change branch/tag/SHA to scan
+    - root_hint: Modify subdirectory to scan
+    - manual_map: Override artifact type detection for specific directories
+    - trust_level: Update trust level
+    - description: Update user description
+    - notes: Update internal notes
+    - enable_frontmatter_detection: Toggle frontmatter parsing
 
     Args:
         source_id: Unique source identifier
@@ -841,8 +868,20 @@ async def update_source(
     Raises:
         HTTPException 400: If no update parameters provided
         HTTPException 404: If source not found
-        HTTPException 422: If manual_map contains invalid directory paths
-        HTTPException 500: If database operation fails
+        HTTPException 422: If manual_map contains invalid directory paths or artifact types
+        HTTPException 500: If database operation fails or GitHub API fails
+
+    Example:
+        Update manual mapping to override type detection:
+
+        >>> request = UpdateSourceRequest(
+        ...     manual_map={
+        ...         "skills/python": "skill",
+        ...         "commands/dev": "command"
+        ...     }
+        ... )
+        >>> response = await update_source("src-123", request)
+        >>> # Next scan will use manual_map for these directories
     """
     # Check if any update parameters provided
     if all(
