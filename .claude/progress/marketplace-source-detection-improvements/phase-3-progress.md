@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 54
+progress: 62
 total_tasks: 13
-completed_tasks: 7
+completed_tasks: 8
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -90,10 +90,13 @@ tasks:
   # Rescan Endpoint (4 tasks)
   - id: "P3.3a"
     name: "Pass manual_map to detector"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.2b"]
     effort: "2 pts"
+    completed_by: "a0b2d72"
+    completed_at: 2026-01-06
+    note: "Rescan endpoint now retrieves manual_map from database and passes to scanner as manual_mappings parameter"
 
   - id: "P3.3b"
     name: "Return dedup counts"
