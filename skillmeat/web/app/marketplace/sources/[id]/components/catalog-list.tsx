@@ -269,12 +269,30 @@ function CatalogRow({
 
         {/* Status */}
         <TableCell>
-          <Badge
-            variant="outline"
-            className={cn(entryStatus.className, entry.status === 'removed' && 'line-through')}
-          >
-            {entryStatus.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={cn(entryStatus.className, entry.status === 'removed' && 'line-through')}
+            >
+              {entryStatus.label}
+            </Badge>
+            {/* Duplicate Badge (P4.3c) */}
+            {entry.status === 'excluded' && entry.is_duplicate && (
+              <Badge
+                variant="outline"
+                className="border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950"
+                title={
+                  entry.duplicate_reason === 'within_source'
+                    ? `Duplicate within this source${entry.duplicate_of ? `: ${entry.duplicate_of}` : ''}`
+                    : entry.duplicate_reason === 'cross_source'
+                    ? 'Duplicate from another source or collection'
+                    : 'Marked as duplicate'
+                }
+              >
+                Duplicate
+              </Badge>
+            )}
+          </div>
         </TableCell>
 
         {/* Actions */}

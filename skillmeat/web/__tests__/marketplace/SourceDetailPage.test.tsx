@@ -820,4 +820,292 @@ describe('SourceDetailPage', () => {
       });
     });
   });
+
+  describe('Duplicate Filter (P4.4b)', () => {
+    beforeEach(() => {
+      // Mock catalog with excluded entries including duplicates
+      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+        data: {
+          pages: [{
+            ...mockCatalogResponse,
+            items: [
+              createMockEntry({ id: 'entry-1', name: 'skill-1', status: 'new' }),
+              createMockEntry({
+                id: 'entry-excluded-1',
+                name: 'duplicate-skill',
+                status: 'excluded',
+                is_duplicate: true,
+                duplicate_reason: 'within_source',
+                duplicate_of: 'skills/original-skill',
+              }),
+              createMockEntry({
+                id: 'entry-excluded-2',
+                name: 'excluded-not-duplicate',
+                status: 'excluded',
+                is_duplicate: false,
+              }),
+              createMockEntry({
+                id: 'entry-excluded-3',
+                name: 'cross-source-dup',
+                status: 'excluded',
+                is_duplicate: true,
+                duplicate_reason: 'cross_source',
+              }),
+            ],
+          }],
+        },
+        isLoading: false,
+        isFetching: false,
+        fetchNextPage: jest.fn(),
+        hasNextPage: false,
+        isFetchingNextPage: false,
+      });
+    });
+
+    it('renders "Only duplicates" toggle in toolbar', () => {
+      renderWithClient(<SourceDetailPage />);
+
+      const toggle = screen.getByLabelText('Only duplicates');
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).not.toBeChecked();
+    });
+
+    it('filters excluded list to show only duplicates when toggle is enabled', async () => {
+      const user = userEvent.setup();
+      renderWithClient(<SourceDetailPage />);
+
+      // Expand excluded list
+      const expandButton = screen.getByRole('button', { name: /show excluded artifacts/i });
+      await user.click(expandButton);
+
+      // Initially should show all 3 excluded entries
+      await waitFor(() => {
+        expect(screen.getByText('duplicate-skill')).toBeInTheDocument();
+        expect(screen.getByText('excluded-not-duplicate')).toBeInTheDocument();
+        expect(screen.getByText('cross-source-dup')).toBeInTheDocument();
+      });
+
+      // Enable duplicate filter
+      const toggle = screen.getByLabelText('Only duplicates');
+      await user.click(toggle);
+
+      // Should now only show 2 duplicates (not the non-duplicate)
+      await waitFor(() => {
+        expect(screen.getByText('duplicate-skill')).toBeInTheDocument();
+        expect(screen.getByText('cross-source-dup')).toBeInTheDocument();
+        expect(screen.queryByText('excluded-not-duplicate')).not.toBeInTheDocument();
+      });
+    });
+
+    it('disables duplicate filter when toggle is clicked again', async () => {
+      const user = userEvent.setup();
+      renderWithClient(<SourceDetailPage />);
+
+      // Expand excluded list
+      const expandButton = screen.getByRole('button', { name: /show excluded artifacts/i });
+      await user.click(expandButton);
+
+      // Enable duplicate filter
+      const toggle = screen.getByLabelText('Only duplicates');
+      await user.click(toggle);
+
+      await waitFor(() => {
+        expect(screen.queryByText('excluded-not-duplicate')).not.toBeInTheDocument();
+      });
+
+      // Disable duplicate filter
+      await user.click(toggle);
+
+      // Should show all excluded entries again
+      await waitFor(() => {
+        expect(screen.getByText('duplicate-skill')).toBeInTheDocument();
+        expect(screen.getByText('excluded-not-duplicate')).toBeInTheDocument();
+        expect(screen.getByText('cross-source-dup')).toBeInTheDocument();
+      });
+    });
+
+    it('includes duplicate filter in "Clear Filters" action', async () => {
+      const user = userEvent.setup();
+      renderWithClient(<SourceDetailPage />);
+
+      // Enable duplicate filter
+      const toggle = screen.getByLabelText('Only duplicates');
+      await user.click(toggle);
+
+      // Clear filters button should appear
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument();
+      });
+
+      // Click clear filters
+      const clearButton = screen.getByRole('button', { name: /clear/i });
+      await user.click(clearButton);
+
+      // Toggle should be unchecked
+      await waitFor(() => {
+        expect(toggle).not.toBeChecked();
+      });
+    });
+
+    it('persists duplicate filter in URL parameters', async () => {
+      const user = userEvent.setup();
+      const mockReplace = jest.fn();
+
+      // Mock useRouter to capture URL changes
+      jest.spyOn(require('next/navigation'), 'useRouter').mockReturnValue({
+        push: jest.fn(),
+        replace: mockReplace,
+      });
+
+      renderWithClient(<SourceDetailPage />);
+
+      // Enable duplicate filter
+      const toggle = screen.getByLabelText('Only duplicates');
+      await user.click(toggle);
+
+      // URL should be updated with showOnlyDuplicates parameter
+      await waitFor(() => {
+        const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1];
+        if (lastCall) {
+          expect(lastCall[0]).toContain('showOnlyDuplicates=true');
+        }
+      });
+    });
+  });
+
+  describe('Scan Toast with Dedup Counts (P4.4a)', () => {
+    it('includes deduplication stats in scan success toast', async () => {
+      const user = userEvent.setup();
+      const mockToast = jest.fn();
+
+      jest.spyOn(require('@/hooks/use-toast'), 'useToast').mockReturnValue({
+        toast: mockToast,
+      });
+
+      const mockMutateAsync = jest.fn().mockResolvedValue({
+        status: 'success',
+        artifacts_found: 25,
+        new_count: 10,
+        updated_count: 3,
+        unchanged_count: 2,
+        removed_count: 0,
+        duplicates_within_source: 5,
+        duplicates_cross_source: 5,
+        total_detected: 30,
+        total_unique: 20,
+        scanned_at: '2024-12-13T10:00:00Z',
+        errors: [],
+      });
+
+      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+      });
+
+      renderWithClient(<SourceDetailPage />);
+
+      const rescanButton = screen.getByRole('button', { name: /^rescan$/i });
+      await user.click(rescanButton);
+
+      // Wait for mutation to complete and toast to be called
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Scan complete',
+          description: expect.stringContaining('25 artifacts'),
+        });
+
+        // Check that dedup stats are included
+        const toastCall = mockToast.mock.calls.find(
+          call => call[0].title === 'Scan complete'
+        );
+        expect(toastCall[0].description).toContain('5 within-source duplicates');
+        expect(toastCall[0].description).toContain('5 cross-source duplicates');
+      });
+    });
+
+    it('shows scan toast without dedup stats when no duplicates', async () => {
+      const user = userEvent.setup();
+      const mockToast = jest.fn();
+
+      jest.spyOn(require('@/hooks/use-toast'), 'useToast').mockReturnValue({
+        toast: mockToast,
+      });
+
+      const mockMutateAsync = jest.fn().mockResolvedValue({
+        status: 'success',
+        artifacts_found: 10,
+        new_count: 8,
+        updated_count: 2,
+        unchanged_count: 0,
+        removed_count: 0,
+        duplicates_within_source: 0,
+        duplicates_cross_source: 0,
+        scanned_at: '2024-12-13T10:00:00Z',
+        errors: [],
+      });
+
+      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+      });
+
+      renderWithClient(<SourceDetailPage />);
+
+      const rescanButton = screen.getByRole('button', { name: /^rescan$/i });
+      await user.click(rescanButton);
+
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Scan complete',
+          description: 'Found 10 artifacts (8 new, 2 updated)',
+        });
+
+        // Should NOT contain dedup stats
+        const toastCall = mockToast.mock.calls.find(
+          call => call[0].title === 'Scan complete'
+        );
+        expect(toastCall[0].description).not.toContain('duplicates');
+      });
+    });
+
+    it('shows only within-source duplicates when present', async () => {
+      const user = userEvent.setup();
+      const mockToast = jest.fn();
+
+      jest.spyOn(require('@/hooks/use-toast'), 'useToast').mockReturnValue({
+        toast: mockToast,
+      });
+
+      const mockMutateAsync = jest.fn().mockResolvedValue({
+        status: 'success',
+        artifacts_found: 15,
+        new_count: 10,
+        updated_count: 2,
+        unchanged_count: 0,
+        removed_count: 0,
+        duplicates_within_source: 3,
+        duplicates_cross_source: 0,
+        scanned_at: '2024-12-13T10:00:00Z',
+        errors: [],
+      });
+
+      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+      });
+
+      renderWithClient(<SourceDetailPage />);
+
+      const rescanButton = screen.getByRole('button', { name: /^rescan$/i });
+      await user.click(rescanButton);
+
+      await waitFor(() => {
+        const toastCall = mockToast.mock.calls.find(
+          call => call[0].title === 'Scan complete'
+        );
+        expect(toastCall[0].description).toContain('3 within-source duplicates');
+        expect(toastCall[0].description).not.toContain('cross-source');
+      });
+    });
+  });
 });

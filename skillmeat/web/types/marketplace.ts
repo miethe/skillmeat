@@ -132,6 +132,7 @@ export interface GitHubSource {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  manual_map?: Record<string, string>; // Directory path -> artifact type
 }
 
 export interface GitHubSourceListResponse {
@@ -188,6 +189,10 @@ export interface CatalogEntry {
     raw_total: number;
     normalized_score: number;
   };
+  // Deduplication fields (Phase 3)
+  is_duplicate?: boolean;
+  duplicate_reason?: 'within_source' | 'cross_source';
+  duplicate_of?: string; // Path of original artifact
 }
 
 export interface CatalogListResponse {
@@ -208,6 +213,7 @@ export interface CatalogFilters {
 
 export interface ScanRequest {
   force?: boolean;
+  manual_map?: Record<string, string>;
 }
 
 export interface ScanResult {
@@ -221,6 +227,11 @@ export interface ScanResult {
   scan_duration_ms: number;
   errors: string[];
   scanned_at: string;
+  // Deduplication statistics (Phase 3)
+  duplicates_within_source?: number;
+  duplicates_cross_source?: number;
+  total_detected?: number;
+  total_unique?: number;
 }
 
 export interface ImportRequest {
