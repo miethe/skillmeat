@@ -1300,6 +1300,30 @@ class ScanResultDTO(BaseModel):
         ge=0,
         examples=[1234.56],
     )
+    duplicates_within_source: int = Field(
+        default=0,
+        description="Number of duplicates found within this source",
+        ge=0,
+        examples=[2],
+    )
+    duplicates_cross_source: int = Field(
+        default=0,
+        description="Number of duplicates found against existing collection",
+        ge=0,
+        examples=[3],
+    )
+    total_detected: int = Field(
+        default=0,
+        description="Original detection count before deduplication",
+        ge=0,
+        examples=[15],
+    )
+    total_unique: int = Field(
+        default=0,
+        description="Final count of unique artifacts after deduplication",
+        ge=0,
+        examples=[10],
+    )
     errors: List[str] = Field(
         default_factory=list,
         description="List of error messages encountered during scan",
@@ -1472,6 +1496,31 @@ class DetectedArtifact(BaseModel):
     score_breakdown: Optional[Dict[str, int]] = Field(
         default=None,
         description="Detailed breakdown of heuristic signal scores",
+    )
+    # Deduplication fields (added by DeduplicationEngine)
+    excluded: Optional[bool] = Field(
+        default=None,
+        description="Whether this artifact was excluded during deduplication",
+    )
+    excluded_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for exclusion (e.g., 'within_source_duplicate', 'cross_source_duplicate')",
+    )
+    excluded_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp when artifact was marked as excluded",
+    )
+    duplicate_of: Optional[str] = Field(
+        default=None,
+        description="Path of the artifact this is a duplicate of (for within-source duplicates)",
+    )
+    content_hash: Optional[str] = Field(
+        default=None,
+        description="SHA256 content hash of artifact files (for deduplication)",
+    )
+    status: Optional[str] = Field(
+        default=None,
+        description="Artifact status (e.g., 'new', 'excluded')",
     )
 
     class Config:
