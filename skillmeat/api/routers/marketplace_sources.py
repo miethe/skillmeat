@@ -218,6 +218,75 @@ def parse_repo_url(repo_url: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
+async def _validate_manual_map_paths(
+    manual_map: dict[str, str],
+    owner: str,
+    repo: str,
+    ref: str,
+) -> None:
+    """Validate that directory paths in manual_map exist in the repository.
+
+    Fetches the repository tree from GitHub and verifies each directory path
+    exists. Uses cached tree data when available to avoid extra API calls.
+
+    Args:
+        manual_map: Dictionary mapping directory paths to artifact types
+        owner: Repository owner
+        repo: Repository name
+        ref: Git reference (branch, tag, SHA)
+
+    Raises:
+        HTTPException 422: If any directory path doesn't exist in repository
+        HTTPException 500: If GitHub API call fails
+    """
+    if not manual_map:
+        return
+
+    try:
+        # Initialize scanner to fetch tree (reuses cached data if available)
+        scanner = GitHubScanner()
+        tree = scanner._fetch_tree(owner, repo, ref)
+
+        # Extract all directory paths from tree
+        # Tree items have "type": "tree" for directories, "type": "blob" for files
+        dir_paths = {
+            item["path"]
+            for item in tree
+            if item.get("type") == "tree"
+        }
+
+        # Validate each directory path in manual_map
+        invalid_paths = []
+        for dir_path in manual_map.keys():
+            if dir_path not in dir_paths:
+                invalid_paths.append(dir_path)
+
+        if invalid_paths:
+            # Format error message with all invalid paths
+            paths_str = ", ".join(f"'{p}'" for p in sorted(invalid_paths))
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid directory path(s) not found in repository: {paths_str}",
+            )
+
+        logger.debug(
+            f"Validated {len(manual_map)} manual_map paths in {owner}/{repo}@{ref}"
+        )
+
+    except HTTPException:
+        # Re-raise validation errors
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to validate manual_map paths for {owner}/{repo}@{ref}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate directory paths: {str(e)}",
+        ) from e
+
+
 def source_to_response(source: MarketplaceSource) -> SourceResponse:
     """Convert MarketplaceSource ORM model to API response.
 
@@ -772,6 +841,7 @@ async def update_source(
     Raises:
         HTTPException 400: If no update parameters provided
         HTTPException 404: If source not found
+        HTTPException 422: If manual_map contains invalid directory paths
         HTTPException 500: If database operation fails
     """
     # Check if any update parameters provided
@@ -780,9 +850,11 @@ async def update_source(
         for v in [
             request.ref,
             request.root_hint,
+            request.manual_map,
             request.trust_level,
             request.description,
             request.notes,
+            request.enable_frontmatter_detection,
         ]
     ):
         raise HTTPException(
@@ -802,17 +874,31 @@ async def update_source(
                 detail=f"Source with ID '{source_id}' not found",
             )
 
+        # Validate manual_map paths if provided
+        if request.manual_map is not None:
+            await _validate_manual_map_paths(
+                manual_map=request.manual_map,
+                owner=source.owner,
+                repo=source.repo_name,
+                ref=request.ref or source.ref,  # Use new ref if updating, else existing
+            )
+
         # Apply updates
         if request.ref is not None:
             source.ref = request.ref
         if request.root_hint is not None:
             source.root_hint = request.root_hint
+        if request.manual_map is not None:
+            # Store as JSON string in database
+            source.manual_map_json = json.dumps(request.manual_map)
         if request.trust_level is not None:
             source.trust_level = request.trust_level
         if request.description is not None:
             source.description = request.description
         if request.notes is not None:
             source.notes = request.notes
+        if request.enable_frontmatter_detection is not None:
+            source.enable_frontmatter_detection = request.enable_frontmatter_detection
 
         # Save updates
         updated = source_repo.update(source)

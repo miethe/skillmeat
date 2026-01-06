@@ -3,13 +3,13 @@ type: progress
 prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
-status: not_started
-progress: 0
+status: in_progress
+progress: 23
 total_tasks: 13
-completed_tasks: 0
+completed_tasks: 3
 effort: "12-18 pts"
 created: 2026-01-05
-updated: 2026-01-05
+updated: 2026-01-06
 
 assigned_to: ["python-backend-engineer"]
 dependencies: [2]
@@ -18,24 +18,33 @@ tasks:
   # PATCH Endpoint (5 tasks)
   - id: "P3.1a"
     name: "Add manual_map to request schema"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P2.4d"]
     effort: "2 pts"
+    completed_by: "aab5845"
+    completed_at: 2026-01-06
+    note: "Added manual_map field to UpdateSourceRequest schema with Optional[Dict[str, str]] type"
 
   - id: "P3.1b"
     name: "Validate directory paths"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.1a"]
     effort: "3 pts"
+    completed_by: "a11c94f"
+    completed_at: 2026-01-06
+    note: "Added path validation in router layer using GitHubScanner tree data, raises 422 for invalid paths"
 
   - id: "P3.1c"
     name: "Validate artifact types"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.1a"]
     effort: "1 pt"
+    completed_by: "a95cc94"
+    completed_at: 2026-01-06
+    note: "Added artifact type validation with ALLOWED_ARTIFACT_TYPES constant, raises 422 for invalid types"
 
   - id: "P3.1d"
     name: "Persist mappings"

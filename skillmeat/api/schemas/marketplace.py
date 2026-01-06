@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .common import PageInfo
 
+# Allowed artifact types for validation
+ALLOWED_ARTIFACT_TYPES = {"skill", "command", "agent", "mcp_server", "hook"}
+
 
 class ListingResponse(BaseModel):
     """Response model for a single marketplace listing.
@@ -709,6 +712,12 @@ class UpdateSourceRequest(BaseModel):
         description="Subdirectory path within repository to start scanning",
         examples=["skills", "src/artifacts"],
     )
+    manual_map: Optional[Dict[str, str]] = Field(
+        default=None,
+        description='Manual directory-to-type mappings (directory path → artifact_type). '
+        'Example: {"path/to/dir": "skill", "other/path": "command"}',
+        examples=[{"skills/python": "skill", "commands/dev": "command"}],
+    )
     trust_level: Optional[Literal["untrusted", "basic", "verified", "official"]] = (
         Field(
             default=None,
@@ -772,6 +781,34 @@ class UpdateSourceRequest(BaseModel):
             raise ValueError("root_hint contains invalid characters")
 
         return v.strip()
+
+    @field_validator("manual_map")
+    @classmethod
+    def validate_manual_map_types(
+        cls, v: Optional[Dict[str, str]]
+    ) -> Optional[Dict[str, str]]:
+        """Validate artifact types in manual_map.
+
+        Args:
+            v: Manual map dictionary to validate
+
+        Returns:
+            Validated manual map
+
+        Raises:
+            ValueError: If any artifact type is invalid
+        """
+        if v is None:
+            return v
+
+        for path, artifact_type in v.items():
+            if artifact_type not in ALLOWED_ARTIFACT_TYPES:
+                allowed_types = ", ".join(sorted(ALLOWED_ARTIFACT_TYPES))
+                raise ValueError(
+                    f"Invalid artifact type: {artifact_type}. Allowed: {allowed_types}"
+                )
+
+        return v
 
     @field_validator("description")
     @classmethod
