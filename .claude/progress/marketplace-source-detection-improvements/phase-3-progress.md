@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 46
+progress: 54
 total_tasks: 13
-completed_tasks: 6
+completed_tasks: 7
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -79,10 +79,13 @@ tasks:
 
   - id: "P3.2b"
     name: "Test GET response"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.2a"]
     effort: "1 pt"
+    completed_by: "a11e023"
+    completed_at: 2026-01-06
+    note: "Added 12 comprehensive tests for GET endpoint manual_map response, all passing with edge cases covered"
 
   # Rescan Endpoint (4 tasks)
   - id: "P3.3a"
