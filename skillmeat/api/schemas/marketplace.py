@@ -938,6 +938,12 @@ class SourceResponse(BaseModel):
     enable_frontmatter_detection: bool = Field(
         description="Whether frontmatter detection is enabled for this source",
     )
+    manual_map: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Manual directory-to-type mappings (directory path → artifact_type). "
+        "None if no manual mapping configured.",
+        examples=[{"skills/python": "skill", "commands/dev": "command"}],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -961,6 +967,7 @@ class SourceResponse(BaseModel):
                 "updated_at": "2025-12-06T10:30:00Z",
                 "description": "Official skills repository",
                 "notes": "Contains verified skills from Anthropic",
+                "manual_map": None,
             }
         }
 

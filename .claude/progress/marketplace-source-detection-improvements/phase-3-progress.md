@@ -4,9 +4,9 @@ prd: "marketplace-source-detection-improvements"
 phase: 3
 phase_name: "API Layer"
 status: in_progress
-progress: 38
+progress: 46
 total_tasks: 13
-completed_tasks: 5
+completed_tasks: 6
 effort: "12-18 pts"
 created: 2026-01-05
 updated: 2026-01-06
@@ -69,10 +69,13 @@ tasks:
   # GET Endpoint (2 tasks)
   - id: "P3.2a"
     name: "Include manual_map in response"
-    status: "pending"
+    status: "completed"
     assigned_to: ["python-backend-engineer"]
     dependencies: ["P3.1e"]
     effort: "1 pt"
+    completed_by: "a34ed31"
+    completed_at: 2026-01-06
+    note: "Added manual_map to SourceResponse schema and GET endpoint, returns Dict or None from database"
 
   - id: "P3.2b"
     name: "Test GET response"
