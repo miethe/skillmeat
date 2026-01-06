@@ -447,6 +447,21 @@ class HeuristicDetector:
         """
         matches: List[HeuristicMatch] = []
 
+        # Build effective container types including manual mappings
+        # This allows .md files under manually-mapped directories to be detected
+        effective_container_types = dict(container_types)
+
+        # Add manual mappings as additional container types (for non-Skill types)
+        for mapped_path, mapped_type in self._normalized_mappings.items():
+            if mapped_type != ArtifactType.SKILL:
+                effective_container_types[mapped_path] = mapped_type
+                logger.debug(
+                    "Added manual mapping '%s' -> '%s' to effective container types "
+                    "for single-file detection",
+                    mapped_path,
+                    mapped_type.value,
+                )
+
         # Skip files to exclude from single-file detection
         excluded_files = {
             "readme.md",
@@ -490,20 +505,31 @@ class HeuristicDetector:
                 continue  # Skip - this is a file inside an artifact, not a standalone
 
             # Find container context for this directory
+            # Use effective_container_types which includes manual mappings
             container_type: Optional[ArtifactType] = None
             container_dir: Optional[str] = None
+            is_manual_mapping = False
 
-            # Check if this IS a container
-            if dir_path in container_types:
-                container_type = container_types[dir_path]
+            # Check if this IS a container (or manual mapping)
+            if dir_path in effective_container_types:
+                container_type = effective_container_types[dir_path]
                 container_dir = dir_path
+                is_manual_mapping = dir_path in self._normalized_mappings
             else:
-                # Check if inside a container
-                for c_path, c_type in container_types.items():
+                # Check if inside a container (or manual mapping)
+                # Find the most specific (longest) matching container
+                best_match_path: Optional[str] = None
+                best_match_type: Optional[ArtifactType] = None
+                for c_path, c_type in effective_container_types.items():
                     if dir_path.startswith(c_path + "/"):
-                        container_type = c_type
-                        container_dir = c_path
-                        break
+                        if best_match_path is None or len(c_path) > len(best_match_path):
+                            best_match_path = c_path
+                            best_match_type = c_type
+
+                if best_match_path is not None:
+                    container_type = best_match_type
+                    container_dir = best_match_path
+                    is_manual_mapping = best_match_path in self._normalized_mappings
 
             if container_type is None:
                 continue  # Not in a container context
@@ -539,7 +565,8 @@ class HeuristicDetector:
                     # For single-file: commands/git/cm.md
                     # container_dir = "commands", dir_path = "commands/git"
                     # organization_path should be "git"
-                    relative_path = dir_path[len(container_dir) + 1 :]
+                    # container_dir is guaranteed non-None here (checked above)
+                    relative_path = dir_path[len(container_dir) + 1 :]  # type: ignore[arg-type]
                     organization_path = relative_path if relative_path else None
 
                 # Bug Fix 2: Apply depth penalty to single-file confidence
@@ -551,15 +578,22 @@ class HeuristicDetector:
                 relative_depth = depth - container_depth
 
                 # Base confidence for single-file artifacts
-                # Direct in container gets higher score, deeper gets penalty
-                if relative_depth == 0:
-                    confidence = 75  # Directly in container
-                elif relative_depth == 1:
-                    confidence = 70  # One level deep (e.g., commands/git/cm.md)
+                # Manual mappings get higher confidence (consistent with directory-based manual mappings)
+                if is_manual_mapping:
+                    # Manual mapping confidence: same formula as directory-based
+                    # depth=0: 95, depth=1: 92, depth=2: 89, depth=3+: 86
+                    confidence = max(86, 95 - (relative_depth * 3))
                 else:
-                    # Each additional level reduces confidence
-                    depth_penalty = (relative_depth - 1) * 5
-                    confidence = max(50, 70 - depth_penalty)
+                    # Heuristic-based confidence
+                    # Direct in container gets higher score, deeper gets penalty
+                    if relative_depth == 0:
+                        confidence = 75  # Directly in container
+                    elif relative_depth == 1:
+                        confidence = 70  # One level deep (e.g., commands/git/cm.md)
+                    else:
+                        # Each additional level reduces confidence
+                        depth_penalty = (relative_depth - 1) * 5
+                        confidence = max(50, 70 - depth_penalty)
 
                 # Calculate depth penalty for breakdown
                 single_file_depth_penalty = (
@@ -571,10 +605,39 @@ class HeuristicDetector:
                     f"Container: {container_dir}/",
                     f"File: {filename}",
                 ]
-                if single_file_depth_penalty > 0:
+                if is_manual_mapping:
+                    match_reasons.insert(0, f"Manual mapping (depth={relative_depth})")
+                if single_file_depth_penalty > 0 and not is_manual_mapping:
                     match_reasons.append(
                         f"Depth penalty (-{single_file_depth_penalty})"
                     )
+
+                # Build breakdown dict
+                breakdown_dict: Dict[str, Any] = {
+                    "dir_name_score": 0,
+                    "manifest_score": 0,
+                    "extensions_score": 5,
+                    "parent_hint_score": 0,
+                    "frontmatter_score": 0,
+                    "container_hint_score": self.config.container_hint_weight,
+                    "depth_penalty": single_file_depth_penalty if not is_manual_mapping else 0,
+                    "raw_total": self.config.container_hint_weight + 5,
+                    "normalized_score": confidence,
+                    "single_file_detection": True,
+                }
+
+                # Add manual mapping metadata if applicable
+                metadata: Optional[Dict[str, Any]] = None
+                if is_manual_mapping:
+                    metadata = {
+                        "is_manual_mapping": True,
+                        "match_type": "inherited" if relative_depth > 0 else "exact",
+                        "inheritance_depth": relative_depth,
+                        "confidence_reason": (
+                            f"Manual mapping single-file (depth={relative_depth}, "
+                            f"score={confidence})"
+                        ),
+                    }
 
                 match = HeuristicMatch(
                     path=artifact_path,
@@ -586,20 +649,10 @@ class HeuristicDetector:
                     dir_name_score=0,
                     manifest_score=0,
                     extension_score=5,  # .md extension
-                    depth_penalty=single_file_depth_penalty,
+                    depth_penalty=single_file_depth_penalty if not is_manual_mapping else 0,
                     raw_score=self.config.container_hint_weight + 5,
-                    breakdown={
-                        "dir_name_score": 0,
-                        "manifest_score": 0,
-                        "extensions_score": 5,
-                        "parent_hint_score": 0,
-                        "frontmatter_score": 0,
-                        "container_hint_score": self.config.container_hint_weight,
-                        "depth_penalty": single_file_depth_penalty,
-                        "raw_total": self.config.container_hint_weight + 5,
-                        "normalized_score": confidence,
-                        "single_file_detection": True,
-                    },
+                    breakdown=breakdown_dict,
+                    metadata=metadata,
                 )
                 matches.append(match)
 
@@ -778,6 +831,32 @@ class HeuristicDetector:
             manual_mapping_info: Optional[Dict[str, Any]] = None
             if manual_mapping_result is not None:
                 mapped_type, match_type, inheritance_depth = manual_mapping_result
+
+                # Check if directory has a SKILL.md manifest
+                has_skill_manifest = any(f.lower() == "skill.md" for f in files)
+
+                # For non-Skill types with manual mapping, directories themselves are NOT artifacts
+                # Only Skills are directory-based; all other types are single .md files
+                # The directory mapping indicates that .md files INSIDE should inherit the type
+                if mapped_type != ArtifactType.SKILL:
+                    if not has_skill_manifest:
+                        logger.debug(
+                            "Skipping directory %s as artifact: non-Skill type '%s' "
+                            "requires single .md files, not directories",
+                            dir_path,
+                            mapped_type.value,
+                        )
+                        continue  # Skip - this directory is not a valid artifact
+                else:
+                    # For Skill types, SKILL.md is required for directory to be an artifact
+                    if not has_skill_manifest:
+                        logger.debug(
+                            "Skipping directory %s as artifact: Skill type requires "
+                            "SKILL.md manifest",
+                            dir_path,
+                        )
+                        continue  # Skip - no manifest means not a valid skill
+
                 # Manual mapping overrides heuristic detection
                 artifact_type = mapped_type
 

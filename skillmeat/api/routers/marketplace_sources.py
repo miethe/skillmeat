@@ -12,6 +12,7 @@ API Endpoints:
     DELETE /marketplace/sources/{id} - Delete source
     POST /marketplace/sources/{id}/rescan - Trigger rescan
     GET /marketplace/sources/{id}/artifacts - List artifacts with filters
+    PATCH /marketplace/sources/{id}/artifacts/{entry_id} - Update artifact name
     POST /marketplace/sources/{id}/import - Import artifacts to collection
     PATCH /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Mark artifact as excluded
     DELETE /marketplace/sources/{id}/artifacts/{entry_id}/exclude - Restore excluded artifact
@@ -51,6 +52,7 @@ from skillmeat.api.schemas.marketplace import (
     ScanResultDTO,
     SourceListResponse,
     SourceResponse,
+    UpdateCatalogEntryNameRequest,
     UpdateSegmentStatusRequest,
     UpdateSegmentStatusResponse,
     UpdateSourceRequest,
@@ -79,6 +81,7 @@ from skillmeat.core.marketplace.import_coordinator import (
     ImportCoordinator,
 )
 from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
+from skillmeat.core.validation import validate_artifact_name
 
 logger = logging.getLogger(__name__)
 
@@ -1445,6 +1448,110 @@ async def list_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list artifacts",
+        ) from e
+
+
+# =============================================================================
+# API-003b: Update Catalog Entry Name
+# =============================================================================
+
+
+@router.patch(
+    "/{source_id}/artifacts/{entry_id}",
+    response_model=CatalogEntryResponse,
+    summary="Update catalog entry name",
+    operation_id="update_catalog_entry_name",
+    description="""
+    Update the display name for a catalog entry.
+
+    The updated name is used when importing the artifact into the user's collection
+    and persists until the next rescan of the source.
+
+    **Request Body**:
+    - `name` (string, required): New artifact name (1-100 chars, no path separators)
+
+    **Response**: Updated catalog entry
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def update_catalog_entry_name(
+    source_id: str,
+    entry_id: str,
+    request: UpdateCatalogEntryNameRequest,
+) -> CatalogEntryResponse:
+    """Update the name for a catalog entry."""
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    normalized_name = request.name.strip()
+    is_valid, error = validate_artifact_name(normalized_name)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Invalid artifact name",
+        )
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        session = catalog_repo._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry).filter_by(id=entry_id).first()
+            )
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Catalog entry with ID '{entry_id}' not found",
+                )
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+                )
+
+            entry.name = normalized_name
+            session.commit()
+            session.refresh(entry)
+
+            logger.info(
+                f"Updated catalog entry name: {entry_id} -> {normalized_name}"
+            )
+            return entry_to_response(entry)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update catalog entry name {entry_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update catalog entry name: {str(e)}",
         ) from e
 
 

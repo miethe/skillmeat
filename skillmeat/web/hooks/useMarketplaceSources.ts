@@ -26,6 +26,7 @@ import type {
   ScanResult,
   ImportRequest,
   ImportResult,
+  UpdateCatalogEntryNameRequest,
 } from '@/types/marketplace';
 
 // Query keys factory
@@ -340,6 +341,43 @@ export function useImportAllMatching(sourceId: string) {
     isLoading: importMutation.isPending,
     totalNew: data?.pages[0]?.counts_by_status.new || 0,
   };
+}
+
+// ============================================================================
+// Catalog Entry Updates
+// ============================================================================
+
+/**
+ * Update catalog entry name
+ */
+export function useUpdateCatalogEntryName(sourceId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ entryId, name }: { entryId: string; name: string }) =>
+      apiRequest<CatalogEntry>(
+        `/marketplace/sources/${sourceId}/artifacts/${entryId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ name } as UpdateCatalogEntryNameRequest),
+        }
+      ),
+    onSuccess: (entry) => {
+      queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
+      toast({
+        title: 'Name updated',
+        description: `Renamed to ${entry.name}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to update name',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 }
 
 // ============================================================================

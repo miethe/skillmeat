@@ -1,1 +1,19 @@
-deployed = []
+[[deployed]]
+artifact_name = "skillmeat-cli"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-05T15:07:49.157370"
+artifact_path = "skills/skillmeat-cli"
+content_hash = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5"
+local_modifications = false
+collection_sha = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5"
+
+[[deployed]]
+artifact_name = "meatycapture-capture"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-05T15:07:49.158515"
+artifact_path = "skills/meatycapture-capture"
+content_hash = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"
+local_modifications = false
+collection_sha = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"

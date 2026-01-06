@@ -1162,6 +1162,26 @@ class CatalogEntryResponse(BaseModel):
         }
 
 
+class UpdateCatalogEntryNameRequest(BaseModel):
+    """Request body for updating the display name of a catalog entry."""
+
+    name: str = Field(
+        description="Updated artifact name to use for display and import",
+        min_length=1,
+        max_length=100,
+        examples=["custom-skill-name"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "name": "custom-skill-name",
+            }
+        }
+
+
 class ExcludeArtifactRequest(BaseModel):
     """Request body for excluding or restoring a catalog entry.
 

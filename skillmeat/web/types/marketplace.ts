@@ -195,6 +195,10 @@ export interface CatalogEntry {
   duplicate_of?: string; // Path of original artifact
 }
 
+export interface UpdateCatalogEntryNameRequest {
+  name: string;
+}
+
 export interface CatalogListResponse {
   items: CatalogEntry[];
   page_info: PageInfo;
