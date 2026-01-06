@@ -411,12 +411,18 @@ async def _perform_scan(
     logger.info(f"Scanning repository: {source.repo_url} (ref={source.ref})")
     scanner = GitHubScanner()
 
+    # Retrieve manual_map from source for artifact type override
+    manual_map = source.get_manual_map_dict()
+    if manual_map:
+        logger.debug(f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}")
+
     try:
         scan_result = scanner.scan_repository(
             owner=source.owner,
             repo=source.repo_name,
             ref=source.ref,
             root_hint=source.root_hint,
+            manual_mappings=manual_map,
         )
 
         # Load path tag config from source (or use defaults)
