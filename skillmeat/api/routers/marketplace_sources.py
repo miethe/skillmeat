@@ -417,11 +417,15 @@ async def _perform_scan(
         logger.debug(f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}")
 
     try:
+        # Get database session for cross-source deduplication
+        session = catalog_repo._get_session()
+
         scan_result = scanner.scan_repository(
             owner=source.owner,
             repo=source.repo_name,
             ref=source.ref,
             root_hint=source.root_hint,
+            session=session,
             manual_mappings=manual_map,
         )
 
