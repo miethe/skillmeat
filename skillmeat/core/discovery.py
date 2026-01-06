@@ -2,6 +2,28 @@
 
 This module provides functionality to scan .claude/ directories and discover
 existing artifacts that can be imported into the collection.
+
+Detection Flow:
+    1. Container name (directory) → get_artifact_type_from_container() provides type hint
+    2. Shared detector → detect_artifact() validates artifact with confidence score
+    3. DiscoveredArtifact → metadata extraction and result packaging
+
+Artifact Detection:
+    This module uses the unified artifact_detection module (Phase 1) for all
+    artifact type detection. The detect_artifact() function provides:
+    - Consistent detection logic across the codebase
+    - Confidence-based validation (0-100% scale)
+    - Heuristic mode for flexible discovery scenarios
+    - Support for nested artifacts (commands/agents)
+
+Supported Artifact Types:
+    Artifact types are derived from ArtifactType.primary_types() and their
+    detection rules are defined in ARTIFACT_SIGNATURES (see artifact_detection.py):
+    - Skills: Directory with SKILL.md manifest
+    - Commands: Single .md file or directory with COMMAND.md (directory pattern deprecated)
+    - Agents: Single .md file or directory with AGENT.md (directory pattern deprecated)
+    - Hooks: Directory with HOOK.md manifest
+    - MCPs: Directory with MCP.md or mcp.json manifest
 """
 
 import logging
@@ -12,7 +34,16 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.artifact_detection import (
+    ARTIFACT_SIGNATURES,
+    ArtifactType,
+    DetectionError,
+    DetectionResult,
+    MANIFEST_FILES,
+    detect_artifact,
+    extract_manifest_file,
+    get_artifact_type_from_container,
+)
 from skillmeat.core.discovery_metrics import (
     discovery_artifacts_found,
     discovery_errors_total,
@@ -28,6 +59,22 @@ if TYPE_CHECKING:
     from skillmeat.core.collection import Collection
 
 logger = logging.getLogger(__name__)
+
+# Deprecation warning messages for legacy artifact patterns
+DEPRECATION_WARNINGS = {
+    "directory_command": (
+        "DEPRECATED: Directory-based command artifacts will no longer be supported. "
+        "Location: {path}. "
+        "Recommended: Move to single .md file (e.g., .claude/commands/my-command.md). "
+        "Migration guide: docs/migration/deprecated-artifact-patterns.md"
+    ),
+    "directory_agent": (
+        "DEPRECATED: Directory-based agent artifacts will no longer be supported. "
+        "Location: {path}. "
+        "Recommended: Move to single .md file (e.g., .claude/agents/my-agent.md). "
+        "Migration guide: docs/migration/deprecated-artifact-patterns.md"
+    ),
+}
 
 
 class DiscoveryRequest(BaseModel):
@@ -91,22 +138,36 @@ class DiscoveryResult(BaseModel):
 class ArtifactDiscoveryService:
     """Service for discovering artifacts in .claude/ directories or collection artifacts.
 
-    This service supports two scan modes:
-    - project mode: Scans .claude/ subdirectories (skills/, commands/, agents/, hooks/, mcp/)
-    - collection mode: Scans collection/artifacts/ subdirectories (legacy)
-    - auto mode: Detects mode based on directory structure
+    This service uses the shared artifact_detection module (Phase 1) for consistent
+    artifact type detection across the SkillMeat codebase.
 
-    Supported artifact types:
-    - Skills: Identified by SKILL.md
-    - Commands: Identified by COMMAND.md or command.md
-    - Agents: Identified by AGENT.md or agent.md
-    - Hooks: Identified by HOOK.md
-    - MCPs: Identified by MCP.md or mcp.json
+    Scan Modes:
+        - project mode: Scans .claude/ subdirectories (skills/, commands/, agents/, hooks/, mcp/)
+        - collection mode: Scans collection/artifacts/ subdirectories (legacy)
+        - auto mode: Detects mode based on directory structure
 
-    Performance target: <2 seconds for 50+ artifacts
+    Supported Artifact Types:
+        Derived from ArtifactType.primary_types() enum:
+        - Skills: Directory with SKILL.md manifest
+        - Commands: Single .md file or directory with COMMAND.md
+        - Agents: Single .md file or directory with AGENT.md
+        - Hooks: Directory with HOOK.md manifest
+        - MCPs: Directory with MCP.md or mcp.json manifest
+
+    Nested Artifact Discovery:
+        For artifact types that support nesting (commands, agents), the service
+        recursively traverses subdirectories up to a maximum depth of 3 levels.
+        Only types with allowed_nesting=True in ARTIFACT_SIGNATURES support this.
+
+    Detection Strategy:
+        Uses detect_artifact() in heuristic mode with 50% confidence threshold
+        for flexible discovery of edge cases while maintaining accuracy.
+
+    Performance Target:
+        <2 seconds for 50+ artifacts
     """
 
-    supported_types: List[str] = ["skill", "command", "agent", "hook", "mcp"]
+    supported_types: List[str] = [t.value for t in ArtifactType.primary_types()]
 
     def __init__(self, base_path: Path, scan_mode: str = "auto"):
         """Initialize the discovery service.
@@ -413,6 +474,9 @@ class ArtifactDiscoveryService:
                             errors.append(error_msg)
                             continue
 
+                        # Check for deprecated patterns (logs warning but continues)
+                        self._check_deprecation(artifact_path, detected_type)
+
                         # Extract metadata
                         metadata = self._extract_artifact_metadata(
                             artifact_path, detected_type
@@ -444,64 +508,174 @@ class ArtifactDiscoveryService:
             logger.warning(error_msg)
             errors.append(error_msg)
 
+        # Scan for nested artifacts (only for types that support nesting)
+        nested = self._discover_nested_artifacts(type_dir, artifact_type, errors)
+        discovered.extend(nested)
+
+        return discovered
+
+    def _discover_nested_artifacts(
+        self,
+        container_path: Path,
+        container_type: str,
+        errors: List[str],
+        max_depth: int = 3,
+    ) -> List[DiscoveredArtifact]:
+        """Recursively discover nested artifacts in subdirectories.
+
+        This method traverses subdirectories to find artifacts nested within
+        container directories. Only artifact types with allowed_nesting=True
+        in ARTIFACT_SIGNATURES support nesting (e.g., commands, agents).
+
+        Recursive Traversal:
+            - Starts from subdirectories of container_path (top-level already scanned)
+            - Recursively descends up to max_depth levels (default 3)
+            - Skips hidden files/directories (starting with '.')
+            - Processes both single-file (.md) and directory-based artifacts
+            - Collects errors without failing entire scan
+
+        Nesting Support:
+            Checks ARTIFACT_SIGNATURES[artifact_type].allowed_nesting before
+            recursing. Skills, hooks, and MCPs do not support nesting and will
+            return empty list immediately.
+
+        Args:
+            container_path: Path to container directory (e.g., .claude/commands/)
+            container_type: Normalized artifact type (e.g., "command")
+            errors: List to append errors to (modified in-place)
+            max_depth: Maximum recursion depth to prevent infinite loops (default 3)
+
+        Returns:
+            List of discovered nested artifacts (empty if type doesn't support nesting)
+        """
+        discovered: List[DiscoveredArtifact] = []
+
+        # Check if this artifact type supports nesting
+        try:
+            artifact_type_enum = ArtifactType(container_type)
+            signature = ARTIFACT_SIGNATURES.get(artifact_type_enum)
+            if not signature or not signature.allowed_nesting:
+                return discovered
+        except ValueError:
+            return discovered
+
+        def _scan_recursive(current_path: Path, depth: int) -> None:
+            if depth > max_depth:
+                return
+
+            try:
+                for entry in current_path.iterdir():
+                    if entry.name.startswith("."):
+                        continue
+
+                    if entry.is_file() and entry.suffix.lower() == ".md":
+                        # Potential single-file artifact
+                        try:
+                            detected_type = self._detect_artifact_type(entry)
+                            if detected_type is None:
+                                continue
+                            if detected_type == container_type:
+                                metadata = self._extract_artifact_metadata(
+                                    entry, detected_type
+                                )
+                                artifact = DiscoveredArtifact(
+                                    type=detected_type,
+                                    name=metadata.get("name", entry.stem),
+                                    source=metadata.get("source"),
+                                    version=metadata.get("version"),
+                                    scope=metadata.get("scope"),
+                                    tags=metadata.get("tags", []),
+                                    description=metadata.get("description"),
+                                    path=str(entry),
+                                    discovered_at=datetime.utcnow(),
+                                )
+                                discovered.append(artifact)
+                                logger.debug(
+                                    f"Discovered nested {detected_type}: "
+                                    f"{artifact.name} at depth {depth}"
+                                )
+                        except Exception as e:
+                            error_msg = f"Error processing nested artifact {entry}: {e}"
+                            logger.warning(error_msg)
+                            errors.append(error_msg)
+
+                    elif entry.is_dir():
+                        # Recurse into subdirectory
+                        _scan_recursive(entry, depth + 1)
+
+            except PermissionError as e:
+                error_msg = f"Permission denied scanning {current_path}: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+
+        # Start recursion from subdirectories only (top-level already scanned)
+        try:
+            for subdir in container_path.iterdir():
+                if subdir.is_dir() and not subdir.name.startswith("."):
+                    _scan_recursive(subdir, 1)
+        except PermissionError as e:
+            error_msg = f"Permission denied accessing {container_path}: {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+
         return discovered
 
     def _detect_artifact_type(self, artifact_path: Path) -> Optional[str]:
-        """Detect artifact type from directory structure.
+        """Detect artifact type using shared detection module.
 
-        Detection logic:
-        - Skills: Check for SKILL.md
-        - Commands: Check for COMMAND.md or command.md
-        - Agents: Check for AGENT.md or agent.md
-        - Hooks: Check for HOOK.md or hook.md
-        - MCPs: Check for MCP.md or mcp.json
+        Uses the unified detect_artifact() function from artifact_detection module
+        for consistent detection across the codebase.
+
+        Detection Flow:
+            1. Extract container type hint from parent directory name
+            2. Call detect_artifact() in heuristic mode for flexible detection
+            3. Apply 50% confidence threshold to filter low-confidence results
+            4. Return artifact type string or None
+
+        Heuristic Mode:
+            Discovery uses heuristic mode (vs strict mode) to handle edge cases
+            like nested artifacts, legacy patterns, and ambiguous structures.
+            The 50% confidence threshold ensures we only accept reasonably
+            confident detections while remaining flexible.
 
         Args:
             artifact_path: Path to potential artifact
 
         Returns:
-            Artifact type string, or None if not detected
+            Artifact type string (e.g., "skill", "command"), or None if not detected
         """
-        # Check if path is a directory
-        if artifact_path.is_dir():
-            # Check for skill
-            if (artifact_path / "SKILL.md").exists():
-                return "skill"
+        try:
+            # Get container type hint from parent directory
+            parent_name = artifact_path.parent.name
+            container_type = None
+            artifact_type_from_parent = get_artifact_type_from_container(parent_name)
+            if artifact_type_from_parent:
+                container_type = parent_name
 
-            # Check for command
-            if (artifact_path / "COMMAND.md").exists():
-                return "command"
-            if (artifact_path / "command.md").exists():
-                return "command"
+            # Use shared detector in heuristic mode for discovery
+            # We use heuristic mode because discovery needs to handle edge cases
+            result = detect_artifact(
+                artifact_path,
+                container_type=container_type,
+                mode="heuristic",
+            )
 
-            # Check for agent
-            if (artifact_path / "AGENT.md").exists():
-                return "agent"
-            if (artifact_path / "agent.md").exists():
-                return "agent"
+            # Only return type if confidence is sufficient (>=50)
+            if result.confidence >= 50:
+                return result.artifact_type.value
 
-            # Check for hook
-            if (artifact_path / "HOOK.md").exists():
-                return "hook"
-            if (artifact_path / "hook.md").exists():
-                return "hook"
+            logger.debug(
+                f"Low confidence detection for {artifact_path}: "
+                f"{result.confidence}% ({', '.join(result.detection_reasons)})"
+            )
+            return None
 
-            # Check for MCP
-            if (artifact_path / "MCP.md").exists():
-                return "mcp"
-            if (artifact_path / "mcp.json").exists():
-                return "mcp"
-
-        # Check if path is a file (for commands/agents that might be single files)
-        elif artifact_path.is_file() and artifact_path.suffix == ".md":
-            # Try to infer from filename
-            name_lower = artifact_path.stem.lower()
-            if "command" in name_lower:
-                return "command"
-            if "agent" in name_lower:
-                return "agent"
-
-        return None
+        except DetectionError as e:
+            logger.debug(f"Detection error for {artifact_path}: {e}")
+            return None
+        except Exception as e:
+            logger.debug(f"Unexpected error detecting {artifact_path}: {e}")
+            return None
 
     def _extract_artifact_metadata(
         self, artifact_path: Path, artifact_type: str
@@ -568,51 +742,64 @@ class ArtifactDiscoveryService:
     ) -> Optional[Path]:
         """Find the metadata file for an artifact.
 
+        Uses extract_manifest_file() from shared artifact_detection module for
+        primary artifact types (skill, command, agent, hook, mcp). Falls back
+        to legacy logic for backward compatibility.
+
+        Manifest File Resolution:
+            - Skills: SKILL.md in directory
+            - Commands: command.md file itself (if single file) or COMMAND.md/command.md in directory
+            - Agents: agent.md file itself (if single file) or AGENT.md/agent.md in directory
+            - Hooks: HOOK.md or hook.md in directory
+            - MCPs: MCP.md in directory
+
         Args:
-            artifact_path: Path to artifact
-            artifact_type: Type of artifact
+            artifact_path: Path to artifact (file or directory)
+            artifact_type: Type of artifact (e.g., "skill", "command")
 
         Returns:
             Path to metadata file, or None if not found
         """
+        # Try to use shared module for primary types
+        try:
+            artifact_type_enum = ArtifactType(artifact_type)
+            manifest_path = extract_manifest_file(artifact_path, artifact_type_enum)
+            if manifest_path:
+                return manifest_path
+        except ValueError:
+            # Not a valid ArtifactType enum value, fall through to legacy logic
+            pass
+
+        # Legacy fallback for backwards compatibility
         if artifact_type == "skill":
             if artifact_path.is_dir():
                 return artifact_path / "SKILL.md"
-
         elif artifact_type == "command":
             if artifact_path.is_file() and artifact_path.suffix == ".md":
                 return artifact_path
             elif artifact_path.is_dir():
-                # Check for COMMAND.md first, then command.md
                 if (artifact_path / "COMMAND.md").exists():
                     return artifact_path / "COMMAND.md"
                 if (artifact_path / "command.md").exists():
                     return artifact_path / "command.md"
-
         elif artifact_type == "agent":
             if artifact_path.is_file() and artifact_path.suffix == ".md":
                 return artifact_path
             elif artifact_path.is_dir():
-                # Check for AGENT.md first, then agent.md
                 if (artifact_path / "AGENT.md").exists():
                     return artifact_path / "AGENT.md"
                 if (artifact_path / "agent.md").exists():
                     return artifact_path / "agent.md"
-
         elif artifact_type == "hook":
             if artifact_path.is_dir():
                 if (artifact_path / "HOOK.md").exists():
                     return artifact_path / "HOOK.md"
                 if (artifact_path / "hook.md").exists():
                     return artifact_path / "hook.md"
-
         elif artifact_type == "mcp":
             if artifact_path.is_dir():
-                # Prefer MCP.md over mcp.json for metadata
                 if (artifact_path / "MCP.md").exists():
                     return artifact_path / "MCP.md"
-                # Note: mcp.json is not markdown, so we don't extract from it
-                # That would require different parsing logic
 
         return None
 
@@ -635,7 +822,7 @@ class ArtifactDiscoveryService:
 
         # Try to parse frontmatter (validation)
         try:
-            yaml_data = extract_yaml_frontmatter(metadata_file)
+            _ = extract_yaml_frontmatter(metadata_file)
             # Valid if we can parse it (even if empty)
             return True
         except Exception as e:
@@ -646,7 +833,7 @@ class ArtifactDiscoveryService:
         self,
         artifact_key: str,  # Format: "type:name" (e.g., "skill:canvas-design")
         manifest: Optional["Collection"] = None,
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """
         Check if an artifact exists in Collection and/or Project.
 
@@ -771,16 +958,54 @@ class ArtifactDiscoveryService:
         }
 
     def _normalize_type_from_dirname(self, dirname: str) -> str:
-        """Normalize directory name to artifact type.
+        """Normalize directory name to artifact type using shared detection module.
 
         Args:
-            dirname: Directory name (e.g., "skills", "commands")
+            dirname: Directory name (e.g., "skills", "commands", "subagents")
 
         Returns:
-            Normalized artifact type (e.g., "skill", "command")
+            Normalized artifact type (e.g., "skill", "command", "agent")
         """
-        # Remove trailing 's' for plural directory names
+        artifact_type = get_artifact_type_from_container(dirname)
+        if artifact_type:
+            return artifact_type.value
+        # Fallback: Remove trailing 's' for plural directory names
         dirname_lower = dirname.lower()
         if dirname_lower.endswith("s") and len(dirname_lower) > 1:
             return dirname_lower[:-1]
         return dirname_lower
+
+    def _check_deprecation(self, artifact_path: Path, artifact_type: str) -> Optional[str]:
+        """Check for deprecated artifact patterns and log warning.
+
+        Per ARTIFACT_SIGNATURES, commands and agents should be single .md files,
+        not directories. Directory-based patterns are legacy and deprecated.
+
+        Deprecated Patterns:
+            - Directory-based commands (should be single .md file)
+            - Directory-based agents (should be single .md file)
+
+        These patterns are still detected and processed for backward compatibility,
+        but will be removed in a future version. Users should migrate to single
+        .md file format per migration guide.
+
+        Args:
+            artifact_path: Path to artifact
+            artifact_type: Detected artifact type
+
+        Returns:
+            Deprecation warning message if deprecated pattern found, None otherwise
+        """
+        # Check for directory-based commands (deprecated)
+        if artifact_type == "command" and artifact_path.is_dir():
+            warning = DEPRECATION_WARNINGS["directory_command"].format(path=artifact_path)
+            logger.warning(warning)
+            return warning
+
+        # Check for directory-based agents (deprecated)
+        if artifact_type == "agent" and artifact_path.is_dir():
+            warning = DEPRECATION_WARNINGS["directory_agent"].format(path=artifact_path)
+            logger.warning(warning)
+            return warning
+
+        return None
