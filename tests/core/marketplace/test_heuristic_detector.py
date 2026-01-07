@@ -216,10 +216,11 @@ class TestScoringAlgorithm:
         artifacts = detect_artifacts_in_tree(files, "https://github.com/test/repo")
 
         assert len(artifacts) == 1
-        # Score includes: dir_name(+5) + manifest(+20) + extensions(+2) + parent_hint(+15) - depth(-3) = 39
-        # Normalized: 39/65 * 100 = 60%
-        assert artifacts[0].confidence_score >= 30
-        assert artifacts[0].confidence_score <= 65  # Normalized score
+        # Score includes: dir_name(+5) + manifest(+20) + skill_manifest_bonus(+40) + extensions(+2)
+        # + parent_hint(+15) + container_hint(+25) - depth(-1) = 106
+        # Normalized: 106/160 * 100 = 66%
+        assert artifacts[0].confidence_score >= 60
+        assert artifacts[0].confidence_score <= 75  # Normalized score
 
     def test_skills_manifest_root(self):
         """Test scoring for .claude/skills/manifest.toml pattern."""
@@ -629,10 +630,11 @@ class TestScoreNormalization:
         assert len(matches) == 1
         breakdown = matches[0].breakdown
 
-        # Calculate expected raw total (including container_hint_score)
+        # Calculate expected raw total (including container_hint_score and skill_manifest_bonus)
         expected_raw = (
             breakdown["dir_name_score"]
             + breakdown["manifest_score"]
+            + breakdown.get("skill_manifest_bonus", 0)
             + breakdown["extensions_score"]
             + breakdown["parent_hint_score"]
             + breakdown["frontmatter_score"]
@@ -746,7 +748,9 @@ class TestScoreNormalization:
         assert breakdown["manifest_score"] > 0
         assert breakdown["extensions_score"] > 0
         # Container hint should give bonus for being in skills/
-        assert breakdown["container_hint_score"] > 0 or breakdown["parent_hint_score"] > 0
+        assert (
+            breakdown["container_hint_score"] > 0 or breakdown["parent_hint_score"] > 0
+        )
 
         # Raw total should be relatively high
         assert breakdown["raw_total"] > 30
@@ -1084,6 +1088,7 @@ class TestContainerTypePropagation:
 
         # Score same path with container_hint (reduced penalty)
         from skillmeat.core.marketplace.heuristic_detector import ArtifactType
+
         _, _, breakdown_with_hint = detector._score_directory(
             "a/b/c/my-cmd", siblings, container_hint=ArtifactType.COMMAND
         )
@@ -1186,8 +1191,12 @@ class TestMultiTypeDetection:
         assert len(artifacts) == 2
 
         # Find each artifact by type
-        command_artifact = next((a for a in artifacts if a.artifact_type == "command"), None)
-        skill_artifact = next((a for a in artifacts if a.artifact_type == "skill"), None)
+        command_artifact = next(
+            (a for a in artifacts if a.artifact_type == "command"), None
+        )
+        skill_artifact = next(
+            (a for a in artifacts if a.artifact_type == "skill"), None
+        )
 
         # Verify command
         assert command_artifact is not None
@@ -1360,9 +1369,7 @@ class TestMultiTypeDetection:
         detector = HeuristicDetector()
 
         # Malformed YAML in frontmatter (missing colon)
-        file_contents = {
-            "SKILL.md": "---\ntype skill\ninvalid yaml\n---\n# Content"
-        }
+        file_contents = {"SKILL.md": "---\ntype skill\ninvalid yaml\n---\n# Content"}
         siblings = {"SKILL.md", "index.ts"}
 
         # Score with file contents
@@ -1383,9 +1390,7 @@ class TestMultiTypeDetection:
         detector = HeuristicDetector()
 
         # Empty frontmatter (no type field)
-        file_contents = {
-            "COMMAND.md": "---\n---\n# Content without type"
-        }
+        file_contents = {"COMMAND.md": "---\n---\n# Content without type"}
         siblings = {"COMMAND.md", "index.ts"}
 
         artifact_type, _, breakdown = detector.score_directory_with_content(
@@ -1647,29 +1652,31 @@ class TestOrganizationPath:
         detector = HeuristicDetector()
 
         # Single level
-        assert detector._compute_organization_path(
-            "commands/dev/execute-phase", "commands"
-        ) == "dev"
+        assert (
+            detector._compute_organization_path(
+                "commands/dev/execute-phase", "commands"
+            )
+            == "dev"
+        )
 
         # Multi-level
-        assert detector._compute_organization_path(
-            "commands/dev/subgroup/my-cmd", "commands"
-        ) == "dev/subgroup"
+        assert (
+            detector._compute_organization_path(
+                "commands/dev/subgroup/my-cmd", "commands"
+            )
+            == "dev/subgroup"
+        )
 
         # Directly in container
-        assert detector._compute_organization_path(
-            "commands/test", "commands"
-        ) is None
+        assert detector._compute_organization_path("commands/test", "commands") is None
 
         # No container
-        assert detector._compute_organization_path(
-            "standalone/my-skill", None
-        ) is None
+        assert detector._compute_organization_path("standalone/my-skill", None) is None
 
         # Container path mismatch
-        assert detector._compute_organization_path(
-            "skills/my-skill", "commands"
-        ) is None
+        assert (
+            detector._compute_organization_path("skills/my-skill", "commands") is None
+        )
 
     def test_organization_path_with_mcp_container(self):
         """Test organization_path with mcp container type."""
@@ -1887,7 +1894,9 @@ class TestSingleFileArtifacts:
 
         assert len(artifacts) == 1
         # Name should be the filename without .md extension for single-file artifacts
-        assert artifacts[0].name == "use-mcp"  # Extension stripped for Commands/Agents/Hooks
+        assert (
+            artifacts[0].name == "use-mcp"
+        )  # Extension stripped for Commands/Agents/Hooks
 
     def test_upstream_url_for_single_file(self):
         """Test that upstream URL is correctly generated for single-file artifacts"""
@@ -1969,7 +1978,9 @@ class TestManualMappings:
 
     def test_exact_match(self):
         """Test exact path matching."""
-        detector = HeuristicDetector(manual_mappings={"skills": "skill", "cmds": "command"})
+        detector = HeuristicDetector(
+            manual_mappings={"skills": "skill", "cmds": "command"}
+        )
 
         result = detector._check_manual_mapping("skills")
         assert result == (ArtifactType.SKILL, "exact", 0)
@@ -2420,7 +2431,10 @@ class TestManualMappings:
 
         # If heuristic detected anything, manual should beat it
         if matches_heuristic:
-            assert matches_manual[0].confidence_score >= matches_heuristic[0].confidence_score
+            assert (
+                matches_manual[0].confidence_score
+                >= matches_heuristic[0].confidence_score
+            )
 
         # Manual should always be >= 86
         assert len(matches_manual) == 1
@@ -2474,7 +2488,10 @@ class TestManualMappings:
         assert matches[0].metadata.get("is_manual_mapping") is True
         assert matches[0].metadata.get("match_type") == "inherited"
         assert matches[0].metadata.get("inheritance_depth") == 1
-        assert matches[0].metadata.get("confidence_reason") == "Manual mapping inherited from ancestor (depth=1, score=92)"
+        assert (
+            matches[0].metadata.get("confidence_reason")
+            == "Manual mapping inherited from ancestor (depth=1, score=92)"
+        )
 
     def test_non_matching_paths_use_heuristics(self):
         """Test that non-matching paths still use heuristic detection."""
@@ -2574,12 +2591,16 @@ class TestManualMappings:
             "weird/custom/path/index.ts",
         ]
         # Without manual mapping - detected with lower confidence via standalone bonus
-        # manifest(20) + extensions(2) + standalone_bonus(25) - depth_penalty(3) = 44 raw
-        # normalized: (44 / 120) * 100 = 37%
-        artifacts_without = detect_artifacts_in_tree(files, "https://github.com/test/repo")
+        # manifest(20) + skill_manifest_bonus(40) + extensions(2) + standalone_bonus(25) - depth_penalty(3) = 84 raw
+        # normalized: (84 / 160) * 100 = 52%
+        artifacts_without = detect_artifacts_in_tree(
+            files, "https://github.com/test/repo"
+        )
         assert len(artifacts_without) == 1
         assert artifacts_without[0].artifact_type == "skill"
-        assert artifacts_without[0].confidence_score < 50  # Low confidence without mapping
+        assert (
+            artifacts_without[0].confidence_score < 60
+        )  # Moderate confidence without mapping
 
         # With manual mapping at "weird" - artifact at depth=2 gets confidence=89
         # This is significantly higher than heuristic-only detection
@@ -2593,7 +2614,9 @@ class TestManualMappings:
         # depth=2 -> confidence = 95 - (2 * 3) = 89
         assert artifacts_with[0].confidence_score == 89
         # Manual mapping provides much higher confidence than heuristic
-        assert artifacts_with[0].confidence_score > artifacts_without[0].confidence_score
+        assert (
+            artifacts_with[0].confidence_score > artifacts_without[0].confidence_score
+        )
 
     def test_invalid_mapping_type_logged(self):
         """Test that invalid artifact types in mappings are logged and ignored."""
@@ -2613,19 +2636,47 @@ class TestManualMappings:
             }
         )
 
-        assert detector._check_manual_mapping("lib/skills") == (ArtifactType.SKILL, "exact", 0)
-        assert detector._check_manual_mapping("lib/skills/canvas") == (ArtifactType.SKILL, "inherited", 1)
-        assert detector._check_manual_mapping("lib/commands") == (ArtifactType.COMMAND, "exact", 0)
-        assert detector._check_manual_mapping("lib/commands/deploy") == (ArtifactType.COMMAND, "inherited", 1)
-        assert detector._check_manual_mapping("lib/agents/helper") == (ArtifactType.AGENT, "inherited", 1)
+        assert detector._check_manual_mapping("lib/skills") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("lib/skills/canvas") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+        assert detector._check_manual_mapping("lib/commands") == (
+            ArtifactType.COMMAND,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("lib/commands/deploy") == (
+            ArtifactType.COMMAND,
+            "inherited",
+            1,
+        )
+        assert detector._check_manual_mapping("lib/agents/helper") == (
+            ArtifactType.AGENT,
+            "inherited",
+            1,
+        )
 
     def test_case_sensitive_matching(self):
         """Test that path matching is case-sensitive."""
         detector = HeuristicDetector(manual_mappings={"Skills": "skill"})
 
         # Exact case should match
-        assert detector._check_manual_mapping("Skills") == (ArtifactType.SKILL, "exact", 0)
-        assert detector._check_manual_mapping("Skills/canvas") == (ArtifactType.SKILL, "inherited", 1)
+        assert detector._check_manual_mapping("Skills") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("Skills/canvas") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
 
         # Different case should NOT match
         assert detector._check_manual_mapping("skills") is None
@@ -2641,8 +2692,16 @@ class TestManualMappings:
         )
 
         # Exact matches
-        assert detector._check_manual_mapping("skills") == (ArtifactType.SKILL, "exact", 0)
-        assert detector._check_manual_mapping("skills/canvas") == (ArtifactType.COMMAND, "exact", 0)
+        assert detector._check_manual_mapping("skills") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("skills/canvas") == (
+            ArtifactType.COMMAND,
+            "exact",
+            0,
+        )
 
         # skills/canvas/nested should match skills/canvas (depth 1), not skills (depth 2)
         result = detector._check_manual_mapping("skills/canvas/nested")
@@ -2666,12 +2725,36 @@ class TestManualMappings:
         detector = HeuristicDetector(manual_mappings={"root": "skill"})
 
         # Test various depths
-        assert detector._check_manual_mapping("root") == (ArtifactType.SKILL, "exact", 0)
-        assert detector._check_manual_mapping("root/a") == (ArtifactType.SKILL, "inherited", 1)
-        assert detector._check_manual_mapping("root/a/b") == (ArtifactType.SKILL, "inherited", 2)
-        assert detector._check_manual_mapping("root/a/b/c") == (ArtifactType.SKILL, "inherited", 3)
-        assert detector._check_manual_mapping("root/a/b/c/d") == (ArtifactType.SKILL, "inherited", 4)
-        assert detector._check_manual_mapping("root/a/b/c/d/e") == (ArtifactType.SKILL, "inherited", 5)
+        assert detector._check_manual_mapping("root") == (
+            ArtifactType.SKILL,
+            "exact",
+            0,
+        )
+        assert detector._check_manual_mapping("root/a") == (
+            ArtifactType.SKILL,
+            "inherited",
+            1,
+        )
+        assert detector._check_manual_mapping("root/a/b") == (
+            ArtifactType.SKILL,
+            "inherited",
+            2,
+        )
+        assert detector._check_manual_mapping("root/a/b/c") == (
+            ArtifactType.SKILL,
+            "inherited",
+            3,
+        )
+        assert detector._check_manual_mapping("root/a/b/c/d") == (
+            ArtifactType.SKILL,
+            "inherited",
+            4,
+        )
+        assert detector._check_manual_mapping("root/a/b/c/d/e") == (
+            ArtifactType.SKILL,
+            "inherited",
+            5,
+        )
 
     def test_confidence_score_by_inheritance_depth(self):
         """Test confidence scores based on inheritance depth.
@@ -2702,23 +2785,35 @@ class TestManualMappings:
         # depth=0 (exact match) -> "skills" is a container, won't be detected as artifact
         # depth=1 -> 95 - 3 = 92
         assert matches_by_path["skills/canvas"].confidence_score == 92
-        assert matches_by_path["skills/canvas"].metadata["confidence_reason"] == \
-            "Manual mapping inherited from ancestor (depth=1, score=92)"
+        assert (
+            matches_by_path["skills/canvas"].metadata["confidence_reason"]
+            == "Manual mapping inherited from ancestor (depth=1, score=92)"
+        )
 
         # depth=2 -> 95 - 6 = 89
         assert matches_by_path["skills/canvas/nested"].confidence_score == 89
-        assert matches_by_path["skills/canvas/nested"].metadata["confidence_reason"] == \
-            "Manual mapping inherited from ancestor (depth=2, score=89)"
+        assert (
+            matches_by_path["skills/canvas/nested"].metadata["confidence_reason"]
+            == "Manual mapping inherited from ancestor (depth=2, score=89)"
+        )
 
         # depth=3 -> 95 - 9 = 86
         assert matches_by_path["skills/canvas/nested/deep"].confidence_score == 86
-        assert matches_by_path["skills/canvas/nested/deep"].metadata["confidence_reason"] == \
-            "Manual mapping inherited from ancestor (depth=3, score=86)"
+        assert (
+            matches_by_path["skills/canvas/nested/deep"].metadata["confidence_reason"]
+            == "Manual mapping inherited from ancestor (depth=3, score=86)"
+        )
 
         # depth=4 -> max(86, 95 - 12) = max(86, 83) = 86
-        assert matches_by_path["skills/canvas/nested/deep/deeper"].confidence_score == 86
-        assert matches_by_path["skills/canvas/nested/deep/deeper"].metadata["confidence_reason"] == \
-            "Manual mapping inherited from ancestor (depth=4, score=86)"
+        assert (
+            matches_by_path["skills/canvas/nested/deep/deeper"].confidence_score == 86
+        )
+        assert (
+            matches_by_path["skills/canvas/nested/deep/deeper"].metadata[
+                "confidence_reason"
+            ]
+            == "Manual mapping inherited from ancestor (depth=4, score=86)"
+        )
 
     def test_confidence_score_exact_match(self):
         """Test exact match gets confidence=95 with correct reason."""
@@ -2728,7 +2823,10 @@ class TestManualMappings:
 
         assert len(matches) == 1
         assert matches[0].confidence_score == 95
-        assert matches[0].metadata["confidence_reason"] == "Manual mapping exact match (95)"
+        assert (
+            matches[0].metadata["confidence_reason"]
+            == "Manual mapping exact match (95)"
+        )
 
     def test_confidence_score_always_beats_heuristic(self):
         """Test that even minimum manual mapping confidence (86) beats max heuristic (~80)."""

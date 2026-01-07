@@ -28,11 +28,12 @@ that are unique to scanning unstructured GitHub repositories.
    - Frontmatter type (30 pts): Parse YAML frontmatter for explicit type field
    - Depth penalty: Penalize deeply nested paths (reduced 50% inside containers)
 
-Scoring Formula (7 signals, MAX_RAW_SCORE = 120):
+Scoring Formula (8 signals, MAX_RAW_SCORE = 160):
 ------------------------------------------------
 Baseline signals (from artifact_detection):
   - dir_name: 10 pts (container/directory name matching)
   - manifest: 20 pts (SKILL.md, COMMAND.md presence)
+  - skill_manifest_bonus: 40 pts (SKILL.md definitive marker for Skills)
 
 Marketplace signals (GitHub-specific):
   - extensions: 5 pts (expected file types present)
@@ -108,10 +109,10 @@ from skillmeat.core.artifact_detection import (
 
 logger = logging.getLogger(__name__)
 
-# Maximum raw score from all signals (10+20+5+15+15+25+30 = 120)
-# dir_name(10) + manifest(20) + extensions(5) + parent_hint(15) + frontmatter(15)
-# + container_hint(25) + frontmatter_type(30)
-MAX_RAW_SCORE = 120
+# Maximum raw score from all signals (10+20+40+5+15+15+25+30 = 160)
+# dir_name(10) + manifest(20) + skill_manifest_bonus(40) + extensions(5)
+# + parent_hint(15) + frontmatter(15) + container_hint(25) + frontmatter_type(30)
+MAX_RAW_SCORE = 160
 
 # Mapping from container directory names to artifact types
 CONTAINER_TYPE_MAPPING: Dict[str, "ArtifactType"] = (
@@ -208,6 +209,7 @@ class DetectionConfig:
     frontmatter_type_weight: int = (
         30  # Strong signal when frontmatter contains type field
     )
+    skill_manifest_bonus: int = 40  # Extra bonus when SKILL.md detected for Skill type
 
 
 class HeuristicDetector:
@@ -1064,6 +1066,9 @@ class HeuristicDetector:
                 complete_breakdown = {
                     "dir_name_score": score_breakdown["dir_name_score"],
                     "manifest_score": score_breakdown["manifest_score"],
+                    "skill_manifest_bonus": score_breakdown.get(
+                        "skill_manifest_bonus", 0
+                    ),
                     "extensions_score": score_breakdown["extensions_score"],
                     "parent_hint_score": score_breakdown["parent_hint_score"],
                     "frontmatter_score": score_breakdown["frontmatter_score"],
@@ -1143,6 +1148,7 @@ class HeuristicDetector:
         breakdown = {
             "dir_name_score": 0,
             "manifest_score": 0,
+            "skill_manifest_bonus": 0,
             "extensions_score": 0,
             "parent_hint_score": 0,
             "frontmatter_score": 0,
@@ -1177,6 +1183,17 @@ class HeuristicDetector:
             else:
                 artifact_type = manifest_type
                 match_reasons.append(f"Contains manifest file (+{manifest_score})")
+
+        # Signal 2b: Skill manifest bonus
+        # SKILL.md is a definitive marker for skill artifacts - give extra weight
+        if manifest_type == ArtifactType.SKILL:
+            has_skill_md = any(f.lower() == "skill.md" for f in siblings)
+            if has_skill_md:
+                total_score += self.config.skill_manifest_bonus
+                breakdown["skill_manifest_bonus"] = self.config.skill_manifest_bonus
+                match_reasons.append(
+                    f"SKILL.md definitive marker (+{self.config.skill_manifest_bonus})"
+                )
 
         # Signal 3: File extensions
         extension_score = self._score_extensions(path, siblings)
@@ -1940,6 +1957,7 @@ class HeuristicDetector:
         breakdown: Dict[str, int] = {
             "dir_name_score": 0,
             "manifest_score": 0,
+            "skill_manifest_bonus": 0,
             "extensions_score": 0,
             "parent_hint_score": 0,
             "frontmatter_score": 0,
@@ -1963,6 +1981,20 @@ class HeuristicDetector:
                     breakdown["dir_name_score"] = self.config.dir_name_weight // 2
             elif "manifest" in reason.lower():
                 breakdown["manifest_score"] = self.config.manifest_weight
+
+        # =====================================================================
+        # Skill Manifest Bonus (40 pts)
+        # =====================================================================
+        # SKILL.md is a definitive marker for skill artifacts - give extra weight
+        # This ensures Skills with SKILL.md score significantly higher
+        if baseline_type == ArtifactType.SKILL:
+            has_skill_md = any(f.lower() == "skill.md" for f in siblings)
+            if has_skill_md:
+                total_score += self.config.skill_manifest_bonus
+                breakdown["skill_manifest_bonus"] = self.config.skill_manifest_bonus
+                reasons.append(
+                    f"SKILL.md definitive marker (+{self.config.skill_manifest_bonus})"
+                )
 
         # =====================================================================
         # Marketplace-Specific Signal 1: Extension Scoring (max 5 pts)

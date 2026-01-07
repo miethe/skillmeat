@@ -1714,8 +1714,8 @@ class HeuristicMatch(BaseModel):
     raw_score: int = Field(
         default=0,
         ge=0,
-        le=150,  # Higher limit to accommodate container_hint + frontmatter_type signals
-        description="Raw score before normalization (0-120 typical)",
+        le=200,  # Higher limit to accommodate all signals including skill_manifest_bonus (MAX=160)
+        description="Raw score before normalization (0-160 typical)",
         examples=[60],
     )
     breakdown: Dict[str, int] = Field(
