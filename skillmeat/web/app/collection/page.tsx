@@ -86,11 +86,17 @@ function artifactToEntity(artifact: Artifact): Entity {
     error: 'conflict',
   };
 
+  // Determine collection name:
+  // - If artifact has a collection assigned, use its name
+  // - If no collection (marketplace/catalog artifacts not yet imported), use 'discovered'
+  //   This prevents the sync-status-tab from making upstream-diff API calls that 404
+  const collectionName = artifact.collection?.name ?? 'discovered';
+
   return {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type,
-    collection: artifact.collection?.name || 'default',
+    collection: collectionName,
     status: statusMap[artifact.status] || 'synced',
     tags: artifact.metadata?.tags || [],
     description: artifact.metadata?.description,
