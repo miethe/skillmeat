@@ -2,6 +2,23 @@
 
 Use artifact-tracker agent for surgical field-level updates.
 
+## Routing Decision: CLI vs Agent
+
+**Use CLI scripts first** - they cost ~50-100 tokens vs ~4,000+ for agent operations.
+
+| Scenario | Method | Command |
+|----------|--------|---------|
+| Mark task complete | **CLI** | `python scripts/update-status.py -f FILE -t TASK-X -s completed` |
+| Mark task blocked | **CLI** | `python scripts/update-status.py -f FILE -t TASK-X -s blocked -n "reason"` |
+| Batch update (2+ tasks) | **CLI** | `python scripts/update-batch.py -f FILE --updates "T1:completed,T2:completed"` |
+| Update with detailed notes | Agent | `Task("artifact-tracker", "Update... with context: ...")` |
+| Record architectural decision | Agent | `Task("artifact-tracker", "Record decision: ...")` |
+| Add blocker with resolution plan | Agent | `Task("artifact-tracker", "Add blocker...")` |
+
+**Rule of thumb**: If it's just a status change, use CLI. If you need to record context/reasoning, use agent.
+
+---
+
 ## Update Task Status
 
 **Command**:
