@@ -2558,22 +2558,31 @@ class TestManualMappings:
         assert "depth=0" in reasons[0]
 
     def test_manual_mapping_enables_non_standard_locations(self):
-        """Test that manual mapping enables detection in non-standard locations.
+        """Test that manual mapping boosts confidence for non-standard locations.
 
-        Note: Confidence varies by inheritance depth:
+        Note: Confidence varies by inheritance depth with manual mapping:
         - weird (depth=0): 95
         - weird/custom (depth=1): 92
         - weird/custom/path (depth=2): 89
+
+        Without manual mapping, artifacts with manifest files can still be
+        detected via the standalone manifest bonus, but with lower confidence.
+        Manual mappings provide significantly higher confidence.
         """
         files = [
             "weird/custom/path/SKILL.md",
             "weird/custom/path/index.ts",
         ]
-        # Without manual mapping - won't be detected
+        # Without manual mapping - detected with lower confidence via standalone bonus
+        # manifest(20) + extensions(2) + standalone_bonus(25) - depth_penalty(3) = 44 raw
+        # normalized: (44 / 120) * 100 = 37%
         artifacts_without = detect_artifacts_in_tree(files, "https://github.com/test/repo")
-        assert len(artifacts_without) == 0
+        assert len(artifacts_without) == 1
+        assert artifacts_without[0].artifact_type == "skill"
+        assert artifacts_without[0].confidence_score < 50  # Low confidence without mapping
 
         # With manual mapping at "weird" - artifact at depth=2 gets confidence=89
+        # This is significantly higher than heuristic-only detection
         artifacts_with = detect_artifacts_in_tree(
             files,
             "https://github.com/test/repo",
@@ -2583,6 +2592,8 @@ class TestManualMappings:
         assert artifacts_with[0].artifact_type == "skill"
         # depth=2 -> confidence = 95 - (2 * 3) = 89
         assert artifacts_with[0].confidence_score == 89
+        # Manual mapping provides much higher confidence than heuristic
+        assert artifacts_with[0].confidence_score > artifacts_without[0].confidence_score
 
     def test_invalid_mapping_type_logged(self):
         """Test that invalid artifact types in mappings are logged and ignored."""
