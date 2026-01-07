@@ -96,9 +96,9 @@ class QualityScorer:
         actual_mean_scaled = (actual_mean - 1) * 25
 
         # Bayesian average
-        quality = (
-            (self.prior * self.prior_weight) + (actual_mean_scaled * count)
-        ) / (self.prior_weight + count)
+        quality = ((self.prior * self.prior_weight) + (actual_mean_scaled * count)) / (
+            self.prior_weight + count
+        )
 
         return round(quality, 2)
 
@@ -147,7 +147,9 @@ class QualityScorer:
 
         if match_score is not None:
             # Full weighting: 25/25/50
-            confidence = (trust_score * 0.25) + (quality_score * 0.25) + (match_score * 0.50)
+            confidence = (
+                (trust_score * 0.25) + (quality_score * 0.25) + (match_score * 0.50)
+            )
         else:
             # No match: 50/50 between trust and quality
             confidence = (trust_score * 0.5) + (quality_score * 0.5)

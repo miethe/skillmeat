@@ -159,7 +159,11 @@ async def get_analytics_summary(
             cutoff = datetime.now() - timedelta(hours=24)
             recent_events = db.get_events(limit=10000)  # Get all recent
             recent_activity_count = len(
-                [e for e in recent_events if datetime.fromisoformat(e["timestamp"]) > cutoff]
+                [
+                    e
+                    for e in recent_events
+                    if datetime.fromisoformat(e["timestamp"]) > cutoff
+                ]
             )
 
             # Get most deployed artifact
@@ -454,7 +458,9 @@ async def get_usage_trends(
                 if period == "hour":
                     bucket = timestamp.replace(minute=0, second=0, microsecond=0)
                 elif period == "day":
-                    bucket = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+                    bucket = timestamp.replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
                 elif period == "week":
                     # Start of week (Monday)
                     days_since_monday = timestamp.weekday()

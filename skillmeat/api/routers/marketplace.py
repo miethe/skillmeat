@@ -947,7 +947,9 @@ async def compliance_consent(
     },
 )
 async def compliance_history(
-    publisher_email: Optional[str] = Query(None, description="Filter by publisher email"),
+    publisher_email: Optional[str] = Query(
+        None, description="Filter by publisher email"
+    ),
     token: TokenDep = None,
 ):
     """Get compliance consent history.

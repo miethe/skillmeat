@@ -170,6 +170,7 @@ class TestScoreCalculatorWeightLoading:
 
     def test_calculator_uses_default_weights(self, tmp_path, monkeypatch):
         """ScoreCalculator uses default weights when config not set."""
+
         # Use clean config dir to avoid picking up real config
         def mock_config_manager(*args, **kwargs):
             return ConfigManager(config_dir=tmp_path)

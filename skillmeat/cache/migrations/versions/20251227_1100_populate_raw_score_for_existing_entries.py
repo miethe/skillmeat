@@ -52,14 +52,16 @@ def upgrade() -> None:
     2. Make migration safe to re-run
     3. Support rollback/replay scenarios
     """
-    op.execute("""
+    op.execute(
+        """
         UPDATE marketplace_catalog_entries
         SET raw_score = CASE
             WHEN confidence_score > 65 THEN 65
             ELSE confidence_score
         END
         WHERE raw_score IS NULL
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
@@ -73,7 +75,9 @@ def downgrade() -> None:
     migration was applied. To fully revert both migrations, you must downgrade
     both this data migration AND the schema migration.
     """
-    op.execute("""
+    op.execute(
+        """
         UPDATE marketplace_catalog_entries
         SET raw_score = NULL
-    """)
+    """
+    )

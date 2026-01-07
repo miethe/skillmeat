@@ -333,9 +333,7 @@ class TestDiscoveryPerformance:
     COMBINED_THRESHOLD = 2.0
     SKIP_OVERHEAD_THRESHOLD = 0.1  # 100ms
 
-    def test_benchmark_empty_project(
-        self, empty_project: Path, benchmark
-    ) -> None:
+    def test_benchmark_empty_project(self, empty_project: Path, benchmark) -> None:
         """Benchmark discovery scan with empty project.
 
         Performance Target: <1 second
@@ -385,9 +383,7 @@ class TestDiscoveryPerformance:
             duration_sec < self.LARGE_COLLECTION_THRESHOLD
         ), f"Collection scan (500 artifacts) took {duration_sec:.2f}s (threshold: {self.LARGE_COLLECTION_THRESHOLD}s)"
 
-    def test_benchmark_large_project(
-        self, large_project: Path, benchmark
-    ) -> None:
+    def test_benchmark_large_project(self, large_project: Path, benchmark) -> None:
         """Benchmark discovery scan with 200 artifacts in Project.
 
         Performance Target: <2 seconds

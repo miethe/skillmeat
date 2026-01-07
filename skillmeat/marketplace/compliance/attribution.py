@@ -122,9 +122,7 @@ class AttributionTracker:
         logger.info(f"Found {len(attributions)} attribution requirements")
         return list(attributions.values())
 
-    def generate_credits(
-        self, attributions: List[AttributionRequirement]
-    ) -> str:
+    def generate_credits(self, attributions: List[AttributionRequirement]) -> str:
         """Generate CREDITS.md file content.
 
         Args:
@@ -257,9 +255,7 @@ class AttributionTracker:
         # Validate each attribution has required fields
         for attr in attributions:
             if not attr.copyright_notices:
-                errors.append(
-                    f"Missing copyright notices for {attr.component_name}"
-                )
+                errors.append(f"Missing copyright notices for {attr.component_name}")
 
             if attr.license in self.ATTRIBUTION_REQUIRED and not attr.copyright_notices:
                 errors.append(

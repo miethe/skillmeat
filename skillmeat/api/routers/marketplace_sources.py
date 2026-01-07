@@ -33,6 +33,7 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
+from skillmeat.api.dependencies import CollectionManagerDep
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
@@ -252,11 +253,7 @@ async def _validate_manual_map_paths(
 
         # Extract all directory paths from tree
         # Tree items have "type": "tree" for directories, "type": "blob" for files
-        dir_paths = {
-            item["path"]
-            for item in tree
-            if item.get("type") == "tree"
-        }
+        dir_paths = {item["path"] for item in tree if item.get("type") == "tree"}
 
         # Validate each directory path in manual_map
         invalid_paths = []
@@ -417,7 +414,9 @@ async def _perform_scan(
     # Retrieve manual_map from source for artifact type override
     manual_map = source.get_manual_map_dict()
     if manual_map:
-        logger.debug(f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}")
+        logger.debug(
+            f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}"
+        )
 
     try:
         # Get database session for cross-source deduplication
@@ -464,11 +463,13 @@ async def _perform_scan(
                 if extractor:
                     try:
                         segments = extractor.extract(artifact.path)
-                        path_segments_json = json.dumps({
-                            "raw_path": artifact.path,
-                            "extracted": [asdict(s) for s in segments],
-                            "extracted_at": datetime.utcnow().isoformat()
-                        })
+                        path_segments_json = json.dumps(
+                            {
+                                "raw_path": artifact.path,
+                                "extracted": [asdict(s) for s in segments],
+                                "extracted_at": datetime.utcnow().isoformat(),
+                            }
+                        )
                     except Exception as e:
                         logger.error(
                             f"Failed to extract path segments for {artifact.path}: {e}"
@@ -511,9 +512,7 @@ async def _perform_scan(
                 error_message=str(scan_error),
             )
 
-        logger.error(
-            f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True
-        )
+        logger.error(f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True)
 
         # Return error result (don't raise - let caller decide)
         return ScanResultDTO(
@@ -938,8 +937,12 @@ async def get_source(source_id: str) -> SourceResponse:
         200: {"description": "Source updated successfully"},
         400: {"description": "Bad request - no update parameters provided"},
         404: {"description": "Source not found"},
-        422: {"description": "Validation error - invalid directory path or artifact type"},
-        500: {"description": "Internal server error - GitHub API failure or database error"},
+        422: {
+            "description": "Validation error - invalid directory path or artifact type"
+        },
+        500: {
+            "description": "Internal server error - GitHub API failure or database error"
+        },
     },
 )
 async def update_source(
@@ -1528,9 +1531,7 @@ async def update_catalog_entry_name(
             session.commit()
             session.refresh(entry)
 
-            logger.info(
-                f"Updated catalog entry name: {entry_id} -> {normalized_name}"
-            )
+            logger.info(f"Updated catalog entry name: {entry_id} -> {normalized_name}")
             return entry_to_response(entry)
 
         except HTTPException:
@@ -1586,6 +1587,7 @@ async def update_catalog_entry_name(
 async def import_artifacts(
     source_id: str,
     request: ImportRequest,
+    collection_mgr: CollectionManagerDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
@@ -1654,7 +1656,7 @@ async def import_artifacts(
             )
 
         # Perform import using ImportCoordinator
-        coordinator = ImportCoordinator()
+        coordinator = ImportCoordinator(collection_mgr=collection_mgr)
         strategy = ConflictStrategy(request.conflict_strategy)
 
         import_result = coordinator.import_entries(

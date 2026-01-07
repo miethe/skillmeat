@@ -114,7 +114,9 @@ class TestGitHubRateLimiting:
     ):
         """Test that file tree endpoint returns 429 when GitHub rate limits us."""
         with patch.object(
-            GitHubScanner, "get_file_tree", side_effect=RateLimitError("Rate limited, reset in 45s")
+            GitHubScanner,
+            "get_file_tree",
+            side_effect=RateLimitError("Rate limited, reset in 45s"),
         ):
             response = client.get(
                 "/api/v1/marketplace/sources/test-source-123/artifacts/skills/canvas/files"
@@ -294,7 +296,9 @@ class TestGitHubTimeout:
         with patch.object(
             GitHubScanner,
             "get_file_tree",
-            side_effect=GitHubAPIError("Request failed after 3 attempts: Connection timed out"),
+            side_effect=GitHubAPIError(
+                "Request failed after 3 attempts: Connection timed out"
+            ),
         ):
             response = client.get(
                 "/api/v1/marketplace/sources/test-source-123/artifacts/skills/canvas/files"
@@ -311,7 +315,9 @@ class TestGitHubTimeout:
         with patch.object(
             GitHubScanner,
             "get_file_content",
-            side_effect=GitHubAPIError("Request failed after 3 attempts: Read timed out"),
+            side_effect=GitHubAPIError(
+                "Request failed after 3 attempts: Read timed out"
+            ),
         ):
             response = client.get(
                 "/api/v1/marketplace/sources/test-source-123/artifacts/skills/canvas/files/SKILL.md"
@@ -477,7 +483,9 @@ class TestErrorMessages:
 
             data = response.json()
             # Should mention the file name in the error
-            assert "missing.txt" in data["detail"] or "not found" in data["detail"].lower()
+            assert (
+                "missing.txt" in data["detail"] or "not found" in data["detail"].lower()
+            )
 
     def test_timeout_message_indicates_transient_error(
         self, client, mock_source_repo, mock_cache_miss

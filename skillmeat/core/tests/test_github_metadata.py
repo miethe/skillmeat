@@ -179,7 +179,9 @@ tags:
 
 Content here...
 """
-        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode("utf-8")
+        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode(
+            "utf-8"
+        )
 
         file_response = Mock()
         file_response.status_code = 200
@@ -219,7 +221,9 @@ description: A great project
 
 # My Project
 """
-        encoded_content = base64.b64encode(readme_content.encode("utf-8")).decode("utf-8")
+        encoded_content = base64.b64encode(readme_content.encode("utf-8")).decode(
+            "utf-8"
+        )
 
         # Mock 404 for SKILL.md, COMMAND.md, AGENT.md, then success for README.md
         not_found_response = Mock()
@@ -241,8 +245,8 @@ description: A great project
                 not_found_response,  # SKILL.md
                 not_found_response,  # COMMAND.md
                 not_found_response,  # AGENT.md
-                readme_response,     # README.md
-                repo_response,       # repo metadata
+                readme_response,  # README.md
+                repo_response,  # repo metadata
             ]
 
             metadata = extractor.fetch_metadata("user/repo/project")
@@ -302,9 +306,9 @@ description: A great project
                 not_found_response,  # COMMAND.md
                 not_found_response,  # AGENT.md
                 not_found_response,  # README.md
-                error_response,      # repo metadata attempt 1
-                error_response,      # repo metadata attempt 2
-                error_response,      # repo metadata attempt 3
+                error_response,  # repo metadata attempt 1
+                error_response,  # repo metadata attempt 2
+                error_response,  # repo metadata attempt 3
             ]
 
             with patch("time.sleep"):  # Mock sleep to speed up test
@@ -416,7 +420,9 @@ description: Newly fetched
 ---
 Content
 """
-        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode("utf-8")
+        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode(
+            "utf-8"
+        )
 
         file_response = Mock()
         file_response.status_code = 200
@@ -703,7 +709,9 @@ class TestRetryWithBackoff:
         mock_func.side_effect = requests.exceptions.RequestException("Persistent error")
 
         with patch("time.sleep"):
-            with pytest.raises(requests.exceptions.RequestException, match="Persistent error"):
+            with pytest.raises(
+                requests.exceptions.RequestException, match="Persistent error"
+            ):
                 extractor._retry_with_backoff(mock_func, max_retries=3)
 
         assert mock_func.call_count == 3

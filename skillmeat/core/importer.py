@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 # Local ImportStatus enum to avoid circular import
 class ImportStatus(str, Enum):
     """Status of an import operation (local definition to avoid circular import)."""
+
     SUCCESS = "success"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -121,7 +122,10 @@ class ArtifactImporter:
         """
         if already_exists:
             if exists_location == "both":
-                return ImportStatus.SKIPPED, "Already exists in both Collection and Project"
+                return (
+                    ImportStatus.SKIPPED,
+                    "Already exists in both Collection and Project",
+                )
             elif exists_location == "collection":
                 return ImportStatus.SKIPPED, "Already exists in Collection"
             elif exists_location == "project":
@@ -171,7 +175,7 @@ class ArtifactImporter:
                 "artifact_count": len(artifacts),
                 "collection": collection_name,
                 "auto_resolve_conflicts": auto_resolve_conflicts,
-            }
+            },
         )
 
         # Phase 1: Validate all artifacts
@@ -181,9 +185,7 @@ class ArtifactImporter:
             for artifact, error in validation_errors:
                 artifact_id = self._get_artifact_id(artifact)
                 status, skip_reason = self.determine_import_status(
-                    artifact_key=artifact_id,
-                    import_success=False,
-                    error=error
+                    artifact_key=artifact_id, import_success=False, error=error
                 )
                 results.append(
                     ImportResultData(
@@ -208,7 +210,9 @@ class ArtifactImporter:
         for artifact in artifacts:
             try:
                 # Check for duplicate
-                is_duplicate, location = self._check_duplicate(artifact, collection_name)
+                is_duplicate, location = self._check_duplicate(
+                    artifact, collection_name
+                )
                 if is_duplicate:
                     artifact_id = self._get_artifact_id(artifact)
                     if auto_resolve_conflicts:
@@ -216,7 +220,7 @@ class ArtifactImporter:
                             artifact_key=artifact_id,
                             import_success=False,
                             already_exists=True,
-                            exists_location=location
+                            exists_location=location,
                         )
                         results.append(
                             ImportResultData(
@@ -234,7 +238,7 @@ class ArtifactImporter:
                             artifact_key=artifact_id,
                             import_success=False,
                             already_exists=True,
-                            exists_location=location
+                            exists_location=location,
                         )
                         results.append(
                             ImportResultData(
@@ -257,7 +261,9 @@ class ArtifactImporter:
                         tags_count = self._apply_path_tags(artifact, collection_name)
                         result.tags_applied = tags_count
                     except Exception as e:
-                        logger.warning(f"Failed to apply path tags for {artifact.name}: {e}")
+                        logger.warning(
+                            f"Failed to apply path tags for {artifact.name}: {e}"
+                        )
                         # Don't fail the import, just log the warning
 
                 results.append(result)
@@ -270,9 +276,7 @@ class ArtifactImporter:
                 logger.exception(f"Failed to import {artifact.name}: {e}")
                 artifact_id = self._get_artifact_id(artifact)
                 status, skip_reason = self.determine_import_status(
-                    artifact_key=artifact_id,
-                    import_success=False,
-                    error=str(e)
+                    artifact_key=artifact_id, import_success=False, error=str(e)
                 )
                 results.append(
                     ImportResultData(
@@ -302,7 +306,9 @@ class ArtifactImporter:
         bulk_import_requests_total.labels(status=status).inc()
         bulk_import_artifacts_total.labels(result="success").inc(imported_count)
         bulk_import_artifacts_total.labels(result="failed").inc(failed_count)
-        bulk_import_duration.labels(batch_size_range=batch_size_range).observe(duration_sec)
+        bulk_import_duration.labels(batch_size_range=batch_size_range).observe(
+            duration_sec
+        )
         discovery_metrics.record_import(imported_count, failed_count)
 
         logger.info(
@@ -312,7 +318,7 @@ class ArtifactImporter:
                 "failed_count": failed_count,
                 "duration_ms": round(duration_ms, 2),
                 "status": status,
-            }
+            },
         )
 
         # Calculate total tags applied
@@ -362,7 +368,8 @@ class ArtifactImporter:
         # Filter to approved/pending segments (not excluded)
         # For initial import, "pending" is treated as approved since user selected them
         approved_segments = [
-            seg.normalized for seg in segments
+            seg.normalized
+            for seg in segments
             if seg.status in ("approved", "pending") and seg.status != "excluded"
         ]
 
@@ -532,9 +539,7 @@ class ArtifactImporter:
 
             artifact_id = f"{artifact.artifact_type}:{added_artifact.name}"
             status, skip_reason = self.determine_import_status(
-                artifact_key=artifact_id,
-                import_success=True,
-                already_exists=False
+                artifact_key=artifact_id, import_success=True, already_exists=False
             )
             return ImportResultData(
                 artifact_id=artifact_id,
@@ -547,9 +552,7 @@ class ArtifactImporter:
             logger.error(f"Failed to import artifact: {e}")
             artifact_id = f"{artifact.artifact_type}:{artifact.name or 'unknown'}"
             status, skip_reason = self.determine_import_status(
-                artifact_key=artifact_id,
-                import_success=False,
-                error=str(e)
+                artifact_key=artifact_id, import_success=False, error=str(e)
             )
             return ImportResultData(
                 artifact_id=artifact_id,

@@ -119,9 +119,7 @@ def collection_to_response(
     # Compute counts
     group_count = len(collection.groups)
     artifact_count = (
-        session.query(CollectionArtifact)
-        .filter_by(collection_id=collection.id)
-        .count()
+        session.query(CollectionArtifact).filter_by(collection_id=collection.id).count()
     )
 
     return UserCollectionResponse(
@@ -274,8 +272,12 @@ async def list_user_collections(
         has_next = end_idx < len(all_collections)
         has_previous = start_idx > 0
 
-        start_cursor = encode_cursor(page_collections[0].id) if page_collections else None
-        end_cursor = encode_cursor(page_collections[-1].id) if page_collections else None
+        start_cursor = (
+            encode_cursor(page_collections[0].id) if page_collections else None
+        )
+        end_cursor = (
+            encode_cursor(page_collections[-1].id) if page_collections else None
+        )
 
         page_info = PageInfo(
             has_next_page=has_next,
@@ -603,7 +605,9 @@ async def list_collection_artifacts(
     token: TokenDep,
     limit: int = Query(default=20, ge=1, le=100),
     after: Optional[str] = Query(default=None),
-    artifact_type: Optional[str] = Query(default=None, description="Filter by artifact type"),
+    artifact_type: Optional[str] = Query(
+        default=None, description="Filter by artifact type"
+    ),
 ) -> CollectionArtifactsResponse:
     """List artifacts in a collection with pagination.
 
@@ -677,10 +681,14 @@ async def list_collection_artifacts(
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(page_associations[0].artifact_id) if page_associations else None
+            encode_cursor(page_associations[0].artifact_id)
+            if page_associations
+            else None
         )
         end_cursor = (
-            encode_cursor(page_associations[-1].artifact_id) if page_associations else None
+            encode_cursor(page_associations[-1].artifact_id)
+            if page_associations
+            else None
         )
 
         page_info = PageInfo(
@@ -691,7 +699,9 @@ async def list_collection_artifacts(
             total_count=len(all_associations),
         )
 
-        logger.info(f"Retrieved {len(items)} artifacts for collection '{collection_id}'")
+        logger.info(
+            f"Retrieved {len(items)} artifacts for collection '{collection_id}'"
+        )
         return CollectionArtifactsResponse(items=items, page_info=page_info)
 
     except HTTPException:
@@ -789,7 +799,9 @@ async def add_artifacts_to_collection(
         )
 
         # Return 200 if all were already present (idempotent), 201 if any added
-        status_code = status.HTTP_200_OK if added_count == 0 else status.HTTP_201_CREATED
+        status_code = (
+            status.HTTP_200_OK if added_count == 0 else status.HTTP_201_CREATED
+        )
 
         return {
             "collection_id": collection_id,
@@ -845,9 +857,7 @@ async def remove_artifact_from_collection(
         This operation is idempotent - removing non-existent artifacts returns 204
     """
     try:
-        logger.info(
-            f"Removing artifact {artifact_id} from collection: {collection_id}"
-        )
+        logger.info(f"Removing artifact {artifact_id} from collection: {collection_id}")
 
         # Verify collection exists
         collection = session.query(Collection).filter_by(id=collection_id).first()
@@ -1185,7 +1195,9 @@ async def list_collection_entities(
         has_previous = start_idx > 0
 
         start_cursor = (
-            encode_cursor(page_associations[0].artifact_id) if page_associations else None
+            encode_cursor(page_associations[0].artifact_id)
+            if page_associations
+            else None
         )
         end_cursor = (
             encode_cursor(page_associations[-1].artifact_id)

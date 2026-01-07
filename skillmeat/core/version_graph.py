@@ -43,7 +43,9 @@ class ArtifactVersion:
     location: str  # "collection" or absolute project path
     location_type: Literal["collection", "project"]  # Type-safe literal
     collection_name: Optional[str] = None  # Source collection
-    parent_sha: Optional[str] = None  # SHA of parent version (if deployed from collection)
+    parent_sha: Optional[str] = (
+        None  # SHA of parent version (if deployed from collection)
+    )
     created_at: datetime = field(default_factory=datetime.now)
     metadata_snapshot: Optional[Dict[str, Any]] = None
 
@@ -147,7 +149,9 @@ class VersionGraph:
     artifact_name: str
     artifact_type: str
     root: Optional[VersionGraphNode] = None  # Collection version (canonical)
-    orphaned_nodes: List[VersionGraphNode] = field(default_factory=list)  # No parent in collection
+    orphaned_nodes: List[VersionGraphNode] = field(
+        default_factory=list
+    )  # No parent in collection
     total_deployments: int = 0
     modified_count: int = 0
     last_updated: datetime = field(default_factory=datetime.now)

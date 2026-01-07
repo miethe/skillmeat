@@ -48,7 +48,9 @@ class VaultFactory:
             )
 
         cls._registry[vault_type] = connector_class
-        logger.debug(f"Registered vault connector: {vault_type} -> {connector_class.__name__}")
+        logger.debug(
+            f"Registered vault connector: {vault_type} -> {connector_class.__name__}"
+        )
 
     @classmethod
     def unregister(cls, vault_type: str) -> None:
@@ -149,7 +151,9 @@ register_builtin_connectors()
 
 
 # Convenience function for external connector registration
-def register_vault_connector(vault_type: str, connector_class: Type[VaultConnector]) -> None:
+def register_vault_connector(
+    vault_type: str, connector_class: Type[VaultConnector]
+) -> None:
     """Register a custom vault connector.
 
     Convenience function for external packages to register custom connectors.

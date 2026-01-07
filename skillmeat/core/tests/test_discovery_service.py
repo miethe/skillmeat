@@ -140,20 +140,16 @@ This is a test skill artifact.
         # Create hook (directory with settings.json - per ARTIFACT_SIGNATURES)
         hook_dir = tmp_path / "artifacts" / "hooks" / "my-hook"
         hook_dir.mkdir(parents=True)
-        (hook_dir / "settings.json").write_text(json.dumps({
-            "name": "my-hook",
-            "type": "hook",
-            "triggers": ["pre-commit"]
-        }))
+        (hook_dir / "settings.json").write_text(
+            json.dumps({"name": "my-hook", "type": "hook", "triggers": ["pre-commit"]})
+        )
 
         # Create MCP (directory with mcp.json - per ARTIFACT_SIGNATURES)
         mcp_dir = tmp_path / "artifacts" / "mcp" / "my-mcp"
         mcp_dir.mkdir(parents=True)
-        (mcp_dir / "mcp.json").write_text(json.dumps({
-            "name": "my-mcp",
-            "type": "mcp",
-            "command": "node"
-        }))
+        (mcp_dir / "mcp.json").write_text(
+            json.dumps({"name": "my-mcp", "type": "mcp", "command": "node"})
+        )
 
         service = ArtifactDiscoveryService(tmp_path)
         result = service.discover_artifacts()
@@ -271,11 +267,11 @@ class TestTypeDetection:
 
         hook_dir = tmp_path / "test-hook"
         hook_dir.mkdir()
-        (hook_dir / "settings.json").write_text(json.dumps({
-            "name": "test-hook",
-            "type": "hook",
-            "triggers": ["pre-commit"]
-        }))
+        (hook_dir / "settings.json").write_text(
+            json.dumps(
+                {"name": "test-hook", "type": "hook", "triggers": ["pre-commit"]}
+            )
+        )
 
         service = ArtifactDiscoveryService(tmp_path)
         detected = service._detect_artifact_type(hook_dir)
@@ -812,11 +808,13 @@ tags:
         result = service.discover_artifacts()
         duration = time.perf_counter() - start
 
-        assert result.discovered_count == 50, f"Expected 50, got {result.discovered_count}"
         assert (
-            duration < 2.0
-        ), f"Discovery took {duration:.2f}s (expected <2s)"
-        print(f"\n  Performance: Discovered {result.discovered_count} artifacts in {duration:.3f}s")
+            result.discovered_count == 50
+        ), f"Expected 50, got {result.discovered_count}"
+        assert duration < 2.0, f"Discovery took {duration:.2f}s (expected <2s)"
+        print(
+            f"\n  Performance: Discovered {result.discovered_count} artifacts in {duration:.3f}s"
+        )
 
     def test_discovery_performance_100_artifacts(self, tmp_path):
         """Test discovery performance with 100 artifacts."""
@@ -839,8 +837,12 @@ tags:
 
         assert result.discovered_count == 100
         # Should still be reasonably fast
-        assert duration < 5.0, f"Discovery of 100 artifacts took {duration:.2f}s (expected <5s)"
-        print(f"\n  Performance: Discovered {result.discovered_count} artifacts in {duration:.3f}s")
+        assert (
+            duration < 5.0
+        ), f"Discovery of 100 artifacts took {duration:.2f}s (expected <5s)"
+        print(
+            f"\n  Performance: Discovered {result.discovered_count} artifacts in {duration:.3f}s"
+        )
 
     def test_scan_duration_recorded(self, tmp_path):
         """Test that scan duration is properly recorded."""
@@ -936,10 +938,7 @@ class TestDiscoveryResultModel:
     def test_discovery_result_defaults(self):
         """Test DiscoveryResult with default values."""
         result = DiscoveryResult(
-            discovered_count=0,
-            importable_count=0,
-            artifacts=[],
-            scan_duration_ms=0.0
+            discovered_count=0, importable_count=0, artifacts=[], scan_duration_ms=0.0
         )
 
         assert result.discovered_count == 0
@@ -1450,7 +1449,9 @@ class TestSharedDetectorIntegration:
         hook_dir.mkdir(parents=True)
         (hook_dir / "settings.json").write_text(json.dumps({"name": "my-hook"}))
 
-        hook_result = detect_artifact(hook_dir, container_type="hooks", mode="heuristic")
+        hook_result = detect_artifact(
+            hook_dir, container_type="hooks", mode="heuristic"
+        )
         assert hook_result.artifact_type == ArtifactType.HOOK
         assert hook_result.confidence > 0  # Should have some confidence
 

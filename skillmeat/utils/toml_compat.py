@@ -15,13 +15,13 @@ else:
 
 def loads(s: str) -> Dict[str, Any]:
     """Parse a TOML string.
-    
+
     Args:
         s: TOML string to parse
-        
+
     Returns:
         Parsed TOML data as a dictionary
-        
+
     Raises:
         TOMLDecodeError: If the string is not valid TOML
     """
@@ -30,13 +30,13 @@ def loads(s: str) -> Dict[str, Any]:
 
 def load(fp):
     """Parse a TOML file.
-    
+
     Args:
         fp: File-like object opened in binary mode
-        
+
     Returns:
         Parsed TOML data as a dictionary
-        
+
     Raises:
         TOMLDecodeError: If the file is not valid TOML
     """

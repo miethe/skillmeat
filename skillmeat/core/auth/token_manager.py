@@ -22,29 +22,29 @@ logger = logging.getLogger(__name__)
 class Token(BaseModel):
     """JWT token data model."""
 
-    model_config = ConfigDict(
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     token_id: str = Field(..., description="Unique token identifier")
     name: str = Field(..., description="Human-readable token name")
     token: str = Field(..., description="JWT token string")
     created_at: datetime = Field(..., description="Token creation timestamp")
-    expires_at: Optional[datetime] = Field(None, description="Token expiration timestamp")
+    expires_at: Optional[datetime] = Field(
+        None, description="Token expiration timestamp"
+    )
     last_used: Optional[datetime] = Field(None, description="Last time token was used")
 
 
 class TokenInfo(BaseModel):
     """Token metadata for listing and display."""
 
-    model_config = ConfigDict(
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     token_id: str = Field(..., description="Unique token identifier")
     name: str = Field(..., description="Human-readable token name")
     created_at: datetime = Field(..., description="Token creation timestamp")
-    expires_at: Optional[datetime] = Field(None, description="Token expiration timestamp")
+    expires_at: Optional[datetime] = Field(
+        None, description="Token expiration timestamp"
+    )
     last_used: Optional[datetime] = Field(None, description="Last time token was used")
     is_expired: bool = Field(..., description="Whether token has expired")
 
@@ -326,7 +326,9 @@ class TokenManager:
         try:
             # Decode without verification (just for inspection)
             claims = jwt.decode(
-                token_string, options={"verify_signature": False}, algorithms=[self.algorithm]
+                token_string,
+                options={"verify_signature": False},
+                algorithms=[self.algorithm],
             )
             return claims
         except Exception as e:

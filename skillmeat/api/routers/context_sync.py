@@ -280,9 +280,7 @@ async def push_changes(
 )
 async def get_sync_status(
     sync_service: ContextSyncServiceDep,
-    project_path: str = Query(
-        ..., description="Absolute path to project directory"
-    ),
+    project_path: str = Query(..., description="Absolute path to project directory"),
 ) -> SyncStatusResponse:
     """Get sync status for a project.
 
@@ -314,9 +312,7 @@ async def get_sync_status(
 
         # Separate by modification location
         modified_in_project = [
-            e["entity_id"]
-            for e in modified
-            if e["modified_in"] in ("project", "both")
+            e["entity_id"] for e in modified if e["modified_in"] in ("project", "both")
         ]
         modified_in_collection = [
             e["entity_id"]
@@ -458,9 +454,7 @@ async def resolve_conflict(
             merged_content=request.merged_content,
         )
 
-        logger.info(
-            f"Conflict resolved for {request.entity_id}: {result.action}"
-        )
+        logger.info(f"Conflict resolved for {request.entity_id}: {result.action}")
 
         return SyncResultResponse(
             entity_id=result.entity_id,

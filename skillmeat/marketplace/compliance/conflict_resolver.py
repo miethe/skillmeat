@@ -295,14 +295,14 @@ class ConflictResolver:
         }
 
         for conflict in conflicts:
-            resolution = f"{conflict.license1} + {conflict.license2}: {conflict.resolution}"
+            resolution = (
+                f"{conflict.license1} + {conflict.license2}: {conflict.resolution}"
+            )
             resolutions[conflict.conflict_type].append(resolution)
 
         return resolutions
 
-    def can_combine(
-        self, license1: str, license2: str
-    ) -> Optional[LicenseConflict]:
+    def can_combine(self, license1: str, license2: str) -> Optional[LicenseConflict]:
         """Check if two licenses can be combined.
 
         Args:
@@ -319,9 +319,7 @@ class ConflictResolver:
         # Check matrix (both directions)
         for lic_pair in [(license1, license2), (license2, license1)]:
             if lic_pair in self.CONFLICT_MATRIX:
-                conflict_type, description, resolution = self.CONFLICT_MATRIX[
-                    lic_pair
-                ]
+                conflict_type, description, resolution = self.CONFLICT_MATRIX[lic_pair]
 
                 # Only return conflicts/warnings, not info
                 if conflict_type in {"incompatible", "warning"}:
@@ -339,9 +337,7 @@ class ConflictResolver:
             return None
 
         # Proprietary with any copyleft is incompatible
-        if (
-            "proprietary" in license1.lower() or "proprietary" in license2.lower()
-        ):
+        if "proprietary" in license1.lower() or "proprietary" in license2.lower():
             if license1 in self.COPYLEFT_STRONG or license2 in self.COPYLEFT_STRONG:
                 return LicenseConflict(
                     license1=license1,
@@ -358,9 +354,7 @@ class ConflictResolver:
             or license2 in self.PERMISSIVE
             and license1 in self.COPYLEFT_STRONG
         ):
-            copyleft_lic = (
-                license1 if license1 in self.COPYLEFT_STRONG else license2
-            )
+            copyleft_lic = license1 if license1 in self.COPYLEFT_STRONG else license2
             return LicenseConflict(
                 license1=license1,
                 license2=license2,

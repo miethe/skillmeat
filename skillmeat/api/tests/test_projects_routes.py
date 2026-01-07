@@ -46,8 +46,10 @@ def sample_project_path(tmp_path):
 @pytest.fixture
 def encode_project_id():
     """Helper to encode project paths to IDs."""
+
     def _encode(path: str) -> str:
         return base64.b64encode(path.encode()).decode()
+
     return _encode
 
 
@@ -123,11 +125,12 @@ class TestListProjects:
                 deployed_at=datetime.utcnow(),
                 artifact_path=Path("skills/test-skill"),
                 content_hash="abc123",
-            collection_sha="abc123",
+                collection_sha="abc123",
                 local_modifications=False,
             )
 
             from skillmeat.storage.deployment import DeploymentTracker
+
             DeploymentTracker.write_deployments(project, [deployment])
             projects.append(project)
 
@@ -167,8 +170,12 @@ class TestCreateProject:
         """Test successful project creation."""
         project_path = tmp_path / "new-project"
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
-            with patch("skillmeat.storage.project.ProjectMetadataStorage.create_metadata") as mock_create:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
+            with patch(
+                "skillmeat.storage.project.ProjectMetadataStorage.create_metadata"
+            ) as mock_create:
                 mock_exists.return_value = False
 
                 mock_metadata = Mock()
@@ -215,8 +222,9 @@ class TestCreateProject:
 
             response = client.post("/api/v1/projects", json=request_data)
 
-            assert response.status_code == 422 or response.status_code == 400, \
-                f"Expected validation error for name: {invalid_name}"
+            assert (
+                response.status_code == 422 or response.status_code == 400
+            ), f"Expected validation error for name: {invalid_name}"
 
     def test_create_project_invalid_path(self, client):
         """Test creating project with invalid path."""
@@ -233,7 +241,9 @@ class TestCreateProject:
         """Test creating project that already exists."""
         project_path = tmp_path / "existing-project"
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
             mock_exists.return_value = True
 
             request_data = {
@@ -256,8 +266,12 @@ class TestCreateProject:
             "Project-123_Test",  # Mixed
         ]
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
-            with patch("skillmeat.storage.project.ProjectMetadataStorage.create_metadata") as mock_create:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
+            with patch(
+                "skillmeat.storage.project.ProjectMetadataStorage.create_metadata"
+            ) as mock_create:
                 mock_exists.return_value = False
 
                 for valid_name in valid_names:
@@ -276,8 +290,9 @@ class TestCreateProject:
 
                     response = client.post("/api/v1/projects", json=request_data)
 
-                    assert response.status_code == 201, \
-                        f"Failed for valid name: {valid_name}"
+                    assert (
+                        response.status_code == 201
+                    ), f"Failed for valid name: {valid_name}"
 
 
 class TestGetProject:
@@ -300,9 +315,12 @@ class TestGetProject:
         )
 
         from skillmeat.storage.deployment import DeploymentTracker
+
         DeploymentTracker.write_deployments(sample_project_path, [deployment])
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.read_metadata") as mock_read:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.read_metadata"
+        ) as mock_read:
             mock_metadata = Mock()
             mock_metadata.name = "test-project"
             mock_read.return_value = mock_metadata
@@ -354,11 +372,18 @@ class TestUpdateProject:
         )
 
         from skillmeat.storage.deployment import DeploymentTracker
+
         DeploymentTracker.write_deployments(sample_project_path, [deployment])
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
-            with patch("skillmeat.storage.project.ProjectMetadataStorage.update_metadata") as mock_update:
-                with patch("skillmeat.storage.project.ProjectMetadataStorage.read_metadata") as mock_read:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
+            with patch(
+                "skillmeat.storage.project.ProjectMetadataStorage.update_metadata"
+            ) as mock_update:
+                with patch(
+                    "skillmeat.storage.project.ProjectMetadataStorage.read_metadata"
+                ) as mock_read:
                     mock_exists.return_value = True
 
                     mock_metadata = Mock()
@@ -371,15 +396,21 @@ class TestUpdateProject:
                         "description": "New description",
                     }
 
-                    response = client.put(f"/api/v1/projects/{project_id}", json=request_data)
+                    response = client.put(
+                        f"/api/v1/projects/{project_id}", json=request_data
+                    )
 
                     assert response.status_code == 200
 
-    def test_update_project_empty_request(self, client, sample_project_path, encode_project_id):
+    def test_update_project_empty_request(
+        self, client, sample_project_path, encode_project_id
+    ):
         """Test updating project with no fields provided."""
         project_id = encode_project_id(str(sample_project_path))
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
             mock_exists.return_value = True
 
             request_data = {}
@@ -407,16 +438,24 @@ class TestUpdateProject:
 class TestDeleteProject:
     """Test DELETE /api/v1/projects/{id} endpoint."""
 
-    def test_delete_project_metadata_only(self, client, sample_project_path, encode_project_id):
+    def test_delete_project_metadata_only(
+        self, client, sample_project_path, encode_project_id
+    ):
         """Test deleting project metadata without files."""
         project_id = encode_project_id(str(sample_project_path))
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
-            with patch("skillmeat.storage.project.ProjectMetadataStorage.delete_metadata") as mock_delete:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
+            with patch(
+                "skillmeat.storage.project.ProjectMetadataStorage.delete_metadata"
+            ) as mock_delete:
                 mock_exists.return_value = True
                 mock_delete.return_value = True
 
-                response = client.delete(f"/api/v1/projects/{project_id}?delete_files=false")
+                response = client.delete(
+                    f"/api/v1/projects/{project_id}?delete_files=false"
+                )
 
                 assert response.status_code == 200
                 data = response.json()
@@ -424,16 +463,24 @@ class TestDeleteProject:
                 assert data["deleted_files"] is False
                 assert "tracking" in data["message"].lower()
 
-    def test_delete_project_with_files(self, client, sample_project_path, encode_project_id):
+    def test_delete_project_with_files(
+        self, client, sample_project_path, encode_project_id
+    ):
         """Test deleting project including files."""
         project_id = encode_project_id(str(sample_project_path))
 
-        with patch("skillmeat.storage.project.ProjectMetadataStorage.exists") as mock_exists:
-            with patch("skillmeat.storage.project.ProjectMetadataStorage.delete_metadata") as mock_delete:
+        with patch(
+            "skillmeat.storage.project.ProjectMetadataStorage.exists"
+        ) as mock_exists:
+            with patch(
+                "skillmeat.storage.project.ProjectMetadataStorage.delete_metadata"
+            ) as mock_delete:
                 mock_exists.return_value = True
                 mock_delete.return_value = True
 
-                response = client.delete(f"/api/v1/projects/{project_id}?delete_files=true")
+                response = client.delete(
+                    f"/api/v1/projects/{project_id}?delete_files=true"
+                )
 
                 assert response.status_code == 200
                 data = response.json()

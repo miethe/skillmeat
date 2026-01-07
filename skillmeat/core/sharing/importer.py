@@ -18,7 +18,12 @@ from skillmeat.utils.toml_compat import loads as toml_loads
 
 from rich.console import Console
 
-from skillmeat.core.artifact import Artifact, ArtifactManager, ArtifactMetadata, ArtifactType
+from skillmeat.core.artifact import (
+    Artifact,
+    ArtifactManager,
+    ArtifactMetadata,
+    ArtifactType,
+)
 from skillmeat.core.collection import Collection, CollectionManager
 from skillmeat.core.sharing.strategies import (
     ConflictDecision,
@@ -148,9 +153,11 @@ class BundleImporter:
                 result.errors.append(str(issue))
             for issue in validation.get_warnings():
                 result.warnings.append(str(issue))
-            
+
             if not force:
-                console.print("[red]Bundle validation failed. Use --force to override.[/red]")
+                console.print(
+                    "[red]Bundle validation failed. Use --force to override.[/red]"
+                )
                 return result
 
         result.bundle_hash = validation.bundle_hash
@@ -174,9 +181,7 @@ class BundleImporter:
 
             # Read manifest from bundle
             with zipfile.ZipFile(bundle_path, "r") as zf:
-                manifest_data = json.loads(
-                    zf.read("manifest.json")
-                )
+                manifest_data = json.loads(zf.read("manifest.json"))
 
             verification = verifier.verify_bundle(
                 validation.bundle_hash, manifest_data, require_signature
@@ -189,7 +194,9 @@ class BundleImporter:
             else:
                 console.print(f"[red]{verification.summary()}[/red]")
                 if not force:
-                    result.errors.append(f"Signature verification failed: {verification.message}")
+                    result.errors.append(
+                        f"Signature verification failed: {verification.message}"
+                    )
                     return result
                 else:
                     result.warnings.append(
@@ -209,7 +216,7 @@ class BundleImporter:
         temp_extract_dir = None
         try:
             temp_extract_dir = Path(tempfile.mkdtemp(prefix="skillmeat_import_"))
-            
+
             console.print(f"[cyan]Extracting bundle to temporary workspace...[/cyan]")
             self._extract_bundle(bundle_path, temp_extract_dir)
 
@@ -219,9 +226,7 @@ class BundleImporter:
 
             # Step 4: Detect conflicts
             console.print("[cyan]Analyzing artifacts and detecting conflicts...[/cyan]")
-            conflicts, non_conflicts = self._detect_conflicts(
-                manifest_data, collection
-            )
+            conflicts, non_conflicts = self._detect_conflicts(manifest_data, collection)
 
             if conflicts:
                 console.print(
@@ -265,9 +270,15 @@ class BundleImporter:
             if dry_run:
                 console.print("\n[cyan]Dry run mode - no changes made[/cyan]")
                 console.print(f"Would import: {len(non_conflicts)} new artifacts")
-                console.print(f"Would merge: {sum(1 for d in decisions if d.resolution == ConflictResolution.MERGE)}")
-                console.print(f"Would fork: {sum(1 for d in decisions if d.resolution == ConflictResolution.FORK)}")
-                console.print(f"Would skip: {sum(1 for d in decisions if d.resolution == ConflictResolution.SKIP)}")
+                console.print(
+                    f"Would merge: {sum(1 for d in decisions if d.resolution == ConflictResolution.MERGE)}"
+                )
+                console.print(
+                    f"Would fork: {sum(1 for d in decisions if d.resolution == ConflictResolution.FORK)}"
+                )
+                console.print(
+                    f"Would skip: {sum(1 for d in decisions if d.resolution == ConflictResolution.SKIP)}"
+                )
                 result.success = True
                 return result
 
@@ -291,7 +302,7 @@ class BundleImporter:
             # Step 7: Execute import
             try:
                 console.print("\n[cyan]Importing artifacts...[/cyan]")
-                
+
                 # Import non-conflicting artifacts
                 for artifact_data in non_conflicts:
                     try:
@@ -310,9 +321,7 @@ class BundleImporter:
                             )
                         )
                     except Exception as e:
-                        error_msg = (
-                            f"Failed to import {artifact_data['type']}/{artifact_data['name']}: {e}"
-                        )
+                        error_msg = f"Failed to import {artifact_data['type']}/{artifact_data['name']}: {e}"
                         result.errors.append(error_msg)
                         logger.error(error_msg, exc_info=True)
                         raise  # Trigger rollback
@@ -341,9 +350,7 @@ class BundleImporter:
                 self.collection_mgr.save_collection(collection)
                 result.success = True
 
-                console.print(
-                    f"\n[green]Import completed successfully![/green]"
-                )
+                console.print(f"\n[green]Import completed successfully![/green]")
                 console.print(f"  Imported: {result.imported_count}")
                 console.print(f"  Merged: {result.merged_count}")
                 console.print(f"  Forked: {result.forked_count}")
@@ -376,7 +383,9 @@ class BundleImporter:
                         snapshot_mgr.restore_snapshot(snapshot, collection_path)
                         console.print("[green]Rollback successful[/green]")
                     except Exception as rollback_error:
-                        logger.error(f"Rollback failed: {rollback_error}", exc_info=True)
+                        logger.error(
+                            f"Rollback failed: {rollback_error}", exc_info=True
+                        )
                         result.errors.append(f"Rollback failed: {rollback_error}")
                         console.print(
                             f"[red]CRITICAL: Rollback failed: {rollback_error}[/red]"
@@ -487,15 +496,13 @@ class BundleImporter:
         source_path = bundle_dir / artifact_path_rel
 
         if not source_path.exists():
-            raise ValueError(
-                f"Artifact files not found in bundle: {artifact_path_rel}"
-            )
+            raise ValueError(f"Artifact files not found in bundle: {artifact_path_rel}")
 
         # Destination path in collection
         collection_path = self.collection_mgr.config.get_collection_path(
             collection.name
         )
-        
+
         if artifact_type == ArtifactType.SKILL:
             dest_path = collection_path / "skills" / artifact_name
         elif artifact_type == ArtifactType.COMMAND:
@@ -607,7 +614,7 @@ class BundleImporter:
             )
             # Reload collection after removal
             collection = self.collection_mgr.load_collection(collection.name)
-            
+
             # Import
             self._import_artifact(artifact_data, bundle_dir, collection, console)
             result.merged_count += 1
@@ -624,7 +631,7 @@ class BundleImporter:
             # Import with new name
             original_name = artifact_data["name"]
             artifact_data["name"] = decision.new_name
-            
+
             try:
                 self._import_artifact(artifact_data, bundle_dir, collection, console)
                 result.forked_count += 1
@@ -667,7 +674,8 @@ class BundleImporter:
                     if imported_artifact.resolution != "skipped":
                         tracker.track_event(
                             event_type="import",
-                            artifact_name=imported_artifact.new_name or imported_artifact.name,
+                            artifact_name=imported_artifact.new_name
+                            or imported_artifact.name,
                             artifact_type=imported_artifact.type,
                             collection_name=collection_name,
                             metadata={

@@ -11,10 +11,10 @@ from typing import Optional, Dict, Any
 
 
 # Context variables for request tracking
-trace_id_var = contextvars.ContextVar('trace_id', default=None)
-span_id_var = contextvars.ContextVar('span_id', default=None)
-user_id_var = contextvars.ContextVar('user_id', default=None)
-request_id_var = contextvars.ContextVar('request_id', default=None)
+trace_id_var = contextvars.ContextVar("trace_id", default=None)
+span_id_var = contextvars.ContextVar("span_id", default=None)
+user_id_var = contextvars.ContextVar("user_id", default=None)
+request_id_var = contextvars.ContextVar("request_id", default=None)
 
 
 class LogContext:
@@ -148,7 +148,7 @@ class LogContext:
         trace_id: Optional[str] = None,
         span_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        request_id: Optional[str] = None
+        request_id: Optional[str] = None,
     ):
         """Set multiple context variables at once.
 

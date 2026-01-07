@@ -44,14 +44,12 @@ def upgrade() -> None:
     """
     # Add description column
     op.add_column(
-        "marketplace_sources",
-        sa.Column("description", sa.String(500), nullable=True)
+        "marketplace_sources", sa.Column("description", sa.String(500), nullable=True)
     )
 
     # Add notes column
     op.add_column(
-        "marketplace_sources",
-        sa.Column("notes", sa.String(2000), nullable=True)
+        "marketplace_sources", sa.Column("notes", sa.String(2000), nullable=True)
     )
 
 

@@ -297,8 +297,6 @@ class BundleHasher:
         if not expected_hash:
             return False
 
-        computed_hash = BundleHasher.compute_bundle_hash(
-            manifest_dict, artifact_hashes
-        )
+        computed_hash = BundleHasher.compute_bundle_hash(manifest_dict, artifact_hashes)
 
         return expected_hash == computed_hash

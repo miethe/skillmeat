@@ -127,12 +127,17 @@ class SecurityScanner:
     # Secret patterns
     SECRET_PATTERNS = {
         "aws_access_key": re.compile(r"AKIA[0-9A-Z]{16}"),
-        "aws_secret_key": re.compile(r"aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?", re.IGNORECASE),
+        "aws_secret_key": re.compile(
+            r"aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?",
+            re.IGNORECASE,
+        ),
         "github_token": re.compile(r"ghp_[a-zA-Z0-9]{36}"),
         "github_oauth": re.compile(r"gho_[a-zA-Z0-9]{36}"),
         "github_app": re.compile(r"(ghu|ghs)_[a-zA-Z0-9]{36}"),
         "slack_token": re.compile(r"xox[baprs]-[0-9a-zA-Z]{10,48}"),
-        "slack_webhook": re.compile(r"https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}"),
+        "slack_webhook": re.compile(
+            r"https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}"
+        ),
         "google_api_key": re.compile(r"AIza[0-9A-Za-z\\-_]{35}"),
         "stripe_api_key": re.compile(r"sk_live_[0-9a-zA-Z]{24}"),
         "stripe_restricted_key": re.compile(r"rk_live_[0-9a-zA-Z]{24}"),
@@ -141,10 +146,18 @@ class SecurityScanner:
         "twilio_api_key": re.compile(r"SK[0-9a-fA-F]{32}"),
         "private_key": re.compile(r"-----BEGIN (RSA |EC )?PRIVATE KEY-----"),
         "ssh_private_key": re.compile(r"-----BEGIN OPENSSH PRIVATE KEY-----"),
-        "generic_api_key": re.compile(r"api[_-]?key\s*[=:]\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]", re.IGNORECASE),
-        "generic_secret": re.compile(r"secret\s*[=:]\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]", re.IGNORECASE),
-        "password": re.compile(r"password\s*[=:]\s*['\"]([^'\"]{8,})['\"]", re.IGNORECASE),
-        "database_url": re.compile(r"(?:postgres|mysql|mongodb)://[^:]+:[^@]+@", re.IGNORECASE),
+        "generic_api_key": re.compile(
+            r"api[_-]?key\s*[=:]\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]", re.IGNORECASE
+        ),
+        "generic_secret": re.compile(
+            r"secret\s*[=:]\s*['\"]([a-zA-Z0-9_\-]{20,})['\"]", re.IGNORECASE
+        ),
+        "password": re.compile(
+            r"password\s*[=:]\s*['\"]([^'\"]{8,})['\"]", re.IGNORECASE
+        ),
+        "database_url": re.compile(
+            r"(?:postgres|mysql|mongodb)://[^:]+:[^@]+@", re.IGNORECASE
+        ),
     }
 
     # Malicious patterns (language-specific)
@@ -153,7 +166,9 @@ class SecurityScanner:
             "eval": re.compile(r"\beval\s*\("),
             "exec": re.compile(r"\bexec\s*\("),
             "compile": re.compile(r"\bcompile\s*\("),
-            "subprocess_shell": re.compile(r"subprocess\.[a-z]+\([^)]*shell\s*=\s*True", re.IGNORECASE),
+            "subprocess_shell": re.compile(
+                r"subprocess\.[a-z]+\([^)]*shell\s*=\s*True", re.IGNORECASE
+            ),
             "os_system": re.compile(r"\bos\.system\s*\("),
             "pickle_loads": re.compile(r"\bpickle\.loads\s*\("),
         },
@@ -325,7 +340,9 @@ class SecurityScanner:
 
                     # Read file content (text files only)
                     try:
-                        content = zf.read(file_info.filename).decode("utf-8", errors="ignore")
+                        content = zf.read(file_info.filename).decode(
+                            "utf-8", errors="ignore"
+                        )
                     except Exception:
                         continue
 
@@ -372,7 +389,9 @@ class SecurityScanner:
 
                     # Read file content
                     try:
-                        content = zf.read(file_info.filename).decode("utf-8", errors="ignore")
+                        content = zf.read(file_info.filename).decode(
+                            "utf-8", errors="ignore"
+                        )
                     except Exception:
                         continue
 
