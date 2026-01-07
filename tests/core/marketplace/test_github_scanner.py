@@ -98,10 +98,11 @@ class TestGitHubScanner:
         }
         mock_session.get.return_value = mock_response
 
-        tree = scanner._fetch_tree("user", "repo", "main")
+        tree, actual_ref = scanner._fetch_tree("user", "repo", "main")
 
         assert len(tree) == 3
         assert tree[0]["path"] == "skills/skill1/SKILL.md"
+        assert actual_ref == "main"  # No fallback needed
         mock_session.get.assert_called_once()
 
     def test_fetch_tree_invalid_response(self, scanner, mock_session):
@@ -149,10 +150,11 @@ class TestGitHubScanner:
 
         mock_session.get.side_effect = mock_get
 
-        tree = scanner._fetch_tree("user", "repo", "main")
+        tree, actual_ref = scanner._fetch_tree("user", "repo", "main")
 
         assert len(tree) == 1
         assert tree[0]["path"] == "skills/skill1/SKILL.md"
+        assert actual_ref == "master"  # Fallback occurred
         # Should have made 5 calls: 3 retries for main (404), repos (default branch), master
         assert call_count[0] == 5
 
@@ -504,7 +506,7 @@ class TestScanGitHubSource:
         with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
             with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
                 with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = []
+                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
                     mock_extract.return_value = []
                     mock_get_sha.return_value = "abc123"
 
@@ -523,7 +525,7 @@ class TestScanGitHubSource:
         with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
             with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
                 with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = []
+                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
                     mock_extract.return_value = []
                     mock_get_sha.return_value = "abc123"
 
@@ -544,7 +546,7 @@ class TestScanGitHubSource:
         with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
             with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
                 with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = []
+                    mock_fetch_tree.return_value = ([], "v1.0.0")  # Returns (tree, actual_ref)
                     mock_extract.return_value = []
                     mock_get_sha.return_value = "def456"
 
@@ -559,7 +561,7 @@ class TestScanGitHubSource:
         with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
             with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
                 with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = []
+                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
                     mock_extract.return_value = []
                     mock_get_sha.return_value = "abc123"
 
