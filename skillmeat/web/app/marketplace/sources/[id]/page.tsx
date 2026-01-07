@@ -825,7 +825,11 @@ export default function SourceDetailPage() {
         onMaxConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
         includeBelowThreshold={confidenceFilters.includeBelowThreshold}
         onIncludeBelowThresholdChange={(v) =>
-          setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
+          setConfidenceFilters(prev => ({
+            ...prev,
+            includeBelowThreshold: v,
+            minConfidence: v ? 1 : 50  // Set to 1% when on, 50% when off
+          }))
         }
         showOnlyDuplicates={showOnlyDuplicates}
         onShowOnlyDuplicatesChange={setShowOnlyDuplicates}

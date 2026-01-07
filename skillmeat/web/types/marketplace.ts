@@ -185,6 +185,9 @@ export interface CatalogEntry {
     extensions_score: number;
     parent_hint_score: number;
     frontmatter_score: number;
+    skill_manifest_bonus: number;
+    container_hint_score: number;
+    frontmatter_type_score: number;
     depth_penalty: number;
     raw_total: number;
     normalized_score: number;

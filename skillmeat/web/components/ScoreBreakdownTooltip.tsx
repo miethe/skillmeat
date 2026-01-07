@@ -7,10 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  HeuristicScoreBreakdown,
-  type ScoreBreakdown,
-} from '@/components/HeuristicScoreBreakdown';
+import { type ScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 
 /**
  * Props for the ScoreBreakdownTooltip component
@@ -41,10 +38,46 @@ export interface ScoreBreakdownTooltipProps {
 }
 
 /**
+ * Short label mapping for inline format
+ */
+const SIGNAL_LABELS: Record<keyof Omit<ScoreBreakdown, 'raw_total' | 'normalized_score'>, string> = {
+  dir_name_score: 'Dir Name',
+  manifest_score: 'Manifest',
+  extensions_score: 'Extensions',
+  parent_hint_score: 'Parent',
+  frontmatter_score: 'Frontmatter',
+  skill_manifest_bonus: 'Manifest Bonus',
+  container_hint_score: 'Container',
+  frontmatter_type_score: 'Type Hint',
+  depth_penalty: 'Depth',
+};
+
+/**
+ * Format score breakdown as inline string
+ * Shows only non-zero signals with sign (+/-)
+ * @example "Dir Name: +30, Manifest: +25, Extensions: +20, Depth: -3"
+ */
+function formatInlineBreakdown(breakdown: ScoreBreakdown): string {
+  const signals: string[] = [];
+
+  // Iterate through signals and format non-zero values
+  (Object.keys(SIGNAL_LABELS) as Array<keyof typeof SIGNAL_LABELS>).forEach((key) => {
+    const value = breakdown[key];
+    if (value !== 0) {
+      const label = SIGNAL_LABELS[key];
+      const sign = value > 0 ? '+' : '';
+      signals.push(`${label}: ${sign}${value}`);
+    }
+  });
+
+  return signals.join(', ');
+}
+
+/**
  * ScoreBreakdownTooltip Component
  *
- * Wraps the HeuristicScoreBreakdown component in a Radix Tooltip for hover display.
- * Uses the compact variant for narrow tooltip display.
+ * Displays an inline score breakdown in a Radix Tooltip for hover display.
+ * Shows only non-zero signals in a single-line format for compactness.
  *
  * Accessibility features:
  * - Radix Tooltip provides: keyboard navigation (Tab to focus trigger, tooltip shows),
@@ -78,8 +111,11 @@ export function ScoreBreakdownTooltip({
   delayDuration = 200,
   className,
 }: ScoreBreakdownTooltipProps) {
+  // Generate inline breakdown text
+  const inlineBreakdown = formatInlineBreakdown(breakdown);
+
   // Generate screen reader summary
-  const srSummary = `Confidence score breakdown: ${breakdown.normalized_score}% confidence from ${breakdown.raw_total} raw points. Signals include directory name, manifest file, file extensions, parent directory, frontmatter, and depth penalty.`;
+  const srSummary = `Confidence score breakdown: ${breakdown.normalized_score}% confidence from ${breakdown.raw_total} raw points. ${inlineBreakdown}.`;
 
   return (
     <TooltipProvider>
@@ -87,13 +123,13 @@ export function ScoreBreakdownTooltip({
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
           side={side}
-          className={className || 'max-w-xs p-3'}
+          className={className || 'max-w-md p-2'}
           aria-label="Confidence score breakdown showing signal contributions"
         >
           {/* Screen reader announcement */}
           <span className="sr-only">{srSummary}</span>
-          {/* Visual breakdown */}
-          <HeuristicScoreBreakdown breakdown={breakdown} variant="compact" />
+          {/* Visual inline breakdown */}
+          <p className="text-xs text-foreground">{inlineBreakdown}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
