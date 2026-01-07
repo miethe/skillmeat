@@ -249,7 +249,7 @@ async def _validate_manual_map_paths(
     try:
         # Initialize scanner to fetch tree (reuses cached data if available)
         scanner = GitHubScanner()
-        tree = scanner._fetch_tree(owner, repo, ref)
+        tree, _actual_ref = scanner._fetch_tree(owner, repo, ref)
 
         # Extract all directory paths from tree
         # Tree items have "type": "tree" for directories, "type": "blob" for files

@@ -183,19 +183,25 @@ class GitHubScanner:
             errors: List[str] = []
 
             try:
-                # 1. Fetch repository tree
+                # 1. Fetch repository tree (may fallback to actual default branch)
                 ctx.metadata["phase"] = "fetch_tree"
-                tree = self._fetch_tree(owner, repo, ref)
+                tree, actual_ref = self._fetch_tree(owner, repo, ref)
                 ctx.metadata["tree_size"] = len(tree)
+                ctx.metadata["actual_ref"] = actual_ref
+                if actual_ref != ref:
+                    logger.info(
+                        f"Using actual ref '{actual_ref}' instead of '{ref}' "
+                        f"for {repo_full_name}"
+                    )
 
                 # 2. Filter to relevant paths
                 ctx.metadata["phase"] = "extract_paths"
                 file_paths = self._extract_file_paths(tree, root_hint)
                 ctx.metadata["file_count"] = len(file_paths)
 
-                # 3. Get commit SHA for versioning
+                # 3. Get commit SHA for versioning (use actual_ref, not original ref)
                 ctx.metadata["phase"] = "get_sha"
-                commit_sha = self._get_ref_sha(owner, repo, ref)
+                commit_sha = self._get_ref_sha(owner, repo, actual_ref)
                 ctx.metadata["commit_sha"] = commit_sha
 
                 # 4. Apply heuristic detection
@@ -204,7 +210,7 @@ class GitHubScanner:
                 detected_artifacts = detect_artifacts_in_tree(
                     file_paths,
                     repo_url=base_url,
-                    _ref=ref,
+                    _ref=actual_ref,
                     root_hint=root_hint,
                     detected_sha=commit_sha,
                     manual_mappings=manual_mappings,
@@ -340,7 +346,7 @@ class GitHubScanner:
         owner: str,
         repo: str,
         ref: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """Fetch repository tree using Git Trees API.
 
         Uses recursive tree fetch for efficiency. If ref is 'main' and fails
@@ -353,12 +359,14 @@ class GitHubScanner:
             ref: Git reference (branch, tag, SHA)
 
         Returns:
-            List of tree items with path and type information
+            Tuple of (tree items, actual_ref used). The actual_ref may differ
+            from the input ref if fallback to default branch occurred.
 
         Raises:
             GitHubAPIError: If API call fails
         """
         url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
+        actual_ref = ref  # Track which ref was actually used
 
         try:
             response = self._request_with_retry(url)
@@ -377,6 +385,7 @@ class GitHubScanner:
                     )
                     url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{actual_default}?recursive=1"
                     response = self._request_with_retry(url)
+                    actual_ref = actual_default  # Update to reflect actual branch used
                 else:
                     raise
             else:
@@ -386,7 +395,7 @@ class GitHubScanner:
         if "tree" not in data:
             raise GitHubAPIError(f"Invalid tree response: {data}")
 
-        return data["tree"]
+        return data["tree"], actual_ref
 
     def _extract_file_paths(
         self,
@@ -845,15 +854,15 @@ def scan_github_source(
 
     scanner = GitHubScanner(token=token)
 
-    # Fetch tree and detect
-    tree = scanner._fetch_tree(owner, repo, ref)
+    # Fetch tree and detect (may fallback to actual default branch)
+    tree, actual_ref = scanner._fetch_tree(owner, repo, ref)
     file_paths = scanner._extract_file_paths(tree, root_hint)
-    commit_sha = scanner._get_ref_sha(owner, repo, ref)
+    commit_sha = scanner._get_ref_sha(owner, repo, actual_ref)
 
     artifacts = detect_artifacts_in_tree(
         file_paths,
         repo_url=repo_url,
-        _ref=ref,
+        _ref=actual_ref,
         root_hint=root_hint,
         detected_sha=commit_sha,
     )
