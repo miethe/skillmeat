@@ -16,6 +16,7 @@ import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScoreBreakdownTooltip } from '@/components/ScoreBreakdownTooltip';
+import type { ScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 
 export interface ScoreBadgeProps {
   /** Confidence score (0-100) */
@@ -25,16 +26,7 @@ export interface ScoreBadgeProps {
   /** Additional CSS classes */
   className?: string;
   /** Optional score breakdown for tooltip */
-  breakdown?: {
-    dir_name_score: number;
-    manifest_score: number;
-    extensions_score: number;
-    parent_hint_score: number;
-    frontmatter_score: number;
-    depth_penalty: number;
-    raw_total: number;
-    normalized_score: number;
-  };
+  breakdown?: ScoreBreakdown;
 }
 
 /**
@@ -97,6 +89,9 @@ function getSizeClasses(size: 'sm' | 'md' | 'lg'): string {
  *     extensions_score: 20,
  *     parent_hint_score: 10,
  *     frontmatter_score: 5,
+ *     skill_manifest_bonus: 0,
+ *     container_hint_score: 0,
+ *     frontmatter_type_score: 0,
  *     depth_penalty: -3,
  *     raw_total: 87,
  *     normalized_score: 87,

@@ -484,6 +484,8 @@ async def _perform_scan(
                     path=artifact.path,
                     upstream_url=artifact.upstream_url,
                     confidence_score=artifact.confidence_score,
+                    raw_score=artifact.raw_score,
+                    score_breakdown=artifact.score_breakdown,
                     detected_sha=artifact.detected_sha,
                     detected_at=datetime.utcnow(),
                     status="new",
