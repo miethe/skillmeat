@@ -113,6 +113,91 @@ class TestGitHubScanner:
         with pytest.raises(GitHubAPIError, match="Invalid tree response"):
             scanner._fetch_tree("user", "repo", "main")
 
+    def test_fetch_tree_fallback_to_default_branch(self, scanner, mock_session):
+        """Test fallback to actual default branch when main returns 404."""
+        # The retry logic will try 3 times for git/trees/main (all 404)
+        # Then fallback code fetches repos endpoint for default branch
+        # Then fetches git/trees/master successfully
+        call_count = [0]
+
+        def mock_get(url, timeout=None):
+            call_count[0] += 1
+            response = Mock()
+            response.status_code = 200
+            response.headers = {}
+
+            if "git/trees/main" in url:
+                # All calls to git/trees/main - simulate 404
+                response.status_code = 404
+                response.raise_for_status.side_effect = requests.HTTPError(
+                    "404 Not Found"
+                )
+            elif url.endswith("/repos/user/repo"):
+                # Call to repos endpoint for default branch
+                response.json.return_value = {"default_branch": "master"}
+                response.raise_for_status = Mock()
+            elif "git/trees/master" in url:
+                # Call to git/trees/master - success
+                response.json.return_value = {
+                    "tree": [
+                        {"path": "skills/skill1/SKILL.md", "type": "blob"},
+                    ]
+                }
+                response.raise_for_status = Mock()
+
+            return response
+
+        mock_session.get.side_effect = mock_get
+
+        tree = scanner._fetch_tree("user", "repo", "main")
+
+        assert len(tree) == 1
+        assert tree[0]["path"] == "skills/skill1/SKILL.md"
+        # Should have made 5 calls: 3 retries for main (404), repos (default branch), master
+        assert call_count[0] == 5
+
+    def test_fetch_tree_no_fallback_for_non_main_ref(self, scanner, mock_session):
+        """Test that fallback does not occur when ref is not 'main'."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
+        mock_session.get.return_value = mock_response
+
+        # Should raise without fallback when ref is not "main"
+        with pytest.raises(GitHubAPIError):
+            scanner._fetch_tree("user", "repo", "feature-branch")
+
+        # Should only make one call (no fallback)
+        assert mock_session.get.call_count == 3  # 3 retries
+
+    def test_fetch_tree_fallback_when_default_is_also_main(self, scanner, mock_session):
+        """Test that if default branch is also 'main', error is re-raised."""
+        call_count = [0]
+
+        def mock_get(url, timeout=None):
+            call_count[0] += 1
+            response = Mock()
+            response.status_code = 200
+
+            if call_count[0] <= 3:
+                # First 3 calls to git/trees/main - simulate 404 with retries
+                response.status_code = 404
+                response.raise_for_status.side_effect = requests.HTTPError(
+                    "404 Not Found"
+                )
+            elif call_count[0] == 4:
+                # Fourth call to repos endpoint - default branch is also "main"
+                response.json.return_value = {"default_branch": "main"}
+                response.raise_for_status = Mock()
+
+            return response
+
+        mock_session.get.side_effect = mock_get
+
+        # Should raise GitHubAPIError since default branch is also "main"
+        with pytest.raises(GitHubAPIError):
+            scanner._fetch_tree("user", "repo", "main")
+
     def test_extract_file_paths_no_filter(self, scanner):
         """Test path extraction without filtering."""
         tree = [

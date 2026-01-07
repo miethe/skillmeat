@@ -204,7 +204,7 @@ class GitHubScanner:
                 detected_artifacts = detect_artifacts_in_tree(
                     file_paths,
                     repo_url=base_url,
-                    ref=ref,
+                    _ref=ref,
                     root_hint=root_hint,
                     detected_sha=commit_sha,
                     manual_mappings=manual_mappings,
@@ -343,7 +343,9 @@ class GitHubScanner:
     ) -> List[Dict[str, Any]]:
         """Fetch repository tree using Git Trees API.
 
-        Uses recursive tree fetch for efficiency.
+        Uses recursive tree fetch for efficiency. If ref is 'main' and fails
+        with 404, automatically falls back to the repository's actual default
+        branch (e.g., 'master').
 
         Args:
             owner: Repository owner
@@ -357,7 +359,28 @@ class GitHubScanner:
             GitHubAPIError: If API call fails
         """
         url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
-        response = self._request_with_retry(url)
+
+        try:
+            response = self._request_with_retry(url)
+        except GitHubAPIError as e:
+            # If ref="main" fails with 404, try actual default branch
+            if "404" in str(e) and ref == "main":
+                logger.warning(
+                    f"Branch 'main' not found for {owner}/{repo}, "
+                    "fetching actual default branch"
+                )
+                actual_default = self._get_default_branch(owner, repo)
+                if actual_default != "main":
+                    logger.info(
+                        f"Retrying with default branch '{actual_default}' "
+                        f"for {owner}/{repo}"
+                    )
+                    url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{actual_default}?recursive=1"
+                    response = self._request_with_retry(url)
+                else:
+                    raise
+            else:
+                raise
 
         data = response.json()
         if "tree" not in data:
@@ -569,6 +592,24 @@ class GitHubScanner:
 
         return result
 
+    def _get_default_branch(self, owner: str, repo: str) -> str:
+        """Get the repository's default branch name.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Name of the default branch (e.g., "main", "master")
+
+        Raises:
+            GitHubAPIError: If API call fails
+        """
+        url = f"{self.API_BASE}/repos/{owner}/{repo}"
+        response = self._request_with_retry(url)
+        data = response.json()
+        return data.get("default_branch", "main")
+
     def _get_default_branch_sha(self, owner: str, repo: str) -> str:
         """Get the SHA of the repository's default branch.
 
@@ -582,11 +623,7 @@ class GitHubScanner:
         Raises:
             GitHubAPIError: If API call fails
         """
-        url = f"{self.API_BASE}/repos/{owner}/{repo}"
-        response = self._request_with_retry(url)
-        data = response.json()
-
-        default_branch = data.get("default_branch", "main")
+        default_branch = self._get_default_branch(owner, repo)
 
         # Get the SHA for the default branch
         return self._get_ref_sha(owner, repo, default_branch)
@@ -816,7 +853,7 @@ def scan_github_source(
     artifacts = detect_artifacts_in_tree(
         file_paths,
         repo_url=repo_url,
-        ref=ref,
+        _ref=ref,
         root_hint=root_hint,
         detected_sha=commit_sha,
     )
