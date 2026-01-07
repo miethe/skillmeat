@@ -1147,6 +1147,7 @@ class HeuristicDetector:
             "parent_hint_score": 0,
             "frontmatter_score": 0,
             "container_hint_score": 0,
+            "standalone_bonus": 0,
             "depth_penalty": 0,
             "raw_total": 0,
         }
@@ -1234,6 +1235,21 @@ class HeuristicDetector:
             breakdown["container_hint_score"] = container_bonus
             match_reasons.append(
                 f"Type inferred from container ({container_hint.value}) (+{container_bonus})"
+            )
+
+        # Signal 7: Standalone artifact bonus
+        # If manifest detected but no container context, give standalone bonus
+        # This ensures root-level artifacts with manifests score above threshold
+        if (
+            artifact_type is not None
+            and container_hint is None
+            and breakdown["manifest_score"] > 0
+        ):
+            standalone_bonus = self.config.container_hint_weight  # 25 pts
+            total_score += standalone_bonus
+            breakdown["standalone_bonus"] = standalone_bonus
+            match_reasons.append(
+                f"Standalone artifact with manifest (+{standalone_bonus})"
             )
 
         # Penalty: Directory depth

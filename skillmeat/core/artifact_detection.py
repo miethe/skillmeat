@@ -566,21 +566,27 @@ def infer_artifact_type(path: Path) -> Optional[ArtifactType]:
                 if (path / manifest).exists():
                     return artifact_type
 
-    # 2. Check parent directory name
-    parent_name = path.parent.name.lower()
-    if parent_name in CONTAINER_TO_TYPE:
-        return CONTAINER_TO_TYPE[parent_name]
+    # 2. Check all ancestor directory names (handles any nesting depth)
+    current = path.parent
+    depth = 0
+    max_ancestor_depth = 10  # Prevent infinite loops
+    while current and current != current.parent and depth < max_ancestor_depth:
+        ancestor_name = current.name.lower()
+        if ancestor_name in CONTAINER_TO_TYPE:
+            artifact_type = CONTAINER_TO_TYPE[ancestor_name]
+            # For depth 0 (direct parent), always allow
+            if depth == 0:
+                return artifact_type
+            # For deeper nesting, only allow if nesting is permitted for this type
+            sig = ARTIFACT_SIGNATURES.get(artifact_type)
+            if sig and sig.allowed_nesting:
+                return artifact_type
+            # For skills (not allowed_nesting), direct child only (depth 0)
+            # So we don't return here for skills at depth > 0
+        current = current.parent
+        depth += 1
 
-    # 3. Check grandparent (for nested structures like commands/subdir/cmd.md)
-    grandparent_name = path.parent.parent.name.lower() if path.parent.parent else ""
-    if grandparent_name in CONTAINER_TO_TYPE:
-        # Only allow nesting for types that support it
-        artifact_type = CONTAINER_TO_TYPE[grandparent_name]
-        sig = ARTIFACT_SIGNATURES.get(artifact_type)
-        if sig and sig.allowed_nesting:
-            return artifact_type
-
-    # 4. Check if this looks like a command/agent based on file structure
+    # 3. Check if this looks like a command/agent based on file structure
     # Commands and agents are .md files that aren't manifest files
     if path.is_file() and path.suffix.lower() == ".md":
         # Check if parent matches any container type
