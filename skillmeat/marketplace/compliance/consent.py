@@ -114,9 +114,7 @@ class ConsentLogger:
             storage_dir: Directory to store consent records
                         (default: ~/.skillmeat/compliance/)
         """
-        self.storage_dir = (
-            storage_dir or Path.home() / ".skillmeat" / "compliance"
-        )
+        self.storage_dir = storage_dir or Path.home() / ".skillmeat" / "compliance"
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.consent_file = self.storage_dir / "consents.json"
 
@@ -226,9 +224,7 @@ class ConsentLogger:
         consents = self._load_consents()
 
         if publisher_email:
-            consents = [
-                c for c in consents if c.publisher_email == publisher_email
-            ]
+            consents = [c for c in consents if c.publisher_email == publisher_email]
 
         # Sort by timestamp (newest first)
         consents.sort(key=lambda c: c.timestamp, reverse=True)
@@ -262,9 +258,7 @@ class ConsentLogger:
         consents = self._load_consents()
         return [c for c in consents if c.bundle_id == bundle_id]
 
-    def get_consents_for_checklist(
-        self, checklist_id: str
-    ) -> List[ConsentRecord]:
+    def get_consents_for_checklist(self, checklist_id: str) -> List[ConsentRecord]:
         """Get all consent records for a checklist.
 
         Args:

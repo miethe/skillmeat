@@ -714,7 +714,7 @@ class UpdateSourceRequest(BaseModel):
     )
     manual_map: Optional[Dict[str, str]] = Field(
         default=None,
-        description='Manual directory-to-type mappings (directory path → artifact_type). '
+        description="Manual directory-to-type mappings (directory path → artifact_type). "
         'Example: {"path/to/dir": "skill", "other/path": "command"}',
         examples=[{"skills/python": "skill", "commands/dev": "command"}],
     )
@@ -1283,7 +1283,12 @@ class CatalogListResponse(BaseModel):
                     "end_cursor": "Y3Vyc29yOjE5",
                     "total_count": 90,
                 },
-                "counts_by_status": {"new": 45, "updated": 12, "imported": 33, "excluded": 5},
+                "counts_by_status": {
+                    "new": 45,
+                    "updated": 12,
+                    "imported": 33,
+                    "excluded": 5,
+                },
                 "counts_by_type": {"skill": 60, "command": 20, "agent": 10},
             }
         }
@@ -2217,9 +2222,7 @@ class ManualMapRequest(BaseModel):
 
             # Block absolute paths
             if normalized_path.startswith("/"):
-                raise ValueError(
-                    f"Path '{path}' must be relative (no leading /)"
-                )
+                raise ValueError(f"Path '{path}' must be relative (no leading /)")
 
             # Block path traversal
             if ".." in normalized_path:
@@ -2229,9 +2232,7 @@ class ManualMapRequest(BaseModel):
 
             # Block double slashes
             if "//" in normalized_path:
-                raise ValueError(
-                    f"Path '{path}' cannot contain double slashes (//)"
-                )
+                raise ValueError(f"Path '{path}' cannot contain double slashes (//)")
 
             # Validate artifact type
             if artifact_type not in valid_types:

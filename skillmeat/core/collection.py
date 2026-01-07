@@ -120,9 +120,7 @@ class Collection:
         """
         existing = self.find_mcp_server(server.name)
         if existing is not None:
-            raise ValueError(
-                f"MCP server '{server.name}' already exists in collection"
-            )
+            raise ValueError(f"MCP server '{server.name}' already exists in collection")
         self.mcp_servers.append(server)
 
     def remove_mcp_server(self, name: str) -> bool:
@@ -173,9 +171,7 @@ class Collection:
 
         # Add MCP servers if present
         if self.mcp_servers:
-            result["mcp_servers"] = [
-                server.to_dict() for server in self.mcp_servers
-            ]
+            result["mcp_servers"] = [server.to_dict() for server in self.mcp_servers]
 
         return result
 
@@ -197,8 +193,7 @@ class Collection:
 
         # Parse MCP servers
         mcp_servers = [
-            MCPServerMetadata.from_dict(server_data)
-            for server_data in mcp_servers_data
+            MCPServerMetadata.from_dict(server_data) for server_data in mcp_servers_data
         ]
 
         return cls(

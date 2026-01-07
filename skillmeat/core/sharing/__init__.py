@@ -6,8 +6,17 @@ functionality for sharing SkillMeat artifacts across teams.
 
 # Bundle creation and inspection
 from skillmeat.core.sharing.bundle import Bundle, BundleArtifact, BundleMetadata
-from skillmeat.core.sharing.builder import BundleBuilder, BundleValidationError, inspect_bundle
-from skillmeat.core.sharing.manifest import BundleManifest, ManifestValidator, ValidationResult, ValidationError
+from skillmeat.core.sharing.builder import (
+    BundleBuilder,
+    BundleValidationError,
+    inspect_bundle,
+)
+from skillmeat.core.sharing.manifest import (
+    BundleManifest,
+    ManifestValidator,
+    ValidationResult,
+    ValidationError,
+)
 from skillmeat.core.sharing.hasher import BundleHasher, FileHasher
 
 __all__ = [

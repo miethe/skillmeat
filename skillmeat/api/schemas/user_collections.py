@@ -107,6 +107,7 @@ class GroupSummary(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
+
         from_attributes = True
 
 
@@ -161,6 +162,7 @@ class UserCollectionResponse(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
+
         from_attributes = True
         json_schema_extra = {
             "example": {

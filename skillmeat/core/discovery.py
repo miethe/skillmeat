@@ -975,7 +975,9 @@ class ArtifactDiscoveryService:
             return dirname_lower[:-1]
         return dirname_lower
 
-    def _check_deprecation(self, artifact_path: Path, artifact_type: str) -> Optional[str]:
+    def _check_deprecation(
+        self, artifact_path: Path, artifact_type: str
+    ) -> Optional[str]:
         """Check for deprecated artifact patterns and log warning.
 
         Per ARTIFACT_SIGNATURES, commands and agents should be single .md files,
@@ -998,7 +1000,9 @@ class ArtifactDiscoveryService:
         """
         # Check for directory-based commands (deprecated)
         if artifact_type == "command" and artifact_path.is_dir():
-            warning = DEPRECATION_WARNINGS["directory_command"].format(path=artifact_path)
+            warning = DEPRECATION_WARNINGS["directory_command"].format(
+                path=artifact_path
+            )
             logger.warning(warning)
             return warning
 

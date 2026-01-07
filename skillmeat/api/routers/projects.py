@@ -1801,7 +1801,9 @@ async def clear_project_cache(
         ]
         cache_manager.populate_projects(projects_data)
 
-        logger.info(f"Cleared project cache and rediscovered {len(discovered)} projects")
+        logger.info(
+            f"Cleared project cache and rediscovered {len(discovered)} projects"
+        )
 
         return {
             "success": True,

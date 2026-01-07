@@ -146,12 +146,15 @@ class SyncManager:
                 # Artifact removed from collection
                 # Get deployment record for modification timestamp
                 from skillmeat.storage.deployment import DeploymentTracker
+
                 deployment_record = DeploymentTracker.get_deployment(
                     project_path, deployed.name, deployed.artifact_type
                 )
                 modification_detected = None
                 if deployment_record and deployment_record.modification_detected_at:
-                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+                    modification_detected = (
+                        deployment_record.modification_detected_at.isoformat() + "Z"
+                    )
 
                 drift_results.append(
                     DriftDetectionResult(
@@ -225,12 +228,15 @@ class SyncManager:
 
                 # Get deployment record for modification timestamp (TASK-4.1)
                 from skillmeat.storage.deployment import DeploymentTracker
+
                 deployment_record = DeploymentTracker.get_deployment(
                     project_path, deployed.name, deployed.artifact_type
                 )
                 modification_detected = None
                 if deployment_record and deployment_record.modification_detected_at:
-                    modification_detected = deployment_record.modification_detected_at.isoformat() + "Z"
+                    modification_detected = (
+                        deployment_record.modification_detected_at.isoformat() + "Z"
+                    )
 
                 drift_results.append(
                     DriftDetectionResult(

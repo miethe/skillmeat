@@ -558,9 +558,7 @@ class EncryptedFileKeyStorage(KeyStorage):
         """
         try:
             base_dir = (
-                self.private_keys_dir
-                if key_type == "private"
-                else self.public_keys_dir
+                self.private_keys_dir if key_type == "private" else self.public_keys_dir
             )
             key_ids = []
 

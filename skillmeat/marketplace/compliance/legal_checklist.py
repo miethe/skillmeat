@@ -82,7 +82,9 @@ class ComplianceChecklist:
         if required_count == 0:
             return 100.0
         completed_count = sum(
-            1 for item in self.items if item.required and item.id in self.completed_items
+            1
+            for item in self.items
+            if item.required and item.id in self.completed_items
         )
         return (completed_count / required_count) * 100.0
 
@@ -353,16 +355,12 @@ class ComplianceChecklistGenerator:
                 errors.append(f"Missing consent for required item: {item_id}")
             elif not checklist.consents[item_id]:
                 item = next(i for i in checklist.items if i.id == item_id)
-                errors.append(
-                    f"Consent required for: {item.question}"
-                )
+                errors.append(f"Consent required for: {item.question}")
 
         # Check signature for proprietary licenses
         if self._is_proprietary_license(checklist.license):
             if not checklist.publisher_signature:
-                errors.append(
-                    "Publisher signature required for proprietary licenses"
-                )
+                errors.append("Publisher signature required for proprietary licenses")
 
         return errors
 

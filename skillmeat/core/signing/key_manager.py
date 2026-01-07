@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 class SigningKey(BaseModel):
     """Private signing key model."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, json_encoders={datetime: lambda v: v.isoformat()})
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True, json_encoders={datetime: lambda v: v.isoformat()}
+    )
 
     key_id: str = Field(..., description="Unique key identifier (fingerprint)")
     name: str = Field(..., description="Key owner name")
@@ -199,9 +201,7 @@ class KeyManager:
         private_key_pem, metadata = result
 
         # Deserialize private key
-        private_key = serialization.load_pem_private_key(
-            private_key_pem, password=None
-        )
+        private_key = serialization.load_pem_private_key(private_key_pem, password=None)
 
         if not isinstance(private_key, ed25519.Ed25519PrivateKey):
             raise ValueError(f"Key {key_id} is not an Ed25519 private key")
@@ -311,9 +311,7 @@ class KeyManager:
         # Check if already imported
         existing = self.storage.retrieve_public_key(key_id)
         if existing:
-            logger.warning(
-                f"Public key {key_id} already imported, updating metadata"
-            )
+            logger.warning(f"Public key {key_id} already imported, updating metadata")
 
         # Prepare metadata
         metadata = {
@@ -367,9 +365,7 @@ class KeyManager:
             public_key_pem=public_key_pem.decode("utf-8"),
         )
 
-    def load_public_key_by_fingerprint(
-        self, fingerprint: str
-    ) -> Optional[PublicKey]:
+    def load_public_key_by_fingerprint(self, fingerprint: str) -> Optional[PublicKey]:
         """Load a public key by full fingerprint.
 
         Args:

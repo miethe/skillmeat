@@ -54,11 +54,36 @@ def reset_cache():
 def mock_tree_data() -> list[dict[str, Any]]:
     """Create mock file tree data for testing."""
     return [
-        {"path": "skills/canvas/SKILL.md", "type": "blob", "size": 1234, "sha": "abc123"},
-        {"path": "skills/canvas/src/index.ts", "type": "blob", "size": 5678, "sha": "def456"},
-        {"path": "skills/canvas/src/utils.ts", "type": "blob", "size": 2345, "sha": "ghi789"},
-        {"path": "skills/canvas/README.md", "type": "blob", "size": 890, "sha": "jkl012"},
-        {"path": "skills/canvas/package.json", "type": "blob", "size": 456, "sha": "mno345"},
+        {
+            "path": "skills/canvas/SKILL.md",
+            "type": "blob",
+            "size": 1234,
+            "sha": "abc123",
+        },
+        {
+            "path": "skills/canvas/src/index.ts",
+            "type": "blob",
+            "size": 5678,
+            "sha": "def456",
+        },
+        {
+            "path": "skills/canvas/src/utils.ts",
+            "type": "blob",
+            "size": 2345,
+            "sha": "ghi789",
+        },
+        {
+            "path": "skills/canvas/README.md",
+            "type": "blob",
+            "size": 890,
+            "sha": "jkl012",
+        },
+        {
+            "path": "skills/canvas/package.json",
+            "type": "blob",
+            "size": 456,
+            "sha": "mno345",
+        },
     ]
 
 
@@ -77,7 +102,9 @@ def mock_content_data() -> dict[str, Any]:
 
 
 @pytest.fixture
-def populated_cache(mock_tree_data: list[dict], mock_content_data: dict) -> GitHubFileCache:
+def populated_cache(
+    mock_tree_data: list[dict], mock_content_data: dict
+) -> GitHubFileCache:
     """Create a cache pre-populated with test data."""
     cache = get_github_file_cache()
 
@@ -86,7 +113,9 @@ def populated_cache(mock_tree_data: list[dict], mock_content_data: dict) -> GitH
     cache.set(tree_key, mock_tree_data, ttl_seconds=DEFAULT_TREE_TTL)
 
     # Add content data
-    content_key = build_content_key("test-source", "skills/canvas", "SKILL.md", "abc123")
+    content_key = build_content_key(
+        "test-source", "skills/canvas", "SKILL.md", "abc123"
+    )
     cache.set(content_key, mock_content_data, ttl_seconds=DEFAULT_CONTENT_TTL)
 
     return cache
@@ -124,9 +153,9 @@ class TestCacheHitRate:
         stats = cache.stats()
         hit_rate = stats["hit_rate"] / 100  # Convert percentage to decimal
 
-        assert hit_rate >= CACHE_HIT_RATE_TARGET, (
-            f"Cache hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%} target"
-        )
+        assert (
+            hit_rate >= CACHE_HIT_RATE_TARGET
+        ), f"Cache hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%} target"
 
     def test_cache_hit_rate_exceeds_70_percent_for_content_requests(
         self,
@@ -154,9 +183,9 @@ class TestCacheHitRate:
         stats = cache.stats()
         hit_rate = stats["hit_rate"] / 100  # Convert percentage to decimal
 
-        assert hit_rate >= CACHE_HIT_RATE_TARGET, (
-            f"Cache hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%} target"
-        )
+        assert (
+            hit_rate >= CACHE_HIT_RATE_TARGET
+        ), f"Cache hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%} target"
 
     def test_mixed_request_pattern_maintains_hit_rate(
         self,
@@ -198,11 +227,13 @@ class TestCacheHitRate:
         stats = cache.stats()
         hit_rate = stats["hit_rate"] / 100
 
-        assert hit_rate >= CACHE_HIT_RATE_TARGET, (
-            f"Mixed request hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%}"
-        )
+        assert (
+            hit_rate >= CACHE_HIT_RATE_TARGET
+        ), f"Mixed request hit rate {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%}"
 
-    def test_cache_eviction_impact_on_hit_rate(self, mock_tree_data: list[dict]) -> None:
+    def test_cache_eviction_impact_on_hit_rate(
+        self, mock_tree_data: list[dict]
+    ) -> None:
         """Test cache hit rate when LRU eviction occurs.
 
         With a small cache size, verify that frequently accessed items
@@ -232,15 +263,17 @@ class TestCacheHitRate:
         # Verify frequently accessed items are still cached
         for key in frequent_keys:
             result = cache.get(key)
-            assert result is not None, f"Expected frequently accessed key to be cached: {key}"
+            assert (
+                result is not None
+            ), f"Expected frequently accessed key to be cached: {key}"
 
         stats = cache.stats()
         hit_rate = stats["hit_rate"] / 100
 
         # With frequent access pattern, hit rate should remain high
-        assert hit_rate >= CACHE_HIT_RATE_TARGET, (
-            f"Hit rate after eviction {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%}"
-        )
+        assert (
+            hit_rate >= CACHE_HIT_RATE_TARGET
+        ), f"Hit rate after eviction {hit_rate:.2%} below {CACHE_HIT_RATE_TARGET:.0%}"
 
 
 # =============================================================================
@@ -302,12 +335,14 @@ class TestFileTreeLoadTime:
         min_duration = min(durations)
 
         # All requests should be under threshold
-        assert max_duration < FILE_TREE_LOAD_THRESHOLD, (
-            f"Max load time {max_duration:.4f}s exceeds threshold"
-        )
+        assert (
+            max_duration < FILE_TREE_LOAD_THRESHOLD
+        ), f"Max load time {max_duration:.4f}s exceeds threshold"
 
         # Average should be well under threshold (cache is fast)
-        assert avg_duration < 0.001, f"Avg load time {avg_duration:.6f}s unexpectedly high"
+        assert (
+            avg_duration < 0.001
+        ), f"Avg load time {avg_duration:.6f}s unexpectedly high"
 
         # Verify consistency (no extreme outliers)
         variance = max_duration - min_duration
@@ -529,7 +564,9 @@ class TestEndToEndCachePerformance:
 
                 # Initial load (cold cache)
                 cache.set(tree_key, mock_tree_data, ttl_seconds=DEFAULT_TREE_TTL)
-                cache.set(content_key, mock_content_data, ttl_seconds=DEFAULT_CONTENT_TTL)
+                cache.set(
+                    content_key, mock_content_data, ttl_seconds=DEFAULT_CONTENT_TTL
+                )
 
                 # Repeated access (warm cache)
                 for _ in range(20):
@@ -554,10 +591,12 @@ class TestEndToEndCachePerformance:
         avg_time = sum(request_times) / len(request_times)
         max_time = max(request_times)
 
-        assert max_time < FILE_TREE_LOAD_THRESHOLD, (
-            f"Max concurrent request time {max_time:.4f}s exceeds threshold"
-        )
-        assert avg_time < 0.01, f"Avg concurrent request time {avg_time:.6f}s unexpectedly high"
+        assert (
+            max_time < FILE_TREE_LOAD_THRESHOLD
+        ), f"Max concurrent request time {max_time:.4f}s exceeds threshold"
+        assert (
+            avg_time < 0.01
+        ), f"Avg concurrent request time {avg_time:.6f}s unexpectedly high"
 
 
 # =============================================================================
@@ -588,7 +627,9 @@ class TestCacheStatistics:
         # Expected: 9 hits, 1 miss = 90% hit rate
         assert stats["hits"] == 9, f"Expected 9 hits, got {stats['hits']}"
         assert stats["misses"] == 1, f"Expected 1 miss, got {stats['misses']}"
-        assert stats["hit_rate"] == 90.0, f"Expected 90% hit rate, got {stats['hit_rate']}%"
+        assert (
+            stats["hit_rate"] == 90.0
+        ), f"Expected 90% hit rate, got {stats['hit_rate']}%"
 
     def test_statistics_after_clear(self) -> None:
         """Verify statistics are reset after cache clear."""

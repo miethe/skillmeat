@@ -66,7 +66,9 @@ class MarketplaceListing:
             raise ValueError(f"price cannot be negative: {self.price}")
 
         if self.artifact_count < 0:
-            raise ValueError(f"artifact_count cannot be negative: {self.artifact_count}")
+            raise ValueError(
+                f"artifact_count cannot be negative: {self.artifact_count}"
+            )
 
         if self.rating is not None and not (0.0 <= self.rating <= 5.0):
             raise ValueError(f"rating must be between 0.0 and 5.0: {self.rating}")

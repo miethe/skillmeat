@@ -232,7 +232,7 @@ class GitHubMetadataExtractor:
         if cached:
             logger.info(
                 "Cache hit for GitHub metadata",
-                extra={"source": source, "cache_hit": True}
+                extra={"source": source, "cache_hit": True},
             )
             github_metadata_requests_total.labels(cache_hit="true").inc()
             discovery_metrics.record_metadata_fetch(cache_hit=True)
@@ -240,7 +240,7 @@ class GitHubMetadataExtractor:
 
         logger.info(
             "Fetching metadata from GitHub",
-            extra={"source": source, "cache_hit": False}
+            extra={"source": source, "cache_hit": False},
         )
         github_metadata_requests_total.labels(cache_hit="false").inc()
         discovery_metrics.record_metadata_fetch(cache_hit=False)
@@ -311,7 +311,7 @@ class GitHubMetadataExtractor:
                 "duration_ms": round(duration * 1000, 2),
                 "has_title": metadata.title is not None,
                 "has_description": metadata.description is not None,
-            }
+            },
         )
 
         return metadata

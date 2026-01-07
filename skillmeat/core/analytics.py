@@ -86,8 +86,7 @@ class EventBuffer:
             event_id: ID of event to remove
         """
         self._buffer = deque(
-            [e for e in self._buffer if e["id"] != event_id],
-            maxlen=self.max_size
+            [e for e in self._buffer if e["id"] != event_id], maxlen=self.max_size
         )
         if event_id in self._retry_counts:
             del self._retry_counts[event_id]
@@ -109,7 +108,7 @@ class EventBuffer:
                 # Remove from buffer after max retries
                 self._buffer = deque(
                     [e for e in self._buffer if e["id"] != event_id],
-                    maxlen=self.max_size
+                    maxlen=self.max_size,
                 )
                 del self._retry_counts[event_id]
                 return False
@@ -452,7 +451,7 @@ class EventTracker:
             except Exception as e:
                 if attempt < self.MAX_RETRY_ATTEMPTS - 1:
                     # Exponential backoff
-                    delay_ms = self.RETRY_DELAY_BASE_MS * (2 ** attempt)
+                    delay_ms = self.RETRY_DELAY_BASE_MS * (2**attempt)
                     logger.debug(
                         f"Event recording failed (attempt {attempt + 1}), "
                         f"retrying in {delay_ms}ms: {e}"
@@ -563,7 +562,9 @@ class EventTracker:
             # Error during redaction - return safe default
             return "redacted"
 
-    def _redact_paths(self, metadata: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _redact_paths(
+        self, metadata: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """Recursively redact paths in metadata dict.
 
         Args:

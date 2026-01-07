@@ -102,7 +102,9 @@ class TagService:
         slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower())
         slug = re.sub(r"-{2,}", "-", slug).strip("-")
         if not slug:
-            raise ValueError("Tag name must contain at least one alphanumeric character")
+            raise ValueError(
+                "Tag name must contain at least one alphanumeric character"
+            )
         return slug
 
     # =========================================================================
@@ -359,8 +361,7 @@ class TagService:
         )
 
         self.logger.info(
-            f"Listed {len(items)} tags (has_next={has_more}, "
-            f"cursor={after_cursor})"
+            f"Listed {len(items)} tags (has_next={has_more}, " f"cursor={after_cursor})"
         )
 
         return TagListResponse(items=items, page_info=page_info)
@@ -440,7 +441,9 @@ class TagService:
 
         for tag_id in existing_ids - desired_ids:
             try:
-                self.repo.remove_tag_from_artifact(artifact_id=artifact_id, tag_id=tag_id)
+                self.repo.remove_tag_from_artifact(
+                    artifact_id=artifact_id, tag_id=tag_id
+                )
             except RepositoryError as e:
                 self.logger.warning(
                     f"Failed to remove tag {tag_id} from artifact {artifact_id}: {e}"

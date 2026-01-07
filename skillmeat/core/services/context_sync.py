@@ -147,9 +147,7 @@ class ContextSyncService:
         self.cache_mgr = cache_mgr
         logger.info("ContextSyncService initialized")
 
-    def detect_modified_entities(
-        self, project_path: str
-    ) -> List[Dict[str, Any]]:
+    def detect_modified_entities(self, project_path: str) -> List[Dict[str, Any]]:
         """Scan project for modified context entities.
 
         Compares deployed files with collection entities to detect changes.
@@ -206,9 +204,7 @@ class ContextSyncService:
 
             # Read deployed file hash
             if not deployed_path.exists():
-                logger.warning(
-                    f"Deployed file not found: {deployed_path}, skipping"
-                )
+                logger.warning(f"Deployed file not found: {deployed_path}, skipping")
                 continue
 
             try:
@@ -413,9 +409,7 @@ class ContextSyncService:
                 m for m in modified if m["modified_in"] in ["collection", "both"]
             ]
         else:
-            push_candidates = [
-                m for m in modified if m["modified_in"] == "collection"
-            ]
+            push_candidates = [m for m in modified if m["modified_in"] == "collection"]
 
         results = []
 
@@ -476,9 +470,7 @@ class ContextSyncService:
         logger.info(f"Push completed: {len(results)} entities processed")
         return results
 
-    def detect_conflicts(
-        self, project_path: str
-    ) -> List[SyncConflict]:
+    def detect_conflicts(self, project_path: str) -> List[SyncConflict]:
         """Detect entities modified in both collection and project.
 
         A conflict occurs when:
@@ -615,9 +607,7 @@ class ContextSyncService:
 
             elif resolution == "merge":
                 # Use merged content for both
-                logger.info(
-                    f"Resolving {conflict.entity_name}: using merged content"
-                )
+                logger.info(f"Resolving {conflict.entity_name}: using merged content")
                 # TODO: Update both collection and deployed file with merged_content
                 # new_hash = compute_content_hash(merged_content)
                 pass

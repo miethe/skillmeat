@@ -53,11 +53,31 @@ class StructuredFormatter(logging.Formatter):
         extra_fields = {}
         for key, value in record.__dict__.items():
             if key not in [
-                "name", "msg", "args", "created", "filename", "funcName",
-                "levelname", "levelno", "lineno", "module", "msecs",
-                "message", "pathname", "process", "processName", "relativeCreated",
-                "thread", "threadName", "exc_info", "exc_text", "stack_info",
-                "trace_id", "span_id", "user_id", "request_id"
+                "name",
+                "msg",
+                "args",
+                "created",
+                "filename",
+                "funcName",
+                "levelname",
+                "levelno",
+                "lineno",
+                "module",
+                "msecs",
+                "message",
+                "pathname",
+                "process",
+                "processName",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "trace_id",
+                "span_id",
+                "user_id",
+                "request_id",
             ]:
                 # Serialize complex objects to strings
                 try:
@@ -100,8 +120,10 @@ class HumanReadableFormatter(logging.Formatter):
             Formatted log string
         """
         # Base format
-        timestamp = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S')
-        msg = f"{timestamp} - {record.name} - {record.levelname} - {record.getMessage()}"
+        timestamp = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
+        msg = (
+            f"{timestamp} - {record.name} - {record.levelname} - {record.getMessage()}"
+        )
 
         # Add trace context if available
         context_parts = []
@@ -123,7 +145,7 @@ class HumanReadableFormatter(logging.Formatter):
 def setup_logging(
     level: int = logging.INFO,
     structured: bool = True,
-    logger_name: Optional[str] = None
+    logger_name: Optional[str] = None,
 ) -> logging.Logger:
     """Configure logging for application.
 

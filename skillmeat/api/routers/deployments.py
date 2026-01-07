@@ -57,9 +57,15 @@ def get_deployment_manager(
     description="Deploy an artifact from collection to a project's .claude directory",
     responses={
         200: {"description": "Artifact deployed successfully"},
-        400: {"model": ErrorResponse, "description": "Invalid request or artifact not found"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or artifact not found",
+        },
         401: {"model": ErrorResponse, "description": "Unauthorized"},
-        404: {"model": ErrorResponse, "description": "Artifact or collection not found"},
+        404: {
+            "model": ErrorResponse,
+            "description": "Artifact or collection not found",
+        },
         500: {"model": ErrorResponse, "description": "Deployment failed"},
     },
 )
@@ -100,7 +106,9 @@ async def deploy_artifact(
             )
 
         # Resolve project path
-        project_path = Path(request.project_path) if request.project_path else Path.cwd()
+        project_path = (
+            Path(request.project_path) if request.project_path else Path.cwd()
+        )
         project_path = project_path.resolve()
 
         # Check if project has .claude directory
@@ -240,7 +248,9 @@ async def undeploy_artifact(
             )
 
         # Resolve project path
-        project_path = Path(request.project_path) if request.project_path else Path.cwd()
+        project_path = (
+            Path(request.project_path) if request.project_path else Path.cwd()
+        )
         project_path = project_path.resolve()
 
         # Undeploy artifact

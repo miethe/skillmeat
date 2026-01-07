@@ -90,7 +90,9 @@ class LicenseScanner:
 
     # Copyright notice patterns
     COPYRIGHT_PATTERNS = [
-        re.compile(r"Copyright\s+(?:\(c\)\s*)?(\d{4}(?:-\d{4})?)\s+(.+)", re.IGNORECASE),
+        re.compile(
+            r"Copyright\s+(?:\(c\)\s*)?(\d{4}(?:-\d{4})?)\s+(.+)", re.IGNORECASE
+        ),
         re.compile(r"\(c\)\s+(\d{4}(?:-\d{4})?)\s+(.+)", re.IGNORECASE),
         re.compile(r"©\s+(\d{4}(?:-\d{4})?)\s+(.+)", re.IGNORECASE),
     ]
@@ -329,9 +331,7 @@ class LicenseScanner:
 
         return license_files
 
-    def compare_licenses(
-        self, declared: str, detected: List[str]
-    ) -> List[str]:
+    def compare_licenses(self, declared: str, detected: List[str]) -> List[str]:
         """Compare declared license with detected licenses.
 
         Args:
@@ -412,7 +412,9 @@ class LicenseScanner:
         """
         try:
             content = zf.read(file_info.filename).decode("utf-8", errors="ignore")
-            result = self._detect_from_content(file_info.filename, content, is_license_file=True)
+            result = self._detect_from_content(
+                file_info.filename, content, is_license_file=True
+            )
 
             # Higher confidence for LICENSE files
             if result and result.detected_license:
@@ -541,13 +543,7 @@ class LicenseScanner:
             )
 
         if report.declared_license == "Unknown":
-            report.recommendations.append(
-                "Declare a license in bundle metadata"
-            )
+            report.recommendations.append("Declare a license in bundle metadata")
 
-        if not any(
-            d.copyright_notices for d in report.detected_licenses
-        ):
-            report.recommendations.append(
-                "Add copyright notices to your source files"
-            )
+        if not any(d.copyright_notices for d in report.detected_licenses):
+            report.recommendations.append("Add copyright notices to your source files")

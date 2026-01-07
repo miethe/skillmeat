@@ -209,7 +209,9 @@ class CustomWebBroker(MarketplaceBroker):
         cache_key = f"listings:{page}:{page_size}:{str(filters)}"
 
         try:
-            response = self._make_request("GET", url, cache_key=cache_key, params=params)
+            response = self._make_request(
+                "GET", url, cache_key=cache_key, params=params
+            )
             data = response.json()
 
             # Validate response against schema
@@ -340,9 +342,7 @@ class CustomWebBroker(MarketplaceBroker):
             try:
                 signer = BundleSigner(self.key_manager)
                 manifest_dict = bundle.to_dict()
-                signature_data = signer.sign_bundle(
-                    bundle.bundle_hash, manifest_dict
-                )
+                signature_data = signer.sign_bundle(bundle.bundle_hash, manifest_dict)
                 bundle.signature = signature_data
                 logger.info("Bundle signed successfully")
             except Exception as e:

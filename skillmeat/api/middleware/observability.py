@@ -110,7 +110,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
                 # Get response size if available
                 response_size = 0
-                if hasattr(response, "headers") and response.headers.get("content-length"):
+                if hasattr(response, "headers") and response.headers.get(
+                    "content-length"
+                ):
                     try:
                         response_size = int(response.headers.get("content-length", 0))
                     except (ValueError, TypeError):
@@ -120,8 +122,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 # Record response size metric
                 if response_size > 0:
                     api_response_size.labels(
-                        method=method,
-                        endpoint=normalized_path
+                        method=method, endpoint=normalized_path
                     ).observe(response_size)
 
         except Exception as e:
@@ -139,14 +140,12 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     "trace_id": trace_id,
                     "request_id": request_id,
                     "error_type": error_type,
-                }
+                },
             )
 
             # Record error metric
             api_errors_total.labels(
-                method=method,
-                endpoint=normalized_path,
-                error_type=error_type
+                method=method, endpoint=normalized_path, error_type=error_type
             ).inc()
 
             # Re-raise to let exception handlers deal with it
@@ -158,21 +157,17 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
             # Record metrics
             api_request_duration.labels(
-                method=method,
-                endpoint=normalized_path
+                method=method, endpoint=normalized_path
             ).observe(duration)
 
             api_requests_total.labels(
-                method=method,
-                endpoint=normalized_path,
-                status=status_code
+                method=method, endpoint=normalized_path, status=status_code
             ).inc()
 
             # Record request size metric
             if request_size > 0:
                 api_request_size.labels(
-                    method=method,
-                    endpoint=normalized_path
+                    method=method, endpoint=normalized_path
                 ).observe(request_size)
 
             # Log request completion
@@ -188,7 +183,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     "trace_id": trace_id,
                     "request_id": request_id,
                     "user_id": user_id,
-                }
+                },
             )
 
         # Add tracing headers to response
@@ -218,19 +213,19 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
         # Replace UUIDs
         path = re.sub(
-            r'/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-            '/{id}',
+            r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "/{id}",
             path,
-            flags=re.IGNORECASE
+            flags=re.IGNORECASE,
         )
 
         # Replace hex IDs (at least 6 chars)
-        path = re.sub(r'/[0-9a-f]{6,}', '/{id}', path, flags=re.IGNORECASE)
+        path = re.sub(r"/[0-9a-f]{6,}", "/{id}", path, flags=re.IGNORECASE)
 
         # Replace numeric IDs
-        path = re.sub(r'/\d+', '/{id}', path)
+        path = re.sub(r"/\d+", "/{id}", path)
 
         # Replace common ID patterns
-        path = re.sub(r'/[a-zA-Z0-9_-]{20,}', '/{id}', path)
+        path = re.sub(r"/[a-zA-Z0-9_-]{20,}", "/{id}", path)
 
         return path

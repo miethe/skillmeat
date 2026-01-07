@@ -192,7 +192,7 @@ class VaultConfigManager:
 
         # Check if this is the default vault
         default_vault = config.get("sharing", {}).get("default_vault")
-        vault_config.is_default = (name == default_vault)
+        vault_config.is_default = name == default_vault
 
         return vault_config
 
@@ -401,9 +401,7 @@ class VaultConfigManager:
 
         if "username" in credentials:
             if "password" not in credentials:
-                raise ValueError(
-                    "Git credentials with username must include password"
-                )
+                raise ValueError("Git credentials with username must include password")
 
     def _validate_s3_credentials(self, credentials: Dict[str, str]) -> None:
         """Validate S3 credentials.

@@ -171,8 +171,7 @@ class SubmissionTracker:
             data = {
                 "version": "1.0",
                 "submissions": [
-                    submission.to_dict()
-                    for submission in self._submissions.values()
+                    submission.to_dict() for submission in self._submissions.values()
                 ],
             }
 
@@ -212,9 +211,11 @@ class SubmissionTracker:
             status=publish_result.status,
             bundle_hash=bundle_hash,
             metadata=metadata or {},
-            submitted_at=publish_result.submitted_at.isoformat()
-            if publish_result.submitted_at
-            else datetime.utcnow().isoformat(),
+            submitted_at=(
+                publish_result.submitted_at.isoformat()
+                if publish_result.submitted_at
+                else datetime.utcnow().isoformat()
+            ),
             listing_url=publish_result.listing_url,
             errors=publish_result.errors,
             warnings=publish_result.warnings,
@@ -250,9 +251,7 @@ class SubmissionTracker:
         """
         submission = self.get_submission(submission_id)
         if not submission:
-            raise SubmissionTrackingError(
-                f"Submission not found: {submission_id}"
-            )
+            raise SubmissionTrackingError(f"Submission not found: {submission_id}")
 
         # Update status
         old_status = submission.status
@@ -274,9 +273,7 @@ class SubmissionTracker:
         # Save changes
         self._save_submissions()
 
-        logger.info(
-            f"Updated submission {submission_id}: {old_status} -> {status}"
-        )
+        logger.info(f"Updated submission {submission_id}: {old_status} -> {status}")
         return submission
 
     def get_submission(self, submission_id: str) -> Optional[Submission]:
@@ -313,9 +310,7 @@ class SubmissionTracker:
             if submission.status == status
         ]
 
-    def poll_broker(
-        self, submission_id: str, broker: MarketplaceBroker
-    ) -> Submission:
+    def poll_broker(self, submission_id: str, broker: MarketplaceBroker) -> Submission:
         """Poll broker for submission status update.
 
         Args:
@@ -330,9 +325,7 @@ class SubmissionTracker:
         """
         submission = self.get_submission(submission_id)
         if not submission:
-            raise SubmissionTrackingError(
-                f"Submission not found: {submission_id}"
-            )
+            raise SubmissionTrackingError(f"Submission not found: {submission_id}")
 
         # Skip if already in terminal state
         if submission.is_terminal:
@@ -353,9 +346,7 @@ class SubmissionTracker:
 
         except Exception as e:
             logger.error(f"Failed to poll broker for {submission_id}: {e}")
-            raise SubmissionTrackingError(
-                f"Failed to poll broker: {e}"
-            ) from e
+            raise SubmissionTrackingError(f"Failed to poll broker: {e}") from e
 
     def notify_publisher(self, submission_id: str, event: str) -> None:
         """Send notification to publisher about submission event.
@@ -370,9 +361,7 @@ class SubmissionTracker:
         """
         submission = self.get_submission(submission_id)
         if not submission:
-            logger.warning(
-                f"Cannot notify for unknown submission: {submission_id}"
-            )
+            logger.warning(f"Cannot notify for unknown submission: {submission_id}")
             return
 
         # Log notification (placeholder for actual notification)

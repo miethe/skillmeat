@@ -52,7 +52,9 @@ def sample_marketplace_entry():
     entry.name = "marketplace-skill"
     entry.artifact_type = "skill"
     entry.path = "skills/marketplace-skill"
-    entry.upstream_url = "https://github.com/user/repo/tree/main/skills/marketplace-skill"
+    entry.upstream_url = (
+        "https://github.com/user/repo/tree/main/skills/marketplace-skill"
+    )
     entry.detected_version = "v2.0.0"
     entry.detected_sha = "abc123def456"
     entry.import_id = None
@@ -198,7 +200,9 @@ def test_get_artifact_metadata_from_cache(mock_session, sample_artifact):
     assert isinstance(result, ArtifactSummary)
     assert result.name == sample_artifact.name
     assert result.type == sample_artifact.type
-    assert result.version == sample_artifact.deployed_version  # Prefers deployed_version
+    assert (
+        result.version == sample_artifact.deployed_version
+    )  # Prefers deployed_version
     assert result.source == sample_artifact.source
 
     # Verify cache was queried first
@@ -231,6 +235,7 @@ def test_get_artifact_metadata_from_cache_uses_upstream_version(mock_session):
 
 def test_get_artifact_metadata_from_marketplace(mock_session, sample_marketplace_entry):
     """Test getting metadata from marketplace catalog (step 2)."""
+
     # Mock cache lookup returning None (skip step 1)
     # Mock marketplace lookup returning entry (step 2)
     def mock_query_side_effect(model):
@@ -286,8 +291,11 @@ def test_get_artifact_metadata_fallback(mock_session):
     assert mock_session.query.call_count == 2
 
 
-def test_get_artifact_metadata_cache_priority(mock_session, sample_artifact, sample_marketplace_entry):
+def test_get_artifact_metadata_cache_priority(
+    mock_session, sample_artifact, sample_marketplace_entry
+):
     """Test that cache is prioritized over marketplace when both exist."""
+
     # Mock both cache and marketplace returning results
     def mock_query_side_effect(model):
         mock_query = MagicMock()
@@ -319,7 +327,9 @@ def test_get_artifact_metadata_cache_priority(mock_session, sample_artifact, sam
     mock_session.query.assert_called_with(Artifact)
 
 
-def test_get_artifact_metadata_marketplace_lookup_by_import_id(mock_session, sample_marketplace_entry):
+def test_get_artifact_metadata_marketplace_lookup_by_import_id(
+    mock_session, sample_marketplace_entry
+):
     """Test marketplace lookup succeeds when matching import_id."""
     # Setup entry with import_id
     sample_marketplace_entry.import_id = "imported-skill-xyz"
@@ -347,8 +357,11 @@ def test_get_artifact_metadata_marketplace_lookup_by_import_id(mock_session, sam
     assert result.type == sample_marketplace_entry.artifact_type
 
 
-def test_get_artifact_metadata_marketplace_lookup_by_path_contains(mock_session, sample_marketplace_entry):
+def test_get_artifact_metadata_marketplace_lookup_by_path_contains(
+    mock_session, sample_marketplace_entry
+):
     """Test marketplace lookup succeeds when path contains artifact_id."""
+
     # Mock cache miss, marketplace hit by path contains
     def mock_query_side_effect(model):
         mock_query = MagicMock()

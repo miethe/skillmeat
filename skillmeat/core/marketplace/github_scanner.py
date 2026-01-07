@@ -55,9 +55,11 @@ def get_existing_collection_hashes(session) -> Set[str]:
     hashes = set()
 
     # Query all non-excluded entries
-    entries = session.query(MarketplaceCatalogEntry).filter(
-        MarketplaceCatalogEntry.excluded_at.is_(None)
-    ).all()
+    entries = (
+        session.query(MarketplaceCatalogEntry)
+        .filter(MarketplaceCatalogEntry.excluded_at.is_(None))
+        .all()
+    )
 
     for entry in entries:
         if entry.metadata_json:
@@ -208,7 +210,9 @@ class GitHubScanner:
                     manual_mappings=manual_mappings,
                 )
                 ctx.metadata["detected_count"] = len(detected_artifacts)
-                logger.info(f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}")
+                logger.info(
+                    f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}"
+                )
 
                 # 5. Deduplicate within source
                 ctx.metadata["phase"] = "deduplicate_within_source"
@@ -231,8 +235,8 @@ class GitHubScanner:
                 cross_excluded_dicts = []
                 if session is not None:
                     existing_hashes = get_existing_collection_hashes(session)
-                    unique_dicts, cross_excluded_dicts = engine.deduplicate_cross_source(
-                        kept_dicts, existing_hashes
+                    unique_dicts, cross_excluded_dicts = (
+                        engine.deduplicate_cross_source(kept_dicts, existing_hashes)
                     )
                     kept_dicts = unique_dicts
                     ctx.metadata["cross_source_duplicates"] = len(cross_excluded_dicts)
@@ -242,7 +246,9 @@ class GitHubScanner:
                         f"{len(existing_hashes)} existing"
                     )
                 else:
-                    logger.debug("No session provided, skipping cross-source deduplication")
+                    logger.debug(
+                        "No session provided, skipping cross-source deduplication"
+                    )
 
                 # Convert dicts back to DetectedArtifact models
                 from skillmeat.api.schemas.marketplace import DetectedArtifact

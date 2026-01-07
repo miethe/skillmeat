@@ -56,11 +56,13 @@ class Span:
             name: Event name
             attributes: Optional event attributes
         """
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {},
-        })
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.time(),
+                "attributes": attributes or {},
+            }
+        )
 
     def end(self, status: str = "success") -> float:
         """End span and record duration.
@@ -89,7 +91,7 @@ class Span:
                 "events": self.events,
                 "trace_id": LogContext.get_trace_id(),
                 "request_id": LogContext.get_request_id(),
-            }
+            },
         )
 
         return duration_ms
@@ -101,10 +103,13 @@ class Span:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         if exc_type is not None:
-            self.add_event("exception", {
-                "type": exc_type.__name__,
-                "message": str(exc_val),
-            })
+            self.add_event(
+                "exception",
+                {
+                    "type": exc_type.__name__,
+                    "message": str(exc_val),
+                },
+            )
             self.end(status="error")
         else:
             self.end(status="success")
@@ -152,17 +157,20 @@ def trace_operation(operation_name: str, **attributes):
             "parent_span_id": parent_span_id,
             "trace_id": LogContext.get_trace_id(),
             "request_id": LogContext.get_request_id(),
-        }
+        },
     )
 
     try:
         yield span
     except Exception as e:
         # Record exception in span
-        span.add_event("exception", {
-            "type": type(e).__name__,
-            "message": str(e),
-        })
+        span.add_event(
+            "exception",
+            {
+                "type": type(e).__name__,
+                "message": str(e),
+            },
+        )
 
         logger.error(
             f"Span failed: {operation_name}",
@@ -172,15 +180,20 @@ def trace_operation(operation_name: str, **attributes):
                 "parent_span_id": parent_span_id,
                 "trace_id": LogContext.get_trace_id(),
                 "request_id": LogContext.get_request_id(),
-            }
+            },
         )
         raise
     finally:
         # End span if not already ended
         if span.end_time is None:
-            span.end(status="error" if span.events and any(
-                e["name"] == "exception" for e in span.events
-            ) else "success")
+            span.end(
+                status=(
+                    "error"
+                    if span.events
+                    and any(e["name"] == "exception" for e in span.events)
+                    else "success"
+                )
+            )
 
         # Restore previous span context
         span_id_var.reset(token)
@@ -198,6 +211,7 @@ def trace_function(operation_name: Optional[str] = None):
         ...     # Function code
         ...     pass
     """
+
     def decorator(func):
         import functools
 
@@ -209,6 +223,7 @@ def trace_function(operation_name: Optional[str] = None):
                 return func(*args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -224,6 +239,7 @@ async def trace_async_function(operation_name: Optional[str] = None):
         ...     # Async function code
         ...     pass
     """
+
     def decorator(func):
         import functools
 
@@ -235,4 +251,5 @@ async def trace_async_function(operation_name: Optional[str] = None):
                 return await func(*args, **kwargs)
 
         return wrapper
+
     return decorator

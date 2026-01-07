@@ -81,7 +81,9 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
     session = get_session()
     try:
         # Verify collection exists
-        collection = session.query(Collection).filter_by(id=request.collection_id).first()
+        collection = (
+            session.query(Collection).filter_by(id=request.collection_id).first()
+        )
         if not collection:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -113,10 +115,14 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
         session.commit()
         session.refresh(group)
 
-        logger.info(f"Created group: {group.id} ('{group.name}') in collection {group.collection_id}")
+        logger.info(
+            f"Created group: {group.id} ('{group.name}') in collection {group.collection_id}"
+        )
 
         # Get artifact count
-        artifact_count = session.query(GroupArtifact).filter_by(group_id=group.id).count()
+        artifact_count = (
+            session.query(GroupArtifact).filter_by(group_id=group.id).count()
+        )
 
         return GroupResponse(
             id=group.id,
@@ -162,7 +168,9 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
 )
 async def list_groups(
     collection_id: str = Query(..., description="Collection ID to list groups from"),
-    search: Optional[str] = Query(None, description="Filter groups by name (case-insensitive)"),
+    search: Optional[str] = Query(
+        None, description="Filter groups by name (case-insensitive)"
+    ),
 ) -> GroupListResponse:
     """List all groups in a collection.
 
@@ -202,7 +210,9 @@ async def list_groups(
         # Build response with artifact counts
         group_responses = []
         for group in groups:
-            artifact_count = session.query(GroupArtifact).filter_by(group_id=group.id).count()
+            artifact_count = (
+                session.query(GroupArtifact).filter_by(group_id=group.id).count()
+            )
             group_responses.append(
                 GroupResponse(
                     id=group.id,
@@ -374,7 +384,9 @@ async def update_group(group_id: str, request: GroupUpdateRequest) -> GroupRespo
         logger.info(f"Updated group {group_id}")
 
         # Get artifact count
-        artifact_count = session.query(GroupArtifact).filter_by(group_id=group.id).count()
+        artifact_count = (
+            session.query(GroupArtifact).filter_by(group_id=group.id).count()
+        )
 
         return GroupResponse(
             id=group.id,
@@ -519,7 +531,9 @@ async def reorder_groups(request: GroupReorderRequest) -> GroupListResponse:
         group_responses = []
         for group in sorted(groups, key=lambda g: g.position):
             session.refresh(group)
-            artifact_count = session.query(GroupArtifact).filter_by(group_id=group.id).count()
+            artifact_count = (
+                session.query(GroupArtifact).filter_by(group_id=group.id).count()
+            )
             group_responses.append(
                 GroupResponse(
                     id=group.id,
@@ -602,7 +616,9 @@ async def add_artifacts_to_group(
         }
 
         # Filter out duplicates
-        new_artifact_ids = [aid for aid in request.artifact_ids if aid not in existing_artifact_ids]
+        new_artifact_ids = [
+            aid for aid in request.artifact_ids if aid not in existing_artifact_ids
+        ]
 
         if not new_artifact_ids:
             logger.info(f"No new artifacts to add to group {group_id} (all duplicates)")
@@ -613,7 +629,12 @@ async def add_artifacts_to_group(
                 session.query(GroupArtifact).filter(
                     GroupArtifact.group_id == group_id,
                     GroupArtifact.position >= request.position,
-                ).update({GroupArtifact.position: GroupArtifact.position + len(new_artifact_ids)})
+                ).update(
+                    {
+                        GroupArtifact.position: GroupArtifact.position
+                        + len(new_artifact_ids)
+                    }
+                )
                 start_position = request.position
             else:
                 # Append to end
@@ -951,7 +972,9 @@ async def reorder_artifacts_in_group(
         raise
     except Exception as e:
         session.rollback()
-        logger.error(f"Failed to reorder artifacts in group {group_id}: {e}", exc_info=True)
+        logger.error(
+            f"Failed to reorder artifacts in group {group_id}: {e}", exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reorder artifacts",

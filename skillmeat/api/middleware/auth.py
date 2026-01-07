@@ -45,7 +45,9 @@ def get_token_manager() -> TokenManager:
 
 
 def verify_token(
-    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
+    credentials: Annotated[
+        Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)
+    ],
 ) -> str:
     """Verify JWT token from Authorization header.
 
@@ -84,7 +86,9 @@ def verify_token(
 
 
 def optional_verify_token(
-    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
+    credentials: Annotated[
+        Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)
+    ],
 ) -> Optional[str]:
     """Optionally verify JWT token from Authorization header.
 

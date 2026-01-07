@@ -84,7 +84,15 @@ BUNDLE_MANIFEST_SCHEMA = {
             "minItems": 1,
             "items": {
                 "type": "object",
-                "required": ["type", "name", "version", "scope", "path", "files", "hash"],
+                "required": [
+                    "type",
+                    "name",
+                    "version",
+                    "scope",
+                    "path",
+                    "files",
+                    "hash",
+                ],
                 "properties": {
                     "type": {
                         "type": "string",
@@ -225,7 +233,14 @@ class ManifestValidator:
         warnings = []
 
         # Check required top-level fields
-        required_fields = ["version", "name", "description", "author", "created_at", "artifacts"]
+        required_fields = [
+            "version",
+            "name",
+            "description",
+            "author",
+            "created_at",
+            "artifacts",
+        ]
         for field in required_fields:
             if field not in manifest_dict:
                 errors.append(

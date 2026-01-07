@@ -62,8 +62,8 @@ def upgrade() -> None:
             "path_tag_config",
             sa.Text(),
             nullable=True,
-            comment="JSON config for path-based tag extraction rules"
-        )
+            comment="JSON config for path-based tag extraction rules",
+        ),
     )
 
     # Add path_segments column to marketplace_catalog_entries
@@ -73,8 +73,8 @@ def upgrade() -> None:
             "path_segments",
             sa.Text(),
             nullable=True,
-            comment="JSON array of extracted path segments with approval status"
-        )
+            comment="JSON array of extracted path segments with approval status",
+        ),
     )
 
 

@@ -341,7 +341,9 @@ class WebDoctor:
         # Print summary
         console.print()
         if all_passed:
-            console.print("[green]All checks passed! Ready for web development.[/green]")
+            console.print(
+                "[green]All checks passed! Ready for web development.[/green]"
+            )
         else:
             console.print(
                 "[yellow]Some checks failed. Please fix the issues above before running web commands.[/yellow]"
