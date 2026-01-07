@@ -34,3 +34,38 @@ collection: collectionName,
 **Commit**: d6d8a0b
 
 **Status**: RESOLVED
+
+---
+
+## All Collection Artifacts Showing as 'discovered'
+
+**Date Fixed**: 2025-01-07
+**Severity**: high
+**Component**: web/collection
+
+**Issue**: After the previous fix, ALL artifacts on the `/collection` page were incorrectly showing as 'discovered', causing sync status and other features to treat them as marketplace artifacts not yet imported.
+
+**Root Cause**: The previous fix changed `artifactToEntity` to use `'discovered'` as the fallback when `artifact.collection` was undefined. However, `artifact.collection` was undefined for ALL artifacts because:
+1. `enrichArtifactSummary` fallback didn't set a `collection` property
+2. Full artifacts from API also sometimes lacked collection info
+
+The `/collection` page is for viewing collection artifacts (not marketplace), so the fallback should be `'default'`, not `'discovered'`.
+
+**Fix**: Two-part fix:
+
+1. Updated `enrichArtifactSummary` to accept optional `collectionInfo` parameter and set it on:
+   - Fallback objects (line 82)
+   - Full artifacts that lack collection (line 49-51)
+
+2. Updated the call site (line 319-325) to pass `currentCollection` context when enriching summaries
+
+3. Reverted `artifactToEntity` fallback from `'discovered'` back to `'default'` (line 98)
+
+**Files Modified**:
+- `skillmeat/web/app/collection/page.tsx` - Updated `enrichArtifactSummary`, call site, and `artifactToEntity`
+
+**Testing**: Build passes (`pnpm build`)
+
+**Commit**: bb3b203
+
+**Status**: RESOLVED

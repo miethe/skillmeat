@@ -38,12 +38,17 @@ type ViewMode = 'grid' | 'list' | 'grouped';
  */
 function enrichArtifactSummary(
   summary: { name: string; type: string; version?: string | null; source: string },
-  allArtifacts: Artifact[]
+  allArtifacts: Artifact[],
+  collectionInfo?: { id: string; name: string }
 ): Artifact {
   // Try to find matching full artifact by name (primary key for artifacts)
   const fullArtifact = allArtifacts.find(a => a.name === summary.name);
 
   if (fullArtifact) {
+    // If we have collection context and the full artifact lacks it, add it
+    if (collectionInfo && !fullArtifact.collection) {
+      return { ...fullArtifact, collection: collectionInfo };
+    }
     return fullArtifact;
   }
 
@@ -74,6 +79,7 @@ function enrichArtifactSummary(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     aliases: [],
+    collection: collectionInfo,
   };
 }
 
@@ -86,11 +92,10 @@ function artifactToEntity(artifact: Artifact): Entity {
     error: 'conflict',
   };
 
-  // Determine collection name:
-  // - If artifact has a collection assigned, use its name
-  // - If no collection (marketplace/catalog artifacts not yet imported), use 'discovered'
-  //   This prevents the sync-status-tab from making upstream-diff API calls that 404
-  const collectionName = artifact.collection?.name ?? 'discovered';
+  // Use artifact's collection name, or 'default' if not available
+  // Note: 'discovered' is only for marketplace artifacts on /marketplace page
+  // On /collection page, artifacts should always have a collection context
+  const collectionName = artifact.collection?.name || 'default';
 
   return {
     id: artifact.id,
@@ -311,8 +316,13 @@ function CollectionPageContent() {
       const summaries = data.items ?? [];
       const fullArtifacts = allArtifactsData?.artifacts ?? [];
 
-      // Enrich each summary with full data from catalog
-      artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts));
+      // Build collection info from current context to ensure artifacts have collection set
+      const collectionInfo = currentCollection
+        ? { id: currentCollection.id, name: currentCollection.name }
+        : undefined;
+
+      // Enrich each summary with full data from catalog, including collection context
+      artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts, collectionInfo));
 
       // Deduplicate by ID to prevent React key conflicts
       const seen = new Set<string>();
@@ -373,7 +383,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [isSpecificCollection, data, allArtifactsData, searchQuery, selectedTags, sortField, sortOrder]);
+  }, [isSpecificCollection, data, allArtifactsData, currentCollection, searchQuery, selectedTags, sortField, sortOrder]);
 
   const handleArtifactClick = (artifact: Artifact) => {
     // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
