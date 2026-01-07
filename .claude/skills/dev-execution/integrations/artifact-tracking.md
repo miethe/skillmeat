@@ -11,38 +11,26 @@ How dev-execution integrates with the artifact-tracking skill.
 | Story execution | If multi-phase |
 | Scaffolding | No |
 
-## Core Integration Points
+## CLI-First Updates
 
-### Progress File Location
+**For status updates, use CLI scripts directly** (0 agent tokens):
 
+```bash
+# Mark task complete
+python .claude/skills/artifact-tracking/scripts/update-status.py \
+  -f .claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md \
+  -t TASK-1.1 -s completed
+
+# Batch update after parallel execution
+python .claude/skills/artifact-tracking/scripts/update-batch.py \
+  -f .claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md \
+  --updates "TASK-1.1:completed,TASK-1.2:completed,TASK-1.3:completed"
 ```
-.claude/progress/{PRD_NAME}/phase-{PHASE_NUM}-progress.md
-```
 
-### YAML Frontmatter Structure
-
-```yaml
----
-prd_name: feature-name
-phase: 1
-status: in_progress
-completion: 45%
-tasks:
-  - id: TASK-1.1
-    title: Task title
-    status: completed
-    assigned_to: [ui-engineer-enhanced]
-    dependencies: []
-  - id: TASK-1.2
-    title: Another task
-    status: in_progress
-    assigned_to: [backend-typescript-architect]
-    dependencies: [TASK-1.1]
-parallelization:
-  batch_1: [TASK-1.1, TASK-1.2]
-  batch_2: [TASK-2.1]
----
-```
+**Use artifact-tracker agent only for**:
+- Creating new progress files
+- Updates requiring context/notes
+- Recording blockers with resolution plans
 
 ## Workflow
 
@@ -50,26 +38,26 @@ parallelization:
 
 1. **Check for existing progress file**:
    ```bash
-   progress_file=".claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md"
+   ls .claude/progress/${PRD_NAME}/phase-${PHASE_NUM}-progress.md
    ```
 
-2. **If missing, create via artifact-tracker**:
+2. **If missing, create via agent**:
    ```
    Task("artifact-tracker", "Create Phase ${PHASE_NUM} progress for ${PRD_NAME}")
    ```
 
 ### During Execution
 
-1. **Read YAML frontmatter only** (token-efficient):
+1. **Read YAML frontmatter only** (~2KB, not full file):
+   - Get `parallelization.batch_N` for current batch
+   - Get `tasks[].assigned_to` for delegation
+
+2. **Execute batch in parallel** (single message with multiple Task calls)
+
+3. **Update via CLI after completion**:
    ```bash
-   head -100 ${progress_file} | sed -n '/^---$/,/^---$/p'
-   ```
-
-2. **Identify batch from `parallelization` field**
-
-3. **After task completion, update via artifact-tracker**:
-   ```
-   Task("artifact-tracker", "Update ${PRD_NAME} phase ${PHASE_NUM}: Mark TASK-X.Y complete")
+   python .claude/skills/artifact-tracking/scripts/update-batch.py \
+     -f FILE --updates "TASK-1.1:completed,TASK-1.2:completed"
    ```
 
 ### After Execution
@@ -79,72 +67,23 @@ parallelization:
    Task("artifact-validator", "Validate Phase ${PHASE_NUM} for ${PRD_NAME}")
    ```
 
-2. **Mark phase complete**:
-   ```
-   Task("artifact-tracker", "Update ${PRD_NAME} phase ${PHASE_NUM}: Set status to complete")
+2. **Mark phase complete via CLI**:
+   ```bash
+   python .claude/skills/artifact-tracking/scripts/update-status.py \
+     -f FILE -t PHASE -s completed
    ```
 
 ## Key Principles
 
-### Token Efficiency
-
-- **Read YAML only** (~2KB) instead of full file (~25KB)
-- Let subagents read detailed task sections when implementing
-- Use artifact-tracker for updates (not manual Edit)
-
-### Update Immediately
-
-- Update task status right after completion
-- Don't batch multiple status updates
-- Include commit hash in completion notes
-
-### Always Validate
-
-- Use artifact-validator before marking phase complete
-- Verify all success criteria met
-- Check no blockers remain
-
-## Status Updates
-
-### Task Completed
-
-```
-Task("artifact-tracker", "Update ${PRD_NAME} phase ${PHASE_NUM}:
-- Mark TASK-1.1 as completed
-- Add commit abc1234
-- Log: Implemented Button component with tests")
-```
-
-### Task Blocked
-
-```
-Task("artifact-tracker", "Update ${PRD_NAME} phase ${PHASE_NUM}:
-- Mark TASK-1.2 as blocked
-- Log blocker: External API dependency unavailable
-- Add to blockers section")
-```
-
-### Phase Complete
-
-```
-Task("artifact-tracker", "Finalize ${PRD_NAME} phase ${PHASE_NUM}:
-- Mark phase as completed
-- Update completion to 100%
-- Generate phase completion summary")
-```
-
-## Artifact-Tracker Commands
-
-The artifact-tracker agent understands these operations:
-
-| Operation | Description |
-|-----------|-------------|
-| Create | Create new progress file |
-| Update | Update task status, add logs |
-| Query | Get pending/blocked tasks |
-| Validate | Check completion criteria |
-| Finalize | Mark phase complete |
+| Principle | Implementation |
+|-----------|---------------|
+| CLI-first | Use scripts for simple status changes (~50 tokens) |
+| YAML source of truth | Read frontmatter only, never parse markdown |
+| Update immediately | Don't batch - update after each task completion |
+| Validate before complete | Run artifact-validator before marking phase done |
 
 ## Reference
 
 Full artifact-tracking skill: `.claude/skills/artifact-tracking/SKILL.md`
+
+For format details, YAML schema, and agent operations: see artifact-tracking skill documentation.
