@@ -69,3 +69,45 @@ The `/collection` page is for viewing collection artifacts (not marketplace), so
 **Commit**: bb3b203
 
 **Status**: RESOLVED
+
+---
+
+## Sync Status Tab Blocking and 404 Errors (Comprehensive Fix)
+
+**Date Fixed**: 2025-01-07
+**Severity**: high
+**Component**: web/sync-status-tab
+**Related Issues**: REQ-20260107-skillmeat-01, REQ-20260107-skillmeat-02
+
+**Issue**: Two related bugs prevented Sync Status tab from working for most/all artifacts:
+1. 404 errors from upstream-diff API for artifacts without backend collection entries
+2. "local-only artifact" message blocking the entire tab instead of disabling options
+
+**Root Cause**:
+
+1. **404 errors**: Query enabled condition passed but artifact didn't exist in backend:
+   - `enabled: !!entity.source && entity.collection !== 'discovered'`
+   - Artifacts with `source` set from enrichment but no actual backend collection entry
+
+2. **Blocking behavior**: Early return at lines 312-324 completely blocked the tab:
+   - `if (isLocalOnly && comparisonScope === 'source-vs-collection') { return <Alert>... }`
+   - `isLocalOnly` check too broad (`!entity.source || entity.source === 'local'`)
+   - Should have disabled options in ComparisonSelector instead of blocking
+
+**Fix**: 5-part remediation (commit 4899b5b):
+
+1. **FIX-001**: Removed early return for local-only artifacts - let ComparisonSelector handle disabled state
+2. **FIX-002**: Improved hasSource detection: `!!entity.source && entity.source !== 'local' && entity.source !== 'unknown'`
+3. **FIX-003**: Smart default scope based on available options (collection-vs-project if no source)
+4. **FIX-004**: Strengthened query guard with source URL pattern validation
+5. **FIX-005**: Added graceful empty diff state with helpful message
+6. **Bonus**: Fixed pre-existing React hooks rule violation by moving early returns after hooks
+
+**Files Modified**:
+- `skillmeat/web/components/sync-status/sync-status-tab.tsx` - All fixes applied
+
+**Testing**: Build passes (`pnpm build`), no sync-status lint errors
+
+**Commit**: 4899b5b
+
+**Status**: RESOLVED
