@@ -327,6 +327,17 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
     Returns:
         CatalogEntryResponse DTO for API
     """
+    # Compute is_duplicate based on excluded_reason
+    is_duplicate = (
+        entry.excluded_reason
+        in (
+            "duplicate_within_source",
+            "duplicate_cross_source",
+        )
+        if entry.excluded_reason
+        else False
+    )
+
     return CatalogEntryResponse(
         id=entry.id,
         source_id=entry.source_id,
@@ -345,6 +356,7 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         import_id=entry.import_id,
         excluded_at=entry.excluded_at,
         excluded_reason=entry.excluded_reason,
+        is_duplicate=is_duplicate,
     )
 
 
@@ -488,7 +500,12 @@ async def _perform_scan(
                     score_breakdown=artifact.score_breakdown,
                     detected_sha=artifact.detected_sha,
                     detected_at=datetime.utcnow(),
-                    status="new",
+                    # Copy exclusion status from deduplication engine
+                    status=artifact.status if artifact.status else "new",
+                    excluded_at=datetime.fromisoformat(artifact.excluded_at)
+                    if artifact.excluded_at
+                    else None,
+                    excluded_reason=artifact.excluded_reason,
                     path_segments=path_segments_json,
                 )
                 new_entries.append(entry)

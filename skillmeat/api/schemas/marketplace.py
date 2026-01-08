@@ -1125,6 +1125,10 @@ class CatalogEntryResponse(BaseModel):
             "Duplicate artifact",
         ],
     )
+    is_duplicate: bool = Field(
+        default=False,
+        description="Whether this artifact was excluded as a duplicate (within-source or cross-source)",
+    )
 
     class Config:
         """Pydantic model configuration."""
