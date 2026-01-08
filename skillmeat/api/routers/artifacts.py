@@ -9,7 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path as PathLib
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    status,
+)
 
 from skillmeat.api.dependencies import (
     ArtifactManagerDep,
@@ -124,6 +133,7 @@ def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
         pass
 
     return None
+
 
 router = APIRouter(
     prefix="/artifacts",
@@ -547,7 +557,7 @@ async def discover_artifacts(
                 logger.warning(f"Scan path does not exist: {scan_path}")
                 raise create_bad_request_error(
                     f"Scan path does not exist: {request.scan_path}",
-                    ErrorCodes.NOT_FOUND
+                    ErrorCodes.NOT_FOUND,
                 )
         else:
             scan_path = collection_path
@@ -556,9 +566,13 @@ async def discover_artifacts(
         manifest = None
         try:
             manifest = collection_mgr.load_collection(collection_name)
-            logger.info(f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection")
+            logger.info(
+                f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection"
+            )
         except Exception as e:
-            logger.warning(f"Could not load manifest for filtering (will return all artifacts as importable): {e}")
+            logger.warning(
+                f"Could not load manifest for filtering (will return all artifacts as importable): {e}"
+            )
             # Graceful fallback - return all as importable
 
         # Create discovery service
@@ -611,13 +625,12 @@ def resolve_project_path(project_id: str) -> PathLib:
     if not project_path.is_absolute():
         raise create_bad_request_error(
             f"Project path must be absolute: {decoded_path}",
-            ErrorCodes.VALIDATION_FAILED
+            ErrorCodes.VALIDATION_FAILED,
         )
 
     if not project_path.exists():
         raise create_not_found_error(
-            f"Project path not found: {decoded_path}",
-            ErrorCodes.NOT_FOUND
+            f"Project path not found: {decoded_path}", ErrorCodes.NOT_FOUND
         )
 
     return project_path
@@ -679,7 +692,7 @@ async def discover_project_artifacts(
         if not claude_dir.exists() or not claude_dir.is_dir():
             raise create_bad_request_error(
                 f"Project does not contain a .claude/ directory: {project_path}",
-                ErrorCodes.VALIDATION_FAILED
+                ErrorCodes.VALIDATION_FAILED,
             )
 
         # Load manifest to filter already-imported artifacts
@@ -688,9 +701,13 @@ async def discover_project_artifacts(
             collection_name = collection or "default"
             try:
                 manifest = collection_mgr.load_collection(collection_name)
-                logger.info(f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection")
+                logger.info(
+                    f"Loaded manifest for filtering: {len(manifest.artifacts)} artifacts in collection"
+                )
             except Exception as e:
-                logger.warning(f"Could not load manifest for filtering (will return all artifacts as importable): {e}")
+                logger.warning(
+                    f"Could not load manifest for filtering (will return all artifacts as importable): {e}"
+                )
                 # Graceful fallback - return all as importable
 
         # Create discovery service with project scan mode
@@ -729,7 +746,9 @@ async def discover_project_artifacts(
     summary="Bulk import artifacts",
     description="Import multiple artifacts from discovered artifacts or external sources with atomic transaction",
     responses={
-        200: {"description": "Bulk import completed (check results for per-artifact status)"},
+        200: {
+            "description": "Bulk import completed (check results for per-artifact status)"
+        },
         400: {"model": ErrorResponse, "description": "Invalid request"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
@@ -878,7 +897,11 @@ async def bulk_import_artifacts(
         results = [
             ImportResult(
                 artifact_id=r.artifact_id,
-                status=r.status if r.status else (ImportStatus.SUCCESS if r.success else ImportStatus.FAILED),
+                status=(
+                    r.status
+                    if r.status
+                    else (ImportStatus.SUCCESS if r.success else ImportStatus.FAILED)
+                ),
                 message=r.message,
                 error=r.error,
                 skip_reason=r.skip_reason,
@@ -933,9 +956,7 @@ async def bulk_import_artifacts(
                                 )
                                 continue
 
-                            artifact_name = (
-                                artifact_payload.name or artifact_path.stem
-                            )
+                            artifact_name = artifact_payload.name or artifact_path.stem
 
                             try:
                                 content_hash = compute_content_hash(artifact_path)
@@ -5081,7 +5102,9 @@ async def fetch_github_metadata(
         if github_token:
             logger.debug("Using configured GitHub token for API requests")
         else:
-            logger.debug("No GitHub token configured, using unauthenticated requests (60 req/hr limit)")
+            logger.debug(
+                "No GitHub token configured, using unauthenticated requests (60 req/hr limit)"
+            )
 
         # Create metadata extractor with cache and token
         extractor = GitHubMetadataExtractor(
@@ -5140,6 +5163,7 @@ async def fetch_github_metadata(
 # =============================================================================
 # Discovery Metrics & Health Endpoints
 # =============================================================================
+
 
 @router.get(
     "/metrics/discovery",
@@ -5216,8 +5240,12 @@ async def discovery_health_check():
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "features": {
                 "discovery_enabled": True,  # Always available
-                "auto_population_enabled": getattr(settings, "enable_auto_population", False),
-                "github_token_configured": bool(getattr(settings, "github_token", None)),
+                "auto_population_enabled": getattr(
+                    settings, "enable_auto_population", False
+                ),
+                "github_token_configured": bool(
+                    getattr(settings, "github_token", None)
+                ),
             },
             "configuration": {
                 "cache_ttl_seconds": getattr(settings, "discovery_cache_ttl", 3600),
@@ -5253,7 +5281,10 @@ async def discovery_health_check():
         400: {"model": ErrorResponse, "description": "Invalid request"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
         404: {"model": ErrorResponse, "description": "Project not found"},
-        422: {"model": ErrorResponse, "description": "Validation error (duplicate or invalid artifact_key)"},
+        422: {
+            "model": ErrorResponse,
+            "description": "Validation error (duplicate or invalid artifact_key)",
+        },
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
@@ -5283,14 +5314,14 @@ async def add_skip_preference(
         if not project_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid project_id: unable to decode project path"
+                detail="Invalid project_id: unable to decode project path",
             )
 
         # Verify project exists
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path}"
+                detail=f"Project not found at path: {project_path}",
             )
 
         # Initialize skip preference manager for this project
@@ -5298,8 +5329,7 @@ async def add_skip_preference(
 
         # Add the skip preference
         skip = skip_manager.add_skip(
-            artifact_key=request.artifact_key,
-            reason=request.skip_reason
+            artifact_key=request.artifact_key, reason=request.skip_reason
         )
 
         logger.info(
@@ -5317,8 +5347,7 @@ async def add_skip_preference(
         # Validation error (duplicate or invalid artifact_key)
         logger.warning(f"Validation error adding skip preference: {e}")
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
         )
     except HTTPException:
         raise
@@ -5326,7 +5355,7 @@ async def add_skip_preference(
         logger.exception(f"Failed to add skip preference: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add skip preference: {str(e)}"
+            detail=f"Failed to add skip preference: {str(e)}",
         )
 
 
@@ -5339,13 +5368,18 @@ async def add_skip_preference(
         200: {"description": "Skip preference removed successfully"},
         400: {"model": ErrorResponse, "description": "Invalid request"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
-        404: {"model": ErrorResponse, "description": "Project or skip preference not found"},
+        404: {
+            "model": ErrorResponse,
+            "description": "Project or skip preference not found",
+        },
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
 async def remove_skip_preference(
     project_id: str = Path(..., description="URL-encoded project path"),
-    artifact_key: str = Path(..., description="Artifact key to remove (e.g., 'skill:canvas')"),
+    artifact_key: str = Path(
+        ..., description="Artifact key to remove (e.g., 'skill:canvas')"
+    ),
     _token: TokenDep = None,
 ) -> SkipClearResponse:
     """Remove a single skip preference by artifact key.
@@ -5369,14 +5403,14 @@ async def remove_skip_preference(
         if not project_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid project_id: unable to decode project path"
+                detail="Invalid project_id: unable to decode project path",
             )
 
         # Verify project exists
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path}"
+                detail=f"Project not found at path: {project_path}",
             )
 
         # Initialize skip preference manager for this project
@@ -5388,7 +5422,7 @@ async def remove_skip_preference(
         if not removed:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Skip preference not found for artifact '{artifact_key}'"
+                detail=f"Skip preference not found for artifact '{artifact_key}'",
             )
 
         logger.info(
@@ -5408,7 +5442,7 @@ async def remove_skip_preference(
         logger.exception(f"Failed to remove skip preference: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to remove skip preference: {str(e)}"
+            detail=f"Failed to remove skip preference: {str(e)}",
         )
 
 
@@ -5449,14 +5483,14 @@ async def clear_skip_preferences(
         if not project_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid project_id: unable to decode project path"
+                detail="Invalid project_id: unable to decode project path",
             )
 
         # Verify project exists
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path}"
+                detail=f"Project not found at path: {project_path}",
             )
 
         # Initialize skip preference manager for this project
@@ -5488,7 +5522,7 @@ async def clear_skip_preferences(
         logger.exception(f"Failed to clear skip preferences: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to clear skip preferences: {str(e)}"
+            detail=f"Failed to clear skip preferences: {str(e)}",
         )
 
 
@@ -5529,14 +5563,14 @@ async def list_skip_preferences(
         if not project_path:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid project_id: unable to decode project path"
+                detail="Invalid project_id: unable to decode project path",
             )
 
         # Verify project exists
         if not project_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Project not found at path: {project_path}"
+                detail=f"Project not found at path: {project_path}",
             )
 
         # Initialize skip preference manager for this project
@@ -5545,7 +5579,9 @@ async def list_skip_preferences(
         # Get all skip preferences
         skips = skip_manager.get_skipped_list()
 
-        logger.debug(f"Retrieved {len(skips)} skip preference(s) from project {project_path}")
+        logger.debug(
+            f"Retrieved {len(skips)} skip preference(s) from project {project_path}"
+        )
 
         # Convert to response format
         skip_responses = [
@@ -5565,7 +5601,7 @@ async def list_skip_preferences(
         logger.exception(f"Failed to list skip preferences: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list skip preferences: {str(e)}"
+            detail=f"Failed to list skip preferences: {str(e)}",
         )
 
 

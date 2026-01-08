@@ -627,7 +627,10 @@ async def diff_snapshots(
             )
 
         # Extract both snapshots to temporary directories
-        with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+        with (
+            tempfile.TemporaryDirectory() as tmpdir1,
+            tempfile.TemporaryDirectory() as tmpdir2,
+        ):
             tmpdir1_path = Path(tmpdir1)
             tmpdir2_path = Path(tmpdir2)
 

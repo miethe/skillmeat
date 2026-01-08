@@ -84,7 +84,9 @@ def add_deprecation_headers(response: Response, endpoint: str) -> None:
     """
     response.headers["Deprecation"] = "true"
     response.headers["Sunset"] = "2025-06-01"
-    response.headers["Link"] = f'</api/v1/user-collections{endpoint}>; rel="successor-version"'
+    response.headers["Link"] = (
+        f'</api/v1/user-collections{endpoint}>; rel="successor-version"'
+    )
     logger.warning(
         f"Deprecated endpoint called: /collections{endpoint}. "
         f"Use /user-collections{endpoint} instead. "
@@ -402,7 +404,9 @@ async def list_collection_artifacts(
             total_count=len(artifacts),
         )
 
-        logger.info(f"Retrieved {len(items)} artifacts from collection '{collection_id}'")
+        logger.info(
+            f"Retrieved {len(items)} artifacts from collection '{collection_id}'"
+        )
         return CollectionArtifactsResponse(items=items, page_info=page_info)
 
     except HTTPException:

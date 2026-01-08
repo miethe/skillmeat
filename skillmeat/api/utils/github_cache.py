@@ -266,8 +266,12 @@ class GitHubFileCache(Generic[T]):
         """
         with self._lock:
             total_requests = self._hits + self._misses
-            hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0.0
-            expired_count = sum(1 for entry in self._cache.values() if entry.is_expired())
+            hit_rate = (
+                (self._hits / total_requests * 100) if total_requests > 0 else 0.0
+            )
+            expired_count = sum(
+                1 for entry in self._cache.values() if entry.is_expired()
+            )
 
             return {
                 "entries": len(self._cache),

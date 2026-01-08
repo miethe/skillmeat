@@ -66,6 +66,7 @@ def ensure_context_entities_project(session) -> None:
         session.commit()
         logger.info(f"Created sentinel project for context entities: {project.id}")
 
+
 router = APIRouter(
     prefix="/context-entities",
     tags=["context-entities"],
@@ -690,7 +691,9 @@ async def delete_context_entity(entity_id: str) -> None:
     responses={
         200: {
             "description": "Raw markdown content",
-            "content": {"text/plain": {"example": "# My Context File\n\nContent here..."}},
+            "content": {
+                "text/plain": {"example": "# My Context File\n\nContent here..."}
+            },
         },
         404: {"description": "Context entity not found"},
         500: {"description": "Internal server error"},

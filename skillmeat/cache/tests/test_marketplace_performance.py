@@ -194,9 +194,9 @@ class TestMarketplacePerformance:
         perf_db.commit()
         duration = time.time() - start_time
 
-        assert duration < BULK_INSERT_THRESHOLD, (
-            f"Bulk insert took {duration:.3f}s, expected < {BULK_INSERT_THRESHOLD}s"
-        )
+        assert (
+            duration < BULK_INSERT_THRESHOLD
+        ), f"Bulk insert took {duration:.3f}s, expected < {BULK_INSERT_THRESHOLD}s"
 
         # Verify count
         cursor.execute(
@@ -227,9 +227,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) == 240  # 240 entries per source
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by source_id took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by source_id took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_query_by_source_and_type(
         self, populated_db: Tuple[sqlite3.Connection, str]
@@ -254,9 +254,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) > 0
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by source+type took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by source+type took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_query_by_source_and_status(
         self, populated_db: Tuple[sqlite3.Connection, str]
@@ -281,9 +281,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) > 0
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by source+status took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by source+status took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_query_by_confidence_threshold(
         self, populated_db: Tuple[sqlite3.Connection, str]
@@ -309,13 +309,11 @@ class TestMarketplacePerformance:
 
         # Should find high-confidence entries
         assert len(results) > 0
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by confidence took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by confidence took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
-    def test_query_by_upstream_url(
-        self, populated_db: Tuple[sqlite3.Connection, str]
-    ):
+    def test_query_by_upstream_url(self, populated_db: Tuple[sqlite3.Connection, str]):
         """Test query performance: Lookup by upstream_url for deduplication.
 
         Uses index: idx_catalog_entries_upstream_url
@@ -340,11 +338,13 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) == 1  # Should be unique
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by upstream_url took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by upstream_url took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
-    def test_query_sources_by_owner_repo(self, populated_db: Tuple[sqlite3.Connection, str]):
+    def test_query_sources_by_owner_repo(
+        self, populated_db: Tuple[sqlite3.Connection, str]
+    ):
         """Test query performance: Lookup source by owner/repo combination.
 
         Uses index: idx_marketplace_sources_owner_repo
@@ -365,9 +365,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) == 1
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by owner+repo took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by owner+repo took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_query_sources_by_scan_status(
         self, populated_db: Tuple[sqlite3.Connection, str]
@@ -392,9 +392,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) == 5  # All sources are 'success'
-        assert duration < QUERY_THRESHOLD, (
-            f"Query by scan_status took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Query by scan_status took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_complex_join_query(self, populated_db: Tuple[sqlite3.Connection, str]):
         """Test query performance: Complex join with filters.
@@ -429,9 +429,9 @@ class TestMarketplacePerformance:
         duration = time.time() - start_time
 
         assert len(results) > 0
-        assert duration < QUERY_THRESHOLD, (
-            f"Complex join query took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
-        )
+        assert (
+            duration < QUERY_THRESHOLD
+        ), f"Complex join query took {duration:.3f}s, expected < {QUERY_THRESHOLD}s"
 
     def test_analyze_optimization(self, perf_db: sqlite3.Connection):
         """Test that ANALYZE improves query performance after bulk inserts.

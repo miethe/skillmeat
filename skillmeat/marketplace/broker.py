@@ -238,7 +238,11 @@ class MarketplaceBroker(ABC):
                 # Create mock response from cached data
                 response = requests.Response()
                 response.status_code = 200
-                response._content = cached_data.encode() if isinstance(cached_data, str) else cached_data
+                response._content = (
+                    cached_data.encode()
+                    if isinstance(cached_data, str)
+                    else cached_data
+                )
                 return response
 
             # Add If-None-Match header if we have an ETag
@@ -254,7 +258,11 @@ class MarketplaceBroker(ABC):
         if response.status_code == 304 and cache_key:
             cached_data = self._get_cached(cache_key)
             if cached_data is not None:
-                response._content = cached_data.encode() if isinstance(cached_data, str) else cached_data
+                response._content = (
+                    cached_data.encode()
+                    if isinstance(cached_data, str)
+                    else cached_data
+                )
                 response.status_code = 200
                 return response
 

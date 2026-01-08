@@ -135,14 +135,14 @@ tags:
         duration = time.perf_counter() - start
 
         # Verify correctness
-        assert result.discovered_count == 55, f"Expected 55, got {result.discovered_count}"
+        assert (
+            result.discovered_count == 55
+        ), f"Expected 55, got {result.discovered_count}"
         assert len(result.artifacts) == 55
         assert len(result.errors) == 0
 
         # Verify performance benchmark
-        assert (
-            duration < 2.0
-        ), f"Discovery took {duration:.3f}s (expected <2.0s)"
+        assert duration < 2.0, f"Discovery took {duration:.3f}s (expected <2.0s)"
 
         # Also check that the reported duration matches
         assert result.scan_duration_ms > 0
@@ -280,7 +280,9 @@ class TestMetadataCachePerformance:
         assert result is None
 
         duration_ms = duration * 1000
-        assert duration_ms < 100, f"Cache miss took {duration_ms:.2f}ms (expected <100ms)"
+        assert (
+            duration_ms < 100
+        ), f"Cache miss took {duration_ms:.2f}ms (expected <100ms)"
 
         print(f"\n  ✓ Cache miss: {duration_ms:.3f}ms")
 
@@ -302,7 +304,9 @@ class TestMetadataCachePerformance:
         duration = time.perf_counter() - start
 
         duration_ms = duration * 1000
-        assert duration_ms < 10, f"Cache write took {duration_ms:.2f}ms (expected <10ms)"
+        assert (
+            duration_ms < 10
+        ), f"Cache write took {duration_ms:.2f}ms (expected <10ms)"
 
         print(f"\n  ✓ Cache write: {duration_ms:.3f}ms")
 
@@ -327,8 +331,12 @@ class TestMetadataCachePerformance:
         read_duration = time.perf_counter() - start
 
         # Verify bulk operations are fast
-        assert write_duration < 0.5, f"Bulk write took {write_duration:.3f}s (expected <0.5s)"
-        assert read_duration < 0.5, f"Bulk read took {read_duration:.3f}s (expected <0.5s)"
+        assert (
+            write_duration < 0.5
+        ), f"Bulk write took {write_duration:.3f}s (expected <0.5s)"
+        assert (
+            read_duration < 0.5
+        ), f"Bulk read took {read_duration:.3f}s (expected <0.5s)"
 
         print(
             f"\n  ✓ Bulk operations (100 entries): write={write_duration*1000:.1f}ms, "
@@ -359,7 +367,9 @@ class TestMetadataCachePerformance:
         assert stats["size"] > 0
 
         duration_ms = duration * 1000
-        assert duration_ms < 1, f"Stats retrieval took {duration_ms:.3f}ms (expected <1ms)"
+        assert (
+            duration_ms < 1
+        ), f"Stats retrieval took {duration_ms:.3f}ms (expected <1ms)"
 
         print(f"\n  ✓ Cache stats: {duration_ms:.3f}ms")
 
@@ -510,7 +520,9 @@ class TestBulkImportPerformance:
         mock_manager = Mock(spec=ArtifactManager)
 
         # Mock add_from_github to be fast
-        def mock_add_from_github(spec, artifact_type, collection_name, custom_name=None, **kwargs):
+        def mock_add_from_github(
+            spec, artifact_type, collection_name, custom_name=None, **kwargs
+        ):
             # Simulate fast artifact addition
             from skillmeat.core.artifact import Artifact, ArtifactMetadata
             from datetime import datetime
@@ -534,7 +546,9 @@ class TestBulkImportPerformance:
 
         return mock_manager
 
-    def test_bulk_import_performance(self, tmp_path, mock_artifact_manager, monkeypatch):
+    def test_bulk_import_performance(
+        self, tmp_path, mock_artifact_manager, monkeypatch
+    ):
         """Bulk import <3 seconds for 20 artifacts.
 
         Benchmark: Bulk import must complete in under 3 seconds for 20 artifacts.
@@ -598,7 +612,9 @@ class TestBulkImportPerformance:
             f"({result.duration_ms:.1f}ms)"
         )
 
-    def test_bulk_import_validation_performance(self, tmp_path, mock_artifact_manager, monkeypatch):
+    def test_bulk_import_validation_performance(
+        self, tmp_path, mock_artifact_manager, monkeypatch
+    ):
         """Bulk import validation <500ms for 20 artifacts.
 
         Verify that validation phase is fast.
@@ -660,9 +676,7 @@ class TestBulkImportPerformance:
         assert result.total_failed > 0
 
         # Verify performance
-        assert (
-            duration < 0.5
-        ), f"Validation took {duration:.3f}s (expected <0.5s)"
+        assert duration < 0.5, f"Validation took {duration:.3f}s (expected <0.5s)"
 
         print(f"\n  ✓ Bulk validation (20 artifacts): {duration*1000:.1f}ms")
 
@@ -813,9 +827,7 @@ class TestPerformanceRegression:
             for i in range(count):
                 skill_dir = skills_dir / f"skill-{i:03d}"
                 skill_dir.mkdir()
-                (skill_dir / "SKILL.md").write_text(
-                    f"---\nname: skill-{i:03d}\n---\n"
-                )
+                (skill_dir / "SKILL.md").write_text(f"---\nname: skill-{i:03d}\n---\n")
 
             service = ArtifactDiscoveryService(tmp_path / f"test-{count}")
 

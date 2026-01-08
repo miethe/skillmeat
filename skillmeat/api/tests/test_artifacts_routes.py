@@ -78,8 +78,12 @@ class TestCreateArtifact:
 
     def test_create_artifact_from_github(self, client, sample_artifact):
         """Test creating artifact from GitHub source."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll_mgr.list_collections.return_value = ["default"]
                 mock_art_mgr.add_from_github.return_value = sample_artifact
 
@@ -106,8 +110,12 @@ class TestCreateArtifact:
         local_path.mkdir(parents=True)
         (local_path / "SKILL.md").write_text("# Test Skill")
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll_mgr.list_collections.return_value = ["default"]
                 mock_art_mgr.add_from_local.return_value = sample_artifact
 
@@ -127,7 +135,9 @@ class TestCreateArtifact:
 
     def test_create_artifact_local_not_found(self, client):
         """Test creating artifact from non-existent local path."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll_mgr.list_collections.return_value = ["default"]
 
             request_data = {
@@ -143,7 +153,9 @@ class TestCreateArtifact:
 
     def test_create_artifact_invalid_type(self, client):
         """Test creating artifact with invalid type."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll_mgr.list_collections.return_value = ["default"]
 
             request_data = {
@@ -159,10 +171,16 @@ class TestCreateArtifact:
 
     def test_create_artifact_duplicate(self, client, sample_artifact):
         """Test creating artifact that already exists."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll_mgr.list_collections.return_value = ["default"]
-                mock_art_mgr.add_from_github.side_effect = ValueError("Artifact already exists")
+                mock_art_mgr.add_from_github.side_effect = ValueError(
+                    "Artifact already exists"
+                )
 
                 request_data = {
                     "source_type": "github",
@@ -177,7 +195,9 @@ class TestCreateArtifact:
 
     def test_create_artifact_no_collection(self, client):
         """Test creating artifact when no collections exist."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll_mgr.list_collections.return_value = []
 
             request_data = {
@@ -197,8 +217,12 @@ class TestUpdateArtifact:
 
     def test_update_artifact_tags(self, client, sample_artifact):
         """Test updating artifact tags."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll = Mock()
                 mock_coll.find_artifact.return_value = sample_artifact
 
@@ -210,20 +234,28 @@ class TestUpdateArtifact:
                     "tags": ["new", "updated"],
                 }
 
-                response = client.put("/api/v1/artifacts/skill:test-skill", json=request_data)
+                response = client.put(
+                    "/api/v1/artifacts/skill:test-skill", json=request_data
+                )
 
                 assert response.status_code == 200
 
     def test_update_artifact_metadata(self, client, sample_artifact):
         """Test updating artifact metadata."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll = Mock()
                 mock_coll.find_artifact.return_value = sample_artifact
 
                 mock_coll_mgr.list_collections.return_value = ["default"]
                 mock_coll_mgr.load_collection.return_value = mock_coll
-                mock_coll_mgr.config.get_collection_path.return_value = Path("/tmp/collection")
+                mock_coll_mgr.config.get_collection_path.return_value = Path(
+                    "/tmp/collection"
+                )
 
                 request_data = {
                     "metadata": {
@@ -232,16 +264,22 @@ class TestUpdateArtifact:
                     }
                 }
 
-                with patch("skillmeat.utils.filesystem.compute_content_hash") as mock_hash:
+                with patch(
+                    "skillmeat.utils.filesystem.compute_content_hash"
+                ) as mock_hash:
                     mock_hash.return_value = "newhash123"
 
-                    response = client.put("/api/v1/artifacts/skill:test-skill", json=request_data)
+                    response = client.put(
+                        "/api/v1/artifacts/skill:test-skill", json=request_data
+                    )
 
                     assert response.status_code == 200
 
     def test_update_artifact_not_found(self, client):
         """Test updating non-existent artifact."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll = Mock()
             mock_coll.find_artifact.return_value = None
 
@@ -252,7 +290,9 @@ class TestUpdateArtifact:
                 "tags": ["test"],
             }
 
-            response = client.put("/api/v1/artifacts/skill:nonexistent", json=request_data)
+            response = client.put(
+                "/api/v1/artifacts/skill:nonexistent", json=request_data
+            )
 
             assert response.status_code == 404
 
@@ -292,14 +332,17 @@ class TestGetArtifactDiff:
             deployed_at=datetime.utcnow(),
             artifact_path=Path("skills/test-skill"),
             content_hash="abc123",
-                    collection_sha="abc123",
+            collection_sha="abc123",
             local_modifications=False,
         )
 
         from skillmeat.storage.deployment import DeploymentTracker
+
         DeploymentTracker.write_deployments(project_path, [deployment])
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll = Mock()
             mock_coll.find_artifact.return_value = sample_artifact
 
@@ -340,14 +383,17 @@ class TestGetArtifactDiff:
             deployed_at=datetime.utcnow(),
             artifact_path=Path("skills/test-skill"),
             content_hash="abc123",
-                    collection_sha="abc123",
+            collection_sha="abc123",
             local_modifications=False,
         )
 
         from skillmeat.storage.deployment import DeploymentTracker
+
         DeploymentTracker.write_deployments(project_path, [deployment])
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll = Mock()
             mock_coll.find_artifact.return_value = sample_artifact
 
@@ -382,7 +428,9 @@ class TestGetArtifactDiff:
         """Test getting diff without providing project_path."""
         response = client.get("/api/v1/artifacts/skill:test-skill/diff")
 
-        assert response.status_code == 422  # Validation error - missing required query param
+        assert (
+            response.status_code == 422
+        )  # Validation error - missing required query param
 
     def test_get_diff_invalid_project_path(self, client):
         """Test getting diff with invalid project path."""
@@ -403,8 +451,12 @@ class TestSyncArtifact:
         project_path.mkdir(parents=True)
         (project_path / ".claude").mkdir(parents=True)
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.sync_manager") as mock_sync_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.sync_manager"
+            ) as mock_sync_mgr:
                 mock_coll = Mock()
                 mock_coll.find_artifact.return_value = sample_artifact
 
@@ -420,7 +472,9 @@ class TestSyncArtifact:
                 mock_deployed.artifact_type = "skill"
                 mock_deployment_metadata.artifacts = [mock_deployed]
 
-                mock_sync_mgr._load_deployment_metadata.return_value = mock_deployment_metadata
+                mock_sync_mgr._load_deployment_metadata.return_value = (
+                    mock_deployment_metadata
+                )
 
                 # Mock sync result
                 mock_sync_result = Mock()
@@ -436,12 +490,13 @@ class TestSyncArtifact:
                     "strategy": "theirs",
                 }
 
-                with patch("skillmeat.utils.filesystem.compute_content_hash") as mock_hash:
+                with patch(
+                    "skillmeat.utils.filesystem.compute_content_hash"
+                ) as mock_hash:
                     mock_hash.return_value = "hash123"
 
                     response = client.post(
-                        "/api/v1/artifacts/skill:test-skill/sync",
-                        json=request_data
+                        "/api/v1/artifacts/skill:test-skill/sync", json=request_data
                     )
 
                     assert response.status_code == 200
@@ -456,8 +511,7 @@ class TestSyncArtifact:
         }
 
         response = client.post(
-            "/api/v1/artifacts/skill:test-skill/sync",
-            json=request_data
+            "/api/v1/artifacts/skill:test-skill/sync", json=request_data
         )
 
         assert response.status_code == 200
@@ -475,8 +529,7 @@ class TestSyncArtifact:
         }
 
         response = client.post(
-            "/api/v1/artifacts/skill:test-skill/sync",
-            json=request_data
+            "/api/v1/artifacts/skill:test-skill/sync", json=request_data
         )
 
         assert response.status_code == 422  # Validation error
@@ -489,8 +542,7 @@ class TestSyncArtifact:
         }
 
         response = client.post(
-            "/api/v1/artifacts/skill:test-skill/sync",
-            json=request_data
+            "/api/v1/artifacts/skill:test-skill/sync", json=request_data
         )
 
         assert response.status_code == 400
@@ -505,9 +557,15 @@ class TestDeployArtifact:
         project_path = tmp_path / "project"
         project_path.mkdir(parents=True)
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
-                with patch("skillmeat.core.deployment.DeploymentManager") as mock_deploy_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
+                with patch(
+                    "skillmeat.core.deployment.DeploymentManager"
+                ) as mock_deploy_mgr:
                     mock_coll = Mock()
                     mock_coll.find_artifact.return_value = sample_artifact
 
@@ -522,12 +580,14 @@ class TestDeployArtifact:
                         deployed_at=datetime.utcnow(),
                         artifact_path=Path("skills/test-skill"),
                         content_hash="abc123",
-                    collection_sha="abc123",
+                        collection_sha="abc123",
                         local_modifications=False,
                     )
 
                     mock_deploy_instance = Mock()
-                    mock_deploy_instance.deploy_artifacts.return_value = [mock_deployment]
+                    mock_deploy_instance.deploy_artifacts.return_value = [
+                        mock_deployment
+                    ]
                     mock_deploy_mgr.return_value = mock_deploy_instance
 
                     request_data = {
@@ -536,8 +596,7 @@ class TestDeployArtifact:
                     }
 
                     response = client.post(
-                        "/api/v1/artifacts/skill:test-skill/deploy",
-                        json=request_data
+                        "/api/v1/artifacts/skill:test-skill/deploy", json=request_data
                     )
 
                     assert response.status_code == 200
@@ -553,8 +612,7 @@ class TestDeployArtifact:
         }
 
         response = client.post(
-            "/api/v1/artifacts/skill:test-skill/deploy",
-            json=request_data
+            "/api/v1/artifacts/skill:test-skill/deploy", json=request_data
         )
 
         assert response.status_code == 400
@@ -565,7 +623,9 @@ class TestDeployArtifact:
         project_path = tmp_path / "project"
         project_path.mkdir(parents=True)
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
             mock_coll = Mock()
             mock_coll.find_artifact.return_value = None
 
@@ -577,8 +637,7 @@ class TestDeployArtifact:
             }
 
             response = client.post(
-                "/api/v1/artifacts/skill:nonexistent/deploy",
-                json=request_data
+                "/api/v1/artifacts/skill:nonexistent/deploy", json=request_data
             )
 
             assert response.status_code == 404
@@ -590,8 +649,12 @@ class TestListArtifacts:
 
     def test_list_artifacts_empty(self, client):
         """Test listing artifacts when collection is empty."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 mock_coll_mgr.list_collections.return_value = ["default"]
                 mock_art_mgr.list_artifacts.return_value = []
 
@@ -604,8 +667,12 @@ class TestListArtifacts:
 
     def test_list_artifacts_with_data(self, client, sample_artifact):
         """Test listing artifacts with data."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 with patch("skillmeat.api.dependencies.app_state.sync_manager"):
                     mock_coll_mgr.list_collections.return_value = ["default"]
                     mock_art_mgr.list_artifacts.return_value = [sample_artifact]
@@ -619,8 +686,12 @@ class TestListArtifacts:
 
     def test_list_artifacts_with_filters(self, client, sample_artifact):
         """Test listing artifacts with type and tag filters."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_coll_mgr:
-            with patch("skillmeat.api.dependencies.app_state.artifact_manager") as mock_art_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_coll_mgr:
+            with patch(
+                "skillmeat.api.dependencies.app_state.artifact_manager"
+            ) as mock_art_mgr:
                 with patch("skillmeat.api.dependencies.app_state.sync_manager"):
                     mock_coll_mgr.list_collections.return_value = ["default"]
                     mock_art_mgr.list_artifacts.return_value = [sample_artifact]

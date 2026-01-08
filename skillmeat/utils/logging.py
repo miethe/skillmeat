@@ -104,9 +104,7 @@ def redact_path(path: Union[str, Path, None]) -> str:
         return "<redacted>"
 
 
-def redact_paths_in_dict(
-    data: dict, path_keys: list[str] = None
-) -> dict:
+def redact_paths_in_dict(data: dict, path_keys: list[str] = None) -> dict:
     """
     Redact paths in dictionary values for safe logging.
 
@@ -149,7 +147,11 @@ def redact_paths_in_dict(
             result[key] = redact_paths_in_dict(value, path_keys)
         elif isinstance(value, list):
             result[key] = [
-                redact_paths_in_dict(item, path_keys) if isinstance(item, dict) else item
+                (
+                    redact_paths_in_dict(item, path_keys)
+                    if isinstance(item, dict)
+                    else item
+                )
                 for item in value
             ]
         else:

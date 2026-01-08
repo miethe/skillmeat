@@ -58,6 +58,38 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 
 ---
 
+## Command-Skill Bindings
+
+**Commands do not automatically load skills.** When executing `/dev:*` or other workflow commands, you MUST explicitly invoke required skills using the `Skill` tool before proceeding.
+
+### Required Skill Invocations
+
+| Command                    | Required Skills                  | Invoke First                                               |
+| -------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `/dev:execute-phase`       | dev-execution, artifact-tracking | `Skill("dev-execution")` then `Skill("artifact-tracking")` |
+| `/dev:quick-feature`       | dev-execution                    | `Skill("dev-execution")`                                   |
+| `/dev:implement-story`     | dev-execution, artifact-tracking | `Skill("dev-execution")` then `Skill("artifact-tracking")` |
+| `/dev:complete-user-story` | dev-execution, artifact-tracking | `Skill("dev-execution")` then `Skill("artifact-tracking")` |
+| `/dev:create-feature`      | dev-execution                    | `Skill("dev-execution")`                                   |
+| `/plan:*`                  | planning                         | `Skill("planning")`                                        |
+| `/mc`                      | (self-contained)                 | No additional skills needed                                |
+
+### Enforcement Protocol
+
+1. **First action** after receiving a listed command: Call `Skill()` for each required skill
+2. **Do not proceed** with any other actions until skills are loaded
+3. **Skill content** provides execution guidance that the command references
+
+### Why This Matters
+
+Commands are prompt templates. Skills are knowledge repositories. Without explicit invocation:
+
+- Referenced file paths like `[.claude/skills/dev-execution/modes/phase-execution.md]` are NOT auto-read
+- Skill guidance is NOT automatically loaded into context
+- The agent operates without the intended workflow knowledge
+
+---
+
 ## Agent Delegation
 
 **Mandatory**: All implementation work MUST be delegated. Opus orchestrates only.
@@ -165,69 +197,54 @@ Task("python-backend-engineer", "Add POST /widgets endpoint", model="sonnet")
 
 ## Orchestration-Driven Development
 
-**Reference**: Use `artifact-tracking` skill for progress tracking of implementation plans.
+**Reference**: Use `artifact-tracking` skill for progress tracking.
 
-### Progress & Context Files
+### File Locations
 
-| File Type | Location | Purpose |
-|-----------|----------|---------|
-| Progress | `.claude/progress/[prd]/phase-N-progress.md` | ONE per phase, tracks tasks |
-| Context | `.claude/worknotes/[prd]/context.md` | ONE per PRD, agent worknotes |
+| Type | Location | Limit |
+|------|----------|-------|
+| Progress | `.claude/progress/[prd]/phase-N-progress.md` | ONE per phase |
+| Context | `.claude/worknotes/[prd]/context.md` | ONE per PRD |
 
-### Progress File Orchestration
+### CLI-First Updates
 
-Progress files include YAML frontmatter optimized for Opus-level orchestration:
+**Use CLI scripts for status updates** (0 agent tokens):
 
-```yaml
-tasks:
-  - id: "TASK-1.1"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]  # REQUIRED
-    model: "opus"                           # Optional: opus (default), sonnet, haiku
-    dependencies: []                        # REQUIRED
+```bash
+# Single task
+python .claude/skills/artifact-tracking/scripts/update-status.py \
+  -f .claude/progress/prd/phase-1-progress.md -t TASK-1.1 -s completed
 
-parallelization:
-  batch_1: ["TASK-1.1", "TASK-1.2"]  # Run in parallel
-  batch_2: ["TASK-2.1"]              # Sequential after batch_1
+# Batch update
+python .claude/skills/artifact-tracking/scripts/update-batch.py \
+  -f FILE --updates "TASK-1.1:completed,TASK-1.2:completed"
 ```
 
-**Key Fields** (REQUIRED for every task):
-- `assigned_to`: Array of agents to delegate to
-- `dependencies`: Array of task IDs that must complete first
-- `model`: Optional - defaults to "opus", use "sonnet"/"haiku" per Model Override Guidelines
+**Use agents only for**: Creating files, updates with context/notes, recording blockers.
 
-### Orchestration Quick Reference
+### Orchestration Workflow
 
-Every progress file includes a markdown section with ready-to-copy Task() commands:
-
-```markdown
-## Orchestration Quick Reference
-
-**Batch 1** (Parallel):
-- TASK-1.1 → `ui-engineer-enhanced` (2h)
-- TASK-1.2 → `python-pro` (1h)
-
-### Task Delegation Commands
-Task("ui-engineer-enhanced", "TASK-1.1: Create component...")
-Task("python-pro", "TASK-1.2: Add API endpoint...")
-```
-
-**Execute batches**: Parallel tasks in one message, sequential batches wait for completion.
+1. **Read YAML frontmatter** → get `parallelization.batch_N` and `tasks[].assigned_to`
+2. **Execute batch in parallel** → single message with multiple Task() calls
+3. **Update via CLI** → `update-batch.py` after tasks complete
+4. **Validate** → `artifact-validator` before marking phase complete
 
 ### Commands
 
 | Command | Purpose |
 |---------|---------|
 | `/dev:execute-phase N` | Execute phase N with orchestration |
-| `skill: artifact-tracking` | Create/update/query progress files |
+| `Skill("artifact-tracking")` | Load skill for complex operations |
 
 ### Token Efficiency
 
-| Operation | Traditional | With Orchestration | Savings |
-|-----------|-------------|-------------------|---------|
-| Read task list | 25KB | 2KB (YAML only) | 92% |
+| Operation | Traditional | CLI-First | Savings |
+|-----------|-------------|-----------|---------|
+| Status update | 25KB | 50 bytes | 99.8% |
+| Batch update (5) | 50KB | 100 bytes | 99.8% |
 | Query blockers | 75KB | 3KB | 96% |
-| Session handoff | 150KB | 5KB | 97% |
+
+Full format spec: `.claude/skills/artifact-tracking/SKILL.md`
 
 ---
 

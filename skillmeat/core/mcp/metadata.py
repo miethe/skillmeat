@@ -86,8 +86,7 @@ class MCPServerMetadata:
 
         if self.name.startswith("."):
             raise ValueError(
-                f"Invalid MCP server name '{self.name}': "
-                "name cannot start with '.'"
+                f"Invalid MCP server name '{self.name}': " "name cannot start with '.'"
             )
 
         # Name must be a valid identifier (alphanumeric, dash, underscore)
@@ -140,9 +139,7 @@ class MCPServerMetadata:
         if self.repo.startswith("http://") or self.repo.startswith("https://"):
             parsed = urlparse(self.repo)
             if not parsed.netloc or not parsed.path:
-                raise ValueError(
-                    f"Invalid repository URL '{self.repo}': malformed URL"
-                )
+                raise ValueError(f"Invalid repository URL '{self.repo}': malformed URL")
             # Validate it's a GitHub URL
             if "github.com" not in parsed.netloc.lower():
                 raise ValueError(

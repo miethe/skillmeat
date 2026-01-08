@@ -33,6 +33,7 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
+from skillmeat.api.dependencies import CollectionManagerDep
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
@@ -248,15 +249,11 @@ async def _validate_manual_map_paths(
     try:
         # Initialize scanner to fetch tree (reuses cached data if available)
         scanner = GitHubScanner()
-        tree = scanner._fetch_tree(owner, repo, ref)
+        tree, _actual_ref = scanner._fetch_tree(owner, repo, ref)
 
         # Extract all directory paths from tree
         # Tree items have "type": "tree" for directories, "type": "blob" for files
-        dir_paths = {
-            item["path"]
-            for item in tree
-            if item.get("type") == "tree"
-        }
+        dir_paths = {item["path"] for item in tree if item.get("type") == "tree"}
 
         # Validate each directory path in manual_map
         invalid_paths = []
@@ -330,6 +327,17 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
     Returns:
         CatalogEntryResponse DTO for API
     """
+    # Compute is_duplicate based on excluded_reason
+    is_duplicate = (
+        entry.excluded_reason
+        in (
+            "duplicate_within_source",
+            "duplicate_cross_source",
+        )
+        if entry.excluded_reason
+        else False
+    )
+
     return CatalogEntryResponse(
         id=entry.id,
         source_id=entry.source_id,
@@ -348,6 +356,7 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         import_id=entry.import_id,
         excluded_at=entry.excluded_at,
         excluded_reason=entry.excluded_reason,
+        is_duplicate=is_duplicate,
     )
 
 
@@ -417,7 +426,9 @@ async def _perform_scan(
     # Retrieve manual_map from source for artifact type override
     manual_map = source.get_manual_map_dict()
     if manual_map:
-        logger.debug(f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}")
+        logger.debug(
+            f"Using manual_map with {len(manual_map)} mapping(s) for source {source_id}"
+        )
 
     try:
         # Get database session for cross-source deduplication
@@ -464,11 +475,13 @@ async def _perform_scan(
                 if extractor:
                     try:
                         segments = extractor.extract(artifact.path)
-                        path_segments_json = json.dumps({
-                            "raw_path": artifact.path,
-                            "extracted": [asdict(s) for s in segments],
-                            "extracted_at": datetime.utcnow().isoformat()
-                        })
+                        path_segments_json = json.dumps(
+                            {
+                                "raw_path": artifact.path,
+                                "extracted": [asdict(s) for s in segments],
+                                "extracted_at": datetime.utcnow().isoformat(),
+                            }
+                        )
                     except Exception as e:
                         logger.error(
                             f"Failed to extract path segments for {artifact.path}: {e}"
@@ -483,9 +496,16 @@ async def _perform_scan(
                     path=artifact.path,
                     upstream_url=artifact.upstream_url,
                     confidence_score=artifact.confidence_score,
+                    raw_score=artifact.raw_score,
+                    score_breakdown=artifact.score_breakdown,
                     detected_sha=artifact.detected_sha,
                     detected_at=datetime.utcnow(),
-                    status="new",
+                    # Copy exclusion status from deduplication engine
+                    status=artifact.status if artifact.status else "new",
+                    excluded_at=datetime.fromisoformat(artifact.excluded_at)
+                    if artifact.excluded_at
+                    else None,
+                    excluded_reason=artifact.excluded_reason,
                     path_segments=path_segments_json,
                 )
                 new_entries.append(entry)
@@ -511,9 +531,7 @@ async def _perform_scan(
                 error_message=str(scan_error),
             )
 
-        logger.error(
-            f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True
-        )
+        logger.error(f"Scan failed for {source.repo_url}: {scan_error}", exc_info=True)
 
         # Return error result (don't raise - let caller decide)
         return ScanResultDTO(
@@ -938,8 +956,12 @@ async def get_source(source_id: str) -> SourceResponse:
         200: {"description": "Source updated successfully"},
         400: {"description": "Bad request - no update parameters provided"},
         404: {"description": "Source not found"},
-        422: {"description": "Validation error - invalid directory path or artifact type"},
-        500: {"description": "Internal server error - GitHub API failure or database error"},
+        422: {
+            "description": "Validation error - invalid directory path or artifact type"
+        },
+        500: {
+            "description": "Internal server error - GitHub API failure or database error"
+        },
     },
 )
 async def update_source(
@@ -1277,8 +1299,10 @@ async def list_artifacts(
     artifact_type: Optional[str] = Query(
         None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
-    status: Optional[str] = Query(
-        None, description="Filter by status (new, updated, removed, imported, excluded)"
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Filter by status (new, updated, removed, imported, excluded)",
     ),
     min_confidence: Optional[int] = Query(
         None, ge=0, le=100, description="Minimum confidence score (0-100)"
@@ -1364,15 +1388,15 @@ async def list_artifacts(
         # Build status filter list
         # When include_excluded=False (default), we exclude entries with status="excluded"
         effective_statuses: Optional[List[str]] = None
-        if status:
+        if status_filter:
             # User specified a status filter - use it directly
-            effective_statuses = [status]
+            effective_statuses = [status_filter]
 
         # Determine if we need filtered query
         # When include_excluded=False and no status filter, we still need to filter
         needs_filtered_query = (
             artifact_type
-            or status
+            or status_filter
             or effective_min_confidence
             or max_confidence
             or not include_excluded
@@ -1390,7 +1414,7 @@ async def list_artifacts(
 
             # Filter out excluded entries if not explicitly requested
             # This handles the case where no status filter was provided
-            if not include_excluded and not status:
+            if not include_excluded and not status_filter:
                 entries = [e for e in entries if e.status != "excluded"]
 
             # Manual pagination for filtered results
@@ -1528,9 +1552,7 @@ async def update_catalog_entry_name(
             session.commit()
             session.refresh(entry)
 
-            logger.info(
-                f"Updated catalog entry name: {entry_id} -> {normalized_name}"
-            )
+            logger.info(f"Updated catalog entry name: {entry_id} -> {normalized_name}")
             return entry_to_response(entry)
 
         except HTTPException:
@@ -1586,6 +1608,7 @@ async def update_catalog_entry_name(
 async def import_artifacts(
     source_id: str,
     request: ImportRequest,
+    collection_mgr: CollectionManagerDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
@@ -1654,7 +1677,7 @@ async def import_artifacts(
             )
 
         # Perform import using ImportCoordinator
-        coordinator = ImportCoordinator()
+        coordinator = ImportCoordinator(collection_mgr=collection_mgr)
         strategy = ConflictStrategy(request.conflict_strategy)
 
         import_result = coordinator.import_entries(

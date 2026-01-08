@@ -60,7 +60,9 @@ class TestSkipIntegration:
         skip_mgr.add_skip("skill:skill-2", "Not needed for this project")
 
         # Run discovery with skip filtering (use collection mode to scan artifacts/)
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(project_path=collection_with_artifacts)
 
         # Should discover 5, but only 3 should be importable (5 - 2 skipped)
@@ -82,7 +84,9 @@ class TestSkipIntegration:
         # Create .claude directory
         (collection_with_artifacts / ".claude").mkdir(exist_ok=True)
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(project_path=collection_with_artifacts)
 
         # All artifacts should be importable
@@ -98,7 +102,9 @@ class TestSkipIntegration:
         for i in range(5):
             skip_mgr.add_skip(f"skill:skill-{i}", f"Skipping skill-{i}")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(project_path=collection_with_artifacts)
 
         # All discovered, none importable
@@ -115,7 +121,9 @@ class TestSkipIntegration:
         skip_mgr.add_skip("skill:skill-0", "Already in collection")
         skip_mgr.add_skip("skill:skill-2", "Not needed for this project")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(
             project_path=collection_with_artifacts, include_skipped=True
         )
@@ -146,7 +154,9 @@ class TestSkipIntegration:
 
         skip_mgr.add_skip("skill:skill-0", "Skipped")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(
             project_path=collection_with_artifacts, include_skipped=False
         )
@@ -216,7 +226,9 @@ class TestSkipIntegration:
     def test_skip_filtering_without_project_path(self, collection_with_artifacts):
         """Test that skip filtering is skipped when project_path not provided."""
         # Don't provide project_path
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(project_path=None)
 
         # All artifacts should be importable (no skip filtering)
@@ -257,7 +269,9 @@ class TestSkipIntegration:
 
         # Performance requirement: total scan + skip filtering < 2 seconds
         # Skip filtering overhead should be minimal (<100ms)
-        assert duration_ms < 2000, f"Discovery took {duration_ms:.2f}ms (expected <2000ms)"
+        assert (
+            duration_ms < 2000
+        ), f"Discovery took {duration_ms:.2f}ms (expected <2000ms)"
 
         print(
             f"\n  Performance: Discovered {result.discovered_count} artifacts "
@@ -273,12 +287,16 @@ class TestSkipIntegration:
         skip_path = collection_with_artifacts / ".claude" / ".skillmeat_skip_prefs.toml"
         skip_path.write_text("invalid toml [[[")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(project_path=collection_with_artifacts)
 
         # Should not crash, gracefully handle corrupt file
         assert result.discovered_count == 5
-        assert result.importable_count == 5  # No skip filtering due to error (loads empty)
+        assert (
+            result.importable_count == 5
+        )  # No skip filtering due to error (loads empty)
 
         # No errors added to result (just logged as warning)
         # This is expected behavior - corrupt file is handled gracefully
@@ -336,7 +354,9 @@ class TestSkipIntegration:
         skip_mgr.add_skip("skill:skill-0", "Already deployed to production")
         skip_mgr.add_skip("skill:skill-1", "Incompatible with current setup")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
         result = service.discover_artifacts(
             project_path=collection_with_artifacts, include_skipped=True
         )
@@ -348,9 +368,7 @@ class TestSkipIntegration:
         assert skipped_dict["skill-0"].skip_reason == "Already deployed to production"
 
         assert "skill-1" in skipped_dict
-        assert (
-            skipped_dict["skill-1"].skip_reason == "Incompatible with current setup"
-        )
+        assert skipped_dict["skill-1"].skip_reason == "Incompatible with current setup"
 
     def test_skip_filtering_empty_project_directory(self, collection_with_artifacts):
         """Test skip filtering when project directory doesn't have .claude/."""
@@ -358,7 +376,9 @@ class TestSkipIntegration:
         project_path = collection_with_artifacts / "empty_project"
         project_path.mkdir()
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
 
         # Should handle missing .claude/ gracefully
         result = service.discover_artifacts(project_path=project_path)
@@ -367,11 +387,15 @@ class TestSkipIntegration:
         assert result.discovered_count == 5
         assert result.importable_count == 5
 
-    def test_skip_filtering_with_nonexistent_project_path(self, collection_with_artifacts):
+    def test_skip_filtering_with_nonexistent_project_path(
+        self, collection_with_artifacts
+    ):
         """Test skip filtering with nonexistent project path."""
         nonexistent_path = collection_with_artifacts / "does_not_exist"
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
 
         # Should handle gracefully (skip filtering skipped)
         result = service.discover_artifacts(project_path=nonexistent_path)
@@ -463,7 +487,9 @@ class TestSkipPreferenceEdgeCases:
 class TestSkipLogging:
     """Tests for skip filtering logging and metrics."""
 
-    def test_skip_filtering_logs_filtered_count(self, collection_with_artifacts, caplog):
+    def test_skip_filtering_logs_filtered_count(
+        self, collection_with_artifacts, caplog
+    ):
         """Test that skip filtering logs the number of filtered artifacts."""
         (collection_with_artifacts / ".claude").mkdir(exist_ok=True)
         skip_mgr = SkipPreferenceManager(collection_with_artifacts)
@@ -472,7 +498,9 @@ class TestSkipLogging:
         skip_mgr.add_skip("skill:skill-0", "Skip 0")
         skip_mgr.add_skip("skill:skill-2", "Skip 2")
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
 
         import logging
 
@@ -480,7 +508,10 @@ class TestSkipLogging:
             result = service.discover_artifacts(project_path=collection_with_artifacts)
 
         # Should log skip filtering summary
-        assert any("Filtered 2 skipped artifacts" in record.message for record in caplog.records)
+        assert any(
+            "Filtered 2 skipped artifacts" in record.message
+            for record in caplog.records
+        )
 
     def test_skip_filtering_logs_performance(self, tmp_path, caplog):
         """Test that skip filtering logs performance metrics."""
@@ -507,14 +538,18 @@ class TestSkipLogging:
             result = service.discover_artifacts(project_path=tmp_path)
 
         # Should log skip filtering performance
-        assert any("skipped artifacts" in record.message.lower() for record in caplog.records)
+        assert any(
+            "skipped artifacts" in record.message.lower() for record in caplog.records
+        )
         assert any("ms" in record.message for record in caplog.records)
 
     def test_no_skips_logs_debug_message(self, collection_with_artifacts, caplog):
         """Test that discovery logs debug message when no artifacts are skipped."""
         (collection_with_artifacts / ".claude").mkdir(exist_ok=True)
 
-        service = ArtifactDiscoveryService(collection_with_artifacts, scan_mode="collection")
+        service = ArtifactDiscoveryService(
+            collection_with_artifacts, scan_mode="collection"
+        )
 
         import logging
 

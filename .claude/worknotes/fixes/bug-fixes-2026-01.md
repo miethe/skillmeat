@@ -1,0 +1,158 @@
+# Bug Fixes - January 2026
+
+## Marketplace Scan Fails with CHECK Constraint Error for MCP Artifacts
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-scanner
+
+**Issue**: When adding a new marketplace source with a large number (1000+) of detected artifacts, the scan fails with `CHECK constraint failed: check_catalog_artifact_type` during bulk insert of catalog entries.
+
+**Root Cause**: The `ArtifactType.MCP` enum has value `"mcp"`, but the database CHECK constraint in `marketplace_catalog_entries` table only accepted `"mcp_server"`. This was a naming mismatch between the Python enum definition and the legacy database schema.
+
+The heuristic detector correctly identifies MCP artifacts using `ArtifactType.MCP` (value: `"mcp"`), but when these are inserted into the database, the constraint `artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', ...)` rejects the value.
+
+**Fix**: Added `'mcp'` to all artifact_type CHECK constraints while keeping `'mcp_server'` for backward compatibility with existing data.
+
+**Files Modified**:
+- `skillmeat/cache/models.py` - Updated 3 CHECK constraints:
+  - `check_artifact_type` (Artifact model)
+  - `check_marketplace_type` (MarketplaceEntry model)
+  - `check_catalog_artifact_type` (MarketplaceCatalogEntry model)
+- `skillmeat/cache/schema.py` - Updated 3 CHECK constraints in raw schema
+- `skillmeat/cache/migrations/versions/20260108_1700_add_mcp_to_type_constraints.py` - New migration to update existing databases
+
+**Testing**:
+- All marketplace cache tests pass
+- Migration applies cleanly using batch_alter_table for SQLite compatibility
+- Verified constraint now accepts both `'mcp'` and `'mcp_server'` values
+
+**Status**: RESOLVED
+
+---
+
+## List Artifacts Endpoint Fails with 500 Error Due to Variable Shadowing
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-sources-api
+
+**Issue**: When viewing low-confidence artifacts in the marketplace, the API returns a 500 error: `AttributeError: 'NoneType' object has no attribute 'HTTP_500_INTERNAL_SERVER_ERROR'`.
+
+**Root Cause**: The `list_artifacts` endpoint had a query parameter named `status` which shadowed the imported `fastapi.status` module. When the query parameter was `None` (no filter provided), the exception handler tried to access `None.HTTP_500_INTERNAL_SERVER_ERROR` instead of `fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR`.
+
+```python
+# Line 1302 - query parameter shadows the module
+status: Optional[str] = Query(None, ...)
+
+# Line 1471 - exception handler references the shadowed name
+raise HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  # status is None!
+    ...
+)
+```
+
+**Fix**: Renamed the query parameter from `status` to `status_filter` with `alias="status"` to maintain API compatibility.
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py`:
+  - Renamed parameter `status` → `status_filter` (line 1302)
+  - Added `alias="status"` for backwards compatibility
+  - Updated all internal references to use `status_filter`
+
+**Testing**: Verified function signature and status module accessibility
+
+**Status**: RESOLVED
+
+---
+
+## CatalogEntryResponse Validation Error for MCP Artifact Type
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-schemas
+
+**Issue**: When viewing low-confidence detected artifacts from a marketplace source, the API fails with Pydantic validation error: `Input should be 'skill', 'command', 'agent', 'mcp_server' or 'hook'`.
+
+**Root Cause**: Continuation of the MCP artifact type naming mismatch. While the database CHECK constraints were updated to accept `'mcp'`, the Pydantic response schema `CatalogEntryResponse` still used a Literal type that only accepted the old values.
+
+```python
+# Before fix - rejected 'mcp' values from database
+artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"]
+```
+
+**Fix**: Added `'mcp'` to the Literal type annotations in Pydantic schemas.
+
+**Files Modified**:
+- `skillmeat/api/schemas/marketplace.py`:
+  - Line 1038: `CatalogEntryResponse.artifact_type` - Added 'mcp' to Literal type
+  - Line 2132: `ManualMapEntry.artifact_type` - Added 'mcp' to Literal type
+
+**Testing**: Response schema now accepts both 'mcp' and 'mcp_server' values
+
+**Status**: RESOLVED
+
+---
+
+## Frontend Crash When Displaying MCP Artifacts
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: web-frontend
+
+**Issue**: When toggling to view detected artifacts in the marketplace sources page, the app crashes with `TypeError: Cannot read properties of undefined (reading 'color')` at CatalogCard (page.tsx:148:81).
+
+**Root Cause**: The frontend UI config objects (typeConfig, artifactTypeIcons, artifactTypeLabels, etc.) only had entries for `mcp_server`, not `mcp`. When artifacts with `artifact_type='mcp'` were returned from the API, the config lookup returned `undefined`, causing the property access to fail.
+
+**Fix**: Added `'mcp'` entries to all artifact type config objects in the frontend, using the same orange color scheme as `mcp_server`.
+
+**Files Modified**:
+- `skillmeat/web/types/marketplace.ts`: Added 'mcp' to ArtifactType union type
+- `skillmeat/web/app/marketplace/sources/[id]/page.tsx`: Added 'mcp' to typeConfig
+- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-list.tsx`: Added 'mcp' to 5 config objects:
+  - artifactTypeIcons
+  - artifactTypeLabels
+  - artifactTypeIconColors
+  - artifactTypeRowTints
+  - artifactTypeBorderAccents
+
+**Testing**: UI now renders 'mcp' artifacts with orange styling matching 'mcp_server'
+
+**Status**: RESOLVED
+
+---
+
+## Hook Artifact Detection Has Inconsistent Low Confidence Scores
+
+**Date Fixed**: 2026-01-08
+**Severity**: medium
+**Component**: marketplace-heuristic-detector
+
+**Issue**: Hook artifacts detected from marketplace sources have unexpectedly low confidence scores. A hook at path `cli-tool/components/hooks/development-tools` with 8 files had a raw score of 49 (normalized to 31%), when it should score higher due to being inside an appropriately named parent directory (`hooks`).
+
+**Root Cause**: Signal ordering bug in `_score_directory` and `_calculate_marketplace_confidence` methods. The parent_hint bonus (+15 pts) was calculated BEFORE container_hint inference, so when artifact_type was inferred from container_hint (e.g., HOOK from hooks/ directory), the parent_hint scoring returned 0 because artifact_type was still None at that point.
+
+**Signal ordering before fix**:
+1. Signal 4: `_score_parent_hint(path, artifact_type)` → returns 0 if artifact_type is None
+2. Signal 6: Container hint inference → sets artifact_type = container_hint if None (too late!)
+
+**Fix**: Reordered signals so container_hint inference happens BEFORE parent_hint scoring:
+1. Signal 4 (NEW): Container hint inference - if artifact_type is None and container_hint exists, set artifact_type = container_hint (+12 pts)
+2. Signal 5: Parent hint bonus - now artifact_type is set, so parent_hint works correctly (+15 pts)
+3. Signal 7: Container hint match bonus - only gives full 25 pts if type was already detected (not inferred)
+
+**Files Modified**:
+- `skillmeat/core/marketplace/heuristic_detector.py`:
+  - `_score_directory` method (lines ~1207-1280): Reordered signals 4-7
+  - `_calculate_marketplace_confidence` method (lines ~2015-2083): Same reordering
+
+**Testing**:
+- All 212 heuristic detector tests pass
+- Verified scoring with test paths:
+  - Path inside `hooks/` container now correctly gets both container_hint (+12) AND parent_hint (+15)
+  - Before fix: hooks/development-tools scored ~13-15 raw
+  - After fix: hooks/development-tools scores ~28-48 raw (depending on other signals)
+
+**Impact**: Artifacts inside typed containers that were previously missing the parent_hint bonus now score 8-12 percentage points higher (normalized), making them more likely to exceed the confidence threshold for display.
+
+**Status**: RESOLVED

@@ -116,7 +116,9 @@ class ClaudeHubBroker(MarketplaceBroker):
         cache_key = f"listings:{page}:{page_size}:{str(filters)}"
 
         try:
-            response = self._make_request("GET", url, cache_key=cache_key, params=params)
+            response = self._make_request(
+                "GET", url, cache_key=cache_key, params=params
+            )
             data = response.json()
 
             # Transform Claude Hub format to SkillMeat format
@@ -137,7 +139,9 @@ class ClaudeHubBroker(MarketplaceBroker):
             return listings
 
         except Exception as e:
-            raise MarketplaceBrokerError(f"Failed to fetch Claude Hub listings: {e}") from e
+            raise MarketplaceBrokerError(
+                f"Failed to fetch Claude Hub listings: {e}"
+            ) from e
 
     def _transform_claude_to_skillmeat(self, claude_item: Dict) -> MarketplaceListing:
         """Transform Claude Hub artifact format to SkillMeat listing format.
@@ -207,7 +211,7 @@ class ClaudeHubBroker(MarketplaceBroker):
                 "(must start with 'claudehub-')"
             )
 
-        claude_id = listing_id[len("claudehub-"):]
+        claude_id = listing_id[len("claudehub-") :]
 
         # Get artifact details
         url = f"{self.endpoint}/artifacts/{claude_id}"

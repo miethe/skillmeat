@@ -39,9 +39,7 @@ def create_deployment_version(
     """
     # Check if version already exists (content-based dedup)
     existing = (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=content_hash)
-        .first()
+        session.query(ArtifactVersion).filter_by(content_hash=content_hash).first()
     )
 
     if existing:
@@ -86,9 +84,7 @@ def create_sync_version(
     """
     # Check if version already exists (content-based dedup)
     existing = (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=content_hash)
-        .first()
+        session.query(ArtifactVersion).filter_by(content_hash=content_hash).first()
     )
 
     if existing:
@@ -96,9 +92,7 @@ def create_sync_version(
 
     # Build lineage: parent's lineage + current hash
     parent_version = (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=parent_hash)
-        .first()
+        session.query(ArtifactVersion).filter_by(content_hash=parent_hash).first()
     )
 
     if parent_version and parent_version.version_lineage:
@@ -147,9 +141,7 @@ def create_local_modification_version(
     """
     # Check if version already exists (content-based dedup)
     existing = (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=content_hash)
-        .first()
+        session.query(ArtifactVersion).filter_by(content_hash=content_hash).first()
     )
 
     if existing:
@@ -157,9 +149,7 @@ def create_local_modification_version(
 
     # Build lineage: parent's lineage + current hash
     parent_version = (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=parent_hash)
-        .first()
+        session.query(ArtifactVersion).filter_by(content_hash=parent_hash).first()
     )
 
     if parent_version and parent_version.version_lineage:
@@ -216,8 +206,4 @@ def get_version_by_hash(
     Returns:
         ArtifactVersion or None if not found
     """
-    return (
-        session.query(ArtifactVersion)
-        .filter_by(content_hash=content_hash)
-        .first()
-    )
+    return session.query(ArtifactVersion).filter_by(content_hash=content_hash).first()

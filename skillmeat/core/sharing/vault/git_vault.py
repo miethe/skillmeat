@@ -114,7 +114,11 @@ class GitVaultConnector(VaultConnector):
             raise ValueError("File URLs are not supported for security reasons")
 
         # Validate SSH or HTTPS
-        if not (url.startswith("git@") or url.startswith("https://") or url.startswith("ssh://")):
+        if not (
+            url.startswith("git@")
+            or url.startswith("https://")
+            or url.startswith("ssh://")
+        ):
             raise ValueError(
                 f"Invalid Git URL: {url}. "
                 f"Must use SSH (git@...) or HTTPS (https://...)"
@@ -165,7 +169,10 @@ class GitVaultConnector(VaultConnector):
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.decode() if e.stderr else str(e)
-            if "Authentication failed" in error_msg or "permission denied" in error_msg.lower():
+            if (
+                "Authentication failed" in error_msg
+                or "permission denied" in error_msg.lower()
+            ):
                 raise VaultAuthError(f"Git authentication failed: {error_msg}")
             raise VaultConnectionError(f"Failed to clone repository: {error_msg}")
         except Exception as e:
@@ -258,11 +265,13 @@ class GitVaultConnector(VaultConnector):
                 json.dump(index, f, indent=2, sort_keys=True)
 
             # Git add, commit, and push
-            self._git_add([
-                str(dest_path.relative_to(self.clone_path)),
-                str(metadata_path.relative_to(self.clone_path)),
-                self.METADATA_FILENAME,
-            ])
+            self._git_add(
+                [
+                    str(dest_path.relative_to(self.clone_path)),
+                    str(metadata_path.relative_to(self.clone_path)),
+                    self.METADATA_FILENAME,
+                ]
+            )
 
             commit_msg = (
                 f"Add bundle: {bundle_metadata.name} v{bundle_metadata.version}\n\n"
@@ -308,7 +317,9 @@ class GitVaultConnector(VaultConnector):
             self._git_pull()
 
             # Find bundle file
-            bundle_path = self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            bundle_path = (
+                self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            )
 
             if not bundle_path.exists():
                 raise VaultNotFoundError(f"Bundle not found in vault: {bundle_id}")
@@ -413,7 +424,9 @@ class GitVaultConnector(VaultConnector):
             # Pull latest changes
             self._git_pull()
 
-            bundle_path = self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            bundle_path = (
+                self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            )
             metadata_path = self.clone_path / self.METADATA_DIR / f"{bundle_id}.json"
 
             if not bundle_path.exists():
@@ -464,7 +477,9 @@ class GitVaultConnector(VaultConnector):
 
         try:
             self._git_pull()
-            bundle_path = self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            bundle_path = (
+                self.clone_path / self.BUNDLES_DIR / f"{bundle_id}.skillmeat-pack"
+            )
             return bundle_path.exists()
         except Exception:
             return False
@@ -508,7 +523,16 @@ class GitVaultConnector(VaultConnector):
         """
         env = self._get_git_env()
 
-        cmd = ["git", "clone", "--depth", "1", "--branch", self.branch, self.url, str(self.clone_path)]
+        cmd = [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            self.branch,
+            self.url,
+            str(self.clone_path),
+        ]
 
         result = subprocess.run(
             cmd,
@@ -600,8 +624,10 @@ class GitVaultConnector(VaultConnector):
         cmd = [
             "git",
             "commit",
-            "-m", message,
-            "--author", f"{self.commit_author} <{self.commit_email}>",
+            "-m",
+            message,
+            "--author",
+            f"{self.commit_author} <{self.commit_email}>",
         ]
 
         result = subprocess.run(
@@ -640,6 +666,7 @@ class GitVaultConnector(VaultConnector):
             Environment dict
         """
         import os
+
         env = os.environ.copy()
 
         # Configure SSH key if provided

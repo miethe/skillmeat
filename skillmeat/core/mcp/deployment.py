@@ -66,10 +66,17 @@ class MCPDeploymentManager:
         system = platform.system()
 
         if system == "Darwin":  # macOS
-            return Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+            return (
+                Path.home()
+                / "Library"
+                / "Application Support"
+                / "Claude"
+                / "claude_desktop_config.json"
+            )
         elif system == "Windows":
             # Use APPDATA environment variable
             import os
+
             appdata = os.environ.get("APPDATA")
             if not appdata:
                 raise RuntimeError("APPDATA environment variable not found")
@@ -95,12 +102,16 @@ class MCPDeploymentManager:
             settings_path = self.get_settings_path()
 
         if not settings_path.exists():
-            console.print("[yellow]No existing settings.json found, will create new one[/yellow]")
+            console.print(
+                "[yellow]No existing settings.json found, will create new one[/yellow]"
+            )
             return None
 
         # Create backup with timestamp
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        backup_path = settings_path.parent / f"claude_desktop_config.backup.{timestamp}.json"
+        backup_path = (
+            settings_path.parent / f"claude_desktop_config.backup.{timestamp}.json"
+        )
 
         try:
             shutil.copy2(settings_path, backup_path)
@@ -109,7 +120,9 @@ class MCPDeploymentManager:
         except Exception as e:
             raise IOError(f"Failed to create backup: {e}")
 
-    def restore_settings(self, backup_path: Path, settings_path: Optional[Path] = None) -> bool:
+    def restore_settings(
+        self, backup_path: Path, settings_path: Optional[Path] = None
+    ) -> bool:
         """Restore settings.json from backup.
 
         Args:
@@ -152,14 +165,16 @@ class MCPDeploymentManager:
             return {}
 
         try:
-            with open(settings_path, 'r', encoding='utf-8') as f:
+            with open(settings_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in settings file: {e}")
         except Exception as e:
             raise IOError(f"Failed to read settings: {e}")
 
-    def write_settings(self, settings: Dict[str, Any], settings_path: Optional[Path] = None) -> None:
+    def write_settings(
+        self, settings: Dict[str, Any], settings_path: Optional[Path] = None
+    ) -> None:
         """Write settings to settings.json atomically.
 
         Uses temp file + atomic rename pattern for safety.
@@ -182,13 +197,13 @@ class MCPDeploymentManager:
             dir=settings_path.parent,
             prefix=".claude_desktop_config.tmp.",
             suffix=".json",
-            text=True
+            text=True,
         )
 
         try:
-            with open(temp_fd, 'w', encoding='utf-8') as f:
+            with open(temp_fd, "w", encoding="utf-8") as f:
                 json.dump(settings, f, indent=2, ensure_ascii=False)
-                f.write('\n')  # Add trailing newline
+                f.write("\n")  # Add trailing newline
 
             # Atomic rename
             Path(temp_path).replace(settings_path)
@@ -201,7 +216,9 @@ class MCPDeploymentManager:
                 pass
             raise IOError(f"Failed to write settings: {e}")
 
-    def is_server_deployed(self, name: str, settings_path: Optional[Path] = None) -> bool:
+    def is_server_deployed(
+        self, name: str, settings_path: Optional[Path] = None
+    ) -> bool:
         """Check if MCP server is already deployed.
 
         Args:
@@ -296,12 +313,14 @@ class MCPDeploymentManager:
             )
 
         try:
-            with open(package_json, 'r', encoding='utf-8') as f:
+            with open(package_json, "r", encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid package.json: {e}")
 
-    def _resolve_command_from_package(self, package_data: Dict[str, Any]) -> tuple[str, List[str]]:
+    def _resolve_command_from_package(
+        self, package_data: Dict[str, Any]
+    ) -> tuple[str, List[str]]:
         """Resolve command and args from package.json.
 
         Common patterns:
@@ -453,7 +472,9 @@ class MCPDeploymentManager:
 
                 # Check if server already exists
                 if server.name in settings["mcpServers"]:
-                    console.print(f"[yellow]Server '{server.name}' already exists, updating...[/yellow]")
+                    console.print(
+                        f"[yellow]Server '{server.name}' already exists, updating...[/yellow]"
+                    )
 
                 # Add/update server config
                 settings["mcpServers"][server.name] = server_config
@@ -461,7 +482,9 @@ class MCPDeploymentManager:
                 # Write updated settings
                 self.write_settings(settings, settings_path)
 
-                console.print(f"[green]Server '{server.name}' deployed to settings.json[/green]")
+                console.print(
+                    f"[green]Server '{server.name}' deployed to settings.json[/green]"
+                )
 
                 # Scaffold environment variables if needed
                 env_file_path = None
@@ -530,6 +553,7 @@ class MCPDeploymentManager:
         else:
             # Use collection directory
             from skillmeat.config import ConfigManager
+
             config = ConfigManager()
             collection_path = config.get_collections_dir()
             env_file = collection_path / ".env"
@@ -538,14 +562,16 @@ class MCPDeploymentManager:
         existing_vars = {}
         if env_file.exists():
             try:
-                with open(env_file, 'r', encoding='utf-8') as f:
+                with open(env_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line and not line.startswith('#') and '=' in line:
-                            key, value = line.split('=', 1)
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
                             existing_vars[key.strip()] = value.strip()
             except Exception as e:
-                console.print(f"[yellow]Warning: Failed to read existing .env: {e}[/yellow]")
+                console.print(
+                    f"[yellow]Warning: Failed to read existing .env: {e}[/yellow]"
+                )
 
         # Add new variables with prefix
         server_prefix = f"MCP_{server.name.upper().replace('-', '_')}_"
@@ -560,7 +586,7 @@ class MCPDeploymentManager:
         try:
             env_file.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(env_file, 'w', encoding='utf-8') as f:
+            with open(env_file, "w", encoding="utf-8") as f:
                 f.write(f"# Environment variables for SkillMeat MCP servers\n")
                 f.write(f"# Generated on {datetime.utcnow().isoformat()}\n\n")
 
@@ -571,7 +597,9 @@ class MCPDeploymentManager:
 
             # Show instructions for sensitive values
             if new_vars:
-                console.print("\n[yellow]NOTE: Update sensitive values in .env before use:[/yellow]")
+                console.print(
+                    "\n[yellow]NOTE: Update sensitive values in .env before use:[/yellow]"
+                )
                 for key in new_vars:
                     console.print(f"  {key}")
                 console.print()

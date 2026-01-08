@@ -110,7 +110,9 @@ class TestListSnapshots:
             "def789ghi012",  # next cursor
         )
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots?limit=1")
 
             assert response.status_code == 200
@@ -127,7 +129,9 @@ class TestListSnapshots:
         cursor = base64.b64encode("abc123def456".encode()).decode()
         mock_mgr.list_snapshots.return_value = ([sample_snapshot], None)
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get(f"/api/v1/versions/snapshots?after={cursor}")
 
             assert response.status_code == 200
@@ -140,7 +144,9 @@ class TestListSnapshots:
         """Test listing with invalid cursor format."""
         mock_mgr = Mock()
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots?after=invalid-base64!")
 
             assert response.status_code == 400
@@ -151,7 +157,9 @@ class TestListSnapshots:
         mock_mgr = Mock()
         mock_mgr.list_snapshots.return_value = ([sample_snapshot], None)
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots?collection_name=default")
 
             assert response.status_code == 200
@@ -164,7 +172,9 @@ class TestListSnapshots:
         mock_mgr = Mock()
         mock_mgr.list_snapshots.return_value = ([], None)
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots")
 
             assert response.status_code == 200
@@ -177,7 +187,9 @@ class TestListSnapshots:
         mock_mgr = Mock()
         mock_mgr.list_snapshots.return_value = ([], None)
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             # Test minimum limit
             response = client.get("/api/v1/versions/snapshots?limit=1")
             assert response.status_code == 200
@@ -199,7 +211,9 @@ class TestListSnapshots:
         mock_mgr = Mock()
         mock_mgr.list_snapshots.side_effect = Exception("Database error")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots")
 
             assert response.status_code == 500
@@ -219,7 +233,9 @@ class TestGetSnapshot:
         mock_mgr = Mock()
         mock_mgr.get_snapshot.return_value = sample_snapshot
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots/abc123def456")
 
             assert response.status_code == 200
@@ -234,19 +250,27 @@ class TestGetSnapshot:
         mock_mgr = Mock()
         mock_mgr.get_snapshot.return_value = None
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots/nonexistent")
 
             assert response.status_code == 404
-            assert "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            assert (
+                "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            )
 
     def test_get_snapshot_with_collection(self, client, sample_snapshot):
         """Test getting snapshot with collection name specified."""
         mock_mgr = Mock()
         mock_mgr.get_snapshot.return_value = sample_snapshot
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
-            response = client.get("/api/v1/versions/snapshots/abc123def456?collection_name=default")
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
+            response = client.get(
+                "/api/v1/versions/snapshots/abc123def456?collection_name=default"
+            )
 
             assert response.status_code == 200
             mock_mgr.get_snapshot.assert_called_once_with("abc123def456", "default")
@@ -256,7 +280,9 @@ class TestGetSnapshot:
         mock_mgr = Mock()
         mock_mgr.get_snapshot.side_effect = Exception("IO error")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get("/api/v1/versions/snapshots/abc123def456")
 
             assert response.status_code == 500
@@ -276,7 +302,9 @@ class TestCreateSnapshot:
         mock_mgr = Mock()
         mock_mgr.create_snapshot.return_value = sample_snapshot
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "collection_name": "default",
                 "message": "Test snapshot",
@@ -300,7 +328,9 @@ class TestCreateSnapshot:
         mock_mgr = Mock()
         mock_mgr.create_snapshot.return_value = sample_snapshot
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "collection_name": "default",
             }
@@ -316,7 +346,9 @@ class TestCreateSnapshot:
             "Collection 'nonexistent' not found"
         )
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "collection_name": "nonexistent",
                 "message": "Test",
@@ -332,7 +364,9 @@ class TestCreateSnapshot:
         mock_mgr = Mock()
         mock_mgr.create_snapshot.return_value = sample_snapshot
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "message": "Test snapshot",
             }
@@ -345,7 +379,9 @@ class TestCreateSnapshot:
         """Test creating snapshot with message exceeding max length."""
         mock_mgr = Mock()
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "message": "x" * 501,  # Max is 500
             }
@@ -359,7 +395,9 @@ class TestCreateSnapshot:
         mock_mgr = Mock()
         mock_mgr.create_snapshot.side_effect = Exception("Disk full")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "message": "Test",
             }
@@ -383,39 +421,39 @@ class TestDeleteSnapshot:
         mock_mgr = Mock()
         mock_mgr.delete_snapshot.return_value = None
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.delete("/api/v1/versions/snapshots/abc123def456")
 
             assert response.status_code == 204
             assert response.content == b""
 
-            mock_mgr.delete_snapshot.assert_called_once_with(
-                "abc123def456", None
-            )
+            mock_mgr.delete_snapshot.assert_called_once_with("abc123def456", None)
 
     def test_delete_snapshot_with_collection(self, client):
         """Test deleting snapshot with collection specified."""
         mock_mgr = Mock()
         mock_mgr.delete_snapshot.return_value = None
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.delete(
                 "/api/v1/versions/snapshots/abc123def456?collection_name=default"
             )
 
             assert response.status_code == 204
-            mock_mgr.delete_snapshot.assert_called_once_with(
-                "abc123def456", "default"
-            )
+            mock_mgr.delete_snapshot.assert_called_once_with("abc123def456", "default")
 
     def test_delete_snapshot_not_found(self, client):
         """Test deleting non-existent snapshot."""
         mock_mgr = Mock()
-        mock_mgr.delete_snapshot.side_effect = ValueError(
-            "Snapshot not found"
-        )
+        mock_mgr.delete_snapshot.side_effect = ValueError("Snapshot not found")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.delete("/api/v1/versions/snapshots/nonexistent")
 
             assert response.status_code == 404
@@ -426,7 +464,9 @@ class TestDeleteSnapshot:
         mock_mgr = Mock()
         mock_mgr.delete_snapshot.side_effect = Exception("Permission denied")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.delete("/api/v1/versions/snapshots/abc123def456")
 
             assert response.status_code == 500
@@ -454,7 +494,9 @@ class TestAnalyzeRollbackSafety:
         )
         mock_mgr.analyze_rollback_safety.return_value = analysis
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get(
                 "/api/v1/versions/snapshots/abc123def456/rollback-analysis"
             )
@@ -479,7 +521,9 @@ class TestAnalyzeRollbackSafety:
         )
         mock_mgr.analyze_rollback_safety.return_value = analysis
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get(
                 "/api/v1/versions/snapshots/abc123def456/rollback-analysis"
             )
@@ -493,11 +537,11 @@ class TestAnalyzeRollbackSafety:
     def test_analyze_rollback_snapshot_not_found(self, client):
         """Test rollback analysis for non-existent snapshot."""
         mock_mgr = Mock()
-        mock_mgr.analyze_rollback_safety.side_effect = ValueError(
-            "Snapshot not found"
-        )
+        mock_mgr.analyze_rollback_safety.side_effect = ValueError("Snapshot not found")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get(
                 "/api/v1/versions/snapshots/nonexistent/rollback-analysis"
             )
@@ -517,7 +561,9 @@ class TestAnalyzeRollbackSafety:
         )
         mock_mgr.analyze_rollback_safety.return_value = analysis
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             response = client.get(
                 "/api/v1/versions/snapshots/abc123def456/rollback-analysis?collection_name=default"
             )
@@ -550,7 +596,9 @@ class TestRollback:
         )
         mock_mgr.intelligent_rollback.return_value = result
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id": "abc123def456",
                 "collection_name": "default",
@@ -591,7 +639,9 @@ class TestRollback:
         )
         mock_mgr.intelligent_rollback.return_value = result
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id": "abc123def456",
                 "preserve_changes": True,
@@ -622,7 +672,9 @@ class TestRollback:
         )
         mock_mgr.intelligent_rollback.return_value = result
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id": "abc123def456",
                 "preserve_changes": False,
@@ -642,11 +694,11 @@ class TestRollback:
     def test_rollback_snapshot_not_found(self, client):
         """Test rollback with non-existent snapshot."""
         mock_mgr = Mock()
-        mock_mgr.intelligent_rollback.side_effect = ValueError(
-            "Snapshot not found"
-        )
+        mock_mgr.intelligent_rollback.side_effect = ValueError("Snapshot not found")
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id": "nonexistent",
             }
@@ -689,11 +741,15 @@ class TestDiffSnapshots:
 
         # Create mock tarballs
         import tarfile
+
         for snapshot in [sample_snapshot, snapshot2]:
             with tarfile.open(snapshot.tarball_path, "w:gz") as tar:
                 # Add empty directory
                 (tmp_path / snapshot.collection_name).mkdir(exist_ok=True)
-                tar.add(tmp_path / snapshot.collection_name, arcname=snapshot.collection_name)
+                tar.add(
+                    tmp_path / snapshot.collection_name,
+                    arcname=snapshot.collection_name,
+                )
 
         mock_mgr.get_snapshot.side_effect = [sample_snapshot, snapshot2]
 
@@ -714,15 +770,22 @@ class TestDiffSnapshots:
         )
         mock_diff_engine.diff_directories.return_value = diff_result
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
-            with patch("skillmeat.api.routers.versions.get_diff_engine", return_value=mock_diff_engine):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
+            with patch(
+                "skillmeat.api.routers.versions.get_diff_engine",
+                return_value=mock_diff_engine,
+            ):
                 request_data = {
                     "snapshot_id_1": "abc123def456",
                     "snapshot_id_2": "def789ghi012",
                     "collection_name": "default",
                 }
 
-                response = client.post("/api/v1/versions/snapshots/diff", json=request_data)
+                response = client.post(
+                    "/api/v1/versions/snapshots/diff", json=request_data
+                )
 
                 assert response.status_code == 200
                 data = response.json()
@@ -737,7 +800,9 @@ class TestDiffSnapshots:
         mock_mgr = Mock()
         mock_mgr.get_snapshot.side_effect = [None, Mock()]
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id_1": "nonexistent",
                 "snapshot_id_2": "def789ghi012",
@@ -746,14 +811,18 @@ class TestDiffSnapshots:
             response = client.post("/api/v1/versions/snapshots/diff", json=request_data)
 
             assert response.status_code == 404
-            assert "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            assert (
+                "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            )
 
     def test_diff_second_snapshot_not_found(self, client, sample_snapshot):
         """Test diff when second snapshot not found."""
         mock_mgr = Mock()
         mock_mgr.get_snapshot.side_effect = [sample_snapshot, None]
 
-        with patch("skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr):
+        with patch(
+            "skillmeat.api.routers.versions.get_version_manager", return_value=mock_mgr
+        ):
             request_data = {
                 "snapshot_id_1": "abc123def456",
                 "snapshot_id_2": "nonexistent",
@@ -762,4 +831,6 @@ class TestDiffSnapshots:
             response = client.post("/api/v1/versions/snapshots/diff", json=request_data)
 
             assert response.status_code == 404
-            assert "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            assert (
+                "snapshot 'nonexistent' not found" in response.json()["detail"].lower()
+            )

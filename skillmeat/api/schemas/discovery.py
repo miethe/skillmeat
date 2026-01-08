@@ -465,9 +465,10 @@ class BulkImportRequest(BaseModel):
 
 class ImportStatus(str, Enum):
     """Status of an artifact import operation."""
+
     SUCCESS = "success"  # Artifact was successfully imported
     SKIPPED = "skipped"  # Artifact already exists in Collection/Project
-    FAILED = "failed"    # Import failed due to error
+    FAILED = "failed"  # Import failed due to error
 
 
 class ImportResult(BaseModel):
@@ -519,7 +520,7 @@ class ImportResult(BaseModel):
                 "skip_reason": None,
                 "tags_applied": 3,
             }
-        }
+        },
     )
 
     @computed_field

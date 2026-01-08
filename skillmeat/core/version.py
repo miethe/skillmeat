@@ -281,7 +281,9 @@ class VersionManager:
         if collection_name is None:
             collection_name = self.collection_mgr.get_active_collection_name()
 
-        return self.snapshot_mgr.list_snapshots(collection_name, limit=limit, cursor=cursor)
+        return self.snapshot_mgr.list_snapshots(
+            collection_name, limit=limit, cursor=cursor
+        )
 
     def get_snapshot(
         self,

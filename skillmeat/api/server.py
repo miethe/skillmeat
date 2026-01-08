@@ -128,7 +128,6 @@ def create_app(settings: APISettings = None) -> FastAPI:
 
     app.add_middleware(RateLimitMiddleware, rate_limiter=get_rate_limiter())
     logger.info("RateLimit middleware enabled")
-    
 
     # Configure CORS middleware
     if settings.cors_enabled:
@@ -231,6 +230,7 @@ def create_app(settings: APISettings = None) -> FastAPI:
     # Mount Prometheus metrics endpoint
     try:
         from prometheus_client import make_asgi_app
+
         metrics_app = make_asgi_app()
         app.mount("/metrics", metrics_app)
         logger.info("Prometheus metrics endpoint enabled at /metrics")
@@ -242,22 +242,40 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(health.router)
 
     # API routers under API prefix
-    app.include_router(collections.router, prefix=settings.api_prefix, tags=["collections"])
-    app.include_router(user_collections.router, prefix=settings.api_prefix, tags=["user-collections"])
+    app.include_router(
+        collections.router, prefix=settings.api_prefix, tags=["collections"]
+    )
+    app.include_router(
+        user_collections.router, prefix=settings.api_prefix, tags=["user-collections"]
+    )
     app.include_router(artifacts.router, prefix=settings.api_prefix, tags=["artifacts"])
     app.include_router(analytics.router, prefix=settings.api_prefix, tags=["analytics"])
     app.include_router(bundles.router, prefix=settings.api_prefix, tags=["bundles"])
     app.include_router(cache.router, prefix=settings.api_prefix, tags=["cache"])
-    app.include_router(context_entities.router, prefix=settings.api_prefix, tags=["context-entities"])
-    app.include_router(context_sync.router, prefix=settings.api_prefix, tags=["context-sync"])
-    app.include_router(deployments.router, prefix=settings.api_prefix, tags=["deployments"])
+    app.include_router(
+        context_entities.router, prefix=settings.api_prefix, tags=["context-entities"]
+    )
+    app.include_router(
+        context_sync.router, prefix=settings.api_prefix, tags=["context-sync"]
+    )
+    app.include_router(
+        deployments.router, prefix=settings.api_prefix, tags=["deployments"]
+    )
     app.include_router(groups.router, prefix=settings.api_prefix, tags=["groups"])
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
-    app.include_router(marketplace.router, prefix=settings.api_prefix, tags=["marketplace"])
-    app.include_router(marketplace_sources.router, prefix=settings.api_prefix, tags=["marketplace-sources"])
+    app.include_router(
+        marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]
+    )
+    app.include_router(
+        marketplace_sources.router,
+        prefix=settings.api_prefix,
+        tags=["marketplace-sources"],
+    )
     app.include_router(match.router, prefix=settings.api_prefix, tags=["match"])
     app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
-    app.include_router(project_templates.router, prefix=settings.api_prefix, tags=["project-templates"])
+    app.include_router(
+        project_templates.router, prefix=settings.api_prefix, tags=["project-templates"]
+    )
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
     app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])
     app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])

@@ -299,8 +299,7 @@ class RequirementsChecker:
 
         if not node_modules.exists():
             return False, (
-                f"Web dependencies not installed.\n"
-                f"Run 'pnpm install' in {web_dir}"
+                f"Web dependencies not installed.\n" f"Run 'pnpm install' in {web_dir}"
             )
 
         return True, None

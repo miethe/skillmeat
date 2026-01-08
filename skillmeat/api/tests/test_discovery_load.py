@@ -34,11 +34,9 @@ def artifact_factory():
     Yields:
         Callable that creates artifact directories with metadata
     """
+
     def create_artifacts(
-        base_path: Path,
-        artifact_type: str,
-        count: int,
-        prefix: str = "artifact"
+        base_path: Path, artifact_type: str, count: int, prefix: str = "artifact"
     ) -> List[Path]:
         """Create mock artifacts in specified directory.
 
@@ -103,7 +101,9 @@ Example usage for {artifact_name}.
             (artifact_dir / metadata_file).write_text(metadata_content)
 
             # Add some dummy files to simulate real artifacts
-            (artifact_dir / "README.md").write_text(f"# {artifact_name}\n\nDocumentation")
+            (artifact_dir / "README.md").write_text(
+                f"# {artifact_name}\n\nDocumentation"
+            )
 
             if artifact_type == "skill":
                 # Skills typically have tools/ directory
@@ -248,8 +248,7 @@ class TestDiscoveryLoadPerformance:
         """
         # Arrange
         service = ArtifactDiscoveryService(
-            collection_with_large_artifacts,
-            scan_mode="collection"
+            collection_with_large_artifacts, scan_mode="collection"
         )
 
         # Act
@@ -258,17 +257,17 @@ class TestDiscoveryLoadPerformance:
         duration = time.perf_counter() - start_time
 
         # Assert - Correctness
-        assert result.discovered_count == 500, (
-            f"Expected 500 artifacts, found {result.discovered_count}"
-        )
+        assert (
+            result.discovered_count == 500
+        ), f"Expected 500 artifacts, found {result.discovered_count}"
         assert len(result.artifacts) == 500
         assert len(result.errors) == 0, f"Unexpected errors: {result.errors}"
 
         # Assert - Performance
         duration_ms = duration * 1000
-        assert duration_ms < 2000, (
-            f"Discovery took {duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            duration_ms < 2000
+        ), f"Discovery took {duration_ms:.2f}ms, expected <2000ms"
 
         # Verify scan_duration_ms matches
         assert abs(result.scan_duration_ms - duration_ms) < 100, (
@@ -285,8 +284,7 @@ class TestDiscoveryLoadPerformance:
         """
         # Arrange
         service = ArtifactDiscoveryService(
-            project_with_large_artifacts,
-            scan_mode="project"
+            project_with_large_artifacts, scan_mode="project"
         )
 
         # Act
@@ -295,17 +293,17 @@ class TestDiscoveryLoadPerformance:
         duration = time.perf_counter() - start_time
 
         # Assert - Correctness
-        assert result.discovered_count == 300, (
-            f"Expected 300 artifacts, found {result.discovered_count}"
-        )
+        assert (
+            result.discovered_count == 300
+        ), f"Expected 300 artifacts, found {result.discovered_count}"
         assert len(result.artifacts) == 300
         assert len(result.errors) == 0, f"Unexpected errors: {result.errors}"
 
         # Assert - Performance
         duration_ms = duration * 1000
-        assert duration_ms < 2000, (
-            f"Discovery took {duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            duration_ms < 2000
+        ), f"Discovery took {duration_ms:.2f}ms, expected <2000ms"
 
         print(f"\n✓ Large Project (300): {duration_ms:.2f}ms")
 
@@ -318,8 +316,7 @@ class TestDiscoveryLoadPerformance:
 
         # Test Collection scan
         collection_service = ArtifactDiscoveryService(
-            collection_dir,
-            scan_mode="collection"
+            collection_dir, scan_mode="collection"
         )
 
         start_time = time.perf_counter()
@@ -327,24 +324,21 @@ class TestDiscoveryLoadPerformance:
         collection_duration_ms = (time.perf_counter() - start_time) * 1000
 
         assert collection_result.discovered_count == 500
-        assert collection_duration_ms < 2000, (
-            f"Collection scan took {collection_duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            collection_duration_ms < 2000
+        ), f"Collection scan took {collection_duration_ms:.2f}ms, expected <2000ms"
 
         # Test Project scan
-        project_service = ArtifactDiscoveryService(
-            project_dir,
-            scan_mode="project"
-        )
+        project_service = ArtifactDiscoveryService(project_dir, scan_mode="project")
 
         start_time = time.perf_counter()
         project_result = project_service.discover_artifacts()
         project_duration_ms = (time.perf_counter() - start_time) * 1000
 
         assert project_result.discovered_count == 300
-        assert project_duration_ms < 2000, (
-            f"Project scan took {project_duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            project_duration_ms < 2000
+        ), f"Project scan took {project_duration_ms:.2f}ms, expected <2000ms"
 
         # Combined should be within reasonable bounds
         total_duration_ms = collection_duration_ms + project_duration_ms
@@ -358,14 +352,12 @@ class TestDiscoveryLoadPerformance:
         print(f"  Avg per artifact: {avg_per_artifact_ms:.3f}ms")
 
         # Performance expectation: <5ms per artifact on average
-        assert avg_per_artifact_ms < 5, (
-            f"Average {avg_per_artifact_ms:.3f}ms per artifact exceeds 5ms threshold"
-        )
+        assert (
+            avg_per_artifact_ms < 5
+        ), f"Average {avg_per_artifact_ms:.3f}ms per artifact exceeds 5ms threshold"
 
     def test_with_skip_preferences_50_skipped(
-        self,
-        collection_with_large_artifacts,
-        project_with_large_artifacts
+        self, collection_with_large_artifacts, project_with_large_artifacts
     ):
         """Test discovery with 500 Collection + 300 Project + 50 skip preferences.
 
@@ -378,42 +370,37 @@ class TestDiscoveryLoadPerformance:
         # Skip 50 artifacts (skills 0-49)
         for i in range(50):
             artifact_key = f"skill:skill-{i:04d}"
-            skip_mgr.add_skip(
-                artifact_key=artifact_key,
-                reason=f"Load test skip {i}"
-            )
+            skip_mgr.add_skip(artifact_key=artifact_key, reason=f"Load test skip {i}")
 
         # Arrange
         service = ArtifactDiscoveryService(
-            collection_with_large_artifacts,
-            scan_mode="collection"
+            collection_with_large_artifacts, scan_mode="collection"
         )
 
         # Act - Discovery with skip preferences
         start_time = time.perf_counter()
         result = service.discover_artifacts(
-            project_path=project_with_large_artifacts,
-            include_skipped=False
+            project_path=project_with_large_artifacts, include_skipped=False
         )
         duration_ms = (time.perf_counter() - start_time) * 1000
 
         # Assert - Correctness
-        assert result.discovered_count == 500, (
-            f"Expected 500 discovered, got {result.discovered_count}"
-        )
+        assert (
+            result.discovered_count == 500
+        ), f"Expected 500 discovered, got {result.discovered_count}"
 
         # Should have 450 importable (500 - 50 skipped)
-        assert result.importable_count == 450, (
-            f"Expected 450 importable (500 - 50 skipped), got {result.importable_count}"
-        )
+        assert (
+            result.importable_count == 450
+        ), f"Expected 450 importable (500 - 50 skipped), got {result.importable_count}"
 
         assert len(result.artifacts) == 450
         assert len(result.errors) == 0
 
         # Assert - Performance
-        assert duration_ms < 2000, (
-            f"Discovery with skip preferences took {duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            duration_ms < 2000
+        ), f"Discovery with skip preferences took {duration_ms:.2f}ms, expected <2000ms"
 
         print(f"\n✓ With Skip Preferences (50 skipped): {duration_ms:.2f}ms")
         print(f"  Discovered: {result.discovered_count}")
@@ -421,9 +408,7 @@ class TestDiscoveryLoadPerformance:
         print(f"  Skipped: {result.discovered_count - result.importable_count}")
 
     def test_with_skip_preferences_include_skipped(
-        self,
-        collection_with_large_artifacts,
-        project_with_large_artifacts
+        self, collection_with_large_artifacts, project_with_large_artifacts
     ):
         """Test discovery with include_skipped=True.
 
@@ -434,22 +419,17 @@ class TestDiscoveryLoadPerformance:
 
         for i in range(50):
             artifact_key = f"skill:skill-{i:04d}"
-            skip_mgr.add_skip(
-                artifact_key=artifact_key,
-                reason=f"Load test skip {i}"
-            )
+            skip_mgr.add_skip(artifact_key=artifact_key, reason=f"Load test skip {i}")
 
         # Arrange
         service = ArtifactDiscoveryService(
-            collection_with_large_artifacts,
-            scan_mode="collection"
+            collection_with_large_artifacts, scan_mode="collection"
         )
 
         # Act
         start_time = time.perf_counter()
         result = service.discover_artifacts(
-            project_path=project_with_large_artifacts,
-            include_skipped=True
+            project_path=project_with_large_artifacts, include_skipped=True
         )
         duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -465,9 +445,9 @@ class TestDiscoveryLoadPerformance:
             assert "Load test skip" in skipped.skip_reason
 
         # Assert - Performance
-        assert duration_ms < 2000, (
-            f"Discovery with include_skipped took {duration_ms:.2f}ms, expected <2000ms"
-        )
+        assert (
+            duration_ms < 2000
+        ), f"Discovery with include_skipped took {duration_ms:.2f}ms, expected <2000ms"
 
         print(f"\n✓ Include Skipped (50 skipped): {duration_ms:.2f}ms")
         print(f"  Importable: {len(result.artifacts)}")
@@ -480,8 +460,7 @@ class TestDiscoveryLoadPerformance:
         """
         # Arrange
         service = ArtifactDiscoveryService(
-            stress_test_collection,
-            scan_mode="collection"
+            stress_test_collection, scan_mode="collection"
         )
 
         # Act
@@ -490,17 +469,17 @@ class TestDiscoveryLoadPerformance:
         duration = time.perf_counter() - start_time
 
         # Assert - Correctness
-        assert result.discovered_count == 1000, (
-            f"Expected 1000 artifacts, found {result.discovered_count}"
-        )
+        assert (
+            result.discovered_count == 1000
+        ), f"Expected 1000 artifacts, found {result.discovered_count}"
         assert len(result.artifacts) == 1000
         assert len(result.errors) == 0, f"Unexpected errors: {result.errors}"
 
         # Assert - Performance (relaxed threshold for stress test)
         duration_ms = duration * 1000
-        assert duration_ms < 5000, (
-            f"Stress test took {duration_ms:.2f}ms, expected <5000ms"
-        )
+        assert (
+            duration_ms < 5000
+        ), f"Stress test took {duration_ms:.2f}ms, expected <5000ms"
 
         # Calculate stats
         avg_per_artifact_ms = duration_ms / 1000
@@ -509,9 +488,9 @@ class TestDiscoveryLoadPerformance:
         print(f"  Avg per artifact: {avg_per_artifact_ms:.3f}ms")
 
         # Expect <5ms per artifact even at scale
-        assert avg_per_artifact_ms < 5, (
-            f"Average {avg_per_artifact_ms:.3f}ms per artifact exceeds 5ms threshold"
-        )
+        assert (
+            avg_per_artifact_ms < 5
+        ), f"Average {avg_per_artifact_ms:.3f}ms per artifact exceeds 5ms threshold"
 
 
 class TestDiscoveryLoadMemory:
@@ -530,8 +509,7 @@ class TestDiscoveryLoadMemory:
 
         # Arrange
         service = ArtifactDiscoveryService(
-            collection_with_large_artifacts,
-            scan_mode="collection"
+            collection_with_large_artifacts, scan_mode="collection"
         )
 
         # Get initial object count
@@ -547,9 +525,9 @@ class TestDiscoveryLoadMemory:
         # Assert - Reasonable memory growth
         # With 500 artifacts, we expect ~500-1000 new objects (artifacts + metadata)
         # Allow up to 5000 objects for overhead (containers, strings, etc.)
-        assert object_growth < 10000, (
-            f"Object count grew by {object_growth}, expected <10000"
-        )
+        assert (
+            object_growth < 10000
+        ), f"Object count grew by {object_growth}, expected <10000"
 
         print(f"\n✓ Memory Check (500 artifacts):")
         print(f"  Initial objects: {initial_objects}")
@@ -565,8 +543,7 @@ class TestDiscoveryLoadMemory:
 
         # Arrange
         service = ArtifactDiscoveryService(
-            stress_test_collection,
-            scan_mode="collection"
+            stress_test_collection, scan_mode="collection"
         )
 
         # Act
@@ -579,9 +556,9 @@ class TestDiscoveryLoadMemory:
         # For 1000 artifacts, expect <1.5MB total
         expected_max_size = 1.5 * 1024 * 1024  # 1.5MB
 
-        assert artifacts_size < expected_max_size, (
-            f"Artifacts list size {artifacts_size} bytes exceeds {expected_max_size} bytes"
-        )
+        assert (
+            artifacts_size < expected_max_size
+        ), f"Artifacts list size {artifacts_size} bytes exceeds {expected_max_size} bytes"
 
         print(f"\n✓ Artifacts List Size (1000):")
         print(f"  Size: {artifacts_size / 1024:.2f} KB")
@@ -595,8 +572,7 @@ class TestDiscoveryLoadAccuracy:
         """Verify all 500 artifacts are processed with correct metadata."""
         # Arrange
         service = ArtifactDiscoveryService(
-            collection_with_large_artifacts,
-            scan_mode="collection"
+            collection_with_large_artifacts, scan_mode="collection"
         )
 
         # Act
@@ -641,8 +617,7 @@ class TestDiscoveryLoadAccuracy:
         """Verify no duplicate artifacts in results (edge case with 1000 artifacts)."""
         # Arrange
         service = ArtifactDiscoveryService(
-            stress_test_collection,
-            scan_mode="collection"
+            stress_test_collection, scan_mode="collection"
         )
 
         # Act
@@ -652,9 +627,9 @@ class TestDiscoveryLoadAccuracy:
         artifact_keys = [f"{a.type}:{a.name}" for a in result.artifacts]
         unique_keys = set(artifact_keys)
 
-        assert len(artifact_keys) == len(unique_keys), (
-            f"Found {len(artifact_keys) - len(unique_keys)} duplicate artifacts"
-        )
+        assert len(artifact_keys) == len(
+            unique_keys
+        ), f"Found {len(artifact_keys) - len(unique_keys)} duplicate artifacts"
 
         assert len(unique_keys) == 1000
 
@@ -694,10 +669,8 @@ class TestDiscoveryBottleneckAnalysis:
 
             # Copy type directory
             import shutil
-            shutil.copytree(
-                base_path / artifact_type,
-                artifacts_dir / artifact_type
-            )
+
+            shutil.copytree(base_path / artifact_type, artifacts_dir / artifact_type)
 
             # Measure discovery time
             service = ArtifactDiscoveryService(test_dir, scan_mode="collection")
@@ -709,7 +682,7 @@ class TestDiscoveryBottleneckAnalysis:
             type_timings[artifact_type] = {
                 "count": count,
                 "duration_ms": duration_ms,
-                "per_artifact_ms": duration_ms / count if count > 0 else 0
+                "per_artifact_ms": duration_ms / count if count > 0 else 0,
             }
 
             # Clean up
@@ -724,8 +697,10 @@ class TestDiscoveryBottleneckAnalysis:
             print(f"    Per artifact: {timing['per_artifact_ms']:.3f}ms")
 
         # Identify slowest type
-        slowest_type = max(type_timings.items(), key=lambda x: x[1]['per_artifact_ms'])
-        print(f"\n  Slowest: {slowest_type[0]} at {slowest_type[1]['per_artifact_ms']:.3f}ms per artifact")
+        slowest_type = max(type_timings.items(), key=lambda x: x[1]["per_artifact_ms"])
+        print(
+            f"\n  Slowest: {slowest_type[0]} at {slowest_type[1]['per_artifact_ms']:.3f}ms per artifact"
+        )
 
 
 # =============================================================================
@@ -736,9 +711,9 @@ class TestDiscoveryBottleneckAnalysis:
 def pytest_sessionfinish(session, exitstatus):
     """Print load test summary after all tests complete."""
     if exitstatus == 0:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("LOAD TEST SUMMARY")
-        print("="*70)
+        print("=" * 70)
         print("\n✓ All load tests passed!")
         print("\nPerformance targets met:")
         print("  - Large Collection (500): <2 seconds")
@@ -752,4 +727,4 @@ def pytest_sessionfinish(session, exitstatus):
         print("\nAccuracy validated:")
         print("  - All artifacts processed correctly")
         print("  - No duplicates detected")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")

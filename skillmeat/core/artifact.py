@@ -29,21 +29,8 @@ import tomli_w
 
 TOML_DUMPS = tomli_w.dumps
 
-
-class ArtifactType(str, Enum):
-    """Types of Claude artifacts."""
-
-    SKILL = "skill"
-    COMMAND = "command"
-    AGENT = "agent"
-    # Future: MCP = "mcp", HOOK = "hook"
-
-    # Context entity types (agent-context-entities-v1)
-    PROJECT_CONFIG = "project_config"  # CLAUDE.md files
-    SPEC_FILE = "spec_file"  # Specification documents (.claude/specs/)
-    RULE_FILE = "rule_file"  # Rule files (.claude/rules/)
-    CONTEXT_FILE = "context_file"  # Context documents (.claude/context/)
-    PROGRESS_TEMPLATE = "progress_template"  # Progress tracking templates (.claude/progress/)
+# Import ArtifactType from the canonical detection module
+from skillmeat.core.artifact_detection import ArtifactType
 
 
 class UpdateStrategy(str, Enum):

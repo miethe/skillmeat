@@ -21,77 +21,71 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 discovery_scans_total = Counter(
-    'skillmeat_discovery_scans_total',
-    'Total artifact discovery scans',
-    ['status']
+    "skillmeat_discovery_scans_total", "Total artifact discovery scans", ["status"]
 )
 
 discovery_artifacts_found = Gauge(
-    'skillmeat_discovery_artifacts_found',
-    'Number of artifacts found in last scan'
+    "skillmeat_discovery_artifacts_found", "Number of artifacts found in last scan"
 )
 
 discovery_scan_duration = Histogram(
-    'skillmeat_discovery_scan_duration_seconds',
-    'Discovery scan duration in seconds',
-    buckets=[.5, 1.0, 2.0, 5.0, 10.0, 30.0]
+    "skillmeat_discovery_scan_duration_seconds",
+    "Discovery scan duration in seconds",
+    buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
 )
 
 discovery_errors_total = Counter(
-    'skillmeat_discovery_errors_total',
-    'Total discovery errors',
-    ['error_type']
+    "skillmeat_discovery_errors_total", "Total discovery errors", ["error_type"]
 )
 
 # Bulk import metrics
 bulk_import_requests_total = Counter(
-    'skillmeat_bulk_import_requests_total',
-    'Total bulk import requests',
-    ['status']
+    "skillmeat_bulk_import_requests_total", "Total bulk import requests", ["status"]
 )
 
 bulk_import_artifacts_total = Counter(
-    'skillmeat_bulk_import_artifacts_total',
-    'Total artifacts processed in bulk imports',
-    ['result']  # 'success' or 'failed'
+    "skillmeat_bulk_import_artifacts_total",
+    "Total artifacts processed in bulk imports",
+    ["result"],  # 'success' or 'failed'
 )
 
 bulk_import_duration = Histogram(
-    'skillmeat_bulk_import_duration_seconds',
-    'Bulk import operation duration in seconds',
-    ['batch_size_range'],  # '1-10', '11-50', '51+'
-    buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0]
+    "skillmeat_bulk_import_duration_seconds",
+    "Bulk import operation duration in seconds",
+    ["batch_size_range"],  # '1-10', '11-50', '51+'
+    buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0],
 )
 
 # GitHub metadata metrics
 github_metadata_requests_total = Counter(
-    'skillmeat_github_metadata_requests_total',
-    'Total GitHub metadata fetch requests',
-    ['cache_hit']  # 'true' or 'false'
+    "skillmeat_github_metadata_requests_total",
+    "Total GitHub metadata fetch requests",
+    ["cache_hit"],  # 'true' or 'false'
 )
 
 github_metadata_fetch_duration = Histogram(
-    'skillmeat_github_metadata_fetch_duration_seconds',
-    'GitHub metadata fetch duration in seconds',
-    buckets=[.1, .5, 1.0, 2.0, 5.0, 10.0]
+    "skillmeat_github_metadata_fetch_duration_seconds",
+    "GitHub metadata fetch duration in seconds",
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
 )
 
 # Cache metrics
 discovery_cache_hits = Counter(
-    'skillmeat_discovery_cache_hits_total',
-    'Total cache hits for discovery operations',
-    ['cache_type']  # 'metadata' or 'discovery'
+    "skillmeat_discovery_cache_hits_total",
+    "Total cache hits for discovery operations",
+    ["cache_type"],  # 'metadata' or 'discovery'
 )
 
 discovery_cache_misses = Counter(
-    'skillmeat_discovery_cache_misses_total',
-    'Total cache misses for discovery operations',
-    ['cache_type']
+    "skillmeat_discovery_cache_misses_total",
+    "Total cache misses for discovery operations",
+    ["cache_type"],
 )
 
 # =============================================================================
 # Simple Thread-Safe Metrics Dataclass
 # =============================================================================
+
 
 @dataclass
 class DiscoveryMetrics:
@@ -190,11 +184,17 @@ class DiscoveryMetrics:
                 "cache_misses": self.cache_misses,
                 "cache_hit_rate": round(cache_hit_rate, 3),
                 "errors": self.errors,
-                "last_scan": {
-                    "timestamp": self.last_scan_at.isoformat() if self.last_scan_at else None,
-                    "duration_ms": self.last_scan_duration_ms,
-                    "artifact_count": self.last_scan_artifact_count,
-                } if self.last_scan_at else None,
+                "last_scan": (
+                    {
+                        "timestamp": (
+                            self.last_scan_at.isoformat() if self.last_scan_at else None
+                        ),
+                        "duration_ms": self.last_scan_duration_ms,
+                        "artifact_count": self.last_scan_artifact_count,
+                    }
+                    if self.last_scan_at
+                    else None
+                ),
             }
 
 
@@ -204,6 +204,7 @@ discovery_metrics = DiscoveryMetrics()
 # =============================================================================
 # Performance Logging Decorator
 # =============================================================================
+
 
 def log_performance(operation: str):
     """Decorator to log operation timing and metrics.
@@ -220,6 +221,7 @@ def log_performance(operation: str):
         ...     # Function code
         ...     return result
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -230,7 +232,7 @@ def log_performance(operation: str):
                 extra={
                     "operation": operation,
                     "status": "started",
-                }
+                },
             )
 
             try:
@@ -243,7 +245,7 @@ def log_performance(operation: str):
                         "operation": operation,
                         "duration_ms": round(duration_ms, 2),
                         "status": "success",
-                    }
+                    },
                 )
 
                 return result
@@ -269,6 +271,7 @@ def log_performance(operation: str):
                 raise
 
         return wrapper
+
     return decorator
 
 
@@ -286,6 +289,7 @@ def log_async_performance(operation: str):
         ...     # Async function code
         ...     return metadata
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -296,7 +300,7 @@ def log_async_performance(operation: str):
                 extra={
                     "operation": operation,
                     "status": "started",
-                }
+                },
             )
 
             try:
@@ -309,7 +313,7 @@ def log_async_performance(operation: str):
                         "operation": operation,
                         "duration_ms": round(duration_ms, 2),
                         "status": "success",
-                    }
+                    },
                 )
 
                 return result
@@ -335,4 +339,5 @@ def log_async_performance(operation: str):
                 raise
 
         return wrapper
+
     return decorator

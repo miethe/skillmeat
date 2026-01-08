@@ -20,7 +20,10 @@ from skillmeat.marketplace.license_validator import (
 )
 from skillmeat.marketplace.metadata import PublishMetadata, ValidationError
 from skillmeat.marketplace.models import PublishResult
-from skillmeat.marketplace.security_scanner import SecurityScanner, SecurityViolationError
+from skillmeat.marketplace.security_scanner import (
+    SecurityScanner,
+    SecurityViolationError,
+)
 from skillmeat.marketplace.submission_tracker import Submission, SubmissionTracker
 
 logger = logging.getLogger(__name__)
@@ -356,7 +359,9 @@ class PublishingWorkflow:
         except Exception as e:
             raise PublishingError(f"Submission failed: {e}") from e
 
-    def track_submission(self, submission_id: str, broker: MarketplaceBroker) -> Submission:
+    def track_submission(
+        self, submission_id: str, broker: MarketplaceBroker
+    ) -> Submission:
         """Track submission status by polling broker.
 
         Args:
@@ -450,9 +455,7 @@ class PublishingWorkflow:
 
         # Check if validation passed
         if not report.passed:
-            error_msg = "Bundle validation failed:\n  - " + "\n  - ".join(
-                report.errors
-            )
+            error_msg = "Bundle validation failed:\n  - " + "\n  - ".join(report.errors)
             raise BundleValidationError(error_msg)
 
         # Warn about warnings if not forced

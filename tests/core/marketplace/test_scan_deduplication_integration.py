@@ -52,8 +52,11 @@ def test_scan_with_deduplication(
 ):
     """Test scan workflow with deduplication enabled."""
 
-    # Setup mocks
-    mock_fetch_tree.return_value = [{"path": "skills/skill1/SKILL.md", "type": "blob"}]
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = (
+        [{"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "blob123"}],
+        "main",
+    )
     mock_extract_paths.return_value = ["skills/skill1/SKILL.md"]
     mock_get_sha.return_value = "abc123"
 
@@ -182,8 +185,8 @@ def test_scan_without_session_skips_cross_source_dedup(
     """Test that cross-source dedup is skipped when no session provided."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
     mock_detect_artifacts.return_value = [
@@ -227,8 +230,8 @@ def test_scan_with_empty_manual_mappings(
 ):
     """Test that empty/None manual_mappings doesn't break deduplication."""
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
     mock_detect_artifacts.return_value = []
@@ -320,8 +323,11 @@ def test_scan_heuristic_detection_only(
     """Test scan with heuristic detection only (no manual mappings)."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = [{"path": "skills/skill1/SKILL.md", "type": "blob"}]
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = (
+        [{"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "blob123"}],
+        "main",
+    )
     mock_extract_paths.return_value = ["skills/skill1/SKILL.md"]
     mock_get_sha.return_value = "abc123"
 
@@ -392,8 +398,8 @@ def test_first_scan_no_collection(
     """Test first scan with no existing collection (session=None)."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
 
@@ -464,8 +470,8 @@ def test_scan_all_duplicates(
     """Test scan where all artifacts are duplicates."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
 
@@ -528,11 +534,14 @@ def test_scan_no_artifacts_detected(
     scanner,
 ):
     """Test scan where no artifacts are detected."""
-    # Setup mocks
-    mock_fetch_tree.return_value = [
-        {"path": "README.md", "type": "blob"},
-        {"path": "LICENSE", "type": "blob"},
-    ]
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = (
+        [
+            {"path": "README.md", "type": "blob", "sha": "readme_sha"},
+            {"path": "LICENSE", "type": "blob", "sha": "license_sha"},
+        ],
+        "main",
+    )
     mock_extract_paths.return_value = ["README.md", "LICENSE"]
     mock_get_sha.return_value = "abc123"
     mock_detect_artifacts.return_value = []  # No artifacts detected
@@ -568,8 +577,8 @@ def test_scan_mixed_artifact_types(
     """Test scan with multiple artifact types (skill, command, agent)."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
 
@@ -679,8 +688,8 @@ def test_scan_database_error_during_cross_source_dedup(
     """Test scan handles database errors during cross-source deduplication."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
     mock_detect_artifacts.return_value = [
@@ -734,8 +743,8 @@ def test_scan_with_manual_mapping_higher_confidence(
     """Test manual mappings produce higher confidence scores."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
 
@@ -812,8 +821,8 @@ def test_scan_with_realistic_skill_content(
     """Test scan with realistic skill content and file structure."""
     from skillmeat.api.schemas.marketplace import DetectedArtifact
 
-    # Setup mocks
-    mock_fetch_tree.return_value = []
+    # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    mock_fetch_tree.return_value = ([], "main")
     mock_extract_paths.return_value = []
     mock_get_sha.return_value = "abc123"
 
@@ -888,3 +897,141 @@ tags = ["design", "ui", "prototyping"]
     assert artifact.metadata["file_count"] == 3
     assert "content_hash" in artifact.metadata
     assert len(artifact.metadata["files"]) == 3
+
+
+# ============================================================================
+# Tests for compute_artifact_hash_from_tree function
+# ============================================================================
+
+
+class TestComputeArtifactHashFromTree:
+    """Test the compute_artifact_hash_from_tree helper function."""
+
+    def test_basic_hash_computation(self):
+        """Test computing hash from a simple artifact directory."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [
+            {"path": "skills/my-skill/SKILL.md", "type": "blob", "sha": "abc123"},
+            {"path": "skills/my-skill/README.md", "type": "blob", "sha": "def456"},
+            {"path": "skills/other/SKILL.md", "type": "blob", "sha": "other123"},
+        ]
+
+        hash_result = compute_artifact_hash_from_tree("skills/my-skill", tree)
+
+        # Should be a valid SHA256 hash (64 characters)
+        assert len(hash_result) == 64
+        assert all(c in "0123456789abcdef" for c in hash_result)
+
+    def test_deterministic_output(self):
+        """Test that same input produces same hash."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [
+            {"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"},
+            {"path": "skills/test/config.toml", "type": "blob", "sha": "sha2"},
+        ]
+
+        hash1 = compute_artifact_hash_from_tree("skills/test", tree)
+        hash2 = compute_artifact_hash_from_tree("skills/test", tree)
+
+        assert hash1 == hash2
+
+    def test_order_independence(self):
+        """Test that file order in tree doesn't affect hash."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree1 = [
+            {"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"},
+            {"path": "skills/test/README.md", "type": "blob", "sha": "sha2"},
+        ]
+        tree2 = [
+            {"path": "skills/test/README.md", "type": "blob", "sha": "sha2"},
+            {"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"},
+        ]
+
+        hash1 = compute_artifact_hash_from_tree("skills/test", tree1)
+        hash2 = compute_artifact_hash_from_tree("skills/test", tree2)
+
+        assert hash1 == hash2
+
+    def test_different_content_different_hash(self):
+        """Test that different blob SHAs produce different hashes."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree1 = [{"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha_v1"}]
+        tree2 = [{"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha_v2"}]
+
+        hash1 = compute_artifact_hash_from_tree("skills/test", tree1)
+        hash2 = compute_artifact_hash_from_tree("skills/test", tree2)
+
+        assert hash1 != hash2
+
+    def test_ignores_non_blob_entries(self):
+        """Test that directory entries (type=tree) are ignored."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [
+            {"path": "skills/test", "type": "tree", "sha": "tree_sha"},
+            {"path": "skills/test/SKILL.md", "type": "blob", "sha": "blob_sha"},
+        ]
+
+        # Should only include the blob entry
+        hash_result = compute_artifact_hash_from_tree("skills/test", tree)
+
+        # Verify it's a valid hash
+        assert len(hash_result) == 64
+
+    def test_empty_artifact_directory(self):
+        """Test hash for artifact with no files."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [
+            {"path": "other/path/file.md", "type": "blob", "sha": "abc"},
+        ]
+
+        # No files match "skills/test" path
+        hash_result = compute_artifact_hash_from_tree("skills/test", tree)
+
+        # Should return hash of empty string
+        assert len(hash_result) == 64
+
+    def test_nested_files(self):
+        """Test that nested files within artifact are included."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [
+            {"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"},
+            {"path": "skills/test/templates/main.html", "type": "blob", "sha": "sha2"},
+            {"path": "skills/test/assets/icon.png", "type": "blob", "sha": "sha3"},
+        ]
+
+        hash_result = compute_artifact_hash_from_tree("skills/test", tree)
+
+        # Hash should include all three files
+        assert len(hash_result) == 64
+
+    def test_trailing_slash_normalization(self):
+        """Test that trailing slashes are handled correctly."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+
+        tree = [{"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"}]
+
+        hash1 = compute_artifact_hash_from_tree("skills/test", tree)
+        hash2 = compute_artifact_hash_from_tree("skills/test/", tree)
+
+        assert hash1 == hash2
+
+    def test_relative_path_in_hash(self):
+        """Test that paths are relative to artifact root in hash computation."""
+        from skillmeat.core.marketplace.github_scanner import compute_artifact_hash_from_tree
+        import hashlib
+
+        tree = [{"path": "skills/test/SKILL.md", "type": "blob", "sha": "sha1"}]
+
+        # The hash should be based on "SKILL.md:sha1", not the full path
+        expected = hashlib.sha256("SKILL.md:sha1".encode("utf-8")).hexdigest()
+
+        hash_result = compute_artifact_hash_from_tree("skills/test", tree)
+
+        assert hash_result == expected

@@ -107,6 +107,7 @@ function CatalogCard({
     skill: { label: 'Skill', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
     command: { label: 'Command', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
     agent: { label: 'Agent', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+    mcp: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
     mcp_server: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
     hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
   };
@@ -825,7 +826,11 @@ export default function SourceDetailPage() {
         onMaxConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
         includeBelowThreshold={confidenceFilters.includeBelowThreshold}
         onIncludeBelowThresholdChange={(v) =>
-          setConfidenceFilters(prev => ({ ...prev, includeBelowThreshold: v }))
+          setConfidenceFilters(prev => ({
+            ...prev,
+            includeBelowThreshold: v,
+            minConfidence: v ? 1 : 50  // Set to 1% when on, 50% when off
+          }))
         }
         showOnlyDuplicates={showOnlyDuplicates}
         onShowOnlyDuplicatesChange={setShowOnlyDuplicates}

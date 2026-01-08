@@ -674,9 +674,7 @@ class UsageReportManager:
         delta = datetime.now() - dt
         return delta.days
 
-    def _calculate_usage_trend(
-        self, artifact_name: str, days: int = 30
-    ) -> str:
+    def _calculate_usage_trend(self, artifact_name: str, days: int = 30) -> str:
         """Calculate usage trend for artifact.
 
         Args:
@@ -712,7 +710,9 @@ class UsageReportManager:
         counts = [row[1] for row in rows]
         mid = len(counts) // 2
         first_half_avg = sum(counts[:mid]) / mid if mid > 0 else 0
-        second_half_avg = sum(counts[mid:]) / (len(counts) - mid) if len(counts) - mid > 0 else 0
+        second_half_avg = (
+            sum(counts[mid:]) / (len(counts) - mid) if len(counts) - mid > 0 else 0
+        )
 
         # Calculate percentage change
         if first_half_avg == 0:

@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-__all__ = ['load_template', 'list_templates', 'Template']
+__all__ = ["load_template", "list_templates", "Template"]
 
 
 class Template:
@@ -31,23 +31,23 @@ class Template:
         Args:
             data: Dictionary loaded from JSON fixture file
         """
-        self.metadata = data.get('template', {})
-        self.entities = data.get('entities', [])
+        self.metadata = data.get("template", {})
+        self.entities = data.get("entities", [])
 
     @property
     def name(self) -> str:
         """Template name."""
-        return self.metadata.get('name', 'Unknown')
+        return self.metadata.get("name", "Unknown")
 
     @property
     def description(self) -> str:
         """Template description."""
-        return self.metadata.get('description', '')
+        return self.metadata.get("description", "")
 
     @property
     def version(self) -> str:
         """Template version."""
-        return self.metadata.get('version', '1.0.0')
+        return self.metadata.get("version", "1.0.0")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert template to dictionary representation.
@@ -56,8 +56,8 @@ class Template:
             Dictionary with metadata and entities
         """
         return {
-            'template': self.metadata,
-            'entities': self.entities,
+            "template": self.metadata,
+            "entities": self.entities,
         }
 
 
@@ -84,23 +84,23 @@ def load_template(template_name: str) -> Optional[Template]:
         json.JSONDecodeError: If fixture file is invalid JSON
         IOError: If fixture file cannot be read
     """
-    fixture_path = get_fixtures_dir() / f'{template_name}.json'
+    fixture_path = get_fixtures_dir() / f"{template_name}.json"
 
     if not fixture_path.exists():
         return None
 
     try:
-        with open(fixture_path, 'r') as f:
+        with open(fixture_path, "r") as f:
             data = json.load(f)
         return Template(data)
     except json.JSONDecodeError as e:
         raise json.JSONDecodeError(
-            f'Invalid JSON in template fixture {template_name}',
+            f"Invalid JSON in template fixture {template_name}",
             e.doc,
             e.pos,
         ) from e
     except IOError as e:
-        raise IOError(f'Cannot read template fixture {template_name}') from e
+        raise IOError(f"Cannot read template fixture {template_name}") from e
 
 
 def list_templates() -> list[str]:
@@ -112,7 +112,7 @@ def list_templates() -> list[str]:
     fixtures_dir = get_fixtures_dir()
     templates = []
 
-    for fixture_file in fixtures_dir.glob('*.json'):
+    for fixture_file in fixtures_dir.glob("*.json"):
         template_name = fixture_file.stem
         templates.append(template_name)
 
@@ -133,7 +133,7 @@ def get_template_info(template_name: str) -> Optional[dict[str, str]]:
         return None
 
     return {
-        'name': template.name,
-        'description': template.description,
-        'version': template.version,
+        "name": template.name,
+        "description": template.description,
+        "version": template.version,
     }

@@ -70,6 +70,7 @@ class AppState:
         if self.cache_manager is None:
             try:
                 from skillmeat.cache.manager import CacheManager as CacheManagerImpl
+
                 self.cache_manager = CacheManagerImpl()
                 logger.info("CacheManager initialized")
             except Exception as e:
@@ -84,7 +85,9 @@ class AppState:
             )
             logger.info("ContextSyncService initialized")
         else:
-            logger.warning("ContextSyncService not initialized (CacheManager unavailable)")
+            logger.warning(
+                "ContextSyncService not initialized (CacheManager unavailable)"
+            )
             self.context_sync_service = None
 
         logger.info("Application state initialized successfully")

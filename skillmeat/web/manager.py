@@ -142,7 +142,9 @@ class WebManager:
         if production:
             command = ["pnpm", "start"]
             startup_msg = f"Starting Next.js server (production) on :{self.web_port}..."
-            ready_msg = f"Next.js ready at http://localhost:{self.web_port} (production)"
+            ready_msg = (
+                f"Next.js ready at http://localhost:{self.web_port} (production)"
+            )
         else:
             command = ["pnpm", "dev"]
             startup_msg = f"Starting Next.js server (dev) on :{self.web_port}..."
@@ -307,7 +309,9 @@ class WebManager:
                 logger.info(f"{name} server stopped gracefully")
             except subprocess.TimeoutExpired:
                 # Force kill if timeout
-                logger.warning(f"{name} server didn't stop gracefully, force killing...")
+                logger.warning(
+                    f"{name} server didn't stop gracefully, force killing..."
+                )
                 process.kill()
                 process.wait(timeout=5)
                 logger.info(f"{name} server killed")
@@ -360,7 +364,9 @@ class WebManager:
 
                 # Wait for health check
                 if self._wait_for_health(config):
-                    progress.update(task, description=f"[green]{config.ready_message}[/green]")
+                    progress.update(
+                        task, description=f"[green]{config.ready_message}[/green]"
+                    )
                 else:
                     progress.update(task, description=f"[red]Health check failed[/red]")
                     self.stop_all()
@@ -437,7 +443,9 @@ class WebManager:
 
                 # Wait for health check
                 if self._wait_for_health(config):
-                    progress.update(task, description=f"[green]{config.ready_message}[/green]")
+                    progress.update(
+                        task, description=f"[green]{config.ready_message}[/green]"
+                    )
                 else:
                     progress.update(task, description=f"[red]Health check failed[/red]")
                     self.stop_all()
@@ -484,8 +492,12 @@ class WebManager:
         Returns:
             Exit code (0 for success)
         """
-        self.console.print("[cyan]Building Next.js application for production...[/cyan]")
-        self.console.print("[dim]Cleaning cache and building fresh to prevent cache corruption[/dim]\n")
+        self.console.print(
+            "[cyan]Building Next.js application for production...[/cyan]"
+        )
+        self.console.print(
+            "[dim]Cleaning cache and building fresh to prevent cache corruption[/dim]\n"
+        )
 
         try:
             # Run pnpm build:fresh (cleans cache then builds)
@@ -499,7 +511,9 @@ class WebManager:
             return result.returncode
 
         except subprocess.CalledProcessError as e:
-            self.console.print(f"\n[red]Build failed with exit code {e.returncode}[/red]")
+            self.console.print(
+                f"\n[red]Build failed with exit code {e.returncode}[/red]"
+            )
             return e.returncode
         except Exception as e:
             self.console.print(f"\n[red]Build failed: {e}[/red]")
@@ -530,7 +544,9 @@ def check_prerequisites(console: Console) -> bool:
         for error in errors:
             console.print(f"  [yellow]•[/yellow] {error}\n")
 
-        console.print("[yellow]Run 'skillmeat web doctor' for detailed diagnostics.[/yellow]")
+        console.print(
+            "[yellow]Run 'skillmeat web doctor' for detailed diagnostics.[/yellow]"
+        )
         return False
 
     return True

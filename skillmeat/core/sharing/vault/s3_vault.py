@@ -328,7 +328,9 @@ class S3VaultConnector(VaultConnector):
             bundle_key = self._get_key(f"{self.BUNDLES_DIR}/{bundle_id}.skillmeat-pack")
 
             try:
-                response = self.s3_client.head_object(Bucket=self.bucket, Key=bundle_key)
+                response = self.s3_client.head_object(
+                    Bucket=self.bucket, Key=bundle_key
+                )
                 bundle_size = response["ContentLength"]
             except self.ClientError as e:
                 if e.response.get("Error", {}).get("Code") == "404":

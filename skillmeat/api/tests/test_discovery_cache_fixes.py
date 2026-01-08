@@ -395,7 +395,9 @@ class TestDiscoveryFiltering:
                 with patch(
                     "skillmeat.core.discovery.ArtifactDiscoveryService.discover_artifacts"
                 ) as mock_discover:
-                    with patch("skillmeat.api.routers.artifacts.ArtifactImporter") as mock_importer_cls:
+                    with patch(
+                        "skillmeat.api.routers.artifacts.ArtifactImporter"
+                    ) as mock_importer_cls:
                         mock_coll_mgr.list_collections.return_value = ["default"]
                         mock_coll_mgr.config.get_collection_path.return_value = (
                             temp_collection_with_artifacts
@@ -623,7 +625,9 @@ class TestProjectDiscovery:
                     scope="user",
                     tags=[],
                     description=f"Project skill {i}",
-                    path=str(Path(project_path) / ".claude" / "skills" / f"project-skill-{i}"),
+                    path=str(
+                        Path(project_path) / ".claude" / "skills" / f"project-skill-{i}"
+                    ),
                     discovered_at=datetime.utcnow(),
                 )
                 for i in range(2, 4)  # Only 2-3 (not 1)
@@ -637,9 +641,7 @@ class TestProjectDiscovery:
                 scan_duration_ms=100.0,
             )
 
-            response = client.post(
-                f"/api/v1/artifacts/discover/project/{encoded_path}"
-            )
+            response = client.post(f"/api/v1/artifacts/discover/project/{encoded_path}")
             assert response.status_code == 200
             data = response.json()
 

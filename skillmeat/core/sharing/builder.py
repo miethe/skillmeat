@@ -156,17 +156,13 @@ class BundleBuilder:
         artifact_path = self.collection_path / artifact.path
 
         if not artifact_path.exists():
-            raise BundleValidationError(
-                f"Artifact files not found: {artifact_path}"
-            )
+            raise BundleValidationError(f"Artifact files not found: {artifact_path}")
 
         # Collect all files in artifact
         files = self._collect_artifact_files(artifact_path, artifact.type)
 
         if not files:
-            raise BundleValidationError(
-                f"Artifact '{artifact.name}' contains no files"
-            )
+            raise BundleValidationError(f"Artifact '{artifact.name}' contains no files")
 
         # Compute hash of artifact files
         artifact_hash = BundleHasher.hash_artifact_files(artifact_path, files)
@@ -314,7 +310,9 @@ class BundleBuilder:
 
             # Get relative path
             rel_path = file_path.relative_to(artifact_path)
-            files.append(str(rel_path).replace("\\", "/"))  # Normalize to forward slashes
+            files.append(
+                str(rel_path).replace("\\", "/")
+            )  # Normalize to forward slashes
 
         return sorted(files)  # Sort for determinism
 
@@ -335,9 +333,7 @@ class BundleBuilder:
             for file_rel_path in artifact.files:
                 file_path = artifact_path / file_rel_path
                 if not file_path.exists():
-                    raise BundleValidationError(
-                        f"Artifact file not found: {file_path}"
-                    )
+                    raise BundleValidationError(f"Artifact file not found: {file_path}")
 
         logging.info(f"Bundle validation passed: {len(self._artifacts)} artifact(s)")
 
@@ -392,9 +388,7 @@ class BundleBuilder:
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(source_path, dest_path)
 
-                logging.debug(
-                    f"Copied artifact {artifact.name} to {artifact.path}"
-                )
+                logging.debug(f"Copied artifact {artifact.name} to {artifact.path}")
 
             # Create bundle metadata
             metadata = BundleMetadata(
@@ -564,8 +558,7 @@ def inspect_bundle(bundle_path: Path) -> Bundle:
         validation_result = ManifestValidator.validate_manifest(manifest_dict)
         if not validation_result.valid:
             error_messages = [
-                f"{error.field}: {error.message}"
-                for error in validation_result.errors
+                f"{error.field}: {error.message}" for error in validation_result.errors
             ]
             raise BundleValidationError(
                 f"Manifest validation failed:\n" + "\n".join(error_messages)
