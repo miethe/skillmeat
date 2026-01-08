@@ -160,3 +160,68 @@ enabled: activeTab === 'sync'
 **Commit**: dcfec9b
 
 **Status**: RESOLVED
+
+---
+
+## Marketplace Duplicate Detection Not Persisting to Catalog
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: api/marketplace
+
+**Issue**: When scanning a marketplace source:
+1. Scan completion message showed correct duplicate counts (e.g., "4 Within-Source Duplicates, 1 New")
+2. But catalog displayed ALL artifacts marked as "New"
+3. `showOnlyDuplicates` toggle had no effect on displayed artifacts
+
+**Root Cause**: Two related bugs:
+
+1. **Catalog entry creation ignored exclusion metadata**:
+   - `MarketplaceCatalogEntry` creation (lines 479-493 in `marketplace_sources.py`) always set `status="new"`
+   - Ignored `excluded_at`, `excluded_reason`, and `status` from `DetectedArtifact` after deduplication
+   - Deduplication engine correctly marked duplicates with `status="excluded"`, `excluded_reason="duplicate_within_source"`, but these weren't persisted
+
+2. **Missing `is_duplicate` field in API response**:
+   - `CatalogEntryResponse` schema lacked `is_duplicate` boolean field
+   - Frontend filtering at `page.tsx:445` used `entry.is_duplicate === true`
+   - Since field was always undefined, filter never matched
+
+**PRD Reference**: `docs/project_plans/PRDs/features/marketplace-source-detection-improvements-v1.md` sections 3.2.1-3.2.4
+
+**Fix**:
+
+1. **Catalog entry creation** now copies exclusion metadata:
+```python
+entry = MarketplaceCatalogEntry(
+    ...
+    status=artifact.status if artifact.status else "new",
+    excluded_at=datetime.fromisoformat(artifact.excluded_at) if artifact.excluded_at else None,
+    excluded_reason=artifact.excluded_reason,
+)
+```
+
+2. **Added `is_duplicate` field** to `CatalogEntryResponse`:
+```python
+is_duplicate: bool = Field(
+    default=False,
+    description="Whether this artifact was excluded as a duplicate (within-source or cross-source)",
+)
+```
+
+3. **`entry_to_response()` computes `is_duplicate`**:
+```python
+is_duplicate = entry.excluded_reason in ("duplicate_within_source", "duplicate_cross_source") if entry.excluded_reason else False
+```
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py` - Lines 491-508: Copy exclusion metadata; Lines 330-339, 359: Compute is_duplicate
+- `skillmeat/api/schemas/marketplace.py` - Lines 1128-1131: Added is_duplicate field
+
+**Testing**:
+- Deduplication tests: 79 passed
+- Rescan integration tests: 7 passed
+- TypeScript build: Passes
+
+**Commit**: 3aba5fa
+
+**Status**: RESOLVED
