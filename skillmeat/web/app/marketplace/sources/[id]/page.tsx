@@ -10,7 +10,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
+import { BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   RefreshCw,
@@ -27,6 +29,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  Tags,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +60,9 @@ import {
   useImportArtifacts,
   useExcludeCatalogEntry,
   useUpdateSource,
+  sourceKeys,
 } from '@/hooks/useMarketplaceSources';
+import { useToast } from '@/hooks/use-toast';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';
@@ -326,6 +331,11 @@ export default function SourceDetailPage() {
   });
   const [lastScanResult, setLastScanResult] = useState<any>(null);
   const [isMappingsOpen, setIsMappingsOpen] = useState(false);
+  const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false);
+
+  // Toast and query client for bulk tag operations
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Pagination state from URL
   const [currentPage, setCurrentPage] = useState(() => {
@@ -397,7 +407,7 @@ export default function SourceDetailPage() {
   // Sync URL when filters or pagination change
   useEffect(() => {
     updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage);
-  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage]);
+  }, [updateURLParams, confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage]);
 
   // Reset to page 1 when filters change (but not when page/limit change)
   useEffect(() => {
@@ -505,8 +515,9 @@ export default function SourceDetailPage() {
 
   // Fetch more pages if needed for pagination
   // Load more data when user navigates to a page beyond loaded data
+  // Use > (not >=) to prevent re-fetching when we have exactly enough data
   useEffect(() => {
-    if (hasNextPage && endIndex >= allEntries.length && !isFetchingNextPage) {
+    if (hasNextPage && endIndex > allEntries.length && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [hasNextPage, endIndex, allEntries.length, isFetchingNextPage, fetchNextPage]);
@@ -747,6 +758,15 @@ export default function SourceDetailPage() {
               View Repo
             </Button>
           </a>
+          <Button
+            variant="outline"
+            onClick={() => setBulkTagDialogOpen(true)}
+            disabled={!allEntries || allEntries.length === 0}
+            aria-label="Bulk tag artifacts by directory"
+          >
+            <Tags className="mr-2 h-4 w-4" />
+            Bulk Tag
+          </Button>
           <Button
             variant="outline"
             onClick={() => setEditModalOpen(true)}
@@ -1239,6 +1259,29 @@ export default function SourceDetailPage() {
         initialMappings={source?.manual_map || {}}
         onConfirm={handleConfirmMappings}
         onConfirmAndRescan={handleConfirmAndRescan}
+      />
+
+      {/* Bulk Tag Dialog */}
+      <BulkTagDialogWithHook
+        open={bulkTagDialogOpen}
+        onOpenChange={setBulkTagDialogOpen}
+        entries={allEntries}
+        sourceId={sourceId}
+        onSuccess={(result) => {
+          toast({
+            title: 'Tags applied',
+            description: `Updated ${result.totalUpdated} artifacts`,
+          });
+          // Refresh catalog data
+          queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
+        }}
+        onError={(error) => {
+          toast({
+            title: 'Failed to apply tags',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }}
       />
     </div>
   );
