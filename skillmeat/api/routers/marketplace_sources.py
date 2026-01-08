@@ -1299,8 +1299,10 @@ async def list_artifacts(
     artifact_type: Optional[str] = Query(
         None, description="Filter by artifact type (skill, command, agent, etc.)"
     ),
-    status: Optional[str] = Query(
-        None, description="Filter by status (new, updated, removed, imported, excluded)"
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Filter by status (new, updated, removed, imported, excluded)",
     ),
     min_confidence: Optional[int] = Query(
         None, ge=0, le=100, description="Minimum confidence score (0-100)"
@@ -1386,15 +1388,15 @@ async def list_artifacts(
         # Build status filter list
         # When include_excluded=False (default), we exclude entries with status="excluded"
         effective_statuses: Optional[List[str]] = None
-        if status:
+        if status_filter:
             # User specified a status filter - use it directly
-            effective_statuses = [status]
+            effective_statuses = [status_filter]
 
         # Determine if we need filtered query
         # When include_excluded=False and no status filter, we still need to filter
         needs_filtered_query = (
             artifact_type
-            or status
+            or status_filter
             or effective_min_confidence
             or max_confidence
             or not include_excluded
@@ -1412,7 +1414,7 @@ async def list_artifacts(
 
             # Filter out excluded entries if not explicitly requested
             # This handles the case where no status filter was provided
-            if not include_excluded and not status:
+            if not include_excluded and not status_filter:
                 entries = [e for e in entries if e.status != "excluded"]
 
             # Manual pagination for filtered results

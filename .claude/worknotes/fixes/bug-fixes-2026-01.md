@@ -28,3 +28,38 @@ The heuristic detector correctly identifies MCP artifacts using `ArtifactType.MC
 - Verified constraint now accepts both `'mcp'` and `'mcp_server'` values
 
 **Status**: RESOLVED
+
+---
+
+## List Artifacts Endpoint Fails with 500 Error Due to Variable Shadowing
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-sources-api
+
+**Issue**: When viewing low-confidence artifacts in the marketplace, the API returns a 500 error: `AttributeError: 'NoneType' object has no attribute 'HTTP_500_INTERNAL_SERVER_ERROR'`.
+
+**Root Cause**: The `list_artifacts` endpoint had a query parameter named `status` which shadowed the imported `fastapi.status` module. When the query parameter was `None` (no filter provided), the exception handler tried to access `None.HTTP_500_INTERNAL_SERVER_ERROR` instead of `fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR`.
+
+```python
+# Line 1302 - query parameter shadows the module
+status: Optional[str] = Query(None, ...)
+
+# Line 1471 - exception handler references the shadowed name
+raise HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  # status is None!
+    ...
+)
+```
+
+**Fix**: Renamed the query parameter from `status` to `status_filter` with `alias="status"` to maintain API compatibility.
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py`:
+  - Renamed parameter `status` → `status_filter` (line 1302)
+  - Added `alias="status"` for backwards compatibility
+  - Updated all internal references to use `status_filter`
+
+**Testing**: Verified function signature and status module accessibility
+
+**Status**: RESOLVED
