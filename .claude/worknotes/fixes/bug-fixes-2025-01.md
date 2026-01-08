@@ -111,3 +111,52 @@ The `/collection` page is for viewing collection artifacts (not marketplace), so
 **Commit**: 4899b5b
 
 **Status**: RESOLVED
+
+---
+
+## Upstream Diff Fetch Error in UnifiedEntityModal
+
+**Date Fixed**: 2026-01-08
+**Severity**: medium
+**Component**: web/entity/unified-entity-modal
+
+**Issue**: The Sync Status tab in the UnifiedEntityModal was throwing API errors when opened for non-GitHub artifacts:
+```
+Upstream diff fetch error: ApiError: Request failed
+    at apiRequest (api.ts:87:11)
+    at async UnifiedEntityModal.useQuery (unified-entity-modal.tsx:445:26)
+```
+
+**Root Cause**: The `unified-entity-modal.tsx` component has its own upstream diff query (separate from `SyncStatusTab`) that was missing the source validation guards added to `sync-status-tab.tsx` in commit `738d46f`.
+
+The insufficient guard at line 461:
+```typescript
+enabled: activeTab === 'sync' && !!entity?.id && entity?.collection !== 'discovered',
+```
+
+Allowed the query to fire for:
+- Marketplace artifacts without GitHub upstream tracking
+- Local artifacts with `source === 'local'`
+- Artifacts with unknown/missing source info
+
+The backend returned 400/404 errors for these cases since they don't have GitHub upstream sources.
+
+**Fix**: Updated the `enabled` condition to match the guards in `sync-status-tab.tsx`:
+```typescript
+enabled: activeTab === 'sync'
+  && !!entity?.id
+  && !!entity?.source
+  && entity.source !== 'local'
+  && entity.source !== 'unknown'
+  && entity?.collection !== 'discovered'
+  && (entity.source.includes('/') || entity.source.includes('github')),
+```
+
+**Files Modified**:
+- `skillmeat/web/components/entity/unified-entity-modal.tsx` - Lines 461-467: Added source validation guards
+
+**Testing**: TypeScript compilation passes, no lint errors in modified file
+
+**Commit**: dcfec9b
+
+**Status**: RESOLVED

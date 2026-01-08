@@ -458,7 +458,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         throw error;
       }
     },
-    enabled: activeTab === 'sync' && !!entity?.id && entity?.collection !== 'discovered',
+    enabled: activeTab === 'sync'
+      && !!entity?.id
+      && !!entity?.source
+      && entity.source !== 'local'
+      && entity.source !== 'unknown'
+      && entity?.collection !== 'discovered'
+      && (entity.source.includes('/') || entity.source.includes('github')),
     staleTime: 60 * 1000, // Cache for 1 minute (upstream changes less frequently)
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     retry: 2, // Retry failed requests up to 2 times
