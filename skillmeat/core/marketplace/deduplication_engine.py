@@ -405,13 +405,19 @@ class DeduplicationEngine:
         hash_groups: dict[str, list[dict[str, Any]]] = {}
 
         for artifact in artifacts:
-            files = artifact.get("files", {})
-            content_hash = self.compute_hash(files)
+            # Get content hash from metadata, or compute if not present
+            metadata = artifact.get("metadata", {})
+            content_hash = metadata.get("content_hash")
 
-            # Store hash in artifact metadata
-            if "metadata" not in artifact:
-                artifact["metadata"] = {}
-            artifact["metadata"]["content_hash"] = content_hash
+            if content_hash is None:
+                # Hash not computed yet - compute it now
+                files = artifact.get("files", {})
+                content_hash = self.compute_hash(files)
+
+                # Store in metadata for future reference
+                if "metadata" not in artifact:
+                    artifact["metadata"] = {}
+                artifact["metadata"]["content_hash"] = content_hash
 
             if content_hash not in hash_groups:
                 hash_groups[content_hash] = []

@@ -558,6 +558,79 @@ class TestDeduplicateWithinSource:
         # Check excluded artifact
         assert "content_hash" in excluded[0]
 
+    def test_uses_pre_computed_hash(self, engine: DeduplicationEngine):
+        """Test uses hash from metadata if already computed (vs computing from files).
+
+        This is critical for DetectedArtifact objects which don't have 'files' field
+        but have pre-computed content_hash from GitHub tree blob SHAs.
+        """
+        # Two artifacts with DIFFERENT files content but SAME pre-computed hash
+        # If the engine recomputes from files, they'd have different hashes
+        # If it uses pre-computed hash, they'll be detected as duplicates
+        pre_hash = "a" * 64  # 64-char hex string
+        artifacts = [
+            {
+                "path": "artifact1",
+                "files": {"f.md": "content 1"},  # Different content
+                "confidence_score": 0.9,
+                "metadata": {"content_hash": pre_hash},  # Same pre-computed hash
+            },
+            {
+                "path": "artifact2",
+                "files": {"f.md": "content 2"},  # Different content
+                "confidence_score": 0.8,
+                "metadata": {"content_hash": pre_hash},  # Same pre-computed hash
+            },
+        ]
+
+        kept, excluded = engine.deduplicate_within_source(artifacts)
+
+        # Should detect as duplicates (using pre-computed hash)
+        assert len(kept) == 1
+        assert len(excluded) == 1
+        assert kept[0]["path"] == "artifact1"  # Higher confidence
+        assert excluded[0]["path"] == "artifact2"
+        # Hash should be preserved, not recomputed
+        assert kept[0]["metadata"]["content_hash"] == pre_hash
+        assert excluded[0]["content_hash"] == pre_hash
+
+    def test_no_files_with_pre_computed_hash(self, engine: DeduplicationEngine):
+        """Test artifacts without 'files' field but with pre-computed hash work correctly.
+
+        This simulates DetectedArtifact objects from GitHub scanner.
+        """
+        hash_a = "a" * 64
+        hash_b = "b" * 64
+        artifacts = [
+            {
+                "path": "artifact1",
+                # No 'files' field - simulates DetectedArtifact
+                "confidence_score": 0.9,
+                "metadata": {"content_hash": hash_a},
+            },
+            {
+                "path": "artifact2",
+                # No 'files' field
+                "confidence_score": 0.8,
+                "metadata": {"content_hash": hash_b},  # Different hash
+            },
+            {
+                "path": "artifact3",
+                # No 'files' field
+                "confidence_score": 0.7,
+                "metadata": {"content_hash": hash_a},  # Same as artifact1
+            },
+        ]
+
+        kept, excluded = engine.deduplicate_within_source(artifacts)
+
+        # artifact1 and artifact3 share hash_a, artifact2 is unique
+        assert len(kept) == 2
+        assert len(excluded) == 1
+        kept_paths = {a["path"] for a in kept}
+        assert kept_paths == {"artifact1", "artifact2"}
+        assert excluded[0]["path"] == "artifact3"
+
     def test_mixed_unique_and_duplicates(self, engine: DeduplicationEngine):
         """Test handling mix of unique and duplicate artifacts."""
         artifacts = [
