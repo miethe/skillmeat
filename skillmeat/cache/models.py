@@ -299,7 +299,7 @@ class Artifact(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_artifact_type",
         ),
@@ -1110,7 +1110,7 @@ class MarketplaceEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_marketplace_type",
         ),
@@ -1477,7 +1477,7 @@ class MarketplaceCatalogEntry(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook', "
+            "artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook', "
             "'project_config', 'spec_file', 'rule_file', 'context_file', 'progress_template')",
             name="check_catalog_artifact_type",
         ),

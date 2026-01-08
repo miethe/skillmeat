@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS artifacts (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')),
+    type TEXT NOT NULL CHECK(type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook')),
     source TEXT,
     deployed_version TEXT,
     upstream_version TEXT,
@@ -158,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_metadata_tags ON artifact_metadata(tags);
 CREATE TABLE IF NOT EXISTS marketplace (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')),
+    type TEXT NOT NULL CHECK(type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook')),
     url TEXT NOT NULL,
     description TEXT,
     cached_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -246,7 +246,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_sources_owner_repo ON marketplace_sou
 CREATE TABLE IF NOT EXISTS marketplace_catalog_entries (
     id TEXT PRIMARY KEY,
     source_id TEXT NOT NULL,
-    artifact_type TEXT NOT NULL CHECK(artifact_type IN ('skill', 'command', 'agent', 'mcp_server', 'hook')),
+    artifact_type TEXT NOT NULL CHECK(artifact_type IN ('skill', 'command', 'agent', 'mcp', 'mcp_server', 'hook')),
     name TEXT NOT NULL,
     path TEXT NOT NULL,
     upstream_url TEXT NOT NULL,
