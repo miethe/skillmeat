@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -25,6 +25,8 @@ import {
   StickyNote,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +39,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ExcludedArtifactsList } from './components/excluded-list';
 import { SourceToolbar, useViewMode } from './components/source-toolbar';
 import { CatalogList } from './components/catalog-list';
@@ -318,17 +327,39 @@ export default function SourceDetailPage() {
   const [lastScanResult, setLastScanResult] = useState<any>(null);
   const [isMappingsOpen, setIsMappingsOpen] = useState(false);
 
+  // Pagination state from URL
+  const [currentPage, setCurrentPage] = useState(() => {
+    const pageParam = searchParams.get('page');
+    return pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+  });
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam, 10) : 25;
+    // Ensure valid limit value
+    return [10, 25, 50, 100].includes(limit) ? limit : 25;
+  });
+
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useViewMode();
 
   // Helper function to update URL parameters
-  const updateURLParams = (
+  const updateURLParams = useCallback((
     newConfidenceFilters: typeof confidenceFilters,
     newFilters: typeof filters,
     newSortOption: SortOption,
-    newShowOnlyDuplicates: boolean
+    newShowOnlyDuplicates: boolean,
+    newPage: number,
+    newLimit: number
   ) => {
     const params = new URLSearchParams();
+
+    // Add pagination params only if different from defaults
+    if (newPage !== 1) {
+      params.set('page', newPage.toString());
+    }
+    if (newLimit !== 25) {
+      params.set('limit', newLimit.toString());
+    }
 
     // Add confidence filters only if different from defaults
     if (newConfidenceFilters.minConfidence !== 50) {
@@ -361,12 +392,17 @@ export default function SourceDetailPage() {
 
     const query = params.toString();
     router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-  };
+  }, [router, pathname]);
 
-  // Sync URL when filters change
+  // Sync URL when filters or pagination change
   useEffect(() => {
-    updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates);
-  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates]);
+    updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage);
+  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change (but not when page/limit change)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, searchQuery]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -449,8 +485,38 @@ export default function SourceDetailPage() {
     return excluded;
   }, [allEntries, showOnlyDuplicates]);
 
+  // Pagination calculations
+  const totalFilteredCount = filteredEntries.length;
+  const totalPages = Math.ceil(totalFilteredCount / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalFilteredCount);
+
+  // Paginated entries for display
+  const paginatedEntries = useMemo(() => {
+    return filteredEntries.slice(startIndex, endIndex);
+  }, [filteredEntries, startIndex, endIndex]);
+
+  // Ensure current page is valid when data changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Fetch more pages if needed for pagination
+  // Load more data when user navigates to a page beyond loaded data
+  useEffect(() => {
+    if (hasNextPage && endIndex >= allEntries.length && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, endIndex, allEntries.length, isFetchingNextPage, fetchNextPage]);
+
   // Get counts from first page
   const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
+
+  // Get total count from first page (stays consistent across pagination)
+  // This is the total number of catalog entries matching current filters
+  const totalCount = catalogData?.pages[0]?.page_info?.total_count;
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -541,6 +607,47 @@ export default function SourceDetailPage() {
   const handleRescan = async () => {
     const result = await rescanMutation.mutateAsync({});
     setLastScanResult(result);
+  };
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    const newLimit = parseInt(value, 10);
+    setItemsPerPage(newLimit);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Generate page numbers to display (max 5 visible + ellipsis)
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | 'ellipsis')[] = [];
+
+    if (currentPage <= 3) {
+      // Near start: show 1 2 3 4 5 ... last
+      pages.push(1, 2, 3, 4, 5);
+      if (totalPages > 5) {
+        pages.push('ellipsis', totalPages);
+      }
+    } else if (currentPage >= totalPages - 2) {
+      // Near end: show 1 ... last-4 last-3 last-2 last-1 last
+      pages.push(1, 'ellipsis');
+      for (let i = totalPages - 4; i <= totalPages; i++) {
+        if (i > 1) pages.push(i);
+      }
+    } else {
+      // Middle: show 1 ... current-1 current current+1 ... last
+      pages.push(1, 'ellipsis');
+      pages.push(currentPage - 1, currentPage, currentPage + 1);
+      pages.push('ellipsis', totalPages);
+    }
+
+    return pages;
   };
 
   // Loading state
@@ -915,6 +1022,19 @@ export default function SourceDetailPage() {
         </Card>
       )}
 
+      {/* Artifact Count Indicator */}
+      {!catalogLoading && filteredEntries.length > 0 && (
+        <div className="flex items-center py-2 text-sm text-muted-foreground">
+          <span>
+            Showing {startIndex + 1}-{endIndex} of{' '}
+            {totalFilteredCount.toLocaleString()} artifacts
+            {totalCount && totalFilteredCount !== totalCount && (
+              <> (filtered from {totalCount.toLocaleString()} total)</>
+            )}
+          </span>
+        </div>
+      )}
+
       {/* Catalog Grid/List */}
       {catalogLoading ? (
         viewMode === 'grid' ? (
@@ -953,7 +1073,7 @@ export default function SourceDetailPage() {
           <div className="max-h-[600px] overflow-y-auto">
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredEntries.map((entry) => (
+                {paginatedEntries.map((entry) => (
                   <CatalogCard
                     key={entry.id}
                     entry={entry}
@@ -971,7 +1091,7 @@ export default function SourceDetailPage() {
               </div>
             ) : (
               <CatalogList
-                entries={filteredEntries}
+                entries={paginatedEntries}
                 sourceId={sourceId}
                 selectedEntries={selectedEntries}
                 onSelectEntry={handleSelectEntry}
@@ -985,23 +1105,88 @@ export default function SourceDetailPage() {
             )}
           </div>
 
-          {/* Load More */}
-          {hasNextPage && (
-            <div className="flex justify-center pt-6">
-              <Button
-                variant="outline"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  'Load More'
+          {/* Pagination Controls */}
+          {totalPages > 0 && (
+            <div className="sticky bottom-0 mt-6 -mx-6 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border/40 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Show</span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={handleItemsPerPageChange}
+                  >
+                    <SelectTrigger className="w-[80px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground">per page</span>
+                </div>
+
+                {/* Page navigation */}
+                <div className="flex items-center gap-1">
+                  {/* Previous button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  {/* Page numbers */}
+                  {getPageNumbers().map((pageNum, index) =>
+                    pageNum === 'ellipsis' ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="px-2 text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        aria-label={`Page ${pageNum}`}
+                        aria-current={currentPage === pageNum ? 'page' : undefined}
+                        className="min-w-[36px]"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  )}
+
+                  {/* Next button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Loading indicator when fetching more data */}
+                {isFetchingNextPage && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading more...</span>
+                  </div>
                 )}
-              </Button>
+              </div>
             </div>
           )}
         </>
