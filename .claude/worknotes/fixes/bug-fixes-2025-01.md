@@ -346,4 +346,73 @@ The deduplication engine already checks `metadata.get("content_hash")` first (li
 
 **Commit**: 5a4deb8
 
+**Status**: RESOLVED (but see next entry for remaining issue)
+
+---
+
+## Marketplace Deduplication Still Marking All Artifacts as Duplicates (Follow-up)
+
+**Date Fixed**: 2026-01-08
+**Severity**: critical
+**Component**: core/marketplace/deduplication
+**Related Issue**: Follow-up to previous "Deduplication Marking All Artifacts as Duplicates" fix
+
+**Issue**: Despite the previous fix (commit 5a4deb8) adding `compute_artifact_hash_from_tree()` to compute content hashes from GitHub blob SHAs, all but 1 artifact per source was still being detected as duplicates. The `showOnlyDuplicates` toggle also had no effect on displayed artifact count.
+
+**Root Cause**: The previous fix was **incomplete**. It correctly computed hashes and stored them in `artifact.metadata["content_hash"]`, but `deduplicate_within_source()` was **ignoring** the pre-computed hash and recomputing from empty `files` dict:
+
+```python
+# Lines 408-414 in deduplication_engine.py (BEFORE fix)
+for artifact in artifacts:
+    files = artifact.get("files", {})  # Empty for DetectedArtifact!
+    content_hash = self.compute_hash(files)  # Computes hash of empty dict
+    artifact["metadata"]["content_hash"] = content_hash  # OVERWRITES pre-computed hash!
+```
+
+This meant:
+1. `github_scanner.py` correctly computed hash from blob SHAs ✓
+2. `deduplicate_within_source()` ignored it and recomputed from empty `files` ✗
+3. All artifacts got the same hash (SHA256 of empty string)
+4. All but one marked as duplicates
+
+Meanwhile, `deduplicate_cross_source()` (lines 538-550) DID check for pre-existing hash first:
+```python
+content_hash = metadata.get("content_hash")
+if content_hash is None:
+    files = artifact.get("files", {})
+    content_hash = self.compute_hash(files)
+```
+
+**Fix**: Updated `deduplicate_within_source()` to match the pattern in `deduplicate_cross_source()`:
+
+```python
+# Lines 408-420 in deduplication_engine.py (AFTER fix)
+for artifact in artifacts:
+    # Get content hash from metadata, or compute if not present
+    metadata = artifact.get("metadata", {})
+    content_hash = metadata.get("content_hash")
+
+    if content_hash is None:
+        # Hash not computed yet - compute it now
+        files = artifact.get("files", {})
+        content_hash = self.compute_hash(files)
+
+        # Store in metadata for future reference
+        if "metadata" not in artifact:
+            artifact["metadata"] = {}
+        artifact["metadata"]["content_hash"] = content_hash
+```
+
+**Files Modified**:
+- `skillmeat/core/marketplace/deduplication_engine.py` - Lines 408-420: Check for pre-computed hash before computing from files
+- `tests/core/marketplace/test_deduplication_engine.py` - Added 2 new tests:
+  - `test_uses_pre_computed_hash`: Verifies pre-computed hash is used instead of recomputing from files
+  - `test_no_files_with_pre_computed_hash`: Verifies artifacts without `files` field but with pre-computed hash work correctly
+
+**Testing**:
+- All 81 deduplication tests pass
+- New tests specifically verify the fix works for DetectedArtifact-like objects
+
+**Commit**: 12ac518
+
 **Status**: RESOLVED
