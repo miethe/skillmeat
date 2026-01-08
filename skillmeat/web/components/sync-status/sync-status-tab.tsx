@@ -133,6 +133,18 @@ function getRightLabel(scope: ComparisonScope): string {
   }
 }
 
+/**
+ * Check if entity has a valid upstream source (not local-only)
+ * Returns false for: undefined, null, empty, 'local', 'local:*', 'unknown'
+ */
+function hasValidUpstreamSource(source: string | undefined | null): boolean {
+  if (!source) return false;
+  if (source === 'local' || source === 'unknown') return false;
+  if (source.startsWith('local:')) return false;
+  // Must look like a remote source (GitHub pattern with '/')
+  return source.includes('/') && !source.startsWith('local');
+}
+
 
 // ============================================================================
 // Loading Skeleton
@@ -271,11 +283,8 @@ export function SyncStatusTab({
       );
     },
     enabled: !!entity.id
-      && !!entity.source
-      && entity.source !== 'local'
-      && entity.source !== 'unknown'
       && entity.collection !== 'discovered'
-      && (entity.source.includes('/') || entity.source.includes('github')),
+      && hasValidUpstreamSource(entity.source),
   });
 
   // Project diff (collection vs project)
@@ -584,16 +593,29 @@ export function SyncStatusTab({
   // Error & Loading States
   // ============================================================================
 
-  const error = upstreamError || projectError;
-  const isLoading = upstreamLoading || projectLoading;
+  // Determine if we have usable data
+  const hasUpstreamData = !upstreamError && !!upstreamDiff;
+  const hasProjectData = !projectError && !!projectDiff;
+  const canShowAnyData = hasUpstreamData || hasProjectData;
 
-  if (error) {
+  // Only show loading if we're loading AND don't have any data yet
+  const isLoading = (upstreamLoading || projectLoading) && !canShowAnyData;
+
+  // Only show blocking error if BOTH queries failed or if we can't show anything useful
+  // For local-only artifacts: upstreamError is expected, so don't block if projectData is available
+  const shouldBlockWithError =
+    (projectError && !hasUpstreamData) || // Project failed and no upstream
+    (upstreamError && projectError) ||     // Both failed
+    (!hasValidUpstreamSource(entity.source) && projectError); // Local artifact and project failed
+
+  if (shouldBlockWithError) {
+    const errorToShow = projectError || upstreamError;
     return (
       <div className="flex h-full items-center justify-center p-8">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load diff: {error.message}
+            Failed to load diff: {errorToShow?.message || 'Unknown error'}
           </AlertDescription>
         </Alert>
       </div>
@@ -605,7 +627,7 @@ export function SyncStatusTab({
   }
 
   // Handle case where selected comparison has no data
-  if (!currentDiff && !isLoading && !error) {
+  if (!currentDiff && !isLoading && !shouldBlockWithError) {
     return (
       <div className="flex h-full flex-col">
         <div className="flex-shrink-0 border-b">

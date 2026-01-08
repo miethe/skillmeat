@@ -225,3 +225,53 @@ is_duplicate = entry.excluded_reason in ("duplicate_within_source", "duplicate_c
 **Commit**: 3aba5fa
 
 **Status**: RESOLVED
+
+---
+
+## Sync Status Tab 404 Errors for Local-Only Artifacts
+
+**Date Fixed**: 2026-01-08
+**Severity**: medium
+**Component**: web/sync-status, web/unified-entity-modal
+
+**Issue**: The Sync Status tab was failing with 404 errors for a subset of artifacts. The `/upstream-diff` API request returned 404 for local-only artifacts, causing the entire tab to fail to load.
+
+**Root Cause**: Two issues:
+
+1. **Incomplete source validation guards**: Both `unified-entity-modal.tsx` and `sync-status-tab.tsx` checked `entity.source !== 'local'` but missed:
+   - Sources starting with `'local:'` prefix (e.g., `'local:/path/to/artifact'`)
+   - The `entity.source.includes('/')` check falsely matched local paths
+
+2. **Blocking error handling**: In `sync-status-tab.tsx`, when upstream-diff returned 404 (expected for local artifacts), the entire tab showed an error, even if project-diff was available:
+   ```typescript
+   const error = upstreamError || projectError;
+   if (error) { return <Alert variant="destructive">... }
+   ```
+
+**Fix**:
+
+1. **Added helper function** to consistently validate upstream sources:
+   ```typescript
+   function hasValidUpstreamSource(source: string | undefined | null): boolean {
+     if (!source) return false;
+     if (source === 'local' || source === 'unknown') return false;
+     if (source.startsWith('local:')) return false;
+     return source.includes('/') && !source.startsWith('local');
+   }
+   ```
+
+2. **Simplified query enabled conditions** in both files to use the helper
+
+3. **Improved error handling** in `sync-status-tab.tsx`:
+   - Only block tab when BOTH queries fail, or when project query fails for local artifacts
+   - Show partial data when available (e.g., project diff without upstream)
+
+**Files Modified**:
+- `skillmeat/web/components/entity/unified-entity-modal.tsx` - Added `hasValidUpstreamSource` helper, simplified enabled condition
+- `skillmeat/web/components/sync-status/sync-status-tab.tsx` - Added helper, improved error handling logic
+
+**Testing**: ESLint passes for modified files, pre-existing type errors in test files unrelated to changes
+
+**Commit**: ee6f9ba
+
+**Status**: RESOLVED
