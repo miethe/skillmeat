@@ -275,3 +275,75 @@ is_duplicate = entry.excluded_reason in ("duplicate_within_source", "duplicate_c
 **Commit**: ee6f9ba
 
 **Status**: RESOLVED
+
+---
+
+## Marketplace Deduplication Marking All Artifacts as Duplicates
+
+**Date Fixed**: 2026-01-08
+**Severity**: critical
+**Component**: core/marketplace/deduplication
+
+**Issue**: When scanning a marketplace source, nearly all artifacts (all but 1) were being classified as "Within-Source Duplicates", leaving only 1 artifact as "New". This was incorrect - the artifacts had different content but were all being marked as identical.
+
+**User Report**: "The duplicate detector is classifying every detected artifact from a source as identical. Instead, it should be using an artifact-level hash, based on all files within the detected artifact."
+
+**Root Cause**: The `DeduplicationEngine.deduplicate_within_source()` method computed content hashes by calling:
+```python
+files = artifact.get("files", {})
+content_hash = self.compute_hash(files)
+```
+
+However, `DetectedArtifact` schema (in `marketplace.py`) has **no `files` field**! The field list includes:
+- artifact_type, name, path, upstream_url, confidence_score
+- detected_sha, detected_version, metadata, raw_score, score_breakdown
+- Deduplication fields: excluded, excluded_reason, excluded_at, duplicate_of, content_hash, status
+
+Since `files` was never set, `artifact.get("files", {})` always returned `{}`, causing ALL artifacts to hash to SHA256 of empty string = same hash = all duplicates.
+
+**Fix**: Compute artifact-level content hash from GitHub tree blob SHAs during scanning:
+
+1. **Added `compute_artifact_hash_from_tree()` helper** in `github_scanner.py`:
+```python
+def compute_artifact_hash_from_tree(artifact_path: str, tree: List[Dict[str, Any]]) -> str:
+    """Compute content hash from GitHub tree blob SHAs."""
+    # Find all blobs within artifact directory
+    file_entries = []
+    for item in tree:
+        if item.get("type") != "blob":
+            continue
+        item_path = item.get("path", "")
+        if item_path.startswith(f"{artifact_path}/") or item_path == artifact_path:
+            rel_path = ...  # compute relative path
+            blob_sha = item.get("sha", "")
+            file_entries.append(f"{rel_path}:{blob_sha}")
+
+    # Sort and hash for determinism
+    file_entries.sort()
+    return hashlib.sha256("\n".join(file_entries).encode()).hexdigest()
+```
+
+2. **Updated `scan_repository()`** to call this for each detected artifact:
+```python
+for artifact in detected_artifacts:
+    content_hash = compute_artifact_hash_from_tree(artifact.path, tree)
+    if artifact.metadata is None:
+        artifact.metadata = {}
+    artifact.metadata["content_hash"] = content_hash
+```
+
+3. **Key insight**: The GitHub tree API already provides blob SHAs (Git's content-based hashes) for each file. Same file content = same blob SHA. By computing a composite hash from blob SHAs, we get content-based deduplication without fetching file contents.
+
+The deduplication engine already checks `metadata.get("content_hash")` first (line 540), so artifacts with pre-computed hashes use them instead of trying to compute from empty `files` dict.
+
+**Files Modified**:
+- `skillmeat/core/marketplace/github_scanner.py` - Added `compute_artifact_hash_from_tree()`, updated `scan_repository()` and `scan_github_source()`
+- `tests/core/marketplace/test_scan_deduplication_integration.py` - Fixed 10 mock returns, added 9 new unit tests for hash function
+
+**Testing**:
+- All 114 deduplication-related tests pass
+- New tests cover: determinism, order independence, different content, non-blob entries, empty dirs, nested files, trailing slash normalization, relative paths
+
+**Commit**: 5a4deb8
+
+**Status**: RESOLVED
