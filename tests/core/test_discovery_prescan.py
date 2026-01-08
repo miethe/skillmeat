@@ -277,24 +277,35 @@ class TestCheckArtifactExists:
     def test_all_artifact_types(
         self, discovery_service, collection_base, mock_collection_config
     ):
-        """Works with skill, command, agent, hook, mcp types."""
+        """Works with skill, command, agent, hook, mcp types.
+
+        Uses standardized manifest files per ARTIFACT_SIGNATURES:
+        - Skills: SKILL.md
+        - Commands: COMMAND.md (directory-based, though single .md files preferred)
+        - Agents: AGENT.md (directory-based, though single .md files preferred)
+        - Hooks: settings.json (not HOOK.md - deprecated)
+        - MCPs: mcp.json (not MCP.md - deprecated)
+        """
+        import json
+
+        # Define artifact types with their correct manifest files
         artifact_types = [
-            ("skill", "skills", "SKILL.md"),
-            ("command", "commands", "COMMAND.md"),
-            ("agent", "agents", "AGENT.md"),
-            ("hook", "hooks", "HOOK.md"),
-            ("mcp", "mcps", "MCP.md"),
+            ("skill", "skills", "SKILL.md", "---\ntitle: Test Skill\n---\n"),
+            ("command", "commands", "COMMAND.md", "---\ntitle: Test Command\n---\n"),
+            ("agent", "agents", "AGENT.md", "---\ntitle: Test Agent\n---\n"),
+            # Hooks use settings.json per ARTIFACT_SIGNATURES
+            ("hook", "hooks", "settings.json", json.dumps({"name": "test-hook", "triggers": ["pre-commit"]})),
+            # MCPs use mcp.json per ARTIFACT_SIGNATURES
+            ("mcp", "mcps", "mcp.json", json.dumps({"name": "test-mcp", "command": "node"})),
         ]
 
-        for artifact_type, type_plural, metadata_file in artifact_types:
+        for artifact_type, type_plural, metadata_file, content in artifact_types:
             # Setup
             artifact_dir = (
                 collection_base / "artifacts" / type_plural / f"test-{artifact_type}"
             )
             artifact_dir.mkdir(parents=True, exist_ok=True)
-            (artifact_dir / metadata_file).write_text(
-                f"---\ntitle: Test {artifact_type.title()}\n---\n"
-            )
+            (artifact_dir / metadata_file).write_text(content)
 
             # Execute
             result = discovery_service.check_artifact_exists(

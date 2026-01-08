@@ -60,10 +60,14 @@ def upgrade() -> None:
     # ===========================================================================
     # Step 1: Create backup table with existing data
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         CREATE TABLE artifacts_backup AS
         SELECT * FROM artifacts
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 2: Drop original table (this removes the old constraint)
@@ -73,7 +77,9 @@ def upgrade() -> None:
     # ===========================================================================
     # Step 3: Recreate table with new columns and updated constraint
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         CREATE TABLE artifacts (
             id VARCHAR NOT NULL,
             project_id VARCHAR NOT NULL,
@@ -97,12 +103,16 @@ def upgrade() -> None:
             ),
             FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
         )
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 4: Copy data back from backup
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         INSERT INTO artifacts
             (id, project_id, name, type, source, deployed_version, upstream_version,
              is_outdated, local_modified, created_at, updated_at)
@@ -110,7 +120,9 @@ def upgrade() -> None:
             id, project_id, name, type, source, deployed_version, upstream_version,
             is_outdated, local_modified, created_at, updated_at
         FROM artifacts_backup
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 5: Drop backup table
@@ -120,12 +132,26 @@ def upgrade() -> None:
     # ===========================================================================
     # Step 6: Recreate indexes
     # ===========================================================================
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_project_id ON artifacts (project_id)"))
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_project_id ON artifacts (project_id)")
+    )
     connection.execute(sa.text("CREATE INDEX idx_artifacts_type ON artifacts (type)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_is_outdated ON artifacts (is_outdated)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_updated_at ON artifacts (updated_at)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_project_type ON artifacts (project_id, type)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_outdated_type ON artifacts (is_outdated, type)"))
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_is_outdated ON artifacts (is_outdated)")
+    )
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_updated_at ON artifacts (updated_at)")
+    )
+    connection.execute(
+        sa.text(
+            "CREATE INDEX idx_artifacts_project_type ON artifacts (project_id, type)"
+        )
+    )
+    connection.execute(
+        sa.text(
+            "CREATE INDEX idx_artifacts_outdated_type ON artifacts (is_outdated, type)"
+        )
+    )
 
 
 def downgrade() -> None:
@@ -143,13 +169,17 @@ def downgrade() -> None:
     # ===========================================================================
     # Step 1: Create backup table with existing data
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         CREATE TABLE artifacts_backup AS
         SELECT
             id, project_id, name, type, source, deployed_version, upstream_version,
             is_outdated, local_modified, created_at, updated_at
         FROM artifacts
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 2: Drop original table
@@ -159,7 +189,9 @@ def downgrade() -> None:
     # ===========================================================================
     # Step 3: Recreate table without new columns and with old constraint
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         CREATE TABLE artifacts (
             id VARCHAR NOT NULL,
             project_id VARCHAR NOT NULL,
@@ -178,15 +210,21 @@ def downgrade() -> None:
             ),
             FOREIGN KEY(project_id) REFERENCES projects (id) ON DELETE CASCADE
         )
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 4: Copy data back from backup
     # ===========================================================================
-    connection.execute(sa.text("""
+    connection.execute(
+        sa.text(
+            """
         INSERT INTO artifacts
         SELECT * FROM artifacts_backup
-    """))
+    """
+        )
+    )
 
     # ===========================================================================
     # Step 5: Drop backup table
@@ -196,9 +234,23 @@ def downgrade() -> None:
     # ===========================================================================
     # Step 6: Recreate indexes
     # ===========================================================================
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_project_id ON artifacts (project_id)"))
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_project_id ON artifacts (project_id)")
+    )
     connection.execute(sa.text("CREATE INDEX idx_artifacts_type ON artifacts (type)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_is_outdated ON artifacts (is_outdated)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_updated_at ON artifacts (updated_at)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_project_type ON artifacts (project_id, type)"))
-    connection.execute(sa.text("CREATE INDEX idx_artifacts_outdated_type ON artifacts (is_outdated, type)"))
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_is_outdated ON artifacts (is_outdated)")
+    )
+    connection.execute(
+        sa.text("CREATE INDEX idx_artifacts_updated_at ON artifacts (updated_at)")
+    )
+    connection.execute(
+        sa.text(
+            "CREATE INDEX idx_artifacts_project_type ON artifacts (project_id, type)"
+        )
+    )
+    connection.execute(
+        sa.text(
+            "CREATE INDEX idx_artifacts_outdated_type ON artifacts (is_outdated, type)"
+        )
+    )

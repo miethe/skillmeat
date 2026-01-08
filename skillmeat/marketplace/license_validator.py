@@ -152,9 +152,7 @@ class LicenseValidator:
                             details_url=lic_data.get("detailsUrl"),
                         )
 
-                logger.debug(
-                    f"Loaded {len(self._licenses)} licenses from cache"
-                )
+                logger.debug(f"Loaded {len(self._licenses)} licenses from cache")
                 return self._licenses
 
             except Exception as e:
@@ -379,12 +377,11 @@ class LicenseValidator:
         unique_licenses = set(licenses)
 
         # Check for GPL + proprietary
-        if any(
-            lic in self.COPYLEFT_LICENSES for lic in unique_licenses
-        ) and "Proprietary" in unique_licenses:
-            warnings.append(
-                "GPL license cannot be combined with proprietary code"
-            )
+        if (
+            any(lic in self.COPYLEFT_LICENSES for lic in unique_licenses)
+            and "Proprietary" in unique_licenses
+        ):
+            warnings.append("GPL license cannot be combined with proprietary code")
 
         # Check for multiple copyleft licenses
         copyleft_found = [

@@ -200,7 +200,9 @@ async def get_artifact_scores(
 )
 async def list_artifact_ratings(
     artifact_id: str,
-    limit: int = Query(default=50, ge=1, le=100, description="Maximum ratings to return"),
+    limit: int = Query(
+        default=50, ge=1, le=100, description="Maximum ratings to return"
+    ),
 ):
     """List all ratings for an artifact.
 
@@ -251,4 +253,4 @@ async def list_artifact_ratings(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to retrieve ratings",
-        )
+            )

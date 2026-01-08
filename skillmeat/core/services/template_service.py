@@ -248,7 +248,9 @@ async def deploy_template_async(
     # This eliminates N+1 query problem by loading everything in one query
     template = (
         session.query(ProjectTemplate)
-        .options(joinedload(ProjectTemplate.entities).joinedload(TemplateEntity.artifact))
+        .options(
+            joinedload(ProjectTemplate.entities).joinedload(TemplateEntity.artifact)
+        )
         .filter(ProjectTemplate.id == template_id)
         .first()
     )
@@ -270,7 +272,9 @@ async def deploy_template_async(
     if selected_entity_ids is not None:
         selected_set = set(selected_entity_ids)
         entities_to_deploy = [
-            entity for entity in entities_to_deploy if entity.artifact_id in selected_set
+            entity
+            for entity in entities_to_deploy
+            if entity.artifact_id in selected_set
         ]
 
         if not entities_to_deploy:
@@ -433,14 +437,24 @@ def deploy_template(
         # No event loop running, create new one
         return asyncio.run(
             deploy_template_async(
-                session, template_id, project_path, variables, selected_entity_ids, overwrite
+                session,
+                template_id,
+                project_path,
+                variables,
+                selected_entity_ids,
+                overwrite,
             )
         )
     else:
         # Event loop already running, use run_until_complete
         return loop.run_until_complete(
             deploy_template_async(
-                session, template_id, project_path, variables, selected_entity_ids, overwrite
+                session,
+                template_id,
+                project_path,
+                variables,
+                selected_entity_ids,
+                overwrite,
             )
         )
 

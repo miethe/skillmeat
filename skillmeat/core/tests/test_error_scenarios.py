@@ -71,7 +71,9 @@ class TestGitHubAPIErrorHandling:
         # Create a valid local artifact structure
         skill_dir = tmp_path / "artifacts" / "skills" / "local-skill"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("---\nname: local-skill\n---\n# Local Skill")
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: local-skill\n---\n# Local Skill"
+        )
 
         service = ArtifactDiscoveryService(tmp_path)
         result = service.discover_artifacts()
@@ -158,7 +160,7 @@ class TestNetworkErrorHandling:
                 requests.exceptions.Timeout("Timeout 1"),
                 requests.exceptions.Timeout("Timeout 2"),
                 success_response,  # SKILL.md succeeds on 3rd attempt
-                repo_response,     # Repo metadata
+                repo_response,  # Repo metadata
             ]
 
             with patch("time.sleep"):
@@ -172,7 +174,9 @@ class TestNetworkErrorHandling:
         with patch.object(
             extractor.session,
             "get",
-            side_effect=requests.exceptions.ConnectionError("Name or service not known"),
+            side_effect=requests.exceptions.ConnectionError(
+                "Name or service not known"
+            ),
         ):
             with patch("time.sleep"):
                 metadata = extractor.fetch_metadata("user/repo/artifact")

@@ -36,6 +36,52 @@ from skillmeat.core.marketplace.deduplication_engine import DeduplicationEngine
 logger = logging.getLogger(__name__)
 
 
+def compute_artifact_hash_from_tree(
+    artifact_path: str,
+    tree: List[Dict[str, Any]],
+) -> str:
+    """Compute content hash for an artifact from GitHub tree blob SHAs.
+
+    Uses blob SHAs (Git's content-based hashes) from the tree to create
+    a deterministic artifact-level hash without fetching file content.
+
+    Args:
+        artifact_path: Path to artifact directory (e.g., "skills/my-skill")
+        tree: GitHub tree API response with path, type, sha for each item
+
+    Returns:
+        SHA256 hash of sorted path:sha pairs for files within artifact_path
+    """
+    import hashlib
+
+    # Normalize artifact path (no trailing slash)
+    artifact_path = artifact_path.rstrip("/")
+
+    # Find all blob entries within this artifact directory
+    file_entries = []
+    for item in tree:
+        if item.get("type") != "blob":
+            continue
+        item_path = item.get("path", "")
+        # Check if file is within artifact directory or is the artifact itself
+        if item_path.startswith(f"{artifact_path}/") or item_path == artifact_path:
+            # Get relative path within artifact
+            if item_path == artifact_path:
+                rel_path = item_path.split("/")[-1]  # Just filename
+            else:
+                rel_path = item_path[len(artifact_path) + 1:]  # Remove prefix
+            blob_sha = item.get("sha", "")
+            if blob_sha:
+                file_entries.append(f"{rel_path}:{blob_sha}")
+
+    # Sort for deterministic hash
+    file_entries.sort()
+
+    # Compute composite hash
+    combined = "\n".join(file_entries)
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+
 def get_existing_collection_hashes(session) -> Set[str]:
     """Query existing artifact hashes from the marketplace catalog.
 
@@ -55,9 +101,11 @@ def get_existing_collection_hashes(session) -> Set[str]:
     hashes = set()
 
     # Query all non-excluded entries
-    entries = session.query(MarketplaceCatalogEntry).filter(
-        MarketplaceCatalogEntry.excluded_at.is_(None)
-    ).all()
+    entries = (
+        session.query(MarketplaceCatalogEntry)
+        .filter(MarketplaceCatalogEntry.excluded_at.is_(None))
+        .all()
+    )
 
     for entry in entries:
         if entry.metadata_json:
@@ -181,19 +229,25 @@ class GitHubScanner:
             errors: List[str] = []
 
             try:
-                # 1. Fetch repository tree
+                # 1. Fetch repository tree (may fallback to actual default branch)
                 ctx.metadata["phase"] = "fetch_tree"
-                tree = self._fetch_tree(owner, repo, ref)
+                tree, actual_ref = self._fetch_tree(owner, repo, ref)
                 ctx.metadata["tree_size"] = len(tree)
+                ctx.metadata["actual_ref"] = actual_ref
+                if actual_ref != ref:
+                    logger.info(
+                        f"Using actual ref '{actual_ref}' instead of '{ref}' "
+                        f"for {repo_full_name}"
+                    )
 
                 # 2. Filter to relevant paths
                 ctx.metadata["phase"] = "extract_paths"
                 file_paths = self._extract_file_paths(tree, root_hint)
                 ctx.metadata["file_count"] = len(file_paths)
 
-                # 3. Get commit SHA for versioning
+                # 3. Get commit SHA for versioning (use actual_ref, not original ref)
                 ctx.metadata["phase"] = "get_sha"
-                commit_sha = self._get_ref_sha(owner, repo, ref)
+                commit_sha = self._get_ref_sha(owner, repo, actual_ref)
                 ctx.metadata["commit_sha"] = commit_sha
 
                 # 4. Apply heuristic detection
@@ -202,13 +256,25 @@ class GitHubScanner:
                 detected_artifacts = detect_artifacts_in_tree(
                     file_paths,
                     repo_url=base_url,
-                    ref=ref,
+                    _ref=actual_ref,
                     root_hint=root_hint,
                     detected_sha=commit_sha,
                     manual_mappings=manual_mappings,
                 )
                 ctx.metadata["detected_count"] = len(detected_artifacts)
-                logger.info(f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}")
+                logger.info(
+                    f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}"
+                )
+
+                # 4b. Compute content hash for each artifact from tree blob SHAs
+                # This enables proper deduplication without fetching file content
+                ctx.metadata["phase"] = "compute_content_hashes"
+                for artifact in detected_artifacts:
+                    content_hash = compute_artifact_hash_from_tree(artifact.path, tree)
+                    # Store in metadata for deduplication
+                    if artifact.metadata is None:
+                        artifact.metadata = {}
+                    artifact.metadata["content_hash"] = content_hash
 
                 # 5. Deduplicate within source
                 ctx.metadata["phase"] = "deduplicate_within_source"
@@ -231,8 +297,8 @@ class GitHubScanner:
                 cross_excluded_dicts = []
                 if session is not None:
                     existing_hashes = get_existing_collection_hashes(session)
-                    unique_dicts, cross_excluded_dicts = engine.deduplicate_cross_source(
-                        kept_dicts, existing_hashes
+                    unique_dicts, cross_excluded_dicts = (
+                        engine.deduplicate_cross_source(kept_dicts, existing_hashes)
                     )
                     kept_dicts = unique_dicts
                     ctx.metadata["cross_source_duplicates"] = len(cross_excluded_dicts)
@@ -242,7 +308,9 @@ class GitHubScanner:
                         f"{len(existing_hashes)} existing"
                     )
                 else:
-                    logger.debug("No session provided, skipping cross-source deduplication")
+                    logger.debug(
+                        "No session provided, skipping cross-source deduplication"
+                    )
 
                 # Convert dicts back to DetectedArtifact models
                 from skillmeat.api.schemas.marketplace import DetectedArtifact
@@ -334,10 +402,12 @@ class GitHubScanner:
         owner: str,
         repo: str,
         ref: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """Fetch repository tree using Git Trees API.
 
-        Uses recursive tree fetch for efficiency.
+        Uses recursive tree fetch for efficiency. If ref is 'main' and fails
+        with 404, automatically falls back to the repository's actual default
+        branch (e.g., 'master').
 
         Args:
             owner: Repository owner
@@ -345,19 +415,43 @@ class GitHubScanner:
             ref: Git reference (branch, tag, SHA)
 
         Returns:
-            List of tree items with path and type information
+            Tuple of (tree items, actual_ref used). The actual_ref may differ
+            from the input ref if fallback to default branch occurred.
 
         Raises:
             GitHubAPIError: If API call fails
         """
         url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
-        response = self._request_with_retry(url)
+        actual_ref = ref  # Track which ref was actually used
+
+        try:
+            response = self._request_with_retry(url)
+        except GitHubAPIError as e:
+            # If ref="main" fails with 404, try actual default branch
+            if "404" in str(e) and ref == "main":
+                logger.warning(
+                    f"Branch 'main' not found for {owner}/{repo}, "
+                    "fetching actual default branch"
+                )
+                actual_default = self._get_default_branch(owner, repo)
+                if actual_default != "main":
+                    logger.info(
+                        f"Retrying with default branch '{actual_default}' "
+                        f"for {owner}/{repo}"
+                    )
+                    url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{actual_default}?recursive=1"
+                    response = self._request_with_retry(url)
+                    actual_ref = actual_default  # Update to reflect actual branch used
+                else:
+                    raise
+            else:
+                raise
 
         data = response.json()
         if "tree" not in data:
             raise GitHubAPIError(f"Invalid tree response: {data}")
 
-        return data["tree"]
+        return data["tree"], actual_ref
 
     def _extract_file_paths(
         self,
@@ -563,6 +657,24 @@ class GitHubScanner:
 
         return result
 
+    def _get_default_branch(self, owner: str, repo: str) -> str:
+        """Get the repository's default branch name.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+
+        Returns:
+            Name of the default branch (e.g., "main", "master")
+
+        Raises:
+            GitHubAPIError: If API call fails
+        """
+        url = f"{self.API_BASE}/repos/{owner}/{repo}"
+        response = self._request_with_retry(url)
+        data = response.json()
+        return data.get("default_branch", "main")
+
     def _get_default_branch_sha(self, owner: str, repo: str) -> str:
         """Get the SHA of the repository's default branch.
 
@@ -576,11 +688,7 @@ class GitHubScanner:
         Raises:
             GitHubAPIError: If API call fails
         """
-        url = f"{self.API_BASE}/repos/{owner}/{repo}"
-        response = self._request_with_retry(url)
-        data = response.json()
-
-        default_branch = data.get("default_branch", "main")
+        default_branch = self._get_default_branch(owner, repo)
 
         # Get the SHA for the default branch
         return self._get_ref_sha(owner, repo, default_branch)
@@ -802,18 +910,25 @@ def scan_github_source(
 
     scanner = GitHubScanner(token=token)
 
-    # Fetch tree and detect
-    tree = scanner._fetch_tree(owner, repo, ref)
+    # Fetch tree and detect (may fallback to actual default branch)
+    tree, actual_ref = scanner._fetch_tree(owner, repo, ref)
     file_paths = scanner._extract_file_paths(tree, root_hint)
-    commit_sha = scanner._get_ref_sha(owner, repo, ref)
+    commit_sha = scanner._get_ref_sha(owner, repo, actual_ref)
 
     artifacts = detect_artifacts_in_tree(
         file_paths,
         repo_url=repo_url,
-        ref=ref,
+        _ref=actual_ref,
         root_hint=root_hint,
         detected_sha=commit_sha,
     )
+
+    # Compute content hash for each artifact from tree blob SHAs
+    for artifact in artifacts:
+        content_hash = compute_artifact_hash_from_tree(artifact.path, tree)
+        if artifact.metadata is None:
+            artifact.metadata = {}
+        artifact.metadata["content_hash"] = content_hash
 
     result = ScanResultDTO(
         source_id="",

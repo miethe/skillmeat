@@ -191,7 +191,9 @@ class TestDiscoveryEndpoint:
             assert response.status_code == 400
             detail = response.json()["detail"]
             # detail might be a string or dict
-            detail_str = str(detail).lower() if isinstance(detail, (str, dict)) else detail
+            detail_str = (
+                str(detail).lower() if isinstance(detail, (str, dict)) else detail
+            )
             assert "does not exist" in detail_str
 
     def test_discover_with_errors(self, client, mock_collection_path):
@@ -277,7 +279,9 @@ class TestBulkImportEndpoint:
             with patch(
                 "skillmeat.api.dependencies.app_state.artifact_manager"
             ) as mock_art_mgr:
-                with patch("skillmeat.api.routers.artifacts.ArtifactImporter") as mock_importer_cls:
+                with patch(
+                    "skillmeat.api.routers.artifacts.ArtifactImporter"
+                ) as mock_importer_cls:
                     mock_coll_mgr.list_collections.return_value = ["default"]
 
                     # Mock bulk import result
@@ -359,7 +363,9 @@ class TestBulkImportEndpoint:
             with patch(
                 "skillmeat.api.dependencies.app_state.artifact_manager"
             ) as mock_art_mgr:
-                with patch("skillmeat.api.routers.artifacts.ArtifactImporter") as mock_importer:
+                with patch(
+                    "skillmeat.api.routers.artifacts.ArtifactImporter"
+                ) as mock_importer:
                     mock_coll_mgr.list_collections.return_value = ["default"]
 
                     from skillmeat.core.importer import (
@@ -415,7 +421,9 @@ class TestBulkImportEndpoint:
             with patch(
                 "skillmeat.api.dependencies.app_state.artifact_manager"
             ) as mock_art_mgr:
-                with patch("skillmeat.api.routers.artifacts.ArtifactImporter") as mock_importer:
+                with patch(
+                    "skillmeat.api.routers.artifacts.ArtifactImporter"
+                ) as mock_importer:
                     mock_coll_mgr.list_collections.return_value = ["default"]
 
                     from skillmeat.core.importer import (
@@ -487,7 +495,9 @@ class TestBulkImportEndpoint:
             with patch(
                 "skillmeat.api.dependencies.app_state.artifact_manager"
             ) as mock_art_mgr:
-                with patch("skillmeat.api.routers.artifacts.ArtifactImporter") as mock_importer_cls:
+                with patch(
+                    "skillmeat.api.routers.artifacts.ArtifactImporter"
+                ) as mock_importer_cls:
                     mock_coll_mgr.list_collections.return_value = []
 
                     # Mock bulk import result with failure
@@ -559,7 +569,8 @@ class TestGitHubMetadataEndpoint:
             mock_fetch.return_value = metadata
 
             response = client.get(
-                "/api/v1/artifacts/metadata/github", params={"source": "test/repo/skill"}
+                "/api/v1/artifacts/metadata/github",
+                params={"source": "test/repo/skill"},
             )
 
             assert response.status_code == 200
@@ -613,7 +624,8 @@ class TestGitHubMetadataEndpoint:
             mock_fetch.side_effect = RuntimeError("429: Rate limit exceeded")
 
             response = client.get(
-                "/api/v1/artifacts/metadata/github", params={"source": "test/repo/skill"}
+                "/api/v1/artifacts/metadata/github",
+                params={"source": "test/repo/skill"},
             )
 
             assert response.status_code == 200
@@ -636,7 +648,8 @@ class TestGitHubMetadataEndpoint:
             mock_fetch.side_effect = RuntimeError("Network error: Connection timeout")
 
             response = client.get(
-                "/api/v1/artifacts/metadata/github", params={"source": "test/repo/skill"}
+                "/api/v1/artifacts/metadata/github",
+                params={"source": "test/repo/skill"},
             )
 
             assert response.status_code == 200
@@ -658,7 +671,8 @@ class TestGitHubMetadataEndpoint:
             reload_settings()
 
             response = client.get(
-                "/api/v1/artifacts/metadata/github", params={"source": "test/repo/skill"}
+                "/api/v1/artifacts/metadata/github",
+                params={"source": "test/repo/skill"},
             )
 
             assert response.status_code == 501
@@ -869,7 +883,9 @@ class TestParameterUpdateEndpoint:
         # Should be 422 validation error
         assert response.status_code == 422
 
-    def test_parameter_update_invalid_source_format(self, client, sample_artifact, tmp_path):
+    def test_parameter_update_invalid_source_format(
+        self, client, sample_artifact, tmp_path
+    ):
         """Test parameter update with invalid source format."""
         # Create mock artifact directory
         artifact_dir = tmp_path / "skills" / "test-skill"
@@ -891,7 +907,9 @@ class TestParameterUpdateEndpoint:
                 "skillmeat.core.github_metadata.GitHubMetadataExtractor"
             ) as mock_extractor_cls:
                 mock_extractor = Mock()
-                mock_extractor.parse_github_url.side_effect = ValueError("Invalid GitHub source format")
+                mock_extractor.parse_github_url.side_effect = ValueError(
+                    "Invalid GitHub source format"
+                )
                 mock_extractor_cls.return_value = mock_extractor
 
                 response = client.put(
@@ -902,7 +920,9 @@ class TestParameterUpdateEndpoint:
                 # Should return 400 or 422 (validation error)
                 assert response.status_code in [400, 422]
                 detail = response.json()["detail"]
-                detail_str = str(detail).lower() if isinstance(detail, (str, dict)) else detail
+                detail_str = (
+                    str(detail).lower() if isinstance(detail, (str, dict)) else detail
+                )
                 assert "invalid" in detail_str or "value_error" in detail_str
 
     def test_parameter_update_invalid_id_format(self, client):
@@ -937,7 +957,9 @@ class TestParameterUpdateEndpoint:
             assert len(data["updated_fields"]) == 0
             assert "no parameters" in data["message"].lower()
 
-    def test_parameter_update_source_and_version(self, client, sample_artifact, tmp_path):
+    def test_parameter_update_source_and_version(
+        self, client, sample_artifact, tmp_path
+    ):
         """Test updating source and version together."""
         # Create mock artifact directory
         artifact_dir = tmp_path / "skills" / "test-skill"

@@ -81,9 +81,7 @@ class ValidationResult:
         else:
             error_count = len(self.get_errors())
             warning_count = len(self.get_warnings())
-            return (
-                f"Bundle invalid: {error_count} errors, {warning_count} warnings"
-            )
+            return f"Bundle invalid: {error_count} errors, {warning_count} warnings"
 
 
 class BundleValidator:
@@ -400,9 +398,7 @@ class BundleValidator:
         normalized = Path(file_path).as_posix()
 
         # Check for absolute paths
-        if normalized.startswith("/") or (
-            len(normalized) > 1 and normalized[1] == ":"
-        ):
+        if normalized.startswith("/") or (len(normalized) > 1 and normalized[1] == ":"):
             issues.append(
                 ValidationIssue(
                     severity="error",

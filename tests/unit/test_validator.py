@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from skillmeat.core.artifact import ArtifactType
-from skillmeat.utils.validator import ArtifactValidator, ValidationResult
+from skillmeat.utils.validator import (
+    ArtifactValidator,
+    ValidationResult,
+    normalize_artifact_type,
+    validate_artifact_type,
+)
 
 
 class TestSkillValidation:
@@ -73,6 +78,7 @@ class TestCommandValidation:
         result = ArtifactValidator.validate_command(command_file)
         assert result.is_valid is True
         assert result.artifact_type == ArtifactType.COMMAND
+        assert result.deprecation_warning is None  # File-based is not deprecated
 
     def test_validate_command_directory(self, tmp_path):
         """Test validating command as a directory with command.md."""
@@ -84,6 +90,9 @@ class TestCommandValidation:
         result = ArtifactValidator.validate_command(command_dir)
         assert result.is_valid is True
         assert result.artifact_type == ArtifactType.COMMAND
+        assert result.deprecation_warning is not None  # Directory-based is deprecated
+        assert "deprecated" in result.deprecation_warning.lower()
+        assert "single .md file" in result.deprecation_warning.lower()
 
     def test_validate_command_directory_any_md(self, tmp_path):
         """Test validating command directory with any .md file."""
@@ -94,6 +103,7 @@ class TestCommandValidation:
 
         result = ArtifactValidator.validate_command(command_dir)
         assert result.is_valid is True
+        assert result.deprecation_warning is not None  # Directory-based is deprecated
 
     def test_validate_command_empty_file(self, tmp_path):
         """Test validating command with empty .md file."""
@@ -142,6 +152,7 @@ class TestAgentValidation:
         result = ArtifactValidator.validate_agent(agent_file)
         assert result.is_valid is True
         assert result.artifact_type == ArtifactType.AGENT
+        assert result.deprecation_warning is None  # File-based is not deprecated
 
     def test_validate_agent_directory_upper(self, tmp_path):
         """Test validating agent directory with AGENT.md."""
@@ -153,6 +164,9 @@ class TestAgentValidation:
         result = ArtifactValidator.validate_agent(agent_dir)
         assert result.is_valid is True
         assert result.artifact_type == ArtifactType.AGENT
+        assert result.deprecation_warning is not None  # Directory-based is deprecated
+        assert "deprecated" in result.deprecation_warning.lower()
+        assert "single .md file" in result.deprecation_warning.lower()
 
     def test_validate_agent_directory_lower(self, tmp_path):
         """Test validating agent directory with agent.md."""
@@ -164,6 +178,7 @@ class TestAgentValidation:
         result = ArtifactValidator.validate_agent(agent_dir)
         assert result.is_valid is True
         assert result.artifact_type == ArtifactType.AGENT
+        assert result.deprecation_warning is not None  # Directory-based is deprecated
 
     def test_validate_agent_directory_any_md(self, tmp_path):
         """Test validating agent directory with any .md file."""
@@ -174,6 +189,7 @@ class TestAgentValidation:
 
         result = ArtifactValidator.validate_agent(agent_dir)
         assert result.is_valid is True
+        assert result.deprecation_warning is not None  # Directory-based is deprecated
 
     def test_validate_agent_empty_file(self, tmp_path):
         """Test validating agent with empty .md file."""
@@ -310,3 +326,172 @@ class TestDetectArtifactType:
 
         detected = ArtifactValidator.detect_artifact_type(dir_path)
         assert detected == ArtifactType.SKILL
+
+
+class TestNormalizeArtifactType:
+    """Test artifact type normalization function."""
+
+    def test_normalize_string_lowercase(self):
+        """Test normalizing lowercase string artifact types."""
+        assert normalize_artifact_type("skill") == ArtifactType.SKILL
+        assert normalize_artifact_type("command") == ArtifactType.COMMAND
+        assert normalize_artifact_type("agent") == ArtifactType.AGENT
+        assert normalize_artifact_type("hook") == ArtifactType.HOOK
+        assert normalize_artifact_type("mcp") == ArtifactType.MCP
+
+    def test_normalize_string_uppercase(self):
+        """Test normalizing uppercase string artifact types."""
+        assert normalize_artifact_type("SKILL") == ArtifactType.SKILL
+        assert normalize_artifact_type("COMMAND") == ArtifactType.COMMAND
+        assert normalize_artifact_type("AGENT") == ArtifactType.AGENT
+        assert normalize_artifact_type("HOOK") == ArtifactType.HOOK
+        assert normalize_artifact_type("MCP") == ArtifactType.MCP
+
+    def test_normalize_string_mixed_case(self):
+        """Test normalizing mixed case string artifact types."""
+        assert normalize_artifact_type("Skill") == ArtifactType.SKILL
+        assert normalize_artifact_type("CoMmAnD") == ArtifactType.COMMAND
+
+    def test_normalize_string_with_whitespace(self):
+        """Test normalizing strings with leading/trailing whitespace."""
+        assert normalize_artifact_type("  skill  ") == ArtifactType.SKILL
+        assert normalize_artifact_type("\tcommand\n") == ArtifactType.COMMAND
+
+    def test_normalize_enum_passthrough(self):
+        """Test that ArtifactType enums pass through unchanged."""
+        assert normalize_artifact_type(ArtifactType.SKILL) == ArtifactType.SKILL
+        assert normalize_artifact_type(ArtifactType.COMMAND) == ArtifactType.COMMAND
+        assert normalize_artifact_type(ArtifactType.AGENT) == ArtifactType.AGENT
+        assert normalize_artifact_type(ArtifactType.HOOK) == ArtifactType.HOOK
+        assert normalize_artifact_type(ArtifactType.MCP) == ArtifactType.MCP
+
+    def test_normalize_mcp_aliases(self):
+        """Test historical MCP type aliases (backwards compatibility)."""
+        # Snake_case variant
+        assert normalize_artifact_type("mcp_server") == ArtifactType.MCP
+        # Kebab-case variant
+        assert normalize_artifact_type("mcp-server") == ArtifactType.MCP
+        # No separator variant
+        assert normalize_artifact_type("mcpserver") == ArtifactType.MCP
+        # Uppercase variants
+        assert normalize_artifact_type("MCP_SERVER") == ArtifactType.MCP
+        assert normalize_artifact_type("MCP-SERVER") == ArtifactType.MCP
+
+    def test_normalize_context_types(self):
+        """Test normalizing context entity types."""
+        assert normalize_artifact_type("project_config") == ArtifactType.PROJECT_CONFIG
+        assert normalize_artifact_type("spec_file") == ArtifactType.SPEC_FILE
+        assert normalize_artifact_type("rule_file") == ArtifactType.RULE_FILE
+        assert normalize_artifact_type("context_file") == ArtifactType.CONTEXT_FILE
+        assert (
+            normalize_artifact_type("progress_template") == ArtifactType.PROGRESS_TEMPLATE
+        )
+
+    def test_normalize_invalid_string(self):
+        """Test that invalid strings raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid artifact type"):
+            normalize_artifact_type("invalid")
+
+        with pytest.raises(ValueError, match="Invalid artifact type"):
+            normalize_artifact_type("unknown_type")
+
+        with pytest.raises(ValueError, match="Invalid artifact type"):
+            normalize_artifact_type("")
+
+    def test_normalize_invalid_type(self):
+        """Test that non-string, non-enum values raise ValueError."""
+        with pytest.raises(ValueError, match="must be a string or ArtifactType enum"):
+            normalize_artifact_type(123)
+
+        with pytest.raises(ValueError, match="must be a string or ArtifactType enum"):
+            normalize_artifact_type(None)
+
+        with pytest.raises(ValueError, match="must be a string or ArtifactType enum"):
+            normalize_artifact_type(["skill"])
+
+        with pytest.raises(ValueError, match="must be a string or ArtifactType enum"):
+            normalize_artifact_type({"type": "skill"})
+
+    def test_normalize_error_message_includes_valid_types(self):
+        """Test that error message lists all valid types."""
+        with pytest.raises(ValueError) as exc_info:
+            normalize_artifact_type("bad_type")
+
+        error_message = str(exc_info.value)
+        # Should include all primary types
+        assert "skill" in error_message
+        assert "command" in error_message
+        assert "agent" in error_message
+        assert "hook" in error_message
+        assert "mcp" in error_message
+
+
+class TestValidateArtifactType:
+    """Test artifact type validation function (non-throwing)."""
+
+    def test_validate_valid_strings(self):
+        """Test that valid string types return True."""
+        assert validate_artifact_type("skill") is True
+        assert validate_artifact_type("command") is True
+        assert validate_artifact_type("agent") is True
+        assert validate_artifact_type("hook") is True
+        assert validate_artifact_type("mcp") is True
+
+    def test_validate_valid_uppercase_strings(self):
+        """Test that uppercase valid strings return True."""
+        assert validate_artifact_type("SKILL") is True
+        assert validate_artifact_type("COMMAND") is True
+
+    def test_validate_valid_enums(self):
+        """Test that ArtifactType enums return True."""
+        assert validate_artifact_type(ArtifactType.SKILL) is True
+        assert validate_artifact_type(ArtifactType.COMMAND) is True
+        assert validate_artifact_type(ArtifactType.AGENT) is True
+        assert validate_artifact_type(ArtifactType.HOOK) is True
+        assert validate_artifact_type(ArtifactType.MCP) is True
+
+    def test_validate_mcp_aliases(self):
+        """Test that MCP aliases return True."""
+        assert validate_artifact_type("mcp_server") is True
+        assert validate_artifact_type("mcp-server") is True
+        assert validate_artifact_type("mcpserver") is True
+        assert validate_artifact_type("MCP_SERVER") is True
+
+    def test_validate_context_types(self):
+        """Test that context entity types return True."""
+        assert validate_artifact_type("project_config") is True
+        assert validate_artifact_type("spec_file") is True
+        assert validate_artifact_type("rule_file") is True
+        assert validate_artifact_type("context_file") is True
+        assert validate_artifact_type("progress_template") is True
+
+    def test_validate_invalid_strings(self):
+        """Test that invalid strings return False (no exception)."""
+        assert validate_artifact_type("invalid") is False
+        assert validate_artifact_type("unknown") is False
+        assert validate_artifact_type("") is False
+        assert validate_artifact_type("   ") is False
+
+    def test_validate_invalid_types(self):
+        """Test that invalid types return False (no exception)."""
+        assert validate_artifact_type(123) is False
+        assert validate_artifact_type(None) is False
+        assert validate_artifact_type([]) is False
+        assert validate_artifact_type({}) is False
+        assert validate_artifact_type(True) is False
+
+    def test_validate_does_not_raise(self):
+        """Test that validate never raises exceptions."""
+        # Should not raise, just return False
+        try:
+            result = validate_artifact_type("totally_invalid_type")
+            assert result is False
+        except Exception as e:
+            pytest.fail(f"validate_artifact_type should not raise, but raised {e}")
+
+        try:
+            result = validate_artifact_type(99999)
+            assert result is False
+        except Exception as e:
+            pytest.fail(f"validate_artifact_type should not raise, but raised {e}")
+

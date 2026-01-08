@@ -118,11 +118,11 @@ class TestNetworkFailures:
 
     def test_github_metadata_fetch_timeout(self, client):
         """Test graceful handling of network timeout during GitHub metadata fetch."""
-        with patch("skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata") as mock_fetch:
+        with patch(
+            "skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata"
+        ) as mock_fetch:
             # Simulate network timeout
-            mock_fetch.side_effect = RuntimeError(
-                "Connection timeout after 10 seconds"
-            )
+            mock_fetch.side_effect = RuntimeError("Connection timeout after 10 seconds")
 
             response = client.get(
                 "/api/v1/artifacts/metadata/github",
@@ -138,7 +138,9 @@ class TestNetworkFailures:
 
     def test_github_metadata_fetch_connection_error(self, client):
         """Test graceful handling of connection errors during GitHub fetch."""
-        with patch("skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata") as mock_fetch:
+        with patch(
+            "skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata"
+        ) as mock_fetch:
             # Simulate connection error
             mock_fetch.side_effect = RuntimeError(
                 "Failed to establish connection to api.github.com"
@@ -157,7 +159,9 @@ class TestNetworkFailures:
 
     def test_github_rate_limit_exceeded(self, client):
         """Test handling of GitHub API rate limit errors."""
-        with patch("skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata") as mock_fetch:
+        with patch(
+            "skillmeat.core.github_metadata.GitHubMetadataExtractor.fetch_metadata"
+        ) as mock_fetch:
             # Simulate rate limit error
             mock_fetch.side_effect = RuntimeError(
                 "GitHub API rate limit exceeded (429)"
@@ -254,7 +258,9 @@ class TestCorruptedSkipPreferences:
         assert len(prefs.skips) == 0  # Corrupted file should be ignored
         assert prefs.metadata.version == "1.0.0"
 
-    def test_discovery_with_corrupted_skip_prefs(self, project_with_corrupted_skip_prefs):
+    def test_discovery_with_corrupted_skip_prefs(
+        self, project_with_corrupted_skip_prefs
+    ):
         """Test that SkipPreferenceManager handles corrupted file gracefully."""
         # This test verifies the manager, not the API endpoint
         from skillmeat.core.skip_preferences import SkipPreferenceManager
@@ -474,9 +480,7 @@ class TestInvalidArtifactFormats:
         assert isinstance(result, DiscoveryResult)
 
         # Invalid artifact should not be in results
-        assert not any(
-            a.name == "invalid-skill" for a in result.artifacts
-        )
+        assert not any(a.name == "invalid-skill" for a in result.artifacts)
 
     def test_discovery_with_malformed_frontmatter(self, project_with_claude_dir):
         """Test that discovery handles malformed YAML frontmatter gracefully."""
@@ -506,7 +510,9 @@ invalid_yaml: [unclosed bracket
         assert len(result.errors) > 0
 
         # Malformed artifact should not be in results (validation failed)
-        malformed_artifacts = [a for a in result.artifacts if a.name == "malformed-skill"]
+        malformed_artifacts = [
+            a for a in result.artifacts if a.name == "malformed-skill"
+        ]
         # May or may not be included depending on YAML parser error handling
         # If included, metadata extraction should have failed gracefully
 
@@ -602,7 +608,9 @@ class TestEdgeCases:
 
         assert "artifact_type" in str(exc_info.value).lower()
 
-    def test_discovery_with_concurrent_file_modifications(self, project_with_claude_dir):
+    def test_discovery_with_concurrent_file_modifications(
+        self, project_with_claude_dir
+    ):
         """Test that discovery handles files being modified during scan."""
         from skillmeat.core.discovery import ArtifactDiscoveryService
 

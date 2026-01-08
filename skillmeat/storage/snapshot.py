@@ -157,7 +157,9 @@ class SnapshotManager:
 
         return snapshot
 
-    def get_snapshot(self, snapshot_id: str, collection_name: Optional[str] = None) -> Optional[Snapshot]:
+    def get_snapshot(
+        self, snapshot_id: str, collection_name: Optional[str] = None
+    ) -> Optional[Snapshot]:
         """Get a specific snapshot by ID.
 
         Args:

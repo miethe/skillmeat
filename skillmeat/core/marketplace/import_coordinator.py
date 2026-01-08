@@ -118,14 +118,30 @@ class ImportCoordinator:
     def __init__(
         self,
         collection_path: Optional[Path] = None,
+        collection_name: Optional[str] = None,
+        collection_mgr: Optional["CollectionManager"] = None,
     ):
         """Initialize coordinator with collection path.
 
         Args:
-            collection_path: Path to collection root (~/.skillmeat/collection)
+            collection_path: Explicit collection path override
+            collection_name: Collection name (defaults to active collection)
+            collection_mgr: Optional CollectionManager instance to resolve paths
         """
-        self.collection_path = (
-            collection_path or Path.home() / ".skillmeat" / "collection"
+        if collection_path is not None:
+            self.collection_path = collection_path
+            self.collection_name = None
+            self.collection_mgr = collection_mgr
+            return
+
+        from skillmeat.core.collection import CollectionManager
+
+        self.collection_mgr = collection_mgr or CollectionManager()
+        self.collection_name = (
+            collection_name or self.collection_mgr.get_active_collection_name()
+        )
+        self.collection_path = self.collection_mgr.config.get_collection_path(
+            self.collection_name
         )
 
     def import_entries(
@@ -258,7 +274,9 @@ class ImportCoordinator:
             )
 
             entry.status = ImportStatus.SUCCESS
-            logger.info(f"Successfully imported {entry.name} ({download_result.files_downloaded} files) to {entry.local_path}")
+            logger.info(
+                f"Successfully imported {entry.name} ({download_result.files_downloaded} files) to {entry.local_path}"
+            )
 
         except Exception as e:
             entry.status = ImportStatus.ERROR
@@ -329,7 +347,7 @@ class ImportCoordinator:
         """Add imported artifact to collection manifest.
 
         Args:
-            collection_path: Path to collection root (e.g., ~/.skillmeat/collection)
+            collection_path: Path to collection root (e.g., ~/.skillmeat/collections/default)
             entry: Import entry with artifact metadata
             local_path: Relative path where artifact was downloaded
 

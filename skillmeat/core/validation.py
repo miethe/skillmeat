@@ -1,4 +1,5 @@
 """Validation helpers for artifact operations."""
+
 import re
 from typing import Optional, Tuple
 
@@ -64,7 +65,10 @@ def validate_artifact_type(type_str: str) -> Tuple[bool, Optional[str]]:
 
     valid_types = {"skill", "command", "agent", "hook", "mcp"}
     if type_str not in valid_types:
-        return False, f"Invalid artifact type: {type_str}. Must be one of: {', '.join(sorted(valid_types))}"
+        return (
+            False,
+            f"Invalid artifact type: {type_str}. Must be one of: {', '.join(sorted(valid_types))}",
+        )
     return True, None
 
 
@@ -117,14 +121,17 @@ def validate_version(version: str) -> Tuple[bool, Optional[str]]:
         return True, None
 
     # Check if it looks like a version
-    if re.match(r'^v?\d+\.\d+', version):
+    if re.match(r"^v?\d+\.\d+", version):
         return True, None
 
     # Check if it looks like a SHA (hex string, 7-40 chars)
-    if re.match(r'^[0-9a-f]{7,40}$', version):
+    if re.match(r"^[0-9a-f]{7,40}$", version):
         return True, None
 
-    return False, f"Invalid version format: {version}. Use 'latest', '@v1.0.0', or '@sha'"
+    return (
+        False,
+        f"Invalid version format: {version}. Use 'latest', '@v1.0.0', or '@sha'",
+    )
 
 
 def validate_tags(tags: list) -> Tuple[bool, Optional[str]]:
@@ -178,7 +185,10 @@ def validate_artifact_name(name: str) -> Tuple[bool, Optional[str]]:
         return False, "Artifact name cannot be empty or whitespace"
 
     if len(name) > 100:
-        return False, f"Artifact name too long ({len(name)} chars). Maximum is 100 characters"
+        return (
+            False,
+            f"Artifact name too long ({len(name)} chars). Maximum is 100 characters",
+        )
 
     # Check for path separators
     if "/" in name or "\\" in name:
@@ -212,7 +222,10 @@ def validate_alias(alias: str) -> Tuple[bool, Optional[str]]:
         return False, f"Alias '{alias}' cannot start or end with whitespace"
 
     if len(alias) > 50:
-        return False, f"Alias '{alias}' too long ({len(alias)} chars). Maximum is 50 characters"
+        return (
+            False,
+            f"Alias '{alias}' too long ({len(alias)} chars). Maximum is 50 characters",
+        )
 
     # Check for path separators
     if "/" in alias or "\\" in alias:

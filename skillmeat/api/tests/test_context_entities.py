@@ -163,7 +163,9 @@ def test_create_context_entity_all_types(client: TestClient):
             entity = {
                 "name": f"test-{entity_type}-all",
                 "entity_type": entity_type,
-                "path_pattern": VALID_PATH_EXAMPLES[entity_type].replace(".md", "-all.md"),
+                "path_pattern": VALID_PATH_EXAMPLES[entity_type].replace(
+                    ".md", "-all.md"
+                ),
                 "content": VALID_CONTENT_EXAMPLES[entity_type],
                 "description": f"Test {entity_type}",
                 "auto_load": False,
@@ -171,7 +173,9 @@ def test_create_context_entity_all_types(client: TestClient):
 
             response = client.post("/api/v1/context-entities", json=entity)
 
-            assert response.status_code == 201, f"Failed to create {entity_type}: {response.json()}"
+            assert (
+                response.status_code == 201
+            ), f"Failed to create {entity_type}: {response.json()}"
             data = response.json()
             assert data["type"] == entity_type
             created_ids.append(data["id"])
@@ -277,7 +281,9 @@ def test_update_context_entity_success(client: TestClient):
         update_data = {
             "description": "Updated description",
         }
-        response = client.put(f"/api/v1/context-entities/{created_id}", json=update_data)
+        response = client.put(
+            f"/api/v1/context-entities/{created_id}", json=update_data
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -292,7 +298,9 @@ def test_update_context_entity_not_found(client: TestClient):
     update_data = {
         "description": "Updated description",
     }
-    response = client.put("/api/v1/context-entities/ctx_nonexistent123", json=update_data)
+    response = client.put(
+        "/api/v1/context-entities/ctx_nonexistent123", json=update_data
+    )
 
     assert response.status_code == 404
 

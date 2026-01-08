@@ -120,7 +120,8 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.UniqueConstraint(
-            "collection_id", "name",
+            "collection_id",
+            "name",
             name="uq_group_collection_name",
         ),
         sa.CheckConstraint(

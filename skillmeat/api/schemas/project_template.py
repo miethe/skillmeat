@@ -225,14 +225,18 @@ class ProjectTemplateResponse(BaseModel):
     )
     entities: list[TemplateEntitySchema] = Field(
         description="List of entities in the template",
-        examples=[[{
-            "artifact_id": "ctx_abc123",
-            "name": "web-api-patterns",
-            "type": "rule_file",
-            "deploy_order": 1,
-            "required": True,
-            "path_pattern": ".claude/rules/web/api-client.md",
-        }]],
+        examples=[
+            [
+                {
+                    "artifact_id": "ctx_abc123",
+                    "name": "web-api-patterns",
+                    "type": "rule_file",
+                    "deploy_order": 1,
+                    "required": True,
+                    "path_pattern": ".claude/rules/web/api-client.md",
+                }
+            ]
+        ],
     )
     entity_count: int = Field(
         description="Total number of entities in template",

@@ -112,7 +112,7 @@ export interface PublishFormData {
 export type TrustLevel = 'untrusted' | 'basic' | 'verified' | 'official';
 export type ScanStatus = 'pending' | 'scanning' | 'success' | 'error';
 export type CatalogStatus = 'new' | 'updated' | 'removed' | 'imported' | 'excluded';
-export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'mcp_server' | 'hook';
 
 export interface GitHubSource {
   id: string;
@@ -185,6 +185,9 @@ export interface CatalogEntry {
     extensions_score: number;
     parent_hint_score: number;
     frontmatter_score: number;
+    skill_manifest_bonus: number;
+    container_hint_score: number;
+    frontmatter_type_score: number;
     depth_penalty: number;
     raw_total: number;
     normalized_score: number;

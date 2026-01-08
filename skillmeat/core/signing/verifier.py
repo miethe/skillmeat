@@ -303,6 +303,8 @@ class BundleVerifier:
 
         # Verify signature
         manifest_dict = bundle.to_dict()
-        result = self.verify_bundle(bundle.bundle_hash, manifest_dict, require_signature)
+        result = self.verify_bundle(
+            bundle.bundle_hash, manifest_dict, require_signature
+        )
 
         return result

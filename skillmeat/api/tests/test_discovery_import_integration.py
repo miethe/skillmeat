@@ -453,11 +453,19 @@ class TestImportWithSkipList:
                     assert len(data["results"]) == 2
 
                     # Verify skill-a succeeded
-                    skill_a = next(r for r in data["results"] if r["artifact_id"] == "skill:skill-a")
+                    skill_a = next(
+                        r
+                        for r in data["results"]
+                        if r["artifact_id"] == "skill:skill-a"
+                    )
                     assert skill_a["status"] == "success"
 
                     # Verify skill-b was skipped
-                    skill_b = next(r for r in data["results"] if r["artifact_id"] == "skill:skill-b")
+                    skill_b = next(
+                        r
+                        for r in data["results"]
+                        if r["artifact_id"] == "skill:skill-b"
+                    )
                     assert skill_b["status"] == "skipped"
                     assert skill_b["skip_reason"] == "In skip list"
 
@@ -530,7 +538,11 @@ class TestBulkImportCounters:
                         "/api/v1/artifacts/discover/import",
                         json={
                             "artifacts": [
-                                {"source": f"test/repo/skill-{x}", "artifact_type": "skill", "name": f"skill-{x}"}
+                                {
+                                    "source": f"test/repo/skill-{x}",
+                                    "artifact_type": "skill",
+                                    "name": f"skill-{x}",
+                                }
                                 for x in ["a", "b", "c", "d"]
                             ],
                             "auto_resolve_conflicts": True,
@@ -585,7 +597,9 @@ class TestPreScanExistenceChecks:
                 "skillmeat.core.discovery.ArtifactDiscoveryService.discover_artifacts"
             ) as mock_discover:
                 mock_coll_mgr.list_collections.return_value = ["default"]
-                mock_coll_mgr.config.get_collection_path.return_value = Path("/tmp/collection")
+                mock_coll_mgr.config.get_collection_path.return_value = Path(
+                    "/tmp/collection"
+                )
 
                 # New artifact discovered
                 discovered = CoreDiscoveredArtifact(
@@ -680,7 +694,9 @@ class TestErrorHandling:
                 "skillmeat.core.discovery.ArtifactDiscoveryService.discover_artifacts"
             ) as mock_discover:
                 mock_coll_mgr.list_collections.return_value = ["default"]
-                mock_coll_mgr.config.get_collection_path.return_value = Path("/tmp/collection")
+                mock_coll_mgr.config.get_collection_path.return_value = Path(
+                    "/tmp/collection"
+                )
 
                 # Mock discovery with permission errors
                 mock_discover.return_value = CoreDiscoveryResult(
@@ -800,7 +816,9 @@ class TestEndToEndFlow:
                                 scope="user",
                                 tags=["test"],
                                 description=f"Test skill {i}",
-                                path=str(mock_collection_path / f"artifacts/skills/skill-{i}"),
+                                path=str(
+                                    mock_collection_path / f"artifacts/skills/skill-{i}"
+                                ),
                                 discovered_at=datetime.utcnow(),
                             )
                             for i in range(3)
@@ -866,4 +884,6 @@ class TestEndToEndFlow:
                         assert import_data["total_requested"] == 3
                         assert import_data["total_imported"] == 3
                         assert import_data["total_failed"] == 0
-                        assert all(r["status"] == "success" for r in import_data["results"])
+                        assert all(
+                            r["status"] == "success" for r in import_data["results"]
+                        )

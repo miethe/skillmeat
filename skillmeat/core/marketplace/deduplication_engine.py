@@ -267,9 +267,7 @@ class DeduplicationEngine:
 
         # Filter to only groups with duplicates (>1 artifact)
         duplicates = {
-            hash_val: group
-            for hash_val, group in hash_groups.items()
-            if len(group) > 1
+            hash_val: group for hash_val, group in hash_groups.items() if len(group) > 1
         }
 
         # Log duplicate detection results
@@ -281,9 +279,7 @@ class DeduplicationEngine:
             )
             for hash_val, group in duplicates.items():
                 paths = [a.get("path", "unknown") for a in group]
-                logger.debug(
-                    f"Duplicate group (hash={hash_val[:12]}...): {paths}"
-                )
+                logger.debug(f"Duplicate group (hash={hash_val[:12]}...): {paths}")
         else:
             logger.debug(f"No duplicates found among {len(artifacts)} artifacts")
 
@@ -409,13 +405,19 @@ class DeduplicationEngine:
         hash_groups: dict[str, list[dict[str, Any]]] = {}
 
         for artifact in artifacts:
-            files = artifact.get("files", {})
-            content_hash = self.compute_hash(files)
+            # Get content hash from metadata, or compute if not present
+            metadata = artifact.get("metadata", {})
+            content_hash = metadata.get("content_hash")
 
-            # Store hash in artifact metadata
-            if "metadata" not in artifact:
-                artifact["metadata"] = {}
-            artifact["metadata"]["content_hash"] = content_hash
+            if content_hash is None:
+                # Hash not computed yet - compute it now
+                files = artifact.get("files", {})
+                content_hash = self.compute_hash(files)
+
+                # Store in metadata for future reference
+                if "metadata" not in artifact:
+                    artifact["metadata"] = {}
+                artifact["metadata"]["content_hash"] = content_hash
 
             if content_hash not in hash_groups:
                 hash_groups[content_hash] = []
@@ -588,10 +590,7 @@ class DeduplicationEngine:
 
 if __name__ == "__main__":
     # Self-test examples
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(levelname)s: %(message)s"
-    )
+    logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
     print("DeduplicationEngine - Self Test")
     print("=" * 50)
@@ -674,7 +673,11 @@ if __name__ == "__main__":
     # Same confidence, one is manual
     tie_artifacts = [
         {"path": "a/b/c", "confidence_score": 0.9, "metadata": {}},
-        {"path": "x/y", "confidence_score": 0.9, "metadata": {"is_manual_mapping": True}},
+        {
+            "path": "x/y",
+            "confidence_score": 0.9,
+            "metadata": {"is_manual_mapping": True},
+        },
     ]
     best = engine.get_best_artifact(tie_artifacts)
     print(f"   Same confidence, one manual: {best['path']} wins")
@@ -701,7 +704,9 @@ if __name__ == "__main__":
         {"files": {"f.md": "content"}},  # Missing path, confidence_score
     ]
     duplicates_missing = engine.find_duplicates(artifacts_missing)
-    print(f"   Handled missing keys gracefully: {len(duplicates_missing)} duplicate groups")
+    print(
+        f"   Handled missing keys gracefully: {len(duplicates_missing)} duplicate groups"
+    )
 
     # Test 9: deduplicate_within_source
     print("\n9. Within-source deduplication:")
@@ -769,7 +774,9 @@ if __name__ == "__main__":
     # Test 10: Empty input
     print("\n10. Empty input handling:")
     kept_empty, excluded_empty = engine2.deduplicate_within_source([])
-    print(f"    Empty list returns: kept={len(kept_empty)}, excluded={len(excluded_empty)}")
+    print(
+        f"    Empty list returns: kept={len(kept_empty)}, excluded={len(excluded_empty)}"
+    )
     assert kept_empty == [] and excluded_empty == []
 
     # Test 11: All unique
@@ -814,9 +821,15 @@ if __name__ == "__main__":
     existing_other_hash = engine3.compute_hash({"SKILL.md": "existing content"})
     existing_unrelated_hash = engine3.compute_hash({"SKILL.md": "unrelated"})
 
-    existing_hashes = {existing_canvas_hash, existing_other_hash, existing_unrelated_hash}
+    existing_hashes = {
+        existing_canvas_hash,
+        existing_other_hash,
+        existing_unrelated_hash,
+    }
 
-    unique, cross_dupes = engine3.deduplicate_cross_source(new_scan_artifacts, existing_hashes)
+    unique, cross_dupes = engine3.deduplicate_cross_source(
+        new_scan_artifacts, existing_hashes
+    )
 
     print(f"   New artifacts: {len(new_scan_artifacts)}")
     print(f"   Existing hashes: {len(existing_hashes)}")
@@ -838,7 +851,9 @@ if __name__ == "__main__":
     unique_paths = [a["path"] for a in unique]
     assert "skills/unique-new" in unique_paths, "Unique artifact should be kept"
     assert len(unique) == 1, f"Expected 1 unique, got {len(unique)}"
-    assert len(cross_dupes) == 2, f"Expected 2 cross-source dupes, got {len(cross_dupes)}"
+    assert (
+        len(cross_dupes) == 2
+    ), f"Expected 2 cross-source dupes, got {len(cross_dupes)}"
 
     for dupe in cross_dupes:
         assert dupe.get("excluded") is True
@@ -868,7 +883,9 @@ if __name__ == "__main__":
     ]
     existing_set = {"abc123def456"}  # Only matches first artifact
 
-    unique_pre, dupes_pre = engine3.deduplicate_cross_source(pre_hashed_artifacts, existing_set)
+    unique_pre, dupes_pre = engine3.deduplicate_cross_source(
+        pre_hashed_artifacts, existing_set
+    )
     print(f"   Pre-hashed artifacts: {len(pre_hashed_artifacts)}")
     print(f"   Unique: {len(unique_pre)}, Duplicates: {len(dupes_pre)}")
     assert len(unique_pre) == 1 and unique_pre[0]["path"] == "skills/b"
@@ -883,7 +900,7 @@ if __name__ == "__main__":
 
     all_unique, no_dupes = engine3.deduplicate_cross_source(
         [{"path": "a", "files": {"f.md": "content"}, "metadata": {}}],
-        set()  # Empty existing hashes
+        set(),  # Empty existing hashes
     )
     print(f"   Empty existing hashes: unique={len(all_unique)}, dupes={len(no_dupes)}")
     assert len(all_unique) == 1 and len(no_dupes) == 0
@@ -895,7 +912,11 @@ if __name__ == "__main__":
     # Simulate raw scan with internal duplicates
     raw_scan = [
         {"path": "a", "files": {"f.md": "content1"}, "confidence_score": 0.9},
-        {"path": "b", "files": {"f.md": "content1"}, "confidence_score": 0.8},  # Dup of a
+        {
+            "path": "b",
+            "files": {"f.md": "content1"},
+            "confidence_score": 0.8,
+        },  # Dup of a
         {"path": "c", "files": {"f.md": "content2"}, "confidence_score": 0.85},
         {"path": "d", "files": {"f.md": "content3"}, "confidence_score": 0.7},
     ]
@@ -907,13 +928,17 @@ if __name__ == "__main__":
     # Stage 1: Within-source
     stage1_kept, stage1_excluded = engine4.deduplicate_within_source(raw_scan)
     print(f"   Raw scan: {len(raw_scan)} artifacts")
-    print(f"   After within-source: {len(stage1_kept)} kept, {len(stage1_excluded)} excluded")
+    print(
+        f"   After within-source: {len(stage1_kept)} kept, {len(stage1_excluded)} excluded"
+    )
 
     # Stage 2: Cross-source
     final_unique, cross_excluded = engine4.deduplicate_cross_source(
         stage1_kept, collection_hashes
     )
-    print(f"   After cross-source: {len(final_unique)} unique, {len(cross_excluded)} excluded")
+    print(
+        f"   After cross-source: {len(final_unique)} unique, {len(cross_excluded)} excluded"
+    )
 
     # Verify
     final_paths = [a["path"] for a in final_unique]
@@ -924,7 +949,9 @@ if __name__ == "__main__":
     assert cross_excluded[0]["path"] == "c"
 
     total_excluded = len(stage1_excluded) + len(cross_excluded)
-    print(f"   Total excluded: {total_excluded} (within: {len(stage1_excluded)}, cross: {len(cross_excluded)})")
+    print(
+        f"   Total excluded: {total_excluded} (within: {len(stage1_excluded)}, cross: {len(cross_excluded)})"
+    )
     print("   Verification: Full pipeline works correctly!")
 
     # Test 16: mark_as_excluded helper function
@@ -993,7 +1020,9 @@ if __name__ == "__main__":
     print(f"      duplicate_of={restored.get('duplicate_of', 'NOT_SET')}")
     print(f"      status={restored.get('status')}")
     print(f"      content_hash (top)={restored.get('content_hash', 'NOT_SET')}")
-    print(f"      metadata.content_hash={restored.get('metadata', {}).get('content_hash')}")
+    print(
+        f"      metadata.content_hash={restored.get('metadata', {}).get('content_hash')}"
+    )
     print(f"      metadata.other_data={restored.get('metadata', {}).get('other_data')}")
 
     assert restored is excluded_artifact, "Should modify in-place and return same dict"

@@ -14,6 +14,7 @@ Columns added:
 - excluded_reason: User-provided reason for exclusion (optional, max 500 chars)
 
 """
+
 from __future__ import annotations
 
 from typing import Sequence, Union
@@ -24,7 +25,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "20251231_2103_add_exclusion_to_catalog"
-down_revision: Union[str, None] = "20251227_1100_populate_raw_score_for_existing_entries"
+down_revision: Union[str, None] = (
+    "20251227_1100_populate_raw_score_for_existing_entries"
+)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

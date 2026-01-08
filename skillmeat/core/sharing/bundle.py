@@ -45,9 +45,7 @@ class BundleArtifact:
             )
 
         if self.scope not in ("user", "local"):
-            raise ValueError(
-                f"Invalid scope '{self.scope}'. Must be 'user' or 'local'"
-            )
+            raise ValueError(f"Invalid scope '{self.scope}'. Must be 'user' or 'local'")
 
         if not self.hash.startswith("sha256:"):
             raise ValueError(
@@ -123,9 +121,7 @@ class BundleMetadata:
         try:
             datetime.fromisoformat(self.created_at)
         except ValueError as e:
-            raise ValueError(
-                f"created_at must be ISO 8601 format: {e}"
-            ) from e
+            raise ValueError(f"created_at must be ISO 8601 format: {e}") from e
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for manifest serialization."""
@@ -204,7 +200,9 @@ class Bundle:
         """Return total number of files across all artifacts."""
         return sum(len(artifact.files) for artifact in self.artifacts)
 
-    def find_artifact(self, name: str, artifact_type: Optional[str] = None) -> Optional[BundleArtifact]:
+    def find_artifact(
+        self, name: str, artifact_type: Optional[str] = None
+    ) -> Optional[BundleArtifact]:
         """Find artifact by name and optional type.
 
         Args:

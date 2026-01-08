@@ -12,6 +12,9 @@ export interface ScoreBreakdown {
   extensions_score: number;
   parent_hint_score: number;
   frontmatter_score: number;
+  skill_manifest_bonus: number;
+  container_hint_score: number;
+  frontmatter_type_score: number;
   depth_penalty: number;
   raw_total: number;
   normalized_score: number;
@@ -75,6 +78,21 @@ const SIGNALS: SignalDisplay[] = [
     key: 'frontmatter_score',
     label: 'Frontmatter',
     description: 'Markdown frontmatter detected',
+  },
+  {
+    key: 'skill_manifest_bonus',
+    label: 'Skill Manifest Bonus',
+    description: 'Definitive SKILL.md marker detected',
+  },
+  {
+    key: 'container_hint_score',
+    label: 'Container Hint',
+    description: 'Inside a typed container directory (e.g. /skills)',
+  },
+  {
+    key: 'frontmatter_type_score',
+    label: 'Frontmatter Type',
+    description: 'Explicit type field found in frontmatter',
   },
   {
     key: 'depth_penalty',

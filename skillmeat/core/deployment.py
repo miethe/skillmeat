@@ -32,11 +32,19 @@ class Deployment:
     local_modifications: bool = False
 
     # Optional version tracking fields
-    parent_hash: Optional[str] = None  # Hash of parent version (if deployed from collection)
-    version_lineage: List[str] = field(default_factory=list)  # Array of version hashes (newest first)
+    parent_hash: Optional[str] = (
+        None  # Hash of parent version (if deployed from collection)
+    )
+    version_lineage: List[str] = field(
+        default_factory=list
+    )  # Array of version hashes (newest first)
     last_modified_check: Optional[datetime] = None  # Last drift check timestamp
-    modification_detected_at: Optional[datetime] = None  # When modification was first detected
-    merge_base_snapshot: Optional[str] = None  # Content hash (SHA-256) used as merge base for 3-way merges
+    modification_detected_at: Optional[datetime] = (
+        None  # When modification was first detected
+    )
+    merge_base_snapshot: Optional[str] = (
+        None  # Content hash (SHA-256) used as merge base for 3-way merges
+    )
 
     # Deprecated field for backward compatibility
     collection_sha: Optional[str] = None  # Deprecated: use content_hash instead
@@ -64,7 +72,9 @@ class Deployment:
             result["last_modified_check"] = self.last_modified_check.isoformat()
 
         if self.modification_detected_at:
-            result["modification_detected_at"] = self.modification_detected_at.isoformat()
+            result["modification_detected_at"] = (
+                self.modification_detected_at.isoformat()
+            )
 
         if self.merge_base_snapshot:
             result["merge_base_snapshot"] = self.merge_base_snapshot
@@ -92,7 +102,9 @@ class Deployment:
 
         modification_detected_at = None
         if "modification_detected_at" in data:
-            modification_detected_at = datetime.fromisoformat(data["modification_detected_at"])
+            modification_detected_at = datetime.fromisoformat(
+                data["modification_detected_at"]
+            )
 
         # Handle version_lineage: initialize with content_hash if not present
         version_lineage = data.get("version_lineage")
@@ -142,6 +154,7 @@ class DeploymentManager:
         """Lazy-load VersionManager on first access."""
         if self._version_mgr is None:
             from skillmeat.core.version import VersionManager
+
             self._version_mgr = VersionManager(collection_mgr=self.collection_mgr)
         return self._version_mgr
 
@@ -283,7 +296,9 @@ class DeploymentManager:
                 console.print(f"[dim]Snapshot created: {snapshot.id}[/dim]")
             except Exception as e:
                 # Never fail deploy due to snapshot failure
-                console.print(f"[yellow]Warning: Failed to create auto-snapshot: {e}[/yellow]")
+                console.print(
+                    f"[yellow]Warning: Failed to create auto-snapshot: {e}[/yellow]"
+                )
 
         return deployments
 

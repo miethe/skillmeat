@@ -122,7 +122,9 @@ class ProjectRegistry:
             Path.cwd(),
         ]
 
-    async def get_projects(self, force_refresh: bool = False) -> List[ProjectCacheEntry]:
+    async def get_projects(
+        self, force_refresh: bool = False
+    ) -> List[ProjectCacheEntry]:
         """
         Get all projects, using cache when available.
 
@@ -167,7 +169,9 @@ class ProjectRegistry:
 
         # Run blocking filesystem scan in thread pool
         loop = asyncio.get_event_loop()
-        discovered_paths = await loop.run_in_executor(None, self._discover_projects_sync)
+        discovered_paths = await loop.run_in_executor(
+            None, self._discover_projects_sync
+        )
 
         # Build cache entries (also in thread pool for TOML reads)
         new_cache: Dict[str, ProjectCacheEntry] = {}
@@ -303,7 +307,9 @@ class ProjectRegistry:
         """Get cache statistics for debugging/monitoring."""
         return {
             "entries": len(self._cache),
-            "last_scan": self._last_full_scan.isoformat() if self._last_full_scan else None,
+            "last_scan": (
+                self._last_full_scan.isoformat() if self._last_full_scan else None
+            ),
             "cache_ttl": self._cache_ttl,
             "is_valid": self._is_cache_valid(),
             "age_seconds": (

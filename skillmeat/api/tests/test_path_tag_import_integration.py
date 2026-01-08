@@ -31,7 +31,11 @@ from skillmeat.core.importer import (
     BulkImportResultData,
     ImportResultData,
 )
-from skillmeat.core.path_tags import ExtractedSegment, PathSegmentExtractor, PathTagConfig
+from skillmeat.core.path_tags import (
+    ExtractedSegment,
+    PathSegmentExtractor,
+    PathTagConfig,
+)
 
 
 @pytest.fixture
@@ -573,9 +577,21 @@ class TestMultipleArtifacts:
                         "/api/v1/artifacts/discover/import",
                         json={
                             "artifacts": [
-                                {"source": "u/r/a/success-skill", "artifact_type": "skill", "name": "success-skill"},
-                                {"source": "u/r/b/skipped-skill", "artifact_type": "skill", "name": "skipped-skill"},
-                                {"source": "u/r/c/failed-skill", "artifact_type": "skill", "name": "failed-skill"},
+                                {
+                                    "source": "u/r/a/success-skill",
+                                    "artifact_type": "skill",
+                                    "name": "success-skill",
+                                },
+                                {
+                                    "source": "u/r/b/skipped-skill",
+                                    "artifact_type": "skill",
+                                    "name": "skipped-skill",
+                                },
+                                {
+                                    "source": "u/r/c/failed-skill",
+                                    "artifact_type": "skill",
+                                    "name": "failed-skill",
+                                },
                             ],
                         },
                     )

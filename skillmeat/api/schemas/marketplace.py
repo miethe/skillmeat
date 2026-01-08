@@ -714,7 +714,7 @@ class UpdateSourceRequest(BaseModel):
     )
     manual_map: Optional[Dict[str, str]] = Field(
         default=None,
-        description='Manual directory-to-type mappings (directory path → artifact_type). '
+        description="Manual directory-to-type mappings (directory path → artifact_type). "
         'Example: {"path/to/dir": "skill", "other/path": "command"}',
         examples=[{"skills/python": "skill", "commands/dev": "command"}],
     )
@@ -1035,7 +1035,7 @@ class CatalogEntryResponse(BaseModel):
         description="ID of the source this artifact was detected in",
         examples=["src_anthropics_quickstarts"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"] = Field(
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
         description="Type of artifact detected",
         examples=["skill"],
     )
@@ -1124,6 +1124,10 @@ class CatalogEntryResponse(BaseModel):
             "False positive detection",
             "Duplicate artifact",
         ],
+    )
+    is_duplicate: bool = Field(
+        default=False,
+        description="Whether this artifact was excluded as a duplicate (within-source or cross-source)",
     )
 
     class Config:
@@ -1283,7 +1287,12 @@ class CatalogListResponse(BaseModel):
                     "end_cursor": "Y3Vyc29yOjE5",
                     "total_count": 90,
                 },
-                "counts_by_status": {"new": 45, "updated": 12, "imported": 33, "excluded": 5},
+                "counts_by_status": {
+                    "new": 45,
+                    "updated": 12,
+                    "imported": 33,
+                    "excluded": 5,
+                },
                 "counts_by_type": {"skill": 60, "command": 20, "agent": 10},
             }
         }
@@ -1709,8 +1718,8 @@ class HeuristicMatch(BaseModel):
     raw_score: int = Field(
         default=0,
         ge=0,
-        le=150,  # Higher limit to accommodate container_hint + frontmatter_type signals
-        description="Raw score before normalization (0-120 typical)",
+        le=200,  # Higher limit to accommodate all signals including skill_manifest_bonus (MAX=160)
+        description="Raw score before normalization (0-160 typical)",
         examples=[60],
     )
     breakdown: Dict[str, int] = Field(
@@ -2120,7 +2129,7 @@ class ManualMapEntry(BaseModel):
         description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
         examples=["skills/python", "commands/dev", "agents/research"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"] = Field(
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
         description="Artifact type for this directory",
         examples=["skill"],
     )
@@ -2217,9 +2226,7 @@ class ManualMapRequest(BaseModel):
 
             # Block absolute paths
             if normalized_path.startswith("/"):
-                raise ValueError(
-                    f"Path '{path}' must be relative (no leading /)"
-                )
+                raise ValueError(f"Path '{path}' must be relative (no leading /)")
 
             # Block path traversal
             if ".." in normalized_path:
@@ -2229,9 +2236,7 @@ class ManualMapRequest(BaseModel):
 
             # Block double slashes
             if "//" in normalized_path:
-                raise ValueError(
-                    f"Path '{path}' cannot contain double slashes (//)"
-                )
+                raise ValueError(f"Path '{path}' cannot contain double slashes (//)")
 
             # Validate artifact type
             if artifact_type not in valid_types:

@@ -99,7 +99,9 @@ class TestAnalyzeMerge:
             remote_collection=None,
         )
 
-    def test_analyze_merge_with_conflicts(self, client, mock_merge_service, sample_conflict):
+    def test_analyze_merge_with_conflicts(
+        self, client, mock_merge_service, sample_conflict
+    ):
         """Test merge analysis with conflicts."""
         analysis = MergeSafetyAnalysis(
             can_auto_merge=False,
@@ -192,7 +194,9 @@ class TestAnalyzeMerge:
 
     def test_analyze_merge_internal_error(self, client, mock_merge_service):
         """Test merge analysis with internal error."""
-        mock_merge_service.analyze_merge_safety.side_effect = Exception("Unexpected error")
+        mock_merge_service.analyze_merge_safety.side_effect = Exception(
+            "Unexpected error"
+        )
 
         request_data = {
             "base_snapshot_id": "snap_base",
@@ -221,7 +225,10 @@ class TestPreviewMerge:
         preview = MergePreviewResult(
             files_added=[".claude/skills/new/SKILL.md"],
             files_removed=[".claude/skills/old/SKILL.md"],
-            files_changed=[".claude/skills/pdf/SKILL.md", ".claude/skills/canvas/main.py"],
+            files_changed=[
+                ".claude/skills/pdf/SKILL.md",
+                ".claude/skills/canvas/main.py",
+            ],
             potential_conflicts=[],
             can_auto_merge=True,
         )
@@ -243,7 +250,9 @@ class TestPreviewMerge:
         assert len(data["potential_conflicts"]) == 0
         assert data["can_auto_merge"] is True
 
-    def test_preview_merge_with_conflicts(self, client, mock_merge_service, sample_conflict):
+    def test_preview_merge_with_conflicts(
+        self, client, mock_merge_service, sample_conflict
+    ):
         """Test merge preview with potential conflicts."""
         from skillmeat.models import MergePreviewResult
 
@@ -267,7 +276,9 @@ class TestPreviewMerge:
         assert response.status_code == 200
         data = response.json()
         assert len(data["potential_conflicts"]) == 1
-        assert data["potential_conflicts"][0]["file_path"] == ".claude/skills/pdf/SKILL.md"
+        assert (
+            data["potential_conflicts"][0]["file_path"] == ".claude/skills/pdf/SKILL.md"
+        )
         assert data["can_auto_merge"] is False
 
     def test_preview_merge_no_changes(self, client, mock_merge_service):
@@ -341,7 +352,10 @@ class TestExecuteMerge:
         """Test successful merge execution."""
         result = VersionMergeResult(
             success=True,
-            files_merged=[".claude/skills/pdf/SKILL.md", ".claude/skills/canvas/main.py"],
+            files_merged=[
+                ".claude/skills/pdf/SKILL.md",
+                ".claude/skills/canvas/main.py",
+            ],
             conflicts=[],
             pre_merge_snapshot_id="snap_safety",
             error=None,
@@ -373,7 +387,9 @@ class TestExecuteMerge:
             auto_snapshot=True,
         )
 
-    def test_execute_merge_with_conflicts(self, client, mock_merge_service, sample_conflict):
+    def test_execute_merge_with_conflicts(
+        self, client, mock_merge_service, sample_conflict
+    ):
         """Test merge execution with unresolved conflicts."""
         result = VersionMergeResult(
             success=False,
@@ -583,7 +599,10 @@ class TestResolveConflict:
 
         mock_merge_service.resolve_conflict.assert_called_once()
         call_kwargs = mock_merge_service.resolve_conflict.call_args[1]
-        assert call_kwargs["custom_content"] == "# Manually merged content\nCombined changes..."
+        assert (
+            call_kwargs["custom_content"]
+            == "# Manually merged content\nCombined changes..."
+        )
 
     def test_resolve_conflict_custom_without_content(self, client, mock_merge_service):
         """Test resolving conflict with custom but no content provided."""
@@ -677,11 +696,14 @@ class TestMergeWorkflow:
         )
         mock_merge_service.analyze_merge_safety.return_value = analysis
 
-        response = client.post("/api/v1/merge/analyze", json={
-            "base_snapshot_id": "snap_base",
-            "local_collection": "default",
-            "remote_snapshot_id": "snap_remote",
-        })
+        response = client.post(
+            "/api/v1/merge/analyze",
+            json={
+                "base_snapshot_id": "snap_base",
+                "local_collection": "default",
+                "remote_snapshot_id": "snap_remote",
+            },
+        )
         assert response.status_code == 200
         assert response.json()["can_auto_merge"] is True
 
@@ -695,11 +717,14 @@ class TestMergeWorkflow:
         )
         mock_merge_service.get_merge_preview.return_value = preview
 
-        response = client.post("/api/v1/merge/preview", json={
-            "base_snapshot_id": "snap_base",
-            "local_collection": "default",
-            "remote_snapshot_id": "snap_remote",
-        })
+        response = client.post(
+            "/api/v1/merge/preview",
+            json={
+                "base_snapshot_id": "snap_base",
+                "local_collection": "default",
+                "remote_snapshot_id": "snap_remote",
+            },
+        )
         assert response.status_code == 200
 
         # Step 3: Execute merge
@@ -712,12 +737,15 @@ class TestMergeWorkflow:
         )
         mock_merge_service.merge_with_conflict_detection.return_value = result
 
-        response = client.post("/api/v1/merge/execute", json={
-            "base_snapshot_id": "snap_base",
-            "local_collection": "default",
-            "remote_snapshot_id": "snap_remote",
-            "auto_snapshot": True,
-        })
+        response = client.post(
+            "/api/v1/merge/execute",
+            json={
+                "base_snapshot_id": "snap_base",
+                "local_collection": "default",
+                "remote_snapshot_id": "snap_remote",
+                "auto_snapshot": True,
+            },
+        )
         assert response.status_code == 200
         assert response.json()["success"] is True
 
@@ -737,11 +765,14 @@ class TestMergeWorkflow:
         )
         mock_merge_service.analyze_merge_safety.return_value = analysis
 
-        response = client.post("/api/v1/merge/analyze", json={
-            "base_snapshot_id": "snap_base",
-            "local_collection": "default",
-            "remote_snapshot_id": "snap_remote",
-        })
+        response = client.post(
+            "/api/v1/merge/analyze",
+            json={
+                "base_snapshot_id": "snap_base",
+                "local_collection": "default",
+                "remote_snapshot_id": "snap_remote",
+            },
+        )
         assert response.status_code == 200
         assert response.json()["can_auto_merge"] is False
         assert len(response.json()["conflicts"]) == 1
@@ -756,19 +787,25 @@ class TestMergeWorkflow:
         )
         mock_merge_service.merge_with_conflict_detection.return_value = result
 
-        response = client.post("/api/v1/merge/execute", json={
-            "base_snapshot_id": "snap_base",
-            "local_collection": "default",
-            "remote_snapshot_id": "snap_remote",
-        })
+        response = client.post(
+            "/api/v1/merge/execute",
+            json={
+                "base_snapshot_id": "snap_base",
+                "local_collection": "default",
+                "remote_snapshot_id": "snap_remote",
+            },
+        )
         assert response.status_code == 409
 
         # Step 3: Resolve conflict
         mock_merge_service.resolve_conflict.return_value = True
 
-        response = client.post("/api/v1/merge/resolve", json={
-            "file_path": ".claude/skills/pdf/SKILL.md",
-            "resolution": "use_local",
-        })
+        response = client.post(
+            "/api/v1/merge/resolve",
+            json={
+                "file_path": ".claude/skills/pdf/SKILL.md",
+                "resolution": "use_local",
+            },
+        )
         assert response.status_code == 200
         assert response.json()["success"] is True

@@ -48,7 +48,12 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 @click.version_option(version=__version__, prog_name="skillmeat")
-@click.option("--smart-defaults", is_flag=True, hidden=True, help="Enable smart defaults mode (used by claudectl wrapper)")
+@click.option(
+    "--smart-defaults",
+    is_flag=True,
+    hidden=True,
+    help="Enable smart defaults mode (used by claudectl wrapper)",
+)
 @click.pass_context
 def main(ctx, smart_defaults):
     """SkillMeat: Personal collection manager for Claude Code artifacts.

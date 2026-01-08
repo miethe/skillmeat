@@ -168,14 +168,24 @@ async def match_artifacts(
 
                 # Build matched artifact
                 matched = MatchedArtifact(
-                    artifact_id=f"{artifact.type.value}:{score.artifact_id}"
-                    if artifact
-                    else score.artifact_id,
+                    artifact_id=(
+                        f"{artifact.type.value}:{score.artifact_id}"
+                        if artifact
+                        else score.artifact_id
+                    ),
                     name=score.artifact_id,
                     artifact_type=artifact.type.value if artifact else "unknown",
                     confidence=score.confidence,
-                    title=artifact.metadata.title if artifact and artifact.metadata else None,
-                    description=artifact.metadata.description if artifact and artifact.metadata else None,
+                    title=(
+                        artifact.metadata.title
+                        if artifact and artifact.metadata
+                        else None
+                    ),
+                    description=(
+                        artifact.metadata.description
+                        if artifact and artifact.metadata
+                        else None
+                    ),
                 )
 
                 # Add breakdown if requested

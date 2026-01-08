@@ -115,6 +115,18 @@ function truncateSha(sha: string | undefined, length: number = 7): string {
 }
 
 /**
+ * Check if entity has a valid upstream source (not local-only)
+ * Returns false for: undefined, null, empty, 'local', 'local:*', 'unknown'
+ */
+function hasValidUpstreamSource(source: string | undefined | null): boolean {
+  if (!source) return false;
+  if (source === 'local' || source === 'unknown') return false;
+  if (source.startsWith('local:')) return false;
+  // Must look like a remote source (GitHub pattern with '/')
+  return source.includes('/') && !source.startsWith('local');
+}
+
+/**
  * Format relative time for display
  */
 function formatRelativeTime(date: Date): string {
@@ -458,7 +470,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         throw error;
       }
     },
-    enabled: activeTab === 'sync' && !!entity?.id && entity?.collection !== 'discovered',
+    enabled: activeTab === 'sync'
+      && !!entity?.id
+      && entity?.collection !== 'discovered'
+      && hasValidUpstreamSource(entity?.source),
     staleTime: 60 * 1000, // Cache for 1 minute (upstream changes less frequently)
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     retry: 2, // Retry failed requests up to 2 times

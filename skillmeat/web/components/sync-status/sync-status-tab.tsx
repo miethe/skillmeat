@@ -133,6 +133,18 @@ function getRightLabel(scope: ComparisonScope): string {
   }
 }
 
+/**
+ * Check if entity has a valid upstream source (not local-only)
+ * Returns false for: undefined, null, empty, 'local', 'local:*', 'unknown'
+ */
+function hasValidUpstreamSource(source: string | undefined | null): boolean {
+  if (!source) return false;
+  if (source === 'local' || source === 'unknown') return false;
+  if (source.startsWith('local:')) return false;
+  // Must look like a remote source (GitHub pattern with '/')
+  return source.includes('/') && !source.startsWith('local');
+}
+
 
 // ============================================================================
 // Loading Skeleton
@@ -241,14 +253,18 @@ export function SyncStatusTab({
   // State
   // ============================================================================
 
+  // Determine if we have a real source (not 'local' or 'unknown')
+  const hasRealSource = !!entity.source && entity.source !== 'local' && entity.source !== 'unknown';
+
   const [comparisonScope, setComparisonScope] = useState<ComparisonScope>(
-    mode === 'project' ? 'collection-vs-project' : 'source-vs-collection'
+    mode === 'project'
+      ? 'collection-vs-project'
+      : hasRealSource
+        ? 'source-vs-collection'
+        : 'collection-vs-project'
   );
   const [pendingActions] = useState<PendingAction[]>([]);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
-
-  // Helper to detect local-only artifacts
-  const isLocalOnly = !entity.source || entity.source === 'local';
 
   // ============================================================================
   // Queries
@@ -266,7 +282,9 @@ export function SyncStatusTab({
         `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff`
       );
     },
-    enabled: !!entity.id && !!entity.source && entity.source !== 'local' && entity.collection !== 'discovered',
+    enabled: !!entity.id
+      && entity.collection !== 'discovered'
+      && hasValidUpstreamSource(entity.source),
   });
 
   // Project diff (collection vs project)
@@ -284,44 +302,6 @@ export function SyncStatusTab({
     },
     enabled: !!entity.id && !!projectPath && mode === 'project' && entity.collection !== 'discovered',
   });
-
-  // ============================================================================
-  // Early Return: Discovered Artifacts
-  // ============================================================================
-
-  // Discovered artifacts are not in any collection yet - they need to be imported first
-  if (entity.collection === 'discovered') {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <Alert className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Sync status is not available for discovered artifacts. Import this artifact to your collection to enable sync tracking.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // Early Return: Local-Only Artifacts with Source Comparison
-  // ============================================================================
-
-  // If this is a local-only artifact and user is trying to compare with source,
-  // show a helpful message instead of an error
-  if (isLocalOnly && comparisonScope === 'source-vs-collection') {
-    return (
-      <div className="flex h-full items-center justify-center p-8">
-        <Alert className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            This is a local-only artifact with no remote source to compare against.
-            Try comparing Collection vs Project instead.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   // ============================================================================
   // Mutations
@@ -513,6 +493,25 @@ export function SyncStatusTab({
   );
 
   // ============================================================================
+  // Early Return: Discovered Artifacts
+  // ============================================================================
+
+  // Discovered artifacts are not in any collection yet - they need to be imported first
+  // NOTE: This early return is placed AFTER all hooks to comply with React's rules of hooks
+  if (entity.collection === 'discovered') {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Sync status is not available for discovered artifacts. Import this artifact to your collection to enable sync tracking.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // ============================================================================
   // Component Props
   // ============================================================================
 
@@ -549,7 +548,7 @@ export function SyncStatusTab({
   const comparisonProps = {
     value: comparisonScope,
     onChange: handleComparisonChange,
-    hasSource: !!entity.source,
+    hasSource: !!entity.source && entity.source !== 'local' && entity.source !== 'unknown',
     hasProject: !!projectPath,
   };
 
@@ -594,16 +593,29 @@ export function SyncStatusTab({
   // Error & Loading States
   // ============================================================================
 
-  const error = upstreamError || projectError;
-  const isLoading = upstreamLoading || projectLoading;
+  // Determine if we have usable data
+  const hasUpstreamData = !upstreamError && !!upstreamDiff;
+  const hasProjectData = !projectError && !!projectDiff;
+  const canShowAnyData = hasUpstreamData || hasProjectData;
 
-  if (error) {
+  // Only show loading if we're loading AND don't have any data yet
+  const isLoading = (upstreamLoading || projectLoading) && !canShowAnyData;
+
+  // Only show blocking error if BOTH queries failed or if we can't show anything useful
+  // For local-only artifacts: upstreamError is expected, so don't block if projectData is available
+  const shouldBlockWithError =
+    (projectError && !hasUpstreamData) || // Project failed and no upstream
+    (upstreamError && projectError) ||     // Both failed
+    (!hasValidUpstreamSource(entity.source) && projectError); // Local artifact and project failed
+
+  if (shouldBlockWithError) {
+    const errorToShow = projectError || upstreamError;
     return (
       <div className="flex h-full items-center justify-center p-8">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load diff: {error.message}
+            Failed to load diff: {errorToShow?.message || 'Unknown error'}
           </AlertDescription>
         </Alert>
       </div>
@@ -612,6 +624,30 @@ export function SyncStatusTab({
 
   if (isLoading) {
     return <SyncStatusTabSkeleton />;
+  }
+
+  // Handle case where selected comparison has no data
+  if (!currentDiff && !isLoading && !shouldBlockWithError) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex-shrink-0 border-b">
+          <ArtifactFlowBanner {...bannerProps} />
+        </div>
+        <div className="flex-shrink-0 space-y-2 border-b p-4">
+          <ComparisonSelector {...comparisonProps} />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <Alert className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No comparison data available for this scope.
+              {!hasRealSource && " This artifact has no remote source."}
+              {!projectPath && " No project deployment found."}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
   }
 
   // ============================================================================

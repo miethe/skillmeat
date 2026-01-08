@@ -258,7 +258,11 @@ class RatingManager:
         """
         session = get_session()
         try:
-            orm_rating = session.query(OrmUserRating).filter(OrmUserRating.id == rating_id).first()
+            orm_rating = (
+                session.query(OrmUserRating)
+                .filter(OrmUserRating.id == rating_id)
+                .first()
+            )
 
             if orm_rating is None:
                 return False
@@ -300,7 +304,11 @@ class RatingManager:
 
         session = get_session()
         try:
-            orm_rating = session.query(OrmUserRating).filter(OrmUserRating.id == rating_id).first()
+            orm_rating = (
+                session.query(OrmUserRating)
+                .filter(OrmUserRating.id == rating_id)
+                .first()
+            )
 
             if orm_rating is None:
                 raise RatingNotFoundError(f"Rating with id {rating_id} not found")

@@ -1,4 +1,5 @@
 """Error handling utilities for API endpoints."""
+
 from typing import List, Optional
 
 from fastapi import HTTPException, status
@@ -86,7 +87,9 @@ def create_conflict_error(resource: str, identifier: str, reason: str) -> HTTPEx
     )
 
 
-def create_bad_request_error(message: str, code: str = ErrorCodes.VALIDATION_FAILED) -> HTTPException:
+def create_bad_request_error(
+    message: str, code: str = ErrorCodes.VALIDATION_FAILED
+) -> HTTPException:
     """Create consistent bad request error response.
 
     Args:
@@ -111,7 +114,9 @@ def create_bad_request_error(message: str, code: str = ErrorCodes.VALIDATION_FAI
     )
 
 
-def create_internal_error(message: str, exception: Optional[Exception] = None) -> HTTPException:
+def create_internal_error(
+    message: str, exception: Optional[Exception] = None
+) -> HTTPException:
     """Create consistent internal server error response.
 
     Args:
@@ -149,7 +154,9 @@ def create_rate_limit_error(message: Optional[str] = None) -> HTTPException:
     Returns:
         HTTPException with 429 status and rate limit error details
     """
-    default_message = "GitHub rate limit exceeded. Please configure a GitHub token for higher limits."
+    default_message = (
+        "GitHub rate limit exceeded. Please configure a GitHub token for higher limits."
+    )
     return HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail={

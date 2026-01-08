@@ -82,7 +82,9 @@ class TestMCPServerList:
             mcp_servers=[],
         )
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = empty_collection
 
@@ -95,7 +97,9 @@ class TestMCPServerList:
 
     def test_list_servers_with_data(self, client, mock_collection):
         """Test listing servers with data."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -114,7 +118,9 @@ class TestMCPServerGet:
 
     def test_get_server_success(self, client, mock_collection):
         """Test getting server details."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -128,7 +134,9 @@ class TestMCPServerGet:
 
     def test_get_server_not_found(self, client, mock_collection):
         """Test getting non-existent server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -141,7 +149,9 @@ class TestMCPServerCreate:
 
     def test_create_server_success(self, client, mock_collection):
         """Test creating a new server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
             mock_mgr.save_collection.return_value = None
@@ -164,7 +174,9 @@ class TestMCPServerCreate:
 
     def test_create_server_invalid_name(self, client, mock_collection):
         """Test creating server with invalid name."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -179,7 +191,9 @@ class TestMCPServerCreate:
 
     def test_create_server_duplicate(self, client, mock_collection):
         """Test creating server with duplicate name."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -198,7 +212,9 @@ class TestMCPServerUpdate:
 
     def test_update_server_success(self, client, mock_collection):
         """Test updating server configuration."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
             mock_mgr.save_collection.return_value = None
@@ -217,7 +233,9 @@ class TestMCPServerUpdate:
 
     def test_update_server_not_found(self, client, mock_collection):
         """Test updating non-existent server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -232,7 +250,9 @@ class TestMCPServerDelete:
 
     def test_delete_server_success(self, client, mock_collection):
         """Test deleting a server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
             mock_mgr.save_collection.return_value = None
@@ -242,7 +262,9 @@ class TestMCPServerDelete:
 
     def test_delete_server_not_found(self, client, mock_collection):
         """Test deleting non-existent server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
             mock_mgr.list_collections.return_value = ["test"]
             mock_mgr.load_collection.return_value = mock_collection
 
@@ -264,8 +286,12 @@ class TestMCPServerDeployment:
             args=["-y", "@anthropic/mcp-filesystem"],
         )
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
-            with patch("skillmeat.core.mcp.deployment.MCPDeploymentManager") as mock_deploy:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
+            with patch(
+                "skillmeat.core.mcp.deployment.MCPDeploymentManager"
+            ) as mock_deploy:
                 mock_mgr.list_collections.return_value = ["test"]
                 mock_mgr.load_collection.return_value = mock_collection
                 mock_mgr.save_collection.return_value = None
@@ -295,8 +321,12 @@ class TestMCPServerDeployment:
             args=["-y", "@anthropic/mcp-filesystem"],
         )
 
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
-            with patch("skillmeat.core.mcp.deployment.MCPDeploymentManager") as mock_deploy:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
+            with patch(
+                "skillmeat.core.mcp.deployment.MCPDeploymentManager"
+            ) as mock_deploy:
                 mock_mgr.list_collections.return_value = ["test"]
                 mock_mgr.load_collection.return_value = mock_collection
 
@@ -316,13 +346,19 @@ class TestMCPServerDeployment:
 
     def test_undeploy_server_success(self, client, mock_collection):
         """Test undeploying a server."""
-        with patch("skillmeat.api.dependencies.app_state.collection_manager") as mock_mgr:
-            with patch("skillmeat.core.mcp.deployment.MCPDeploymentManager") as mock_deploy:
+        with patch(
+            "skillmeat.api.dependencies.app_state.collection_manager"
+        ) as mock_mgr:
+            with patch(
+                "skillmeat.core.mcp.deployment.MCPDeploymentManager"
+            ) as mock_deploy:
                 mock_mgr.list_collections.return_value = ["test"]
                 mock_mgr.load_collection.return_value = mock_collection
 
                 mock_deploy_instance = Mock()
-                mock_deploy_instance.get_settings_path.return_value = "/path/to/settings.json"
+                mock_deploy_instance.get_settings_path.return_value = (
+                    "/path/to/settings.json"
+                )
                 mock_deploy_instance.undeploy_server.return_value = True
                 mock_deploy.return_value = mock_deploy_instance
 
@@ -341,7 +377,9 @@ class TestMCPServerStatus:
         """Test getting deployment status for a server."""
         with patch("skillmeat.core.mcp.deployment.MCPDeploymentManager") as mock_deploy:
             mock_deploy_instance = Mock()
-            mock_deploy_instance.get_settings_path.return_value = tmp_path / "settings.json"
+            mock_deploy_instance.get_settings_path.return_value = (
+                tmp_path / "settings.json"
+            )
             mock_deploy_instance.is_server_deployed.return_value = True
             mock_deploy_instance.read_settings.return_value = {
                 "mcpServers": {

@@ -131,9 +131,7 @@ class BrokerRegistry:
             with open(self.config_path, "rb") as f:
                 return TOML_LOADS(f.read().decode("utf-8"))
         except Exception as e:
-            raise BrokerRegistryError(
-                f"Failed to parse marketplace config: {e}"
-            ) from e
+            raise BrokerRegistryError(f"Failed to parse marketplace config: {e}") from e
 
     def _write_config(self, config: Dict) -> None:
         """Write marketplace configuration.
@@ -149,9 +147,7 @@ class BrokerRegistry:
             with open(self.config_path, "wb") as f:
                 f.write(TOML_DUMPS(config).encode("utf-8"))
         except Exception as e:
-            raise BrokerRegistryError(
-                f"Failed to write marketplace config: {e}"
-            ) from e
+            raise BrokerRegistryError(f"Failed to write marketplace config: {e}") from e
 
     def _load_brokers(self) -> None:
         """Load brokers from configuration.

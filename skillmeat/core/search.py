@@ -896,7 +896,9 @@ class SearchManager:
                             }
                         )
                 except (OSError, IOError) as e:
-                    logging.warning(f"Error reading skills directory {redact_path(skills_dir)}: {e}")
+                    logging.warning(
+                        f"Error reading skills directory {redact_path(skills_dir)}: {e}"
+                    )
 
             # Get directory mtime for cache invalidation
             try:
