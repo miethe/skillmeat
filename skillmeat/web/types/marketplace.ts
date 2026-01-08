@@ -112,7 +112,7 @@ export interface PublishFormData {
 export type TrustLevel = 'untrusted' | 'basic' | 'verified' | 'official';
 export type ScanStatus = 'pending' | 'scanning' | 'success' | 'error';
 export type CatalogStatus = 'new' | 'updated' | 'removed' | 'imported' | 'excluded';
-export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook';
+export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'mcp_server' | 'hook';
 
 export interface GitHubSource {
   id: string;

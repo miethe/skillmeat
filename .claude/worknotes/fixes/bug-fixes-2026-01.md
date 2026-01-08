@@ -91,3 +91,31 @@ artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"]
 **Testing**: Response schema now accepts both 'mcp' and 'mcp_server' values
 
 **Status**: RESOLVED
+
+---
+
+## Frontend Crash When Displaying MCP Artifacts
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: web-frontend
+
+**Issue**: When toggling to view detected artifacts in the marketplace sources page, the app crashes with `TypeError: Cannot read properties of undefined (reading 'color')` at CatalogCard (page.tsx:148:81).
+
+**Root Cause**: The frontend UI config objects (typeConfig, artifactTypeIcons, artifactTypeLabels, etc.) only had entries for `mcp_server`, not `mcp`. When artifacts with `artifact_type='mcp'` were returned from the API, the config lookup returned `undefined`, causing the property access to fail.
+
+**Fix**: Added `'mcp'` entries to all artifact type config objects in the frontend, using the same orange color scheme as `mcp_server`.
+
+**Files Modified**:
+- `skillmeat/web/types/marketplace.ts`: Added 'mcp' to ArtifactType union type
+- `skillmeat/web/app/marketplace/sources/[id]/page.tsx`: Added 'mcp' to typeConfig
+- `skillmeat/web/app/marketplace/sources/[id]/components/catalog-list.tsx`: Added 'mcp' to 5 config objects:
+  - artifactTypeIcons
+  - artifactTypeLabels
+  - artifactTypeIconColors
+  - artifactTypeRowTints
+  - artifactTypeBorderAccents
+
+**Testing**: UI now renders 'mcp' artifacts with orange styling matching 'mcp_server'
+
+**Status**: RESOLVED
