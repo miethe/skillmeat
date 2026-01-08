@@ -156,3 +156,54 @@ artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"]
 **Impact**: Artifacts inside typed containers that were previously missing the parent_hint bonus now score 8-12 percentage points higher (normalized), making them more likely to exceed the confidence threshold for display.
 
 **Status**: RESOLVED
+
+---
+
+## Infinite API Request Loop When Changing Items Per Page Selector
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-pagination
+
+**Issue**: When a user changes the number of detected artifacts to display from a marketplace source using the items per page selector, the site begins looping the same API requests constantly until hitting a rate limit, breaking site functionality.
+
+**Root Cause**: The `useEffect` hook that triggers `fetchNextPage()` for infinite scroll used a `>=` comparison instead of `>`:
+
+```javascript
+// BUG: Line 509 in page.tsx
+if (hasNextPage && endIndex >= allEntries.length && !isFetchingNextPage) {
+    fetchNextPage();
+}
+```
+
+The infinite loop occurred because:
+1. User changes `itemsPerPage` from 25 to 100
+2. `endIndex` recalculates to 100 (for page 1)
+3. `allEntries.length` is 50 (from first API fetch with limit=50)
+4. Condition `100 >= 50` is true → triggers `fetchNextPage()`
+5. After fetch completes: `allEntries.length = 100`
+6. Condition `100 >= 100` is **still true** → triggers another fetch!
+7. Loop continues indefinitely until rate limit is hit
+
+**Fix**: Changed comparison from `>=` to `>` so that when we have exactly enough data (`endIndex === allEntries.length`), we don't trigger another unnecessary fetch.
+
+```javascript
+// FIXED: Line 509 in page.tsx
+if (hasNextPage && endIndex > allEntries.length && !isFetchingNextPage) {
+    fetchNextPage();
+}
+```
+
+Also added missing `updateURLParams` dependency to the URL sync useEffect (line 400) to prevent potential stale closure bugs.
+
+**Files Modified**:
+- `skillmeat/web/app/marketplace/sources/[id]/page.tsx`:
+  - Line 509: Changed `>=` to `>` in fetchNextPage condition
+  - Line 400: Added `updateURLParams` to dependency array
+
+**Testing**: Lint and type-check pass without new errors. The fix ensures:
+- When `endIndex > allEntries.length`: Still fetches more data (correct behavior)
+- When `endIndex === allEntries.length`: Stops fetching (prevents infinite loop)
+- When `endIndex < allEntries.length`: Doesn't fetch (we already have enough)
+
+**Status**: RESOLVED
