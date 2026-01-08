@@ -36,6 +36,52 @@ from skillmeat.core.marketplace.deduplication_engine import DeduplicationEngine
 logger = logging.getLogger(__name__)
 
 
+def compute_artifact_hash_from_tree(
+    artifact_path: str,
+    tree: List[Dict[str, Any]],
+) -> str:
+    """Compute content hash for an artifact from GitHub tree blob SHAs.
+
+    Uses blob SHAs (Git's content-based hashes) from the tree to create
+    a deterministic artifact-level hash without fetching file content.
+
+    Args:
+        artifact_path: Path to artifact directory (e.g., "skills/my-skill")
+        tree: GitHub tree API response with path, type, sha for each item
+
+    Returns:
+        SHA256 hash of sorted path:sha pairs for files within artifact_path
+    """
+    import hashlib
+
+    # Normalize artifact path (no trailing slash)
+    artifact_path = artifact_path.rstrip("/")
+
+    # Find all blob entries within this artifact directory
+    file_entries = []
+    for item in tree:
+        if item.get("type") != "blob":
+            continue
+        item_path = item.get("path", "")
+        # Check if file is within artifact directory or is the artifact itself
+        if item_path.startswith(f"{artifact_path}/") or item_path == artifact_path:
+            # Get relative path within artifact
+            if item_path == artifact_path:
+                rel_path = item_path.split("/")[-1]  # Just filename
+            else:
+                rel_path = item_path[len(artifact_path) + 1:]  # Remove prefix
+            blob_sha = item.get("sha", "")
+            if blob_sha:
+                file_entries.append(f"{rel_path}:{blob_sha}")
+
+    # Sort for deterministic hash
+    file_entries.sort()
+
+    # Compute composite hash
+    combined = "\n".join(file_entries)
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+
 def get_existing_collection_hashes(session) -> Set[str]:
     """Query existing artifact hashes from the marketplace catalog.
 
@@ -219,6 +265,16 @@ class GitHubScanner:
                 logger.info(
                     f"Detected {len(detected_artifacts)} artifacts from {repo_full_name}"
                 )
+
+                # 4b. Compute content hash for each artifact from tree blob SHAs
+                # This enables proper deduplication without fetching file content
+                ctx.metadata["phase"] = "compute_content_hashes"
+                for artifact in detected_artifacts:
+                    content_hash = compute_artifact_hash_from_tree(artifact.path, tree)
+                    # Store in metadata for deduplication
+                    if artifact.metadata is None:
+                        artifact.metadata = {}
+                    artifact.metadata["content_hash"] = content_hash
 
                 # 5. Deduplicate within source
                 ctx.metadata["phase"] = "deduplicate_within_source"
@@ -866,6 +922,13 @@ def scan_github_source(
         root_hint=root_hint,
         detected_sha=commit_sha,
     )
+
+    # Compute content hash for each artifact from tree blob SHAs
+    for artifact in artifacts:
+        content_hash = compute_artifact_hash_from_tree(artifact.path, tree)
+        if artifact.metadata is None:
+            artifact.metadata = {}
+        artifact.metadata["content_hash"] = content_hash
 
     result = ScanResultDTO(
         source_id="",
