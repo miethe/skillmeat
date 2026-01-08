@@ -1035,7 +1035,7 @@ class CatalogEntryResponse(BaseModel):
         description="ID of the source this artifact was detected in",
         examples=["src_anthropics_quickstarts"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"] = Field(
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
         description="Type of artifact detected",
         examples=["skill"],
     )
@@ -2129,7 +2129,7 @@ class ManualMapEntry(BaseModel):
         description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
         examples=["skills/python", "commands/dev", "agents/research"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"] = Field(
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
         description="Artifact type for this directory",
         examples=["skill"],
     )
