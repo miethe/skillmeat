@@ -1204,14 +1204,32 @@ class HeuristicDetector:
                 f"Contains expected file extensions (+{extension_score})"
             )
 
-        # Signal 4: Parent hint bonus
+        # Signal 4: Container hint inference (if type unknown)
+        # IMPORTANT: This must run BEFORE parent hint scoring so that artifact_type
+        # is set when we check parent directories. Otherwise, hooks and other artifacts
+        # that rely solely on container_hint would miss the +15 parent hint bonus.
+        if container_hint is not None and artifact_type is None:
+            # If no type detected yet but we have a container hint, use it as weak signal
+            # This helps detect artifacts that only have file extensions but are inside
+            # a typed container directory
+            artifact_type = container_hint
+            # Give a smaller bonus since we're inferring the type
+            container_bonus = self.config.container_hint_weight // 2
+            total_score += container_bonus
+            breakdown["container_hint_score"] = container_bonus
+            match_reasons.append(
+                f"Type inferred from container ({container_hint.value}) (+{container_bonus})"
+            )
+
+        # Signal 5: Parent hint bonus
+        # Now artifact_type may be set from container_hint inference above
         parent_hint_score = self._score_parent_hint(path, artifact_type)
         if parent_hint_score > 0:
             total_score += parent_hint_score
             breakdown["parent_hint_score"] = parent_hint_score
             match_reasons.append(f"Parent directory hint bonus (+{parent_hint_score})")
 
-        # Signal 5: Frontmatter detection (if enabled)
+        # Signal 6: Frontmatter detection (if enabled)
         if use_frontmatter:
             # Look for .md files that might contain frontmatter
             md_files = [f for f in siblings if f.endswith(".md")]
@@ -1230,31 +1248,20 @@ class HeuristicDetector:
                     match_reasons.append(f"frontmatter_candidate:{md_file}")
                     break
 
-        # Signal 6: Container hint bonus
+        # Signal 7: Container hint match bonus (when type already detected)
         # If this directory is inside a container (e.g., skills/my-skill inside skills/)
-        # and the detected type matches the container type, add a bonus
+        # and the detected type matches the container type, add full bonus
+        # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint:
+            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight
                 match_reasons.append(
                     f"Type matches container hint ({container_hint.value}) "
                     f"(+{self.config.container_hint_weight})"
                 )
-        elif container_hint is not None and artifact_type is None:
-            # If no type detected yet but we have a container hint, use it as weak signal
-            # This helps detect artifacts that only have file extensions but are inside
-            # a typed container directory
-            artifact_type = container_hint
-            # Give a smaller bonus since we're inferring the type
-            container_bonus = self.config.container_hint_weight // 2
-            total_score += container_bonus
-            breakdown["container_hint_score"] = container_bonus
-            match_reasons.append(
-                f"Type inferred from container ({container_hint.value}) (+{container_bonus})"
-            )
 
-        # Signal 7: Standalone artifact bonus
+        # Signal 8: Standalone artifact bonus
         # If manifest detected but no container context, give standalone bonus
         # This ensures root-level artifacts with manifests score above threshold
         if (
@@ -1895,24 +1902,29 @@ class HeuristicDetector:
            (.md, .py, .ts, .js, .json, .yaml, .yml). Helps distinguish artifact
            directories from empty/readme-only folders.
 
-        2. **Parent hint scoring** (15 pts): Check ancestor directories for
+        2. **Container hint inference** (12 pts): If no artifact type detected yet,
+           infer type from container hint. This MUST run before parent hint scoring
+           so artifacts inside typed containers (e.g., hooks/my-hook) get the
+           parent hint bonus.
+
+        3. **Parent hint scoring** (15 pts): Check ancestor directories for
            patterns like "claude", "anthropic", "artifacts", or artifact type names.
            Boosts confidence when artifacts are in recognizable collection structures.
+           Now artifact_type may be set from container_hint inference above.
 
-        3. **Frontmatter presence** (15 pts): When use_frontmatter=True, boost
+        4. **Frontmatter presence** (15 pts): When use_frontmatter=True, boost
            confidence if README.md, SKILL.md, etc. are present. Indicates
            well-documented artifacts.
 
-        4. **Container hint bonus** (25 pts): Add bonus when detected type
-           matches the container type hint (e.g., skill inside skills/), or
-           infer type from container if no type detected yet (12 pts for inference).
-           This is the strongest marketplace signal.
+        5. **Container hint match bonus** (25 pts): Add bonus when detected type
+           matches the container type hint (e.g., skill inside skills/).
+           Only applied if type was NOT inferred from container (already got 12 pts).
 
-        5. **Frontmatter type detection** (30 pts): If file_contents provided,
+        6. **Frontmatter type detection** (30 pts): If file_contents provided,
            parse YAML frontmatter for explicit type field. When present, this
            overrides other type signals (highest confidence signal).
 
-        6. **Depth penalty** (variable): Subtract penalty based on path depth.
+        7. **Depth penalty** (variable): Subtract penalty based on path depth.
            Reduced 50% when inside a typed container to avoid unfairly penalizing
            properly organized nested artifacts.
 
@@ -2008,10 +2020,27 @@ class HeuristicDetector:
             reasons.append(f"Contains expected file extensions (+{extension_score})")
 
         # =====================================================================
-        # Marketplace-Specific Signal 2: Parent Hint Scoring (15 pts)
+        # Marketplace-Specific Signal 2: Container Hint Inference (12 pts)
+        # =====================================================================
+        # IMPORTANT: This must run BEFORE parent hint scoring so that artifact_type
+        # is set when we check parent directories. Otherwise, hooks and other artifacts
+        # that rely solely on container_hint would miss the +15 parent hint bonus.
+        if container_hint is not None and artifact_type is None:
+            # No type detected yet - infer from container (weaker signal)
+            artifact_type = container_hint
+            container_bonus = self.config.container_hint_weight // 2  # 12 pts
+            total_score += container_bonus
+            breakdown["container_hint_score"] = container_bonus
+            reasons.append(
+                f"Type inferred from container ({container_hint.value}) (+{container_bonus})"
+            )
+
+        # =====================================================================
+        # Marketplace-Specific Signal 3: Parent Hint Scoring (15 pts)
         # =====================================================================
         # Boosts confidence when ancestor paths contain "claude", "anthropic",
         # "artifacts", or artifact type names (e.g., "skills", "commands")
+        # Now artifact_type may be set from container_hint inference above
         parent_hint_score = self._score_parent_hint(path, artifact_type)
         if parent_hint_score > 0:
             total_score += parent_hint_score
@@ -2019,7 +2048,7 @@ class HeuristicDetector:
             reasons.append(f"Parent directory hint bonus (+{parent_hint_score})")
 
         # =====================================================================
-        # Marketplace-Specific Signal 3: Frontmatter Presence (15 pts)
+        # Marketplace-Specific Signal 4: Frontmatter Presence (15 pts)
         # =====================================================================
         # When enabled, boosts confidence if README.md/SKILL.md/etc. present
         # Indicates well-documented artifacts
@@ -2038,13 +2067,13 @@ class HeuristicDetector:
                     break
 
         # =====================================================================
-        # Marketplace-Specific Signal 4: Container Hint Bonus (25 pts or 12 pts)
+        # Marketplace-Specific Signal 5: Container Hint Match Bonus (25 pts)
         # =====================================================================
         # Strongest marketplace signal - adds 25 pts when detected type matches
-        # container type (e.g., skill inside skills/), or 12 pts when inferring
-        # type from container when no type detected yet
+        # container type (e.g., skill inside skills/)
+        # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint:
+            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
                 # Type matches container - full bonus
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight
@@ -2052,18 +2081,9 @@ class HeuristicDetector:
                     f"Type matches container hint ({container_hint.value}) "
                     f"(+{self.config.container_hint_weight})"
                 )
-        elif container_hint is not None and artifact_type is None:
-            # No type detected yet - infer from container (weaker signal)
-            artifact_type = container_hint
-            container_bonus = self.config.container_hint_weight // 2  # 12 pts
-            total_score += container_bonus
-            breakdown["container_hint_score"] = container_bonus
-            reasons.append(
-                f"Type inferred from container ({container_hint.value}) (+{container_bonus})"
-            )
 
         # =====================================================================
-        # Marketplace-Specific Signal 5: Frontmatter Type Detection
+        # Marketplace-Specific Signal 6: Frontmatter Type Detection
         # =====================================================================
         if file_contents:
             _, _, frontmatter_type = self._score_manifest_with_content(

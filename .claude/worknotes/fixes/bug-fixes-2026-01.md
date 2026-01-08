@@ -119,3 +119,40 @@ artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"]
 **Testing**: UI now renders 'mcp' artifacts with orange styling matching 'mcp_server'
 
 **Status**: RESOLVED
+
+---
+
+## Hook Artifact Detection Has Inconsistent Low Confidence Scores
+
+**Date Fixed**: 2026-01-08
+**Severity**: medium
+**Component**: marketplace-heuristic-detector
+
+**Issue**: Hook artifacts detected from marketplace sources have unexpectedly low confidence scores. A hook at path `cli-tool/components/hooks/development-tools` with 8 files had a raw score of 49 (normalized to 31%), when it should score higher due to being inside an appropriately named parent directory (`hooks`).
+
+**Root Cause**: Signal ordering bug in `_score_directory` and `_calculate_marketplace_confidence` methods. The parent_hint bonus (+15 pts) was calculated BEFORE container_hint inference, so when artifact_type was inferred from container_hint (e.g., HOOK from hooks/ directory), the parent_hint scoring returned 0 because artifact_type was still None at that point.
+
+**Signal ordering before fix**:
+1. Signal 4: `_score_parent_hint(path, artifact_type)` → returns 0 if artifact_type is None
+2. Signal 6: Container hint inference → sets artifact_type = container_hint if None (too late!)
+
+**Fix**: Reordered signals so container_hint inference happens BEFORE parent_hint scoring:
+1. Signal 4 (NEW): Container hint inference - if artifact_type is None and container_hint exists, set artifact_type = container_hint (+12 pts)
+2. Signal 5: Parent hint bonus - now artifact_type is set, so parent_hint works correctly (+15 pts)
+3. Signal 7: Container hint match bonus - only gives full 25 pts if type was already detected (not inferred)
+
+**Files Modified**:
+- `skillmeat/core/marketplace/heuristic_detector.py`:
+  - `_score_directory` method (lines ~1207-1280): Reordered signals 4-7
+  - `_calculate_marketplace_confidence` method (lines ~2015-2083): Same reordering
+
+**Testing**:
+- All 212 heuristic detector tests pass
+- Verified scoring with test paths:
+  - Path inside `hooks/` container now correctly gets both container_hint (+12) AND parent_hint (+15)
+  - Before fix: hooks/development-tools scored ~13-15 raw
+  - After fix: hooks/development-tools scores ~28-48 raw (depending on other signals)
+
+**Impact**: Artifacts inside typed containers that were previously missing the parent_hint bonus now score 8-12 percentage points higher (normalized), making them more likely to exceed the confidence threshold for display.
+
+**Status**: RESOLVED
