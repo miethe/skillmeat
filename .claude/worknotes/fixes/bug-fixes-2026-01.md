@@ -63,3 +63,31 @@ raise HTTPException(
 **Testing**: Verified function signature and status module accessibility
 
 **Status**: RESOLVED
+
+---
+
+## CatalogEntryResponse Validation Error for MCP Artifact Type
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-schemas
+
+**Issue**: When viewing low-confidence detected artifacts from a marketplace source, the API fails with Pydantic validation error: `Input should be 'skill', 'command', 'agent', 'mcp_server' or 'hook'`.
+
+**Root Cause**: Continuation of the MCP artifact type naming mismatch. While the database CHECK constraints were updated to accept `'mcp'`, the Pydantic response schema `CatalogEntryResponse` still used a Literal type that only accepted the old values.
+
+```python
+# Before fix - rejected 'mcp' values from database
+artifact_type: Literal["skill", "command", "agent", "mcp_server", "hook"]
+```
+
+**Fix**: Added `'mcp'` to the Literal type annotations in Pydantic schemas.
+
+**Files Modified**:
+- `skillmeat/api/schemas/marketplace.py`:
+  - Line 1038: `CatalogEntryResponse.artifact_type` - Added 'mcp' to Literal type
+  - Line 2132: `ManualMapEntry.artifact_type` - Added 'mcp' to Literal type
+
+**Testing**: Response schema now accepts both 'mcp' and 'mcp_server' values
+
+**Status**: RESOLVED
