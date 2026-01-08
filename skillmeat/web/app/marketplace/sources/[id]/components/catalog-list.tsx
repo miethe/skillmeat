@@ -65,6 +65,7 @@ const artifactTypeIcons: Record<ArtifactType, React.ComponentType<{ className?: 
   skill: Sparkles,
   command: Terminal,
   agent: Bot,
+  mcp: Server,
   mcp_server: Server,
   hook: Webhook,
 };
@@ -73,6 +74,7 @@ const artifactTypeLabels: Record<ArtifactType, string> = {
   skill: 'Skill',
   command: 'Command',
   agent: 'Agent',
+  mcp: 'MCP',
   mcp_server: 'MCP Server',
   hook: 'Hook',
 };
@@ -81,6 +83,7 @@ const artifactTypeIconColors: Record<ArtifactType, string> = {
   skill: 'text-blue-700 dark:text-blue-400',
   command: 'text-purple-700 dark:text-purple-400',
   agent: 'text-green-700 dark:text-green-400',
+  mcp: 'text-orange-700 dark:text-orange-400',
   mcp_server: 'text-orange-700 dark:text-orange-400',
   hook: 'text-pink-700 dark:text-pink-400',
 };
@@ -89,6 +92,7 @@ const artifactTypeRowTints: Record<ArtifactType, string> = {
   skill: 'bg-blue-500/[0.02] dark:bg-blue-500/[0.03]',
   command: 'bg-purple-500/[0.02] dark:bg-purple-500/[0.03]',
   agent: 'bg-green-500/[0.02] dark:bg-green-500/[0.03]',
+  mcp: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   mcp_server: 'bg-orange-500/[0.02] dark:bg-orange-500/[0.03]',
   hook: 'bg-pink-500/[0.02] dark:bg-pink-500/[0.03]',
 };
@@ -97,6 +101,7 @@ const artifactTypeBorderAccents: Record<ArtifactType, string> = {
   skill: 'border-l-blue-500',
   command: 'border-l-purple-500',
   agent: 'border-l-green-500',
+  mcp: 'border-l-orange-500',
   mcp_server: 'border-l-orange-500',
   hook: 'border-l-pink-500',
 };
