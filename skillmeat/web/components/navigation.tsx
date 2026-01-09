@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -123,12 +122,6 @@ export function Navigation() {
 
   return (
     <aside className="w-64 border-r bg-background">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="SkillMeat Logo" width={32} height={32} className="h-8 w-auto" />
-          <span className="font-bold">SkillMeat</span>
-        </Link>
-      </div>
       <nav className="space-y-1 p-4">
         {/* Collection Switcher */}
         <div className="mb-4">
