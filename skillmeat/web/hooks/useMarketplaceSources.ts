@@ -259,6 +259,12 @@ export function useSourceCatalog(
       if (filters?.include_below_threshold !== undefined) {
         params.append('include_below_threshold', filters.include_below_threshold.toString());
       }
+      if (filters?.sort_by) {
+        params.append('sort_by', filters.sort_by);
+      }
+      if (filters?.sort_order) {
+        params.append('sort_order', filters.sort_order);
+      }
       // Note: search is client-side filter for now
       return apiRequest<CatalogListResponse>(
         `/marketplace/sources/${sourceId}/artifacts?${params}`

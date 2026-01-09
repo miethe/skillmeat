@@ -25,7 +25,6 @@ import {
   Terminal,
   Server,
   Webhook,
-  FolderTree,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,9 +95,6 @@ export interface SourceToolbarProps {
   // Clear filters
   hasActiveFilters: boolean;
   onClearFilters: () => void;
-
-  // Directory mapping
-  onMapDirectories?: () => void;
 }
 
 // ============================================================================
@@ -174,7 +170,6 @@ export function SourceToolbar({
   onViewModeChange,
   hasActiveFilters,
   onClearFilters,
-  onMapDirectories,
 }: SourceToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -374,14 +369,6 @@ export function SourceToolbar({
             <Button variant="ghost" size="sm" onClick={onClearFilters} className="h-9 gap-2">
               <X className="h-4 w-4" />
               Clear
-            </Button>
-          )}
-
-          {/* Map Directories Button */}
-          {onMapDirectories && (
-            <Button variant="outline" size="sm" onClick={onMapDirectories} className="h-9 gap-2">
-              <FolderTree className="h-4 w-4" />
-              <span className="hidden sm:inline">Map Directories</span>
             </Button>
           )}
 

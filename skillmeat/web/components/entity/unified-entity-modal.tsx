@@ -470,10 +470,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         throw error;
       }
     },
-    enabled: activeTab === 'sync'
-      && !!entity?.id
-      && entity?.collection !== 'discovered'
-      && hasValidUpstreamSource(entity?.source),
+    // Disabled - SyncStatusTab handles upstream diff queries
+    // This query was causing duplicate API calls with potentially different configurations
+    enabled: false,
     staleTime: 60 * 1000, // Cache for 1 minute (upstream changes less frequently)
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     retry: 2, // Retry failed requests up to 2 times
