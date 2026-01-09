@@ -276,10 +276,15 @@ export function SyncStatusTab({
     isLoading: upstreamLoading,
     error: upstreamError,
   } = useQuery<ArtifactUpstreamDiffResponse>({
-    queryKey: ['upstream-diff', entity.id],
+    queryKey: ['upstream-diff', entity.id, entity.collection],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+      const queryString = params.toString();
       return await apiRequest<ArtifactUpstreamDiffResponse>(
-        `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff`
+        `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff${queryString ? `?${queryString}` : ''}`
       );
     },
     enabled: !!entity.id
@@ -322,7 +327,7 @@ export function SyncStatusTab({
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       toast({
@@ -355,7 +360,7 @@ export function SyncStatusTab({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
-      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       queryClient.invalidateQueries({ queryKey: ['deployments'] });
       toast({
@@ -394,7 +399,7 @@ export function SyncStatusTab({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+      queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
       toast({
         title: 'Changes Accepted',
@@ -690,7 +695,7 @@ export function SyncStatusTab({
         isOpen={showSyncDialog}
         onClose={() => setShowSyncDialog(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id] });
+          queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
           queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
           queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({

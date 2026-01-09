@@ -509,6 +509,315 @@ flowchart TB
   useDeleteProject --> API_DeleteProject[DELETE /projects/{id}]
 ```
 
+## Marketplace pages: `/marketplace` and sub-pages
+
+Scope: Marketplace listings, listing detail, publishing, GitHub sources, and source catalogs.
+
+Shared sources: `skillmeat/web/app/marketplace`, `skillmeat/web/components/marketplace`, `skillmeat/web/hooks/useMarketplace*`, `skillmeat/web/lib/api/marketplace.ts`, `skillmeat/web/lib/api/catalog.ts`.
+
+---
+
+## Marketplace listings page: `/marketplace`
+
+Entry: `skillmeat/web/app/marketplace/page.tsx`
+
+### Component tree (page level)
+
+- `MarketplacePage`
+  - `MarketplaceStats`
+  - `MarketplaceFilters`
+  - `MarketplaceListingCard` (listings grid)
+  - `MarketplaceInstallDialog`
+
+### Page-local functions and state
+
+- `filters`, `selectedListing`, `isInstallDialogOpen`
+- `handleListingClick` -> route to `/marketplace/[listing_id]`
+- `handleInstallConfirm` -> install listing with strategy
+- `handleLoadMore` -> fetch next page
+
+### Hooks used
+
+- `useListings` (infinite listings)
+- `useBrokers` (broker list for filters)
+- `useInstallListing` (install flow)
+- `useRouter`
+
+### API calls
+
+- `GET /marketplace/listings?broker=&query=&tags=&license=&publisher=&cursor=&limit=...` from `useListings`
+- `GET /marketplace/brokers` from `useBrokers`
+- `POST /marketplace/install` from `useInstallListing`
+
+### Visual map (page -> components -> hooks -> APIs)
+
+```mermaid
+flowchart TB
+  MarketplacePage[app/marketplace/page.tsx] --> MarketplaceStats
+  MarketplacePage --> MarketplaceFilters
+  MarketplacePage --> MarketplaceListingCard
+  MarketplacePage --> MarketplaceInstallDialog
+
+  MarketplacePage --> useListings
+  MarketplacePage --> useBrokers
+  MarketplacePage --> useInstallListing
+
+  useListings --> API_Listings[GET /marketplace/listings]
+  useBrokers --> API_Brokers[GET /marketplace/brokers]
+  useInstallListing --> API_Install[POST /marketplace/install]
+```
+
+---
+
+## Listing detail page: `/marketplace/[listing_id]`
+
+Entry: `skillmeat/web/app/marketplace/[listing_id]/page.tsx`
+
+### Component tree (page level)
+
+- `ListingDetailPage`
+  - `MarketplaceListingDetail`
+  - `MarketplaceInstallDialog`
+
+### Hooks used
+
+- `useListing` (listing detail)
+- `useInstallListing` (install flow)
+- `useRouter`
+
+### API calls
+
+- `GET /marketplace/listings/{listing_id}` from `useListing`
+- `POST /marketplace/install` from `useInstallListing`
+
+### Visual map (page -> components -> hooks -> APIs)
+
+```mermaid
+flowchart TB
+  ListingDetail[app/marketplace/[listing_id]/page.tsx] --> MarketplaceListingDetail
+  ListingDetail --> MarketplaceInstallDialog
+  ListingDetail --> useListing
+  ListingDetail --> useInstallListing
+
+  useListing --> API_ListingDetail[GET /marketplace/listings/{listing_id}]
+  useInstallListing --> API_Install[POST /marketplace/install]
+```
+
+---
+
+## Publish page: `/marketplace/publish`
+
+Entry: `skillmeat/web/app/marketplace/publish/page.tsx`
+
+### Component tree (page level)
+
+- `PublishPage`
+  - `MarketplacePublishWizard`
+    - `MarketplaceBrokerSelector`
+
+### Hooks used
+
+- `useBrokers` (broker list)
+- `usePublishBundle` (publish flow)
+- `useRouter`
+
+### API calls
+
+- `GET /marketplace/brokers` from `useBrokers`
+- `POST /marketplace/publish` from `usePublishBundle`
+
+### Visual map (page -> components -> hooks -> APIs)
+
+```mermaid
+flowchart TB
+  PublishPage[app/marketplace/publish/page.tsx] --> MarketplacePublishWizard
+  MarketplacePublishWizard --> MarketplaceBrokerSelector
+
+  PublishPage --> useBrokers
+  PublishPage --> usePublishBundle
+
+  useBrokers --> API_Brokers[GET /marketplace/brokers]
+  usePublishBundle --> API_Publish[POST /marketplace/publish]
+```
+
+---
+
+## Sources page: `/marketplace/sources`
+
+Entry: `skillmeat/web/app/marketplace/sources/page.tsx`
+
+### Component tree (page level)
+
+- `MarketplaceSourcesPage`
+  - `SourceCard` (listings grid)
+  - `AddSourceModal`
+  - `EditSourceModal`
+  - `DeleteSourceDialog`
+
+### Page-local functions and state
+
+- `searchQuery`, modal open states, `selectedSource`, `rescanningSourceId`
+- `handleRescan` -> rescan source via direct `apiRequest`
+- `handleEdit`, `handleDelete`
+
+### Hooks used
+
+- `useSources` (list sources)
+- `useMutation` (rescan API via `apiRequest`)
+- `useToast`
+- Modals:
+  - `AddSourceModal` -> `useCreateSource`, `useInferUrl`
+  - `EditSourceModal` -> `useUpdateSource`, `useRescanSource`
+  - `DeleteSourceDialog` -> `useDeleteSource`
+
+### API calls
+
+- `GET /marketplace/sources?cursor=&limit=...` from `useSources`
+- `POST /marketplace/sources` from `useCreateSource`
+- `PATCH /marketplace/sources/{id}` from `useUpdateSource`
+- `DELETE /marketplace/sources/{id}` from `useDeleteSource`
+- `POST /marketplace/sources/{id}/rescan` from `useRescanSource` and page-local `apiRequest`
+- `POST /marketplace/sources/infer-url` from `useInferUrl`
+
+### Visual map (page -> components -> hooks -> APIs)
+
+```mermaid
+flowchart TB
+  SourcesPage[app/marketplace/sources/page.tsx] --> SourceCard
+  SourcesPage --> AddSourceModal
+  SourcesPage --> EditSourceModal
+  SourcesPage --> DeleteSourceDialog
+
+  SourcesPage --> useSources
+  SourcesPage --> RescanMutation[apiRequest rescan]
+  AddSourceModal --> useCreateSource
+  AddSourceModal --> useInferUrl
+  EditSourceModal --> useUpdateSource
+  EditSourceModal --> useRescanSource
+  DeleteSourceDialog --> useDeleteSource
+
+  useSources --> API_SourcesList[GET /marketplace/sources]
+  useCreateSource --> API_SourcesCreate[POST /marketplace/sources]
+  useUpdateSource --> API_SourcesUpdate[PATCH /marketplace/sources/{id}]
+  useDeleteSource --> API_SourcesDelete[DELETE /marketplace/sources/{id}]
+  useRescanSource --> API_SourcesRescan[POST /marketplace/sources/{id}/rescan]
+  RescanMutation --> API_SourcesRescan
+  useInferUrl --> API_SourcesInfer[POST /marketplace/sources/infer-url]
+```
+
+---
+
+## Source detail page: `/marketplace/sources/[id]`
+
+Entry: `skillmeat/web/app/marketplace/sources/[id]/page.tsx`
+
+### Component tree (page level)
+
+- `SourceDetailPage`
+  - `SourceToolbar` (`useViewMode`, filters, search, sort, confidence range)
+  - `CatalogList` or `CatalogCard` (grid)
+  - `ExcludedArtifactsList`
+  - `CatalogEntryModal` (details, file browser, path tags, rename)
+  - `DirectoryMapModal` (manual directory mappings)
+  - `BulkTagDialogWithHook`
+  - `EditSourceModal`, `DeleteSourceDialog`
+
+### Page-local functions and state
+
+- URL-driven filters (`type`, `status`, `minConfidence`, `maxConfidence`, `includeBelowThreshold`, `sort`, `page`, `limit`)
+- `searchQuery`, `selectedEntries`, `viewMode`, pagination state
+- `handleImportSelected`, `handleImportSingle` (import)
+- `handleRescan` (scan and dedup results)
+- `handleOpenDirectoryMap` (fetch GitHub repo tree)
+- `handleConfirmMappings`, `handleConfirmAndRescan` (update `manual_map`)
+
+### Hooks used
+
+- `useSource` (source detail)
+- `useSourceCatalog` (catalog entries with filters)
+- `useRescanSource` (rescan)
+- `useImportArtifacts` (import to collection)
+- `useUpdateSource` (manual map / settings update)
+- `useExcludeCatalogEntry` / `useRestoreCatalogEntry` (exclude/restore entries)
+- `useUpdateCatalogEntryName` (rename entry)
+- `useCatalogFileTree` / `useCatalogFileContent` (file browser in modal)
+- `usePathTags` / `useUpdatePathTagStatus` (path tag review)
+- `useBulkTagApply` (bulk tag apply via path tags)
+- `useSearchTags` (tag autocomplete for bulk tagging)
+- `useViewMode`, `useToast`, `useQueryClient`
+
+### API calls
+
+Source + catalog
+- `GET /marketplace/sources/{id}` from `useSource`
+- `GET /marketplace/sources/{id}/artifacts?cursor=&limit=&artifact_type=&status=&min_confidence=&max_confidence=&include_below_threshold=&sort_by=&sort_order=...` from `useSourceCatalog`
+- `POST /marketplace/sources/{id}/rescan` from `useRescanSource`
+- `POST /marketplace/sources/{id}/import` from `useImportArtifacts`
+- `PATCH /marketplace/sources/{id}` from `useUpdateSource` (manual map + settings)
+
+Catalog entry updates
+- `PATCH /marketplace/sources/{id}/artifacts/{entryId}` from `useUpdateCatalogEntryName`
+- `PATCH /marketplace/sources/{id}/artifacts/{entryId}/exclude` from `useExcludeCatalogEntry` + `useRestoreCatalogEntry`
+
+Catalog entry files (modal)
+- `GET /marketplace/sources/{id}/artifacts/{artifactPath}/files` from `useCatalogFileTree`
+- `GET /marketplace/sources/{id}/artifacts/{artifactPath}/files/{filePath}` from `useCatalogFileContent`
+
+Path tags (modal + bulk tagging)
+- `GET /marketplace/sources/{id}/catalog/{entryId}/path-tags` from `usePathTags`
+- `PATCH /marketplace/sources/{id}/catalog/{entryId}/path-tags` from `useUpdatePathTagStatus`
+
+Tags autocomplete (bulk tagging)
+- `GET /tags/search?q=...` from `useSearchTags`
+
+External (directory mapping)
+- `GET https://api.github.com/repos/{owner}/{repo}/git/trees/{ref}?recursive=1` from `handleOpenDirectoryMap`
+
+### Visual map (page -> components -> hooks -> APIs)
+
+```mermaid
+flowchart TB
+  SourceDetail[app/marketplace/sources/[id]/page.tsx] --> SourceToolbar
+  SourceDetail --> CatalogList
+  SourceDetail --> CatalogEntryModal
+  SourceDetail --> ExcludedArtifactsList
+  SourceDetail --> DirectoryMapModal
+  SourceDetail --> BulkTagDialog
+
+  SourceDetail --> useSource
+  SourceDetail --> useSourceCatalog
+  SourceDetail --> useRescanSource
+  SourceDetail --> useImportArtifacts
+  SourceDetail --> useUpdateSource
+
+  CatalogEntryModal --> useCatalogFileTree
+  CatalogEntryModal --> useCatalogFileContent
+  CatalogEntryModal --> useUpdateCatalogEntryName
+  CatalogEntryModal --> PathTagReview
+  PathTagReview --> usePathTags
+  PathTagReview --> useUpdatePathTagStatus
+
+  CatalogList --> useExcludeCatalogEntry
+  ExcludedArtifactsList --> useRestoreCatalogEntry
+  BulkTagDialog --> useBulkTagApply
+  BulkTagDialog --> useSearchTags
+
+  useSource --> API_Source[GET /marketplace/sources/{id}]
+  useSourceCatalog --> API_Catalog[GET /marketplace/sources/{id}/artifacts]
+  useRescanSource --> API_Rescan[POST /marketplace/sources/{id}/rescan]
+  useImportArtifacts --> API_Import[POST /marketplace/sources/{id}/import]
+  useUpdateSource --> API_UpdateSource[PATCH /marketplace/sources/{id}]
+  useUpdateCatalogEntryName --> API_RenameEntry[PATCH /marketplace/sources/{id}/artifacts/{entryId}]
+  useExcludeCatalogEntry --> API_ExcludeEntry[PATCH /marketplace/sources/{id}/artifacts/{entryId}/exclude]
+  useRestoreCatalogEntry --> API_RestoreEntry[PATCH /marketplace/sources/{id}/artifacts/{entryId}/exclude]
+  useCatalogFileTree --> API_FileTree[GET /marketplace/sources/{id}/artifacts/{artifactPath}/files]
+  useCatalogFileContent --> API_FileContent[GET /marketplace/sources/{id}/artifacts/{artifactPath}/files/{filePath}]
+  usePathTags --> API_PathTags[GET /marketplace/sources/{id}/catalog/{entryId}/path-tags]
+  useUpdatePathTagStatus --> API_UpdatePathTags[PATCH /marketplace/sources/{id}/catalog/{entryId}/path-tags]
+  useSearchTags --> API_TagSearch[GET /tags/search]
+```
+
+
 ## Shared core pages (same collection/entity lifecycle)
 
 These pages use the same `EntityLifecycleProvider` + `UnifiedEntityModal` stack and therefore share the same API surface for diff, sync, deploy, file editing, and deployments.
