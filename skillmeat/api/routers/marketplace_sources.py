@@ -2371,8 +2371,9 @@ async def update_path_tag_status(
 
             # Find and update the segment
             segment_found = False
+            request_lower = request.segment.lower()
             for seg in segments_data["extracted"]:
-                if seg["segment"] == request.segment:
+                if seg["segment"].lower() == request_lower or seg.get("normalized", "").lower() == request_lower:
                     segment_found = True
 
                     # Cannot change "excluded" segments
@@ -2392,8 +2393,8 @@ async def update_path_tag_status(
                     # Update status
                     seg["status"] = request.status
                     logger.info(
-                        f"Updated segment '{request.segment}' to status '{request.status}' "
-                        f"in entry '{entry_id}'"
+                        f"Updated segment '{request.segment}' (matched '{seg['segment']}') "
+                        f"to status '{request.status}' in entry '{entry_id}'"
                     )
                     break
 
