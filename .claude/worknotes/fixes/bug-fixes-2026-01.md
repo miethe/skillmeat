@@ -207,3 +207,75 @@ Also added missing `updateURLParams` dependency to the URL sync useEffect (line 
 - When `endIndex < allEntries.length`: Doesn't fetch (we already have enough)
 
 **Status**: RESOLVED
+
+---
+
+## Marketplace Catalog Limited to 50 Items Due to Client-Side Sorting
+
+**Date Fixed**: 2026-01-08
+**Severity**: high
+**Component**: marketplace-pagination, marketplace-sorting
+
+**Issue**: When viewing artifacts from a marketplace source, only 50 items would ever display regardless of how many artifacts existed. The user reported:
+- Max 50 items displayed regardless of settings or filters
+- Changing Type filter showed different artifacts (proving more existed)
+- Sorting only affected displayed items, not the full list
+- No way to load more items even with pagination
+
+**Root Cause**: Architecture flaw in the pagination/sorting order of operations:
+
+1. **Backend** loaded all entries matching filters into memory, but paginated to 50 items with **no server-side sorting**
+2. **Frontend** received 50-item pages and applied **client-side sorting** only on loaded items
+3. **Sorting happened AFTER pagination** instead of BEFORE, so sorting never operated on the full dataset
+4. **Prefetch logic** only triggered when `endIndex > allEntries.length`, which never happened because sorting the 50 items kept them within bounds
+
+**Why Type filter revealed different artifacts**: The Type filter was passed to the backend, which filtered the full dataset BEFORE pagination. Different filter = different first-50 items from the filtered set.
+
+**Why sorting appeared broken**: Sorting operated on the 50 loaded items, not the full dataset. Sorting by "Name A-Z" would alphabetize items 1-50, but items 51-200 (sorted first by name) would never load because the prefetch trigger never fired.
+
+**Fix**: Implemented proper server-side sorting architecture:
+
+1. **Backend**: Added `sort_by` (confidence|name|date) and `sort_order` (asc|desc) query parameters
+2. **Backend**: Sort full filtered entries BEFORE cursor pagination
+3. **Frontend Types**: Added `sort_by` and `sort_order` to `CatalogFilters` interface
+4. **Frontend Hook**: Pass sort params in API request
+5. **Frontend Page**: Removed client-side sorting, rely on server response order
+
+**Data Flow After Fix**:
+```
+User selects "Name A-Z" → filters.sort_by='name', sort_order='asc'
+  → Hook refetches with ?sort_by=name&sort_order=asc
+  → Server sorts FULL dataset by name
+  → Server returns first 50 items (sorted across entire dataset)
+  → User clicks "Next Page"
+  → Server returns items 51-100 (still sorted by name)
+  → Data remains consistently sorted across pagination
+```
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py`:
+  - Added `sort_by` and `sort_order` Query parameters (lines 1329-1340)
+  - Added sorting logic before pagination in both code paths (lines 1443-1451, 1476-1484)
+  - Updated docstring with sorting documentation
+- `skillmeat/web/types/marketplace.ts`:
+  - Added `sort_by?: 'confidence' | 'name' | 'date'` to CatalogFilters
+  - Added `sort_order?: 'asc' | 'desc'` to CatalogFilters
+- `skillmeat/web/hooks/useMarketplaceSources.ts`:
+  - Added params.append for sort_by and sort_order (lines 262-267)
+- `skillmeat/web/app/marketplace/sources/[id]/page.tsx`:
+  - Initialize filters with sort_by='confidence', sort_order='desc'
+  - Added `parseSortOption()` helper to convert UI format to API format
+  - Added useEffect to sync sortOption changes to filters
+  - Removed client-side sorting from `filteredEntries` useMemo
+
+**Testing**:
+- TypeScript compilation passes (pre-existing test type errors unrelated)
+- Python import validation passes
+- Backend sorting logic covers all three fields with null handling
+
+**Impact**: Users can now:
+- Browse ALL artifacts from a source via proper pagination
+- Sort the entire dataset (not just loaded items)
+- Sorting remains consistent across page navigation
+
+**Status**: RESOLVED

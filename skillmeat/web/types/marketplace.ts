@@ -216,6 +216,8 @@ export interface CatalogFilters {
   max_confidence?: number;
   include_below_threshold?: boolean;
   search?: string;
+  sort_by?: 'confidence' | 'name' | 'date';
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface ScanRequest {
