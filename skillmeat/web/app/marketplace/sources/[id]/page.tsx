@@ -52,7 +52,7 @@ import {
 import { ExcludedArtifactsList } from './components/excluded-list';
 import { SourceToolbar, useViewMode } from './components/source-toolbar';
 import { CatalogList } from './components/catalog-list';
-import type { SortOption, ViewMode } from './components/source-toolbar';
+import type { SortOption } from './components/source-toolbar';
 import {
   useSource,
   useSourceCatalog,
@@ -302,6 +302,8 @@ export default function SourceDetailPage() {
   const [filters, setFilters] = useState<CatalogFilters>(() => ({
     artifact_type: (searchParams.get('type') as ArtifactType) || undefined,
     status: (searchParams.get('status') as CatalogStatus) || undefined,
+    sort_by: 'confidence',
+    sort_order: 'desc',
   }));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
@@ -321,6 +323,24 @@ export default function SourceDetailPage() {
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(() =>
     searchParams.get('showOnlyDuplicates') === 'true'
   );
+  // Helper function to convert between SortOption and filters
+  const parseSortOption = (option: SortOption): { sort_by: 'confidence' | 'name' | 'date'; sort_order: 'asc' | 'desc' } => {
+    switch (option) {
+      case 'confidence-asc':
+        return { sort_by: 'confidence', sort_order: 'asc' };
+      case 'confidence-desc':
+        return { sort_by: 'confidence', sort_order: 'desc' };
+      case 'name-asc':
+        return { sort_by: 'name', sort_order: 'asc' };
+      case 'name-desc':
+        return { sort_by: 'name', sort_order: 'desc' };
+      case 'date-added':
+        return { sort_by: 'date', sort_order: 'desc' };
+      default:
+        return { sort_by: 'confidence', sort_order: 'desc' };
+    }
+  };
+
   const [sortOption, setSortOption] = useState<SortOption>(() => {
     const param = searchParams.get('sort');
     if (param === 'confidence-asc' || param === 'confidence-desc' ||
@@ -404,6 +424,14 @@ export default function SourceDetailPage() {
     router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
   }, [router, pathname]);
 
+  // Sync sortOption changes to filters
+  useEffect(() => {
+    const { sort_by, sort_order } = parseSortOption(sortOption);
+    if (filters.sort_by !== sort_by || filters.sort_order !== sort_order) {
+      setFilters(prev => ({ ...prev, sort_by, sort_order }));
+    }
+  }, [sortOption, filters.sort_by, filters.sort_order]);
+
   // Sync URL when filters or pagination change
   useEffect(() => {
     updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage);
@@ -450,7 +478,8 @@ export default function SourceDetailPage() {
       });
   }, [catalogData]);
 
-  // Filter by search and sort (client-side)
+  // Filter by search (client-side for UI convenience)
+  // Data comes pre-sorted from server
   const filteredEntries = useMemo(() => {
     let entries = allEntries;
 
@@ -464,24 +493,9 @@ export default function SourceDetailPage() {
       );
     }
 
-    // Sort based on sortOption
-    return [...entries].sort((a, b) => {
-      switch (sortOption) {
-        case 'confidence-desc':
-          return b.confidence_score - a.confidence_score;
-        case 'confidence-asc':
-          return a.confidence_score - b.confidence_score;
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'date-added':
-          return new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime();
-        default:
-          return b.confidence_score - a.confidence_score;
-      }
-    });
-  }, [allEntries, searchQuery, sortOption]);
+    // No sorting needed - data is already sorted by server
+    return entries;
+  }, [allEntries, searchQuery]);
 
   // Separate excluded entries for the excluded list (P4.4b: filter duplicates)
   const excludedEntries = useMemo(() => {

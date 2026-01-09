@@ -1254,7 +1254,7 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     summary="List artifacts from source",
     operation_id="list_source_artifacts",
     description="""
-    List all artifacts discovered from a specific source with optional filtering.
+    List all artifacts discovered from a specific source with optional filtering and sorting.
 
     By default, excluded artifacts are hidden from results. Use `include_excluded=true`
     to include them in listings (useful for reviewing or restoring excluded entries).
@@ -1266,6 +1266,10 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     - `max_confidence`: Maximum confidence score (0-100)
     - `include_below_threshold`: Include artifacts below 30% confidence threshold (default: false)
     - `include_excluded`: Include excluded artifacts in results (default: false)
+
+    Supports sorting by:
+    - `sort_by`: Field to sort by - confidence, name, or date (detected_at). Default: confidence
+    - `sort_order`: Sort order - asc or desc. Default: desc (highest confidence first)
 
     Results are paginated using cursor-based pagination for efficiency.
 
@@ -1284,6 +1288,11 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
     Filter by artifact type with minimum confidence:
     ```bash
     curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?artifact_type=skill&min_confidence=70"
+    ```
+
+    Sort by name ascending:
+    ```bash
+    curl -X GET "http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?sort_by=name&sort_order=asc"
     ```
 
     Pagination example:
@@ -1317,14 +1326,24 @@ async def list_artifacts(
     include_excluded: bool = Query(
         False, description="Include excluded artifacts in results (default: false)"
     ),
+    sort_by: Optional[str] = Query(
+        "confidence",
+        description="Sort field: confidence, name, date (detected_at)",
+        regex="^(confidence|name|date)$",
+    ),
+    sort_order: Optional[str] = Query(
+        "desc",
+        description="Sort order: asc or desc",
+        regex="^(asc|desc)$",
+    ),
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page (1-100)"),
     cursor: Optional[str] = Query(
         None, description="Cursor for pagination (from previous response)"
     ),
 ) -> CatalogListResponse:
-    """List artifacts from a source with optional filters.
+    """List artifacts from a source with optional filters and sorting.
 
-    Retrieves catalog entries from a source with support for filtering and pagination.
+    Retrieves catalog entries from a source with support for filtering, sorting, and pagination.
     By default, excluded artifacts are filtered out; set include_excluded=true to see them.
 
     Args:
@@ -1335,6 +1354,8 @@ async def list_artifacts(
         max_confidence: Filter entries with confidence <= this value (0-100)
         include_below_threshold: If True, include entries <30% that are normally hidden
         include_excluded: If True, include entries with status="excluded" (default: False)
+        sort_by: Field to sort by - confidence, name, or date (detected_at). Default: confidence
+        sort_order: Sort order - asc or desc. Default: desc (highest first)
         limit: Maximum items per page (1-100)
         cursor: Pagination cursor from previous response
 
@@ -1346,10 +1367,11 @@ async def list_artifacts(
         HTTPException 500: If database operation fails
 
     Example:
-        >>> # List artifacts including excluded
+        >>> # List artifacts sorted by name ascending
         >>> response = await list_artifacts(
         ...     source_id="src-123",
-        ...     include_excluded=True,
+        ...     sort_by="name",
+        ...     sort_order="asc",
         ...     limit=50
         ... )
         >>> # Count by status shows excluded entries
@@ -1417,6 +1439,16 @@ async def list_artifacts(
             if not include_excluded and not status_filter:
                 entries = [e for e in entries if e.status != "excluded"]
 
+            # Apply sorting before pagination
+            if sort_by:
+                reverse = sort_order == "desc"
+                if sort_by == "confidence":
+                    entries.sort(key=lambda e: e.confidence_score, reverse=reverse)
+                elif sort_by == "name":
+                    entries.sort(key=lambda e: e.name.lower(), reverse=reverse)
+                elif sort_by == "date":
+                    entries.sort(key=lambda e: e.detected_at or "", reverse=reverse)
+
             # Manual pagination for filtered results
             # Convert to list and apply cursor
             if cursor:
@@ -1437,8 +1469,20 @@ async def list_artifacts(
                 limit=limit,
                 cursor=cursor,
             )
-            items = result.items
+            entries = result.items
             has_more = result.has_more
+
+            # Apply sorting (note: this loads all into memory but only happens when no filters applied)
+            if sort_by:
+                reverse = sort_order == "desc"
+                if sort_by == "confidence":
+                    entries.sort(key=lambda e: e.confidence_score, reverse=reverse)
+                elif sort_by == "name":
+                    entries.sort(key=lambda e: e.name.lower(), reverse=reverse)
+                elif sort_by == "date":
+                    entries.sort(key=lambda e: e.detected_at or "", reverse=reverse)
+
+            items = entries
 
         # Convert to response DTOs
         response_items = [entry_to_response(entry) for entry in items]
