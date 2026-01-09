@@ -273,3 +273,48 @@
 
 - **Commit(s)**: 835fa7c
 - **Status**: RESOLVED
+
+---
+
+### Bulk Tag Apply Returns 404 for All PATCH Requests
+
+**Date Fixed**: 2026-01-09
+**Severity**: high
+**Component**: marketplace path-tags API
+
+**Issue**: When applying bulk tags from the marketplace source detail page, every PATCH request to `/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags` returned 404 "Segment not found".
+
+- **Location**: `skillmeat/api/routers/marketplace_sources.py:2375`
+- **Root Cause**: The segment matching logic used exact string comparison:
+  ```python
+  if seg["segment"] == request.segment:
+  ```
+
+  The frontend sends lowercase tag names (via `normalizeTag()` which lowercases), but the backend stores segments in their original case from the artifact path. This case sensitivity mismatch caused all segment lookups to fail.
+
+  **Example**:
+  - Backend stored: `{"segment": "Categories", "normalized": "categories", ...}`
+  - Frontend sent: `{"segment": "categories", "status": "approved"}`
+  - Comparison: `"Categories" == "categories"` → False → 404
+
+- **Fix**: Made segment matching case-insensitive and added fallback to normalized field:
+  ```python
+  # Before (case-sensitive, no normalized fallback)
+  if seg["segment"] == request.segment:
+
+  # After (case-insensitive, with normalized fallback)
+  request_lower = request.segment.lower()
+  if seg["segment"].lower() == request_lower or seg.get("normalized", "").lower() == request_lower:
+  ```
+
+  This allows:
+  1. Case-insensitive matching against the original segment
+  2. Matching against the normalized field (handles numeric prefix normalization like "05-data-ai" → "data-ai")
+  3. Defensive coding with `.get("normalized", "")` for entries without normalized field
+
+- **Files Modified**:
+  - `skillmeat/api/routers/marketplace_sources.py` (lines 2374-2376, 2395-2398)
+
+- **Testing**: All 23 path-tags API tests pass
+
+- **Status**: RESOLVED
