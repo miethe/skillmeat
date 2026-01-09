@@ -30,6 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Tags,
+  MoreVertical,
+  FolderTree,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +51,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ExcludedArtifactsList } from './components/excluded-list';
 import { SourceToolbar, useViewMode } from './components/source-toolbar';
 import { CatalogList } from './components/catalog-list';
@@ -754,48 +769,78 @@ export default function SourceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleRescan}
-            disabled={rescanMutation.isPending}
-          >
-            <RefreshCw className={cn('mr-2 h-4 w-4', rescanMutation.isPending && 'animate-spin')} />
-            {rescanMutation.isPending ? 'Scanning...' : 'Rescan'}
-          </Button>
-          <a
-            href={source.repo_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button variant="outline">
-              <Github className="mr-2 h-4 w-4" />
-              View Repo
-            </Button>
-          </a>
-          <Button
-            variant="outline"
-            onClick={() => setBulkTagDialogOpen(true)}
-            disabled={!allEntries || allEntries.length === 0}
-            aria-label="Bulk tag artifacts by directory"
-          >
-            <Tags className="mr-2 h-4 w-4" />
-            Bulk Tag
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setEditModalOpen(true)}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
+          {/* Icon-only buttons with tooltips */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRescan}
+                  disabled={rescanMutation.isPending}
+                  aria-label={rescanMutation.isPending ? 'Scanning...' : 'Rescan source'}
+                >
+                  <RefreshCw className={cn('h-4 w-4', rescanMutation.isPending && 'animate-spin')} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{rescanMutation.isPending ? 'Scanning...' : 'Rescan'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={source.repo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" size="icon" aria-label="View repository">
+                    <Github className="h-4 w-4" />
+                  </Button>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View Repo</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Actions dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="More actions">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setBulkTagDialogOpen(true)}
+                disabled={!allEntries || allEntries.length === 0}
+              >
+                <Tags className="mr-2 h-4 w-4" />
+                Bulk Tag
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenDirectoryMap}>
+                <FolderTree className="mr-2 h-4 w-4" />
+                Map Directories
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setDeleteDialogOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1002,7 +1047,6 @@ export default function SourceDetailPage() {
           setSortOption('confidence-desc');
           setSearchQuery('');
         }}
-        onMapDirectories={handleOpenDirectoryMap}
       />
 
       {/* Refetching indicator */}

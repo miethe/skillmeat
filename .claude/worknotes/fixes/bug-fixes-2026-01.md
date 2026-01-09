@@ -279,3 +279,53 @@ User selects "Name A-Z" → filters.sort_by='name', sort_order='asc'
 - Sorting remains consistent across page navigation
 
 **Status**: RESOLVED
+
+---
+
+## Sync Status Tab Shows 404 Errors and "No Comparison Data" Due to Duplicate Queries
+
+**Date Fixed**: 2026-01-09
+**Severity**: high
+**Component**: sync-status-tab, unified-entity-modal
+
+**Issue**: When navigating to the Sync Status tab for an artifact with an upstream source, the first upstream-diff API call succeeds and returns all files, but then successive API calls fail with 404 errors. The modal displays "No comparison data available" with "No Project deployment found" even when the user only wants to view Source vs Collection.
+
+**Root Cause**: Two separate upstream-diff queries were running with different configurations when the Sync Status tab opened:
+
+| Component | Query Key | API URL | Result |
+|-----------|-----------|---------|--------|
+| `unified-entity-modal.tsx` | `['upstream-diff', id, collection]` | `/upstream-diff?collection=xxx` | Success |
+| `sync-status-tab.tsx` | `['upstream-diff', id]` | `/upstream-diff` | 404 Error |
+
+The queries had different cache keys (TanStack Query treated them as separate) and different URL parameters:
+1. `unified-entity-modal.tsx` included the `collection` parameter, which helped the backend find the correct artifact
+2. `sync-status-tab.tsx` omitted the `collection` parameter, forcing the backend to search all collections
+
+When the backend searched all collections without the `collection` hint, it could fail to find the artifact in certain edge cases, returning 404.
+
+Additionally, `unified-entity-modal.tsx` had an upstream query that was dead code - the `_renderUpstreamSection()` function that used it was never called in render.
+
+**Fix**:
+
+1. **Updated `sync-status-tab.tsx` query** to include `entity.collection`:
+   - Added `entity.collection` to query key: `['upstream-diff', entity.id, entity.collection]`
+   - Added `collection` parameter to API URL: `/upstream-diff?collection=${entity.collection}`
+   - Updated all cache invalidation calls to use the new query key format
+
+2. **Disabled dead query in `unified-entity-modal.tsx`**:
+   - Set `enabled: false` on the redundant upstream-diff query
+   - Added comment explaining this prevents duplicate API calls
+
+**Files Modified**:
+- `skillmeat/web/components/sync-status/sync-status-tab.tsx`:
+  - Line 279: Added `entity.collection` to query key
+  - Lines 280-287: Added URLSearchParams to include `collection` param in URL
+  - Lines 330, 363, 402, 698: Updated cache invalidation calls to use new query key format
+- `skillmeat/web/components/entity/unified-entity-modal.tsx`:
+  - Lines 473-475: Set `enabled: false` with comment explaining the change
+
+**Testing**: TypeScript type-check passes (pre-existing test type errors unrelated to this change)
+
+**Impact**: Only one upstream-diff query now runs per Sync Status tab view, with proper collection context provided to the backend, preventing 404 errors and ensuring consistent cache behavior.
+
+**Status**: RESOLVED

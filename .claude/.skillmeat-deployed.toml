@@ -6,6 +6,9 @@ deployed_at = "2026-01-05T15:07:49.157370"
 artifact_path = "skills/skillmeat-cli"
 content_hash = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5"
 local_modifications = false
+version_lineage = [
+    "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5",
+]
 collection_sha = "2e7442e246b43330c40e3a09313bc002a3c08b28261f35ac64d1f6a4201944a5"
 
 [[deployed]]
@@ -16,4 +19,18 @@ deployed_at = "2026-01-05T15:07:49.158515"
 artifact_path = "skills/meatycapture-capture"
 content_hash = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"
 local_modifications = false
+version_lineage = [
+    "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9",
+]
 collection_sha = "735b0aa20026876fcb02379c6f87a48913e6bb7310415ad8dc0c8480db835bb9"
+
+[[deployed]]
+artifact_name = "Design Principles"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-09T14:03:41.312919"
+artifact_path = "skills/Design Principles"
+content_hash = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+local_modifications = false
+merge_base_snapshot = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+collection_sha = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
