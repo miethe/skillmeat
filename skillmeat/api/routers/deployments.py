@@ -356,6 +356,7 @@ async def list_deployments(
                     from_collection=deployment.from_collection,
                     deployed_at=deployment.deployed_at,
                     artifact_path=str(deployment.artifact_path),
+                    project_path=str(resolved_path),
                     collection_sha=deployment.collection_sha,
                     local_modifications=deployment.local_modifications,
                     sync_status=sync_status,

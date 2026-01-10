@@ -84,6 +84,8 @@ export interface ArtifactDeploymentInfo {
   deployed_at: string;
   /** Relative path within .claude/ */
   artifact_path: string;
+  /** Absolute path to the project directory */
+  project_path: string;
   /** SHA at deployment time */
   collection_sha: string;
   /** Whether local modifications detected */
