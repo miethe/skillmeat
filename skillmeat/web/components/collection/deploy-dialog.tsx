@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
-import { useDeploy } from '@/hooks/useDeploy';
+import { useDeployArtifact } from '@/hooks/use-deployments';
+import type { ArtifactDeployRequest } from '@/types/deployments';
 import { useProjects } from '@/hooks/useProjects';
 import { CreateProjectDialog } from '@/app/projects/components/create-project-dialog';
 import type { Artifact } from '@/types/artifact';
@@ -100,15 +101,7 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
     }
   }, [isOpen, artifact?.id]);
 
-  const deployMutation = useDeploy({
-    onSuccess: () => {
-      // Deployment successful - show completion
-      handleComplete(true);
-    },
-    onError: () => {
-      setIsDeploying(false);
-    },
-  });
+  const deployMutation = useDeployArtifact();
 
   const handleDeploy = async () => {
     if (!artifact) return;
@@ -117,14 +110,17 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
 
     try {
       await deployMutation.mutateAsync({
-        artifactId: artifact.id,
-        artifactName: artifact.name,
-        artifactType: artifact.type,
-        projectPath: effectivePath || undefined,
+        artifact_id: `${artifact.type}:${artifact.name}`,
+        artifact_name: artifact.name,
+        artifact_type: artifact.type,
+        project_path: effectivePath || undefined,
         overwrite,
       });
+      // Deployment successful
+      handleComplete(true);
     } catch (error) {
       console.error('Deploy failed:', error);
+      setIsDeploying(false);
     }
   };
 

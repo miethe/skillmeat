@@ -371,3 +371,42 @@ projects.find(...)  // Safe - guaranteed to be an array
 **Testing**: Build succeeds, TypeScript type-check passes
 
 **Status**: RESOLVED
+
+---
+
+## Deploy Artifact Returns 404 - Wrong Endpoint in useDeploy Hook
+
+**Date Fixed**: 2026-01-10
+**Severity**: high
+**Component**: web/deploy-dialog
+
+**Issue**: Attempting to deploy an artifact from the web UI fails with a 404 error: `POST /api/v1/artifacts/agent%3Aprd-writer/deploy HTTP/1.1" 404`. The deployment functionality completely broken.
+
+**Root Cause**: The `useDeploy` hook in `hooks/useDeploy.ts` called a non-existent endpoint `/artifacts/${artifactId}/deploy` instead of the correct `/deploy` endpoint. This was a mismatch between two competing implementations:
+
+1. **Broken hook** (`useDeploy`): Called `/api/v1/artifacts/{id}/deploy` - doesn't exist
+2. **Correct hook** (`useDeployArtifact`): Calls `/api/v1/deploy` - works correctly
+
+The `DeployDialog` component used the broken `useDeploy` hook.
+
+**Fix**: Updated `deploy-dialog.tsx` to use the correct `useDeployArtifact` hook from `use-deployments.ts`:
+
+1. Changed import from `useDeploy` to `useDeployArtifact`
+2. Updated request shape to use snake_case properties matching `ArtifactDeployRequest`:
+   - `artifact_id` (format: `type:name`)
+   - `artifact_name`
+   - `artifact_type`
+   - `project_path`
+   - `overwrite`
+3. Moved success handling into the try block after `mutateAsync` completes
+
+**Files Modified**:
+- `skillmeat/web/components/collection/deploy-dialog.tsx` - Migrated to correct hook
+
+**Testing**: 
+- TypeScript compilation passes
+- Correct endpoint `/api/v1/deploy` now called with proper request body
+
+**Commit(s)**: (pending)
+
+**Status**: RESOLVED
