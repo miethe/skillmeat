@@ -8,12 +8,20 @@
 'use client';
 
 import * as React from 'react';
+import { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ArtifactDeploymentInfo, ArtifactSyncStatus } from '@/types/deployments';
 import type { ArtifactType } from '@/types/artifact';
+import type { ProjectSummary } from '@/types/project';
 import { getEntityTypeConfig } from '@/types/entity';
 import { DeploymentActions } from './deployment-actions';
 
@@ -37,6 +45,8 @@ export interface Deployment extends ArtifactDeploymentInfo {
 export interface DeploymentCardProps {
   /** Deployment information to display */
   deployment: Deployment;
+  /** List of projects for matching deployment path to project name */
+  projects?: ProjectSummary[];
   /** Project path for context */
   projectPath?: string;
   /** Callback when deployment should be updated */
@@ -118,6 +128,7 @@ const syncStatusLabels: Record<ArtifactSyncStatus, string> = {
  */
 export function DeploymentCard({
   deployment,
+  projects,
   projectPath: _projectPath,
   onUpdate,
   onRemove,
@@ -126,6 +137,20 @@ export function DeploymentCard({
 }: DeploymentCardProps) {
   void _projectPath; // Reserved for future use
   const config = getEntityTypeConfig(deployment.artifact_type as ArtifactType);
+
+  // Find which project this deployment belongs to
+  const projectMatch = useMemo(() => {
+    if (!Array.isArray(projects)) return null;
+    // Match project path that is a prefix of the artifact_path
+    // deployments are stored like "/path/to/project/.claude/skills/name"
+    return projects.find(
+      (p) =>
+        deployment.artifact_path.startsWith(p.path + '/.claude/') ||
+        deployment.artifact_path.startsWith(p.path + '/')
+    );
+  }, [projects, deployment.artifact_path]);
+
+  const projectDisplayName = projectMatch?.name || 'Custom Path';
 
   // Type-safe icon lookup with fallback
   const IconComponent = (LucideIcons as any)[config.icon] as
@@ -210,14 +235,23 @@ export function DeploymentCard({
 
       {/* Content */}
       <div className="space-y-3 px-4 pb-4">
-        {/* Deployment path */}
+        {/* Project / Deployment path */}
         <div className="flex items-start gap-2 text-sm">
           <LucideIcons.FolderTree className="h-4 w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">Deployed to</p>
-            <p className="truncate font-mono text-xs" title={deployment.artifact_path}>
-              {deployment.artifact_path}
-            </p>
+            <p className="text-xs text-muted-foreground">Project</p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="truncate font-medium cursor-help">
+                    {projectDisplayName}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[400px]">
+                  <p className="font-mono text-xs break-all">{deployment.artifact_path}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 

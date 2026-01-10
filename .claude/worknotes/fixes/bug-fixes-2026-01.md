@@ -329,3 +329,45 @@ Additionally, `unified-entity-modal.tsx` had an upstream query that was dead cod
 **Impact**: Only one upstream-diff query now runs per Sync Status tab view, with proper collection context provided to the backend, preventing 404 errors and ensuring consistent cache behavior.
 
 **Status**: RESOLVED
+
+---
+
+## DeploymentCard Crashes on Deployments Tab Due to Array Type Check
+
+**Date Fixed**: 2026-01-10
+**Severity**: high
+**Component**: deployment-card, deploy-dialog
+
+**Issue**: When opening the Deployments tab in the unified-entity-modal, the page crashes with:
+```
+TypeError: projects.find is not a function
+    at DeploymentCard.useMemo[projectMatch] (deployment-card.tsx:146:21)
+```
+
+**Root Cause**: The newly added `projects` prop validation used a falsy check (`if (!projects)`) which only catches `undefined`, `null`, `0`, `''`, etc. During React Query loading states or certain edge cases, `projects` could be truthy but not an array (e.g., an empty object or the query result object itself).
+
+Similarly, `existingDeploymentPaths` in `deploy-dialog.tsx` had the same potential issue.
+
+```typescript
+// BUG: Only catches falsy values, not non-array truthy values
+if (!projects) return null;
+projects.find(...)  // Crashes if projects is {} or other non-array
+```
+
+**Fix**: Changed both guard clauses to use `Array.isArray()` for proper type validation:
+
+```typescript
+// FIX: Properly validates array type
+if (!Array.isArray(projects)) return null;
+projects.find(...)  // Safe - guaranteed to be an array
+```
+
+**Files Modified**:
+- `skillmeat/web/components/deployments/deployment-card.tsx`:
+  - Line 143: Changed `if (!projects)` to `if (!Array.isArray(projects))`
+- `skillmeat/web/components/collection/deploy-dialog.tsx`:
+  - Line 68: Changed `if (!existingDeploymentPaths)` to `if (!Array.isArray(existingDeploymentPaths))`
+
+**Testing**: Build succeeds, TypeScript type-check passes
+
+**Status**: RESOLVED

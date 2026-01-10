@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Upload, Folder, AlertTriangle, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Upload, Folder, AlertTriangle, Plus, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,13 @@ const CUSTOM_PATH_VALUE = '__custom__';
 
 export interface DeployDialogProps {
   artifact: Artifact | null;
+  existingDeploymentPaths?: string[];
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDialogProps) {
+export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClose, onSuccess }: DeployDialogProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [customPath, setCustomPath] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -61,6 +62,34 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
 
   // Get the effective path for deployment
   const effectivePath = useCustomPath ? customPath : (selectedProject?.path || '');
+
+  // Check if artifact is already deployed to a project
+  const isAlreadyDeployed = (projectPath: string): boolean => {
+    if (!Array.isArray(existingDeploymentPaths)) return false;
+    // Check if any deployment path starts with this project path
+    return existingDeploymentPaths.some(
+      deployPath => deployPath.startsWith(projectPath + '/.claude/') ||
+                    deployPath.startsWith(projectPath + '/')
+    );
+  };
+
+  // Check if current selection is valid for deployment
+  const canDeploy = useMemo(() => {
+    if (!selectedProjectId) return false;
+
+    if (useCustomPath) {
+      // Custom path is valid if not empty
+      return customPath.trim().length > 0;
+    }
+
+    // For project selection, check if not already deployed
+    if (selectedProject) {
+      return !isAlreadyDeployed(selectedProject.path);
+    }
+
+    return false;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, useCustomPath, customPath, selectedProject, existingDeploymentPaths]);
 
   // Reset selection when dialog opens for a new artifact
   useEffect(() => {
@@ -192,16 +221,26 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
                     <SelectContent>
                       {projects && projects.length > 0 ? (
                         <>
-                          {projects.map((project) => (
-                            <SelectItem key={project.id} value={project.id}>
-                              <div className="flex flex-col">
-                                <span>{project.name}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[280px]">
-                                  {project.path}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {projects.map((project) => {
+                            const deployed = isAlreadyDeployed(project.path);
+                            return (
+                              <SelectItem key={project.id} value={project.id}>
+                                <div className="flex items-center gap-2">
+                                  {deployed && (
+                                    <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                  )}
+                                  <div className="flex flex-col">
+                                    <span className={deployed ? 'text-muted-foreground' : ''}>
+                                      {project.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                                      {project.path}
+                                    </span>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                           <SelectSeparator />
                         </>
                       ) : !projectsLoading ? (
@@ -226,9 +265,16 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
                   </Button>
                 </div>
                 {selectedProject && (
-                  <p className="text-xs text-muted-foreground">
-                    Deploy to: {selectedProject.path}
-                  </p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Deploy to: {selectedProject.path}
+                    </p>
+                    {isAlreadyDeployed(selectedProject.path) && (
+                      <p className="text-xs text-yellow-600">
+                        Artifact is already deployed to this project
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -294,7 +340,7 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
           <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
             Cancel
           </Button>
-          <Button onClick={handleDeploy} disabled={isDeploying || deployMutation.isPending}>
+          <Button onClick={handleDeploy} disabled={isDeploying || deployMutation.isPending || !canDeploy}>
             {isDeploying ? 'Deploying...' : 'Deploy'}
           </Button>
         </DialogFooter>

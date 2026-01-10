@@ -56,6 +56,7 @@ import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { useDeploymentList } from '@/hooks/use-deployments';
+import { useProjects } from '@/hooks/useProjects';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
 import { usePendingContextChanges } from '@/hooks/use-context-sync';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
@@ -490,6 +491,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     error: deploymentsError,
   } = useDeploymentList();
 
+  // Fetch projects for deployment card project name display
+  const { data: projects } = useProjects();
+
   // Filter deployments by artifact name
   const artifactDeployments = useMemo(() => {
     if (!deploymentsData?.deployments || !entity) return [];
@@ -518,6 +522,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       };
     });
   }, [deploymentsData, entity]);
+
+  // Extract deployment paths for this artifact (used by DeployDialog to show existing deployments)
+  const existingDeploymentPaths = useMemo(() => {
+    return artifactDeployments.map((d) => d.artifact_path);
+  }, [artifactDeployments]);
 
   // Count unique collections (projects are determined by the parent query)
   const deploymentProjectCount = useMemo(() => {
@@ -1824,6 +1833,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                         <DeploymentCard
                           key={deployment.id}
                           deployment={deployment}
+                          projects={projects}
                           onUpdate={() => {
                             // TODO: Implement update handler
                             toast({
@@ -1950,6 +1960,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       {/* Deploy Dialog */}
       <DeployDialog
         artifact={artifactForDeploy}
+        existingDeploymentPaths={existingDeploymentPaths}
         isOpen={showDeployDialog}
         onClose={() => setShowDeployDialog(false)}
         onSuccess={() => {
