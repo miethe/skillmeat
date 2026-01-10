@@ -403,10 +403,66 @@ The `DeployDialog` component used the broken `useDeploy` hook.
 **Files Modified**:
 - `skillmeat/web/components/collection/deploy-dialog.tsx` - Migrated to correct hook
 
-**Testing**: 
+**Testing**:
 - TypeScript compilation passes
 - Correct endpoint `/api/v1/deploy` now called with proper request body
 
-**Commit(s)**: (pending)
+**Commit(s)**: 35b0720
+
+**Status**: RESOLVED
+
+---
+
+## Deployment System Bugs (2026-01-10)
+
+**Commit**: ddffb56
+**Request Log**: REQ-20260110-skillmeat
+
+### Backend UnboundLocalError: dest_path not assigned for MCP/HOOK types
+
+**Date Fixed**: 2026-01-10
+**Severity**: critical
+**Component**: core/deployment.py
+
+**Issue**: When deploying MCP or HOOK artifact types, `dest_path` variable was never assigned, causing `UnboundLocalError: cannot access local variable 'dest_path' where it is not associated with a value`.
+
+**Root Cause**: Lines 213-218 only handled SKILL, COMMAND, and AGENT types - missing elif/else for MCP and HOOK.
+
+**Fix**: Added elif branches for MCP and HOOK types:
+- MCP servers deploy to `.claude/mcp/{artifact.name}` (directory)
+- Hooks deploy to `.claude/hooks/{artifact.name}.md` (single file)
+- Added else clause that raises ValueError for unknown artifact types
+
+**Files Modified**:
+- `skillmeat/core/deployment.py` - Added MCP/HOOK handling and error clause
+
+**Status**: RESOLVED
+
+---
+
+### Deployments showing "Custom Path" instead of project name
+
+**Date Fixed**: 2026-01-10
+**Severity**: medium
+**Component**: web/components/deployments, api/schemas
+
+**Issue**: All deployments in the artifact detail modal showed "Custom Path" as the project name instead of the actual project name (e.g., "SkillMeat", "MeatyGifts").
+
+**Root Cause**:
+- `DeploymentInfo` schema only included relative `artifact_path` (e.g., `skills/prd-writer`)
+- Frontend matching logic compared this relative path against absolute project paths
+- Comparison never matched, triggering "Custom Path" fallback
+
+**Fix**:
+1. Added `project_path: str` field to backend `DeploymentInfo` schema
+2. API now includes absolute project path in each deployment record
+3. Updated frontend `ArtifactDeploymentInfo` TypeScript type
+4. Simplified frontend matching to direct path equality comparison
+
+**Files Modified**:
+- `skillmeat/api/schemas/deployments.py` - Added project_path field
+- `skillmeat/api/routers/deployments.py` - Include project_path in response
+- `skillmeat/web/types/deployments.ts` - Added project_path to interface
+- `skillmeat/web/components/deployments/deployment-card.tsx` - Updated matching logic
 
 **Status**: RESOLVED
