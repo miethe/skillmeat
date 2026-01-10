@@ -1,6 +1,6 @@
 # Quick Feature: Deploy Dialog Project Selector
 
-**Status**: in_progress
+**Status**: completed
 **Created**: 2025-01-10
 **Type**: UI Enhancement
 
