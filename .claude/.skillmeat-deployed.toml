@@ -46,4 +46,18 @@ deployed_at = "2026-01-09T14:32:10.550083"
 artifact_path = "agents/pm/prd-writer.md"
 content_hash = "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2"
 local_modifications = false
+version_lineage = [
+    "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2",
+]
 collection_sha = "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2"
+
+[[deployed]]
+artifact_name = "aesthetic"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-10T14:47:36.696010"
+artifact_path = "skills/aesthetic"
+content_hash = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
+local_modifications = false
+merge_base_snapshot = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
+collection_sha = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"

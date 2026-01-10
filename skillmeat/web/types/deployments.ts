@@ -24,6 +24,13 @@ export interface ArtifactDeployRequest {
   collection_name?: string;
   /** Overwrite existing deployment without prompting */
   overwrite?: boolean;
+  /**
+   * Custom destination path relative to project root.
+   * If provided, artifact will be deployed to {dest_path}/{artifact_name}/.
+   * Must not contain '..' or be absolute.
+   * Examples: '.claude/skills/', '.claude/skills/dev/'
+   */
+  dest_path?: string;
 }
 
 /** Request to undeploy (remove) an artifact from a project */
