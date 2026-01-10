@@ -29,12 +29,13 @@ echo '{
   "items": [{
     "title": "Add validation for empty tags array",
     "type": "bug",
-    "domain": "core",
+    "domain": ["core"],
+    "subdomain": ["validation"],
     "context": "serializer",
     "priority": "medium",
     "status": "triage",
     "tags": ["validation", "serializer"],
-    "notes": "Problem: Empty tags array causes invalid frontmatter. Goal: Validate before write."
+    "notes": ["Problem: Empty tags array causes invalid frontmatter.", "Goal: Validate before write."]
   }]
 }' | meatycapture log create --json
 ```
@@ -55,7 +56,7 @@ echo '{
 }
 ```
 
-**Minimum Required Fields**: `project`, `title`, `type`, `domain`
+**Minimum Required Fields**: `project`, `title`, `type`, `domain`, `subdomain`
 
 ---
 
@@ -72,31 +73,34 @@ cat > /tmp/findings.json <<'EOF'
     {
       "title": "Sanitize user input in project names",
       "type": "bug",
-      "domain": "core",
+      "domain": ["core"],
+      "subdomain": ["validation"],
       "context": "validation",
       "priority": "critical",
       "status": "triage",
       "tags": ["security", "input-validation"],
-      "notes": "Problem: Project names not sanitized. Goal: Add validation regex."
+      "notes": ["Problem: Project names not sanitized.", "Goal: Add validation regex."]
     },
     {
       "title": "Add file permission checks before write",
       "type": "enhancement",
-      "domain": "adapters",
+      "domain": ["adapters"],
+      "subdomain": ["fs-local"],
       "context": "fs-local",
       "priority": "high",
       "status": "backlog",
       "tags": ["security", "file-io"],
-      "notes": "Goal: Verify write permissions before operations."
+      "notes": ["Goal: Verify write permissions before operations."]
     },
     {
       "title": "Document security best practices",
       "type": "task",
-      "domain": "docs",
+      "domain": ["docs"],
+      "subdomain": ["security"],
       "priority": "medium",
       "status": "backlog",
       "tags": ["security", "documentation"],
-      "notes": "Goal: Create security.md with guidelines."
+      "notes": ["Goal: Create security.md with guidelines."]
     }
   ]
 }
@@ -123,10 +127,11 @@ echo '{
   "items": [{
     "title": "Performance optimization for large documents",
     "type": "enhancement",
-    "domain": "core",
+    "domain": ["core"],
+    "subdomain": ["parsing"],
     "priority": "medium",
     "tags": ["performance"],
-    "notes": "Goal: Optimize parsing for docs with 100+ items."
+    "notes": ["Goal: Optimize parsing for docs with 100+ items."]
   }]
 }' | meatycapture log append "$DOC_PATH" - --json
 ```
@@ -153,17 +158,18 @@ See `./viewing-logs.md` for detailed search patterns.
 
 ## Field Reference
 
-| Field | Required | Valid Values | Default |
-|-------|----------|--------------|---------|
-| `project` | Yes | Project slug from config | - |
-| `title` | Yes | String (max 200 chars) | - |
-| `type` | Yes | `enhancement`, `bug`, `idea`, `task`, `question` | - |
-| `domain` | Yes | `web`, `api`, `cli`, `core`, `mobile`, `docs`, etc. | - |
-| `context` | No | String (module/component) | `""` |
-| `priority` | No | `low`, `medium`, `high`, `critical` | `medium` |
-| `status` | No | `triage`, `backlog`, `planned`, `in-progress`, `done`, `wontfix` | `triage` |
-| `tags` | No | Array of strings | `[]` |
-| `notes` | No | Markdown text | `""` |
+| Field | Required | Type | Valid Values | Default |
+|-------|----------|------|--------------|---------|
+| `project` | Yes | string | Project slug from config | - |
+| `title` | Yes | string | Max 200 chars | - |
+| `type` | Yes | enum | `enhancement`, `bug`, `idea`, `task`, `question` | - |
+| `domain` | Yes | array | `["web"]`, `["api"]`, `["core"]`, etc. | - |
+| `subdomain` | Yes | array | `["feature-area"]`, `["component"]`, etc. | - |
+| `context` | No | string | Module/component path | `""` |
+| `priority` | No | enum | `low`, `medium`, `high`, `critical` | `medium` |
+| `status` | No | enum | `triage`, `backlog`, `planned`, `in-progress`, `done`, `wontfix` | `triage` |
+| `tags` | No | array | `["tag1", "tag2"]` | `[]` |
+| `notes` | No | array | `["note1", "note2"]` | `[]` |
 
 See `./references/field-options.md` for complete field catalog.
 
@@ -246,11 +252,12 @@ Single item: `./templates/quick-capture.json`
   "items": [{
     "title": "Item title here",
     "type": "bug",
-    "domain": "core",
+    "domain": ["core"],
+    "subdomain": ["component"],
     "priority": "medium",
     "status": "triage",
     "tags": [],
-    "notes": "Problem: [Describe the issue]\nGoal: [Desired outcome]"
+    "notes": ["Problem: [Describe the issue]", "Goal: [Desired outcome]"]
   }]
 }
 ```
