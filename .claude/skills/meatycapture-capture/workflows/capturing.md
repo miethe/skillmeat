@@ -37,7 +37,7 @@ echo '{
     "tags": ["validation", "serializer"],
     "notes": ["Problem: Empty tags array causes invalid frontmatter.", "Goal: Validate before write."]
   }]
-}' | meatycapture log create --json
+}' | meatycapture log create - --json
 ```
 
 **Output**:
@@ -234,7 +234,7 @@ Context:
 | `meatycapture create [file] --json` | Alias for log create |
 | `meatycapture append <doc> [file] --json` | Alias for log append |
 
-**Stdin Support**: Use `-` or omit file argument to read from stdin.
+**Stdin Support**: Use `-` as the file argument to read from stdin in non-interactive mode. Interactive mode allows omitting the file argument.
 
 **Output Formats**: `--json`, `--yaml`, `--csv`, `--table`
 
