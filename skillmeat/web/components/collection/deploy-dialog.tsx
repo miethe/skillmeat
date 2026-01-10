@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Upload, Folder, AlertTriangle, Plus, Check } from 'lucide-react';
+import { Upload, Folder, AlertTriangle, Plus, Check, FolderOpen } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -22,12 +34,59 @@ import {
 } from '@/components/ui/select';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
 import { useDeployArtifact } from '@/hooks/use-deployments';
-import type { ArtifactDeployRequest } from '@/types/deployments';
 import { useProjects } from '@/hooks/useProjects';
 import { CreateProjectDialog } from '@/app/projects/components/create-project-dialog';
 import type { Artifact } from '@/types/artifact';
+import { cn } from '@/lib/utils';
 
 const CUSTOM_PATH_VALUE = '__custom__';
+
+/**
+ * Get the default deployment directory based on artifact type
+ */
+function getDefaultDeployPath(artifactType: string): string {
+  switch (artifactType) {
+    case 'skill':
+      return '.claude/skills/';
+    case 'command':
+      return '.claude/commands/';
+    case 'hook':
+      return '.claude/hooks/';
+    case 'agent':
+      return '.claude/agents/';
+    case 'mcp':
+    case 'mcp-server':
+      return '.claude/mcp/';
+    default:
+      return '.claude/skills/';
+  }
+}
+
+/**
+ * Validate and sanitize a custom sub-path for deployment
+ * @param input - The user input for sub-directory
+ * @returns Object with sanitized value and any error message
+ */
+function validateAndSanitizeSubPath(input: string): { value: string; error: string | null } {
+  const trimmed = input.trim();
+
+  // Check for directory traversal attempts
+  if (trimmed.includes('../') || trimmed.includes('..\\')) {
+    return { value: trimmed, error: 'Directory traversal not allowed' };
+  }
+
+  // Check for absolute paths
+  if (trimmed.startsWith('/') || /^[a-zA-Z]:/.test(trimmed)) {
+    return { value: trimmed, error: 'Absolute paths not allowed' };
+  }
+
+  // If non-empty, ensure it ends with /
+  if (trimmed && !trimmed.endsWith('/')) {
+    return { value: trimmed + '/', error: null };
+  }
+
+  return { value: trimmed, error: null };
+}
 
 export interface DeployDialogProps {
   artifact: Artifact | null;
@@ -41,8 +100,14 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [customPath, setCustomPath] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
-  const [overwrite, setOverwrite] = useState(false);
+  const [overwriteEnabled, setOverwriteEnabled] = useState(false);
+  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  // Custom deployment path state
+  const [customPathEnabled, setCustomPathEnabled] = useState(false);
+  const [customSubPath, setCustomSubPath] = useState('');
+  const [customPathError, setCustomPathError] = useState<string | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [initialSteps] = useState<ProgressStep[]>([
     { step: 'Validating artifact', status: 'pending' },
@@ -64,8 +129,32 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
   // Get the effective path for deployment
   const effectivePath = useCustomPath ? customPath : (selectedProject?.path || '');
 
+  // Default deploy path based on artifact type
+  const defaultDeployPath = useMemo(() => {
+    return artifact ? getDefaultDeployPath(artifact.type) : '.claude/skills/';
+  }, [artifact]);
+
+  // Compute the full custom destination path if enabled
+  const computedDestPath = useMemo(() => {
+    if (!customPathEnabled || customPathError) return undefined;
+    // If no sub-path, just use the default
+    if (!customSubPath.trim()) return undefined;
+    // Combine default path with sub-path
+    // e.g., '.claude/skills/' + 'dev/' = '.claude/skills/dev/'
+    const sanitized = validateAndSanitizeSubPath(customSubPath);
+    if (sanitized.error) return undefined;
+    return defaultDeployPath + sanitized.value;
+  }, [customPathEnabled, customSubPath, customPathError, defaultDeployPath]);
+
+  // Handle custom sub-path input change with validation
+  const handleCustomSubPathChange = (value: string) => {
+    const result = validateAndSanitizeSubPath(value);
+    setCustomSubPath(value);
+    setCustomPathError(result.error);
+  };
+
   // Check if artifact is already deployed to a project
-  const isAlreadyDeployed = (projectPath: string): boolean => {
+  const checkIsAlreadyDeployed = (projectPath: string): boolean => {
     if (!Array.isArray(existingDeploymentPaths)) return false;
     // Check if any deployment path starts with this project path
     return existingDeploymentPaths.some(
@@ -74,38 +163,88 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
     );
   };
 
+  // Track if current selection is already deployed
+  const currentSelectionDeployed = useMemo(() => {
+    if (useCustomPath || !selectedProject) return false;
+    return checkIsAlreadyDeployed(selectedProject.path);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProject, existingDeploymentPaths, useCustomPath]);
+
   // Check if current selection is valid for deployment
   const canDeploy = useMemo(() => {
     if (!selectedProjectId) return false;
+
+    // If custom deployment path is enabled with error, prevent deployment
+    if (customPathEnabled && customPathError) return false;
 
     if (useCustomPath) {
       // Custom path is valid if not empty
       return customPath.trim().length > 0;
     }
 
-    // For project selection, check if not already deployed
+    // For project selection, allow if not deployed OR overwrite is enabled
     if (selectedProject) {
-      return !isAlreadyDeployed(selectedProject.path);
+      const deployed = checkIsAlreadyDeployed(selectedProject.path);
+      return !deployed || overwriteEnabled;
     }
 
     return false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId, useCustomPath, customPath, selectedProject, existingDeploymentPaths]);
+  }, [selectedProjectId, useCustomPath, customPath, selectedProject, existingDeploymentPaths, overwriteEnabled, customPathEnabled, customPathError]);
 
   // Reset selection when dialog opens for a new artifact
   useEffect(() => {
     if (isOpen) {
       setSelectedProjectId(null);
       setCustomPath('');
-      setOverwrite(false);
+      setOverwriteEnabled(false);
+      setShowOverwriteWarning(false);
+      setShowConfirmDialog(false);
+      // Reset custom deployment path state
+      setCustomPathEnabled(false);
+      setCustomSubPath('');
+      setCustomPathError(null);
     }
   }, [isOpen, artifact?.id]);
 
+  // Reset overwrite warning when overwrite is enabled
+  useEffect(() => {
+    if (overwriteEnabled) {
+      setShowOverwriteWarning(false);
+    }
+  }, [overwriteEnabled]);
+
+  // Reset overwrite state when project selection changes
+  useEffect(() => {
+    setOverwriteEnabled(false);
+    setShowOverwriteWarning(false);
+  }, [selectedProjectId]);
+
   const deployMutation = useDeployArtifact();
 
-  const handleDeploy = async () => {
+  const handleDeployClick = () => {
     if (!artifact) return;
 
+    // If already deployed and overwrite not enabled, show warning
+    if (currentSelectionDeployed && !overwriteEnabled) {
+      setShowOverwriteWarning(true);
+      return;
+    }
+
+    // If overwrite enabled, show confirmation dialog
+    if (currentSelectionDeployed && overwriteEnabled) {
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    // Normal deployment (not already deployed)
+    executeDeploy();
+  };
+
+  const executeDeploy = async () => {
+    if (!artifact) return;
+
+    setShowConfirmDialog(false);
     setIsDeploying(true);
 
     try {
@@ -114,7 +253,9 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
         artifact_name: artifact.name,
         artifact_type: artifact.type,
         project_path: effectivePath || undefined,
-        overwrite,
+        overwrite: overwriteEnabled,
+        // Include custom destination path if enabled and valid
+        dest_path: computedDestPath,
       });
       // Deployment successful
       handleComplete(true);
@@ -142,7 +283,9 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
         // Reset state
         setSelectedProjectId(null);
         setCustomPath('');
-        setOverwrite(false);
+        setOverwriteEnabled(false);
+        setShowOverwriteWarning(false);
+        setShowConfirmDialog(false);
         setStreamUrl(null);
       }, 1500);
     }
@@ -154,9 +297,15 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
       // Reset state
       setSelectedProjectId(null);
       setCustomPath('');
-      setOverwrite(false);
+      setOverwriteEnabled(false);
+      setShowOverwriteWarning(false);
+      setShowConfirmDialog(false);
       setStreamUrl(null);
       setIsDeploying(false);
+      // Reset custom deployment path state
+      setCustomPathEnabled(false);
+      setCustomSubPath('');
+      setCustomPathError(null);
     }
   };
 
@@ -218,7 +367,7 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
                       {projects && projects.length > 0 ? (
                         <>
                           {projects.map((project) => {
-                            const deployed = isAlreadyDeployed(project.path);
+                            const deployed = checkIsAlreadyDeployed(project.path);
                             return (
                               <SelectItem key={project.id} value={project.id}>
                                 <div className="flex items-center gap-2">
@@ -226,9 +375,16 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
                                     <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
                                   )}
                                   <div className="flex flex-col">
-                                    <span className={deployed ? 'text-muted-foreground' : ''}>
-                                      {project.name}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={deployed ? 'text-muted-foreground' : ''}>
+                                        {project.name}
+                                      </span>
+                                      {deployed && (
+                                        <span className="text-xs text-yellow-600 dark:text-yellow-500">
+                                          (Already Deployed)
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-xs text-muted-foreground truncate max-w-[280px]">
                                       {project.path}
                                     </span>
@@ -265,9 +421,9 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
                     <p className="text-xs text-muted-foreground">
                       Deploy to: {selectedProject.path}
                     </p>
-                    {isAlreadyDeployed(selectedProject.path) && (
+                    {currentSelectionDeployed && !overwriteEnabled && (
                       <p className="text-xs text-yellow-600">
-                        Artifact is already deployed to this project
+                        Artifact is already deployed to this project. Enable overwrite to replace.
                       </p>
                     )}
                   </div>
@@ -296,7 +452,110 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
                 </div>
               )}
 
-              {/* Overwrite Warning */}
+              {/* Overwrite Toggle - Only shown when selecting an already-deployed project */}
+              {currentSelectionDeployed && (
+                <div
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-3 transition-all",
+                    showOverwriteWarning
+                      ? "border-red-500 ring-2 ring-red-500/20 bg-red-50 dark:bg-red-950/20"
+                      : "border-border"
+                  )}
+                >
+                  <Switch
+                    id="overwrite-toggle"
+                    checked={overwriteEnabled}
+                    onCheckedChange={setOverwriteEnabled}
+                    disabled={isDeploying}
+                  />
+                  <div className="flex-1 space-y-1">
+                    <Label
+                      htmlFor="overwrite-toggle"
+                      className={cn(
+                        "text-sm font-medium cursor-pointer",
+                        showOverwriteWarning && "text-red-700 dark:text-red-400"
+                      )}
+                    >
+                      Overwrite Deployment
+                    </Label>
+                    {showOverwriteWarning ? (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Enable overwrite to replace existing deployment
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Replace the existing deployment with this version
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Deployment Path Toggle */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="custom-path-toggle"
+                    checked={customPathEnabled}
+                    onCheckedChange={(checked) => {
+                      setCustomPathEnabled(checked);
+                      if (!checked) {
+                        setCustomSubPath('');
+                        setCustomPathError(null);
+                      }
+                    }}
+                    disabled={isDeploying}
+                  />
+                  <Label
+                    htmlFor="custom-path-toggle"
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    Custom Deployment Path
+                  </Label>
+                </div>
+
+                {/* Custom path input - shown when toggle is ON */}
+                {customPathEnabled && (
+                  <div className="space-y-2 pl-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
+                        <FolderOpen className="h-4 w-4" />
+                        <span className="font-mono">{defaultDeployPath}</span>
+                      </div>
+                      <Input
+                        id="customSubPath"
+                        placeholder="subdirectory/"
+                        value={customSubPath}
+                        onChange={(e) => handleCustomSubPathChange(e.target.value)}
+                        disabled={isDeploying}
+                        className={cn(
+                          "flex-1 font-mono text-sm",
+                          customPathError && "border-red-500 focus-visible:ring-red-500"
+                        )}
+                        aria-invalid={!!customPathError}
+                        aria-describedby={customPathError ? "custom-path-error" : undefined}
+                      />
+                    </div>
+                    {customPathError ? (
+                      <p
+                        id="custom-path-error"
+                        className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        Invalid path: {customPathError}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {customSubPath.trim()
+                          ? `Deploys to: ${defaultDeployPath}${validateAndSanitizeSubPath(customSubPath).value}`
+                          : 'Enter a sub-directory to append to the default path (optional)'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Existing Deployments Info */}
               {artifact.usageStats.totalDeployments > 0 && (
                 <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <div className="flex items-start gap-2">
@@ -336,8 +595,11 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
           <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
             Cancel
           </Button>
-          <Button onClick={handleDeploy} disabled={isDeploying || deployMutation.isPending || !canDeploy}>
-            {isDeploying ? 'Deploying...' : 'Deploy'}
+          <Button
+            onClick={handleDeployClick}
+            disabled={isDeploying || deployMutation.isPending || (!canDeploy && !currentSelectionDeployed)}
+          >
+            {isDeploying ? 'Deploying...' : currentSelectionDeployed && overwriteEnabled ? 'Overwrite' : 'Deploy'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -349,6 +611,29 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
       onOpenChange={setShowCreateProject}
       onSuccess={handleProjectCreated}
     />
+
+    {/* Overwrite Confirmation Dialog */}
+    <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Overwrite Existing Deployment?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to overwrite the existing deployment of{' '}
+            <span className="font-semibold">{artifact?.name}</span> in{' '}
+            <span className="font-semibold">{selectedProject?.name}</span>?
+            <br />
+            <br />
+            This will replace the currently deployed version with the version from your collection.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={executeDeploy}>
+            Overwrite Deployment
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

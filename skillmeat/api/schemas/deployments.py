@@ -41,6 +41,13 @@ class DeployRequest(BaseModel):
         default=False,
         description="Overwrite existing deployment without prompting",
     )
+    dest_path: Optional[str] = Field(
+        default=None,
+        description="Custom destination path relative to project root "
+        "(e.g., '.claude/skills/dev/'). If provided, artifact will be deployed "
+        "to {dest_path}/{artifact_name}/. Must not contain '..' or be absolute.",
+        examples=[".claude/skills/", ".claude/skills/dev/"],
+    )
 
     class Config:
         """Pydantic config."""
@@ -53,6 +60,7 @@ class DeployRequest(BaseModel):
                 "project_path": "/path/to/project",
                 "collection_name": "default",
                 "overwrite": False,
+                "dest_path": ".claude/skills/dev/",
             }
         }
 

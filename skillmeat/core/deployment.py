@@ -165,6 +165,7 @@ class DeploymentManager:
         project_path: Optional[Path] = None,
         artifact_type: Optional[ArtifactType] = None,
         overwrite: bool = False,
+        dest_path: Optional[str] = None,
     ) -> List[Deployment]:
         """Deploy specified artifacts to project.
 
@@ -174,6 +175,9 @@ class DeploymentManager:
             project_path: Project directory (uses CWD if None)
             artifact_type: Filter artifacts by type (if ambiguous names)
             overwrite: If True, skip interactive prompt and overwrite existing artifacts
+            dest_path: Custom destination path relative to project root
+                (e.g., '.claude/skills/dev/'). If provided, artifact will be
+                deployed to {dest_path}/{artifact_name}/. Should be pre-validated.
 
         Returns:
             List of Deployment objects
@@ -210,22 +214,41 @@ class DeploymentManager:
             source_path = collection_path / artifact.path
             dest_base = project_path / ".claude"
 
-            if artifact.type == ArtifactType.SKILL:
-                dest_path = dest_base / "skills" / artifact.name
+            # Use custom dest_path if provided, otherwise use default based on type
+            if dest_path:
+                # Custom destination path provided
+                # dest_path is relative to project root, e.g., '.claude/skills/dev/'
+                # Append artifact name to create final destination
+                if artifact.type in (ArtifactType.SKILL, ArtifactType.MCP):
+                    # Directory-based artifacts
+                    final_dest_path = project_path / dest_path / artifact.name
+                else:
+                    # File-based artifacts (commands, agents, hooks)
+                    final_dest_path = project_path / dest_path / f"{artifact.name}.md"
+            elif artifact.type == ArtifactType.SKILL:
+                final_dest_path = dest_base / "skills" / artifact.name
             elif artifact.type == ArtifactType.COMMAND:
-                dest_path = dest_base / "commands" / f"{artifact.name}.md"
+                final_dest_path = dest_base / "commands" / f"{artifact.name}.md"
             elif artifact.type == ArtifactType.AGENT:
-                dest_path = dest_base / "agents" / f"{artifact.name}.md"
+                final_dest_path = dest_base / "agents" / f"{artifact.name}.md"
             elif artifact.type == ArtifactType.MCP:
-                dest_path = dest_base / "mcp" / artifact.name
+                final_dest_path = dest_base / "mcp" / artifact.name
             elif artifact.type == ArtifactType.HOOK:
-                dest_path = dest_base / "hooks" / f"{artifact.name}.md"
+                final_dest_path = dest_base / "hooks" / f"{artifact.name}.md"
             else:
                 raise ValueError(f"Unknown artifact type: {artifact.type}")
 
+            # Security check: ensure final path is within project directory
+            try:
+                final_dest_path.resolve().relative_to(project_path.resolve())
+            except ValueError:
+                raise ValueError(
+                    f"Destination path '{final_dest_path}' is outside project directory"
+                )
+
             # Check if destination exists and prompt for overwrite
-            if dest_path.exists():
-                console.print(f"[yellow]Warning:[/yellow] {dest_path} already exists")
+            if final_dest_path.exists():
+                console.print(f"[yellow]Warning:[/yellow] {final_dest_path} already exists")
                 if not overwrite:  # Only prompt if overwrite not explicitly requested
                     if not Confirm.ask(f"Overwrite {artifact.name}?"):
                         console.print(f"[yellow]Skipped:[/yellow] {artifact.name}")
@@ -234,7 +257,7 @@ class DeploymentManager:
 
             # Copy artifact
             try:
-                self.filesystem_mgr.copy_artifact(source_path, dest_path, artifact.type)
+                self.filesystem_mgr.copy_artifact(source_path, final_dest_path, artifact.type)
                 console.print(
                     f"[green][/green] Deployed {artifact.type.value}/{artifact.name}"
                 )
@@ -243,7 +266,7 @@ class DeploymentManager:
                 continue
 
             # Compute content hash (becomes merge base for future three-way merges)
-            content_hash = compute_content_hash(dest_path)
+            content_hash = compute_content_hash(final_dest_path)
 
             # Record deployment
             DeploymentTracker.record_deployment(
@@ -261,12 +284,20 @@ class DeploymentManager:
             # Create deployment object
             # Set merge_base_snapshot to content_hash at deployment time
             # This hash becomes the baseline for future three-way merges
+            # For artifact_path, use relative path from .claude directory if possible,
+            # otherwise relative to project root
+            try:
+                artifact_path = final_dest_path.relative_to(dest_base)
+            except ValueError:
+                # Custom dest_path outside .claude directory
+                artifact_path = final_dest_path.relative_to(project_path)
+
             deployment = Deployment(
                 artifact_name=artifact.name,
                 artifact_type=artifact.type.value,
                 from_collection=collection.name,
                 deployed_at=datetime.now(),
-                artifact_path=dest_path.relative_to(dest_base),
+                artifact_path=artifact_path,
                 content_hash=content_hash,
                 local_modifications=False,
                 merge_base_snapshot=content_hash,  # Store baseline for merge tracking

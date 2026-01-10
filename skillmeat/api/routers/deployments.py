@@ -28,6 +28,43 @@ from skillmeat.core.deployment import DeploymentManager
 
 logger = logging.getLogger(__name__)
 
+
+def validate_dest_path(dest_path: Optional[str]) -> Optional[str]:
+    """Validate and normalize custom destination path.
+
+    Args:
+        dest_path: Custom destination path relative to project root
+
+    Returns:
+        Normalized path string with trailing slash, or None if not provided
+
+    Raises:
+        ValueError: If path contains directory traversal or is absolute
+    """
+    if not dest_path:
+        return None
+
+    # Check for directory traversal
+    if ".." in dest_path:
+        raise ValueError("Directory traversal ('..') not allowed in dest_path")
+
+    # Check for absolute path
+    if dest_path.startswith("/"):
+        raise ValueError("Absolute paths not allowed in dest_path")
+
+    # Check for Windows-style absolute paths
+    if len(dest_path) >= 2 and dest_path[1] == ":":
+        raise ValueError("Absolute paths not allowed in dest_path")
+
+    # Check for dangerous characters (null bytes, etc.)
+    dangerous_chars = ["\x00", "\n", "\r"]
+    for char in dangerous_chars:
+        if char in dest_path:
+            raise ValueError(f"Invalid character in dest_path")
+
+    # Normalize: ensure trailing slash for directory path
+    return dest_path.rstrip("/") + "/"
+
 router = APIRouter(
     prefix="/deploy",
     tags=["deployments"],
@@ -93,8 +130,17 @@ async def deploy_artifact(
     try:
         logger.info(
             f"Deploying artifact: {request.artifact_id} "
-            f"(project={request.project_path or 'CWD'})"
+            f"(project={request.project_path or 'CWD'}, dest_path={request.dest_path})"
         )
+
+        # Validate custom destination path
+        try:
+            validated_dest_path = validate_dest_path(request.dest_path)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
 
         # Parse artifact type
         try:
@@ -149,6 +195,7 @@ async def deploy_artifact(
                 collection_name=request.collection_name,
                 project_path=project_path,
                 artifact_type=artifact_type,
+                dest_path=validated_dest_path,
             )
 
             if not deployments:
