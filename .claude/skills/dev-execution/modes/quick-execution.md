@@ -151,7 +151,20 @@ Edit `.claude/progress/quick-features/{feature-slug}.md`:
 - Set `status: completed` and `completed_at: {ISO date}`
 - Check all completion criteria boxes
 
-### 4.2 Update Request Log (if applicable)
+### 4.2 Commit All Changes
+
+**Required:** Opus commits directly (never delegate this step).
+
+```bash
+git add -A
+git commit -m "feat({scope}): {description}
+
+{Detailed commit body describing changes}
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+```
+
+### 4.3 Update Request Log (if applicable)
 
 If input was a REQ ID:
 
@@ -163,7 +176,7 @@ meatycapture log item update DOC ITEM --status done
 meatycapture log note add DOC ITEM -c "Completed in quick-feature/{feature-slug}"
 ```
 
-### 4.3 Capture Issues (if any)
+### 4.4 Capture Issues (if any)
 
 If issues arose during implementation:
 
