@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, MoreHorizontal, FolderPlus, Layers, Edit, Trash2 } from 'lucide-react';
+import { Package, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, Rocket } from 'lucide-react';
 import type { Artifact } from '@/types/artifact';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
 
 interface ArtifactGridProps {
   artifacts: Artifact[];
@@ -43,6 +44,7 @@ interface ArtifactCardActionsProps {
   onManageGroups?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDeploy?: () => void;
 }
 
 function ArtifactCardActions({
@@ -52,6 +54,7 @@ function ArtifactCardActions({
   onManageGroups,
   onEdit,
   onDelete,
+  onDeploy,
 }: ArtifactCardActionsProps) {
   return (
     <DropdownMenu>
@@ -68,6 +71,11 @@ function ArtifactCardActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={onDeploy}>
+          <Rocket className="mr-2 h-4 w-4" />
+          Deploy to Project
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onMoveToCollection}>
           <FolderPlus className="mr-2 h-4 w-4" />
           {collectionId ? 'Move to Collection' : 'Add to Collection'}
@@ -103,6 +111,7 @@ function ArtifactCard({
   onManageGroups,
   onEdit,
   onDelete,
+  onDeploy,
 }: {
   artifact: Artifact;
   onClick: () => void;
@@ -112,6 +121,7 @@ function ArtifactCard({
   onManageGroups?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDeploy?: () => void;
 }) {
   return (
     <div className="relative group">
@@ -136,6 +146,7 @@ function ArtifactCard({
         <ArtifactCardActions
           artifact={artifact}
           collectionId={artifact.collection?.id}
+          onDeploy={onDeploy}
           onMoveToCollection={onMoveToCollection}
           onManageGroups={onManageGroups}
           onEdit={onEdit}
@@ -171,9 +182,14 @@ export function ArtifactGrid({
   onDelete,
 }: ArtifactGridProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
+  const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
 
   const handleDelete = (artifact: Artifact) => {
     setDeleteArtifact(artifact);
+  };
+
+  const handleDeploy = (artifact: Artifact) => {
+    setDeployArtifact(artifact);
   };
 
   const confirmDelete = () => {
@@ -214,6 +230,7 @@ export function ArtifactGrid({
             onClick={() => onArtifactClick(artifact)}
             showCollectionBadge={showCollectionBadge}
             onCollectionClick={onCollectionClick}
+            onDeploy={() => handleDeploy(artifact)}
             onMoveToCollection={onMoveToCollection ? () => onMoveToCollection(artifact) : undefined}
             onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
             onEdit={onEdit ? () => onEdit(artifact) : undefined}
@@ -221,6 +238,14 @@ export function ArtifactGrid({
           />
         ))}
       </div>
+
+      {/* Deploy Dialog */}
+      <DeployDialog
+        artifact={deployArtifact}
+        isOpen={!!deployArtifact}
+        onClose={() => setDeployArtifact(null)}
+        onSuccess={() => setDeployArtifact(null)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteArtifact} onOpenChange={(open) => !open && setDeleteArtifact(null)}>

@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Entity, ENTITY_TYPES } from '@/types/entity';
+import type { Artifact } from '@/types/artifact';
 import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
@@ -57,6 +58,7 @@ import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments
 import { useDeploymentList } from '@/hooks/use-deployments';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
 import { usePendingContextChanges } from '@/hooks/use-context-sync';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
 import type {
   ArtifactDiffResponse,
   ArtifactUpstreamDiffResponse,
@@ -302,6 +304,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showParameterEditor, setShowParameterEditor] = useState(false);
   // Artifact deletion state
   const [showDeletionDialog, setShowDeletionDialog] = useState(false);
+  // Deploy dialog state
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -524,6 +528,43 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     );
     return collections.size;
   }, [artifactDeployments]);
+
+  // Convert Entity to Artifact format for DeployDialog
+  const artifactForDeploy = useMemo(() => {
+    if (!entity) return null;
+    return {
+      id: entity.id,
+      name: entity.name,
+      type: entity.type,
+      scope: 'user' as const,
+      status: 'active' as const,
+      version: entity.version,
+      source: entity.source,
+      metadata: {
+        description: entity.description,
+        version: entity.version,
+        tags: entity.tags,
+      },
+      upstreamStatus: {
+        hasUpstream: !!entity.source,
+        isOutdated: entity.status === 'outdated',
+      },
+      usageStats: {
+        totalDeployments: artifactDeployments.length,
+        activeProjects: deploymentProjectCount,
+        usageCount: 0,
+      },
+      createdAt: entity.deployedAt || new Date().toISOString(),
+      updatedAt: entity.modifiedAt || new Date().toISOString(),
+      aliases: entity.aliases,
+      collection: entity.collection
+        ? {
+            id: entity.collection,
+            name: entity.collection,
+          }
+        : undefined,
+    };
+  }, [entity, artifactDeployments.length, deploymentProjectCount]);
 
   // Get pending context changes count if this is a context entity
   const pendingContextCount = usePendingContextChanges(
@@ -1717,15 +1758,25 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="deployments" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-4 py-4">
-                  {/* Summary */}
-                  {artifactDeployments.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground">
-                        {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
-                        {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
-                      </p>
+                  {/* Header with Deploy button and Summary */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {artifactDeployments.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
+                          {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
+                        </p>
+                      )}
                     </div>
-                  )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDeployDialog(true)}
+                    >
+                      <Rocket className="mr-2 h-4 w-4" />
+                      Deploy to Project
+                    </Button>
+                  </div>
 
                   {/* Loading state */}
                   {isDeploymentsLoading && (
@@ -1893,6 +1944,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         onSuccess={() => {
           onClose();
           setShowDeletionDialog(false);
+        }}
+      />
+
+      {/* Deploy Dialog */}
+      <DeployDialog
+        artifact={artifactForDeploy}
+        isOpen={showDeployDialog}
+        onClose={() => setShowDeployDialog(false)}
+        onSuccess={() => {
+          toast({
+            title: 'Deployment Successful',
+            description: `${entity.name} has been deployed to the project.`,
+          });
+          // Refresh deployments list
+          queryClient.invalidateQueries({ queryKey: ['deployments'] });
         }}
       />
     </>
