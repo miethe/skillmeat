@@ -32,5 +32,18 @@ deployed_at = "2026-01-09T14:03:41.312919"
 artifact_path = "skills/Design Principles"
 content_hash = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
 local_modifications = false
+version_lineage = [
+    "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06",
+]
 merge_base_snapshot = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
 collection_sha = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+
+[[deployed]]
+artifact_name = "prd-writer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-09T14:32:10.550083"
+artifact_path = "agents/pm/prd-writer.md"
+content_hash = "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2"
+local_modifications = false
+collection_sha = "4c1dd9d428073f665d9b198c506da53b6337ca7676d80684b7126fae77bf5ff2"
