@@ -14,13 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X, AlertCircle } from 'lucide-react';
+import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X, AlertCircle, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildArtifactKey } from '@/lib/skip-preferences';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
 import { ArtifactActions } from './ArtifactActions';
-import type { DiscoveredArtifact, SkipPreference } from '@/types/discovery';
+import type { DiscoveredArtifact, SkipPreference, MatchType } from '@/types/discovery';
 
 /**
  * Filter types for discovery artifacts
@@ -58,6 +58,10 @@ export interface DiscoveryTabProps {
   onImport?: (artifact: DiscoveredArtifact) => void;
   onToggleSkip?: (artifactKey: string, skip: boolean) => void;
   onViewDetails?: (artifact: DiscoveredArtifact) => void;
+  /** Callback to import only new artifacts (no matches) */
+  onImportNewOnly?: (artifacts: DiscoveredArtifact[]) => void;
+  /** Callback to open duplicate review modal */
+  onReviewDuplicates?: (artifacts: DiscoveredArtifact[]) => void;
   /** Show token usage summary (for context entities) */
   showTokenUsage?: boolean;
   /** Function to calculate token count for an artifact */
@@ -107,14 +111,14 @@ function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'outli
 }
 
 /**
- * Get status label text
+ * Get status label text with clearer messaging
  */
 function getStatusLabel(status: string): string {
   switch (status) {
     case 'new':
-      return 'New';
+      return 'New - Ready to Import';
     case 'in_collection':
-      return 'In Collection';
+      return 'Already in Collection';
     case 'in_project':
       return 'In Project';
     case 'skipped':
@@ -143,20 +147,35 @@ function getStatusColorClass(status: string): string {
 }
 
 /**
- * Format date as relative time
+ * Format date as relative time with improved granularity
+ * Handles edge cases like invalid dates or future dates
  */
 function formatRelativeTime(dateString: string): string {
+  if (!dateString) return 'Unknown';
+
   const date = new Date(dateString);
+
+  // Check for invalid date
+  if (isNaN(date.getTime())) return 'Unknown';
+
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
+
+  // Handle negative differences (future dates)
+  if (diffMs < 0) return 'Just now';
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return 'Today';
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-  return `${Math.floor(diffDays / 365)} years ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return date.toLocaleDateString();
 }
 
 /**
@@ -173,8 +192,8 @@ function truncateSource(source?: string, maxLength: number = 40): string {
 }
 
 /**
- * Determine artifact status based on skip preferences
- * In real implementation, this would also check collection and project membership
+ * Determine artifact status based on collection_status and skip preferences
+ * Uses backend-provided collection_status for accurate membership check
  */
 function determineArtifactStatus(
   artifact: DiscoveredArtifact,
@@ -182,13 +201,105 @@ function determineArtifactStatus(
 ): string {
   const artifactKey = buildArtifactKey(artifact.type, artifact.name);
 
+  // Check skip preferences first (user's explicit decision)
   if (skipPrefs?.some(pref => pref.artifact_key === artifactKey)) {
     return 'skipped';
   }
 
-  // For now, default to 'new'
-  // In real implementation, check collection and project membership via API/props
+  // Use collection_status from backend if available
+  if (artifact.collection_status) {
+    if (artifact.collection_status.in_collection) {
+      return 'in_collection';
+    }
+    // Not in collection means it's new and ready to import
+    return 'new';
+  }
+
+  // Fallback: if no collection_status, assume new (legacy behavior)
   return 'new';
+}
+
+/**
+ * Grouped artifacts by collection match type
+ */
+interface GroupedArtifacts {
+  /** New artifacts with no collection match (type="none") */
+  new: DiscoveredArtifact[];
+  /** Possible duplicates: name_type or hash matches with confidence < 1.0 */
+  possible_duplicates: DiscoveredArtifact[];
+  /** Exact matches: identical content already in collection */
+  exact_matches: DiscoveredArtifact[];
+}
+
+/**
+ * Get the effective match type from collection_match or collection_status
+ */
+function getEffectiveMatchType(artifact: DiscoveredArtifact): MatchType {
+  // Prefer collection_match (new P2-T1 hash-based matching)
+  if (artifact.collection_match?.type) {
+    return artifact.collection_match.type;
+  }
+  // Fallback to collection_status.match_type
+  if (artifact.collection_status?.match_type) {
+    return artifact.collection_status.match_type;
+  }
+  return 'none';
+}
+
+/**
+ * Group artifacts by their collection match status
+ */
+function groupArtifacts(artifacts: DiscoveredArtifact[]): GroupedArtifacts {
+  const groups: GroupedArtifacts = {
+    new: [],
+    possible_duplicates: [],
+    exact_matches: [],
+  };
+
+  for (const artifact of artifacts) {
+    const matchType = getEffectiveMatchType(artifact);
+
+    switch (matchType) {
+      case 'exact':
+      case 'hash':
+        // Exact hash match - already in collection
+        groups.exact_matches.push(artifact);
+        break;
+      case 'name_type':
+        // Name+type match but different content - possible duplicate
+        groups.possible_duplicates.push(artifact);
+        break;
+      case 'none':
+      default:
+        // No match - new artifact ready to import
+        groups.new.push(artifact);
+        break;
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Get match info display for an artifact
+ */
+function getMatchInfo(artifact: DiscoveredArtifact): { name: string | null; confidence: number } {
+  if (artifact.collection_match) {
+    return {
+      name: artifact.collection_match.matched_name,
+      confidence: artifact.collection_match.confidence,
+    };
+  }
+  if (artifact.collection_status?.matched_artifact_id) {
+    // Extract name from artifact ID (format: type:name)
+    const parts = artifact.collection_status.matched_artifact_id.split(':');
+    const matchedName = parts.length > 1 ? parts[1] : artifact.collection_status.matched_artifact_id;
+    return {
+      name: matchedName ?? null,
+      confidence: artifact.collection_status.match_type === 'exact' ? 1.0 : 0.85,
+    };
+  }
+  return { name: null, confidence: 0 };
 }
 
 /**
@@ -205,6 +316,8 @@ export function DiscoveryTab({
   onImport,
   onToggleSkip,
   onViewDetails,
+  onImportNewOnly,
+  onReviewDuplicates,
   showTokenUsage = false,
   getTokenCount,
   tokenWarningThreshold = 2000,
@@ -223,6 +336,9 @@ export function DiscoveryTab({
 
   // Debounced search state
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Toggle for showing exact matches section
+  const [showExactMatches, setShowExactMatches] = useState(false);
 
   const tracking = useTrackDiscovery();
 
@@ -288,6 +404,14 @@ export function DiscoveryTab({
 
     return result;
   }, [artifacts, debouncedSearch, filters.status, filters.type, sort, skipPrefs]);
+
+  // Group filtered artifacts by collection match status
+  const groupedArtifacts = useMemo(() => {
+    return groupArtifacts(filteredAndSortedArtifacts);
+  }, [filteredAndSortedArtifacts]);
+
+  // Check if there are any duplicates to review
+  const hasDuplicatesToReview = groupedArtifacts.possible_duplicates.length > 0;
 
   // Reset all filters to default
   const handleClearFilters = () => {
@@ -532,105 +656,360 @@ export function DiscoveryTab({
         </div>
       </div>
 
-      {/* Artifacts Table */}
-      <div className="rounded-md border">
-        <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="min-w-[200px]">Source</TableHead>
-            <TableHead>Discovered</TableHead>
-            <TableHead className="w-24 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredAndSortedArtifacts.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No artifacts match your filters. Try adjusting your search or filter criteria.
-                </p>
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredAndSortedArtifacts.map((artifact) => {
-            const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
-            const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-            const status = determineArtifactStatus(artifact, skipPrefs);
-            const statusColorClass = getStatusColorClass(status);
-            const artifactKey = buildArtifactKey(artifact.type, artifact.name);
-            const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
-            const isImported = status === 'in_collection' || status === 'in_project';
+      {/* Action Buttons for Grouped View */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Import New Only Button */}
+        {groupedArtifacts.new.length > 0 && onImportNewOnly && (
+          <Button
+            onClick={() => onImportNewOnly(groupedArtifacts.new)}
+            className="gap-2"
+          >
+            <Package className="h-4 w-4" />
+            Import New Only ({groupedArtifacts.new.length})
+          </Button>
+        )}
 
-            return (
-              <TableRow
-                key={`${artifact.type}:${artifact.name}:${artifact.path}`}
-                className="cursor-pointer hover:bg-accent/50"
-                onClick={() => onViewDetails?.(artifact)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onViewDetails?.(artifact);
-                  }
-                }}
-                aria-label={`View details for ${artifact.name}`}
-              >
-                <TableCell className="font-medium">{artifact.name}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={cn('gap-1.5', typeColorClass)}
-                    aria-label={`Type: ${artifact.type}`}
-                  >
-                    <Icon className="h-3 w-3" aria-hidden="true" />
-                    {artifact.type}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={getStatusBadgeVariant(status)}
-                    className={cn(statusColorClass)}
-                    aria-label={`Status: ${getStatusLabel(status)}`}
-                  >
-                    {getStatusLabel(status)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span
-                    className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
-                    title={artifact.source || 'No source'}
-                  >
-                    {truncateSource(artifact.source)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {formatRelativeTime(artifact.discovered_at)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    <ArtifactActions
-                      artifact={artifact}
-                      isSkipped={isSkipped}
-                      isImported={isImported}
-                      onImport={() => onImport?.(artifact)}
-                      onToggleSkip={(skip) => onToggleSkip?.(artifactKey, skip)}
-                      onViewDetails={() => onViewDetails?.(artifact)}
-                    />
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })
-          )}
-        </TableBody>
-      </Table>
+        {/* Review Duplicates Button */}
+        {hasDuplicatesToReview && onReviewDuplicates && (
+          <Button
+            variant="outline"
+            onClick={() => onReviewDuplicates(groupedArtifacts.possible_duplicates)}
+            className="gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10 dark:text-yellow-400"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Review Duplicates ({groupedArtifacts.possible_duplicates.length})
+          </Button>
+        )}
       </div>
+
+      {/* No artifacts message */}
+      {filteredAndSortedArtifacts.length === 0 && (
+        <div className="rounded-md border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No artifacts match your filters. Try adjusting your search or filter criteria.
+          </p>
+        </div>
+      )}
+
+      {/* New Artifacts Section */}
+      {groupedArtifacts.new.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <h3 className="text-lg font-semibold">
+              New Artifacts ({groupedArtifacts.new.length})
+            </h3>
+            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400">
+              Ready to Import
+            </Badge>
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="min-w-[200px]">Source</TableHead>
+                  <TableHead>Discovered</TableHead>
+                  <TableHead className="w-24 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedArtifacts.new.map((artifact) => {
+                  const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                  const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                  const status = determineArtifactStatus(artifact, skipPrefs);
+                  const statusColorClass = getStatusColorClass(status);
+                  const artifactKey = buildArtifactKey(artifact.type, artifact.name);
+                  const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+                  const isImported = status === 'in_collection' || status === 'in_project';
+
+                  return (
+                    <TableRow
+                      key={`${artifact.type}:${artifact.name}:${artifact.path}`}
+                      className="cursor-pointer hover:bg-accent/50"
+                      onClick={() => onViewDetails?.(artifact)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onViewDetails?.(artifact);
+                        }
+                      }}
+                      aria-label={`View details for ${artifact.name}`}
+                    >
+                      <TableCell className="font-medium">{artifact.name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn('gap-1.5', typeColorClass)}
+                          aria-label={`Type: ${artifact.type}`}
+                        >
+                          <Icon className="h-3 w-3" aria-hidden="true" />
+                          {artifact.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getStatusBadgeVariant(status)}
+                          className={cn(statusColorClass)}
+                          aria-label={`Status: ${getStatusLabel(status)}`}
+                        >
+                          {getStatusLabel(status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                          title={artifact.source || 'No source'}
+                        >
+                          {truncateSource(artifact.source)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(artifact.discovered_at)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <ArtifactActions
+                            artifact={artifact}
+                            isSkipped={isSkipped}
+                            isImported={isImported}
+                            onImport={() => onImport?.(artifact)}
+                            onToggleSkip={(skip) => onToggleSkip?.(artifactKey, skip)}
+                            onViewDetails={() => onViewDetails?.(artifact)}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Possible Duplicates Section */}
+      {groupedArtifacts.possible_duplicates.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            <h3 className="text-lg font-semibold">
+              Possible Duplicates ({groupedArtifacts.possible_duplicates.length})
+            </h3>
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400">
+              Review Recommended
+            </Badge>
+          </div>
+          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/5">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Matches</TableHead>
+                  <TableHead className="min-w-[200px]">Source</TableHead>
+                  <TableHead>Discovered</TableHead>
+                  <TableHead className="w-24 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedArtifacts.possible_duplicates.map((artifact) => {
+                  const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                  const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                  const matchInfo = getMatchInfo(artifact);
+                  const artifactKey = buildArtifactKey(artifact.type, artifact.name);
+                  const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+
+                  return (
+                    <TableRow
+                      key={`${artifact.type}:${artifact.name}:${artifact.path}`}
+                      className="cursor-pointer hover:bg-yellow-500/10"
+                      onClick={() => onViewDetails?.(artifact)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onViewDetails?.(artifact);
+                        }
+                      }}
+                      aria-label={`View details for ${artifact.name}`}
+                    >
+                      <TableCell className="font-medium">{artifact.name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn('gap-1.5', typeColorClass)}
+                          aria-label={`Type: ${artifact.type}`}
+                        >
+                          <Icon className="h-3 w-3" aria-hidden="true" />
+                          {artifact.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                            {matchInfo.name || 'Unknown'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(matchInfo.confidence * 100)}% confidence
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                          title={artifact.source || 'No source'}
+                        >
+                          {truncateSource(artifact.source)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(artifact.discovered_at)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <ArtifactActions
+                            artifact={artifact}
+                            isSkipped={isSkipped}
+                            isImported={false}
+                            onImport={() => onImport?.(artifact)}
+                            onToggleSkip={(skip) => onToggleSkip?.(artifactKey, skip)}
+                            onViewDetails={() => onViewDetails?.(artifact)}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Exact Matches Section (Collapsible) */}
+      {groupedArtifacts.exact_matches.length > 0 && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setShowExactMatches(!showExactMatches)}
+            className="flex w-full items-center gap-2 text-left"
+            aria-expanded={showExactMatches}
+            aria-controls="exact-matches-section"
+          >
+            {showExactMatches ? (
+              <ChevronDown className="h-5 w-5 text-blue-500" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-blue-500" />
+            )}
+            <h3 className="text-lg font-semibold">
+              Exact Matches ({groupedArtifacts.exact_matches.length})
+            </h3>
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400">
+              Already in Collection
+            </Badge>
+          </button>
+
+          {showExactMatches && (
+            <div id="exact-matches-section" className="rounded-md border border-blue-500/30 bg-blue-500/5">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Collection Match</TableHead>
+                    <TableHead className="min-w-[200px]">Source</TableHead>
+                    <TableHead>Discovered</TableHead>
+                    <TableHead className="w-24 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupedArtifacts.exact_matches.map((artifact) => {
+                    const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                    const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                    const matchInfo = getMatchInfo(artifact);
+                    const artifactKey = buildArtifactKey(artifact.type, artifact.name);
+                    const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+
+                    return (
+                      <TableRow
+                        key={`${artifact.type}:${artifact.name}:${artifact.path}`}
+                        className="cursor-pointer hover:bg-blue-500/10"
+                        onClick={() => onViewDetails?.(artifact)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onViewDetails?.(artifact);
+                          }
+                        }}
+                        aria-label={`View details for ${artifact.name}`}
+                      >
+                        <TableCell className="font-medium">{artifact.name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn('gap-1.5', typeColorClass)}
+                            aria-label={`Type: ${artifact.type}`}
+                          >
+                            <Icon className="h-3 w-3" aria-hidden="true" />
+                            {artifact.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              {matchInfo.name || artifact.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Identical content
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                            title={artifact.source || 'No source'}
+                          >
+                            {truncateSource(artifact.source)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">
+                            {formatRelativeTime(artifact.discovered_at)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            <ArtifactActions
+                              artifact={artifact}
+                              isSkipped={isSkipped}
+                              isImported={true}
+                              onImport={() => onImport?.(artifact)}
+                              onToggleSkip={(skip) => onToggleSkip?.(artifactKey, skip)}
+                              onViewDetails={() => onViewDetails?.(artifact)}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
