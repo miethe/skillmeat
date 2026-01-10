@@ -21,7 +21,15 @@ import type { ProjectCreateRequest } from '@/sdk';
 export interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (project?: ProjectDetail) => void;
+}
+
+interface ProjectDetail {
+  id: string;
+  path: string;
+  name: string;
+  deployment_count: number;
+  last_deployment?: string;
 }
 
 export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreateProjectDialogProps) {
@@ -71,7 +79,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
         description: description.trim() || null,
       };
 
-      await createMutation.mutateAsync(requestBody);
+      const createdProject = await createMutation.mutateAsync(requestBody);
 
       toast({
         title: 'Project created',
@@ -84,9 +92,9 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
       setDescription('');
       setErrors({});
 
-      // Close dialog and call success callback
+      // Close dialog and call success callback with created project
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(createdProject);
     } catch (error) {
       console.error('Failed to create project:', error);
       toast({

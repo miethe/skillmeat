@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Upload, Folder, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, Folder, AlertTriangle, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,21 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
 import { useDeploy } from '@/hooks/useDeploy';
+import { useProjects } from '@/hooks/useProjects';
+import { CreateProjectDialog } from '@/app/projects/components/create-project-dialog';
 import type { Artifact } from '@/types/artifact';
+
+const CUSTOM_PATH_VALUE = '__custom__';
 
 export interface DeployDialogProps {
   artifact: Artifact | null;
@@ -24,7 +36,9 @@ export interface DeployDialogProps {
 }
 
 export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDialogProps) {
-  const [projectPath, setProjectPath] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [customPath, setCustomPath] = useState('');
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
@@ -34,6 +48,28 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
     { step: 'Copying files', status: 'pending' },
     { step: 'Updating deployment registry', status: 'pending' },
   ]);
+
+  const { data: projects, isLoading: projectsLoading } = useProjects();
+
+  // Determine if using custom path mode
+  const useCustomPath = selectedProjectId === CUSTOM_PATH_VALUE;
+
+  // Get selected project object
+  const selectedProject = selectedProjectId && !useCustomPath
+    ? projects?.find((p) => p.id === selectedProjectId)
+    : null;
+
+  // Get the effective path for deployment
+  const effectivePath = useCustomPath ? customPath : (selectedProject?.path || '');
+
+  // Reset selection when dialog opens for a new artifact
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedProjectId(null);
+      setCustomPath('');
+      setOverwrite(false);
+    }
+  }, [isOpen, artifact?.id]);
 
   const deployMutation = useDeploy({
     onSuccess: () => {
@@ -55,12 +91,20 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
         artifactId: artifact.id,
         artifactName: artifact.name,
         artifactType: artifact.type,
-        projectPath: projectPath || undefined,
+        projectPath: effectivePath || undefined,
         overwrite,
       });
     } catch (error) {
       console.error('Deploy failed:', error);
     }
+  };
+
+  const handleProjectCreated = (newProject?: { id: string; path: string; name: string }) => {
+    // Select the newly created project if provided
+    if (newProject) {
+      setSelectedProjectId(newProject.id);
+    }
+    setShowCreateProject(false);
   };
 
   const handleComplete = (success: boolean) => {
@@ -71,7 +115,8 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
         onSuccess?.();
         onClose();
         // Reset state
-        setProjectPath('');
+        setSelectedProjectId(null);
+        setCustomPath('');
         setOverwrite(false);
         setStreamUrl(null);
       }, 1500);
@@ -82,7 +127,8 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
     if (!isDeploying) {
       onClose();
       // Reset state
-      setProjectPath('');
+      setSelectedProjectId(null);
+      setCustomPath('');
       setOverwrite(false);
       setStreamUrl(null);
       setIsDeploying(false);
@@ -92,6 +138,7 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
   if (!artifact) return null;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -127,26 +174,85 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
                 </div>
               </div>
 
-              {/* Project Path Input */}
+              {/* Project Selector */}
               <div className="space-y-2">
-                <label
-                  htmlFor="projectPath"
-                  className="flex items-center gap-2 text-sm font-medium"
-                >
+                <label className="flex items-center gap-2 text-sm font-medium">
                   <Folder className="h-4 w-4" />
-                  Project Path
+                  Target Project
                 </label>
-                <Input
-                  id="projectPath"
-                  placeholder="/path/to/project (leave empty for current directory)"
-                  value={projectPath}
-                  onChange={(e) => setProjectPath(e.target.value)}
-                  disabled={isDeploying}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The artifact will be deployed to the .claude directory in this project
-                </p>
+                <div className="flex gap-2">
+                  <Select
+                    value={selectedProjectId || ''}
+                    onValueChange={(value) => setSelectedProjectId(value || null)}
+                    disabled={isDeploying || projectsLoading}
+                  >
+                    <SelectTrigger className="flex-1" aria-label="Select target project">
+                      <SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'Select a project...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects && projects.length > 0 ? (
+                        <>
+                          {projects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              <div className="flex flex-col">
+                                <span>{project.name}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+                                  {project.path}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          <SelectSeparator />
+                        </>
+                      ) : !projectsLoading ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No projects found
+                        </div>
+                      ) : null}
+                      <SelectItem value={CUSTOM_PATH_VALUE}>
+                        <span className="text-muted-foreground">Custom path...</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowCreateProject(true)}
+                    disabled={isDeploying}
+                    aria-label="Add new project"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {selectedProject && (
+                  <p className="text-xs text-muted-foreground">
+                    Deploy to: {selectedProject.path}
+                  </p>
+                )}
               </div>
+
+              {/* Custom Path Input (shown when "Custom path..." is selected) */}
+              {useCustomPath && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="customPath"
+                    className="text-sm font-medium"
+                  >
+                    Custom Path
+                  </label>
+                  <Input
+                    id="customPath"
+                    placeholder="/path/to/project"
+                    value={customPath}
+                    onChange={(e) => setCustomPath(e.target.value)}
+                    disabled={isDeploying}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The artifact will be deployed to the .claude directory in this path
+                  </p>
+                </div>
+              )}
 
               {/* Overwrite Warning */}
               {artifact.usageStats.totalDeployments > 0 && (
@@ -194,5 +300,13 @@ export function DeployDialog({ artifact, isOpen, onClose, onSuccess }: DeployDia
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Create Project Dialog */}
+    <CreateProjectDialog
+      open={showCreateProject}
+      onOpenChange={setShowCreateProject}
+      onSuccess={handleProjectCreated}
+    />
+    </>
   );
 }
