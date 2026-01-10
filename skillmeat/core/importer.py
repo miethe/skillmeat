@@ -62,6 +62,9 @@ class ImportResultData:
     error: Optional[str] = None
     status: Optional[ImportStatus] = None
     skip_reason: Optional[str] = None
+    reason_code: Optional[str] = None  # ErrorReasonCode enum value
+    details: Optional[str] = None  # Additional error details (e.g., line numbers)
+    path: Optional[str] = None  # Path to the artifact
     tags_applied: int = 0  # Count of tags applied from path segments
 
 
@@ -494,6 +497,214 @@ class ArtifactImporter:
             logger.warning(f"Error checking duplicate for {artifact.name}: {e}")
             return (False, None)
 
+    def _classify_error(
+        self, error: Exception, artifact_path: Optional[str] = None
+    ) -> tuple[str, str, Optional[str]]:
+        """Classify an exception into reason code, message, and details.
+
+        Args:
+            error: The exception that occurred
+            artifact_path: Optional path to the artifact for context
+
+        Returns:
+            tuple of (reason_code, error_message, details)
+        """
+        import yaml
+
+        error_str = str(error)
+        error_type = type(error).__name__
+
+        # YAML parsing errors
+        if isinstance(error, yaml.YAMLError):
+            details = None
+            if hasattr(error, "problem_mark") and error.problem_mark:
+                mark = error.problem_mark
+                details = f"Line {mark.line + 1}, Column {mark.column + 1}: {getattr(error, 'problem', 'syntax error')}"
+            return ("yaml_parse_error", f"YAML parsing failed: {error_str}", details)
+
+        # Permission errors (check first since PermissionError inherits from OSError)
+        if isinstance(error, PermissionError):
+            return (
+                "permission_error",
+                f"Permission denied: {error_str}",
+                artifact_path,
+            )
+
+        # File I/O errors
+        if isinstance(error, (IOError, OSError)):
+            if "Permission denied" in error_str:
+                return (
+                    "permission_error",
+                    f"Permission denied: {error_str}",
+                    artifact_path,
+                )
+            return ("io_error", f"I/O error: {error_str}", artifact_path)
+
+        # Network errors (typically from GitHub)
+        if "network" in error_str.lower() or "connection" in error_str.lower():
+            return ("network_error", f"Network error: {error_str}", None)
+        if "timeout" in error_str.lower():
+            return ("network_error", f"Connection timeout: {error_str}", None)
+        if "404" in error_str or "not found" in error_str.lower():
+            return ("network_error", f"Resource not found: {error_str}", None)
+
+        # Validation errors
+        if isinstance(error, ValueError):
+            if "invalid" in error_str.lower() and "type" in error_str.lower():
+                return ("invalid_type", f"Invalid artifact type: {error_str}", None)
+            if "source" in error_str.lower() or "path" in error_str.lower():
+                return ("invalid_source", f"Invalid source: {error_str}", None)
+            if "structure" in error_str.lower() or "directory" in error_str.lower():
+                return (
+                    "invalid_structure",
+                    f"Invalid artifact structure: {error_str}",
+                    artifact_path,
+                )
+            if "metadata" in error_str.lower() or "missing" in error_str.lower():
+                return (
+                    "missing_metadata",
+                    f"Missing metadata: {error_str}",
+                    artifact_path,
+                )
+
+        if isinstance(error, KeyError):
+            return (
+                "missing_metadata",
+                f"Missing required field: {error_str}",
+                None,
+            )
+
+        # Generic import error
+        return ("import_error", f"Import failed: {error_str}", None)
+
+    def _validate_artifact_structure(
+        self, artifact: BulkImportArtifactData
+    ) -> Optional[ImportResultData]:
+        """Validate artifact structure before import.
+
+        Checks for common issues like missing SKILL.md, invalid YAML, etc.
+
+        Args:
+            artifact: Artifact to validate
+
+        Returns:
+            ImportResultData if validation fails, None if valid
+        """
+        import os
+        from pathlib import Path
+        import yaml
+
+        # Skip validation for GitHub sources (validated during fetch)
+        if not artifact.source.startswith("local/"):
+            return None
+
+        # Local sources require path
+        if not artifact.path:
+            artifact_id = f"{artifact.artifact_type}:{artifact.name or 'unknown'}"
+            return ImportResultData(
+                artifact_id=artifact_id,
+                success=False,
+                message="Validation failed",
+                error=f"Local source '{artifact.source}' requires 'path' field",
+                status=ImportStatus.FAILED,
+                reason_code="invalid_source",
+                path=None,
+            )
+
+        artifact_path = Path(artifact.path)
+
+        # Check path exists
+        if not artifact_path.exists():
+            artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            return ImportResultData(
+                artifact_id=artifact_id,
+                success=False,
+                message="Validation failed",
+                error=f"Artifact path does not exist: {artifact.path}",
+                status=ImportStatus.FAILED,
+                reason_code="invalid_structure",
+                path=artifact.path,
+            )
+
+        # Check it's a directory
+        if not artifact_path.is_dir():
+            artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+            return ImportResultData(
+                artifact_id=artifact_id,
+                success=False,
+                message="Validation failed",
+                error=f"Artifact path is not a directory: {artifact.path}",
+                status=ImportStatus.FAILED,
+                reason_code="invalid_structure",
+                path=artifact.path,
+            )
+
+        # Check for metadata file based on artifact type
+        metadata_files = {
+            "skill": "SKILL.md",
+            "command": "command.md",
+            "agent": "agent.md",
+            "hook": "hook.md",
+            "mcp": "mcp.json",
+        }
+
+        expected_file = metadata_files.get(artifact.artifact_type)
+        if expected_file:
+            metadata_path = artifact_path / expected_file
+            if not metadata_path.exists():
+                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                return ImportResultData(
+                    artifact_id=artifact_id,
+                    success=False,
+                    message="Validation failed",
+                    error=f"Missing required metadata file: {expected_file}",
+                    status=ImportStatus.FAILED,
+                    reason_code="missing_metadata",
+                    details=f"Expected file at: {metadata_path}",
+                    path=artifact.path,
+                )
+
+            # For markdown files, validate YAML frontmatter
+            if expected_file.endswith(".md"):
+                try:
+                    content = metadata_path.read_text(encoding="utf-8")
+                    if content.startswith("---"):
+                        # Extract YAML frontmatter
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            yaml_content = parts[1].strip()
+                            if yaml_content:
+                                yaml.safe_load(yaml_content)
+                except yaml.YAMLError as e:
+                    artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                    details = None
+                    if hasattr(e, "problem_mark") and e.problem_mark:
+                        mark = e.problem_mark
+                        details = f"Line {mark.line + 1}, Column {mark.column + 1}: {getattr(e, 'problem', 'syntax error')}"
+                    return ImportResultData(
+                        artifact_id=artifact_id,
+                        success=False,
+                        message="Validation failed",
+                        error=f"Invalid YAML frontmatter in {expected_file}",
+                        status=ImportStatus.FAILED,
+                        reason_code="yaml_parse_error",
+                        details=details,
+                        path=artifact.path,
+                    )
+                except Exception as e:
+                    artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                    return ImportResultData(
+                        artifact_id=artifact_id,
+                        success=False,
+                        message="Validation failed",
+                        error=f"Failed to read {expected_file}: {str(e)}",
+                        status=ImportStatus.FAILED,
+                        reason_code="io_error",
+                        path=artifact.path,
+                    )
+
+        return None  # Validation passed
+
     def _import_single(
         self, artifact: BulkImportArtifactData, collection_name: str
     ) -> ImportResultData:
@@ -506,6 +717,11 @@ class ArtifactImporter:
         Returns:
             ImportResultData with import status
         """
+        # Pre-validate structure for local artifacts
+        validation_result = self._validate_artifact_structure(artifact)
+        if validation_result is not None:
+            return validation_result
+
         try:
             # Extract name from source
             name = artifact.name or artifact.source.split("/")[-1].split("@")[0]
@@ -547,10 +763,12 @@ class ArtifactImporter:
                 message="Imported successfully",
                 status=status,
                 skip_reason=skip_reason,
+                path=artifact.path,
             )
         except Exception as e:
             logger.error(f"Failed to import artifact: {e}")
             artifact_id = f"{artifact.artifact_type}:{artifact.name or 'unknown'}"
+            reason_code, error_msg, details = self._classify_error(e, artifact.path)
             status, skip_reason = self.determine_import_status(
                 artifact_key=artifact_id, import_success=False, error=str(e)
             )
@@ -558,7 +776,10 @@ class ArtifactImporter:
                 artifact_id=artifact_id,
                 success=False,
                 message="Import failed",
-                error=str(e),
+                error=error_msg,
                 status=status,
                 skip_reason=skip_reason,
+                reason_code=reason_code,
+                details=details,
+                path=artifact.path,
             )
