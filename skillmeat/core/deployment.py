@@ -216,6 +216,12 @@ class DeploymentManager:
                 dest_path = dest_base / "commands" / f"{artifact.name}.md"
             elif artifact.type == ArtifactType.AGENT:
                 dest_path = dest_base / "agents" / f"{artifact.name}.md"
+            elif artifact.type == ArtifactType.MCP:
+                dest_path = dest_base / "mcp" / artifact.name
+            elif artifact.type == ArtifactType.HOOK:
+                dest_path = dest_base / "hooks" / f"{artifact.name}.md"
+            else:
+                raise ValueError(f"Unknown artifact type: {artifact.type}")
 
             # Check if destination exists and prompt for overwrite
             if dest_path.exists():

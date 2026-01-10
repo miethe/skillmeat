@@ -161,6 +161,7 @@ class DeploymentInfo(BaseModel):
     from_collection: str = Field(description="Source collection name")
     deployed_at: datetime = Field(description="Deployment timestamp")
     artifact_path: str = Field(description="Relative path within .claude/")
+    project_path: str = Field(description="Absolute path to the project directory")
     collection_sha: str = Field(description="SHA at deployment time")
     local_modifications: bool = Field(
         default=False,
@@ -185,6 +186,7 @@ class DeploymentInfo(BaseModel):
                 "from_collection": "default",
                 "deployed_at": "2025-11-18T12:00:00Z",
                 "artifact_path": "skills/pdf",
+                "project_path": "/path/to/project",
                 "collection_sha": "abc123def456",
                 "local_modifications": False,
                 "sync_status": "synced",

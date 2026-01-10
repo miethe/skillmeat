@@ -141,14 +141,9 @@ export function DeploymentCard({
   // Find which project this deployment belongs to
   const projectMatch = useMemo(() => {
     if (!Array.isArray(projects)) return null;
-    // Match project path that is a prefix of the artifact_path
-    // deployments are stored like "/path/to/project/.claude/skills/name"
-    return projects.find(
-      (p) =>
-        deployment.artifact_path.startsWith(p.path + '/.claude/') ||
-        deployment.artifact_path.startsWith(p.path + '/')
-    );
-  }, [projects, deployment.artifact_path]);
+    // Match project by its path matching the deployment's project_path
+    return projects.find((p) => p.path === deployment.project_path);
+  }, [projects, deployment.project_path]);
 
   const projectDisplayName = projectMatch?.name || 'Custom Path';
 
