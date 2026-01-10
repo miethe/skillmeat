@@ -549,8 +549,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   }, [allDeployments, entity]);
 
   // Extract deployment paths for this artifact (used by DeployDialog to show existing deployments)
+  // Must combine project_path + artifact_path for checkIsAlreadyDeployed to match correctly
   const existingDeploymentPaths = useMemo(() => {
-    return artifactDeployments.map((d) => d.artifact_path);
+    return artifactDeployments.map((d) => `${d.project_path}/${d.artifact_path}`);
   }, [artifactDeployments]);
 
   // Count unique projects where this artifact is deployed
