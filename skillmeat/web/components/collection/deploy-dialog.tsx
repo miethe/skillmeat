@@ -214,7 +214,7 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
                     <SelectTrigger className="flex-1" aria-label="Select target project">
                       <SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'Select a project...'} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[60]">
                       {projects && projects.length > 0 ? (
                         <>
                           {projects.map((project) => {
