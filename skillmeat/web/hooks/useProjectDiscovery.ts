@@ -19,6 +19,8 @@ import type {
   BulkImportRequest,
   BulkImportResult,
   SkipPreference,
+  ConfirmDuplicatesRequest,
+  ConfirmDuplicatesResponse,
 } from '@/types/discovery';
 
 /**
@@ -142,4 +144,36 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     isArtifactSkipped,
     clearSkips,
   };
+}
+
+/**
+ * Hook for confirming duplicate decisions during artifact import.
+ *
+ * Processes user decisions from the duplicate review modal:
+ * - Link discovered duplicates to existing collection artifacts
+ * - Import selected paths as new artifacts
+ * - Record paths the user chose to skip
+ *
+ * @returns Mutation for confirming duplicates
+ */
+export function useConfirmDuplicates() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ConfirmDuplicatesRequest): Promise<ConfirmDuplicatesResponse> => {
+      return await apiRequest<ConfirmDuplicatesResponse>('/artifacts/confirm-duplicates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: async (_result, variables) => {
+      // Invalidate discovery queries for this project
+      await queryClient.invalidateQueries({
+        queryKey: ['artifacts', 'discover', 'project', variables.project_path],
+      });
+      // Invalidate general artifacts query to refresh collection state
+      await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+    },
+  });
 }

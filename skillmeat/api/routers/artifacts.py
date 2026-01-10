@@ -61,6 +61,8 @@ from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.discovery import (
     BulkImportRequest,
     BulkImportResult,
+    ConfirmDuplicatesRequest,
+    ConfirmDuplicatesResponse,
     DiscoveredArtifact,
     DiscoveryRequest,
     DiscoveryResult,
@@ -892,11 +894,16 @@ async def bulk_import_artifacts(
         )
 
         # Convert data class results back to Pydantic schemas
-        from skillmeat.api.schemas.discovery import ImportResult, ImportStatus
+        from skillmeat.api.schemas.discovery import (
+            ErrorReasonCode,
+            ImportResult,
+            ImportStatus,
+        )
 
         results = [
             ImportResult(
                 artifact_id=r.artifact_id,
+                path=r.path,
                 status=(
                     r.status
                     if r.status
@@ -904,7 +911,13 @@ async def bulk_import_artifacts(
                 ),
                 message=r.message,
                 error=r.error,
+                reason_code=(
+                    ErrorReasonCode(r.reason_code)
+                    if r.reason_code and r.reason_code in [e.value for e in ErrorReasonCode]
+                    else None
+                ),
                 skip_reason=r.skip_reason,
+                details=r.details,
                 tags_applied=r.tags_applied,
             )
             for r in result_data.results
@@ -1020,6 +1033,217 @@ async def bulk_import_artifacts(
     except Exception as e:
         logger.exception(f"Bulk import failed: {e}")
         raise create_internal_error("Bulk import failed", e)
+
+
+@router.post(
+    "/confirm-duplicates",
+    response_model=ConfirmDuplicatesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Process duplicate review decisions",
+    description="""
+    Process user decisions from the duplicate review modal.
+
+    Handles three types of decisions:
+    1. **matches**: Link discovered duplicates to existing collection artifacts
+    2. **new_artifacts**: Import selected paths as new artifacts
+    3. **skipped**: Acknowledge paths the user chose to skip (logged for audit)
+
+    All operations are atomic - if any operation fails, the response will
+    indicate partial success with error details.
+
+    This endpoint is idempotent for link operations - calling multiple times
+    with the same matches will not create duplicate links.
+    """,
+    responses={
+        200: {"description": "Duplicate decisions processed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    tags=["discovery"],
+)
+async def confirm_duplicates(
+    request: ConfirmDuplicatesRequest,
+    collection_mgr: CollectionManagerDep,
+    artifact_mgr: ArtifactManagerDep,
+    _token: TokenDep,
+    collection: Optional[str] = Query(
+        None, description="Collection name (uses default if not specified)"
+    ),
+) -> ConfirmDuplicatesResponse:
+    """Process duplicate review decisions from the frontend modal.
+
+    This endpoint processes user decisions made in the duplicate review modal:
+    - Links duplicates to existing collection artifacts
+    - Imports new artifacts using the standard importer
+    - Logs skipped artifacts for audit purposes
+
+    Args:
+        request: ConfirmDuplicatesRequest with matches, new_artifacts, and skipped
+        collection_mgr: Collection manager dependency
+        artifact_mgr: Artifact manager dependency
+        _token: Authentication token
+        collection: Target collection name
+
+    Returns:
+        ConfirmDuplicatesResponse with operation counts and status
+    """
+    from skillmeat.api.schemas.discovery import (
+        ConfirmDuplicatesStatus,
+        DuplicateDecisionAction,
+    )
+
+    errors: List[str] = []
+    linked_count = 0
+    imported_count = 0
+    skipped_count = len(request.skipped)
+
+    collection_name = collection or collection_mgr.get_active_collection_name()
+
+    logger.info(
+        f"Processing duplicate decisions: {len(request.matches)} matches, "
+        f"{len(request.new_artifacts)} new, {len(request.skipped)} skipped"
+    )
+
+    # Phase 1: Process duplicate links
+    for match in request.matches:
+        if match.action == DuplicateDecisionAction.SKIP:
+            skipped_count += 1
+            logger.debug(f"Skipping duplicate match for {match.discovered_path}")
+            continue
+
+        try:
+            # Validate discovered path exists
+            discovered_path = PathLib(match.discovered_path)
+            if not discovered_path.exists():
+                errors.append(
+                    f"Discovered path does not exist: {match.discovered_path}"
+                )
+                continue
+
+            # Create the duplicate link
+            success = collection_mgr.link_duplicate(
+                discovered_path=str(discovered_path),
+                collection_artifact_id=match.collection_artifact_id,
+                collection_name=collection_name,
+            )
+
+            if success:
+                linked_count += 1
+                logger.info(
+                    f"Linked duplicate: {match.discovered_path} -> "
+                    f"{match.collection_artifact_id}"
+                )
+            else:
+                errors.append(
+                    f"Failed to link {match.discovered_path} to "
+                    f"{match.collection_artifact_id}: artifact not found in collection"
+                )
+
+        except ValueError as e:
+            errors.append(f"Invalid artifact ID format: {e}")
+        except Exception as e:
+            logger.exception(f"Failed to link duplicate: {e}")
+            errors.append(f"Failed to link {match.discovered_path}: {str(e)}")
+
+    # Phase 2: Import new artifacts
+    if request.new_artifacts:
+        try:
+            # Use the existing importer for new artifacts
+            importer = ArtifactImporter(artifact_mgr, collection_mgr)
+
+            for artifact_path in request.new_artifacts:
+                try:
+                    path = PathLib(artifact_path)
+                    if not path.exists():
+                        errors.append(f"Artifact path does not exist: {artifact_path}")
+                        continue
+
+                    # Detect artifact type and extract metadata
+                    from skillmeat.core.artifact_detection import detect_artifact_type
+
+                    artifact_type = detect_artifact_type(path)
+                    if artifact_type is None:
+                        errors.append(
+                            f"Could not detect artifact type for: {artifact_path}"
+                        )
+                        continue
+
+                    # Build import data
+                    artifact_data = BulkImportArtifactData(
+                        source=f"local/{path.name}",
+                        artifact_type=artifact_type.value,
+                        name=path.name,
+                        path=str(path),
+                        scope="user",
+                    )
+
+                    # Import single artifact
+                    result = importer._import_single(artifact_data, collection_name)
+
+                    if result.success:
+                        imported_count += 1
+                        logger.info(f"Imported new artifact: {artifact_path}")
+                    else:
+                        errors.append(
+                            f"Failed to import {artifact_path}: {result.error or result.message}"
+                        )
+
+                except Exception as e:
+                    logger.exception(f"Failed to import artifact {artifact_path}: {e}")
+                    errors.append(f"Failed to import {artifact_path}: {str(e)}")
+
+        except Exception as e:
+            logger.exception(f"Failed to initialize importer: {e}")
+            errors.append(f"Failed to initialize importer: {str(e)}")
+
+    # Phase 3: Log skipped artifacts (for audit trail)
+    for skipped_path in request.skipped:
+        logger.info(f"User skipped artifact: {skipped_path}")
+
+    # Determine overall status
+    total_operations = len(request.matches) + len(request.new_artifacts)
+    successful_operations = linked_count + imported_count
+
+    if total_operations == 0:
+        op_status = ConfirmDuplicatesStatus.SUCCESS
+    elif successful_operations == 0 and errors:
+        op_status = ConfirmDuplicatesStatus.FAILED
+    elif errors:
+        op_status = ConfirmDuplicatesStatus.PARTIAL
+    else:
+        op_status = ConfirmDuplicatesStatus.SUCCESS
+
+    # Build summary message
+    parts = []
+    if linked_count > 0:
+        parts.append(f"{linked_count} linked")
+    if imported_count > 0:
+        parts.append(f"{imported_count} imported")
+    if skipped_count > 0:
+        parts.append(f"{skipped_count} skipped")
+
+    total_processed = linked_count + imported_count + skipped_count
+    message = f"Processed {total_processed} artifacts"
+    if parts:
+        message += f": {', '.join(parts)}"
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    logger.info(
+        f"Duplicate confirmation complete: {message} "
+        f"(status={op_status.value}, errors={len(errors)})"
+    )
+
+    return ConfirmDuplicatesResponse(
+        status=op_status,
+        linked_count=linked_count,
+        imported_count=imported_count,
+        skipped_count=skipped_count,
+        message=message,
+        timestamp=timestamp,
+        errors=errors,
+    )
 
 
 @router.post(
