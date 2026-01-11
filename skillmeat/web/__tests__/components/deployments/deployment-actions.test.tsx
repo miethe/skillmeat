@@ -1,4 +1,8 @@
 /**
+ * @jest-environment jsdom
+ */
+
+/**
  * Unit tests for DeploymentActions component
  */
 
@@ -53,7 +57,7 @@ describe('DeploymentActions', () => {
       render(
         <DeploymentActions
           deployment={mockDeployment}
-          {...mockCallbacks}
+          onViewSource={mockCallbacks.onViewSource}
         />
       );
 
@@ -343,7 +347,7 @@ describe('DeploymentActions', () => {
       });
     });
 
-    it('calls onRemove when confirmed', async () => {
+    it('calls onRemove with filesystem flag when confirmed', async () => {
       render(
         <DeploymentActions
           deployment={mockDeployment}
@@ -361,6 +365,12 @@ describe('DeploymentActions', () => {
         fireEvent.click(removeButton);
       });
 
+      // Check that filesystem removal checkbox is checked by default
+      await waitFor(() => {
+        const checkbox = screen.getByRole('checkbox');
+        expect(checkbox).toBeChecked();
+      });
+
       // Click confirmation button
       await waitFor(() => {
         const confirmButtons = screen.getAllByText('Remove');
@@ -369,7 +379,7 @@ describe('DeploymentActions', () => {
       });
 
       await waitFor(() => {
-        expect(mockCallbacks.onRemove).toHaveBeenCalled();
+        expect(mockCallbacks.onRemove).toHaveBeenCalledWith(true);
       });
     });
 
@@ -459,6 +469,65 @@ describe('DeploymentActions', () => {
       // Check for "Removing..." text
       await waitFor(() => {
         expect(screen.getByText('Removing...')).toBeInTheDocument();
+      });
+    });
+
+    it('calls onRemove with false when filesystem checkbox is unchecked', async () => {
+      render(
+        <DeploymentActions
+          deployment={mockDeployment}
+          onRemove={mockCallbacks.onRemove}
+        />
+      );
+
+      // Open menu and click Remove
+      const menuButton = screen.getByRole('button', { name: /open menu/i });
+      fireEvent.click(menuButton);
+
+      await waitFor(() => {
+        const removeButton = screen.getByText('Remove');
+        fireEvent.click(removeButton);
+      });
+
+      // Uncheck the filesystem removal checkbox
+      await waitFor(() => {
+        const checkbox = screen.getByRole('checkbox');
+        fireEvent.click(checkbox);
+      });
+
+      // Click confirmation button
+      await waitFor(() => {
+        const confirmButtons = screen.getAllByText('Remove');
+        const confirmButton = confirmButtons.find((el) => el.tagName === 'BUTTON');
+        if (confirmButton) fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(mockCallbacks.onRemove).toHaveBeenCalledWith(false);
+      });
+    });
+
+    it('shows filesystem removal checkbox with correct label', async () => {
+      render(
+        <DeploymentActions
+          deployment={mockDeployment}
+          onRemove={mockCallbacks.onRemove}
+        />
+      );
+
+      // Open menu and click Remove
+      const menuButton = screen.getByRole('button', { name: /open menu/i });
+      fireEvent.click(menuButton);
+
+      await waitFor(() => {
+        const removeButton = screen.getByText('Remove');
+        fireEvent.click(removeButton);
+      });
+
+      // Check that the checkbox and label are present
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+        expect(screen.getByText('Remove files from local filesystem at project path')).toBeInTheDocument();
       });
     });
   });
