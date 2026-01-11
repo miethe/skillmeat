@@ -77,22 +77,23 @@ Provide:
 
 ### 2.1 Create Request Log Entry
 
-If this is a new bug not already tracked:
+If this is a new bug not already tracked, use `mc-quick.sh` for token-efficient capture:
 
 ```bash
-# Create bug entry in request log
-meatycapture log create --json << 'EOF'
-{
-  "title": "[BUG_TITLE_FROM_ARGUMENTS]",
-  "type": "bug",
-  "domain": "[DOMAIN]",
-  "priority": "[SEVERITY]",
-  "status": "in-progress",
-  "tags": ["debug", "[COMPONENT]"],
-  "notes": "Root cause: [IDENTIFIED_ROOT_CAUSE]\nFix strategy: [PLANNED_APPROACH]"
-}
-EOF
+# Quick capture with mc-quick.sh (~50 tokens vs ~200+ for JSON)
+MC_STATUS=in-progress MC_PRIORITY=[SEVERITY] mc-quick.sh bug [DOMAIN] [COMPONENT] \
+  "[BUG_TITLE]" \
+  "Root cause: [IDENTIFIED_ROOT_CAUSE]" \
+  "Fix strategy: [PLANNED_APPROACH]"
+
+# Example:
+MC_STATUS=in-progress MC_PRIORITY=high mc-quick.sh bug api auth \
+  "Fix session timeout" \
+  "Root cause: Token expiry set to 5min" \
+  "Fix strategy: Extend TTL to 24 hours"
 ```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 
 ### 2.2 Define Remediation Plan
 

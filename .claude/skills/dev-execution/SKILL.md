@@ -101,10 +101,17 @@ Integration patterns: [./integrations/artifact-tracking.md]
 
 For request-log operations during any execution mode:
 
-- Track work items via `/mc` commands
-- Update item status when starting/completing
-- Add notes for progress context
-- Search existing logs before creating duplicates
+- **Capture new issues**: Use `mc-quick.sh` (~50 tokens vs ~200+ for JSON)
+- **Update status**: `meatycapture log item update DOC ITEM --status done`
+- **Add notes**: `meatycapture log note add DOC ITEM -c "text"`
+- **Search logs**: `meatycapture log search "query" PROJECT`
+
+**Quick capture script**:
+```bash
+mc-quick.sh bug api validation "Issue title" "What's wrong" "Expected behavior"
+```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 
 Integration patterns: [./integrations/request-log-workflow.md]
 
@@ -162,7 +169,7 @@ When blocked on any task:
 3. **If unrecoverable**: Stop, report to user with clear next steps
 4. **Track** issue in request-log if it warrants separate tracking:
    ```bash
-   /mc capture {"title": "...", "type": "bug", "status": "blocked"}
+   MC_STATUS=blocked mc-quick.sh bug [DOMAIN] [COMPONENT] "Blocked: [title]" "[What's blocking]" "[What's needed]"
    ```
 
 ## Architecture Compliance

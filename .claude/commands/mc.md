@@ -12,9 +12,36 @@ Default project: skillmeat
 - List: `meatycapture log list $ARGUMENTS --json`
 - View: `meatycapture log view $ARGUMENTS --json`
 - Search: `meatycapture log search "$ARGUMENTS" --json`
-- Capture: `echo '$ARGUMENTS' | meatycapture log create --json`
 - Note: `meatycapture log note add $ARGUMENTS`
 - Update: `meatycapture log item update $ARGUMENTS`
+
+## Quick Capture (Preferred)
+
+Use `mc-quick.sh` for single-item captures (~50 tokens vs ~200+ for JSON):
+
+```bash
+mc-quick.sh TYPE DOMAIN SUBDOMAIN "Title" "Problem" "Goal" [notes...]
+
+# Examples:
+mc-quick.sh bug api validation "Fix timeout error" "Sessions expire early" "Extend TTL to 24h"
+mc-quick.sh enhancement web ui "Add loading states" "No feedback during load" "Show spinners"
+mc-quick.sh idea dx tooling "Auto-generate schemas" "Manual schema writing error-prone" "Generate from types"
+
+# With environment overrides:
+MC_PROJECT=other-project MC_PRIORITY=high mc-quick.sh bug cli commands "Title" "Problem" "Goal"
+```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
+
+**Environment Variables**: `MC_PROJECT` (default: skillmeat), `MC_PRIORITY` (default: medium), `MC_STATUS` (default: triage)
+
+## Legacy Capture (for complex/batch scenarios)
+
+For advanced fields (context) or batch capture (3+ items), use direct CLI:
+
+```bash
+echo '$ARGUMENTS' | meatycapture log create --json
+```
 
 ## Note Add Usage
 

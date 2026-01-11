@@ -124,7 +124,18 @@ Save to: `.claude/reports/${story_id}-qa.md`
 <!-- MeatyCapture Integration - Project: skillmeat -->
 ### 8. Capture Review Findings
 
-- **1-2 issues**: `/mc capture {"title": "...", "type": "bug"}`
-- **3+ issues**: Use `/meatycapture-capture` skill for batch capture (more token-efficient)
-- Update resolved items: change `**Status:**` to `done`
+Use `mc-quick.sh` for token-efficient capture (~50 tokens per item):
+
+```bash
+# Single issue capture
+mc-quick.sh bug [DOMAIN] [COMPONENT] "Issue title" "What's wrong" "Expected behavior"
+
+# Examples:
+mc-quick.sh bug web components "Missing error boundary" "Component crashes on bad data" "Add error handling"
+MC_PRIORITY=high mc-quick.sh bug api security "Auth bypass vulnerability" "Token not validated" "Add token verification"
+```
+
+- **3+ issues**: Use `/meatycapture-capture` skill for batch capture with JSON
+- **Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
+- Update resolved items: `meatycapture log item update DOC ITEM --status done`
 <!-- End MeatyCapture Integration -->

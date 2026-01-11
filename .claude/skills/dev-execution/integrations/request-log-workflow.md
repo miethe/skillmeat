@@ -119,18 +119,29 @@ meatycapture log note add DOC ${story_id} -c "Story completed. PR: #123"
 
 ## Capturing New Issues
 
-When issues arise during execution:
+When issues arise during execution, use `mc-quick.sh` for token-efficient capture (~50 tokens vs ~200+ for JSON):
 
 ```bash
 # Bug discovered during work
-/mc capture {"title": "...", "type": "bug", "domain": "...", "notes": "Found during..."}
+mc-quick.sh bug [DOMAIN] [COMPONENT] "Bug title" "What's broken" "Expected behavior" "Found during [context]"
 
 # Enhancement idea
-/mc capture {"title": "...", "type": "enhancement", "notes": "Could improve..."}
+mc-quick.sh enhancement [DOMAIN] [COMPONENT] "Enhancement title" "Current limitation" "Proposed improvement"
 
 # Blocked issue
-/mc capture {"title": "...", "type": "bug", "status": "blocked", "notes": "Needs..."}
+MC_STATUS=blocked mc-quick.sh bug [DOMAIN] [COMPONENT] "Blocked: Title" "What's blocking" "Needs [dependency]"
+
+# Examples:
+mc-quick.sh bug api auth "Token refresh fails" "Refresh returns 401" "Should return new token"
+mc-quick.sh enhancement web forms "Add form autosave" "Data lost on navigation" "Auto-save every 30s"
+MC_STATUS=blocked mc-quick.sh bug core sync "Blocked: Sync conflict" "Multiple writers" "Needs locking mechanism"
 ```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
+
+**Environment Variables**: `MC_PROJECT` (default: skillmeat), `MC_PRIORITY` (default: medium), `MC_STATUS` (default: triage)
+
+For batch capture (3+ items) or advanced fields, use `/meatycapture-capture` skill with JSON.
 
 ## Status Values
 
