@@ -33,7 +33,9 @@ Backend-only fix. 2 files affected:
 ## Affected Files
 
 - `skillmeat/api/schemas/artifacts.py`: Add `ArtifactCollectionInfo` embedded schema and `collections` field to `ArtifactResponse`
-- `skillmeat/api/routers/artifacts.py`: Update `artifact_to_response()` to populate collections from ORM relationship
+- `skillmeat/api/routers/artifacts.py`:
+  - Update `artifact_to_response()` to accept `collections_data` parameter
+  - Add database query in `list_artifacts()` to fetch collection memberships from `CollectionArtifact` table
 
 ## Implementation Steps
 
