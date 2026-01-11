@@ -7,7 +7,7 @@ import base64
 import logging
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -100,6 +100,7 @@ from skillmeat.core.importer import (
 from skillmeat.core.services import TagService
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
+from skillmeat.cache.models import Collection, CollectionArtifact, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +435,7 @@ def artifact_to_response(
     artifact,
     drift_status: Optional[str] = None,
     has_local_modifications: Optional[bool] = None,
+    collections_data: Optional[List[dict]] = None,
 ) -> ArtifactResponse:
     """Convert Artifact model to API response schema.
 
@@ -441,6 +443,7 @@ def artifact_to_response(
         artifact: Artifact instance
         drift_status: Optional drift status ("none", "modified", "deleted", "added")
         has_local_modifications: Optional flag indicating local modifications
+        collections_data: Optional list of collection info dicts from database query
 
     Returns:
         ArtifactResponse schema
@@ -480,19 +483,15 @@ def artifact_to_response(
     # Determine version to display
     version = artifact.version_spec or "unknown"
 
-    # Convert collections (many-to-many relationship)
+    # Convert collections from passed data (queried from database)
     collections_response = []
-    if hasattr(artifact, "collections") and artifact.collections:
-        for collection in artifact.collections:
+    if collections_data:
+        for coll in collections_data:
             collections_response.append(
                 ArtifactCollectionInfo(
-                    id=collection.id,
-                    name=collection.name,
-                    artifact_count=(
-                        len(collection.collection_artifacts)
-                        if hasattr(collection, "collection_artifacts")
-                        else None
-                    ),
+                    id=coll["id"],
+                    name=coll["name"],
+                    artifact_count=coll.get("artifact_count"),
                 )
             )
 
@@ -1692,6 +1691,55 @@ async def list_artifacts(
                 logger.warning(f"Failed to check drift: {e}")
                 # Continue without drift info rather than failing the request
 
+        # Query database for collection memberships
+        artifact_ids = [f"{a.type.value}:{a.name}" for a in page_artifacts]
+        collections_map: Dict[str, List[dict]] = {}
+
+        if artifact_ids:
+            try:
+                db_session = get_session()
+                # Query CollectionArtifact associations
+                associations = (
+                    db_session.query(CollectionArtifact)
+                    .filter(CollectionArtifact.artifact_id.in_(artifact_ids))
+                    .all()
+                )
+
+                # Get unique collection IDs
+                collection_ids = {assoc.collection_id for assoc in associations}
+
+                if collection_ids:
+                    # Query Collection details
+                    collections = (
+                        db_session.query(Collection)
+                        .filter(Collection.id.in_(collection_ids))
+                        .all()
+                    )
+                    collection_details = {c.id: c for c in collections}
+
+                    # Build mapping: artifact_id -> list of collection info
+                    for assoc in associations:
+                        if assoc.artifact_id not in collections_map:
+                            collections_map[assoc.artifact_id] = []
+
+                        coll = collection_details.get(assoc.collection_id)
+                        if coll:
+                            # Count artifacts in this collection
+                            artifact_count = (
+                                db_session.query(CollectionArtifact)
+                                .filter_by(collection_id=coll.id)
+                                .count()
+                            )
+                            collections_map[assoc.artifact_id].append({
+                                "id": coll.id,
+                                "name": coll.name,
+                                "artifact_count": artifact_count,
+                            })
+
+                db_session.close()
+            except Exception as e:
+                logger.warning(f"Failed to query collection memberships: {e}")
+
         # Convert to response format
         items: List[ArtifactResponse] = []
         for artifact in page_artifacts:
@@ -1707,6 +1755,7 @@ async def list_artifacts(
                     artifact,
                     drift_status=drift_status,
                     has_local_modifications=has_modifications,
+                    collections_data=collections_map.get(artifact_key, []),
                 )
             )
 
