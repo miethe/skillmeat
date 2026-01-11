@@ -21,7 +21,45 @@ Workflows for capturing bugs, enhancements, ideas, and technical debt to request
 
 ## Quick Capture (Single Item)
 
-Most common workflow - capture one item during development:
+### Recommended: mc-quick.sh Script
+
+For single-item captures, use the wrapper script for fastest workflow:
+
+```bash
+# Basic syntax
+mc-quick.sh TYPE DOMAIN SUBDOMAIN "Title" "Problem" "Goal" [notes...]
+
+# Examples
+mc-quick.sh bug core validation \
+  "Add validation for empty tags array" \
+  "Empty tags array causes invalid frontmatter" \
+  "Validate before write"
+
+mc-quick.sh enhancement web deployments \
+  "Add remove button" \
+  "Button shows not implemented" \
+  "Full removal with filesystem toggle"
+
+# With environment overrides
+MC_PROJECT=other-project MC_PRIORITY=high mc-quick.sh bug api auth "Title" "Problem" "Goal"
+```
+
+**Benefits**:
+- ~50 tokens vs ~200+ for JSON construction
+- Auto-generates tags from domain/subdomain
+- Enforces Problem/Goal note format
+- Handles temp file workaround automatically
+
+**Environment Variables**:
+- `MC_PROJECT` (default: skillmeat)
+- `MC_PRIORITY` (default: medium)
+- `MC_STATUS` (default: triage)
+
+**Full documentation**: `../usage-specs/mc-quick-script.md`
+
+### Alternative: Direct JSON (for advanced fields)
+
+When you need custom fields like `context` or structured notes:
 
 ```bash
 echo '{

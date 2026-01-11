@@ -178,11 +178,18 @@ meatycapture log note add DOC ITEM -c "Completed in quick-feature/{feature-slug}
 
 ### 4.4 Capture Issues (if any)
 
-If issues arose during implementation:
+If issues arose during implementation, use `mc-quick.sh` for token-efficient capture:
 
 ```bash
-/mc capture {"title": "...", "type": "bug", "domain": "...", "notes": "Context..."}
+# Quick capture (~50 tokens vs ~200+ for JSON)
+mc-quick.sh bug [DOMAIN] [COMPONENT] "Issue title" "What went wrong" "How to fix" "[Context]"
+
+# Examples:
+mc-quick.sh bug api validation "Missing null check" "API crashes on null input" "Add validation"
+mc-quick.sh enhancement web ux "Add loading feedback" "No indication of progress" "Show spinner during fetch"
 ```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 
 ## Error Recovery
 
@@ -193,7 +200,7 @@ If blocked:
 3. Report to user with clear next steps needed
 4. Track blocker if warranted:
    ```bash
-   /mc capture {"title": "...", "type": "bug", "status": "blocked"}
+   MC_STATUS=blocked mc-quick.sh bug [DOMAIN] [COMPONENT] "Blocked: [title]" "[What's blocking]" "[What's needed]"
    ```
 
 ## Output Summary
