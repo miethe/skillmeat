@@ -30,6 +30,7 @@ from skillmeat.api.dependencies import (
 )
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
+    ArtifactCollectionInfo,
     ArtifactCreateRequest,
     ArtifactCreateResponse,
     ArtifactDeployRequest,
@@ -479,6 +480,22 @@ def artifact_to_response(
     # Determine version to display
     version = artifact.version_spec or "unknown"
 
+    # Convert collections (many-to-many relationship)
+    collections_response = []
+    if hasattr(artifact, "collections") and artifact.collections:
+        for collection in artifact.collections:
+            collections_response.append(
+                ArtifactCollectionInfo(
+                    id=collection.id,
+                    name=collection.name,
+                    artifact_count=(
+                        len(collection.collection_artifacts)
+                        if hasattr(collection, "collection_artifacts")
+                        else None
+                    ),
+                )
+            )
+
     return ArtifactResponse(
         id=f"{artifact.type.value}:{artifact.name}",
         name=artifact.name,
@@ -489,6 +506,7 @@ def artifact_to_response(
         tags=artifact.tags or [],
         metadata=metadata_response,
         upstream=upstream_response,
+        collections=collections_response,
         added=artifact.added,
         updated=artifact.last_updated or artifact.added,
     )
