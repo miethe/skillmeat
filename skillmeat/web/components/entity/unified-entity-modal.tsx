@@ -56,7 +56,7 @@ import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { deploymentKeys } from '@/hooks/use-deployments';
-import { listDeployments } from '@/lib/api/deployments';
+import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { useProjects } from '@/hooks/useProjects';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
 import { usePendingContextChanges } from '@/hooks/use-context-sync';
@@ -606,6 +606,51 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     isContextEntity(entity) ? entity.id : undefined,
     entity?.projectPath
   );
+
+  // Helper function to encode project path as base64 for API
+  const encodeProjectId = (projectPath: string): string => {
+    return btoa(projectPath);
+  };
+
+  // Handler for removing deployment from a project
+  const handleDeploymentRemove = async (deployment: Deployment, removeFiles: boolean) => {
+    if (!entity) return;
+
+    try {
+      const projectId = encodeProjectId(deployment.project_path);
+
+      await removeProjectDeployment(
+        projectId,
+        deployment.artifact_name,
+        deployment.artifact_type,
+        removeFiles
+      );
+
+      // Invalidate deployment queries to refresh the list
+      await queryClient.invalidateQueries({
+        queryKey: deploymentKeys.list(deployment.project_path)
+      });
+
+      // Also invalidate all deployment queries since we're showing deployments from all projects
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'deployments'
+      });
+
+      toast({
+        title: 'Deployment Removed',
+        description: `Successfully removed "${deployment.artifact_name}" from project${removeFiles ? ' and deleted files from filesystem' : ''}`,
+      });
+    } catch (error) {
+      console.error('Failed to remove deployment:', error);
+      toast({
+        title: 'Removal Failed',
+        description: error instanceof Error ? error.message : 'Failed to remove deployment',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
@@ -1872,13 +1917,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                               description: 'Deployment update functionality coming soon',
                             });
                           }}
-                          onRemove={() => {
-                            // TODO: Implement remove handler
-                            toast({
-                              title: 'Remove Deployment',
-                              description: 'Deployment removal functionality coming soon',
-                            });
-                          }}
+                          onRemove={(removeFiles) => handleDeploymentRemove(deployment, removeFiles)}
                           onViewSource={() => {
                             // Close modal - user is already viewing the source
                             onClose();

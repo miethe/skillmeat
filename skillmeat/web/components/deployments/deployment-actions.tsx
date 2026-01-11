@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import type { Deployment } from './deployment-card';
 
@@ -46,7 +47,7 @@ export interface DeploymentActionsProps {
   /** Callback to update deployment to latest version */
   onUpdate?: () => void;
   /** Callback to remove deployment from project */
-  onRemove?: () => void;
+  onRemove?: (removeFiles: boolean) => void;
   /** Callback to view source artifact in collection */
   onViewSource?: () => void;
   /** Callback to view diff between deployed and collection version */
@@ -89,13 +90,14 @@ export function DeploymentActions({
   const [showRemoveDialog, setShowRemoveDialog] = React.useState(false);
   const [isRemoving, setIsRemoving] = React.useState(false);
   const [pathCopied, setPathCopied] = React.useState(false);
+  const [removeFiles, setRemoveFiles] = React.useState(true);
 
   const handleRemove = async () => {
     if (!onRemove) return;
 
     setIsRemoving(true);
     try {
-      await onRemove();
+      await onRemove(removeFiles);
       setShowRemoveDialog(false);
     } catch (error) {
       console.error('Failed to remove deployment:', error);
@@ -203,6 +205,22 @@ export function DeploymentActions({
               . This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="flex items-center space-x-2 px-6 pb-4">
+            <Checkbox
+              id="remove-files"
+              checked={removeFiles}
+              onCheckedChange={(checked) => setRemoveFiles(checked === true)}
+              disabled={isRemoving}
+            />
+            <label
+              htmlFor="remove-files"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Remove files from local filesystem at project path
+            </label>
+          </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
