@@ -16,6 +16,8 @@ You are Claude Code implementing user story `$ARGUMENTS` following MeatyPrompts 
 Before implementation, search request-logs for related items:
 - `/mc search "story-keyword" skillmeat` - Find bugs/enhancements that may be resolved by this story
 
+## Story Execution
+
 Execute story ${ARGUMENTS} by:
 
 1. Create branch from main (eg feat/{story_id})
