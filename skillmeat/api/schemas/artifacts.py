@@ -118,6 +118,17 @@ class ArtifactMetadataResponse(BaseModel):
     )
 
 
+class ArtifactCollectionInfo(BaseModel):
+    """Embedded collection info for artifact responses."""
+
+    id: str = Field(description="Collection UUID")
+    name: str = Field(description="Collection name")
+    artifact_count: Optional[int] = Field(
+        default=None,
+        description="Number of artifacts in collection",
+    )
+
+
 class ArtifactUpstreamInfo(BaseModel):
     """Upstream tracking information for an artifact."""
 
@@ -198,6 +209,10 @@ class ArtifactResponse(BaseModel):
     deployment_stats: Optional["DeploymentStatistics"] = Field(
         default=None,
         description="Deployment statistics (included when include_deployments=true)",
+    )
+    collections: List[ArtifactCollectionInfo] = Field(
+        default_factory=list,
+        description="Collections this artifact belongs to (many-to-many relationship)",
     )
     added: datetime = Field(
         description="Timestamp when artifact was added to collection",
