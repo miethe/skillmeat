@@ -110,15 +110,24 @@ function artifactToEntity(artifact: Artifact): Entity {
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
     aliases: artifact.aliases || [],
-    collections: artifact.collection
-      ? [
-          {
-            id: artifact.collection.id,
-            name: artifact.collection.name,
-            artifact_count: 0, // Not available in artifact context
-          },
-        ]
-      : [],
+    // Collections array for the Collections tab in unified entity modal
+    // Priority: artifact.collections (array) > artifact.collection (single) > empty array
+    // TODO: Backend needs to populate artifact.collections with ALL collections the artifact belongs to
+    collections: artifact.collections && artifact.collections.length > 0
+      ? artifact.collections.map(collection => ({
+          id: collection.id,
+          name: collection.name,
+          artifact_count: collection.artifact_count || 0,
+        }))
+      : artifact.collection
+        ? [
+            {
+              id: artifact.collection.id,
+              name: artifact.collection.name,
+              artifact_count: 0, // Not available in artifact context
+            },
+          ]
+        : [],
   };
 }
 

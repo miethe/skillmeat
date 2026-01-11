@@ -61,6 +61,15 @@ export interface Artifact {
     id: string;
     name: string;
   };
+  /**
+   * All collections this artifact belongs to (many-to-many relationship)
+   * TODO: Backend needs to populate this field with data from CollectionArtifact table
+   */
+  collections?: {
+    id: string;
+    name: string;
+    artifact_count?: number;
+  }[];
   score?: ArtifactScore;
 }
 

@@ -327,6 +327,8 @@ export function useAddArtifactToCollection() {
       // Invalidate collection details and artifacts list
       queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
       queryClient.invalidateQueries({ queryKey: collectionKeys.artifacts(collectionId) });
+      // Invalidate artifact queries since collections data on artifacts changes
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
   });
 }
@@ -359,6 +361,8 @@ export function useRemoveArtifactFromCollection() {
       // Invalidate collection details and artifacts list
       queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
       queryClient.invalidateQueries({ queryKey: collectionKeys.artifacts(collectionId) });
+      // Invalidate artifact queries since collections data on artifacts changes
+      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     },
   });
 }
