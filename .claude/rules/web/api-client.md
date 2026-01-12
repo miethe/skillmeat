@@ -6,6 +6,11 @@ API client functions for SkillMeat web frontend communicating with FastAPI backe
 
 ---
 
+## Inventory (Auto-generated)
+
+<!-- CODEBASE_GRAPH:API_CLIENTS:START -->
+<!-- CODEBASE_GRAPH:API_CLIENTS:END -->
+
 ## Endpoint Mapping (Quick Reference)
 
 | Operation | Endpoint | Method | Status | Notes |

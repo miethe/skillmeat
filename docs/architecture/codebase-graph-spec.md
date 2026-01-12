@@ -33,6 +33,7 @@ Scripts live in `scripts/code_map/`:
 - `apply_overrides.py`
 - `coverage_summary.py`
 - `validate_graph.py`
+- `build_outputs.py`
 - `graph.py` (shared graph model)
 - `frontend_utils.py` (shared frontend helpers)
 - `backend_utils.py` (shared backend helpers)
@@ -48,6 +49,7 @@ python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
 python -m scripts.code_map.coverage_summary
 python -m scripts.code_map.validate_graph
+python -m scripts.code_map.build_outputs
 ```
 
 Optional overrides:
@@ -65,6 +67,7 @@ python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-gr
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
+python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
 ```
 
 ## Graph Schema (v1)
@@ -151,6 +154,18 @@ Current checks:
 - `deprecated: true` nodes are not referenced unless `allow_deprecated` is set on the edge.
 - OpenAPI endpoints have `handled_by` edges.
 - Pages have `page_uses_component` edges unless ignored.
+
+## Phase 4 Outputs
+
+Generated from the unified graph:
+- `.claude/rules/web/hooks.md` inventory table
+- `.claude/rules/web/api-client.md` inventory table
+- `.claude/rules/api/schemas.md` inventory table
+
+Run:
+```bash
+python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
+```
 
 ## Unified Graph + Overrides
 
