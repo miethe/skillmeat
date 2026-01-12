@@ -2,12 +2,47 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+import subprocess
 from typing import Any, Dict, List, Optional
+
+
+def _utc_now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _get_repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _get_source_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=_get_repo_root(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return "unknown"
+    if result.returncode != 0:
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 @dataclass
 class Graph:
     source: str
+    schema_version: str = "v1"
+    generated_at: str = field(default_factory=_utc_now_iso)
+    source_commit: str = field(default_factory=_get_source_commit)
     nodes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     edges: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -59,6 +94,9 @@ class Graph:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "source": self.source,
+            "schema_version": self.schema_version,
+            "generated_at": self.generated_at,
+            "source_commit": self.source_commit,
             "nodes": list(self.nodes.values()),
             "edges": self.edges,
         }
