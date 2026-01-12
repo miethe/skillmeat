@@ -26,7 +26,12 @@ web/
 │   ├── marketplace/            # Marketplace UI
 │   └── providers.tsx           # Context providers
 ├── lib/                        # Utilities
-│   ├── api.ts                  # API client
+│   ├── api/                    # API client functions (domain-organized)
+│   │   ├── index.ts            # Barrel export
+│   │   ├── collections.ts      # Collection API functions
+│   │   ├── groups.ts           # Group API functions
+│   │   └── deployments.ts      # Deployment API functions
+│   ├── api.ts                  # API configuration & error handling
 │   └── utils.ts                # Helper functions
 ├── sdk/                        # Generated API client (OpenAPI)
 │   ├── models/                 # TypeScript types
@@ -37,7 +42,12 @@ web/
 │   ├── project.ts
 │   ├── analytics.ts
 │   └── marketplace.ts
-├── hooks/                      # Custom React hooks
+├── hooks/                      # Custom React hooks (import from @/hooks)
+│   ├── index.ts                # Barrel export - canonical import point
+│   ├── use-collections.ts      # Collection management hooks
+│   ├── use-groups.ts           # Group management hooks
+│   ├── use-deployments.ts      # Deployment management hooks
+│   └── use-projects.ts         # Project management hooks
 ├── public/                     # Static assets
 │   └── logo.png                # App logo (header)
 ├── __tests__/                  # Unit tests (Jest)
@@ -252,63 +262,95 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### Custom Hooks
+### Custom Hooks (Canonical Registry Pattern)
 
-**File**: `hooks/use-artifacts.ts`
+Hooks are organized by domain and exported via barrel imports. **Always import from `@/hooks`** (the canonical import point).
+
+**Barrel Export**: `hooks/index.ts`
+
+```typescript
+// Re-export all hooks from their domain files
+export * from './use-collections';
+export * from './use-groups';
+export * from './use-deployments';
+export * from './use-projects';
+```
+
+**Hook Implementation**: `hooks/use-collections.ts`
 
 ```typescript
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SkillMeatClient } from '@/sdk';
+import { createCollection, updateCollection } from '@/lib/api/collections';
+import type { Collection, CreateCollectionRequest } from '@/types/collections';
 
-export function useArtifacts() {
+// Query key factory (for type-safe cache management)
+export const collectionKeys = {
+  all: ['collections'] as const,
+  lists: () => [...collectionKeys.all, 'list'] as const,
+  list: (filters?: Record<string, unknown>) => [...collectionKeys.lists(), filters] as const,
+  details: () => [...collectionKeys.all, 'detail'] as const,
+  detail: (id: string) => [...collectionKeys.details(), id] as const,
+};
+
+export function useCollections() {
   return useQuery({
-    queryKey: ['artifacts'],
+    queryKey: collectionKeys.all,
     queryFn: async () => {
-      const client = new SkillMeatClient(apiConfig);
-      return client.artifacts.listArtifacts();
+      // Import from @/lib/api, not inline fetch
+      const response = await fetch('/api/v1/collections');
+      if (!response.ok) throw new Error('Failed to fetch collections');
+      return response.json();
     },
   });
 }
 
-export function useCreateArtifact() {
+export function useCreateCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: ArtifactCreateRequest) => {
-      const client = new SkillMeatClient(apiConfig);
-      return client.artifacts.createArtifact(data);
+    mutationFn: async (data: CreateCollectionRequest) => {
+      // Call API client function
+      return createCollection(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      // Invalidate collections cache
+      queryClient.invalidateQueries({ queryKey: collectionKeys.all });
     },
   });
 }
 ```
 
-**Usage in Components**:
+**Canonical Usage in Components**:
 
 ```tsx
 'use client';
 
-import { useArtifacts, useCreateArtifact } from '@/hooks/use-artifacts';
+// Use barrel import - always import from @/hooks
+import { useCollections, useCreateCollection } from '@/hooks';
 
-export function ArtifactList() {
-  const { data, isLoading, error } = useArtifacts();
-  const createArtifact = useCreateArtifact();
+export function CollectionList() {
+  const { data, isLoading, error } = useCollections();
+  const createCollection = useCreateCollection();
 
   if (isLoading) return <Spinner />;
   if (error) return <ErrorAlert error={error} />;
 
   return (
     <div>
-      {data?.artifacts.map(artifact => (
-        <ArtifactCard key={artifact.id} artifact={artifact} />
+      {data?.map(collection => (
+        <CollectionCard key={collection.id} collection={collection} />
       ))}
-      <CreateArtifactButton onSubmit={createArtifact.mutate} />
+      <CreateCollectionButton onSubmit={createCollection.mutate} />
     </div>
   );
 }
 ```
+
+**Key Patterns**:
+- **Barrel imports**: Always import from `@/hooks` (canonical registry point)
+- **Query key factories**: Use `*.Keys` for type-safe cache management
+- **API client calls**: Import functions from `@/lib/api/{domain}`, don't inline fetch
+- **Cache invalidation**: Use query key factories for targeted invalidation
 
 ---
 
