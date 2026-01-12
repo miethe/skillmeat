@@ -4,6 +4,22 @@ Usage notes for batch bug filing and bug-fixes documentation updates.
 
 ---
 
+## Quick Reference
+
+| Scenario | Script | Example |
+|----------|--------|---------|
+| Capture single bug | `mc-quick.sh` | `mc-quick.sh bug api auth "Title" "Problem" "Goal"` |
+| Batch capture (3+) | `batch-file-bugs.sh` | `batch-file-bugs.sh --input bugs.json` |
+| Post-commit update | `update-bug-docs.py` | `update-bug-docs.py --commits sha --req-log REQ-...` |
+| Status update only | `/mc` command | `/mc item update doc.md ITEM-01 --status done` |
+
+**Script Locations**:
+- `mc-quick.sh`: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
+- `batch-file-bugs.sh`: `.claude/scripts/batch-file-bugs.sh`
+- `update-bug-docs.py`: `.claude/scripts/update-bug-docs.py`
+
+---
+
 ## update-bug-docs.py
 
 Purpose:

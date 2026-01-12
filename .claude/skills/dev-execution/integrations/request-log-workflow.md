@@ -66,6 +66,14 @@ meatycapture log note add REQ-*.md REQ-ITEM -c "Blocked: waiting on API dependen
 
 ### Completing Work
 
+**Preferred: Use `update-bug-docs.py`** for automated bug-fixes doc + request-log update:
+
+```bash
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-project
+```
+
+**Manual fallback**:
+
 1. **Mark complete**:
    ```bash
    meatycapture log item update REQ-*.md REQ-ITEM --status done
@@ -178,4 +186,5 @@ Notes should be brief but informative:
 
 ## Reference
 
-Full meatycapture-capture skill: `.claude/skills/meatycapture-capture/SKILL.md`
+- Full meatycapture-capture skill: `.claude/skills/meatycapture-capture/SKILL.md`
+- Bug automation scripts spec: `.claude/specs/script-usage/bug-automation-scripts.md`

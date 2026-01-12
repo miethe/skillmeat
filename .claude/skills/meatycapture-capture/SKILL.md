@@ -16,8 +16,10 @@ Request-log markdown files for development tracking.
 | Batch capture (3+ items) | Direct CLI | ~200+ tokens |
 | Complex notes or custom fields | Direct CLI | ~200+ tokens |
 | Appending to existing docs | Direct CLI | ~150 tokens |
+| Post-commit: update docs + close item | `update-bug-docs.py` | ~20 tokens |
+| Batch file bugs (3+) from JSON/CSV | `batch-file-bugs.sh` | ~30 tokens |
 
-**Scripts location**: `.claude/skills/meatycapture-capture/scripts/`
+**Scripts spec**: `.claude/specs/script-usage/bug-automation-scripts.md`
 
 ## Quick Capture Script
 
