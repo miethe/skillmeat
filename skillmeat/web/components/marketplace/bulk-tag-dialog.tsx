@@ -57,7 +57,7 @@ import { cn } from '@/lib/utils';
 import { groupByDirectory } from '@/lib/utils/directory-utils';
 import { generateTagSuggestions } from '@/lib/utils/tag-suggestions';
 import { DirectoryTagInput } from '@/components/marketplace/directory-tag-input';
-import { useBulkTagApply } from '@/hooks/use-bulk-tag-apply';
+import { useBulkTagApply } from '@/hooks';
 import type { CatalogEntry } from '@/types/marketplace';
 import type { BulkTagResult } from '@/lib/utils/bulk-tag-apply';
 

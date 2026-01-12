@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { useDeleteSource } from '@/hooks/useMarketplaceSources';
+import { useDeleteSource } from '@/hooks';
 import type { GitHubSource } from '@/types/marketplace';
 
 interface DeleteSourceDialogProps {

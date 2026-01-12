@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { usePathTags, useUpdatePathTagStatus } from '@/hooks/use-path-tags';
+import { usePathTags, useUpdatePathTagStatus } from '@/hooks';
 import type { ExtractedSegment } from '@/types/path-tags';
 
 // ============================================================================

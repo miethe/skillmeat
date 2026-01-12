@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useEffect, useState } from 'react';
-import { useUpdateSource, useRescanSource } from '@/hooks/useMarketplaceSources';
+import { useUpdateSource, useRescanSource } from '@/hooks';
 import { Loader2 } from 'lucide-react';
 import type { GitHubSource, TrustLevel } from '@/types/marketplace';
 
