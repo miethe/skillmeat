@@ -5,11 +5,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
-import * as useMarketplaceSources from '@/hooks/useMarketplaceSources';
+import { useCreateSource } from '@/hooks';
 
 // Mock the hooks
-jest.mock('@/hooks/useMarketplaceSources');
-jest.mock('@/hooks/use-toast', () => ({
+jest.mock('@/hooks', () => ({
+  useCreateSource: jest.fn(),
+  useInferUrl: jest.fn(() => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+    isSuccess: false,
+    data: null,
+    reset: jest.fn(),
+  })),
   useToast: () => ({
     toast: jest.fn(),
   }),
@@ -34,12 +41,23 @@ describe('AddSourceModal', () => {
   const mockOnOpenChange = jest.fn();
   const mockOnSuccess = jest.fn();
   const mockMutateAsync = jest.fn();
+  const mockInferUrlMutateAsync = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (useMarketplaceSources.useCreateSource as jest.Mock).mockReturnValue({
+    (useCreateSource as jest.Mock).mockReturnValue({
       mutateAsync: mockMutateAsync,
       isPending: false,
+    });
+
+    // Mock useInferUrl hook
+    const useInferUrl = require('@/hooks').useInferUrl;
+    (useInferUrl as jest.Mock).mockReturnValue({
+      mutateAsync: mockInferUrlMutateAsync,
+      isPending: false,
+      isSuccess: false,
+      data: null,
+      reset: jest.fn(),
     });
   });
 
@@ -412,7 +430,7 @@ describe('AddSourceModal', () => {
 
   describe('Loading State', () => {
     it('shows loading state during submission', () => {
-      (useMarketplaceSources.useCreateSource as jest.Mock).mockReturnValue({
+      (useCreateSource as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: true,
       });
@@ -430,7 +448,7 @@ describe('AddSourceModal', () => {
     });
 
     it('disables submit button during submission', () => {
-      (useMarketplaceSources.useCreateSource as jest.Mock).mockReturnValue({
+      (useCreateSource as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: true,
       });

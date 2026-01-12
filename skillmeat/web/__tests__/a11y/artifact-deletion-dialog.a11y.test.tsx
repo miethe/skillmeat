@@ -8,16 +8,17 @@ import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
-import { useArtifactDeletion } from '@/hooks/use-artifact-deletion';
-import { useDeploymentList } from '@/hooks/use-deployments';
+import { useArtifactDeletion, useDeploymentList } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations);
 
 // Mock hooks
-jest.mock('@/hooks/use-artifact-deletion');
-jest.mock('@/hooks/use-deployments');
+jest.mock('@/hooks', () => ({
+  useArtifactDeletion: jest.fn(),
+  useDeploymentList: jest.fn(),
+}));
 jest.mock('sonner', () => ({
   toast: {
     success: jest.fn(),
