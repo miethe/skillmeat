@@ -5,7 +5,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 
 def _load_graph(path: Path) -> Dict[str, Any]:
@@ -34,10 +34,35 @@ def _print_counter(title: str, counter: Counter) -> None:
     print()
 
 
-def _hooks_missing_calls_api(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]) -> List[str]:
+def _hook_api_buckets(
+    nodes: List[Dict[str, Any]],
+    edges: List[Dict[str, Any]],
+) -> Dict[str, List[str]]:
     hook_ids = {node["id"] for node in nodes if node.get("type") == "hook"}
     calls_api = {edge["from"] for edge in edges if edge.get("type") == "calls_api"}
-    return sorted(hook_ids - calls_api)
+    calls_client = {
+        edge["from"] for edge in edges if edge.get("type") == "hook_calls_api_client"
+    }
+
+    direct_only = sorted(calls_api - calls_client)
+    client_only = sorted(calls_client - calls_api)
+    both = sorted(calls_api & calls_client)
+    without_api = sorted(hook_ids - calls_api - calls_client)
+
+    return {
+        "hooks_api_client_only": client_only,
+        "hooks_direct_api_only": direct_only,
+        "hooks_with_both": both,
+        "hooks_without_api": without_api,
+    }
+
+
+def _print_bucket(label: str, items: List[str], max_list: int) -> None:
+    print(f"- {label}: {len(items)}")
+    if items and max_list > 0:
+        print("  - sample:")
+        for item in items[:max_list]:
+            print(f"    - {item}")
 
 
 def coverage_summary(graph: Dict[str, Any], max_list: int) -> None:
@@ -47,13 +72,12 @@ def coverage_summary(graph: Dict[str, Any], max_list: int) -> None:
     _print_counter("Node counts by type:", _count_by_key(nodes, "type"))
     _print_counter("Edge counts by type:", _count_by_key(edges, "type"))
 
-    missing_hooks = _hooks_missing_calls_api(nodes, edges)
-    print("Missing links:")
-    print(f"- hooks_missing_calls_api: {len(missing_hooks)}")
-    if missing_hooks and max_list > 0:
-        print("- sample:")
-        for hook_id in missing_hooks[:max_list]:
-            print(f"  - {hook_id}")
+    buckets = _hook_api_buckets(nodes, edges)
+    print("Hook API coverage:")
+    _print_bucket("hooks_api_client_only", buckets["hooks_api_client_only"], max_list)
+    _print_bucket("hooks_direct_api_only", buckets["hooks_direct_api_only"], max_list)
+    _print_bucket("hooks_with_both", buckets["hooks_with_both"], max_list)
+    _print_bucket("hooks_without_api", buckets["hooks_without_api"], max_list)
 
 
 def main() -> None:
