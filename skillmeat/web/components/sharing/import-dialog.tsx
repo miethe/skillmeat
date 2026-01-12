@@ -33,7 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProgressIndicator, ProgressStep } from '../collection/progress-indicator';
 import { BundlePreview } from './bundle-preview';
-import { usePreviewBundle, useImportBundle } from '@/hooks/useImportBundle';
+import { usePreviewBundle, useImportBundle } from '@/hooks';
 import type { ImportRequest, BundleSource, ImportOptions, ConflictStrategy } from '@/types/bundle';
 
 export interface ImportDialogProps {

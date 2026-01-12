@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useContextEntityContent } from '@/hooks/use-context-entities';
+import { useContextEntityContent } from '@/hooks';
 import type { ContextEntity, ContextEntityType } from '@/types/context-entity';
 
 interface ContextEntityDetailProps {

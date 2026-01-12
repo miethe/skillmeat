@@ -10,7 +10,7 @@
 import {
   EntityLifecycleProvider as BaseProvider,
   EntityLifecycleProviderProps,
-} from '@/hooks/useEntityLifecycle';
+} from '@/hooks';
 
 export type { EntityLifecycleProviderProps };
 
@@ -46,4 +46,4 @@ export function EntityLifecycleProvider({
   );
 }
 
-export { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
+export { useEntityLifecycle } from '@/hooks';

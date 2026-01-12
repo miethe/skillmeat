@@ -7,7 +7,7 @@ import type { Entity } from '@/types/entity';
 import type { ArtifactDiffResponse } from '@/sdk/models/ArtifactDiffResponse';
 import type { ArtifactUpstreamDiffResponse } from '@/sdk/models/ArtifactUpstreamDiffResponse';
 import type { FileDiff } from '@/sdk/models/FileDiff';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiRequest } from '@/lib/api';

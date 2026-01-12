@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { DiffViewer, type ResolutionType } from '@/components/entity/diff-viewer';
 import type { FileDiff } from '@/sdk/models/FileDiff';
 import {

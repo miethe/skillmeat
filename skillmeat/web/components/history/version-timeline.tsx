@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSnapshots } from '@/hooks/use-snapshots';
+import { useSnapshots } from '@/hooks';
 import type { Snapshot } from '@/types/snapshot';
 import { cn } from '@/lib/utils';
 

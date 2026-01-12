@@ -6,14 +6,13 @@ import { GitBranch, Plus, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useProjectCache } from '@/hooks/useProjectCache';
+import { useProjectCache, useOutdatedArtifacts } from '@/hooks';
 import { ProjectsToolbar } from '@/components/ProjectsToolbar';
 import { ProjectsList } from '@/components/ProjectsList';
 import { CreateProjectDialog } from './components/create-project-dialog';
-import { useOutdatedArtifacts } from '@/hooks/useOutdatedArtifacts';
 import { UpdateAvailableModal } from '@/components/UpdateAvailableModal';
 import type { ProjectSummary } from '@/types/project';
-import type { OutdatedArtifact } from '@/hooks/useOutdatedArtifacts';
+import type { OutdatedArtifact } from '@/hooks';
 
 export default function ProjectsPage() {
   const router = useRouter();
