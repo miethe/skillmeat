@@ -55,6 +55,13 @@ def join_paths(prefix: str, path: str) -> str:
     return prefix + path
 
 
+def apply_api_prefix(api_prefix: Optional[str], path: str) -> str:
+    if not api_prefix:
+        return path
+    api_prefix = api_prefix.rstrip("/")
+    return join_paths(api_prefix, path)
+
+
 def find_next_handler(text: str, start: int) -> Optional[str]:
     match = DEF_RE.search(text, start)
     if not match:
@@ -131,9 +138,17 @@ def schema_node_id(module: str, name: str) -> str:
     return f"schema:{module}::{name}"
 
 
-def extract_backend_handlers(api_root: Path) -> Graph:
+def extract_backend_handlers(api_root: Path, api_prefix: Optional[str] = None) -> Graph:
     routers_root = api_root / "routers"
     graph = Graph(source="backend")
+
+    if api_prefix is None:
+        try:
+            from skillmeat.api.config import get_settings
+        except Exception:
+            api_prefix = ""
+        else:
+            api_prefix = get_settings().api_prefix
 
     for router_file in routers_root.rglob("*.py"):
         text = router_file.read_text(encoding="utf-8")
@@ -160,7 +175,7 @@ def extract_backend_handlers(api_root: Path) -> Graph:
                 continue
             raw_path = path_match.group(1)
             prefix = prefixes.get(router_name, "")
-            full_path = join_paths(prefix, raw_path)
+            full_path = apply_api_prefix(api_prefix, join_paths(prefix, raw_path))
 
             handler_name = find_next_handler(text, match.end())
             if not handler_name:
