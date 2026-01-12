@@ -32,7 +32,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { useToastNotification } from '@/hooks/use-toast-notification';
+import { useToastNotification } from '@/hooks';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
 import { cn } from '@/lib/utils';

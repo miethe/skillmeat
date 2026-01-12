@@ -151,7 +151,7 @@ export function ParameterEditorModalExample() {
  *
  * ```tsx
  * import { ParameterEditorModal, ArtifactParameters } from '@/components/discovery';
- * import { useUpdateArtifact } from '@/hooks/useArtifacts';
+ * import { useUpdateArtifact } from '@/hooks';
  *
  * export function CollectionPage() {
  *   const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);

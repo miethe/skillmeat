@@ -25,7 +25,7 @@ import {
   XCircle,
   FileQuestion,
 } from 'lucide-react';
-import { useToastNotification } from '@/hooks/use-toast-notification';
+import { useToastNotification } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { DuplicateReviewTab } from './DuplicateReviewTab';
 import type {
