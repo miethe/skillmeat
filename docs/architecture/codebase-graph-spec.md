@@ -193,6 +193,12 @@ python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-g
 ```
 Requires the unified graph to exist (run merge + overrides first).
 
+Hook API coverage buckets:
+- `hooks_api_client_only`: hook calls API client (preferred).
+- `hooks_direct_api_only`: hook calls API endpoint directly (refactor signal).
+- `hooks_with_both`: hook calls both client and endpoint (refactor signal).
+- `hooks_without_api`: hook does not call API (utility/UI hooks).
+
 ## What It Enables (Use Cases)
 
 Human workflows:
