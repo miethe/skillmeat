@@ -40,7 +40,7 @@ import type {
   BulkImportResult,
   ImportResult,
   ImportStatus,
-  getReasonCodeMessage,
+  MatchType,
 } from '@/types/discovery';
 import { getReasonCodeMessage as getReasonMessage } from '@/types/discovery';
 import type { ArtifactImportResult } from '@/types/notification';
@@ -59,6 +59,19 @@ export interface DiscoveredArtifact {
   path: string;
   discovered_at: string;
   status?: ImportStatus;
+  /** Hash-based collection matching result */
+  collection_match?: {
+    type: MatchType;
+    matched_artifact_id: string | null;
+    matched_name: string | null;
+    confidence: number;
+  } | null;
+  /** Collection membership status */
+  collection_status?: {
+    in_collection: boolean;
+    match_type: MatchType;
+    matched_artifact_id: string | null;
+  } | null;
 }
 
 export interface BulkImportModalProps {
@@ -73,30 +86,64 @@ export interface BulkImportModalProps {
 }
 
 /**
- * Get badge variant based on import status
+ * Get the effective match type from a discovered artifact.
+ * Prioritizes collection_match.type, falls back to collection_status.match_type.
  */
-function getStatusVariant(status?: ImportStatus): 'default' | 'secondary' | 'outline' {
-  switch (status) {
-    case 'success':
+function getEffectiveMatchType(artifact: DiscoveredArtifact): MatchType {
+  // Prefer collection_match (hash-based matching)
+  if (artifact.collection_match?.type) {
+    return artifact.collection_match.type;
+  }
+  // Fallback to collection_status.match_type
+  if (artifact.collection_status?.match_type) {
+    return artifact.collection_status.match_type;
+  }
+  return 'none';
+}
+
+/**
+ * Get badge variant based on artifact's collection match status
+ */
+function getStatusVariant(artifact: DiscoveredArtifact): 'default' | 'secondary' | 'outline' {
+  // Check for explicit skipped status first
+  if (artifact.status === 'skipped') {
+    return 'secondary'; // Gray for skipped
+  }
+
+  const matchType = getEffectiveMatchType(artifact);
+  switch (matchType) {
+    case 'none':
       return 'default'; // Green for new artifacts
-    case 'skipped':
-      return 'secondary'; // Gray for skipped
+    case 'exact':
+    case 'hash':
+      return 'outline'; // Blue for already in collection
+    case 'name_type':
+      return 'secondary'; // Yellow-ish for similar (needs review)
     default:
-      return 'outline'; // Blue for existing in collection
+      return 'default';
   }
 }
 
 /**
- * Get status label text
+ * Get status label text based on artifact's collection match status
  */
-function getStatusLabel(status?: ImportStatus): string {
-  switch (status) {
-    case 'success':
-      return 'Will add to Collection & Project';
-    case 'skipped':
-      return 'Skipped (marked to skip)';
-    default:
+function getStatusLabel(artifact: DiscoveredArtifact): string {
+  // Check for explicit skipped status first
+  if (artifact.status === 'skipped') {
+    return 'Skipped (marked to skip)';
+  }
+
+  const matchType = getEffectiveMatchType(artifact);
+  switch (matchType) {
+    case 'none':
+      return 'New - Will add to Collection & Project';
+    case 'exact':
+    case 'hash':
       return 'Already in Collection, will add to Project';
+    case 'name_type':
+      return 'Similar artifact exists - Review needed';
+    default:
+      return 'New - Will add to Collection & Project';
   }
 }
 
@@ -635,8 +682,8 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                               </span>
                             </TableCell>
                             <TableCell onClick={(e) => e.stopPropagation()}>
-                              <Badge variant={getStatusVariant(artifact.status)} className="text-xs">
-                                {getStatusLabel(artifact.status)}
+                              <Badge variant={getStatusVariant(artifact)} className="text-xs">
+                                {getStatusLabel(artifact)}
                               </Badge>
                             </TableCell>
                             <TableCell onClick={(e) => e.stopPropagation()}>
