@@ -1,8 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useCollections, useCollection } from '@/hooks/use-collections';
-import { useGroups } from '@/hooks/use-groups';
+import { useCollections, useCollection, useGroups } from '@/hooks';
 import type { Collection } from '@/types/collections';
 import type { Group } from '@/types/groups';
 

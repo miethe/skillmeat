@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import type { MCPServer, DeploymentResponse } from '@/types/mcp';
 
 interface MCPDeployButtonProps {

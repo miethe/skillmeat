@@ -12,8 +12,7 @@ import { TemplateDetail } from '@/components/templates/template-detail';
 import { TemplateDeployWizard } from '@/components/templates/template-deploy-wizard';
 
 // Import hooks
-import { useTemplates } from '@/hooks/use-templates';
-import { useToast } from '@/hooks/use-toast';
+import { useTemplates, useToast } from '@/hooks';
 
 // Import types
 import type { ProjectTemplate, TemplateFilters } from '@/types/template';

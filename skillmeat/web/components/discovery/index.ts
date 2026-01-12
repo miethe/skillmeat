@@ -61,3 +61,9 @@ export type { ArtifactActionsProps } from './ArtifactActions';
 
 export { SkipPreferencesList } from './SkipPreferencesList';
 export type { SkipPreferencesListProps } from './SkipPreferencesList';
+
+export { DuplicateReviewModal } from './DuplicateReviewModal';
+export type { DuplicateReviewModalProps } from './DuplicateReviewModal';
+
+export { DuplicateReviewTab } from './DuplicateReviewTab';
+export type { DuplicateReviewTabProps } from './DuplicateReviewTab';

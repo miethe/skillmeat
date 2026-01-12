@@ -84,6 +84,19 @@ class DiscoveredArtifact(BaseModel):
         ...,
         description="When artifact was discovered",
     )
+    content_hash: Optional[str] = Field(
+        default=None,
+        description="SHA256 content hash of the artifact for deduplication",
+        examples=["abc123def456789..."],
+    )
+    collection_match: Optional["CollectionMatch"] = Field(
+        default=None,
+        description=(
+            "Hash-based collection matching result. Populated when collection "
+            "context is provided during discovery. Shows if artifact content "
+            "matches an existing collection artifact."
+        ),
+    )
 
     @field_validator("scope")
     @classmethod
@@ -105,6 +118,13 @@ class DiscoveredArtifact(BaseModel):
                 "description": "Create beautiful visual art in .png and .pdf documents",
                 "path": "/Users/me/.claude/skills/canvas-design",
                 "discovered_at": "2025-11-30T10:30:00Z",
+                "content_hash": "a1b2c3d4e5f6...",
+                "collection_match": {
+                    "type": "exact",
+                    "matched_artifact_id": "skill:canvas-design",
+                    "matched_name": "canvas-design",
+                    "confidence": 1.0,
+                },
             }
         }
     }
@@ -471,6 +491,33 @@ class ImportStatus(str, Enum):
     FAILED = "failed"  # Import failed due to error
 
 
+class ErrorReasonCode(str, Enum):
+    """Reason codes for import failures and skips.
+
+    These codes provide machine-readable reasons for why an artifact
+    was skipped or failed during bulk import, enabling frontend
+    error handling and reporting.
+    """
+
+    # Validation errors
+    INVALID_STRUCTURE = "invalid_structure"  # Artifact directory structure invalid
+    YAML_PARSE_ERROR = "yaml_parse_error"  # YAML frontmatter parsing failed
+    MISSING_METADATA = "missing_metadata"  # Required metadata files missing
+    INVALID_TYPE = "invalid_type"  # Invalid artifact type specified
+    INVALID_SOURCE = "invalid_source"  # Invalid source format
+
+    # Import errors
+    IMPORT_ERROR = "import_error"  # Generic import failure
+    NETWORK_ERROR = "network_error"  # Failed to fetch from GitHub
+    PERMISSION_ERROR = "permission_error"  # Filesystem permission denied
+    IO_ERROR = "io_error"  # File I/O operation failed
+
+    # Skip reasons
+    ALREADY_EXISTS = "already_exists"  # Artifact already exists in target
+    IN_SKIP_LIST = "in_skip_list"  # Artifact is in user's skip list
+    DUPLICATE = "duplicate"  # Duplicate in current batch
+
+
 class ImportResult(BaseModel):
     """Result for a single imported artifact."""
 
@@ -478,6 +525,11 @@ class ImportResult(BaseModel):
         ...,
         description="ID of the artifact (type:name)",
         examples=["skill:canvas-design"],
+    )
+    path: Optional[str] = Field(
+        default=None,
+        description="Path to the artifact (for local imports)",
+        examples=["/Users/me/.claude/skills/canvas-design"],
     )
     status: ImportStatus = Field(
         ...,
@@ -494,10 +546,26 @@ class ImportResult(BaseModel):
         description="Error message (if status=failed)",
         examples=["Artifact already exists and auto_resolve_conflicts is False"],
     )
+    reason_code: Optional[ErrorReasonCode] = Field(
+        default=None,
+        description=(
+            "Machine-readable reason code for failures/skips. "
+            "Use this for programmatic error handling."
+        ),
+        examples=[ErrorReasonCode.YAML_PARSE_ERROR],
+    )
     skip_reason: Optional[str] = Field(
         default=None,
         description="Reason artifact was skipped (if status=skipped)",
         examples=["Artifact already exists in collection"],
+    )
+    details: Optional[str] = Field(
+        default=None,
+        description=(
+            "Additional details about the error, such as line numbers "
+            "for YAML parse errors or specific validation failures."
+        ),
+        examples=["Line 5: expected ':' but found '-'"],
     )
     tags_applied: int = Field(
         default=0,
@@ -514,10 +582,13 @@ class ImportResult(BaseModel):
         json_schema_extra={
             "example": {
                 "artifact_id": "skill:canvas-design",
+                "path": "/Users/me/.claude/skills/canvas-design",
                 "status": "success",
                 "message": "Artifact 'canvas-design' imported successfully",
                 "error": None,
+                "reason_code": None,
                 "skip_reason": None,
+                "details": None,
                 "tags_applied": 3,
             }
         },
@@ -871,3 +942,285 @@ class SkipPreferenceAddRequest(BaseModel):
             }
         }
     }
+
+
+# ===========================
+# Collection Membership Schemas
+# ===========================
+
+
+class MatchType(str, Enum):
+    """Type of match when checking collection membership."""
+
+    EXACT = "exact"  # Exact source_link match
+    HASH = "hash"  # Content hash match
+    NAME_TYPE = "name_type"  # Name + type match
+    NONE = "none"  # No match found
+
+
+class CollectionStatus(BaseModel):
+    """Collection membership status for a discovered artifact.
+
+    Provides detailed information about whether an artifact exists
+    in the collection and how it was matched.
+    """
+
+    in_collection: bool = Field(
+        ...,
+        description="Whether the artifact exists in the collection",
+        examples=[True],
+    )
+    match_type: MatchType = Field(
+        ...,
+        description=(
+            "How the artifact was matched: "
+            "'exact' (source_link match), "
+            "'hash' (content hash match), "
+            "'name_type' (name + type match), "
+            "'none' (no match)"
+        ),
+        examples=[MatchType.EXACT],
+    )
+    matched_artifact_id: Optional[str] = Field(
+        default=None,
+        description="ID of the matched artifact in collection (format: type:name)",
+        examples=["skill:canvas-design"],
+    )
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
+            "example": {
+                "in_collection": True,
+                "match_type": "exact",
+                "matched_artifact_id": "skill:canvas-design",
+            }
+        },
+    )
+
+
+class CollectionMatch(BaseModel):
+    """Hash-based collection matching result for a discovered artifact.
+
+    Provides detailed information about how an artifact matches against
+    the collection using content hash and name+type matching.
+
+    Attributes:
+        type: Type of match found:
+            - "exact": Content hash exact match (confidence: 1.0)
+            - "hash": Legacy alias for exact hash match (confidence: 1.0)
+            - "name_type": Name and type match but different content (confidence: 0.85)
+            - "none": No match found (confidence: 0.0)
+        matched_artifact_id: ID of matched artifact if found (format: type:name)
+        matched_name: Name of the matched artifact
+        confidence: Confidence score (0.0-1.0) indicating match quality
+    """
+
+    type: str = Field(
+        ...,
+        description=(
+            "Match type: 'exact' (hash match, 1.0 confidence), "
+            "'hash' (alias for exact), 'name_type' (0.85 confidence), "
+            "'none' (no match, 0.0 confidence)"
+        ),
+        examples=["exact"],
+    )
+    matched_artifact_id: Optional[str] = Field(
+        default=None,
+        description="ID of matched artifact in collection (format: type:name)",
+        examples=["skill:canvas-design"],
+    )
+    matched_name: Optional[str] = Field(
+        default=None,
+        description="Name of the matched artifact",
+        examples=["canvas-design"],
+    )
+    confidence: float = Field(
+        ...,
+        description="Confidence score from 0.0 (no match) to 1.0 (exact hash match)",
+        ge=0.0,
+        le=1.0,
+        examples=[1.0],
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "type": "exact",
+                "matched_artifact_id": "skill:canvas-design",
+                "matched_name": "canvas-design",
+                "confidence": 1.0,
+            }
+        },
+    )
+
+
+# ===========================
+# Duplicate Confirmation Schemas
+# ===========================
+
+
+class DuplicateDecisionAction(str, Enum):
+    """Action to take for a duplicate match."""
+
+    LINK = "link"  # Link discovered artifact to existing collection artifact
+    SKIP = "skip"  # Skip this artifact (do nothing)
+
+
+class DuplicateMatch(BaseModel):
+    """A single duplicate match decision from the user.
+
+    Represents the user's decision to link a discovered artifact
+    to an existing artifact in their collection.
+    """
+
+    discovered_path: str = Field(
+        ...,
+        description="Full filesystem path to the discovered artifact",
+        examples=["/Users/me/.claude/skills/my-canvas"],
+    )
+    collection_artifact_id: str = Field(
+        ...,
+        description="ID of the matching collection artifact (format: type:name)",
+        examples=["skill:canvas-design"],
+    )
+    action: DuplicateDecisionAction = Field(
+        default=DuplicateDecisionAction.LINK,
+        description="Action to take: 'link' to create association, 'skip' to ignore",
+        examples=[DuplicateDecisionAction.LINK],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "discovered_path": "/Users/me/.claude/skills/my-canvas",
+                "collection_artifact_id": "skill:canvas-design",
+                "action": "link",
+            }
+        }
+    }
+
+
+class ConfirmDuplicatesRequest(BaseModel):
+    """Request to process duplicate review decisions.
+
+    Handles three types of decisions:
+    1. matches: Duplicates to link to existing collection artifacts
+    2. new_artifacts: Paths to import as new artifacts
+    3. skipped: Paths the user chose to skip
+    """
+
+    project_path: str = Field(
+        ...,
+        description="Base64-encoded or absolute path to the project being scanned",
+        examples=["/Users/me/myproject"],
+    )
+    matches: List[DuplicateMatch] = Field(
+        default_factory=list,
+        description="Duplicate artifacts to link to collection entries",
+    )
+    new_artifacts: List[str] = Field(
+        default_factory=list,
+        description="Filesystem paths of artifacts to import as new",
+        examples=[["/Users/me/.claude/skills/new-skill"]],
+    )
+    skipped: List[str] = Field(
+        default_factory=list,
+        description="Filesystem paths of artifacts the user chose to skip",
+        examples=[["/Users/me/.claude/skills/unwanted-skill"]],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "project_path": "/Users/me/myproject",
+                "matches": [
+                    {
+                        "discovered_path": "/Users/me/.claude/skills/my-canvas",
+                        "collection_artifact_id": "skill:canvas-design",
+                        "action": "link",
+                    }
+                ],
+                "new_artifacts": ["/Users/me/.claude/skills/new-skill"],
+                "skipped": ["/Users/me/.claude/skills/unwanted-skill"],
+            }
+        }
+    }
+
+
+class ConfirmDuplicatesStatus(str, Enum):
+    """Status of duplicate confirmation operation."""
+
+    SUCCESS = "success"  # All operations completed successfully
+    PARTIAL = "partial"  # Some operations succeeded, some failed
+    FAILED = "failed"  # All operations failed
+
+
+class ConfirmDuplicatesResponse(BaseModel):
+    """Response from processing duplicate review decisions.
+
+    Provides summary counts and status of all operations performed.
+    """
+
+    status: ConfirmDuplicatesStatus = Field(
+        ...,
+        description="Overall status: 'success', 'partial', or 'failed'",
+        examples=[ConfirmDuplicatesStatus.SUCCESS],
+    )
+    linked_count: int = Field(
+        ...,
+        description="Number of artifacts successfully linked to collection entries",
+        ge=0,
+        examples=[3],
+    )
+    imported_count: int = Field(
+        ...,
+        description="Number of new artifacts successfully imported",
+        ge=0,
+        examples=[2],
+    )
+    skipped_count: int = Field(
+        ...,
+        description="Number of artifacts marked as skipped",
+        ge=0,
+        examples=[1],
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable summary message",
+        examples=["Processed 6 artifacts: 3 linked, 2 imported, 1 skipped"],
+    )
+    timestamp: str = Field(
+        ...,
+        description="ISO 8601 timestamp of when the operation completed",
+        examples=["2025-01-09T10:30:00Z"],
+    )
+    errors: List[str] = Field(
+        default_factory=list,
+        description="List of error messages for failed operations",
+        examples=[["Failed to import /path/to/artifact: permission denied"]],
+    )
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "linked_count": 3,
+                "imported_count": 2,
+                "skipped_count": 1,
+                "message": "Processed 6 artifacts: 3 linked, 2 imported, 1 skipped",
+                "timestamp": "2025-01-09T10:30:00Z",
+                "errors": [],
+            }
+        },
+    )
+
+
+# =============================================================================
+# Forward Reference Resolution
+# =============================================================================
+# Rebuild models that have forward references to classes defined later in the file
+# This must be done after all referenced classes are defined
+
+DiscoveredArtifact.model_rebuild()  # References CollectionMatch

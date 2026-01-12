@@ -172,7 +172,11 @@ class CacheManager:
                 db_path = Path(self.db_path)
                 db_path.parent.mkdir(parents=True, exist_ok=True)
 
-                # Create tables if they don't exist
+                # Run Alembic migrations first (creates/updates schema)
+                from skillmeat.cache.migrations import run_migrations
+                run_migrations(self.db_path)
+
+                # Then create any missing base tables (backward compatibility)
                 create_tables(self.db_path)
 
                 logger.info(f"Cache initialized at {self.db_path}")

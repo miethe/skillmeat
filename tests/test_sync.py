@@ -108,45 +108,39 @@ class TestLoadDeploymentMetadata:
     """Tests for _load_deployment_metadata method."""
 
     def test_load_nonexistent_file(self, tmp_path):
-        """Test loading nonexistent metadata returns None."""
+        """Test loading nonexistent metadata returns empty list."""
         sync_mgr = SyncManager()
-        metadata = sync_mgr._load_deployment_metadata(tmp_path)
-        assert metadata is None
+        deployments = sync_mgr._load_deployment_metadata(tmp_path)
+        assert deployments == []
 
     def test_load_valid_metadata(self, tmp_path):
         """Test loading valid deployment metadata."""
-        # Create metadata file
+        # Create metadata file in new format
         metadata_dir = tmp_path / ".claude"
         metadata_dir.mkdir()
         metadata_file = metadata_dir / ".skillmeat-deployed.toml"
 
         toml_content = """
-[deployment]
-collection = "my-collection"
-deployed-at = "2025-11-15T10:30:00Z"
-skillmeat-version = "0.2.0-alpha"
-
-[[artifacts]]
-name = "test-skill"
-type = "skill"
-source = "github:user/repo/test-skill"
-version = "1.0.0"
-sha = "abc123def456"
-deployed-at = "2025-11-15T10:30:00Z"
-deployed-from = "/path/to/collection"
+[[deployed]]
+artifact_name = "test-skill"
+artifact_type = "skill"
+from_collection = "my-collection"
+deployed_at = "2025-11-15T10:30:00Z"
+artifact_path = "skills/test-skill"
+content_hash = "abc123def456"
+local_modifications = false
+collection_sha = "abc123def456"
 """
         metadata_file.write_text(toml_content)
 
         sync_mgr = SyncManager()
-        metadata = sync_mgr._load_deployment_metadata(tmp_path)
+        deployments = sync_mgr._load_deployment_metadata(tmp_path)
 
-        assert metadata is not None
-        assert metadata.collection == "my-collection"
-        assert metadata.deployed_at == "2025-11-15T10:30:00Z"
-        assert metadata.skillmeat_version == "0.2.0-alpha"
-        assert len(metadata.artifacts) == 1
-        assert metadata.artifacts[0].name == "test-skill"
-        assert metadata.artifacts[0].sha == "abc123def456"
+        assert len(deployments) == 1
+        assert deployments[0].artifact_name == "test-skill"
+        assert deployments[0].artifact_type == "skill"
+        assert deployments[0].from_collection == "my-collection"
+        assert deployments[0].content_hash == "abc123def456"
 
     def test_load_multiple_artifacts(self, tmp_path):
         """Test loading metadata with multiple artifacts."""
@@ -155,49 +149,46 @@ deployed-from = "/path/to/collection"
         metadata_file = metadata_dir / ".skillmeat-deployed.toml"
 
         toml_content = """
-[deployment]
-collection = "default"
-deployed-at = "2025-11-15T10:30:00Z"
-skillmeat-version = "0.2.0-alpha"
+[[deployed]]
+artifact_name = "skill1"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-11-15T10:30:00Z"
+artifact_path = "skills/skill1"
+content_hash = "abc123"
+local_modifications = false
 
-[[artifacts]]
-name = "skill1"
-type = "skill"
-source = "local:/path/skill1"
-version = "1.0.0"
-sha = "abc123"
-deployed-at = "2025-11-15T10:30:00Z"
-deployed-from = "/path/to/collection"
-
-[[artifacts]]
-name = "skill2"
-type = "skill"
-source = "local:/path/skill2"
-version = "2.0.0"
-sha = "def456"
-deployed-at = "2025-11-15T10:35:00Z"
-deployed-from = "/path/to/collection"
+[[deployed]]
+artifact_name = "skill2"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2025-11-15T10:35:00Z"
+artifact_path = "skills/skill2"
+content_hash = "def456"
+local_modifications = false
 """
         metadata_file.write_text(toml_content)
 
         sync_mgr = SyncManager()
-        metadata = sync_mgr._load_deployment_metadata(tmp_path)
+        deployments = sync_mgr._load_deployment_metadata(tmp_path)
 
-        assert metadata is not None
-        assert len(metadata.artifacts) == 2
-        assert metadata.artifacts[0].name == "skill1"
-        assert metadata.artifacts[1].name == "skill2"
+        assert len(deployments) == 2
+        assert deployments[0].artifact_name == "skill1"
+        assert deployments[1].artifact_name == "skill2"
 
     def test_load_corrupted_metadata(self, tmp_path):
-        """Test loading corrupted metadata returns None."""
+        """Test loading corrupted metadata raises exception."""
+        import tomllib
+
         metadata_dir = tmp_path / ".claude"
         metadata_dir.mkdir()
         metadata_file = metadata_dir / ".skillmeat-deployed.toml"
         metadata_file.write_text("invalid toml content {{{")
 
         sync_mgr = SyncManager()
-        metadata = sync_mgr._load_deployment_metadata(tmp_path)
-        assert metadata is None
+        # DeploymentTracker.read_deployments raises exception on corrupted TOML
+        with pytest.raises(tomllib.TOMLDecodeError):
+            sync_mgr._load_deployment_metadata(tmp_path)
 
 
 class TestSaveDeploymentMetadata:
@@ -205,54 +196,41 @@ class TestSaveDeploymentMetadata:
 
     def test_save_creates_directory(self, tmp_path):
         """Test save creates .claude directory if needed."""
-        metadata_file = tmp_path / ".claude" / ".skillmeat-deployed.toml"
+        from skillmeat.core.deployment import Deployment
 
-        metadata = DeploymentMetadata(
-            collection="test",
-            deployed_at="2025-11-15T10:30:00Z",
-            skillmeat_version="0.2.0-alpha",
-            artifacts=[],
-        )
+        deployments = []
 
         sync_mgr = SyncManager()
-        sync_mgr._save_deployment_metadata(metadata_file, metadata)
+        sync_mgr._save_deployment_metadata(tmp_path, deployments)
 
+        metadata_file = tmp_path / ".claude" / ".skillmeat-deployed.toml"
         assert metadata_file.exists()
         assert metadata_file.parent.exists()
 
     def test_save_and_load_roundtrip(self, tmp_path):
         """Test save and load roundtrip preserves data."""
-        metadata_file = tmp_path / ".claude" / ".skillmeat-deployed.toml"
+        from skillmeat.core.deployment import Deployment
 
-        metadata = DeploymentMetadata(
-            collection="my-collection",
-            deployed_at="2025-11-15T10:30:00Z",
-            skillmeat_version="0.2.0-alpha",
-            artifacts=[
-                DeploymentRecord(
-                    name="test-skill",
-                    artifact_type="skill",
-                    source="github:user/repo",
-                    version="1.0.0",
-                    sha="abc123",
-                    deployed_at="2025-11-15T10:30:00Z",
-                    deployed_from="/path/to/collection",
-                )
-            ],
+        deployment = Deployment(
+            artifact_name="test-skill",
+            artifact_type="skill",
+            from_collection="my-collection",
+            deployed_at=datetime.fromisoformat("2025-11-15T10:30:00"),
+            artifact_path=Path("skills/test-skill"),
+            content_hash="abc123",
+            local_modifications=False,
         )
 
         sync_mgr = SyncManager()
-        sync_mgr._save_deployment_metadata(metadata_file, metadata)
+        sync_mgr._save_deployment_metadata(tmp_path, [deployment])
 
         # Load back
         loaded = sync_mgr._load_deployment_metadata(tmp_path)
 
-        assert loaded is not None
-        assert loaded.collection == metadata.collection
-        assert loaded.deployed_at == metadata.deployed_at
-        assert len(loaded.artifacts) == len(metadata.artifacts)
-        assert loaded.artifacts[0].name == metadata.artifacts[0].name
-        assert loaded.artifacts[0].sha == metadata.artifacts[0].sha
+        assert len(loaded) == 1
+        assert loaded[0].artifact_name == deployment.artifact_name
+        assert loaded[0].from_collection == deployment.from_collection
+        assert loaded[0].content_hash == deployment.content_hash
 
 
 class TestUpdateDeploymentMetadata:
@@ -281,12 +259,12 @@ class TestUpdateDeploymentMetadata:
         metadata_file = project_path / ".claude" / ".skillmeat-deployed.toml"
         assert metadata_file.exists()
 
-        # Load and verify
-        metadata = sync_mgr._load_deployment_metadata(project_path)
-        assert metadata is not None
-        assert metadata.collection == "default"
-        assert len(metadata.artifacts) == 1
-        assert metadata.artifacts[0].name == "test-skill"
+        # Load and verify - returns List[Deployment] now
+        deployments = sync_mgr._load_deployment_metadata(project_path)
+        assert deployments is not None
+        assert len(deployments) == 1
+        assert deployments[0].from_collection == "default"
+        assert deployments[0].artifact_name == "test-skill"
 
     def test_update_replaces_existing_artifact(self, tmp_path):
         """Test update replaces existing artifact record."""
@@ -319,9 +297,9 @@ class TestUpdateDeploymentMetadata:
             collection_path=collection_path,
         )
 
-        # Should only have one artifact record
-        metadata = sync_mgr._load_deployment_metadata(project_path)
-        assert len(metadata.artifacts) == 1
+        # Should only have one deployment record
+        deployments = sync_mgr._load_deployment_metadata(project_path)
+        assert len(deployments) == 1
 
     def test_update_adds_multiple_artifacts(self, tmp_path):
         """Test update can track multiple artifacts."""
@@ -355,9 +333,9 @@ class TestUpdateDeploymentMetadata:
         )
 
         # Check both recorded
-        metadata = sync_mgr._load_deployment_metadata(project_path)
-        assert len(metadata.artifacts) == 2
-        names = {a.name for a in metadata.artifacts}
+        deployments = sync_mgr._load_deployment_metadata(project_path)
+        assert len(deployments) == 2
+        names = {d.artifact_name for d in deployments}
         assert names == {"skill1", "skill2"}
 
 
@@ -374,11 +352,21 @@ class TestCheckDrift:
         """Test no drift when artifacts unchanged."""
 
         # Setup collection mock
+        class MockConfig:
+            def __init__(self, collection_path):
+                self._collection_path = collection_path
+
+            def get_collection_path(self, name):
+                return self._collection_path
+
         class MockCollectionManager:
+            def __init__(self, collection_path):
+                self.collection_path = collection_path
+                self.config = MockConfig(collection_path)
+
             def load_collection(self, name):
                 class Collection:
-                    path = tmp_path / "collection"
-
+                    pass
                 return Collection()
 
         # Create collection artifact
@@ -389,13 +377,18 @@ class TestCheckDrift:
 
         # Create deployment metadata
         project_path = tmp_path / "project"
-        sync_mgr = SyncManager(collection_manager=MockCollectionManager())
+        sync_mgr = SyncManager(collection_manager=MockCollectionManager(collection_path))
         sync_mgr.update_deployment_metadata(
             project_path=project_path,
             artifact_name="test-skill",
             artifact_type="skill",
             collection_path=collection_path,
         )
+
+        # Copy artifact to project to simulate deployed state
+        project_artifact_path = project_path / ".claude" / "skills" / "test-skill"
+        project_artifact_path.mkdir(parents=True, exist_ok=True)
+        (project_artifact_path / "SKILL.md").write_text("# Test\n")
 
         # Check drift - should be none
         drift_results = sync_mgr.check_drift(project_path)
@@ -405,11 +398,22 @@ class TestCheckDrift:
         """Test detects when artifact modified in collection."""
 
         class MockCollectionManager:
+            def __init__(self, collection_path):
+                self.collection_path = collection_path
+
             def load_collection(self, name):
                 class Collection:
-                    path = tmp_path / "collection"
-
+                    pass
                 return Collection()
+
+            @property
+            def config(self):
+                class Config:
+                    def __init__(self, collection_path):
+                        self.collection_path = collection_path
+                    def get_collection_path(self, name):
+                        return self.collection_path
+                return Config(self.collection_path)
 
         collection_path = tmp_path / "collection"
         artifact_path = collection_path / "skills" / "test-skill"
@@ -417,7 +421,7 @@ class TestCheckDrift:
         (artifact_path / "SKILL.md").write_text("# Test\n")
 
         project_path = tmp_path / "project"
-        sync_mgr = SyncManager(collection_manager=MockCollectionManager())
+        sync_mgr = SyncManager(collection_manager=MockCollectionManager(collection_path))
 
         # Deploy
         sync_mgr.update_deployment_metadata(
@@ -427,7 +431,12 @@ class TestCheckDrift:
             collection_path=collection_path,
         )
 
-        # Modify artifact
+        # Copy artifact to project to simulate deployed state
+        project_artifact_path = project_path / ".claude" / "skills" / "test-skill"
+        project_artifact_path.mkdir(parents=True, exist_ok=True)
+        (project_artifact_path / "SKILL.md").write_text("# Test\n")
+
+        # Modify artifact in collection
         (artifact_path / "SKILL.md").write_text("# Modified\n")
 
         # Check drift
@@ -435,7 +444,7 @@ class TestCheckDrift:
 
         assert len(drift_results) == 1
         assert drift_results[0].artifact_name == "test-skill"
-        assert drift_results[0].drift_type == "modified"
+        assert drift_results[0].drift_type == "outdated"  # Collection changed, project unchanged
         assert drift_results[0].collection_sha is not None
         assert drift_results[0].project_sha is not None
         assert drift_results[0].collection_sha != drift_results[0].project_sha
@@ -444,11 +453,22 @@ class TestCheckDrift:
         """Test detects when artifact added to collection."""
 
         class MockCollectionManager:
+            def __init__(self, collection_path):
+                self.collection_path = collection_path
+
             def load_collection(self, name):
                 class Collection:
-                    path = tmp_path / "collection"
-
+                    pass
                 return Collection()
+
+            @property
+            def config(self):
+                class Config:
+                    def __init__(self, collection_path):
+                        self.collection_path = collection_path
+                    def get_collection_path(self, name):
+                        return self.collection_path
+                return Config(self.collection_path)
 
         collection_path = tmp_path / "collection"
         project_path = tmp_path / "project"
@@ -458,13 +478,18 @@ class TestCheckDrift:
         artifact1_path.mkdir(parents=True)
         (artifact1_path / "SKILL.md").write_text("# Skill 1\n")
 
-        sync_mgr = SyncManager(collection_manager=MockCollectionManager())
+        sync_mgr = SyncManager(collection_manager=MockCollectionManager(collection_path))
         sync_mgr.update_deployment_metadata(
             project_path=project_path,
             artifact_name="skill1",
             artifact_type="skill",
             collection_path=collection_path,
         )
+
+        # Copy artifact to project to simulate deployed state
+        project_artifact1_path = project_path / ".claude" / "skills" / "skill1"
+        project_artifact1_path.mkdir(parents=True, exist_ok=True)
+        (project_artifact1_path / "SKILL.md").write_text("# Skill 1\n")
 
         # Add new artifact to collection
         artifact2_path = collection_path / "skills" / "skill2"
@@ -525,11 +550,22 @@ class TestCheckDrift:
         """Test drift detection with custom collection name."""
 
         class MockCollectionManager:
+            def __init__(self, collection_path):
+                self.collection_path = collection_path
+
             def load_collection(self, name):
                 class Collection:
-                    path = tmp_path / "my-collection"
-
+                    pass
                 return Collection()
+
+            @property
+            def config(self):
+                class Config:
+                    def __init__(self, collection_path):
+                        self.collection_path = collection_path
+                    def get_collection_path(self, name):
+                        return self.collection_path
+                return Config(self.collection_path)
 
         collection_path = tmp_path / "my-collection"
         artifact_path = collection_path / "skills" / "test-skill"
@@ -537,7 +573,7 @@ class TestCheckDrift:
         (artifact_path / "SKILL.md").write_text("# Test\n")
 
         project_path = tmp_path / "project"
-        sync_mgr = SyncManager(collection_manager=MockCollectionManager())
+        sync_mgr = SyncManager(collection_manager=MockCollectionManager(collection_path))
 
         sync_mgr.update_deployment_metadata(
             project_path=project_path,
@@ -546,6 +582,11 @@ class TestCheckDrift:
             collection_path=collection_path,
             collection_name="my-collection",
         )
+
+        # Copy artifact to project to simulate deployed state
+        project_artifact_path = project_path / ".claude" / "skills" / "test-skill"
+        project_artifact_path.mkdir(parents=True, exist_ok=True)
+        (project_artifact_path / "SKILL.md").write_text("# Test\n")
 
         # Check drift with custom collection
         drift_results = sync_mgr.check_drift(

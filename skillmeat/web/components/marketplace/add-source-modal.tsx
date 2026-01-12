@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useState, useEffect, useRef } from 'react';
-import { useCreateSource, useInferUrl } from '@/hooks/useMarketplaceSources';
+import { useCreateSource, useInferUrl } from '@/hooks';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { TrustLevel } from '@/types/marketplace';
 

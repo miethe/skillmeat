@@ -55,6 +55,15 @@ interface ApiArtifact {
   upstream?: ApiArtifactUpstream;
   added: string;
   updated: string;
+  collection?: {
+    id: string;
+    name: string;
+  };
+  collections?: {
+    id: string;
+    name: string;
+    artifact_count?: number;
+  }[];
 }
 
 interface ApiArtifactListResponse {
@@ -102,6 +111,23 @@ const generateMockArtifacts = (): Artifact[] => {
         id: 'design-tools',
         name: 'Design Tools',
       },
+      collections: [
+        {
+          id: 'design-tools',
+          name: 'Design Tools',
+          artifact_count: 12,
+        },
+        {
+          id: 'ai-tools',
+          name: 'AI Tools',
+          artifact_count: 25,
+        },
+        {
+          id: 'productivity',
+          name: 'Productivity',
+          artifact_count: 8,
+        },
+      ],
     },
     {
       id: '2',
@@ -139,6 +165,13 @@ const generateMockArtifacts = (): Artifact[] => {
         id: 'document-processing',
         name: 'Document Processing',
       },
+      collections: [
+        {
+          id: 'document-processing',
+          name: 'Document Processing',
+          artifact_count: 6,
+        },
+      ],
     },
     {
       id: '3',
@@ -308,6 +341,8 @@ const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
     createdAt: artifact.added,
     updatedAt,
     aliases: artifact.aliases || [],
+    collection: artifact.collection,
+    collections: artifact.collections,
   };
 };
 

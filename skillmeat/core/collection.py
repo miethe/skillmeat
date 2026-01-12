@@ -355,3 +355,424 @@ class CollectionManager:
 
         # Delete collection directory
         shutil.rmtree(collection_path)
+
+    def artifact_in_collection(
+        self,
+        name: str,
+        artifact_type: str,
+        source_link: Optional[str] = None,
+        content_hash: Optional[str] = None,
+        collection_name: Optional[str] = None,
+    ) -> tuple:
+        """Check if artifact exists in collection.
+
+        Performs membership check with priority-based matching:
+        1. Exact source_link match (highest priority) -> "exact"
+        2. Content hash match -> "hash"
+        3. Name + type match (lowest priority) -> "name_type"
+        4. No match -> "none"
+
+        This method is optimized for performance when checking multiple
+        artifacts. For bulk operations, consider caching the collection.
+
+        Args:
+            name: Artifact name to check (case-insensitive comparison)
+            artifact_type: Artifact type (skill, command, agent, etc.)
+            source_link: Optional source URL for exact matching
+            content_hash: Optional content hash for hash matching
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            Tuple of (in_collection: bool, matched_artifact_id: Optional[str], match_type: str)
+            - in_collection: True if artifact found in collection
+            - matched_artifact_id: ID of matched artifact (format: "type:name") or None
+            - match_type: "exact" | "hash" | "name_type" | "none"
+
+        Examples:
+            >>> mgr = CollectionManager()
+            >>> # Check by source link (exact match)
+            >>> in_coll, matched_id, match_type = mgr.artifact_in_collection(
+            ...     "canvas-design", "skill",
+            ...     source_link="anthropics/skills/canvas-design"
+            ... )
+            >>> print(f"In collection: {in_coll}, Match: {match_type}")
+            In collection: True, Match: exact
+
+            >>> # Check by name only (name_type match)
+            >>> in_coll, matched_id, match_type = mgr.artifact_in_collection(
+            ...     "my-local-skill", "skill"
+            ... )
+            >>> print(f"In collection: {in_coll}, Match: {match_type}")
+            In collection: True, Match: name_type
+        """
+        try:
+            collection = self.load_collection(collection_name)
+        except ValueError:
+            # Collection doesn't exist - artifact not in collection
+            return (False, None, "none")
+
+        # Normalize inputs for case-insensitive comparison
+        name_lower = name.lower()
+        artifact_type_lower = artifact_type.lower()
+
+        # Priority 1: Exact source_link match
+        if source_link:
+            source_link_normalized = source_link.strip().lower()
+            for artifact in collection.artifacts:
+                if artifact.upstream:
+                    # Normalize stored upstream for comparison
+                    upstream_normalized = artifact.upstream.strip().lower()
+                    if upstream_normalized == source_link_normalized:
+                        matched_id = f"{artifact.type.value}:{artifact.name}"
+                        return (True, matched_id, "exact")
+
+        # Priority 2: Content hash match (if hash provided)
+        if content_hash:
+            # Need to check lock file for content hashes
+            try:
+                collection_path = self.config.get_collection_path(
+                    collection_name or self.get_active_collection_name()
+                )
+                lock_entries = self.lock_mgr.read(collection_path)
+
+                for (entry_name, entry_type), lock_entry in lock_entries.items():
+                    if lock_entry.content_hash == content_hash:
+                        matched_id = f"{entry_type}:{entry_name}"
+                        return (True, matched_id, "hash")
+            except Exception:
+                # If lock file read fails, continue with name+type matching
+                pass
+
+        # Priority 3: Name + type match (case-insensitive)
+        for artifact in collection.artifacts:
+            artifact_name_lower = artifact.name.lower()
+            artifact_type_value_lower = artifact.type.value.lower()
+
+            if (
+                artifact_name_lower == name_lower
+                and artifact_type_value_lower == artifact_type_lower
+            ):
+                matched_id = f"{artifact.type.value}:{artifact.name}"
+                return (True, matched_id, "name_type")
+
+        # No match found
+        return (False, None, "none")
+
+    def get_collection_membership_index(
+        self, collection_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Build an indexed structure for fast membership lookups.
+
+        Creates lookup dictionaries for source_link, content_hash, and name+type
+        to enable O(1) membership checks when processing many artifacts.
+
+        Args:
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            Dictionary with:
+            - by_source: Dict mapping normalized source_link -> artifact_id
+            - by_hash: Dict mapping content_hash -> artifact_id
+            - by_name_type: Dict mapping (name_lower, type_lower) -> artifact_id
+            - artifacts: List of (artifact_id, artifact) tuples
+
+        Example:
+            >>> mgr = CollectionManager()
+            >>> index = mgr.get_collection_membership_index()
+            >>> source = "anthropics/skills/canvas-design".lower()
+            >>> if source in index["by_source"]:
+            ...     print(f"Found: {index['by_source'][source]}")
+        """
+        result: Dict[str, Any] = {
+            "by_source": {},
+            "by_hash": {},
+            "by_name_type": {},
+            "artifacts": [],
+        }
+
+        try:
+            collection = self.load_collection(collection_name)
+        except ValueError:
+            return result
+
+        collection_path = self.config.get_collection_path(
+            collection_name or self.get_active_collection_name()
+        )
+
+        # Build source link index
+        for artifact in collection.artifacts:
+            artifact_id = f"{artifact.type.value}:{artifact.name}"
+            result["artifacts"].append((artifact_id, artifact))
+
+            # Index by source
+            if artifact.upstream:
+                source_normalized = artifact.upstream.strip().lower()
+                result["by_source"][source_normalized] = artifact_id
+
+            # Index by name+type (case-insensitive)
+            name_type_key = (artifact.name.lower(), artifact.type.value.lower())
+            result["by_name_type"][name_type_key] = artifact_id
+
+        # Build hash index from lock file
+        try:
+            lock_entries = self.lock_mgr.read(collection_path)
+            for (entry_name, entry_type), lock_entry in lock_entries.items():
+                if lock_entry.content_hash:
+                    artifact_id = f"{entry_type}:{entry_name}"
+                    result["by_hash"][lock_entry.content_hash] = artifact_id
+        except Exception:
+            # If lock file read fails, hash index remains empty
+            pass
+
+        return result
+
+    def check_membership_batch(
+        self,
+        artifacts: List[Dict[str, Any]],
+        collection_name: Optional[str] = None,
+    ) -> List[tuple]:
+        """Check membership for multiple artifacts efficiently.
+
+        Uses indexed lookups for O(n) total time complexity instead of
+        O(n*m) when checking n artifacts against m collection entries.
+
+        Args:
+            artifacts: List of dicts with keys:
+                - name: str (required)
+                - artifact_type: str (required)
+                - source_link: Optional[str]
+                - content_hash: Optional[str]
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            List of tuples (in_collection, matched_artifact_id, match_type)
+            in same order as input artifacts.
+
+        Performance:
+            Target: <500ms for 100+ artifacts
+        """
+        # Build index once
+        index = self.get_collection_membership_index(collection_name)
+        results = []
+
+        for artifact_data in artifacts:
+            name = artifact_data.get("name", "")
+            artifact_type = artifact_data.get("artifact_type", "")
+            source_link = artifact_data.get("source_link")
+            content_hash = artifact_data.get("content_hash")
+
+            # Priority 1: Exact source_link match
+            if source_link:
+                source_normalized = source_link.strip().lower()
+                if source_normalized in index["by_source"]:
+                    matched_id = index["by_source"][source_normalized]
+                    results.append((True, matched_id, "exact"))
+                    continue
+
+            # Priority 2: Content hash match
+            if content_hash and content_hash in index["by_hash"]:
+                matched_id = index["by_hash"][content_hash]
+                results.append((True, matched_id, "hash"))
+                continue
+
+            # Priority 3: Name + type match
+            name_type_key = (name.lower(), artifact_type.lower())
+            if name_type_key in index["by_name_type"]:
+                matched_id = index["by_name_type"][name_type_key]
+                results.append((True, matched_id, "name_type"))
+                continue
+
+            # No match
+            results.append((False, None, "none"))
+
+        return results
+
+    def link_duplicate(
+        self,
+        discovered_path: str,
+        collection_artifact_id: str,
+        collection_name: Optional[str] = None,
+    ) -> bool:
+        """Create link between discovered artifact and collection artifact.
+
+        Adds discovered_path to the artifact's duplicate_links list in the
+        collection manifest. This relationship tracks that the discovered
+        artifact is a duplicate/copy of the collection artifact.
+
+        This method is idempotent - calling it multiple times with the same
+        arguments will not create duplicate entries.
+
+        Args:
+            discovered_path: Full filesystem path to the discovered artifact
+            collection_artifact_id: ID of collection artifact (format: type:name)
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            True if link was created or already exists, False if artifact not found
+
+        Raises:
+            ValueError: If collection_artifact_id format is invalid
+
+        Example:
+            >>> mgr = CollectionManager()
+            >>> success = mgr.link_duplicate(
+            ...     "/Users/me/.claude/skills/my-canvas",
+            ...     "skill:canvas-design"
+            ... )
+            >>> print(f"Link created: {success}")
+            Link created: True
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Parse artifact ID (format: type:name)
+        if ":" not in collection_artifact_id:
+            raise ValueError(
+                f"Invalid artifact ID format '{collection_artifact_id}'. "
+                "Expected 'type:name' format."
+            )
+
+        artifact_type, artifact_name = collection_artifact_id.split(":", 1)
+
+        try:
+            collection = self.load_collection(collection_name)
+        except ValueError as e:
+            logger.warning(f"Failed to load collection for duplicate linking: {e}")
+            return False
+
+        # Find the artifact in collection
+        target_artifact = None
+        for artifact in collection.artifacts:
+            if (
+                artifact.name.lower() == artifact_name.lower()
+                and artifact.type.value.lower() == artifact_type.lower()
+            ):
+                target_artifact = artifact
+                break
+
+        if target_artifact is None:
+            logger.warning(
+                f"Artifact '{collection_artifact_id}' not found in collection "
+                f"for duplicate linking"
+            )
+            return False
+
+        # Initialize duplicate_links if not present (stored in metadata.extra)
+        if "duplicate_links" not in target_artifact.metadata.extra:
+            target_artifact.metadata.extra["duplicate_links"] = []
+
+        # Check for existing link (idempotent)
+        existing_links = target_artifact.metadata.extra["duplicate_links"]
+        if discovered_path in existing_links:
+            logger.debug(
+                f"Duplicate link already exists: {discovered_path} -> "
+                f"{collection_artifact_id}"
+            )
+            return True
+
+        # Add the new link
+        existing_links.append(discovered_path)
+        target_artifact.metadata.extra["duplicate_links"] = existing_links
+
+        # Save collection with updated artifact
+        self.save_collection(collection)
+
+        logger.info(
+            f"Created duplicate link: {discovered_path} -> {collection_artifact_id}"
+        )
+        return True
+
+    def get_duplicate_links(
+        self,
+        collection_artifact_id: str,
+        collection_name: Optional[str] = None,
+    ) -> List[str]:
+        """Get all duplicate links for a collection artifact.
+
+        Args:
+            collection_artifact_id: ID of collection artifact (format: type:name)
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            List of discovered paths linked to this artifact
+
+        Raises:
+            ValueError: If collection_artifact_id format is invalid
+        """
+        # Parse artifact ID (format: type:name)
+        if ":" not in collection_artifact_id:
+            raise ValueError(
+                f"Invalid artifact ID format '{collection_artifact_id}'. "
+                "Expected 'type:name' format."
+            )
+
+        artifact_type, artifact_name = collection_artifact_id.split(":", 1)
+
+        try:
+            collection = self.load_collection(collection_name)
+        except ValueError:
+            return []
+
+        # Find the artifact in collection
+        for artifact in collection.artifacts:
+            if (
+                artifact.name.lower() == artifact_name.lower()
+                and artifact.type.value.lower() == artifact_type.lower()
+            ):
+                return artifact.metadata.extra.get("duplicate_links", [])
+
+        return []
+
+    def remove_duplicate_link(
+        self,
+        discovered_path: str,
+        collection_artifact_id: str,
+        collection_name: Optional[str] = None,
+    ) -> bool:
+        """Remove a duplicate link from a collection artifact.
+
+        Args:
+            discovered_path: Full filesystem path to remove
+            collection_artifact_id: ID of collection artifact (format: type:name)
+            collection_name: Collection name (uses active if None)
+
+        Returns:
+            True if link was removed, False if not found
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Parse artifact ID
+        if ":" not in collection_artifact_id:
+            raise ValueError(
+                f"Invalid artifact ID format '{collection_artifact_id}'. "
+                "Expected 'type:name' format."
+            )
+
+        artifact_type, artifact_name = collection_artifact_id.split(":", 1)
+
+        try:
+            collection = self.load_collection(collection_name)
+        except ValueError:
+            return False
+
+        # Find the artifact
+        for artifact in collection.artifacts:
+            if (
+                artifact.name.lower() == artifact_name.lower()
+                and artifact.type.value.lower() == artifact_type.lower()
+            ):
+                links = artifact.metadata.extra.get("duplicate_links", [])
+                if discovered_path in links:
+                    links.remove(discovered_path)
+                    artifact.metadata.extra["duplicate_links"] = links
+                    self.save_collection(collection)
+                    logger.info(
+                        f"Removed duplicate link: {discovered_path} -> "
+                        f"{collection_artifact_id}"
+                    )
+                    return True
+
+        return False

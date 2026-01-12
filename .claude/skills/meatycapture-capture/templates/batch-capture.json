@@ -5,31 +5,34 @@
     {
       "title": "First item title",
       "type": "bug",
-      "domain": "core",
+      "domain": ["core"],
+      "subdomain": ["module-name"],
       "context": "module-name",
       "priority": "high",
       "status": "triage",
       "tags": ["bug", "critical-path"],
-      "notes": "Problem: [Describe the issue]\nGoal: [Desired outcome]\n\nContext: [Additional details]"
+      "notes": ["Problem: [Describe the issue]", "Goal: [Desired outcome]", "Context: [Additional details]"]
     },
     {
       "title": "Second item title",
       "type": "enhancement",
-      "domain": "web",
+      "domain": ["web"],
+      "subdomain": ["component-name"],
       "context": "component-name",
       "priority": "medium",
       "status": "backlog",
       "tags": ["ux", "enhancement"],
-      "notes": "Goal: [Desired improvement]\n\nBenefits: [Why this matters]\nConsiderations: [Trade-offs or dependencies]"
+      "notes": ["Goal: [Desired improvement]", "Benefits: [Why this matters]", "Considerations: [Trade-offs or dependencies]"]
     },
     {
       "title": "Third item title",
       "type": "task",
-      "domain": "docs",
+      "domain": ["docs"],
+      "subdomain": ["documentation"],
       "priority": "low",
       "status": "backlog",
       "tags": ["documentation", "task"],
-      "notes": "Goal: [Task objective]\n\nSteps:\n- [ ] Step 1\n- [ ] Step 2\n- [ ] Step 3"
+      "notes": ["Goal: [Task objective]", "Steps: Step 1, Step 2, Step 3"]
     }
   ]
 }

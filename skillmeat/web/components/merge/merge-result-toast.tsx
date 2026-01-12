@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import type { MergeExecuteResponse } from '@/types/merge';
 
 interface MergeResultToastProps {

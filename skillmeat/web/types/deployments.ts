@@ -24,6 +24,13 @@ export interface ArtifactDeployRequest {
   collection_name?: string;
   /** Overwrite existing deployment without prompting */
   overwrite?: boolean;
+  /**
+   * Custom destination path relative to project root.
+   * If provided, artifact will be deployed to {dest_path}/{artifact_name}/.
+   * Must not contain '..' or be absolute.
+   * Examples: '.claude/skills/', '.claude/skills/dev/'
+   */
+  dest_path?: string;
 }
 
 /** Request to undeploy (remove) an artifact from a project */
@@ -72,6 +79,32 @@ export interface ArtifactUndeployResponse {
   project_path: string;
 }
 
+/** Request to remove a deployed artifact from a specific project */
+export interface ProjectDeploymentRemovalRequest {
+  /** Name of the artifact to remove */
+  artifact_name: string;
+  /** Type of the artifact to remove */
+  artifact_type: string;
+  /** Whether to remove files from filesystem (default: True) */
+  remove_files?: boolean;
+}
+
+/** Response for removing a deployed artifact from a project */
+export interface ProjectDeploymentRemovalResponse {
+  /** Whether the removal was successful */
+  success: boolean;
+  /** Human-readable status message */
+  message: string;
+  /** Name of the removed artifact */
+  artifact_name: string;
+  /** Type of the removed artifact */
+  artifact_type: string;
+  /** Path to the project */
+  project_path: string;
+  /** Whether files were removed from filesystem */
+  files_removed: boolean;
+}
+
 /** Information about a single artifact deployment */
 export interface ArtifactDeploymentInfo {
   /** Artifact name */
@@ -84,6 +117,8 @@ export interface ArtifactDeploymentInfo {
   deployed_at: string;
   /** Relative path within .claude/ */
   artifact_path: string;
+  /** Absolute path to the project directory */
+  project_path: string;
   /** SHA at deployment time */
   collection_sha: string;
   /** Whether local modifications detected */

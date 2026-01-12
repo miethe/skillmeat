@@ -47,8 +47,7 @@ import {
 } from '@/components/ui/command';
 import { Tag, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDebounce } from '@/hooks/use-debounce';
-import { useSearchTags } from '@/hooks/use-tags';
+import { useDebounce, useSearchTags } from '@/hooks';
 
 export interface DirectoryTagInputProps {
   /** Directory path for context (used in labels and IDs) */

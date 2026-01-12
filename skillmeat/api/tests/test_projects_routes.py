@@ -5,9 +5,10 @@ and modification detection.
 """
 
 import base64
+import json
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -495,3 +496,181 @@ class TestDeleteProject:
         response = client.delete(f"/api/v1/projects/{project_id}")
 
         assert response.status_code == 404
+
+
+class TestRemoveProjectDeployment:
+    """Test DELETE /api/v1/projects/{id}/deployments/{artifact_name} endpoint."""
+
+    def test_remove_deployment_success_with_files(
+        self, client, sample_project_path, encode_project_id
+    ):
+        """Test successful deployment removal with files."""
+        project_id = encode_project_id(str(sample_project_path))
+        artifact_name = "test-skill"
+
+        # Mock deployment exists
+        mock_deployment = Deployment(
+            artifact_name=artifact_name,
+            artifact_type="skill",
+            from_collection="default",
+            deployed_at=datetime.utcnow(),
+            artifact_path=Path("skills/test-skill"),
+            content_hash="abc123def",
+            local_modifications=False,
+        )
+
+        with patch(
+            "skillmeat.storage.deployment.DeploymentTracker.get_deployment"
+        ) as mock_get_deployment:
+            with patch(
+                "skillmeat.storage.deployment.DeploymentTracker.remove_deployment"
+            ) as mock_remove_deployment:
+                with patch(
+                    "skillmeat.utils.filesystem.FilesystemManager.remove_artifact"
+                ) as mock_remove_artifact:
+                    with patch(
+                        "skillmeat.api.routers.projects.get_project_registry"
+                    ) as mock_get_registry:
+                        with patch(
+                            "skillmeat.core.analytics.EventTracker"
+                        ) as mock_event_tracker:
+                            mock_get_deployment.return_value = mock_deployment
+
+                            # Create async mock for get_project_registry
+                            mock_registry = AsyncMock()
+                            mock_registry.refresh_entry = AsyncMock(return_value=None)
+                            mock_get_registry.return_value = mock_registry
+
+                            # Create artifact file
+                            artifact_path = (
+                                sample_project_path / ".claude" / "skills" / "test-skill"
+                            )
+                            artifact_path.mkdir(parents=True, exist_ok=True)
+                            (artifact_path / "SKILL.md").touch()
+
+                            response = client.delete(
+                                f"/api/v1/projects/{project_id}/deployments/{artifact_name}?artifact_type=skill&remove_files=true"
+                            )
+
+                            assert response.status_code == 200
+                            data = response.json()
+                            assert data["success"] is True
+                            assert data["artifact_name"] == artifact_name
+                            assert data["artifact_type"] == "skill"
+                            assert data["files_removed"] is True
+
+                            # Verify tracking removal was called
+                            mock_remove_deployment.assert_called_once_with(
+                                sample_project_path, artifact_name, "skill"
+                            )
+
+    def test_remove_deployment_tracking_only(
+        self, client, sample_project_path, encode_project_id
+    ):
+        """Test deployment removal without removing files."""
+        project_id = encode_project_id(str(sample_project_path))
+        artifact_name = "test-skill"
+
+        # Mock deployment exists
+        mock_deployment = Deployment(
+            artifact_name=artifact_name,
+            artifact_type="skill",
+            from_collection="default",
+            deployed_at=datetime.utcnow(),
+            artifact_path=Path("skills/test-skill"),
+            content_hash="abc123def",
+            local_modifications=False,
+        )
+
+        with patch(
+            "skillmeat.storage.deployment.DeploymentTracker.get_deployment"
+        ) as mock_get_deployment:
+            with patch(
+                "skillmeat.storage.deployment.DeploymentTracker.remove_deployment"
+            ) as mock_remove_deployment:
+                with patch(
+                    "skillmeat.utils.filesystem.FilesystemManager.remove_artifact"
+                ) as mock_remove_artifact:
+                    with patch(
+                        "skillmeat.api.routers.projects.get_project_registry"
+                    ) as mock_get_registry:
+                        mock_get_deployment.return_value = mock_deployment
+
+                        # Create async mock for get_project_registry
+                        mock_registry = AsyncMock()
+                        mock_registry.refresh_entry = AsyncMock(return_value=None)
+                        mock_get_registry.return_value = mock_registry
+
+                        # Create artifact file
+                        artifact_path = (
+                            sample_project_path / ".claude" / "skills" / "test-skill"
+                        )
+                        artifact_path.mkdir(parents=True, exist_ok=True)
+                        (artifact_path / "SKILL.md").touch()
+
+                        response = client.delete(
+                            f"/api/v1/projects/{project_id}/deployments/{artifact_name}?artifact_type=skill&remove_files=false"
+                        )
+
+                        assert response.status_code == 200
+                        data = response.json()
+                        assert data["success"] is True
+                        assert data["files_removed"] is False
+
+                        # Verify only tracking removal was called, not file removal
+                        mock_remove_deployment.assert_called_once()
+                        mock_remove_artifact.assert_not_called()
+
+    def test_remove_deployment_not_found(
+        self, client, sample_project_path, encode_project_id
+    ):
+        """Test removing deployment that doesn't exist."""
+        project_id = encode_project_id(str(sample_project_path))
+        artifact_name = "nonexistent-skill"
+
+        with patch(
+            "skillmeat.storage.deployment.DeploymentTracker.get_deployment"
+        ) as mock_get_deployment:
+            mock_get_deployment.return_value = None
+
+            response = client.delete(
+                f"/api/v1/projects/{project_id}/deployments/{artifact_name}?artifact_type=skill&remove_files=true"
+            )
+
+            assert response.status_code == 404
+            assert "not found in project" in response.json()["detail"]
+
+    def test_remove_deployment_artifact_name_mismatch(
+        self, client, sample_project_path, encode_project_id
+    ):
+        """Test removing deployment with mismatched artifact names."""
+        # This test is no longer applicable since artifact name comes only from URL path now
+        # The test would be testing invalid artifact types instead
+        pass
+
+    def test_remove_deployment_invalid_artifact_type(
+        self, client, sample_project_path, encode_project_id
+    ):
+        """Test removing deployment with invalid artifact type."""
+        project_id = encode_project_id(str(sample_project_path))
+        artifact_name = "test-skill"
+
+        response = client.delete(
+            f"/api/v1/projects/{project_id}/deployments/{artifact_name}?artifact_type=invalid-type&remove_files=true"
+        )
+
+        assert response.status_code == 400
+        assert "Invalid artifact type" in response.json()["detail"]
+
+    def test_remove_deployment_project_not_found(self, client, encode_project_id):
+        """Test removing deployment from non-existent project."""
+        fake_path = "/nonexistent/project"
+        project_id = encode_project_id(fake_path)
+        artifact_name = "test-skill"
+
+        response = client.delete(
+            f"/api/v1/projects/{project_id}/deployments/{artifact_name}?artifact_type=skill&remove_files=true"
+        )
+
+        assert response.status_code == 404
+        assert "Project not found" in response.json()["detail"]

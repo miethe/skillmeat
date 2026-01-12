@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, HelpCircle } from 'lucide-react';
+import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, HelpCircle, Rocket } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 interface ArtifactListProps {
@@ -101,6 +102,7 @@ interface ArtifactRowActionsProps {
   onManageGroups?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDeploy?: () => void;
 }
 
 function ArtifactRowActions({
@@ -110,6 +112,7 @@ function ArtifactRowActions({
   onManageGroups,
   onEdit,
   onDelete,
+  onDeploy,
 }: ArtifactRowActionsProps) {
   return (
     <DropdownMenu>
@@ -126,6 +129,11 @@ function ArtifactRowActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={onDeploy}>
+          <Rocket className="mr-2 h-4 w-4" />
+          Deploy to Project
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onMoveToCollection}>
           <FolderPlus className="mr-2 h-4 w-4" />
           {collectionId ? 'Move to Collection' : 'Add to Collection'}
@@ -237,9 +245,14 @@ export function ArtifactList({
   onDelete,
 }: ArtifactListProps) {
   const [deleteArtifact, setDeleteArtifact] = useState<Artifact | null>(null);
+  const [deployArtifact, setDeployArtifact] = useState<Artifact | null>(null);
 
   const handleDelete = (artifact: Artifact) => {
     setDeleteArtifact(artifact);
+  };
+
+  const handleDeploy = (artifact: Artifact) => {
+    setDeployArtifact(artifact);
   };
 
   const confirmDelete = () => {
@@ -379,6 +392,7 @@ export function ArtifactList({
                     <ArtifactRowActions
                       artifact={artifact}
                       collectionId={artifact.collection?.id}
+                      onDeploy={() => handleDeploy(artifact)}
                       onMoveToCollection={onMoveToCollection ? () => onMoveToCollection(artifact) : undefined}
                       onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
                       onEdit={onEdit ? () => onEdit(artifact) : undefined}
@@ -391,6 +405,14 @@ export function ArtifactList({
           </TableBody>
         </Table>
       </div>
+
+      {/* Deploy Dialog */}
+      <DeployDialog
+        artifact={deployArtifact}
+        isOpen={!!deployArtifact}
+        onClose={() => setDeployArtifact(null)}
+        onSuccess={() => setDeployArtifact(null)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteArtifact} onOpenChange={(open) => !open && setDeleteArtifact(null)}>

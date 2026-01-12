@@ -194,7 +194,8 @@ const EntityLifecycleContext = createContext<EntityLifecycleContextValue | null>
 function mapApiArtifactToEntity(
   artifact: ArtifactResponse,
   mode: 'collection' | 'project',
-  projectPath?: string
+  projectPath?: string,
+  collectionId?: string
 ): Entity {
   const metadata = artifact.metadata || {};
   const artifactTags = artifact.tags || [];
@@ -229,11 +230,13 @@ function mapApiArtifactToEntity(
     status = 'outdated';
   }
 
+  const effectiveCollection = collectionId || 'default';
+
   return {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type as EntityType,
-    collection: mode === 'collection' ? 'default' : undefined,
+    collection: mode === 'collection' ? effectiveCollection : undefined,
     projectPath: mode === 'project' ? projectPath : undefined,
     status,
     tags: mergedTags,
@@ -260,6 +263,8 @@ export interface EntityLifecycleProviderProps {
   mode?: 'collection' | 'project';
   /** Required when mode is 'project' - path to the target project directory */
   projectPath?: string;
+  /** Optional collection ID for collection mode (defaults to 'default') */
+  collectionId?: string;
 }
 
 /**
@@ -294,6 +299,7 @@ export function EntityLifecycleProvider({
   children,
   mode = 'collection',
   projectPath,
+  collectionId,
 }: EntityLifecycleProviderProps) {
   const queryClient = useQueryClient();
 
@@ -325,7 +331,7 @@ export function EntityLifecycleProvider({
     queryKey,
     queryFn: async (): Promise<Entity[]> => {
       if (mode === 'collection') {
-        return fetchCollectionEntities(typeFilter, searchQuery);
+        return fetchCollectionEntities(typeFilter, searchQuery, collectionId);
       } else {
         if (!projectPath) {
           throw new Error('Project path is required for project mode');
@@ -616,7 +622,8 @@ export function useEntityLifecycle(): EntityLifecycleContextValue {
 
 async function fetchCollectionEntities(
   typeFilter: EntityType | null,
-  searchQuery: string
+  searchQuery: string,
+  collectionId?: string
 ): Promise<Entity[]> {
   const params = new URLSearchParams({
     limit: '100',
@@ -627,7 +634,9 @@ async function fetchCollectionEntities(
   }
 
   const processResponse = (response: ArtifactListResponse): Entity[] => {
-    const entities = response.items.map((item) => mapApiArtifactToEntity(item, 'collection'));
+    const entities = response.items.map((item) =>
+      mapApiArtifactToEntity(item, 'collection', undefined, collectionId)
+    );
 
     // Apply search filter client-side
     if (searchQuery) {
@@ -648,7 +657,7 @@ async function fetchCollectionEntities(
       const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
       return processResponse(response);
     },
-    () => generateMockCollectionEntities(typeFilter, searchQuery),
+    () => generateMockCollectionEntities(typeFilter, searchQuery, collectionId),
     'Collection'
   );
 }
@@ -704,14 +713,17 @@ async function fetchProjectEntities(
 
 function generateMockCollectionEntities(
   typeFilter: EntityType | null,
-  searchQuery: string
+  searchQuery: string,
+  collectionId?: string
 ): Entity[] {
+  const effectiveCollection = collectionId || 'default';
+
   const mockEntities: Entity[] = [
     {
       id: 'skill:canvas-design',
       name: 'canvas-design',
       type: 'skill',
-      collection: 'default',
+      collection: effectiveCollection,
       status: 'synced',
       tags: ['design', 'visual'],
       description: 'Create and edit visual designs with an interactive canvas',
@@ -724,7 +736,7 @@ function generateMockCollectionEntities(
       id: 'skill:docx-processor',
       name: 'docx-processor',
       type: 'skill',
-      collection: 'default',
+      collection: effectiveCollection,
       status: 'outdated',
       tags: ['document', 'docx'],
       description: 'Read and process Microsoft Word documents',
@@ -737,7 +749,7 @@ function generateMockCollectionEntities(
       id: 'command:git-helper',
       name: 'git-helper',
       type: 'command',
-      collection: 'default',
+      collection: effectiveCollection,
       status: 'synced',
       tags: ['git', 'vcs'],
       description: 'Custom git workflow commands',

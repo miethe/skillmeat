@@ -96,6 +96,12 @@ class DeploymentTracker:
             artifact_path = Path(f"commands/{artifact.name}.md")
         elif artifact.type.value == "agent":
             artifact_path = Path(f"agents/{artifact.name}.md")
+        elif artifact.type.value == "hook":
+            artifact_path = Path(f"hooks/{artifact.name}.md")
+        elif artifact.type.value == "mcp":
+            artifact_path = Path(f"mcp/{artifact.name}")
+        else:
+            raise ValueError(f"Unknown artifact type: {artifact.type.value}")
 
         # Check if deployment already exists (update it)
         existing = None

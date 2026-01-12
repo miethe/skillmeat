@@ -4,11 +4,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PathTagReview, PathTagReviewSkeleton } from '@/components/marketplace/path-tag-review';
-import { usePathTags, useUpdatePathTagStatus } from '@/hooks/use-path-tags';
+import { usePathTags, useUpdatePathTagStatus } from '@/hooks';
 import type { PathSegmentsResponse, ExtractedSegment } from '@/types/path-tags';
 
 // Mock hooks
-jest.mock('@/hooks/use-path-tags', () => ({
+jest.mock('@/hooks', () => ({
   usePathTags: jest.fn(),
   useUpdatePathTagStatus: jest.fn(),
 }));

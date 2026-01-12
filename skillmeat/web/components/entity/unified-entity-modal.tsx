@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +36,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Entity, ENTITY_TYPES } from '@/types/entity';
-import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
+import type { Artifact } from '@/types/artifact';
+import { useEntityLifecycle } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
 import { MergeWorkflow } from '@/components/entity/merge-workflow';
@@ -49,14 +50,19 @@ import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-di
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
-import { useEditArtifactParameters } from '@/hooks/useDiscovery';
-import { useToast } from '@/hooks/use-toast';
+import {
+  useEditArtifactParameters,
+  useToast,
+  deploymentKeys,
+  useProjects,
+  usePendingContextChanges,
+} from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
-import { useDeploymentList } from '@/hooks/use-deployments';
+import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
-import { usePendingContextChanges } from '@/hooks/use-context-sync';
+import { DeployDialog } from '@/components/collection/deploy-dialog';
 import type {
   ArtifactDiffResponse,
   ArtifactUpstreamDiffResponse,
@@ -64,6 +70,7 @@ import type {
 } from '@/sdk';
 import type { FileListResponse, FileContentResponse, FileUpdateRequest } from '@/types/files';
 import type { ArtifactParameters } from '@/types/discovery';
+import type { ArtifactDeploymentInfo } from '@/types/deployments';
 import type { Deployment } from '@/components/deployments/deployment-card';
 
 interface UnifiedEntityModalProps {
@@ -302,6 +309,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showParameterEditor, setShowParameterEditor] = useState(false);
   // Artifact deletion state
   const [showDeletionDialog, setShowDeletionDialog] = useState(false);
+  // Deploy dialog state
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -479,19 +488,45 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
-  // Fetch deployments for this artifact
-  const {
-    data: deploymentsData,
-    isLoading: isDeploymentsLoading,
-    error: deploymentsError,
-  } = useDeploymentList();
+  // Fetch projects for deployment card project name display AND for querying all deployments
+  const { data: projects, isLoading: isProjectsLoading } = useProjects();
+
+  // Fetch deployments for ALL registered projects in parallel
+  // This allows us to show all deployments of this artifact across all projects
+  const deploymentQueries = useQueries({
+    queries: (projects || []).map((project) => ({
+      queryKey: deploymentKeys.list(project.path),
+      queryFn: () => listDeployments(project.path),
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      enabled: !!projects && projects.length > 0,
+    })),
+  });
+
+  // Combine deployment results from all projects
+  const isDeploymentsLoading = isProjectsLoading || deploymentQueries.some((q) => q.isLoading);
+  const deploymentsError = deploymentQueries.find((q) => q.error)?.error;
+
+  // Combine all deployments from all projects into a single array
+  const allDeployments = useMemo((): ArtifactDeploymentInfo[] => {
+    if (!projects || projects.length === 0) return [];
+
+    const combined: ArtifactDeploymentInfo[] = [];
+
+    deploymentQueries.forEach((query) => {
+      if (query.data?.deployments) {
+        combined.push(...query.data.deployments);
+      }
+    });
+
+    return combined;
+  }, [deploymentQueries, projects]);
 
   // Filter deployments by artifact name
   const artifactDeployments = useMemo(() => {
-    if (!deploymentsData?.deployments || !entity) return [];
+    if (!allDeployments || allDeployments.length === 0 || !entity) return [];
 
     // Filter deployments that match this artifact
-    const filtered = deploymentsData.deployments.filter(
+    const filtered = allDeployments.filter(
       (d) => d.artifact_name === entity.name && d.artifact_type === entity.type
     );
 
@@ -507,29 +542,117 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
       return {
         ...d,
-        id: d.artifact_path, // Use path as unique ID
+        id: `${d.project_path}::${d.artifact_path}`, // Use project_path + artifact_path as unique ID for uniqueness across projects
         status,
         latest_version: entity.version,
         deployed_version: d.collection_sha?.substring(0, 7), // Use SHA as version indicator
       };
     });
-  }, [deploymentsData, entity]);
+  }, [allDeployments, entity]);
 
-  // Count unique collections (projects are determined by the parent query)
-  const deploymentProjectCount = useMemo(() => {
-    const collections = new Set(
-      artifactDeployments
-        .map((d) => d.from_collection)
-        .filter((c): c is string => c != null)
-    );
-    return collections.size;
+  // Extract deployment paths for this artifact (used by DeployDialog to show existing deployments)
+  // Must combine project_path + artifact_path for checkIsAlreadyDeployed to match correctly
+  const existingDeploymentPaths = useMemo(() => {
+    return artifactDeployments.map((d) => `${d.project_path}/${d.artifact_path}`);
   }, [artifactDeployments]);
+
+  // Count unique projects where this artifact is deployed
+  const deploymentProjectCount = useMemo(() => {
+    const projectPaths = new Set(
+      artifactDeployments
+        .map((d) => d.project_path)
+        .filter((p): p is string => p != null)
+    );
+    return projectPaths.size;
+  }, [artifactDeployments]);
+
+  // Convert Entity to Artifact format for DeployDialog
+  const artifactForDeploy = useMemo(() => {
+    if (!entity) return null;
+    return {
+      id: entity.id,
+      name: entity.name,
+      type: entity.type,
+      scope: 'user' as const,
+      status: 'active' as const,
+      version: entity.version,
+      source: entity.source,
+      metadata: {
+        description: entity.description,
+        version: entity.version,
+        tags: entity.tags,
+      },
+      upstreamStatus: {
+        hasUpstream: !!entity.source,
+        isOutdated: entity.status === 'outdated',
+      },
+      usageStats: {
+        totalDeployments: artifactDeployments.length,
+        activeProjects: deploymentProjectCount,
+        usageCount: 0,
+      },
+      createdAt: entity.deployedAt || new Date().toISOString(),
+      updatedAt: entity.modifiedAt || new Date().toISOString(),
+      aliases: entity.aliases,
+      collection: entity.collection
+        ? {
+            id: entity.collection,
+            name: entity.collection,
+          }
+        : undefined,
+    };
+  }, [entity, artifactDeployments.length, deploymentProjectCount]);
 
   // Get pending context changes count if this is a context entity
   const pendingContextCount = usePendingContextChanges(
     isContextEntity(entity) ? entity.id : undefined,
     entity?.projectPath
   );
+
+  // Helper function to encode project path as base64 for API
+  const encodeProjectId = (projectPath: string): string => {
+    return btoa(projectPath);
+  };
+
+  // Handler for removing deployment from a project
+  const handleDeploymentRemove = async (deployment: Deployment, removeFiles: boolean) => {
+    if (!entity) return;
+
+    try {
+      const projectId = encodeProjectId(deployment.project_path);
+
+      await removeProjectDeployment(
+        projectId,
+        deployment.artifact_name,
+        deployment.artifact_type,
+        removeFiles
+      );
+
+      // Invalidate deployment queries to refresh the list
+      await queryClient.invalidateQueries({
+        queryKey: deploymentKeys.list(deployment.project_path)
+      });
+
+      // Also invalidate all deployment queries since we're showing deployments from all projects
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'deployments'
+      });
+
+      toast({
+        title: 'Deployment Removed',
+        description: `Successfully removed "${deployment.artifact_name}" from project${removeFiles ? ' and deleted files from filesystem' : ''}`,
+      });
+    } catch (error) {
+      console.error('Failed to remove deployment:', error);
+      toast({
+        title: 'Removal Failed',
+        description: error instanceof Error ? error.message : 'Failed to remove deployment',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
@@ -1378,6 +1501,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
               >
                 <Rocket className="mr-2 h-4 w-4" />
                 Deployments
+                {artifactDeployments.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {artifactDeployments.length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
 
@@ -1717,15 +1845,25 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             <TabsContent value="deployments" className="mt-0 flex-1">
               <ScrollArea className="h-[calc(90vh-12rem)]">
                 <div className="space-y-4 py-4">
-                  {/* Summary */}
-                  {artifactDeployments.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground">
-                        {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
-                        {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
-                      </p>
+                  {/* Header with Deploy button and Summary */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {artifactDeployments.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
+                          {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
+                        </p>
+                      )}
                     </div>
-                  )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDeployDialog(true)}
+                    >
+                      <Rocket className="mr-2 h-4 w-4" />
+                      Deploy to Project
+                    </Button>
+                  </div>
 
                   {/* Loading state */}
                   {isDeploymentsLoading && (
@@ -1773,6 +1911,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                         <DeploymentCard
                           key={deployment.id}
                           deployment={deployment}
+                          projects={projects}
                           onUpdate={() => {
                             // TODO: Implement update handler
                             toast({
@@ -1780,13 +1919,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                               description: 'Deployment update functionality coming soon',
                             });
                           }}
-                          onRemove={() => {
-                            // TODO: Implement remove handler
-                            toast({
-                              title: 'Remove Deployment',
-                              description: 'Deployment removal functionality coming soon',
-                            });
-                          }}
+                          onRemove={(removeFiles) => handleDeploymentRemove(deployment, removeFiles)}
                           onViewSource={() => {
                             // Close modal - user is already viewing the source
                             onClose();
@@ -1893,6 +2026,22 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
         onSuccess={() => {
           onClose();
           setShowDeletionDialog(false);
+        }}
+      />
+
+      {/* Deploy Dialog */}
+      <DeployDialog
+        artifact={artifactForDeploy}
+        existingDeploymentPaths={existingDeploymentPaths}
+        isOpen={showDeployDialog}
+        onClose={() => setShowDeployDialog(false)}
+        onSuccess={() => {
+          toast({
+            title: 'Deployment Successful',
+            description: `${entity.name} has been deployed to the project.`,
+          });
+          // Refresh deployments list
+          queryClient.invalidateQueries({ queryKey: ['deployments'] });
         }}
       />
     </>

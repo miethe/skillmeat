@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useToast } from '@/hooks';
 import { DiffViewer, type ResolutionType } from '@/components/entity/diff-viewer';
 import type { FileDiff } from '@/sdk/models/FileDiff';
 import {
@@ -219,7 +225,21 @@ export function ContextSyncStatus({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Sync Status</CardTitle>
-            <Badge variant="secondary">{pendingCount} pending</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{pendingCount} pending</Badge>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs cursor-help">
+                      Preview
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Context sync detection works, but pull/push/resolve are not yet implemented.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

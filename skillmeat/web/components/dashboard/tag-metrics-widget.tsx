@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useTags } from '@/hooks/use-tags';
+import { useTags } from '@/hooks';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';

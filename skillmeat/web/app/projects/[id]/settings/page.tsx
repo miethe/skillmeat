@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useProject, useUpdateProject } from '@/hooks/useProjects';
-import { useToast } from '@/hooks/use-toast';
+import { useProject, useUpdateProject, useToast } from '@/hooks';
 import { DeleteProjectDialog } from '../../components/delete-project-dialog';
 import type { ProjectUpdateRequest } from '@/sdk';
 

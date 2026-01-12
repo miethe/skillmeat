@@ -29,7 +29,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { useDeploymentList, useDeploymentSummary, useRefreshDeployments } from '@/hooks/use-deployments';
+import { useDeploymentList, useDeploymentSummary, useRefreshDeployments } from '@/hooks';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import type { ArtifactDeploymentInfo, ArtifactSyncStatus } from '@/types/deployments';
 import type { ArtifactType } from '@/types/artifact';

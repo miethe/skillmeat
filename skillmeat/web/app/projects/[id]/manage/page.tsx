@@ -24,7 +24,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useProject } from '@/hooks/useProjects';
+import { useProject } from '@/hooks';
 
 interface ProjectManagePageContentProps {
   projectPath: string;

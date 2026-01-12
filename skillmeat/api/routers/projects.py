@@ -13,7 +13,7 @@ from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from skillmeat.api.dependencies import get_app_state, verify_api_key
+from skillmeat.api.dependencies import get_app_state, get_collection_manager, verify_api_key
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.artifacts import (
     DeploymentModificationStatus,
@@ -33,6 +33,7 @@ from skillmeat.api.schemas.projects import (
     ProjectCreateRequest,
     ProjectCreateResponse,
     ProjectDeleteResponse,
+    ProjectDeploymentRemovalResponse,
     ProjectDetail,
     ProjectListResponse,
     ProjectSummary,
@@ -987,6 +988,192 @@ async def delete_project(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete project: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{project_id}/deployments/{artifact_name}",
+    response_model=ProjectDeploymentRemovalResponse,
+    summary="Remove deployment from project",
+    description="Remove a specific artifact deployment from a project",
+    responses={
+        200: {"description": "Deployment removed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Project or deployment not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def remove_project_deployment(
+    project_id: str,
+    artifact_name: str,
+    token: TokenDep,
+    artifact_type: str = Query(
+        description="Type of the artifact to remove",
+        examples=["skill"],
+    ),
+    remove_files: bool = Query(
+        default=True,
+        description="Whether to remove files from filesystem (default: True)",
+    ),
+) -> ProjectDeploymentRemovalResponse:
+    """Remove a deployed artifact from a specific project.
+
+    This endpoint removes an artifact deployment from a specific project,
+    including:
+    - Removing from SkillMeat system tracking
+    - Optionally removing files from local filesystem at project path
+
+    The operation only affects the specific project deployment and leaves:
+    - The collection artifact intact
+    - Other project deployments of the same artifact intact
+
+    Args:
+        project_id: Base64-encoded project path
+        artifact_name: Name of the artifact to remove
+        request: Deployment removal request with artifact details and options
+        token: Authentication token
+
+    Returns:
+        ProjectDeploymentRemovalResponse with removal status
+
+    Raises:
+        HTTPException: If project not found, deployment not found, or on error
+
+    Example:
+        DELETE /api/v1/projects/L1VzZXJzL21lL3Byb2plY3Qx/deployments/pdf-processor?artifact_type=skill&remove_files=true
+
+        Returns:
+        {
+            "success": true,
+            "message": "Artifact 'pdf-processor' removed from project successfully",
+            "artifact_name": "pdf-processor",
+            "artifact_type": "skill",
+            "project_path": "/Users/me/project1",
+            "files_removed": true
+        }
+    """
+    try:
+        logger.info(
+            f"Removing deployment: {artifact_name} "
+            f"({artifact_type}) from project {project_id}"
+        )
+
+        # Decode project ID to path
+        project_path_str = decode_project_id(project_id)
+        project_path = Path(project_path_str)
+
+        # Validate project exists
+        if not project_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project not found at path: {project_path_str}",
+            )
+
+        # Validate artifact type
+        try:
+            from skillmeat.core.artifact import ArtifactType
+            artifact_type_enum = ArtifactType(artifact_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid artifact type: {artifact_type}",
+            )
+
+        # Check if deployment exists
+        deployment = DeploymentTracker.get_deployment(
+            project_path, artifact_name, artifact_type
+        )
+
+        if not deployment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Deployment '{artifact_name}' ({artifact_type}) not found in project",
+            )
+
+        # Track the artifact info before removal
+        artifact_path = project_path / ".claude" / deployment.artifact_path
+        files_existed = artifact_path.exists()
+
+        # Perform the removal - handle files separately based on remove_files option
+        files_removed = False
+        try:
+            # Remove files from filesystem if requested and they exist
+            if remove_files and files_existed:
+                from skillmeat.utils.filesystem import FilesystemManager
+                fs_mgr = FilesystemManager()
+                fs_mgr.remove_artifact(artifact_path)
+                files_removed = True
+                logger.info(
+                    f"Removed files: {artifact_path} "
+                    f"(artifact: {artifact_name}, type: {artifact_type})"
+                )
+
+            # Always remove deployment record from tracking
+            DeploymentTracker.remove_deployment(
+                project_path, artifact_name, artifact_type
+            )
+            logger.info(
+                f"Removed deployment record: {artifact_name} "
+                f"({artifact_type}) from {project_path}"
+            )
+
+            # Track remove event for analytics
+            try:
+                from skillmeat.core.analytics import EventTracker
+
+                with EventTracker() as tracker:
+                    tracker.track_remove(
+                        artifact_name=artifact_name,
+                        artifact_type=artifact_type,
+                        collection_name=deployment.from_collection,
+                        reason="user_action",
+                        from_project=True,
+                    )
+            except Exception as e:
+                # Never fail undeploy due to analytics
+                logger.warning(f"Failed to record remove analytics: {e}")
+
+            # files_removed already set based on actual operation
+
+            # Update project cache
+            registry = await get_project_registry()
+            await registry.refresh_entry(project_path)
+
+            response = ProjectDeploymentRemovalResponse(
+                success=True,
+                message=f"Artifact '{artifact_name}' removed from project successfully",
+                artifact_name=artifact_name,
+                artifact_type=artifact_type,
+                project_path=str(project_path),
+                files_removed=files_removed,
+            )
+
+            logger.info(
+                f"Successfully removed deployment: {artifact_name} "
+                f"({artifact_type}) from {project_path}"
+            )
+            return response
+
+        except ValueError as e:
+            # Deployment not found or other validation error
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+
+    except Exception as e:
+        logger.error(
+            f"Error removing deployment '{artifact_name}' from project '{project_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to remove deployment: {str(e)}",
         )
 
 

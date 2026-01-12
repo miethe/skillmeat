@@ -106,6 +106,7 @@ class Artifact:
     resolved_sha: Optional[str] = None
     resolved_version: Optional[str] = None
     last_updated: Optional[datetime] = None
+    discovered_at: Optional[datetime] = None  # When artifact was first discovered or last changed
     tags: List[str] = field(default_factory=list)
 
     def __post_init__(self):
@@ -177,6 +178,8 @@ class Artifact:
             result["resolved_version"] = self.resolved_version
         if self.last_updated is not None:
             result["last_updated"] = self.last_updated.isoformat()
+        if self.discovered_at is not None:
+            result["discovered_at"] = self.discovered_at.isoformat()
         if self.tags:
             result["tags"] = self.tags
 
@@ -194,6 +197,9 @@ class Artifact:
         last_updated = None
         if "last_updated" in data and data["last_updated"] is not None:
             last_updated = datetime.fromisoformat(data["last_updated"])
+        discovered_at = None
+        if "discovered_at" in data and data["discovered_at"] is not None:
+            discovered_at = datetime.fromisoformat(data["discovered_at"])
 
         return cls(
             name=data["name"],
@@ -207,6 +213,7 @@ class Artifact:
             resolved_sha=data.get("resolved_sha"),
             resolved_version=data.get("resolved_version"),
             last_updated=last_updated,
+            discovered_at=discovered_at,
             tags=data.get("tags", []),
         )
 

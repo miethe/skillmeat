@@ -77,22 +77,23 @@ Provide:
 
 ### 2.1 Create Request Log Entry
 
-If this is a new bug not already tracked:
+If this is a new bug not already tracked, use `mc-quick.sh` for token-efficient capture:
 
 ```bash
-# Create bug entry in request log
-meatycapture log create --json << 'EOF'
-{
-  "title": "[BUG_TITLE_FROM_ARGUMENTS]",
-  "type": "bug",
-  "domain": "[DOMAIN]",
-  "priority": "[SEVERITY]",
-  "status": "in-progress",
-  "tags": ["debug", "[COMPONENT]"],
-  "notes": "Root cause: [IDENTIFIED_ROOT_CAUSE]\nFix strategy: [PLANNED_APPROACH]"
-}
-EOF
+# Quick capture with mc-quick.sh (~50 tokens vs ~200+ for JSON)
+MC_STATUS=in-progress MC_PRIORITY=[SEVERITY] mc-quick.sh bug [DOMAIN] [COMPONENT] \
+  "[BUG_TITLE]" \
+  "Root cause: [IDENTIFIED_ROOT_CAUSE]" \
+  "Fix strategy: [PLANNED_APPROACH]"
+
+# Example:
+MC_STATUS=in-progress MC_PRIORITY=high mc-quick.sh bug api auth \
+  "Fix session timeout" \
+  "Root cause: Token expiry set to 5min" \
+  "Fix strategy: Extend TTL to 24 hours"
 ```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 
 ### 2.2 Define Remediation Plan
 
@@ -190,47 +191,30 @@ git status --porcelain | grep "^??" | awk '{print $2}' | xargs -I {} sh -c 'file
 
 ## Phase 5: Documentation
 
-### 5.1 Update Bug-Fixes Document
+### 5.1 Update Bug-Fixes Document + Request Log
 
-**File**: `.claude/worknotes/fixes/bug-fixes-{YYYY}-{MM}.md`
+**Use `update-bug-docs.py`** to automate both updates in one command:
 
-Create directory if needed:
+```bash
+# After commit: updates bug-fixes doc + marks request-log item done
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-skillmeat
+
+# Preview without editing
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-skillmeat --dry-run
+
+# Multiple commits
+.claude/scripts/update-bug-docs.py --commits sha1,sha2,sha3 --req-log REQ-YYYYMMDD-skillmeat
+```
+
+**Script location**: `.claude/scripts/update-bug-docs.py`
+**Full spec**: `.claude/specs/script-usage/bug-automation-scripts.md`
+
+### 5.2 Manual Updates (Fallback)
+
+Only if script unavailable:
 
 ```bash
 mkdir -p .claude/worknotes/fixes
-```
-
-Add entry using this format:
-
-```markdown
-### [BUG_DESCRIPTIVE_TITLE]
-
-**Date Fixed**: [YYYY-MM-DD]
-**Severity**: [critical|high|medium|low]
-**Component**: [component-name]
-
-**Issue**: [Explanation of what was broken]
-
-**Root Cause**: [Technical explanation of why it happened]
-
-**Fix**: [Description of changes made]
-
-**Files Modified**:
-- `path/to/file1` - [What changed]
-- `path/to/file2` - [What changed]
-
-**Testing**: [How it was validated]
-
-**Commit(s)**: [commit-hash]
-
-**Status**: RESOLVED
-```
-
-### 5.2 Update Request Log
-
-If a request log entry was created:
-
-```bash
 meatycapture log item update [DOC_PATH] [ITEM_ID] --status done
 meatycapture log note add [DOC_PATH] [ITEM_ID] -c "Fixed in commit [HASH]. Root cause: [BRIEF]"
 ```

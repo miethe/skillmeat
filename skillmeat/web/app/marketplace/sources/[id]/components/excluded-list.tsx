@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useRestoreCatalogEntry } from '@/hooks/useMarketplaceSources';
+import { useRestoreCatalogEntry } from '@/hooks';
 import type { CatalogEntry } from '@/types/marketplace';
 
 export interface ExcludedArtifactsListProps {

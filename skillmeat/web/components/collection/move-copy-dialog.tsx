@@ -14,9 +14,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useAddArtifactToCollection, useRemoveArtifactFromCollection } from '@/hooks/use-collections';
-import { useToast } from '@/hooks/use-toast';
+import { useCollectionContext, useAddArtifactToCollection, useRemoveArtifactFromCollection, useToast } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 

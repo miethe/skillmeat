@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
 import { ConflictResolver } from './conflict-resolver';
-import { useSync, type ConflictInfo } from '@/hooks/useSync';
+import { useSync, type ConflictInfo } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 export interface SyncDialogProps {

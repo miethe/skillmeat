@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useToastNotification } from '@/hooks/use-toast-notification';
+import { useToastNotification } from '@/hooks';
 import type { DiscoveredArtifact } from '@/types/discovery';
 
 /**
