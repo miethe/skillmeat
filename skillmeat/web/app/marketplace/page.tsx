@@ -9,7 +9,7 @@ import { MarketplaceFilters } from '@/components/marketplace/MarketplaceFilters'
 import { MarketplaceStats } from '@/components/marketplace/MarketplaceStats';
 import { MarketplaceInstallDialog } from '@/components/marketplace/MarketplaceInstallDialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useListings, useBrokers, useInstallListing } from '@/hooks/useMarketplace';
+import { useListings, useBrokers, useInstallListing } from '@/hooks';
 import { useRouter } from 'next/navigation';
 import type { MarketplaceListing, MarketplaceFilters as Filters } from '@/types/marketplace';
 

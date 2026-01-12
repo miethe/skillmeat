@@ -36,8 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeployDialog } from './deploy-dialog';
 import { SyncDialog } from './sync-dialog';
 import { VersionTreeView } from './version-tree';
-import { useVersionGraph } from '@/hooks/useVersionGraph';
-import { useArtifactTags } from '@/hooks/use-tags';
+import { useVersionGraph, useArtifactTags } from '@/hooks';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 interface ArtifactDetailProps {

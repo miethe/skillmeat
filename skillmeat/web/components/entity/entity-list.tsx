@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Entity } from '@/types/entity';
 import { EntityCard, EntityCardSkeleton } from './entity-card';
 import { EntityRow } from './entity-row';
-import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
+import { useEntityLifecycle } from '@/hooks';
 
 const { useCallback } = React;
 

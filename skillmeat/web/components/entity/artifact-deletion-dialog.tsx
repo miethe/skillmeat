@@ -30,8 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Loader2, Trash2 } from 'lucide-react';
-import { useArtifactDeletion } from '@/hooks/use-artifact-deletion';
-import { useDeploymentList } from '@/hooks/use-deployments';
+import { useArtifactDeletion, useDeploymentList } from '@/hooks';
 import { toast } from 'sonner';
 import type { Artifact } from '@/types/artifact';
 

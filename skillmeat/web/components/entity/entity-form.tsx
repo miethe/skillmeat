@@ -4,8 +4,15 @@ import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Loader2, X, CheckCircle2 } from 'lucide-react';
 import { EntityType, EntityFormField, ENTITY_TYPES, Entity } from '@/types/entity';
-import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
-import { useGitHubMetadata } from '@/hooks/useDiscovery';
+import {
+  useEntityLifecycle,
+  useGitHubMetadata,
+  useTags,
+  useArtifactTags,
+  useAddTagToArtifact,
+  useRemoveTagFromArtifact,
+  useCreateTag,
+} from '@/hooks';
 import { useDebouncedCallback } from 'use-debounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,13 +27,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TagInput, type Tag } from '@/components/ui/tag-input';
-import {
-  useTags,
-  useArtifactTags,
-  useAddTagToArtifact,
-  useRemoveTagFromArtifact,
-  useCreateTag,
-} from '@/hooks/use-tags';
 
 /**
  * Props for EntityForm component

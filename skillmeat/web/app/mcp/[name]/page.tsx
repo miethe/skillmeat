@@ -25,15 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
 import {
+  useToast,
   useMcpServer,
   useMcpDeploymentStatus,
   useUpdateMcpServer,
   useDeleteMcpServer,
   useDeployMcpServer,
   useUndeployMcpServer,
-} from '@/hooks/useMcpServers';
+} from '@/hooks';
 import { MCPServerForm } from '@/components/mcp/MCPServerForm';
 import { MCPDeployButton } from '@/components/mcp/MCPDeployButton';
 import type { MCPFormData, MCPServerStatus } from '@/types/mcp';

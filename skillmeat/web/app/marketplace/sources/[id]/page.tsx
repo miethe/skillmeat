@@ -76,8 +76,8 @@ import {
   useExcludeCatalogEntry,
   useUpdateSource,
   sourceKeys,
-} from '@/hooks/useMarketplaceSources';
-import { useToast } from '@/hooks/use-toast';
+  useToast,
+} from '@/hooks';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';

@@ -13,12 +13,14 @@ import { CreateCollectionDialog } from '@/components/collection/create-collectio
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
-import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useArtifacts } from '@/hooks/useArtifacts';
-import { useCollectionArtifacts } from '@/hooks/use-collections';
-import { useEditArtifactParameters } from '@/hooks/useDiscovery';
-import { useToast } from '@/hooks/use-toast';
+import {
+  EntityLifecycleProvider,
+  useCollectionContext,
+  useArtifacts,
+  useCollectionArtifacts,
+  useEditArtifactParameters,
+  useToast,
+} from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { Entity } from '@/types/entity';

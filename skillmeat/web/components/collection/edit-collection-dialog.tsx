@@ -24,9 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useUpdateCollection, useDeleteCollection } from '@/hooks/use-collections';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useToast } from '@/hooks/use-toast';
+import { useUpdateCollection, useDeleteCollection, useCollectionContext, useToast } from '@/hooks';
 import type { Collection } from '@/types/collections';
 import type { UpdateCollectionRequest } from '@/types/collections';
 

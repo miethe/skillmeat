@@ -7,7 +7,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, GitBranch, Activity, Clock } from 'lucide-react';
-import { useAnalyticsSummary } from '@/hooks/useAnalytics';
+import { useAnalyticsSummary } from '@/hooks';
 import { formatDistanceToNow } from '@/lib/utils';
 
 export function StatsCards() {

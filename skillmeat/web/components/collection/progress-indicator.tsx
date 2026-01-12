@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useSSE } from '@/hooks/useSSE';
+import { useSSE } from '@/hooks';
 
 export interface ProgressStep {
   step: string;
