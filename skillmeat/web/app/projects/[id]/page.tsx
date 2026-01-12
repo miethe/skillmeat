@@ -29,7 +29,33 @@ import { DiscoveryTab } from '@/components/discovery/DiscoveryTab';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
 import type { DeployedArtifact } from '@/types/project';
 import type { Entity, EntityType } from '@/types/entity';
-import type { DiscoveredArtifact } from '@/types/discovery';
+import type { DiscoveredArtifact, MatchType } from '@/types/discovery';
+
+/**
+ * Get the effective match type from a discovered artifact.
+ * Prioritizes collection_match.type, falls back to collection_status.match_type.
+ */
+function getEffectiveMatchType(artifact: DiscoveredArtifact): MatchType {
+  // Prefer collection_match (hash-based matching)
+  if (artifact.collection_match?.type) {
+    return artifact.collection_match.type;
+  }
+  // Fallback to collection_status.match_type
+  if (artifact.collection_status?.match_type) {
+    return artifact.collection_status.match_type;
+  }
+  return 'none';
+}
+
+/**
+ * Filter artifacts to only include "new" ones (not already in collection)
+ */
+function filterNewArtifacts(artifacts: DiscoveredArtifact[]): DiscoveredArtifact[] {
+  return artifacts.filter((artifact) => {
+    const matchType = getEffectiveMatchType(artifact);
+    return matchType === 'none';
+  });
+}
 
 const artifactTypeIcons = {
   skill: Folder,
@@ -520,9 +546,9 @@ function ProjectDetailPageContent() {
           onClose={handleDetailClose}
         />
 
-        {/* Bulk Import Modal */}
+        {/* Bulk Import Modal - only show new artifacts (not already in collection) */}
         <BulkImportModal
-          artifacts={discoveredArtifacts}
+          artifacts={filterNewArtifacts(discoveredArtifacts)}
           open={showImportModal}
           onClose={() => setShowImportModal(false)}
           onImport={handleImport}
