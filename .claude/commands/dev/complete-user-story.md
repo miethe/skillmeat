@@ -1,6 +1,6 @@
 ---
 description: Complete a user story end-to-end with automatic subagent orchestration
-argument-hint: [<story_id>] | [<attached_user_story.md>]
+argument-hint: "[<story_id>] | [<attached_user_story.md>]"
 allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
   Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(pytest:*),
   Bash(uv:*), Bash(pre-commit:*), Bash(pytest:*),

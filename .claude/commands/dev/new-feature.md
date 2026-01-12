@@ -1,7 +1,7 @@
 ---
 description: Scaffold a feature following MP architecture (schema → DTO → repo → service → API → UI)
 allowed-tools: Read(./**), Write(./**), Edit, MultiEdit
-argument-hint: [feature-name]
+argument-hint: "[feature-name]"
 ---
 
 <!-- MeatyCapture Integration - Project: skillmeat -->

@@ -1,7 +1,7 @@
 ---
 description: Perform comprehensive SPIKE research and design with domain experts and ADR documentation
 allowed-tools: Read(./**), Write(./**), Edit, MultiEdit, Glob, Grep, Bash
-argument-hint: [document-path-or-feature-description]
+argument-hint: "[document-path-or-feature-description]"
 ---
 
 Execute comprehensive SPIKE for "$ARGUMENTS" using MP architecture patterns:

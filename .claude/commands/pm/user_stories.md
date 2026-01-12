@@ -1,7 +1,7 @@
 ---
 description: Create implementation plan with Epic headers and Story ID tables, then auto-extract individual story files
 allowed-tools: Read(./**), Write(./docs/**), Edit, Bash
-argument-hint: [STORY_IDS] [ATTACHMENT] [ADDITIONAL_DETAILS]
+argument-hint: "[STORY_IDS] [ATTACHMENT] [ADDITIONAL_DETAILS]"
 ---
 
 # Implementation Plan & User Story Creation

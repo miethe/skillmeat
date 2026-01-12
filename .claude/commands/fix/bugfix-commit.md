@@ -1,7 +1,7 @@
 ---
 description: Prepare a minimal bugfix commit (single change set).
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Read(./**), Edit
-argument-hint: [one-line summary]
+argument-hint: "[one-line summary]"
 ---
 
 ## Context

@@ -1,7 +1,7 @@
 ---
 description: Fix common architecture violations (mixed DTO/ORM, direct Radix imports, etc.)
 allowed-tools: Read(./**), Edit, MultiEdit, Grep
-argument-hint: [violation-type]
+argument-hint: "[violation-type]"
 ---
 
 Common violations to fix:
