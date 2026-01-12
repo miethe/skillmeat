@@ -41,8 +41,8 @@ function enrichArtifactSummary(
   allArtifacts: Artifact[],
   collectionInfo?: { id: string; name: string }
 ): Artifact {
-  // Try to find matching full artifact by name (primary key for artifacts)
-  const fullArtifact = allArtifacts.find(a => a.name === summary.name);
+  // Try to find matching full artifact by name and type
+  const fullArtifact = allArtifacts.find(a => a.name === summary.name && a.type === summary.type);
 
   if (fullArtifact) {
     // If we have collection context and the full artifact lacks it, add it

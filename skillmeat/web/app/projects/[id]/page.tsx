@@ -134,9 +134,9 @@ function ProjectDetailPageContent() {
   };
 
   const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
-    // Try to find matching artifact from collection by name
+    // Try to find matching artifact from collection by name and type
     const matchingArtifact = artifactsData?.artifacts.find(
-      (artifact) => artifact.name === deployedArtifact.artifact_name
+      (artifact) => artifact.name === deployedArtifact.artifact_name && artifact.type === deployedArtifact.artifact_type
     );
 
     if (matchingArtifact) {

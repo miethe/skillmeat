@@ -25,6 +25,8 @@ from skillmeat.models import (
     SyncResult,
     ArtifactSyncResult,
 )
+from skillmeat.storage.deployment import DeploymentTracker
+from skillmeat.core.deployment import Deployment
 
 logger = logging.getLogger(__name__)
 
@@ -121,14 +123,14 @@ class SyncManager:
             raise ValueError(f"Project path does not exist: {project_path}")
 
         # Load deployment metadata
-        metadata = self._load_deployment_metadata(project_path)
-        if not metadata:
+        deployments = self._load_deployment_metadata(project_path)
+        if not deployments:
             logger.info(f"No deployment metadata found at {redact_path(project_path)}")
             return []
 
-        # Use collection from metadata if not specified
+        # Use collection from first deployment if not specified
         if not collection_name:
-            collection_name = metadata.collection
+            collection_name = deployments[0].from_collection if deployments else "default"
 
         # Get artifacts from collection
         collection_artifacts = self._get_collection_artifacts(collection_name)
@@ -136,40 +138,35 @@ class SyncManager:
         drift_results = []
 
         # Check each deployed artifact for drift
-        for deployed in metadata.artifacts:
+        for deployed in deployments:
             # Find artifact in collection
             collection_artifact = self._find_artifact(
-                collection_artifacts, deployed.name, deployed.artifact_type
+                collection_artifacts, deployed.artifact_name, deployed.artifact_type
             )
 
             if not collection_artifact:
                 # Artifact removed from collection
-                # Get deployment record for modification timestamp
-                from skillmeat.storage.deployment import DeploymentTracker
-
-                deployment_record = DeploymentTracker.get_deployment(
-                    project_path, deployed.name, deployed.artifact_type
-                )
+                # Deployment already has modification_detected_at field
                 modification_detected = None
-                if deployment_record and deployment_record.modification_detected_at:
+                if deployed.modification_detected_at:
                     modification_detected = (
-                        deployment_record.modification_detected_at.isoformat() + "Z"
+                        deployed.modification_detected_at.isoformat() + "Z"
                     )
 
                 drift_results.append(
                     DriftDetectionResult(
-                        artifact_name=deployed.name,
+                        artifact_name=deployed.artifact_name,
                         artifact_type=deployed.artifact_type,
                         drift_type="removed",
                         collection_sha=None,
-                        project_sha=deployed.sha,
+                        project_sha=deployed.content_hash,
                         collection_version=None,
-                        project_version=deployed.version,
-                        last_deployed=deployed.deployed_at,
+                        project_version=None,  # Version not stored in new Deployment
+                        last_deployed=deployed.deployed_at.isoformat() + "Z",
                         recommendation="remove_from_project",
                         change_origin=self.determine_change_origin("removed"),
-                        baseline_hash=deployed.sha,
-                        current_hash=deployed.sha,  # Same as baseline since removed
+                        baseline_hash=deployed.content_hash,
+                        current_hash=deployed.content_hash,  # Same as baseline since removed
                         modification_detected_at=modification_detected,
                     )
                 )
@@ -180,19 +177,19 @@ class SyncManager:
 
             # Compute current project SHA (check if project has local modifications)
             project_artifact_path = self._get_project_artifact_path(
-                project_path, deployed.name, deployed.artifact_type
+                project_path, deployed.artifact_name, deployed.artifact_type
             )
-            current_project_sha = deployed.sha  # Default to deployed SHA
+            current_project_sha = deployed.content_hash  # Default to deployed SHA
             if project_artifact_path and project_artifact_path.exists():
                 current_project_sha = self._compute_artifact_hash(project_artifact_path)
 
             # Three-way conflict detection:
-            # - deployed.sha is the "base" (what was deployed)
+            # - deployed.content_hash is the "base" (what was deployed)
             # - collection_sha is "upstream" (current collection state)
             # - current_project_sha is "local" (current project state)
 
-            collection_changed = collection_sha != deployed.sha
-            project_changed = current_project_sha != deployed.sha
+            collection_changed = collection_sha != deployed.content_hash
+            project_changed = current_project_sha != deployed.content_hash
 
             if collection_changed or project_changed:
                 # Determine drift type
@@ -213,7 +210,7 @@ class SyncManager:
                 if drift_type in ("modified", "conflict"):
                     self._track_modification_timestamp(
                         project_path,
-                        deployed.name,
+                        deployed.artifact_name,
                         deployed.artifact_type,
                     )
 
@@ -221,36 +218,31 @@ class SyncManager:
                 # Only track if project has local changes (modified or conflict with local changes)
                 if project_changed:
                     self._create_local_modification_version(
-                        artifact_id=deployed.name,  # Using name as ID
+                        artifact_id=deployed.artifact_name,  # Using name as ID
                         new_content_hash=current_project_sha,
-                        parent_content_hash=deployed.sha,
+                        parent_content_hash=deployed.content_hash,
                     )
 
-                # Get deployment record for modification timestamp (TASK-4.1)
-                from skillmeat.storage.deployment import DeploymentTracker
-
-                deployment_record = DeploymentTracker.get_deployment(
-                    project_path, deployed.name, deployed.artifact_type
-                )
+                # Deployment already has modification_detected_at field
                 modification_detected = None
-                if deployment_record and deployment_record.modification_detected_at:
+                if deployed.modification_detected_at:
                     modification_detected = (
-                        deployment_record.modification_detected_at.isoformat() + "Z"
+                        deployed.modification_detected_at.isoformat() + "Z"
                     )
 
                 drift_results.append(
                     DriftDetectionResult(
-                        artifact_name=deployed.name,
+                        artifact_name=deployed.artifact_name,
                         artifact_type=deployed.artifact_type,
                         drift_type=drift_type,
                         collection_sha=collection_sha,
                         project_sha=current_project_sha,
                         collection_version=collection_artifact.get("version"),
-                        project_version=deployed.version,
-                        last_deployed=deployed.deployed_at,
+                        project_version=None,  # Version not stored in new Deployment
+                        last_deployed=deployed.deployed_at.isoformat() + "Z",
                         recommendation=recommendation,
                         change_origin=self.determine_change_origin(drift_type),
-                        baseline_hash=deployed.sha,  # The deployed version = merge base
+                        baseline_hash=deployed.content_hash,  # The deployed version = merge base
                         current_hash=current_project_sha,  # Current project file hash
                         modification_detected_at=modification_detected,
                     )
@@ -258,7 +250,7 @@ class SyncManager:
 
         # Check for new artifacts in collection not yet deployed
         for artifact in collection_artifacts:
-            if not self._is_deployed(artifact, metadata):
+            if not self._is_deployed(artifact, deployments):
                 collection_sha = self._compute_artifact_hash(artifact["path"])
                 drift_results.append(
                     DriftDetectionResult(
@@ -319,105 +311,30 @@ class SyncManager:
 
     def _load_deployment_metadata(
         self, project_path: Path
-    ) -> Optional[DeploymentMetadata]:
-        """Load .skillmeat-deployed.toml from project.
+    ) -> List[Deployment]:
+        """Load deployment metadata using unified tracker.
 
         Args:
             project_path: Path to project root
 
         Returns:
-            DeploymentMetadata object or None if file doesn't exist
+            List of Deployment objects (empty list if no metadata)
         """
-        metadata_file = project_path / ".claude" / ".skillmeat-deployed.toml"
-
-        if not metadata_file.exists():
-            return None
-
-        try:
-            with open(metadata_file, "rb") as f:
-                data = tomllib.load(f)
-
-            # Parse deployment section
-            deployment = data.get("deployment", {})
-            collection = deployment.get("collection", "default")
-            deployed_at = deployment.get("deployed-at", "")
-            skillmeat_version = deployment.get("skillmeat-version", "unknown")
-
-            # Parse artifacts
-            artifacts = []
-            for artifact_data in data.get("artifacts", []):
-                artifacts.append(
-                    DeploymentRecord(
-                        name=artifact_data["name"],
-                        artifact_type=artifact_data["type"],
-                        source=artifact_data["source"],
-                        version=artifact_data["version"],
-                        sha=artifact_data["sha"],
-                        deployed_at=artifact_data["deployed-at"],
-                        deployed_from=artifact_data["deployed-from"],
-                    )
-                )
-
-            return DeploymentMetadata(
-                collection=collection,
-                deployed_at=deployed_at,
-                skillmeat_version=skillmeat_version,
-                artifacts=artifacts,
-            )
-
-        except Exception as e:
-            logger.warning(f"Failed to load deployment metadata: {e}")
-            return None
+        return DeploymentTracker.read_deployments(project_path)
 
     def _save_deployment_metadata(
-        self, metadata_file: Path, metadata: DeploymentMetadata
+        self, project_path: Path, deployments: List[Deployment]
     ) -> None:
-        """Save deployment metadata to .skillmeat-deployed.toml.
+        """Save deployment metadata using unified tracker.
 
         Args:
-            metadata_file: Path to metadata file
-            metadata: DeploymentMetadata to save
+            project_path: Project root path
+            deployments: List of Deployment objects to save
 
         Raises:
             OSError: If file cannot be written
         """
-        # Ensure .claude directory exists
-        metadata_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # Build TOML structure
-        toml_data = {
-            "deployment": {
-                "collection": metadata.collection,
-                "deployed-at": metadata.deployed_at,
-                "skillmeat-version": metadata.skillmeat_version,
-            },
-            "artifacts": [],
-        }
-
-        for artifact in metadata.artifacts:
-            toml_data["artifacts"].append(
-                {
-                    "name": artifact.name,
-                    "type": artifact.artifact_type,
-                    "source": artifact.source,
-                    "version": artifact.version,
-                    "sha": artifact.sha,
-                    "deployed-at": artifact.deployed_at,
-                    "deployed-from": artifact.deployed_from,
-                }
-            )
-
-        # Write TOML file
-        try:
-            import tomli_w
-        except ImportError:
-            raise ImportError(
-                "tomli_w is required for writing TOML files. "
-                "Install with: pip install tomli-w"
-            )
-
-        with open(metadata_file, "wb") as f:
-            tomli_w.dump(toml_data, f)
+        DeploymentTracker.write_deployments(project_path, deployments)
 
     def update_deployment_metadata(
         self,
@@ -441,17 +358,8 @@ class SyncManager:
         Raises:
             ValueError: If artifact or collection path doesn't exist
         """
-        metadata_file = project_path / ".claude" / ".skillmeat-deployed.toml"
-
-        # Load existing or create new
-        metadata = self._load_deployment_metadata(project_path)
-        if not metadata:
-            metadata = DeploymentMetadata(
-                collection=collection_name,
-                deployed_at=datetime.utcnow().isoformat() + "Z",
-                skillmeat_version="0.2.0-alpha",
-                artifacts=[],
-            )
+        # Load existing deployments
+        deployments = self._load_deployment_metadata(project_path)
 
         # Compute hash
         # Convert artifact type to plural form for directory name
@@ -462,42 +370,50 @@ class SyncManager:
 
         sha = self._compute_artifact_hash(artifact_path)
 
-        # Get artifact metadata (source, version)
-        source = self._get_artifact_source(artifact_path)
-        version = self._get_artifact_version(artifact_path)
+        # Determine artifact path within .claude/
+        if artifact_type == "skill":
+            relative_artifact_path = Path(f"skills/{artifact_name}")
+        elif artifact_type == "command":
+            relative_artifact_path = Path(f"commands/{artifact_name}.md")
+        elif artifact_type == "agent":
+            relative_artifact_path = Path(f"agents/{artifact_name}.md")
+        elif artifact_type == "hook":
+            relative_artifact_path = Path(f"hooks/{artifact_name}.md")
+        elif artifact_type == "mcp":
+            relative_artifact_path = Path(f"mcp/{artifact_name}")
+        else:
+            raise ValueError(f"Unknown artifact type: {artifact_type}")
 
-        # Create or update record
-        now = datetime.utcnow().isoformat() + "Z"
-        record = DeploymentRecord(
-            name=artifact_name,
+        # Create or update deployment record
+        now = datetime.utcnow()
+        deployment = Deployment(
+            artifact_name=artifact_name,
             artifact_type=artifact_type,
-            source=source,
-            version=version,
-            sha=sha,
+            from_collection=collection_name,
             deployed_at=now,
-            deployed_from=str(collection_path),
+            artifact_path=relative_artifact_path,
+            content_hash=sha,
+            local_modifications=False,
+            merge_base_snapshot=sha,  # Store baseline for merge tracking
         )
 
         # Replace existing or append
         existing_idx = None
-        for i, existing in enumerate(metadata.artifacts):
+        for i, existing in enumerate(deployments):
             if (
-                existing.name == artifact_name
+                existing.artifact_name == artifact_name
                 and existing.artifact_type == artifact_type
             ):
                 existing_idx = i
                 break
 
         if existing_idx is not None:
-            metadata.artifacts[existing_idx] = record
+            deployments[existing_idx] = deployment
         else:
-            metadata.artifacts.append(record)
-
-        # Update deployment timestamp
-        metadata.deployed_at = now
+            deployments.append(deployment)
 
         # Save to file
-        self._save_deployment_metadata(metadata_file, metadata)
+        self._save_deployment_metadata(project_path, deployments)
 
     def _get_collection_artifacts(self, collection_name: str) -> List[Dict[str, Any]]:
         """Get list of artifacts from collection.
@@ -564,20 +480,20 @@ class SyncManager:
         return None
 
     def _is_deployed(
-        self, artifact: Dict[str, Any], metadata: DeploymentMetadata
+        self, artifact: Dict[str, Any], deployments: List[Deployment]
     ) -> bool:
         """Check if artifact is already deployed.
 
         Args:
             artifact: Artifact dictionary
-            metadata: Deployment metadata
+            deployments: List of Deployment objects
 
         Returns:
-            True if artifact is in deployment metadata
+            True if artifact is in deployments
         """
-        for deployed in metadata.artifacts:
+        for deployed in deployments:
             if (
-                deployed.name == artifact["name"]
+                deployed.artifact_name == artifact["name"]
                 and deployed.artifact_type == artifact["type"]
             ):
                 return True
@@ -697,9 +613,9 @@ class SyncManager:
                 interactive=interactive,
             )
 
-        # Get collection info from metadata
-        metadata = self._load_deployment_metadata(project_path)
-        if not metadata:
+        # Get collection info from deployments
+        deployments = self._load_deployment_metadata(project_path)
+        if not deployments:
             # No metadata, proceed without snapshot
             logger.warning("No deployment metadata, proceeding without snapshot")
             return self.sync_from_project(
@@ -710,7 +626,7 @@ class SyncManager:
                 interactive=interactive,
             )
 
-        collection_name = metadata.collection
+        collection_name = deployments[0].from_collection
 
         # Get collection path
         if not self.collection_mgr:
@@ -868,9 +784,9 @@ class SyncManager:
             )
         else:
             # Check collection exists
-            metadata = self._load_deployment_metadata(project_path)
-            if metadata:
-                coll_name = collection_name or metadata.collection
+            deployments = self._load_deployment_metadata(project_path)
+            if deployments:
+                coll_name = collection_name or deployments[0].from_collection
                 try:
                     collection = self.collection_mgr.get_collection(coll_name)
                     coll_path = self.collection_mgr.config.get_collection_path(
@@ -1100,8 +1016,8 @@ class SyncManager:
         # Step 4.5: Capture version snapshot (SVCV-002)
         if synced_artifacts and self.collection_mgr:
             try:
-                metadata = self._load_deployment_metadata(project_path)
-                collection_name = metadata.collection if metadata else "default"
+                deployments = self._load_deployment_metadata(project_path)
+                collection_name = deployments[0].from_collection if deployments else "default"
 
                 # Create descriptive message for the snapshot
                 artifact_list = ", ".join(synced_artifacts[:3])
@@ -1245,8 +1161,8 @@ class SyncManager:
 
         try:
             # Get collection from drift metadata
-            metadata = self._load_deployment_metadata(project_path)
-            collection_name = metadata.collection if metadata else "default"
+            deployments = self._load_deployment_metadata(project_path)
+            collection_name = deployments[0].from_collection if deployments else "default"
 
             collection = self.collection_mgr.load_collection(collection_name)
             collection_path = self.collection_mgr.config.get_collection_path(
@@ -1470,22 +1386,22 @@ class SyncManager:
             # project_path is /path/to/project
             project_path = project_artifact_path.parent.parent.parent
 
-        metadata = self._load_deployment_metadata(project_path)
+        deployments = self._load_deployment_metadata(project_path)
         base_path = None
 
-        if metadata:
+        if deployments:
             # Find deployment record for this artifact
             deployed = next(
-                (d for d in metadata.artifacts if d.name == artifact_name), None
+                (d for d in deployments if d.artifact_name == artifact_name), None
             )
 
             if deployed:
                 # Try to get merge_base_snapshot (added in v1.5)
-                merge_base_snapshot = getattr(deployed, "merge_base_snapshot", None)
+                merge_base_snapshot = deployed.merge_base_snapshot
 
                 if merge_base_snapshot and self.snapshot_mgr:
                     # Use merge base from snapshot
-                    collection_name = metadata.collection if metadata else None
+                    collection_name = deployments[0].from_collection if deployments else None
                     base_path = self._extract_base_from_snapshot(
                         merge_base_snapshot,
                         artifact_name,
@@ -1559,8 +1475,8 @@ class SyncManager:
         try:
             # Infer collection name if not provided
             if not collection_name:
-                metadata = self._load_deployment_metadata(Path.cwd())
-                collection_name = metadata.collection if metadata else None
+                deployments = self._load_deployment_metadata(Path.cwd())
+                collection_name = deployments[0].from_collection if deployments else None
 
             if not collection_name:
                 logger.warning("No collection name available for baseline search")
@@ -1806,8 +1722,8 @@ class SyncManager:
 
             try:
                 # Get collection path
-                metadata = self._load_deployment_metadata(Path("."))
-                collection_name = metadata.collection if metadata else "default"
+                deployments = self._load_deployment_metadata(Path("."))
+                collection_name = deployments[0].from_collection if deployments else "default"
                 collection = self.collection_mgr.load_collection(collection_name)
                 collection_path = self.collection_mgr.config.get_collection_path(
                     collection_name
