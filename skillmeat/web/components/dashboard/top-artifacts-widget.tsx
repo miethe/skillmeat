@@ -9,7 +9,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useTopArtifacts } from '@/hooks/useAnalytics';
+import { useTopArtifacts } from '@/hooks';
 import {
   BarChart,
   Bar,

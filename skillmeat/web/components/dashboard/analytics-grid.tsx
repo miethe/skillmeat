@@ -11,7 +11,7 @@ import { StatsCards } from './stats-cards';
 import { TopArtifactsWidget } from './top-artifacts-widget';
 import { UsageTrendsWidget } from './usage-trends-widget';
 import { TagMetricsWidget } from './tag-metrics-widget';
-import { useAnalyticsStream } from '@/hooks/useAnalyticsStream';
+import { useAnalyticsStream } from '@/hooks';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

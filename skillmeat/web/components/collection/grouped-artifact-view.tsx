@@ -50,7 +50,7 @@ import {
   useGroupArtifacts,
   useReorderGroups,
   useReorderArtifactsInGroup,
-} from '@/hooks/use-groups';
+} from '@/hooks';
 
 // Props interface
 export interface GroupedArtifactViewProps {

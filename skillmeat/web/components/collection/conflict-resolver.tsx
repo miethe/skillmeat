@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { ConflictInfo } from '@/hooks/useSync';
+import type { ConflictInfo } from '@/hooks';
 
 export interface ConflictResolverProps {
   conflicts: ConflictInfo[];

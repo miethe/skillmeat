@@ -17,8 +17,8 @@ import {
   useContextEntities,
   useCreateContextEntity,
   useDeleteContextEntity,
-} from '@/hooks/use-context-entities';
-import { useToast } from '@/hooks/use-toast';
+  useToast,
+} from '@/hooks';
 
 // Import types
 import type {

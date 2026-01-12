@@ -33,8 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ProgressIndicator, ProgressStep } from './progress-indicator';
-import { useDeployArtifact } from '@/hooks/use-deployments';
-import { useProjects } from '@/hooks/useProjects';
+import { useDeployArtifact, useProjects } from '@/hooks';
 import { CreateProjectDialog } from '@/app/projects/components/create-project-dialog';
 import type { Artifact } from '@/types/artifact';
 import { cn } from '@/lib/utils';

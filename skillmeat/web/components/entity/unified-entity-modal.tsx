@@ -37,7 +37,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Entity, ENTITY_TYPES } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
-import { useEntityLifecycle } from '@/hooks/useEntityLifecycle';
+import { useEntityLifecycle } from '@/hooks';
 import { DiffViewer } from '@/components/entity/diff-viewer';
 import { RollbackDialog } from '@/components/entity/rollback-dialog';
 import { MergeWorkflow } from '@/components/entity/merge-workflow';
@@ -50,16 +50,18 @@ import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-di
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
-import { useEditArtifactParameters } from '@/hooks/useDiscovery';
-import { useToast } from '@/hooks/use-toast';
+import {
+  useEditArtifactParameters,
+  useToast,
+  deploymentKeys,
+  useProjects,
+  usePendingContextChanges,
+} from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
-import { deploymentKeys } from '@/hooks/use-deployments';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
-import { useProjects } from '@/hooks/useProjects';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
-import { usePendingContextChanges } from '@/hooks/use-context-sync';
 import { DeployDialog } from '@/components/collection/deploy-dialog';
 import type {
   ArtifactDiffResponse,

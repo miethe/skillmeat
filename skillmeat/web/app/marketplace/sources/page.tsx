@@ -15,12 +15,11 @@ import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
-import { useSources } from '@/hooks/useMarketplaceSources';
+import { useSources, sourceKeys } from '@/hooks';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import type { ScanResult } from '@/types/marketplace';
-import { sourceKeys } from '@/hooks/useMarketplaceSources';
 import type { GitHubSource } from '@/types/marketplace';
 
 export default function MarketplaceSourcesPage() {

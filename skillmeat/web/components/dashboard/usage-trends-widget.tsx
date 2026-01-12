@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUsageTrends } from '@/hooks/useAnalytics';
+import { useUsageTrends } from '@/hooks';
 import {
   LineChart,
   Line,

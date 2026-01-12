@@ -38,7 +38,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
-import { useExcludeCatalogEntry } from '@/hooks/useMarketplaceSources';
+import { useExcludeCatalogEntry } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { CatalogEntry, ArtifactType } from '@/types/marketplace';
 

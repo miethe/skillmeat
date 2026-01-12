@@ -32,8 +32,8 @@ import {
   useCreateGroup,
   useUpdateGroup,
   useDeleteGroup,
-} from '@/hooks/use-groups';
-import { useToast } from '@/hooks/use-toast';
+  useToast,
+} from '@/hooks';
 import type { Group } from '@/types/groups';
 
 export interface ManageGroupsDialogProps {
