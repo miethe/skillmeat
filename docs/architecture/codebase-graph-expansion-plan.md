@@ -224,11 +224,11 @@ Implementation notes:
 
 Step-by-step tasks:
 1) OpenAPI extraction (`extract_backend_openapi.py`)
-   - Use `skillmeat/api/openapi.py` to export `openapi.json`.
+   - Use `skillmeat/api/openapi.py` to export `openapi.json` if missing.
    - Parse `paths` and `methods` into `api_endpoint` nodes.
-   - Link endpoints to handlers by matching `operationId` or router+function.
+   - Preserve `operationId` in endpoint metadata for downstream linking.
 2) Handler -> service mapping (`extract_backend_handlers.py`)
-   - Parse `skillmeat/api/routers/**` with AST.
+   - Parse `skillmeat/api/routers/**` with AST + decorator scan.
    - For each handler function, add `handler` node with `symbol` and `line`.
    - Record direct calls into `skillmeat/api/services/**` and `skillmeat/core/**`.
 3) Service -> repository mapping (`extract_backend_services.py`)
