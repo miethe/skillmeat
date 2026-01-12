@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+import argparse
+import re
+from pathlib import Path
+from typing import Dict, Optional
+
+try:
+    from .graph import Graph
+except ImportError:  # pragma: no cover - fallback for direct script execution
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
+    from scripts.code_map.graph import Graph
+
+ROUTER_ASSIGN_RE = re.compile(
+    r"(?P<name>\w+)\s*=\s*APIRouter\((?P<args>.*?)\)",
+    re.DOTALL,
+)
+PREFIX_RE = re.compile(r"prefix\s*=\s*['\"]([^'\"]+)['\"]")
+DECORATOR_RE = re.compile(
+    r"@(?P<router>\w+)\.(?P<method>get|post|put|patch|delete|options|head)\((?P<args>.*?)\)",
+    re.DOTALL,
+)
+STRING_RE = re.compile(r"['\"]([^'\"]+)['\"]")
+DEF_RE = re.compile(r"(?m)^(?:async\s+def|def)\s+([A-Za-z0-9_]+)\b")
+
+
+def parse_router_prefixes(text: str) -> Dict[str, str]:
+    prefixes: Dict[str, str] = {}
+    for match in ROUTER_ASSIGN_RE.finditer(text):
+        name = match.group("name")
+        args = match.group("args")
+        prefix_match = PREFIX_RE.search(args)
+        if prefix_match:
+            prefixes[name] = prefix_match.group(1)
+    return prefixes
+
+
+def join_paths(prefix: str, path: str) -> str:
+    if not prefix:
+        return path
+    if not path:
+        return prefix
+    if prefix.endswith("/") and path.startswith("/"):
+        return prefix[:-1] + path
+    if not prefix.endswith("/") and not path.startswith("/"):
+        return prefix + "/" + path
+    return prefix + path
+
+
+def find_next_handler(text: str, start: int) -> Optional[str]:
+    match = DEF_RE.search(text, start)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def extract_backend(api_root: Path) -> Graph:
+    routers_root = api_root / "routers"
+    graph = Graph(source="backend")
+
+    for router_file in routers_root.rglob("*.py"):
+        text = router_file.read_text(encoding="utf-8")
+        prefixes = parse_router_prefixes(text)
+
+        for match in DECORATOR_RE.finditer(text):
+            router_name = match.group("router")
+            method = match.group("method").upper()
+            args = match.group("args")
+            path_match = STRING_RE.search(args)
+            if not path_match:
+                continue
+            raw_path = path_match.group(1)
+            prefix = prefixes.get(router_name, "")
+            full_path = join_paths(prefix, raw_path)
+
+            handler_name = find_next_handler(text, match.end())
+            if not handler_name:
+                continue
+
+            router_id = f"router:{router_file.as_posix()}::{router_name}"
+            endpoint_id = f"endpoint:{method} {full_path}"
+            handler_id = f"handler:{router_file.as_posix()}::{handler_name}"
+
+            graph.add_node(
+                router_id,
+                "router",
+                label=router_name,
+                file=router_file.as_posix(),
+                prefix=prefix or None,
+            )
+            graph.add_node(
+                endpoint_id,
+                "api_endpoint",
+                label=f"{method} {full_path}",
+                method=method,
+                path=full_path,
+                file=router_file.as_posix(),
+            )
+            graph.add_node(
+                handler_id,
+                "handler",
+                label=handler_name,
+                file=router_file.as_posix(),
+            )
+            graph.add_edge(router_id, endpoint_id, "router_exposes")
+            graph.add_edge(endpoint_id, handler_id, "handled_by")
+
+    return graph
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Extract backend code graph.")
+    parser.add_argument(
+        "--api-root",
+        default="skillmeat/api",
+        help="Path to API root (default: skillmeat/api)",
+    )
+    parser.add_argument(
+        "--out",
+        default="docs/architecture/codebase-graph.backend.json",
+        help="Output JSON path",
+    )
+    args = parser.parse_args()
+
+    api_root = Path(args.api_root)
+    graph = extract_backend(api_root)
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    graph.write_json(args.out)
+
+
+if __name__ == "__main__":
+    main()
