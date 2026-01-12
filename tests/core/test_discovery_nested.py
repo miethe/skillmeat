@@ -11,16 +11,6 @@ Per ARTIFACT_SIGNATURES:
 - MCPs (allowed_nesting=False): Do NOT support nesting
 
 Max nesting depth is 3 levels.
-
-IMPLEMENTATION NOTE (2024-01):
-The current implementation of `_discover_nested_artifacts` has a limitation where
-deeply nested artifacts (depth 2+) may not be detected due to how `_detect_artifact_type`
-infers type from path structure. The `infer_artifact_type` function only checks parent
-and grandparent directories, which fails for files nested 2+ levels deep.
-
-Tests marked with `@pytest.mark.xfail` document the expected behavior that is not yet
-fully implemented. Once the implementation is fixed to pass container_type context
-to the detection logic, these tests should pass.
 """
 
 import shutil
@@ -212,20 +202,10 @@ class TestNestedCommands:
         assert "flat-cmd" in command_names, "Flat command not found"
         assert "nested-cmd" in command_names, "Nested command not found"
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_nested_commands_at_depth_2(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Commands at depth 2 should be discovered.
-
-        EXPECTED: Commands nested 2 levels deep should be discovered.
-        ACTUAL: Detection fails because infer_artifact_type can't determine type.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Commands at depth 2 should be discovered."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Create nested structure at depth 2
@@ -240,20 +220,10 @@ class TestNestedCommands:
         command_names = [a.name for a in result.artifacts if a.type == "command"]
         assert "deep-cmd" in command_names, "Command at depth 2 not found"
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_nested_commands_at_depth_3(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Commands at depth 3 should be discovered (max depth).
-
-        EXPECTED: Commands nested 3 levels deep (max depth) should be discovered.
-        ACTUAL: Detection fails because infer_artifact_type can't determine type.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Commands at depth 3 should be discovered (max depth)."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Create nested structure at depth 3
@@ -321,20 +291,10 @@ class TestNestedAgents:
         assert "flat-agent" in agent_names, "Flat agent not found"
         assert "nested-agent" in agent_names, "Nested agent not found"
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_nested_agents_at_all_depths(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Agents at depths 1, 2, and 3 should all be discovered.
-
-        EXPECTED: Agents at all depths up to max_depth should be discovered.
-        ACTUAL: Only depth 1 works; depth 2+ fails detection.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Agents at depths 1, 2, and 3 should all be discovered."""
         agents_dir = temp_project_dir / ".claude" / "agents"
 
         # Create agents at different depths
@@ -518,20 +478,10 @@ class TestNestedEdgeCases:
         assert "hidden-cmd" not in command_names, "Hidden command should be skipped"
         assert "visible-cmd" in command_names, "Visible command should be found"
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_mixed_nested_structure(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Mix of nested and flat artifacts in same directory.
-
-        EXPECTED: All 6 commands (2 flat + 4 nested at various depths) should be discovered.
-        ACTUAL: Only flat and depth-1 nested commands are found (4 total).
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Mix of nested and flat artifacts in same directory."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Create flat commands
@@ -644,20 +594,10 @@ class TestNestedEdgeCases:
 class TestNestingDepthLimit:
     """Tests for max depth enforcement."""
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_nesting_depth_limit_is_3(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Default max depth should be 3.
-
-        EXPECTED: Depths 1-3 should be discovered, depth 4 should not.
-        ACTUAL: Only depth 1 is discovered due to detection limitation.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Default max depth should be 3. Depths 1-3 should be discovered, depth 4 should not."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Create commands at each depth level
@@ -699,20 +639,10 @@ class TestNestingDepthLimit:
         # Depth 4 should NOT be discovered
         assert discovered_at_depth[4] not in command_names, "Depth 4 should NOT be found"
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_parallel_branches_at_max_depth(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Multiple parallel branches should all be scanned up to max depth.
-
-        EXPECTED: All three branches should find their commands at various depths.
-        ACTUAL: None are found because all are at depth 2+.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Multiple parallel branches should all be scanned up to max depth."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Branch A: depth 3
@@ -746,20 +676,10 @@ class TestNestingDepthLimit:
 class TestNestedDiscoveryMetadata:
     """Tests for metadata accuracy in nested discovery."""
 
-    @pytest.mark.xfail(
-        reason="Detection logic doesn't pass container_type to nested artifacts at depth 2+. "
-        "infer_artifact_type only checks parent/grandparent, not full ancestor chain.",
-        strict=True,
-    )
     def test_nested_artifact_paths_are_correct(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Nested artifacts should have correct absolute paths.
-
-        EXPECTED: Nested artifact at depth 2 should have correct path.
-        ACTUAL: Artifact is not found due to detection limitation.
-        FIX: Pass container_type context from _discover_nested_artifacts to detection.
-        """
+        """Nested artifacts should have correct absolute paths."""
         commands_dir = temp_project_dir / ".claude" / "commands"
 
         # Create nested command at depth 2

@@ -7,6 +7,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from skillmeat.core.artifact import ArtifactManager, ArtifactType
+from skillmeat.core.artifact_detection import (
+    ArtifactType as DetectionArtifactType,
+    ARTIFACT_SIGNATURES,
+)
 
 if TYPE_CHECKING:
     from skillmeat.api.schemas.discovery import ImportStatus
@@ -626,20 +630,101 @@ class ArtifactImporter:
                 path=artifact.path,
             )
 
-        # Check it's a directory
-        if not artifact_path.is_dir():
-            artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
-            return ImportResultData(
-                artifact_id=artifact_id,
-                success=False,
-                message="Validation failed",
-                error=f"Artifact path is not a directory: {artifact.path}",
-                status=ImportStatus.FAILED,
-                reason_code="invalid_structure",
-                path=artifact.path,
-            )
+        # Determine if this artifact type requires a directory or allows single files
+        # Look up the signature from ARTIFACT_SIGNATURES for authoritative is_directory info
+        try:
+            detection_type = DetectionArtifactType(artifact.artifact_type)
+            signature = ARTIFACT_SIGNATURES.get(detection_type)
+            requires_directory = signature.is_directory if signature else True
+        except ValueError:
+            # Unknown artifact type - default to requiring directory (conservative)
+            requires_directory = True
 
-        # Check for metadata file based on artifact type
+        if requires_directory:
+            # Directory-based artifacts (skills): must be a directory
+            if not artifact_path.is_dir():
+                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                return ImportResultData(
+                    artifact_id=artifact_id,
+                    success=False,
+                    message="Validation failed",
+                    error=f"Artifact path is not a directory: {artifact.path}",
+                    status=ImportStatus.FAILED,
+                    reason_code="invalid_structure",
+                    path=artifact.path,
+                )
+        else:
+            # File-based artifacts (commands, agents, hooks, mcp): must be a file
+            if not artifact_path.is_file():
+                artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                return ImportResultData(
+                    artifact_id=artifact_id,
+                    success=False,
+                    message="Validation failed",
+                    error=f"Artifact path is not a file: {artifact.path}",
+                    status=ImportStatus.FAILED,
+                    reason_code="invalid_structure",
+                    path=artifact.path,
+                )
+
+            # For file-based artifacts, validate the file itself
+            # Check file extension for markdown-based types
+            if artifact.artifact_type in ("command", "agent"):
+                if not artifact_path.suffix.lower() == ".md":
+                    artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                    return ImportResultData(
+                        artifact_id=artifact_id,
+                        success=False,
+                        message="Validation failed",
+                        error=f"Expected .md file for {artifact.artifact_type}, got: {artifact_path.suffix}",
+                        status=ImportStatus.FAILED,
+                        reason_code="invalid_structure",
+                        path=artifact.path,
+                    )
+
+            # Validate YAML frontmatter in the file itself for markdown-based artifacts
+            if artifact_path.suffix.lower() == ".md":
+                try:
+                    content = artifact_path.read_text(encoding="utf-8")
+                    if content.startswith("---"):
+                        # Extract YAML frontmatter
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            yaml_content = parts[1].strip()
+                            if yaml_content:
+                                yaml.safe_load(yaml_content)
+                except yaml.YAMLError as e:
+                    artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                    details = None
+                    if hasattr(e, "problem_mark") and e.problem_mark:
+                        mark = e.problem_mark
+                        details = f"Line {mark.line + 1}, Column {mark.column + 1}: {getattr(e, 'problem', 'syntax error')}"
+                    return ImportResultData(
+                        artifact_id=artifact_id,
+                        success=False,
+                        message="Validation failed",
+                        error=f"Invalid YAML frontmatter in {artifact_path.name}",
+                        status=ImportStatus.FAILED,
+                        reason_code="yaml_parse_error",
+                        details=details,
+                        path=artifact.path,
+                    )
+                except Exception as e:
+                    artifact_id = f"{artifact.artifact_type}:{artifact.name or artifact_path.name}"
+                    return ImportResultData(
+                        artifact_id=artifact_id,
+                        success=False,
+                        message="Validation failed",
+                        error=f"Failed to read {artifact_path.name}: {str(e)}",
+                        status=ImportStatus.FAILED,
+                        reason_code="io_error",
+                        path=artifact.path,
+                    )
+
+            # Validation passed for file-based artifact
+            return None
+
+        # Check for metadata file based on artifact type (directory-based artifacts only)
         metadata_files = {
             "skill": "SKILL.md",
             "command": "command.md",
