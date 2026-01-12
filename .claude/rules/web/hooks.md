@@ -9,6 +9,183 @@ Custom React hooks for SkillMeat web frontend using TanStack Query v5.
 ## Inventory (Auto-generated)
 
 <!-- CODEBASE_GRAPH:HOOKS:START -->
+| Hook | File | API Clients | Query Keys |
+| --- | --- | --- | --- |
+| useAddArtifactToCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useAddArtifactToGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useAddTagToArtifact | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useAnalyticsStream | skillmeat/web/hooks/useAnalyticsStream.ts | apiConfig | ['analytics', 'summary'], ['analytics', 'top-artifacts'], ['analytics', 'trends'], ['analytics'] |
+| useAnalyticsSummary | skillmeat/web/hooks/useAnalytics.ts | ApiError, apiConfig, apiRequest | - |
+| useAnalyzeMerge | skillmeat/web/hooks/use-merge.ts | analyzeMergeSafety, executeMerge, previewMerge, resolveConflict | ['collections', variables.localCollection], ['snapshots'] |
+| useArtifact | skillmeat/web/hooks/useArtifacts.ts | ApiError, apiConfig, apiRequest | - |
+| useArtifactDeletion | skillmeat/web/hooks/use-artifact-deletion.ts | deleteArtifactFromCollection, undeployArtifact | ['artifacts'], ['collections'], ['deployments'], ['projects'] |
+| useArtifactTags | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useArtifacts | - | - | - |
+| useArtifacts | skillmeat/web/hooks/useArtifacts.ts | ApiError, apiConfig, apiRequest | - |
+| useBrokers | - | - | - |
+| useBrokers | skillmeat/web/hooks/useMarketplace.ts | ApiError, apiRequest, useToast | - |
+| useBulkTagApply | skillmeat/web/hooks/use-bulk-tag-apply.ts | sourceKeys, useToast | - |
+| useBundleAnalytics | skillmeat/web/hooks/useBundles.ts | apiConfig, apiRequest | ['bundle-analytics', bundleId], ['bundles', filter], ['bundles'] |
+| useBundles | skillmeat/web/hooks/useBundles.ts | apiConfig, apiRequest | ['bundle-analytics', bundleId], ['bundles', filter], ['bundles'] |
+| useCacheRefresh | skillmeat/web/hooks/useCacheRefresh.ts | apiRequest | ['cache', projectId], ['cache'], ['projects', 'detail', projectId], ['projects'] |
+| useCacheStatus | skillmeat/web/hooks/useCacheStatus.ts | apiRequest | ['cache', 'status'] |
+| useCatalogFileContent | skillmeat/web/hooks/use-catalog-files.ts | fetchCatalogFileContent, fetchCatalogFileTree, type FileContentResponse, type FileTreeResponse | - |
+| useCatalogFileTree | skillmeat/web/hooks/use-catalog-files.ts | fetchCatalogFileContent, fetchCatalogFileTree, type FileContentResponse, type FileTreeResponse | - |
+| useCheckUpstream | skillmeat/web/hooks/useSync.ts | - | ['artifact', variables.artifactId], ['artifacts'] |
+| useCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useCollectionArtifacts | - | - | - |
+| useCollectionArtifacts | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useCollectionContext | - | - | - |
+| useCollectionContext | skillmeat/web/hooks/use-collection-context.ts | - | - |
+| useCollections | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useConfirmDuplicates | skillmeat/web/hooks/useProjectDiscovery.ts | apiRequest | ['artifacts', 'discover', 'project', projectPath], ['artifacts', 'discover', 'project', variables.project_path], ['artifacts'], ['projects', 'detail', projectId] |
+| useContextEntities | - | - | - |
+| useContextEntities | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useContextEntity | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useContextEntityContent | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useContextSyncStatus | skillmeat/web/hooks/use-context-sync.ts | getSyncStatus, pullChanges, pushChanges, resolveConflict, type SyncResolution, type SyncStatus | ['artifact-files'], ['context-entities'], ['context-sync-status', projectPath], ['context-sync-status', variables.projectPath] |
+| useCreateCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useCreateContextEntity | - | - | - |
+| useCreateContextEntity | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useCreateGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useCreateMcpServer | - | - | - |
+| useCreateMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useCreateProject | skillmeat/web/hooks/useProjects.ts | ApiError, apiConfig, apiRequest | - |
+| useCreateSnapshot | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useCreateSource | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useCreateTag | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useCreateTemplate | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useDebounce | skillmeat/web/hooks/use-debounce.ts | - | - |
+| useDeleteArtifact | skillmeat/web/hooks/useArtifacts.ts | ApiError, apiConfig, apiRequest | - |
+| useDeleteBundle | skillmeat/web/hooks/useBundles.ts | apiConfig, apiRequest | ['bundle-analytics', bundleId], ['bundles', filter], ['bundles'] |
+| useDeleteCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useDeleteContextEntity | - | - | - |
+| useDeleteContextEntity | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useDeleteGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useDeleteMcpServer | - | - | - |
+| useDeleteMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useDeleteProject | skillmeat/web/hooks/useProjects.ts | ApiError, apiConfig, apiRequest | - |
+| useDeleteSnapshot | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useDeleteSource | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useDeleteTag | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useDeleteTemplate | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useDeploy | skillmeat/web/hooks/useDeploy.ts | apiRequest | ['artifacts'], ['deployments'], ['projects', 'detail'] |
+| useDeployArtifact | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useDeployMcpServer | - | - | - |
+| useDeployMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useDeployTemplate | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useDeploymentList | - | - | - |
+| useDeploymentList | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useDeploymentSummary | - | - | - |
+| useDeploymentSummary | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useDeployments | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useDiffSnapshots | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useDiscovery | skillmeat/web/hooks/useDiscovery.ts | apiRequest | ['artifacts', 'detail', artifactId], ['artifacts', 'discover'], ['artifacts', 'list'], ['artifacts'], ['entities'] |
+| useEditArtifactParameters | - | - | - |
+| useEditArtifactParameters | skillmeat/web/hooks/useDiscovery.ts | apiRequest | ['artifacts', 'detail', artifactId], ['artifacts', 'discover'], ['artifacts', 'list'], ['artifacts'], ['entities'] |
+| useEntityLifecycle | skillmeat/web/hooks/useEntityLifecycle.tsx | apiConfig, apiRequest | ['entities'], ['projects'] |
+| useExcludeCatalogEntry | - | - | - |
+| useExcludeCatalogEntry | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useExecuteMerge | skillmeat/web/hooks/use-merge.ts | analyzeMergeSafety, executeMerge, previewMerge, resolveConflict | ['collections', variables.localCollection], ['snapshots'] |
+| useExportBundle | skillmeat/web/hooks/useExportBundle.ts | apiConfig, apiRequest | ['bundles'] |
+| useFocusTrap | skillmeat/web/hooks/useFocusTrap.ts | - | - |
+| useGitHubMetadata | skillmeat/web/hooks/useDiscovery.ts | apiRequest | ['artifacts', 'detail', artifactId], ['artifacts', 'discover'], ['artifacts', 'list'], ['artifacts'], ['entities'] |
+| useGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useGroupArtifacts | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useGroups | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useImportAllMatching | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useImportArtifacts | - | - | - |
+| useImportArtifacts | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useImportBundle | skillmeat/web/hooks/useImportBundle.ts | apiConfig, apiRequest | ['artifacts'], ['bundle-preview', source], ['bundles'] |
+| useInferUrl | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useInstallListing | - | - | - |
+| useInstallListing | skillmeat/web/hooks/useMarketplace.ts | ApiError, apiRequest, useToast | - |
+| useListing | - | - | - |
+| useListing | skillmeat/web/hooks/useMarketplace.ts | ApiError, apiRequest, useToast | - |
+| useListings | - | - | - |
+| useListings | skillmeat/web/hooks/useMarketplace.ts | ApiError, apiRequest, useToast | - |
+| useMcpBatchOperations | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useMcpDeploymentStatus | - | - | - |
+| useMcpDeploymentStatus | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useMcpServer | - | - | - |
+| useMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useMcpServers | - | - | - |
+| useMcpServers | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useMoveArtifactToGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useOutdatedArtifacts | - | - | - |
+| useOutdatedArtifacts | skillmeat/web/hooks/useOutdatedArtifacts.ts | apiRequest | - |
+| usePathTags | skillmeat/web/hooks/use-path-tags.ts | getPathTags, updatePathTagStatus | - |
+| usePendingContextChanges | skillmeat/web/hooks/use-context-sync.ts | getSyncStatus, pullChanges, pushChanges, resolveConflict, type SyncResolution, type SyncStatus | ['artifact-files'], ['context-entities'], ['context-sync-status', projectPath], ['context-sync-status', variables.projectPath] |
+| usePreviewBundle | skillmeat/web/hooks/useImportBundle.ts | apiConfig, apiRequest | ['artifacts'], ['bundle-preview', source], ['bundles'] |
+| usePreviewMerge | skillmeat/web/hooks/use-merge.ts | analyzeMergeSafety, executeMerge, previewMerge, resolveConflict | ['collections', variables.localCollection], ['snapshots'] |
+| useProject | - | - | - |
+| useProject | skillmeat/web/hooks/useProjects.ts | ApiError, apiConfig, apiRequest | - |
+| useProjectCache | - | - | - |
+| useProjectCache | skillmeat/web/hooks/useProjectCache.ts | apiRequest | ['projects', 'list', 'with-cache-info'] |
+| useProjectDiscovery | - | - | - |
+| useProjectDiscovery | skillmeat/web/hooks/useProjectDiscovery.ts | apiRequest | ['artifacts', 'discover', 'project', projectPath], ['artifacts', 'discover', 'project', variables.project_path], ['artifacts'], ['projects', 'detail', projectId] |
+| useProjects | skillmeat/web/hooks/useProjects.ts | ApiError, apiConfig, apiRequest | - |
+| usePublishBundle | - | - | - |
+| usePublishBundle | skillmeat/web/hooks/useMarketplace.ts | ApiError, apiRequest, useToast | - |
+| usePullContextChanges | skillmeat/web/hooks/use-context-sync.ts | getSyncStatus, pullChanges, pushChanges, resolveConflict, type SyncResolution, type SyncStatus | ['artifact-files'], ['context-entities'], ['context-sync-status', projectPath], ['context-sync-status', variables.projectPath] |
+| usePushContextChanges | skillmeat/web/hooks/use-context-sync.ts | getSyncStatus, pullChanges, pushChanges, resolveConflict, type SyncResolution, type SyncStatus | ['artifact-files'], ['context-entities'], ['context-sync-status', projectPath], ['context-sync-status', variables.projectPath] |
+| useRefreshDeployments | - | - | - |
+| useRefreshDeployments | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useRemoveArtifactFromCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useRemoveArtifactFromGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useRemoveTagFromArtifact | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useReorderArtifactsInGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useReorderGroups | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useRescanSource | - | - | - |
+| useRescanSource | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useResolveConflict | skillmeat/web/hooks/use-merge.ts | analyzeMergeSafety, executeMerge, previewMerge, resolveConflict | ['collections', variables.localCollection], ['snapshots'] |
+| useResolveContextConflict | skillmeat/web/hooks/use-context-sync.ts | getSyncStatus, pullChanges, pushChanges, resolveConflict, type SyncResolution, type SyncStatus | ['artifact-files'], ['context-entities'], ['context-sync-status', projectPath], ['context-sync-status', variables.projectPath] |
+| useRestoreCatalogEntry | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useRevokeShareLink | skillmeat/web/hooks/useBundles.ts | apiConfig, apiRequest | ['bundle-analytics', bundleId], ['bundles', filter], ['bundles'] |
+| useRollback | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useRollbackAnalysis | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useSSE | skillmeat/web/hooks/useSSE.ts | - | - |
+| useSearchTags | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useSnapshot | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useSnapshots | skillmeat/web/hooks/use-snapshots.ts | analyzeRollbackSafety, createSnapshot, deleteSnapshot, diffSnapshots, executeRollback, fetchSnapshot, fetchSnapshots | ['artifacts'], ['collections'] |
+| useSource | - | - | - |
+| useSource | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useSourceCatalog | - | - | - |
+| useSourceCatalog | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useSources | - | - | - |
+| useSources | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useSync | skillmeat/web/hooks/useSync.ts | - | ['artifact', variables.artifactId], ['artifacts'] |
+| useTags | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useTemplate | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useTemplates | - | - | - |
+| useTemplates | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useToast | - | - | - |
+| useToast | skillmeat/web/hooks/use-toast.tsx | - | - |
+| useToastNotification | skillmeat/web/hooks/use-toast-notification.ts | - | - |
+| useTopArtifacts | skillmeat/web/hooks/useAnalytics.ts | ApiError, apiConfig, apiRequest | - |
+| useUndeploy | skillmeat/web/hooks/useDeploy.ts | apiRequest | ['artifacts'], ['deployments'], ['projects', 'detail'] |
+| useUndeployArtifact | skillmeat/web/hooks/use-deployments.ts | deployArtifact, getDeploymentSummary, getDeployments, listDeployments, type DeploymentQueryParams, type DeploymentSummary, undeployArtifact | - |
+| useUndeployMcpServer | - | - | - |
+| useUndeployMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useUpdateArtifact | skillmeat/web/hooks/useArtifacts.ts | ApiError, apiConfig, apiRequest | - |
+| useUpdateCatalogEntryName | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useUpdateCollection | skillmeat/web/hooks/use-collections.ts | ApiError, addArtifactToCollection, apiRequest, createCollection, deleteCollection, removeArtifactFromCollection, updateCollection | ['artifacts'], [...collectionKeys.artifacts(id!), options] |
+| useUpdateContextEntity | skillmeat/web/hooks/use-context-entities.ts | createContextEntity, deleteContextEntity, fetchContextEntities, fetchContextEntity, fetchContextEntityContent, updateContextEntity | - |
+| useUpdateGroup | skillmeat/web/hooks/use-groups.ts | apiConfig, apiRequest | - |
+| useUpdateMcpServer | - | - | - |
+| useUpdateMcpServer | skillmeat/web/hooks/useMcpServers.ts | apiRequest | - |
+| useUpdatePathTagStatus | skillmeat/web/hooks/use-path-tags.ts | getPathTags, updatePathTagStatus | - |
+| useUpdateProject | - | - | - |
+| useUpdateProject | skillmeat/web/hooks/useProjects.ts | ApiError, apiConfig, apiRequest | - |
+| useUpdateShareLink | skillmeat/web/hooks/useBundles.ts | apiConfig, apiRequest | ['bundle-analytics', bundleId], ['bundles', filter], ['bundles'] |
+| useUpdateSource | - | - | - |
+| useUpdateSource | skillmeat/web/hooks/useMarketplaceSources.ts | apiRequest, inferUrl, useToast | ['artifacts'], [...sourceKeys.catalogs(), sourceId] |
+| useUpdateTag | skillmeat/web/hooks/use-tags.ts | addTagToArtifact, createTag, deleteTag, fetchTags, getArtifactTags, removeTagFromArtifact, searchTags, type Tag, type TagCreateRequest, type TagListResponse, type TagUpdateRequest, updateTag | - |
+| useUpdateTemplate | skillmeat/web/hooks/use-templates.ts | createTemplate, deleteTemplate, deployTemplate, fetchTemplateById, fetchTemplates, updateTemplate | ['deployments'] |
+| useUsageTrends | skillmeat/web/hooks/useAnalytics.ts | ApiError, apiConfig, apiRequest | - |
+| useValidateExport | skillmeat/web/hooks/useExportBundle.ts | apiConfig, apiRequest | ['bundles'] |
+| useValidateImport | skillmeat/web/hooks/useImportBundle.ts | apiConfig, apiRequest | ['artifacts'], ['bundle-preview', source], ['bundles'] |
+| useVersionGraph | skillmeat/web/hooks/useVersionGraph.ts | apiRequest | - |
 <!-- CODEBASE_GRAPH:HOOKS:END -->
 
 ## Canonical Hooks Registry
