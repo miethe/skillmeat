@@ -36,8 +36,7 @@ import {
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
 import { ContentPane, type TruncationInfo } from '@/components/entity/content-pane';
-import { useCatalogFileTree, useCatalogFileContent } from '@/hooks/use-catalog-files';
-import { useUpdateCatalogEntryName } from '@/hooks/useMarketplaceSources';
+import { useCatalogFileTree, useCatalogFileContent, useUpdateCatalogEntryName } from '@/hooks';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
