@@ -1,7 +1,7 @@
 ---
 description: Plan new features with PRD, implementation plan, and progress tracking using planning and artifact-tracking skills
 allowed-tools: Task, Skill, Read, Write, Edit, Bash
-argument-hint: [request-or-file] [--impl-only|-i] [--plan-progress|-p] [--all|-a]
+argument-hint: "[request-or-file] [--impl-only|-i] [--plan-progress|-p] [--all|-a]"
 ---
 
 **You are Opus. Tokens are expensive. You orchestrate; subagents execute.**

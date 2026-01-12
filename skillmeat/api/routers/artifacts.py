@@ -5,6 +5,7 @@ Provides REST API for managing artifacts within collections.
 
 import base64
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path as PathLib
 from typing import Dict, List, Optional
@@ -787,26 +788,29 @@ async def bulk_import_artifacts(
     ),
 ) -> BulkImportResult:
     """
-    Bulk import multiple artifacts with atomic transaction.
+    Bulk import multiple artifacts with graceful error handling.
 
-    Validates all artifacts before importing. If any validation fails
-    and auto_resolve_conflicts is False, no artifacts are imported.
-    If True, failed artifacts are skipped.
+    Validates all artifacts before importing. Validation failures are tracked
+    per-artifact but do NOT cause the entire batch to fail. Valid artifacts
+    are imported while failed ones are reported in the results with detailed
+    error messages.
 
     The endpoint supports importing from:
     - GitHub sources (e.g., "anthropics/skills/canvas-design@latest")
     - Discovered artifacts from the collection
 
     Process:
-    1. Validate all artifact specifications
-    2. Check for duplicates in target collection
-    3. Import artifacts (skip duplicates if auto_resolve_conflicts=True)
-    4. Update collection manifest and lock files
+    1. Validate all artifact specifications (failures tracked, not raised)
+    2. Filter to valid artifacts only
+    3. Check for duplicates in target collection
+    4. Import valid artifacts (skip duplicates if auto_resolve_conflicts=True)
+    5. Update collection manifest and lock files
+    6. Build results combining validation failures + import results
 
     Response includes per-artifact status:
     - status: "success" (imported), "skipped" (already exists), "failed" (error)
     - skip_reason: Explanation when status="skipped"
-    - error: Error message when status="failed"
+    - error: Error message when status="failed" (includes validation errors)
 
     Args:
         request: BulkImportRequest with list of artifacts to import
@@ -819,7 +823,7 @@ async def bulk_import_artifacts(
         BulkImportResult with per-artifact status, summary counts, and location breakdown
 
     Raises:
-        HTTPException: 400 if validation fails, 500 if import fails
+        HTTPException: 500 if import fails catastrophically
 
     Examples:
         Import multiple artifacts:
@@ -849,8 +853,15 @@ async def bulk_import_artifacts(
     collection_name = collection or "default"
 
     try:
-        # Validate all artifacts before importing
-        validation_errors = []
+        # Import schemas needed for building results
+        from skillmeat.api.schemas.discovery import (
+            ErrorReasonCode,
+            ImportResult,
+            ImportStatus,
+        )
+
+        # Validate all artifacts before importing - track failures instead of raising 422
+        validation_failures: dict[int, str] = {}  # index -> error message
         for i, artifact in enumerate(request.artifacts):
             error = validate_artifact_request(
                 source=artifact.source,
@@ -860,16 +871,19 @@ async def bulk_import_artifacts(
                 tags=artifact.tags,
             )
             if error:
-                # Extract validation details and add index context
+                # Extract validation error messages
                 detail = error.detail
                 if isinstance(detail, dict) and "details" in detail:
-                    for err_detail in detail["details"]:
-                        err_detail["message"] = f"Artifact {i}: {err_detail['message']}"
-                        validation_errors.append(ErrorDetail(**err_detail))
-
-        # If validation errors found and auto_resolve_conflicts is False, fail fast
-        if validation_errors and not request.auto_resolve_conflicts:
-            raise create_validation_error(validation_errors)
+                    messages = [
+                        d.get("message", str(d)) for d in detail["details"]
+                    ]
+                    validation_failures[i] = "; ".join(messages)
+                else:
+                    validation_failures[i] = str(detail)
+                logger.warning(
+                    f"Artifact {i} ({artifact.name or artifact.source}) failed validation: "
+                    f"{validation_failures[i]}"
+                )
 
         # Create importer service
         importer = ArtifactImporter(
@@ -877,7 +891,13 @@ async def bulk_import_artifacts(
             collection_manager=collection_mgr,
         )
 
-        # Convert Pydantic schemas to data classes
+        # Filter to only valid artifacts for import
+        valid_artifact_indices = [
+            i for i in range(len(request.artifacts)) if i not in validation_failures
+        ]
+        valid_artifacts = [request.artifacts[i] for i in valid_artifact_indices]
+
+        # Convert only valid Pydantic schemas to data classes
         artifacts_data = [
             BulkImportArtifactData(
                 source=a.source,
@@ -889,56 +909,105 @@ async def bulk_import_artifacts(
                 scope=a.scope,
                 path=a.path,
             )
-            for a in request.artifacts
+            for a in valid_artifacts
         ]
 
-        # Perform bulk import
-        logger.info(
-            f"Starting bulk import of {len(artifacts_data)} artifacts "
-            f"to collection '{collection_name}'"
-        )
+        # Perform bulk import only if there are valid artifacts
+        start_time = time.time()
 
-        result_data = importer.bulk_import(
-            artifacts=artifacts_data,
-            collection_name=collection_name,
-            auto_resolve_conflicts=request.auto_resolve_conflicts,
-            apply_path_tags=request.apply_path_tags,
-        )
-
-        logger.info(
-            f"Bulk import completed: {result_data.total_imported}/{result_data.total_requested} "
-            f"imported, {result_data.total_failed} failed in {result_data.duration_ms:.1f}ms"
-        )
-
-        # Convert data class results back to Pydantic schemas
-        from skillmeat.api.schemas.discovery import (
-            ErrorReasonCode,
-            ImportResult,
-            ImportStatus,
-        )
-
-        results = [
-            ImportResult(
-                artifact_id=r.artifact_id,
-                path=r.path,
-                status=(
-                    r.status
-                    if r.status
-                    else (ImportStatus.SUCCESS if r.success else ImportStatus.FAILED)
-                ),
-                message=r.message,
-                error=r.error,
-                reason_code=(
-                    ErrorReasonCode(r.reason_code)
-                    if r.reason_code and r.reason_code in [e.value for e in ErrorReasonCode]
-                    else None
-                ),
-                skip_reason=r.skip_reason,
-                details=r.details,
-                tags_applied=r.tags_applied,
+        if artifacts_data:
+            logger.info(
+                f"Starting bulk import of {len(artifacts_data)} artifacts "
+                f"(skipped {len(validation_failures)} with validation errors) "
+                f"to collection '{collection_name}'"
             )
-            for r in result_data.results
-        ]
+
+            result_data = importer.bulk_import(
+                artifacts=artifacts_data,
+                collection_name=collection_name,
+                auto_resolve_conflicts=request.auto_resolve_conflicts,
+                apply_path_tags=request.apply_path_tags,
+            )
+
+            logger.info(
+                f"Bulk import completed: {result_data.total_imported}/{result_data.total_requested} "
+                f"imported, {result_data.total_failed} failed in {result_data.duration_ms:.1f}ms"
+            )
+        else:
+            # All artifacts failed validation - create empty result
+            from skillmeat.core.importer import BulkImportResultData
+
+            logger.warning(
+                f"No valid artifacts to import - all {len(request.artifacts)} failed validation"
+            )
+            result_data = BulkImportResultData(
+                total_requested=0,
+                total_imported=0,
+                total_failed=0,
+                results=[],
+                duration_ms=(time.time() - start_time) * 1000,
+                total_tags_applied=0,
+            )
+
+        # Build results: combine validation failures + import results in original order
+        # Create a mapping from valid artifact index to its import result
+        import_results_by_valid_idx = {
+            i: r for i, r in enumerate(result_data.results)
+        }
+
+        results: list[ImportResult] = []
+        valid_idx = 0  # Track position in valid artifacts list
+
+        for i, artifact in enumerate(request.artifacts):
+            if i in validation_failures:
+                # This artifact failed validation - add failed result
+                artifact_id = (
+                    f"{artifact.artifact_type}:{artifact.name}"
+                    if artifact.name
+                    else f"{artifact.artifact_type}:{artifact.source}"
+                )
+                results.append(
+                    ImportResult(
+                        artifact_id=artifact_id,
+                        path=artifact.path,
+                        status=ImportStatus.FAILED,
+                        message="Validation failed",
+                        error=validation_failures[i],
+                        reason_code=ErrorReasonCode.INVALID_SOURCE,
+                        skip_reason=None,
+                        details=None,
+                        tags_applied=0,
+                    )
+                )
+            else:
+                # This artifact was valid - get its import result
+                if valid_idx in import_results_by_valid_idx:
+                    r = import_results_by_valid_idx[valid_idx]
+                    results.append(
+                        ImportResult(
+                            artifact_id=r.artifact_id,
+                            path=r.path,
+                            status=(
+                                r.status
+                                if r.status
+                                else (
+                                    ImportStatus.SUCCESS if r.success else ImportStatus.FAILED
+                                )
+                            ),
+                            message=r.message,
+                            error=r.error,
+                            reason_code=(
+                                ErrorReasonCode(r.reason_code)
+                                if r.reason_code
+                                and r.reason_code in [e.value for e in ErrorReasonCode]
+                                else None
+                            ),
+                            skip_reason=r.skip_reason,
+                            details=r.details,
+                            tags_applied=r.tags_applied,
+                        )
+                    )
+                valid_idx += 1
 
         # If we know which project initiated the import, record deployments so UI reflects the change
         if project_id:
@@ -966,9 +1035,9 @@ async def bulk_import_artifacts(
                         updated = False
 
                         for artifact_payload, import_result in zip(
-                            request.artifacts, result_data.results
+                            request.artifacts, results
                         ):
-                            if not import_result.success:
+                            if import_result.status != ImportStatus.SUCCESS:
                                 continue
 
                             if not artifact_payload.path:
@@ -1029,15 +1098,17 @@ async def bulk_import_artifacts(
                         f"Failed to update project deployments for {project_path}: {e}"
                     )
 
-        # Calculate total_skipped from results
+        # Calculate totals from combined results (including validation failures)
         total_skipped = sum(1 for r in results if r.status == ImportStatus.SKIPPED)
+        total_failed = sum(1 for r in results if r.status == ImportStatus.FAILED)
+        total_imported = sum(1 for r in results if r.status == ImportStatus.SUCCESS)
 
         return BulkImportResult(
-            total_requested=result_data.total_requested,
-            total_imported=result_data.total_imported,
+            total_requested=len(request.artifacts),  # All requested, including validation failures
+            total_imported=total_imported,
             total_skipped=total_skipped,
-            total_failed=result_data.total_failed,
-            imported_to_collection=result_data.total_imported,  # All successful imports go to collection
+            total_failed=total_failed,  # Includes validation failures + import failures
+            imported_to_collection=total_imported,  # All successful imports go to collection
             added_to_project=0,  # TODO: Track project deployments separately
             total_tags_applied=result_data.total_tags_applied,
             results=results,

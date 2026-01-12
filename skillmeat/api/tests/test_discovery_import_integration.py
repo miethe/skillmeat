@@ -524,7 +524,7 @@ class TestBulkImportCounters:
 
                     bulk_result = BulkImportResultData(
                         total_requested=4,
-                        total_imported=3,  # 2 success + 1 skipped
+                        total_imported=2,  # Only SUCCESS count (not SKIPPED)
                         total_failed=1,
                         results=results,
                         duration_ms=300.0,
@@ -554,7 +554,7 @@ class TestBulkImportCounters:
 
                     # Verify counters
                     assert data["total_requested"] == 4
-                    assert data["total_imported"] == 3
+                    assert data["total_imported"] == 2  # Only SUCCESS, not SKIPPED
                     assert data["total_failed"] == 1
 
                     # Count statuses
@@ -773,15 +773,14 @@ class TestErrorHandling:
                 },
             )
 
-            # The importer's validation will catch this and return it in the response
-            # But it could also be caught at Pydantic level depending on validation
-            # Either 422 (Pydantic validation) or 200 with failed result is acceptable
-            assert response.status_code in [200, 422]
+            # Validation failures are now gracefully handled - returns 200 with failed status
+            # No longer raises 422 for validation errors
+            assert response.status_code == 200
 
-            if response.status_code == 200:
-                data = response.json()
-                assert data["total_failed"] == 1
-                assert "Invalid source format" in data["results"][0]["error"]
+            data = response.json()
+            assert data["total_failed"] == 1
+            # Error message from validate_artifact_request
+            assert "Invalid GitHub spec" in data["results"][0]["error"]
 
 
 class TestEndToEndFlow:

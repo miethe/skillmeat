@@ -1,6 +1,6 @@
 ---
 description: Debug and remediate bugs with Opus delegation, artifact tracking, and request-log integration
-argument-hint: <bug-description> [--severity=critical|high|medium|low] [--component=name]
+argument-hint: "<bug-description> [--severity=critical|high|medium|low] [--component=name]"
 allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
   Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(pytest:*),
   Bash(uv:*), Bash(pre-commit:*), Bash(ls:*), Bash(find:*), Bash(rm:*),

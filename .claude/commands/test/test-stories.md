@@ -1,7 +1,7 @@
 ---
 description: Run Storybook tests on UI components with accessibility validation
 allowed-tools: Bash, Read(./**), Glob
-argument-hint: [component-pattern]
+argument-hint: "[component-pattern]"
 ---
 
 Execute MP Storybook testing for "$ARGUMENTS":

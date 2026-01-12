@@ -1,7 +1,7 @@
 ---
 description: Quick feature implementation - streamlined planning + execution for simple enhancements
 allowed-tools: Read, Write, Edit, MultiEdit, Bash(git:*), Bash(pnpm:*), Grep, Glob, Task
-argument-hint: [feature-text|file-path|REQ-ID]
+argument-hint: "[feature-text|file-path|REQ-ID]"
 ---
 
 # Quick Feature

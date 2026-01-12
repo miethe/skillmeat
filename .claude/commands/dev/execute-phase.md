@@ -1,6 +1,6 @@
 ---
 description: Execute phase development with YAML-driven orchestration
-argument-hint: <phase-number> [--plan=path/to/plan.md]
+argument-hint: "<phase-number> [--plan=path/to/plan.md]"
 allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write, Skill,
   Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(pytest:*),
   Bash(uv:*), Bash(pre-commit:*)

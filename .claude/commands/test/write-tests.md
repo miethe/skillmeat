@@ -1,7 +1,7 @@
 ---
 description: Add unit + integration tests for a changed area; include negative paths.
 allowed-tools: Read(./**), Write(./**), Edit, MultiEdit, Bash(pnpm:*), Bash(uv:*), Bash(git add:*), Bash(git commit:*)
-argument-hint: [path-or-glob]
+argument-hint: "[path-or-glob]"
 ---
 
 Identify code touched under "$ARGUMENTS". For each file:
