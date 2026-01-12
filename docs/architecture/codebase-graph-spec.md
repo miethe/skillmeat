@@ -21,16 +21,23 @@ Outputs live in `docs/architecture/` as JSON graphs:
 
 Scripts live in `scripts/code_map/`:
 - `extract_frontend.py`
+- `extract_frontend_components.py`
+- `extract_frontend_hooks.py`
+- `extract_frontend_api_clients.py`
 - `extract_backend.py`
 - `merge_graphs.py`
 - `apply_overrides.py`
 - `coverage_summary.py`
 - `graph.py` (shared graph model)
+- `frontend_utils.py` (shared frontend helpers)
 
 Run from repo root:
 ```bash
 python -m scripts.code_map.extract_frontend
 python -m scripts.code_map.extract_backend
+python -m scripts.code_map.extract_frontend_components
+python -m scripts.code_map.extract_frontend_hooks
+python -m scripts.code_map.extract_frontend_api_clients
 python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
 python -m scripts.code_map.coverage_summary
@@ -39,6 +46,9 @@ python -m scripts.code_map.coverage_summary
 Optional overrides:
 ```bash
 python -m scripts.code_map.extract_frontend --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.json
+python -m scripts.code_map.extract_frontend_components --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.components.json
+python -m scripts.code_map.extract_frontend_hooks --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.hooks.json
+python -m scripts.code_map.extract_frontend_api_clients --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.api-clients.json
 python -m scripts.code_map.extract_backend --api-root skillmeat/api --out docs/architecture/codebase-graph.backend.json
 python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-graph.frontend.json --backend docs/architecture/codebase-graph.backend.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
@@ -55,7 +65,8 @@ Root metadata:
 
 Nodes:
 - `id`: stable identifier
-- `type`: one of `route`, `page`, `hook`, `api_endpoint`, `router`, `handler`
+- `type`: one of `route`, `page`, `component`, `hook`, `api_client`, `query_key`, `type`,
+  `api_endpoint`, `router`, `handler`
 - `label`: human-readable label
 - `file`: file path when known
 - optional metadata per node type (ex: `method`, `path`, `prefix`)
@@ -63,12 +74,36 @@ Nodes:
 Edges:
 - `from`, `to`: node ids
 - `type`: relationship type
-  - `route_to_page`
-  - `uses_hook`
+- `route_to_page`
+- `uses_hook`
 - `calls_api`
+- `page_uses_component`
+- `component_uses_component`
+- `component_uses_hook`
+- `hook_calls_api_client`
+- `api_client_calls_endpoint`
+- `hook_registers_query_key`
+- `uses_type`
 - `router_exposes`
 - `handled_by`
 - optional metadata (ex: `file`)
+
+## Frontend Expansion (Phase 1)
+
+Additional frontend coverage includes:
+- Page/component relationships (`page_uses_component`, `component_uses_component`)
+- Component hook usage (`component_uses_hook`)
+- Hook to API client mapping (`hook_calls_api_client`, `api_client_calls_endpoint`)
+- React Query keys (`hook_registers_query_key`)
+- Imports of shared types (`uses_type`)
+
+Primary extractors:
+- `extract_frontend_components.py`: scans `web/app/**/page.tsx` and `web/components/**`
+  for component edges and component/type nodes.
+- `extract_frontend_hooks.py`: scans component hook usage + hook files for query keys
+  and type imports.
+- `extract_frontend_api_clients.py`: scans `web/lib/api.ts` + `web/lib/api/**` for
+  exported clients, and hook imports of those clients.
 
 ## Unified Graph + Overrides
 
