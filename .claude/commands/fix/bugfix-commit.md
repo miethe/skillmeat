@@ -15,8 +15,12 @@ argument-hint: [one-line summary]
 Describe the bug and fix in ≤3 bullet points, make the smallest safe change, stage, and craft a single commit message: "$ARGUMENTS".
 
 <!-- MeatyCapture Integration - Project: skillmeat -->
-## Post-Commit (if pattern-worthy)
+## Post-Commit
 
-After committing, if this bug represents a pattern worth tracking:
-- `/mc capture {"title": "...", "type": "bug", "status": "done", "domain": "..."}`
-- Include root cause and solution in description
+Update bug-fixes doc and request-log in one command:
+
+```bash
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-skillmeat
+```
+
+**Spec**: `.claude/specs/script-usage/bug-automation-scripts.md`

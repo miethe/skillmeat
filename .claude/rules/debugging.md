@@ -300,3 +300,4 @@ After fix is implemented:
 - **Backend Patterns**: `.claude/context/backend-api-patterns.md`
 - **Frontend Patterns**: `.claude/context/frontend-patterns.md`
 - **Orchestration**: `CLAUDE.md` → Agent Delegation section
+- **Bug Automation**: `.claude/specs/script-usage/bug-automation-scripts.md`

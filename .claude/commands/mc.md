@@ -70,4 +70,22 @@ meatycapture log item update doc.md ITEM-01 --remove-tags "oldtag" # Remove tags
 # Other fields: --type, --title, --domain, --context
 ```
 
+## Post-Fix Documentation
+
+After committing a fix, update bug-fixes doc + request-log together:
+
+```bash
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-skillmeat
+```
+
+## Batch Filing
+
+For 3+ bugs from JSON/CSV:
+
+```bash
+.claude/scripts/batch-file-bugs.sh --input /tmp/bugs.json --project skillmeat
+```
+
+**Full spec**: `.claude/specs/script-usage/bug-automation-scripts.md`
+
 Run the appropriate command based on user request.
