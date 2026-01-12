@@ -293,14 +293,18 @@ Scope:
 Outputs:
 - Auto-generated rules tables.
 - Registry enforcement via imports and lint checks.
+- Context docs in `.claude/context/` for hook selection + schema migration rules.
 
 Acceptance checks:
 - Agents can choose canonical hooks/endpoints without deep code search.
+- Inventory tables refresh from `scripts/code_map/build_outputs.py`.
 
 Agent-facing artifacts to generate:
 - `.claude/rules/web/hooks.md` inventory table (from graph)
 - `.claude/rules/web/api-client.md` endpoint table (from graph)
+- `.claude/rules/api/schemas.md` schema inventory table (from graph)
 - `.claude/context/web-hook-guide.md` (high-level decisions + deprecated list)
+- `.claude/context/schema-migration-rules.md` (schema and migration guidance)
 
 ## Script Architecture (Proposed)
 

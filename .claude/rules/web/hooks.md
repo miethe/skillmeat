@@ -6,6 +6,11 @@ Custom React hooks for SkillMeat web frontend using TanStack Query v5.
 
 ---
 
+## Inventory (Auto-generated)
+
+<!-- CODEBASE_GRAPH:HOOKS:START -->
+<!-- CODEBASE_GRAPH:HOOKS:END -->
+
 ## Canonical Hooks Registry
 
 **Pattern**: All hooks are exported from `@/hooks` barrel export.
