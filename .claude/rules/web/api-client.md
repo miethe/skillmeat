@@ -9,6 +9,90 @@ API client functions for SkillMeat web frontend communicating with FastAPI backe
 ## Inventory (Auto-generated)
 
 <!-- CODEBASE_GRAPH:API_CLIENTS:START -->
+| API Client | File | Endpoints |
+| --- | --- | --- |
+| ApiError | skillmeat/web/lib/api.ts | - |
+| addArtifactToCollection | skillmeat/web/lib/api/collections.ts | POST /user-collections/${collectionId}/artifacts |
+| addArtifactToGroup | skillmeat/web/lib/api/groups.ts | POST /groups/${groupId}/artifacts/${artifactId} |
+| addTagToArtifact | skillmeat/web/lib/api/tags.ts | POST /artifacts/${artifactId}/tags/${tagId} |
+| analyzeMergeSafety | skillmeat/web/lib/api/merge.ts | POST /merge/analyze |
+| analyzeRollbackSafety | skillmeat/web/lib/api/snapshots.ts | /versions/snapshots/${snapshotId}/rollback-analysis${params.toString() ?  |
+| apiConfig | skillmeat/web/lib/api.ts | - |
+| apiRequest | skillmeat/web/lib/api.ts | - |
+| buildApiHeaders | skillmeat/web/lib/api.ts | - |
+| copyArtifactToCollection | skillmeat/web/lib/api/collections.ts | - |
+| createCollection | skillmeat/web/lib/api/collections.ts | POST /user-collections |
+| createContextEntity | skillmeat/web/lib/api/context-entities.ts | POST /context-entities |
+| createGroup | skillmeat/web/lib/api/groups.ts | POST /groups |
+| createSnapshot | skillmeat/web/lib/api/snapshots.ts | POST /versions/snapshots |
+| createTag | skillmeat/web/lib/api/tags.ts | POST /tags |
+| createTemplate | skillmeat/web/lib/api/templates.ts | POST /project-templates |
+| deleteArtifactFromCollection | skillmeat/web/lib/api/artifacts.ts | DELETE /artifacts/${artifactId} |
+| deleteCollection | skillmeat/web/lib/api/collections.ts | DELETE /user-collections/${id} |
+| deleteContextEntity | skillmeat/web/lib/api/context-entities.ts | DELETE /context-entities/${id} |
+| deleteGroup | skillmeat/web/lib/api/groups.ts | DELETE /groups/${id} |
+| deleteSnapshot | skillmeat/web/lib/api/snapshots.ts | DELETE /versions/snapshots/${id}${params.toString() ?  |
+| deleteTag | skillmeat/web/lib/api/tags.ts | DELETE /tags/${id} |
+| deleteTemplate | skillmeat/web/lib/api/templates.ts | DELETE /project-templates/${id} |
+| deployArtifact | skillmeat/web/lib/api/deployments.ts | POST /deploy |
+| deployTemplate | skillmeat/web/lib/api/templates.ts | POST /project-templates/${id}/deploy |
+| diffSnapshots | skillmeat/web/lib/api/snapshots.ts | POST /versions/snapshots/diff |
+| executeMerge | skillmeat/web/lib/api/merge.ts | POST /merge/execute |
+| executeRollback | skillmeat/web/lib/api/snapshots.ts | POST /versions/snapshots/${snapshotId}/rollback |
+| fetchCatalogFileContent | skillmeat/web/lib/api/catalog.ts | /marketplace/sources/${sourceId}/artifacts/${encodedArtifactPath}/files/${encodedFilePath} |
+| fetchCatalogFileTree | skillmeat/web/lib/api/catalog.ts | /marketplace/sources/${sourceId}/artifacts/${encodedPath}/files |
+| fetchCollection | skillmeat/web/lib/api/collections.ts | /user-collections/${id} |
+| fetchCollections | skillmeat/web/lib/api/collections.ts | /user-collections |
+| fetchContextEntities | skillmeat/web/lib/api/context-entities.ts | /context-entities${params.toString() ?  |
+| fetchContextEntity | skillmeat/web/lib/api/context-entities.ts | /context-entities/${id} |
+| fetchContextEntityContent | skillmeat/web/lib/api/context-entities.ts | /context-entities/${id}/content |
+| fetchGroup | skillmeat/web/lib/api/groups.ts | /groups/${id} |
+| fetchGroups | skillmeat/web/lib/api/groups.ts | /groups?collection_id=${collectionId} |
+| fetchSnapshot | skillmeat/web/lib/api/snapshots.ts | /versions/snapshots/${id}${params.toString() ?  |
+| fetchSnapshots | skillmeat/web/lib/api/snapshots.ts | /versions/snapshots${params.toString() ?  |
+| fetchTags | skillmeat/web/lib/api/tags.ts | /tags${params.toString() ?  |
+| fetchTemplateById | skillmeat/web/lib/api/templates.ts | /project-templates/${id} |
+| fetchTemplates | skillmeat/web/lib/api/templates.ts | /project-templates${params.toString() ?  |
+| getArtifactTags | skillmeat/web/lib/api/tags.ts | /artifacts/${artifactId}/tags |
+| getDeploymentSummary | skillmeat/web/lib/api/deployments.ts | - |
+| getDeployments | skillmeat/web/lib/api/deployments.ts | - |
+| getPathTags | skillmeat/web/lib/api/marketplace.ts | /marketplace/sources/${sourceId}/catalog/${entryId}/path-tags |
+| getSyncStatus | skillmeat/web/lib/api/context-sync.ts | /context-sync/status?${params.toString()} |
+| inferUrl | skillmeat/web/lib/api/marketplace.ts | POST /marketplace/sources/infer-url |
+| listDeployments | skillmeat/web/lib/api/deployments.ts | /deploy${params.toString() ?  |
+| moveArtifactToCollection | skillmeat/web/lib/api/collections.ts | - |
+| moveArtifactToGroup | skillmeat/web/lib/api/groups.ts | POST /groups/${sourceGroupId}/artifacts/${artifactId}/move |
+| previewMerge | skillmeat/web/lib/api/merge.ts | POST /merge/preview |
+| pullChanges | skillmeat/web/lib/api/context-sync.ts | POST /context-sync/pull |
+| pushChanges | skillmeat/web/lib/api/context-sync.ts | POST /context-sync/push |
+| removeArtifactFromCollection | skillmeat/web/lib/api/collections.ts | DELETE /user-collections/${collectionId}/artifacts/${artifactId} |
+| removeArtifactFromGroup | skillmeat/web/lib/api/groups.ts | DELETE /groups/${groupId}/artifacts/${artifactId} |
+| removeProjectDeployment | skillmeat/web/lib/api/deployments.ts | DELETE /projects/${projectId}/deployments/${artifactName}?${params.toString()} |
+| removeTagFromArtifact | skillmeat/web/lib/api/tags.ts | DELETE /artifacts/${artifactId}/tags/${tagId} |
+| reorderArtifactsInGroup | skillmeat/web/lib/api/groups.ts | POST /groups/${groupId}/artifacts/reorder |
+| reorderGroups | skillmeat/web/lib/api/groups.ts | PUT /collections/${collectionId}/groups/reorder |
+| resolveConflict | skillmeat/web/lib/api/context-sync.ts | POST /context-sync/resolve |
+| resolveConflict | skillmeat/web/lib/api/merge.ts | POST /merge/resolve |
+| searchTags | skillmeat/web/lib/api/tags.ts | /tags/search?${params.toString()} |
+| sourceKeys | skillmeat/web/hooks/useMarketplaceSources.ts | - |
+| type DeploymentQueryParams | skillmeat/web/lib/api/deployments.ts | - |
+| type DeploymentSummary | skillmeat/web/lib/api/deployments.ts | - |
+| type FileContentResponse | skillmeat/web/lib/api/catalog.ts | - |
+| type FileTreeResponse | skillmeat/web/lib/api/catalog.ts | - |
+| type SyncResolution | skillmeat/web/lib/api/context-sync.ts | - |
+| type SyncStatus | skillmeat/web/lib/api/context-sync.ts | - |
+| type Tag | skillmeat/web/lib/api/tags.ts | - |
+| type TagCreateRequest | skillmeat/web/lib/api/tags.ts | - |
+| type TagListResponse | skillmeat/web/lib/api/tags.ts | - |
+| type TagUpdateRequest | skillmeat/web/lib/api/tags.ts | - |
+| undeployArtifact | skillmeat/web/lib/api/deployments.ts | POST /deploy/undeploy |
+| updateCollection | skillmeat/web/lib/api/collections.ts | PUT /user-collections/${id} |
+| updateContextEntity | skillmeat/web/lib/api/context-entities.ts | PUT /context-entities/${id} |
+| updateGroup | skillmeat/web/lib/api/groups.ts | PUT /groups/${id} |
+| updatePathTagStatus | skillmeat/web/lib/api/marketplace.ts | PATCH /marketplace/sources/${sourceId}/catalog/${entryId}/path-tags |
+| updateTag | skillmeat/web/lib/api/tags.ts | PUT /tags/${id} |
+| updateTemplate | skillmeat/web/lib/api/templates.ts | PUT /project-templates/${id} |
+| useToast | skillmeat/web/hooks/use-toast.tsx | - |
 <!-- CODEBASE_GRAPH:API_CLIENTS:END -->
 
 ## Endpoint Mapping (Quick Reference)
