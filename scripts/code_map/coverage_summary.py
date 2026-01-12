@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 
 
 def _load_graph(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        print(f"ERROR: graph file not found: {path}")
+        print("Build the unified graph first:")
+        print("- python -m scripts.code_map.merge_graphs")
+        print("- python -m scripts.code_map.apply_overrides")
+        raise FileNotFoundError(path)
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -64,7 +71,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    graph = _load_graph(Path(args.graph))
+    try:
+        graph = _load_graph(Path(args.graph))
+    except FileNotFoundError:
+        sys.exit(1)
     coverage_summary(graph, args.max_list)
 
 
