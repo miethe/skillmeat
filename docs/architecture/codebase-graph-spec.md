@@ -34,12 +34,14 @@ Scripts live in `scripts/code_map/`:
 - `coverage_summary.py`
 - `validate_graph.py`
 - `build_outputs.py`
+- `__main__.py` (pipeline orchestrator)
 - `graph.py` (shared graph model)
 - `frontend_utils.py` (shared frontend helpers)
 - `backend_utils.py` (shared backend helpers)
 
 Run from repo root:
 ```bash
+python -m scripts.code_map
 python -m scripts.code_map.extract_frontend
 python -m scripts.code_map.extract_backend
 python -m scripts.code_map.extract_frontend_components
@@ -54,6 +56,7 @@ python -m scripts.code_map.build_outputs
 
 Optional overrides:
 ```bash
+python -m scripts.code_map --skip-coverage
 python -m scripts.code_map.extract_frontend --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.json
 python -m scripts.code_map.extract_frontend_components --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.components.json
 python -m scripts.code_map.extract_frontend_hooks --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.hooks.json
