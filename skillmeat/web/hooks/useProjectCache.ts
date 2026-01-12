@@ -59,8 +59,12 @@ export interface UseProjectCacheOptions {
 export function useProjectCache(options: UseProjectCacheOptions = {}) {
   const queryClient = useQueryClient();
 
+  // NOTE: We use a distinct query key from useProjects() hook because:
+  // - useProjects stores ProjectSummary[] (the items array directly)
+  // - useProjectCache stores ProjectsResponse (full object with items + page_info)
+  // Using the same key would cause cache pollution and "map is not a function" errors.
   const query = useQuery({
-    queryKey: ['projects', 'list'],
+    queryKey: ['projects', 'list', 'with-cache-info'],
     queryFn: async () => {
       const response = await apiRequest<ProjectsResponse>('/projects');
       return response;
@@ -92,7 +96,7 @@ export function useProjectCache(options: UseProjectCacheOptions = {}) {
    */
   const forceRefresh = async () => {
     const response = await apiRequest<ProjectsResponse>('/projects?refresh=true');
-    queryClient.setQueryData(['projects', 'list'], response);
+    queryClient.setQueryData(['projects', 'list', 'with-cache-info'], response);
     return response;
   };
 
