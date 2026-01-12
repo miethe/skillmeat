@@ -7,12 +7,18 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 try:
     from .graph import Graph
+    from .extract_frontend_components import extract_frontend_components
+    from .extract_frontend_hooks import extract_frontend_hooks
+    from .extract_frontend_api_clients import extract_frontend_api_clients
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
     from pathlib import Path as _Path
 
     sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
     from scripts.code_map.graph import Graph
+    from scripts.code_map.extract_frontend_components import extract_frontend_components
+    from scripts.code_map.extract_frontend_hooks import extract_frontend_hooks
+    from scripts.code_map.extract_frontend_api_clients import extract_frontend_api_clients
 
 IMPORT_RE = re.compile(
     r"import\s+\{([^}]+)\}\s+from\s+['\"]([^'\"]+)['\"]",
@@ -169,6 +175,10 @@ def extract_frontend(web_root: Path) -> Graph:
                     path=path,
                 )
                 graph.add_edge(hook_id, endpoint_id, "calls_api", file=hook_file.as_posix())
+
+    graph.merge(extract_frontend_components(web_root))
+    graph.merge(extract_frontend_hooks(web_root))
+    graph.merge(extract_frontend_api_clients(web_root))
 
     return graph
 
