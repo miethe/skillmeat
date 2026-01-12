@@ -5,15 +5,41 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SourceDetailPage from '@/app/marketplace/sources/[id]/page';
-import * as useMarketplaceSources from '@/hooks/useMarketplaceSources';
+import {
+  useSource,
+  useSourceCatalog,
+  useRescanSource,
+  useImportArtifacts,
+} from '@/hooks';
 import type { GitHubSource, CatalogEntry, CatalogListResponse } from '@/types/marketplace';
 
 // Mock hooks
-jest.mock('@/hooks/useMarketplaceSources');
-jest.mock('@/hooks/use-toast', () => ({
+jest.mock('@/hooks', () => ({
+  useSource: jest.fn(),
+  useSourceCatalog: jest.fn(),
+  useRescanSource: jest.fn(),
+  useImportArtifacts: jest.fn(),
+  useExcludeCatalogEntry: jest.fn(() => ({
+    mutate: jest.fn(),
+    isPending: false,
+  })),
+  useUpdateSource: jest.fn(() => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  })),
+  sourceKeys: {
+    all: ['sources'],
+    catalogs: () => ['sources', 'catalogs'],
+  },
   useToast: () => ({
     toast: jest.fn(),
   }),
+}));
+
+// Mock CatalogEntryModal to avoid react-markdown parsing issues
+jest.mock('@/components/CatalogEntryModal', () => ({
+  CatalogEntryModal: ({ entry, open }: any) =>
+    open && entry ? <div data-testid="catalog-entry-modal">{entry.name}</div> : null,
 }));
 
 // Mock next/navigation
@@ -104,13 +130,13 @@ describe('SourceDetailPage', () => {
     jest.clearAllMocks();
 
     // Default mock implementations
-    (useMarketplaceSources.useSource as jest.Mock).mockReturnValue({
+    (useSource as jest.Mock).mockReturnValue({
       data: mockSource,
       isLoading: false,
       error: null,
     });
 
-    (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+    (useSourceCatalog as jest.Mock).mockReturnValue({
       data: { pages: [mockCatalogResponse] },
       isLoading: false,
       error: null,
@@ -119,12 +145,12 @@ describe('SourceDetailPage', () => {
       isFetchingNextPage: false,
     });
 
-    (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+    (useRescanSource as jest.Mock).mockReturnValue({
       mutate: jest.fn(),
       isPending: false,
     });
 
-    (useMarketplaceSources.useImportArtifacts as jest.Mock).mockReturnValue({
+    (useImportArtifacts as jest.Mock).mockReturnValue({
       mutateAsync: jest.fn(),
       isPending: false,
     });
@@ -132,7 +158,7 @@ describe('SourceDetailPage', () => {
 
   describe('Loading State', () => {
     it('shows skeleton while loading source', () => {
-      (useMarketplaceSources.useSource as jest.Mock).mockReturnValue({
+      (useSource as jest.Mock).mockReturnValue({
         data: null,
         isLoading: true,
         error: null,
@@ -146,7 +172,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('shows skeleton while loading catalog', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: null,
         isLoading: true,
         error: null,
@@ -162,7 +188,7 @@ describe('SourceDetailPage', () => {
 
   describe('Error State', () => {
     it('shows error when source fails to load', () => {
-      (useMarketplaceSources.useSource as jest.Mock).mockReturnValue({
+      (useSource as jest.Mock).mockReturnValue({
         data: null,
         isLoading: false,
         error: new Error('Source not found'),
@@ -176,7 +202,7 @@ describe('SourceDetailPage', () => {
 
     it('shows back button in error state', async () => {
       const user = userEvent.setup();
-      (useMarketplaceSources.useSource as jest.Mock).mockReturnValue({
+      (useSource as jest.Mock).mockReturnValue({
         data: null,
         isLoading: false,
         error: new Error('Not found'),
@@ -200,7 +226,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('displays root hint when provided', () => {
-      (useMarketplaceSources.useSource as jest.Mock).mockReturnValue({
+      (useSource as jest.Mock).mockReturnValue({
         data: { ...mockSource, root_hint: 'src/' },
         isLoading: false,
         error: null,
@@ -241,7 +267,7 @@ describe('SourceDetailPage', () => {
     it('triggers rescan when button is clicked', async () => {
       const user = userEvent.setup();
       const mockMutate = jest.fn();
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
       });
@@ -255,7 +281,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('shows loading state during rescan', () => {
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutate: jest.fn(),
         isPending: true,
       });
@@ -266,7 +292,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('disables rescan button during rescan', () => {
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutate: jest.fn(),
         isPending: true,
       });
@@ -289,7 +315,7 @@ describe('SourceDetailPage', () => {
 
     it('filters by status when badge is clicked', async () => {
       const user = userEvent.setup();
-      const mockUseSourceCatalog = useMarketplaceSources.useSourceCatalog as jest.Mock;
+      const mockUseSourceCatalog = useSourceCatalog as jest.Mock;
 
       renderWithClient(<SourceDetailPage />);
 
@@ -303,7 +329,7 @@ describe('SourceDetailPage', () => {
 
     it('clears status filter when badge is clicked again', async () => {
       const user = userEvent.setup();
-      const mockUseSourceCatalog = useMarketplaceSources.useSourceCatalog as jest.Mock;
+      const mockUseSourceCatalog = useSourceCatalog as jest.Mock;
 
       renderWithClient(<SourceDetailPage />);
 
@@ -338,7 +364,7 @@ describe('SourceDetailPage', () => {
 
     it('searches by path as well as name', async () => {
       const user = userEvent.setup();
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -368,7 +394,7 @@ describe('SourceDetailPage', () => {
 
     it('filters by artifact type', async () => {
       const user = userEvent.setup();
-      const mockUseSourceCatalog = useMarketplaceSources.useSourceCatalog as jest.Mock;
+      const mockUseSourceCatalog = useSourceCatalog as jest.Mock;
 
       renderWithClient(<SourceDetailPage />);
 
@@ -387,7 +413,7 @@ describe('SourceDetailPage', () => {
 
     it('shows all types when "All types" is selected', async () => {
       const user = userEvent.setup();
-      const mockUseSourceCatalog = useMarketplaceSources.useSourceCatalog as jest.Mock;
+      const mockUseSourceCatalog = useSourceCatalog as jest.Mock;
 
       renderWithClient(<SourceDetailPage />);
 
@@ -421,7 +447,7 @@ describe('SourceDetailPage', () => {
 
     it('clears all filters when clicked', async () => {
       const user = userEvent.setup();
-      const mockUseSourceCatalog = useMarketplaceSources.useSourceCatalog as jest.Mock;
+      const mockUseSourceCatalog = useSourceCatalog as jest.Mock;
 
       renderWithClient(<SourceDetailPage />);
 
@@ -503,7 +529,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('disables checkbox for removed entries', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -568,7 +594,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('disables select all when no importable entries', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -610,7 +636,7 @@ describe('SourceDetailPage', () => {
     it('imports selected entries when clicked', async () => {
       const user = userEvent.setup();
       const mockMutateAsync = jest.fn().mockResolvedValue({});
-      (useMarketplaceSources.useImportArtifacts as jest.Mock).mockReturnValue({
+      (useImportArtifacts as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: false,
       });
@@ -632,7 +658,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('shows loading state during import', () => {
-      (useMarketplaceSources.useImportArtifacts as jest.Mock).mockReturnValue({
+      (useImportArtifacts as jest.Mock).mockReturnValue({
         mutateAsync: jest.fn(),
         isPending: true,
       });
@@ -665,7 +691,7 @@ describe('SourceDetailPage', () => {
     it('imports single entry when clicked', async () => {
       const user = userEvent.setup();
       const mockMutateAsync = jest.fn().mockResolvedValue({});
-      (useMarketplaceSources.useImportArtifacts as jest.Mock).mockReturnValue({
+      (useImportArtifacts as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: false,
       });
@@ -684,7 +710,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('does not show import button for imported entries', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -705,7 +731,7 @@ describe('SourceDetailPage', () => {
 
   describe('Empty State', () => {
     it('shows empty state when no artifacts', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -735,7 +761,7 @@ describe('SourceDetailPage', () => {
 
   describe('Pagination', () => {
     it('shows load more button when has next page', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: { pages: [mockCatalogResponse] },
         isLoading: false,
         fetchNextPage: jest.fn(),
@@ -751,7 +777,7 @@ describe('SourceDetailPage', () => {
     it('fetches next page when load more is clicked', async () => {
       const user = userEvent.setup();
       const mockFetchNextPage = jest.fn();
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: { pages: [mockCatalogResponse] },
         isLoading: false,
         fetchNextPage: mockFetchNextPage,
@@ -768,7 +794,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('shows loading state when fetching next page', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: { pages: [mockCatalogResponse] },
         isLoading: false,
         fetchNextPage: jest.fn(),
@@ -782,7 +808,7 @@ describe('SourceDetailPage', () => {
     });
 
     it('hides load more button when no next page', () => {
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: { pages: [mockCatalogResponse] },
         isLoading: false,
         fetchNextPage: jest.fn(),
@@ -824,7 +850,7 @@ describe('SourceDetailPage', () => {
   describe('Duplicate Filter (P4.4b)', () => {
     beforeEach(() => {
       // Mock catalog with excluded entries including duplicates
-      (useMarketplaceSources.useSourceCatalog as jest.Mock).mockReturnValue({
+      (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
           pages: [{
             ...mockCatalogResponse,
@@ -997,7 +1023,7 @@ describe('SourceDetailPage', () => {
         errors: [],
       });
 
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: false,
       });
@@ -1044,7 +1070,7 @@ describe('SourceDetailPage', () => {
         errors: [],
       });
 
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: false,
       });
@@ -1089,7 +1115,7 @@ describe('SourceDetailPage', () => {
         errors: [],
       });
 
-      (useMarketplaceSources.useRescanSource as jest.Mock).mockReturnValue({
+      (useRescanSource as jest.Mock).mockReturnValue({
         mutateAsync: mockMutateAsync,
         isPending: false,
       });

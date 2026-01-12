@@ -5,7 +5,7 @@
 import { render } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { EntityList } from '@/components/entity/entity-list';
-import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
+import { EntityLifecycleProvider } from '@/hooks';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Entity } from '@/types/entity';
 

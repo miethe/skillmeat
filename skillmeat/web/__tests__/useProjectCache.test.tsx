@@ -4,7 +4,7 @@
 import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useProjectCache } from '@/hooks/useProjectCache';
+import { useProjectCache } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import type { ProjectsResponse } from '@/types/project';
 

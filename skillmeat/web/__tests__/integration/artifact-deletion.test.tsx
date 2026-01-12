@@ -46,23 +46,14 @@ jest.mock('@/components/entity/unified-entity-modal', () => {
 });
 
 // Mock hooks
-jest.mock('@/hooks/use-artifact-deletion', () => ({
+jest.mock('@/hooks', () => ({
   useArtifactDeletion: jest.fn(),
-}));
-
-jest.mock('@/hooks/use-deployments', () => ({
   useDeploymentList: jest.fn(),
-}));
-
-jest.mock('@/hooks/useEntityLifecycle', () => ({
   useEntityLifecycle: jest.fn(() => ({
     deployEntity: jest.fn(),
     syncEntity: jest.fn(),
     refetch: jest.fn(),
   })),
-}));
-
-jest.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
     toast: jest.fn(),
   }),
@@ -78,8 +69,7 @@ jest.mock('sonner', () => ({
 }));
 
 // Import mocked hooks
-import { useArtifactDeletion } from '@/hooks/use-artifact-deletion';
-import { useDeploymentList } from '@/hooks/use-deployments';
+import { useArtifactDeletion, useDeploymentList } from '@/hooks';
 
 // Mock deployment data
 const mockDeployments = [

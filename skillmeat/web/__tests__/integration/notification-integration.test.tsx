@@ -16,7 +16,7 @@ import userEvent from '@testing-library/user-event';
 import { NotificationProvider, useNotifications } from '@/lib/notification-store';
 import { NotificationBell } from '@/components/notifications/NotificationCenter';
 import { Header } from '@/components/header';
-import { useToastNotification } from '@/hooks/use-toast-notification';
+import { useToastNotification } from '@/hooks';
 import type { ArtifactImportResult } from '@/types/notification';
 import { toast } from 'sonner';
 

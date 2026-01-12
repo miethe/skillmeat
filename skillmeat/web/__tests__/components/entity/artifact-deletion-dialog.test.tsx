@@ -6,15 +6,16 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
-import { useArtifactDeletion } from '@/hooks/use-artifact-deletion';
-import { useDeploymentList } from '@/hooks/use-deployments';
+import { useArtifactDeletion, useDeploymentList } from '@/hooks';
 import { toast } from 'sonner';
 import type { Artifact } from '@/types/artifact';
-import type { DeletionResult } from '@/hooks/use-artifact-deletion';
+import type { DeletionResult } from '@/hooks';
 
 // Mock the hooks
-jest.mock('@/hooks/use-artifact-deletion');
-jest.mock('@/hooks/use-deployments');
+jest.mock('@/hooks', () => ({
+  useArtifactDeletion: jest.fn(),
+  useDeploymentList: jest.fn(),
+}));
 
 // Mock sonner toast
 jest.mock('sonner', () => ({

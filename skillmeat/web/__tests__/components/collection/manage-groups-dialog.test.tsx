@@ -1,12 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ManageGroupsDialog } from '@/components/collection/manage-groups-dialog';
-import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup } from '@/hooks/use-groups';
-import { useToast } from '@/hooks/use-toast';
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useToast } from '@/hooks';
 
 // Mock hooks
-jest.mock('@/hooks/use-groups');
-jest.mock('@/hooks/use-toast');
+jest.mock('@/hooks', () => ({
+  useGroups: jest.fn(),
+  useCreateGroup: jest.fn(),
+  useUpdateGroup: jest.fn(),
+  useDeleteGroup: jest.fn(),
+  useToast: jest.fn(),
+}));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
