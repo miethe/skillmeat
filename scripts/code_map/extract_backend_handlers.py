@@ -25,6 +25,10 @@ DECORATOR_RE = re.compile(
     r"@(?P<router>\w+)\.(?P<method>get|post|put|patch|delete|options|head)\((?P<args>.*?)\)",
     re.DOTALL,
 )
+APP_DECORATOR_RE = re.compile(
+    r"@app\.(?P<method>get|post|put|patch|delete|options|head)\((?P<args>.*?)\)",
+    re.DOTALL,
+)
 STRING_RE = re.compile(r"['\"]([^'\"]*)['\"]")
 DEF_RE = re.compile(r"(?m)^(?:async\s+def|def)\s+([A-Za-z0-9_]+)\b")
 
@@ -60,6 +64,16 @@ def apply_api_prefix(api_prefix: Optional[str], path: str) -> str:
         return path
     api_prefix = api_prefix.rstrip("/")
     return join_paths(api_prefix, path)
+
+
+def normalize_path_params(path: str) -> str:
+    return re.sub(r"\{([^}:]+):[^}]+\}", r"{\1}", path)
+
+
+def resolve_app_path(raw_path: str, api_prefix: Optional[str]) -> str:
+    if "{settings.api_prefix}" in raw_path and api_prefix:
+        return raw_path.replace("{settings.api_prefix}", api_prefix)
+    return raw_path
 
 
 def find_next_handler(text: str, start: int) -> Optional[str]:
@@ -153,6 +167,7 @@ def extract_backend_handlers(api_root: Path, api_prefix: Optional[str] = None) -
     for router_file in routers_root.rglob("*.py"):
         text = router_file.read_text(encoding="utf-8")
         prefixes = parse_router_prefixes(text)
+        apply_prefix = router_file.name != "health.py"
 
         try:
             tree = ast.parse(text)
@@ -173,9 +188,11 @@ def extract_backend_handlers(api_root: Path, api_prefix: Optional[str] = None) -
             path_match = STRING_RE.search(args)
             if not path_match:
                 continue
-            raw_path = path_match.group(1)
+            raw_path = normalize_path_params(path_match.group(1))
             prefix = prefixes.get(router_name, "")
-            full_path = apply_api_prefix(api_prefix, join_paths(prefix, raw_path))
+            full_path = join_paths(prefix, raw_path)
+            if apply_prefix:
+                full_path = apply_api_prefix(api_prefix, full_path)
 
             handler_name = find_next_handler(text, match.end())
             if not handler_name:
@@ -239,6 +256,54 @@ def extract_backend_handlers(api_root: Path, api_prefix: Optional[str] = None) -
                             file=(module_to_path(module) or router_file).as_posix(),
                         )
                         graph.add_edge(handler_id, schema_node_id(module, name), "handler_uses_schema")
+
+    server_file = api_root / "server.py"
+    if server_file.exists():
+        text = server_file.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            tree = ast.parse("")
+
+        func_defs: Dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_defs[node.name] = node
+
+        for match in APP_DECORATOR_RE.finditer(text):
+            method = match.group("method").upper()
+            args = match.group("args")
+            path_match = STRING_RE.search(args)
+            if not path_match:
+                continue
+            raw_path = normalize_path_params(path_match.group(1))
+            full_path = resolve_app_path(raw_path, api_prefix or "")
+            handler_name = find_next_handler(text, match.end())
+            if not handler_name:
+                continue
+
+            handler_id = handler_node_id(server_file, handler_name)
+            endpoint_id = f"api_endpoint:{method} {full_path}"
+            handler_def = func_defs.get(handler_name)
+            line = handler_def.lineno if handler_def else None
+
+            graph.add_node(
+                handler_id,
+                "handler",
+                label=handler_name,
+                file=server_file.as_posix(),
+                line=line,
+                symbol=handler_name,
+            )
+            graph.add_node(
+                endpoint_id,
+                "api_endpoint",
+                label=f"{method} {full_path}",
+                method=method,
+                path=full_path,
+                file=server_file.as_posix(),
+            )
+            graph.add_edge(endpoint_id, handler_id, "handled_by")
 
     return graph
 

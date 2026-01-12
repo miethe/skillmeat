@@ -65,6 +65,10 @@ def apply_api_prefix(api_prefix: Optional[str], path: str) -> str:
     return join_paths(api_prefix, path)
 
 
+def normalize_path_params(path: str) -> str:
+    return re.sub(r"\{([^}:]+):[^}]+\}", r"{\1}", path)
+
+
 def find_next_handler(text: str, start: int) -> Optional[str]:
     match = DEF_RE.search(text, start)
     if not match:
@@ -86,6 +90,7 @@ def extract_backend(api_root: Path) -> Graph:
     for router_file in routers_root.rglob("*.py"):
         text = router_file.read_text(encoding="utf-8")
         prefixes = parse_router_prefixes(text)
+        apply_prefix = router_file.name != "health.py"
 
         for match in DECORATOR_RE.finditer(text):
             router_name = match.group("router")
@@ -94,9 +99,11 @@ def extract_backend(api_root: Path) -> Graph:
             path_match = STRING_RE.search(args)
             if not path_match:
                 continue
-            raw_path = path_match.group(1)
+            raw_path = normalize_path_params(path_match.group(1))
             prefix = prefixes.get(router_name, "")
-            full_path = apply_api_prefix(api_prefix, join_paths(prefix, raw_path))
+            full_path = join_paths(prefix, raw_path)
+            if apply_prefix:
+                full_path = apply_api_prefix(api_prefix, full_path)
 
             handler_name = find_next_handler(text, match.end())
             if not handler_name:
