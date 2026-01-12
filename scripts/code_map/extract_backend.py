@@ -31,7 +31,7 @@ DECORATOR_RE = re.compile(
     r"@(?P<router>\w+)\.(?P<method>get|post|put|patch|delete|options|head)\((?P<args>.*?)\)",
     re.DOTALL,
 )
-STRING_RE = re.compile(r"['\"]([^'\"]+)['\"]")
+STRING_RE = re.compile(r"['\"]([^'\"]*)['\"]")
 DEF_RE = re.compile(r"(?m)^(?:async\s+def|def)\s+([A-Za-z0-9_]+)\b")
 
 
