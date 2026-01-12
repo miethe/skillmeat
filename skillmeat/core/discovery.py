@@ -1194,6 +1194,18 @@ class ArtifactDiscoveryService:
         collection_path = None
         project_path = None
 
+        # Determine if this artifact type is directory-based or file-based
+        # by looking up its signature in ARTIFACT_SIGNATURES
+        is_directory_artifact = True  # Default to directory (skills behavior)
+        try:
+            artifact_type_enum = ArtifactType(artifact_type)
+            signature = ARTIFACT_SIGNATURES.get(artifact_type_enum)
+            if signature is not None:
+                is_directory_artifact = signature.is_directory
+        except ValueError:
+            # Unknown artifact type - default to directory check
+            logger.debug(f"Unknown artifact type '{artifact_type}', defaulting to directory check")
+
         # Check Collection
         try:
             # Get collection base path
@@ -1203,39 +1215,70 @@ class ArtifactDiscoveryService:
             collection_name = config.get_active_collection()
             collection_base = config.get_collection_path(collection_name)
 
-            # Check collection artifacts directory
-            # Format: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/{name}/
-            collection_artifact_dir = (
-                collection_base / "artifacts" / f"{artifact_type}s" / artifact_name
-            )
+            # Container directory: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/
+            collection_container_dir = collection_base / "artifacts" / f"{artifact_type}s"
 
-            if collection_artifact_dir.exists() and collection_artifact_dir.is_dir():
-                exists_in_collection = True
-                collection_path = str(collection_artifact_dir)
-                logger.debug(
-                    f"Artifact {artifact_key} found in collection at {collection_path}"
-                )
+            if is_directory_artifact:
+                # Directory-based artifacts (skills): check for artifact directory
+                # Format: {container}/{name}/
+                collection_artifact_dir = collection_container_dir / artifact_name
+                if collection_artifact_dir.exists() and collection_artifact_dir.is_dir():
+                    exists_in_collection = True
+                    collection_path = str(collection_artifact_dir)
+                    logger.debug(
+                        f"Artifact {artifact_key} found in collection at {collection_path}"
+                    )
             else:
-                # Fallback: Check manifest if provided
-                if manifest:
-                    try:
-                        artifact_type_enum = ArtifactType(artifact_type)
-                        found = manifest.find_artifact(
-                            artifact_name, artifact_type_enum
+                # File-based artifacts (commands, agents, hooks, mcp): check for .md file
+                # Supports direct files, nested paths, and legacy directory format
+                if collection_container_dir.exists():
+                    # Check direct file first: {container}/{name}.md
+                    direct_file = collection_container_dir / f"{artifact_name}.md"
+                    if direct_file.exists() and direct_file.is_file():
+                        exists_in_collection = True
+                        collection_path = str(direct_file)
+                        logger.debug(
+                            f"Artifact {artifact_key} found in collection at {collection_path}"
                         )
-                        if found:
+                    else:
+                        # Search for nested file: {container}/**/{name}.md
+                        nested_files = list(collection_container_dir.rglob(f"{artifact_name}.md"))
+                        if nested_files:
                             exists_in_collection = True
-                            # Construct path from manifest
-                            collection_path = str(collection_base / found.path)
-                            logger.debug(f"Artifact {artifact_key} found in manifest")
-                    except ValueError:
-                        # Invalid artifact type
-                        logger.debug(f"Invalid artifact type in key: {artifact_type}")
-                    except Exception as e:
-                        # Corrupt manifest or other error
-                        logger.warning(
-                            f"Error checking manifest for {artifact_key}: {e}"
-                        )
+                            collection_path = str(nested_files[0])
+                            logger.debug(
+                                f"Artifact {artifact_key} found (nested) in collection at {collection_path}"
+                            )
+                        else:
+                            # Check legacy directory format: {container}/{name}/
+                            legacy_dir = collection_container_dir / artifact_name
+                            if legacy_dir.exists() and legacy_dir.is_dir():
+                                exists_in_collection = True
+                                collection_path = str(legacy_dir)
+                                logger.debug(
+                                    f"Artifact {artifact_key} found (legacy dir) in collection at {collection_path}"
+                                )
+
+            # Fallback: Check manifest if not found via filesystem
+            if not exists_in_collection and manifest:
+                try:
+                    artifact_type_enum_for_manifest = ArtifactType(artifact_type)
+                    found = manifest.find_artifact(
+                        artifact_name, artifact_type_enum_for_manifest
+                    )
+                    if found:
+                        exists_in_collection = True
+                        # Construct path from manifest
+                        collection_path = str(collection_base / found.path)
+                        logger.debug(f"Artifact {artifact_key} found in manifest")
+                except ValueError:
+                    # Invalid artifact type
+                    logger.debug(f"Invalid artifact type in key: {artifact_type}")
+                except Exception as e:
+                    # Corrupt manifest or other error
+                    logger.warning(
+                        f"Error checking manifest for {artifact_key}: {e}"
+                    )
         except PermissionError as e:
             logger.warning(
                 f"Permission denied accessing collection for {artifact_key}: {e}"
@@ -1245,17 +1288,49 @@ class ArtifactDiscoveryService:
 
         # Check Project
         try:
-            # Format: {self.base_path}/.claude/{type}s/{name}/
-            project_artifact_dir = (
-                self.base_path / ".claude" / f"{artifact_type}s" / artifact_name
-            )
+            # Container directory: {self.base_path}/.claude/{type}s/
+            project_container_dir = self.base_path / ".claude" / f"{artifact_type}s"
 
-            if project_artifact_dir.exists() and project_artifact_dir.is_dir():
-                exists_in_project = True
-                project_path = str(project_artifact_dir)
-                logger.debug(
-                    f"Artifact {artifact_key} found in project at {project_path}"
-                )
+            if is_directory_artifact:
+                # Directory-based artifacts (skills): check for artifact directory
+                # Format: {container}/{name}/
+                project_artifact_dir = project_container_dir / artifact_name
+                if project_artifact_dir.exists() and project_artifact_dir.is_dir():
+                    exists_in_project = True
+                    project_path = str(project_artifact_dir)
+                    logger.debug(
+                        f"Artifact {artifact_key} found in project at {project_path}"
+                    )
+            else:
+                # File-based artifacts (commands, agents, hooks, mcp): check for .md file
+                # Supports direct files, nested paths, and legacy directory format
+                if project_container_dir.exists():
+                    # Check direct file first: {container}/{name}.md
+                    direct_file = project_container_dir / f"{artifact_name}.md"
+                    if direct_file.exists() and direct_file.is_file():
+                        exists_in_project = True
+                        project_path = str(direct_file)
+                        logger.debug(
+                            f"Artifact {artifact_key} found in project at {project_path}"
+                        )
+                    else:
+                        # Search for nested file: {container}/**/{name}.md
+                        nested_files = list(project_container_dir.rglob(f"{artifact_name}.md"))
+                        if nested_files:
+                            exists_in_project = True
+                            project_path = str(nested_files[0])
+                            logger.debug(
+                                f"Artifact {artifact_key} found (nested) in project at {project_path}"
+                            )
+                        else:
+                            # Check legacy directory format: {container}/{name}/
+                            legacy_dir = project_container_dir / artifact_name
+                            if legacy_dir.exists() and legacy_dir.is_dir():
+                                exists_in_project = True
+                                project_path = str(legacy_dir)
+                                logger.debug(
+                                    f"Artifact {artifact_key} found (legacy dir) in project at {project_path}"
+                                )
         except PermissionError as e:
             logger.warning(
                 f"Permission denied accessing project for {artifact_key}: {e}"

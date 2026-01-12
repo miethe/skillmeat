@@ -369,11 +369,14 @@ name: valid-skill
 
         assert result is None  # Validation skipped
 
-    def test_validate_command_metadata_file(self, importer, tmp_path):
-        """Command artifacts check for command.md."""
+    def test_validate_command_single_file(self, importer, tmp_path):
+        """Command artifacts are single .md files, not directories.
+
+        Per ARTIFACT_SIGNATURES, commands have is_directory=False.
+        Passing a directory should fail with invalid_structure.
+        """
         command_dir = tmp_path / "test-command"
         command_dir.mkdir()
-        # Missing command.md
 
         artifact = BulkImportArtifactData(
             source="local/command/test-command",
@@ -386,8 +389,43 @@ name: valid-skill
 
         assert result is not None
         assert result.success is False
-        assert result.reason_code == "missing_metadata"
-        assert "command.md" in result.error
+        assert result.reason_code == "invalid_structure"
+        assert "not a file" in result.error
+
+    def test_validate_command_valid_file(self, importer, tmp_path):
+        """Valid command file passes validation."""
+        command_file = tmp_path / "test-command.md"
+        command_file.write_text("---\nname: test-command\n---\n# Command\n")
+
+        artifact = BulkImportArtifactData(
+            source="local/command/test-command",
+            artifact_type="command",
+            name="test-command",
+            path=str(command_file),
+        )
+
+        result = importer._validate_artifact_structure(artifact)
+
+        assert result is None  # Validation passed
+
+    def test_validate_command_wrong_extension(self, importer, tmp_path):
+        """Command with wrong extension fails validation."""
+        command_file = tmp_path / "test-command.txt"
+        command_file.write_text("not a markdown file")
+
+        artifact = BulkImportArtifactData(
+            source="local/command/test-command",
+            artifact_type="command",
+            name="test-command",
+            path=str(command_file),
+        )
+
+        result = importer._validate_artifact_structure(artifact)
+
+        assert result is not None
+        assert result.success is False
+        assert result.reason_code == "invalid_structure"
+        assert "Expected .md file" in result.error
 
 
 class TestBulkImportWithErrors:
