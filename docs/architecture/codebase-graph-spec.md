@@ -91,6 +91,7 @@ Coverage summary:
 ```bash
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 ```
+Requires the unified graph to exist (run merge + overrides first).
 
 ## What It Enables (Use Cases)
 
