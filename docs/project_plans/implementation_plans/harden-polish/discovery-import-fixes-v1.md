@@ -6,7 +6,7 @@ tags: [implementation-plan, discovery, import, bulk-operations, duplicate-detect
 created: 2026-01-09
 updated: 2026-01-09
 category: "harden-polish"
-status: "ready-for-implementation"
+status: "done"
 prd_reference: "docs/project_plans/PRDs/harden-polish-discovery-import-fixes-v1.md"
 request_log: "REQ-20260109-skillmeat"
 ---
