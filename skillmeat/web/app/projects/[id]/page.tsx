@@ -23,13 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { EntityLifecycleProvider } from '@/components/entity/EntityLifecycleProvider';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
-import { useProject } from '@/hooks/useProjects';
-import { useArtifacts } from '@/hooks/useArtifacts';
-import { useProjectDiscovery } from '@/hooks/useProjectDiscovery';
+import { useProject, useArtifacts, useProjectDiscovery, useToast } from '@/hooks';
 import { DiscoveryBanner } from '@/components/discovery/DiscoveryBanner';
 import { DiscoveryTab } from '@/components/discovery/DiscoveryTab';
 import { BulkImportModal } from '@/components/discovery/BulkImportModal';
-import { useToast } from '@/hooks/use-toast';
 import type { DeployedArtifact } from '@/types/project';
 import type { Entity, EntityType } from '@/types/entity';
 import type { DiscoveredArtifact } from '@/types/discovery';
@@ -134,9 +131,9 @@ function ProjectDetailPageContent() {
   };
 
   const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
-    // Try to find matching artifact from collection by name
+    // Try to find matching artifact from collection by name and type
     const matchingArtifact = artifactsData?.artifacts.find(
-      (artifact) => artifact.name === deployedArtifact.artifact_name
+      (artifact) => artifact.name === deployedArtifact.artifact_name && artifact.type === deployedArtifact.artifact_type
     );
 
     if (matchingArtifact) {

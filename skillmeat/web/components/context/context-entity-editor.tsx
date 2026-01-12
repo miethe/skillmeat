@@ -31,7 +31,7 @@ import {
 import {
   useCreateContextEntity,
   useUpdateContextEntity,
-} from '@/hooks/use-context-entities';
+} from '@/hooks';
 
 /**
  * Props for ContextEntityEditor component

@@ -29,8 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TagInput } from '@/components/ui/tag-input';
-import { useToast } from '@/hooks/use-toast';
-import { useTags } from '@/hooks/use-tags';
+import { useToast, useTags } from '@/hooks';
 import type { ArtifactType, ArtifactScope } from '@/types/artifact';
 
 export interface ArtifactParameters {

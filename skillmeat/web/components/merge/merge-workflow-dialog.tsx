@@ -34,7 +34,7 @@ import {
   usePreviewMerge,
   useExecuteMerge,
   useResolveConflict,
-} from '@/hooks/use-merge';
+} from '@/hooks';
 import type {
   MergeAnalyzeRequest,
   MergeWorkflowState,

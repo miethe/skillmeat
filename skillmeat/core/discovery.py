@@ -24,11 +24,18 @@ Supported Artifact Types:
     - Agents: Single .md file or directory with AGENT.md (directory pattern deprecated)
     - Hooks: Directory with HOOK.md manifest
     - MCPs: Directory with MCP.md or mcp.json manifest
+
+Timestamp Tracking:
+    Discovery tracks when artifacts are first discovered and when they change:
+    - discovered_at: ISO 8601 timestamp when artifact first seen or content changed
+    - Timestamps are preserved in collection manifest between discovery runs
+    - Changes are detected via content hash comparison with lockfile
+    - New/modified artifacts get current timestamp; unchanged preserve original
 """
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -54,6 +61,7 @@ from skillmeat.core.discovery_metrics import (
 )
 from skillmeat.core.skip_preferences import SkipPreferenceManager, build_artifact_key
 from skillmeat.utils.metadata import extract_yaml_frontmatter
+from skillmeat.utils.filesystem import compute_content_hash
 
 if TYPE_CHECKING:
     from skillmeat.core.collection import Collection
@@ -87,6 +95,50 @@ class DiscoveryRequest(BaseModel):
     scan_path: Optional[str] = None
 
 
+class CollectionStatusInfo(BaseModel):
+    """Collection membership status for a discovered artifact.
+
+    Provides detailed information about whether an artifact exists
+    in the collection and how it was matched.
+
+    Attributes:
+        in_collection: Whether the artifact exists in the collection
+        match_type: How the artifact was matched:
+            - "exact": Source link exact match
+            - "hash": Content hash match
+            - "name_type": Name + type match
+            - "none": No match found
+        matched_artifact_id: ID of matched artifact (format: type:name) or None
+    """
+
+    in_collection: bool = False
+    match_type: str = "none"  # "exact" | "hash" | "name_type" | "none"
+    matched_artifact_id: Optional[str] = None
+
+
+class CollectionMatchInfo(BaseModel):
+    """Hash-based collection matching result for a discovered artifact.
+
+    Provides detailed information about how an artifact matches against
+    the collection using content hash and name+type matching.
+
+    Attributes:
+        type: Type of match found:
+            - "exact": Content hash exact match (confidence: 1.0)
+            - "hash": Legacy alias for exact hash match (confidence: 1.0)
+            - "name_type": Name and type match but different content (confidence: 0.85)
+            - "none": No match found (confidence: 0.0)
+        matched_artifact_id: ID of matched artifact if found (format: type:name)
+        matched_name: Name of the matched artifact
+        confidence: Confidence score (0.0-1.0) indicating match quality
+    """
+
+    type: str = "none"  # "exact" | "hash" | "name_type" | "none"
+    matched_artifact_id: Optional[str] = None
+    matched_name: Optional[str] = None
+    confidence: float = 0.0  # 0.0-1.0
+
+
 class DiscoveredArtifact(BaseModel):
     """Metadata about a discovered artifact.
 
@@ -101,6 +153,9 @@ class DiscoveredArtifact(BaseModel):
         path: Full path to artifact directory
         discovered_at: Timestamp when artifact was discovered
         skip_reason: Optional reason why artifact is skipped (only set when include_skipped=True)
+        collection_status: Collection membership status (populated when collection context provided)
+        content_hash: SHA256 content hash of the artifact for deduplication
+        collection_match: Hash-based collection matching result with confidence score
     """
 
     type: str
@@ -113,6 +168,9 @@ class DiscoveredArtifact(BaseModel):
     path: str
     discovered_at: datetime
     skip_reason: Optional[str] = None
+    collection_status: Optional[CollectionStatusInfo] = None
+    content_hash: Optional[str] = None
+    collection_match: Optional[CollectionMatchInfo] = None
 
 
 class DiscoveryResult(BaseModel):
@@ -200,17 +258,90 @@ class ArtifactDiscoveryService:
         self.collection_path = base_path
         self.artifacts_path = self.artifacts_base
 
+    def _get_artifact_timestamp(
+        self,
+        artifact_path: Path,
+        artifact_name: str,
+        artifact_type: str,
+        manifest: Optional["Collection"] = None,
+    ) -> datetime:
+        """Get discovery timestamp for artifact.
+
+        Determines if artifact is new, modified, or unchanged by checking:
+        1. Content hash against lockfile (if available)
+        2. Existing timestamp in manifest (if artifact unchanged)
+
+        Args:
+            artifact_path: Path to artifact directory or file
+            artifact_name: Artifact name
+            artifact_type: Artifact type
+            manifest: Optional Collection manifest for timestamp lookup
+
+        Returns:
+            ISO 8601 timestamp - current if new/modified, preserved if unchanged
+        """
+        now = datetime.now(timezone.utc)
+
+        # Compute current content hash
+        try:
+            current_hash = compute_content_hash(artifact_path)
+        except Exception as e:
+            logger.debug(f"Failed to compute hash for {artifact_path}: {e}")
+            # If we can't compute hash, treat as new
+            return now
+
+        # Check lockfile for existing hash
+        try:
+            from skillmeat.storage.lockfile import LockManager
+
+            lock_mgr = LockManager()
+            lock_entries = lock_mgr.read(self.base_path)
+            lock_key = (artifact_name, artifact_type)
+
+            if lock_key in lock_entries:
+                lock_entry = lock_entries[lock_key]
+                if lock_entry.content_hash == current_hash:
+                    # Unchanged: Preserve existing timestamp from manifest
+                    if manifest:
+                        try:
+                            existing = manifest.find_artifact(
+                                artifact_name, ArtifactType(artifact_type)
+                            )
+                            if existing and hasattr(existing, "discovered_at"):
+                                logger.debug(
+                                    f"Artifact {artifact_name} unchanged, preserving timestamp"
+                                )
+                                return existing.discovered_at
+                        except (ValueError, AttributeError) as e:
+                            logger.debug(
+                                f"Could not find existing timestamp for {artifact_name}: {e}"
+                            )
+                else:
+                    # Modified: Use current timestamp
+                    logger.debug(
+                        f"Artifact {artifact_name} modified (hash changed), updating timestamp"
+                    )
+                    return now
+        except Exception as e:
+            logger.debug(f"Error checking lockfile for {artifact_name}: {e}")
+
+        # New artifact or no lockfile: Use current timestamp
+        return now
+
     @log_performance("discovery_scan")
     def discover_artifacts(
         self,
         manifest: Optional["Collection"] = None,
         project_path: Optional[Path] = None,
         include_skipped: bool = False,
+        collection_name: Optional[str] = None,
+        include_collection_status: bool = True,
     ) -> DiscoveryResult:
         """Scan artifacts directory and discover all artifacts.
 
         This method recursively scans the artifacts directory, detects
-        artifact types, extracts metadata, and validates structure.
+        artifact types, extracts metadata, validates structure, and optionally
+        checks collection membership status for each artifact.
 
         Errors during individual artifact processing are collected but
         do not fail the entire scan.
@@ -222,6 +353,12 @@ class ArtifactDiscoveryService:
                          If provided, artifacts in the skip list will be filtered out.
             include_skipped: If True and project_path is provided, include skipped artifacts
                             in a separate list with their skip reasons. Default: False.
+            collection_name: Optional collection name for membership checking.
+                            If provided (or defaulted to active), each artifact's
+                            collection_status will be populated.
+            include_collection_status: Whether to populate collection_status for each
+                            artifact. Default: True. Set to False for faster scans
+                            when collection membership is not needed.
 
         Returns:
             DiscoveryResult with discovered artifacts, error list, and metrics.
@@ -229,10 +366,32 @@ class ArtifactDiscoveryService:
             The `importable_count` field shows artifacts not yet imported (filtered).
             The `artifacts` list contains only importable artifacts if manifest provided.
             The `skipped_artifacts` list contains skipped artifacts if include_skipped=True.
+            Each artifact's `collection_status` field will be populated if
+            include_collection_status=True.
         """
         start_time = time.time()
         discovered_artifacts: List[DiscoveredArtifact] = []
         errors: List[str] = []
+
+        # Initialize collection membership index for efficient batch checking
+        collection_membership_index = None
+        if include_collection_status:
+            try:
+                from skillmeat.core.collection import CollectionManager
+
+                collection_mgr = CollectionManager()
+                collection_membership_index = collection_mgr.get_collection_membership_index(
+                    collection_name
+                )
+                logger.debug(
+                    f"Loaded collection membership index: "
+                    f"{len(collection_membership_index.get('by_source', {}))} sources, "
+                    f"{len(collection_membership_index.get('by_hash', {}))} hashes, "
+                    f"{len(collection_membership_index.get('by_name_type', {}))} name+type entries"
+                )
+            except Exception as e:
+                logger.warning(f"Could not load collection membership index: {e}")
+                # Continue without membership checking
 
         logger.info(
             "Starting artifact discovery",
@@ -277,7 +436,8 @@ class ArtifactDiscoveryService:
                 # Scan artifacts in this type directory
                 try:
                     type_artifacts = self._scan_type_directory(
-                        type_dir, artifact_type, errors
+                        type_dir, artifact_type, errors, manifest,
+                        collection_membership_index
                     )
                     discovered_artifacts.extend(type_artifacts)
                 except PermissionError as e:
@@ -429,8 +589,124 @@ class ArtifactDiscoveryService:
             scan_duration_ms=scan_duration_ms,
         )
 
+    def _check_collection_membership(
+        self,
+        name: str,
+        artifact_type: str,
+        source_link: Optional[str],
+        membership_index: Dict[str, Any],
+    ) -> CollectionStatusInfo:
+        """Check collection membership using pre-built index.
+
+        Performs O(1) membership lookup using the indexed structure.
+        Matching priority:
+        1. Exact source_link match -> "exact"
+        2. Name + type match -> "name_type"
+        3. No match -> "none"
+
+        Note: Hash matching requires content hash from the discovered artifact,
+        which is computed elsewhere. This method focuses on source and name+type.
+
+        Args:
+            name: Artifact name
+            artifact_type: Artifact type (skill, command, etc.)
+            source_link: Optional source URL
+            membership_index: Pre-built index from get_collection_membership_index()
+
+        Returns:
+            CollectionStatusInfo with in_collection, match_type, matched_artifact_id
+        """
+        # Priority 1: Exact source_link match
+        if source_link:
+            source_normalized = source_link.strip().lower()
+            if source_normalized in membership_index.get("by_source", {}):
+                matched_id = membership_index["by_source"][source_normalized]
+                return CollectionStatusInfo(
+                    in_collection=True,
+                    match_type="exact",
+                    matched_artifact_id=matched_id,
+                )
+
+        # Priority 2: Name + type match (case-insensitive)
+        name_type_key = (name.lower(), artifact_type.lower())
+        if name_type_key in membership_index.get("by_name_type", {}):
+            matched_id = membership_index["by_name_type"][name_type_key]
+            return CollectionStatusInfo(
+                in_collection=True,
+                match_type="name_type",
+                matched_artifact_id=matched_id,
+            )
+
+        # No match found
+        return CollectionStatusInfo(
+            in_collection=False,
+            match_type="none",
+            matched_artifact_id=None,
+        )
+
+    def _compute_collection_match(
+        self,
+        content_hash: Optional[str],
+        name: str,
+        artifact_type: str,
+        membership_index: Dict[str, Any],
+    ) -> CollectionMatchInfo:
+        """Compute hash-based collection match with confidence score.
+
+        Performs matching against collection using content hash and name+type
+        with confidence scoring:
+        1. Exact hash match -> "exact" (confidence: 1.0)
+        2. Name + type match -> "name_type" (confidence: 0.85)
+        3. No match -> "none" (confidence: 0.0)
+
+        Args:
+            content_hash: SHA256 content hash of the discovered artifact
+            name: Artifact name
+            artifact_type: Artifact type (skill, command, etc.)
+            membership_index: Pre-built index from get_collection_membership_index()
+
+        Returns:
+            CollectionMatchInfo with type, matched_artifact_id, matched_name, confidence
+        """
+        # Priority 1: Exact hash match (highest confidence)
+        if content_hash and content_hash in membership_index.get("by_hash", {}):
+            matched_id = membership_index["by_hash"][content_hash]
+            # Extract name from matched_id (format: "type:name")
+            matched_name = matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            return CollectionMatchInfo(
+                type="exact",
+                matched_artifact_id=matched_id,
+                matched_name=matched_name,
+                confidence=1.0,
+            )
+
+        # Priority 2: Name + type match (moderate confidence)
+        name_type_key = (name.lower(), artifact_type.lower())
+        if name_type_key in membership_index.get("by_name_type", {}):
+            matched_id = membership_index["by_name_type"][name_type_key]
+            matched_name = matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            return CollectionMatchInfo(
+                type="name_type",
+                matched_artifact_id=matched_id,
+                matched_name=matched_name,
+                confidence=0.85,
+            )
+
+        # No match found
+        return CollectionMatchInfo(
+            type="none",
+            matched_artifact_id=None,
+            matched_name=None,
+            confidence=0.0,
+        )
+
     def _scan_type_directory(
-        self, type_dir: Path, artifact_type: str, errors: List[str]
+        self,
+        type_dir: Path,
+        artifact_type: str,
+        errors: List[str],
+        manifest: Optional["Collection"] = None,
+        collection_membership_index: Optional[Dict[str, Any]] = None,
     ) -> List[DiscoveredArtifact]:
         """Scan a single artifact type directory.
 
@@ -438,6 +714,9 @@ class ArtifactDiscoveryService:
             type_dir: Path to artifact type directory (e.g., skills/)
             artifact_type: Type of artifacts in this directory
             errors: List to append errors to
+            manifest: Optional Collection manifest for timestamp preservation
+            collection_membership_index: Optional pre-built membership index for
+                efficient O(1) collection membership lookups.
 
         Returns:
             List of discovered artifacts in this directory
@@ -482,21 +761,64 @@ class ArtifactDiscoveryService:
                             artifact_path, detected_type
                         )
 
+                        # Get artifact name
+                        artifact_name = metadata.get("name", artifact_path.stem)
+
+                        # Get timestamp (preserves existing if unchanged)
+                        discovered_at = self._get_artifact_timestamp(
+                            artifact_path, artifact_name, detected_type, manifest
+                        )
+
+                        # Compute content hash for deduplication
+                        content_hash = None
+                        try:
+                            content_hash = compute_content_hash(artifact_path)
+                        except Exception as hash_err:
+                            logger.debug(
+                                f"Failed to compute content hash for {artifact_path}: {hash_err}"
+                            )
+
+                        # Determine collection membership status
+                        collection_status = None
+                        collection_match = None
+                        if collection_membership_index is not None:
+                            collection_status = self._check_collection_membership(
+                                artifact_name,
+                                detected_type,
+                                metadata.get("source"),
+                                collection_membership_index,
+                            )
+                            # Compute hash-based match with confidence score
+                            collection_match = self._compute_collection_match(
+                                content_hash,
+                                artifact_name,
+                                detected_type,
+                                collection_membership_index,
+                            )
+
                         # Create DiscoveredArtifact
                         artifact = DiscoveredArtifact(
                             type=detected_type,
-                            name=metadata.get("name", artifact_path.stem),
+                            name=artifact_name,
                             source=metadata.get("source"),
                             version=metadata.get("version"),
                             scope=metadata.get("scope"),
                             tags=metadata.get("tags", []),
                             description=metadata.get("description"),
                             path=str(artifact_path),
-                            discovered_at=datetime.utcnow(),
+                            discovered_at=discovered_at,
+                            collection_status=collection_status,
+                            content_hash=content_hash,
+                            collection_match=collection_match,
                         )
 
                         discovered.append(artifact)
-                        logger.debug(f"Discovered {detected_type}: {artifact.name}")
+                        logger.debug(
+                            f"Discovered {detected_type}: {artifact.name} "
+                            f"(in_collection={collection_status.in_collection if collection_status else 'N/A'}, "
+                            f"hash_match={collection_match.type if collection_match else 'N/A'}, "
+                            f"confidence={collection_match.confidence if collection_match else 'N/A'})"
+                        )
 
                     except Exception as e:
                         error_msg = f"Error processing {artifact_path}: {e}"
@@ -509,7 +831,9 @@ class ArtifactDiscoveryService:
             errors.append(error_msg)
 
         # Scan for nested artifacts (only for types that support nesting)
-        nested = self._discover_nested_artifacts(type_dir, artifact_type, errors)
+        nested = self._discover_nested_artifacts(
+            type_dir, artifact_type, errors
+        )
         discovered.extend(nested)
 
         return discovered

@@ -31,6 +31,8 @@ Item classification determining workflow and prioritization.
 
 Technical domain or system component affected by the item.
 
+**Format**: Array of strings (e.g., `["web"]`, `["api", "core"]`)
+
 #### Global Domains
 
 | Value | Description | Typical Components |
@@ -60,6 +62,25 @@ Projects may define additional domains in their field catalogs:
 **Default**: None (must be specified)
 
 **Best Practice**: Use global domains when possible. Create project-specific domains only when global domains don't capture the component accurately.
+
+---
+
+### subdomain (Required)
+
+Sub-categorization within the domain for finer-grained filtering and organization.
+
+**Format**: Array of strings (e.g., `["discovery"]`, `["bulk-import"]`)
+
+**Examples**:
+- `["discovery"]` - Discovery feature area
+- `["bulk-import"]` - Bulk import functionality
+- `["user-facing"]` - User-visible features
+- `["validation"]` - Input validation subsystem
+- `["auth", "jwt"]` - Multiple sub-areas (authentication with JWT focus)
+
+**Default**: None (must be specified)
+
+**Best Practice**: Use subdomain to narrow scope within the broader domain. Helps with filtering, search, and organizing related items.
 
 ---
 
@@ -183,70 +204,51 @@ Free-form metadata for categorization, filtering, and search.
 
 ### notes (Optional)
 
-Detailed description in markdown format.
+Detailed description as an array of note strings.
 
-**Format**: Markdown text, no length limit (reasonable).
+**Format**: Array of strings. Each string becomes a separate note entry with timestamp.
 
-**Recommended Structure**:
+**Recommended Structure** (use separate array elements for Problem/Goal):
 
-```markdown
-Problem: [Describe current issue/limitation]
-Goal: [Desired outcome/solution]
-[Additional context, code snippets, references]
+```json
+"notes": [
+  "Problem: Validation logic duplicated across 3 components.",
+  "Goal: Extract to shared validator utility with unit tests."
+]
 ```
 
-**Alternative Structure**:
+**With Additional Context**:
 
-```markdown
-[Detailed description of enhancement/idea]
-Benefits: [Why this matters]
-Considerations: [Trade-offs, dependencies]
+```json
+"notes": [
+  "Problem: Tag aggregation fails on Unicode characters.",
+  "Goal: Use locale-aware sorting for tag lists.",
+  "Context: Discovered during i18n testing. Related to REQ-20251228-project-03."
+]
 ```
 
-**Default**: Empty string
+**Default**: Empty array `[]`
 
 **Best Practices**:
 
-1. **Problem/Goal Format** (for bugs/enhancements):
-   ```
-   Problem: Tag aggregation fails when items array is empty.
-   Goal: Handle empty arrays gracefully, return empty tags array.
-   ```
-
-2. **Include Context**:
-   - File/line references: `Found in serializer.ts:87`
-   - Related items: `Related to REQ-20251228-meatycapture-05`
+1. **Separate Problem/Goal** into distinct array elements for clarity
+2. **Include Context** as additional array elements:
+   - File/line references: `"Found in serializer.ts:87"`
+   - Related items: `"Related to REQ-20251228-meatycapture-05"`
    - Stack traces, error messages
-   - Links to docs, issues, PRs
+3. **Keep each note focused** - one concept per string
+4. **Use markdown within notes** - each string supports full markdown
 
-3. **Code Snippets** (when helpful):
-   ````markdown
-   Current implementation:
-   ```typescript
-   const tags = items.map(i => i.tags).flat();
-   ```
+**Example with multiple notes**:
 
-   Fails when items is undefined. Should add null check.
-   ````
-
-4. **Action Items** (for tasks):
-   ```markdown
-   - [ ] Extract validation to shared utility
-   - [ ] Add unit tests for edge cases
-   - [ ] Update documentation
-   ```
-
-5. **Research Notes** (for questions/ideas):
-   ```markdown
-   Options considered:
-   1. GraphQL (flexibility, learning curve)
-   2. REST (simplicity, familiar)
-   3. gRPC (performance, complexity)
-
-   Need to evaluate query complexity and client support.
-   ```
-
-**Markdown Support**: Full markdown including headers, lists, code blocks, links, emphasis.
+```json
+"notes": [
+  "Problem: Tag aggregation fails when items array is empty.",
+  "Goal: Handle empty arrays gracefully, return empty tags array.",
+  "Found in serializer.ts:87",
+  "Related to REQ-20251228-meatycapture-05"
+]
+```
 
 ---
 
@@ -257,7 +259,8 @@ Considerations: [Trade-offs, dependencies]
 All items **must** include:
 - `title` (string, 1-200 characters)
 - `type` (enum: enhancement, bug, idea, task, question)
-- `domain` (string, valid domain value)
+- `domain` (array of strings, e.g., `["web"]`)
+- `subdomain` (array of strings, e.g., `["discovery"]`)
 
 ### Optional Fields
 
@@ -266,20 +269,21 @@ May be omitted (defaults apply):
 - `priority` (enum: low, medium, high, critical, default: medium)
 - `status` (enum: triage, backlog, planned, in-progress, done, wontfix, default: triage)
 - `tags` (array of strings, default: [])
-- `notes` (markdown string, default: "")
+- `notes` (array of strings, default: [])
 
 ### Validation Constraints
 
-| Field | Min Length | Max Length | Pattern | Notes |
-|-------|-----------|-----------|---------|-------|
-| `title` | 1 | 200 | Any | Concise, descriptive |
-| `type` | - | - | Enum | One of 5 valid values |
-| `domain` | 1 | 50 | `[a-z0-9-/]+` | Lowercase, hyphens, slashes |
-| `context` | 0 | 100 | Any | Empty allowed |
-| `priority` | - | - | Enum | One of 4 valid values |
-| `status` | - | - | Enum | One of 6 valid values |
-| `tags` | - | - | Array | Each tag: `[a-z0-9-]+` |
-| `notes` | 0 | Unlimited | Markdown | Empty allowed |
+| Field | Type | Pattern | Notes |
+|-------|------|---------|-------|
+| `title` | string | 1-200 chars | Concise, descriptive |
+| `type` | enum | One of 5 values | enhancement, bug, idea, task, question |
+| `domain` | array | `["value", ...]` | Each value: `[a-z0-9-/]+` |
+| `subdomain` | array | `["value", ...]` | Each value: `[a-z0-9-/]+` |
+| `context` | string | 0-100 chars | Empty allowed |
+| `priority` | enum | One of 4 values | low, medium, high, critical |
+| `status` | enum | One of 6 values | triage, backlog, planned, in-progress, done, wontfix |
+| `tags` | array | `["tag", ...]` | Each tag: `[a-z0-9-]+` |
+| `notes` | array | `["note", ...]` | Each note: markdown string |
 
 ---
 
@@ -375,12 +379,17 @@ echo '{"project":"xyz","items":[{"title":"Test","type":"bug","domain":"unknown-d
 {
   "title": "SQL injection in project search endpoint",
   "type": "bug",
-  "domain": "api",
+  "domain": ["api"],
+  "subdomain": ["security"],
   "context": "projects/search",
   "priority": "critical",
   "status": "triage",
   "tags": ["security", "sql-injection", "api", "input-validation"],
-  "notes": "Problem: User input not sanitized in /api/projects/search?q={query}. Direct string interpolation allows SQL injection.\n\nGoal: Use parameterized queries, add input validation.\n\nSeverity: High - allows data exfiltration."
+  "notes": [
+    "Problem: User input not sanitized in /api/projects/search?q={query}. Direct string interpolation allows SQL injection.",
+    "Goal: Use parameterized queries, add input validation.",
+    "Severity: High - allows data exfiltration."
+  ]
 }
 ```
 
@@ -390,12 +399,18 @@ echo '{"project":"xyz","items":[{"title":"Test","type":"bug","domain":"unknown-d
 {
   "title": "Cache aggregated tags to improve append performance",
   "type": "enhancement",
-  "domain": "core",
+  "domain": ["core"],
+  "subdomain": ["serializer"],
   "context": "serializer/tags",
   "priority": "medium",
   "status": "backlog",
   "tags": ["performance", "caching", "tags", "optimization"],
-  "notes": "Goal: Reduce tag aggregation time on append by caching results.\n\nCurrent: 200ms to re-aggregate 1000 item tags on every append.\nProposed: Cache aggregated tags, invalidate on item changes.\n\nBenefit: 95% reduction in append latency for large documents."
+  "notes": [
+    "Goal: Reduce tag aggregation time on append by caching results.",
+    "Current: 200ms to re-aggregate 1000 item tags on every append.",
+    "Proposed: Cache aggregated tags, invalidate on item changes.",
+    "Benefit: 95% reduction in append latency for large documents."
+  ]
 }
 ```
 
@@ -405,11 +420,16 @@ echo '{"project":"xyz","items":[{"title":"Test","type":"bug","domain":"unknown-d
 {
   "title": "Document request-log format specification",
   "type": "task",
-  "domain": "docs",
+  "domain": ["docs"],
+  "subdomain": ["specification"],
   "priority": "high",
   "status": "planned",
   "tags": ["documentation", "specification", "request-log"],
-  "notes": "Goal: Create comprehensive spec for request-log markdown format.\n\nSections:\n- [ ] YAML frontmatter fields\n- [ ] Item structure\n- [ ] ID generation rules\n- [ ] Tag aggregation behavior\n- [ ] Backup strategy\n\nTarget: docs/specs/request-log-format.md"
+  "notes": [
+    "Goal: Create comprehensive spec for request-log markdown format.",
+    "Sections: YAML frontmatter fields, Item structure, ID generation rules, Tag aggregation behavior, Backup strategy",
+    "Target: docs/specs/request-log-format.md"
+  ]
 }
 ```
 
@@ -419,12 +439,18 @@ echo '{"project":"xyz","items":[{"title":"Test","type":"bug","domain":"unknown-d
 {
   "title": "Should we support remote storage backends?",
   "type": "question",
-  "domain": "adapters",
+  "domain": ["adapters"],
+  "subdomain": ["architecture"],
   "context": "architecture",
   "priority": "low",
   "status": "triage",
   "tags": ["architecture", "storage", "cloud", "needs-discussion"],
-  "notes": "Question: Is local file storage sufficient, or should we support S3/GCS/etc?\n\nPros (remote storage):\n- Team collaboration\n- Backup/sync automatic\n- Access from multiple devices\n\nCons:\n- Complexity\n- Auth/permissions\n- Latency\n\nMVP Decision: File-first, defer remote until proven need."
+  "notes": [
+    "Question: Is local file storage sufficient, or should we support S3/GCS/etc?",
+    "Pros (remote storage): Team collaboration, Backup/sync automatic, Access from multiple devices",
+    "Cons: Complexity, Auth/permissions, Latency",
+    "MVP Decision: File-first, defer remote until proven need."
+  ]
 }
 ```
 

@@ -329,3 +329,140 @@ Additionally, `unified-entity-modal.tsx` had an upstream query that was dead cod
 **Impact**: Only one upstream-diff query now runs per Sync Status tab view, with proper collection context provided to the backend, preventing 404 errors and ensuring consistent cache behavior.
 
 **Status**: RESOLVED
+
+---
+
+## DeploymentCard Crashes on Deployments Tab Due to Array Type Check
+
+**Date Fixed**: 2026-01-10
+**Severity**: high
+**Component**: deployment-card, deploy-dialog
+
+**Issue**: When opening the Deployments tab in the unified-entity-modal, the page crashes with:
+```
+TypeError: projects.find is not a function
+    at DeploymentCard.useMemo[projectMatch] (deployment-card.tsx:146:21)
+```
+
+**Root Cause**: The newly added `projects` prop validation used a falsy check (`if (!projects)`) which only catches `undefined`, `null`, `0`, `''`, etc. During React Query loading states or certain edge cases, `projects` could be truthy but not an array (e.g., an empty object or the query result object itself).
+
+Similarly, `existingDeploymentPaths` in `deploy-dialog.tsx` had the same potential issue.
+
+```typescript
+// BUG: Only catches falsy values, not non-array truthy values
+if (!projects) return null;
+projects.find(...)  // Crashes if projects is {} or other non-array
+```
+
+**Fix**: Changed both guard clauses to use `Array.isArray()` for proper type validation:
+
+```typescript
+// FIX: Properly validates array type
+if (!Array.isArray(projects)) return null;
+projects.find(...)  // Safe - guaranteed to be an array
+```
+
+**Files Modified**:
+- `skillmeat/web/components/deployments/deployment-card.tsx`:
+  - Line 143: Changed `if (!projects)` to `if (!Array.isArray(projects))`
+- `skillmeat/web/components/collection/deploy-dialog.tsx`:
+  - Line 68: Changed `if (!existingDeploymentPaths)` to `if (!Array.isArray(existingDeploymentPaths))`
+
+**Testing**: Build succeeds, TypeScript type-check passes
+
+**Status**: RESOLVED
+
+---
+
+## Deploy Artifact Returns 404 - Wrong Endpoint in useDeploy Hook
+
+**Date Fixed**: 2026-01-10
+**Severity**: high
+**Component**: web/deploy-dialog
+
+**Issue**: Attempting to deploy an artifact from the web UI fails with a 404 error: `POST /api/v1/artifacts/agent%3Aprd-writer/deploy HTTP/1.1" 404`. The deployment functionality completely broken.
+
+**Root Cause**: The `useDeploy` hook in `hooks/useDeploy.ts` called a non-existent endpoint `/artifacts/${artifactId}/deploy` instead of the correct `/deploy` endpoint. This was a mismatch between two competing implementations:
+
+1. **Broken hook** (`useDeploy`): Called `/api/v1/artifacts/{id}/deploy` - doesn't exist
+2. **Correct hook** (`useDeployArtifact`): Calls `/api/v1/deploy` - works correctly
+
+The `DeployDialog` component used the broken `useDeploy` hook.
+
+**Fix**: Updated `deploy-dialog.tsx` to use the correct `useDeployArtifact` hook from `use-deployments.ts`:
+
+1. Changed import from `useDeploy` to `useDeployArtifact`
+2. Updated request shape to use snake_case properties matching `ArtifactDeployRequest`:
+   - `artifact_id` (format: `type:name`)
+   - `artifact_name`
+   - `artifact_type`
+   - `project_path`
+   - `overwrite`
+3. Moved success handling into the try block after `mutateAsync` completes
+
+**Files Modified**:
+- `skillmeat/web/components/collection/deploy-dialog.tsx` - Migrated to correct hook
+
+**Testing**:
+- TypeScript compilation passes
+- Correct endpoint `/api/v1/deploy` now called with proper request body
+
+**Commit(s)**: 35b0720
+
+**Status**: RESOLVED
+
+---
+
+## Deployment System Bugs (2026-01-10)
+
+**Commit**: ddffb56
+**Request Log**: REQ-20260110-skillmeat
+
+### Backend UnboundLocalError: dest_path not assigned for MCP/HOOK types
+
+**Date Fixed**: 2026-01-10
+**Severity**: critical
+**Component**: core/deployment.py
+
+**Issue**: When deploying MCP or HOOK artifact types, `dest_path` variable was never assigned, causing `UnboundLocalError: cannot access local variable 'dest_path' where it is not associated with a value`.
+
+**Root Cause**: Lines 213-218 only handled SKILL, COMMAND, and AGENT types - missing elif/else for MCP and HOOK.
+
+**Fix**: Added elif branches for MCP and HOOK types:
+- MCP servers deploy to `.claude/mcp/{artifact.name}` (directory)
+- Hooks deploy to `.claude/hooks/{artifact.name}.md` (single file)
+- Added else clause that raises ValueError for unknown artifact types
+
+**Files Modified**:
+- `skillmeat/core/deployment.py` - Added MCP/HOOK handling and error clause
+
+**Status**: RESOLVED
+
+---
+
+### Deployments showing "Custom Path" instead of project name
+
+**Date Fixed**: 2026-01-10
+**Severity**: medium
+**Component**: web/components/deployments, api/schemas
+
+**Issue**: All deployments in the artifact detail modal showed "Custom Path" as the project name instead of the actual project name (e.g., "SkillMeat", "MeatyGifts").
+
+**Root Cause**:
+- `DeploymentInfo` schema only included relative `artifact_path` (e.g., `skills/prd-writer`)
+- Frontend matching logic compared this relative path against absolute project paths
+- Comparison never matched, triggering "Custom Path" fallback
+
+**Fix**:
+1. Added `project_path: str` field to backend `DeploymentInfo` schema
+2. API now includes absolute project path in each deployment record
+3. Updated frontend `ArtifactDeploymentInfo` TypeScript type
+4. Simplified frontend matching to direct path equality comparison
+
+**Files Modified**:
+- `skillmeat/api/schemas/deployments.py` - Added project_path field
+- `skillmeat/api/routers/deployments.py` - Include project_path in response
+- `skillmeat/web/types/deployments.ts` - Added project_path to interface
+- `skillmeat/web/components/deployments/deployment-card.tsx` - Updated matching logic
+
+**Status**: RESOLVED

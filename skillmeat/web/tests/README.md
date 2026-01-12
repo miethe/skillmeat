@@ -50,6 +50,7 @@ tests/
 │   └── test-utils.ts          # Common test utilities and helpers
 ├── collections.spec.ts        # Collections dashboard tests
 ├── deploy-sync.spec.ts        # Deploy and sync workflow tests
+├── multi-collection-deploy.spec.ts # Multi-collection deployment tests
 ├── analytics.spec.ts          # Analytics widgets tests
 ├── accessibility.spec.ts      # Accessibility compliance tests
 ├── keyboard-navigation.spec.ts # Keyboard navigation tests
@@ -86,7 +87,26 @@ Tests for deployment and synchronization workflows:
 
 **Run:** `pnpm run test:e2e tests/deploy-sync.spec.ts`
 
-### 3. Analytics Tests (`analytics.spec.ts`)
+### 3. Multi-Collection Deployment Tests (`multi-collection-deploy.spec.ts`)
+
+Integration tests for multi-collection deployment scenarios:
+
+- Collection ID tracking in deployment requests
+- Deployment from specific collections (not defaulting to 'default')
+- Same-name artifacts with different types (skill vs command vs agent)
+- Artifact type matching in deployment lookups
+- Deployment status checks by name AND type
+- Collection context in error messages
+- Multiple deployments of same-name different-type artifacts
+
+**Key Scenarios:**
+- Verify `collection_name` parameter sent correctly to backend
+- Ensure artifact type included in deployment matching logic
+- Confirm same-name artifacts don't collide when types differ
+
+**Run:** `pnpm run test:e2e tests/multi-collection-deploy.spec.ts`
+
+### 4. Analytics Tests (`analytics.spec.ts`)
 
 Tests for analytics dashboard widgets:
 
@@ -100,7 +120,7 @@ Tests for analytics dashboard widgets:
 
 **Run:** `pnpm run test:e2e tests/analytics.spec.ts`
 
-### 4. Accessibility Tests (`accessibility.spec.ts`)
+### 5. Accessibility Tests (`accessibility.spec.ts`)
 
 WCAG 2.1 AA compliance tests:
 
@@ -117,7 +137,7 @@ WCAG 2.1 AA compliance tests:
 
 **Run:** `pnpm run test:a11y`
 
-### 5. Keyboard Navigation Tests (`keyboard-navigation.spec.ts`)
+### 6. Keyboard Navigation Tests (`keyboard-navigation.spec.ts`)
 
 Comprehensive keyboard accessibility:
 

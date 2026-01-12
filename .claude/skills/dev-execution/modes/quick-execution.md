@@ -151,7 +151,20 @@ Edit `.claude/progress/quick-features/{feature-slug}.md`:
 - Set `status: completed` and `completed_at: {ISO date}`
 - Check all completion criteria boxes
 
-### 4.2 Update Request Log (if applicable)
+### 4.2 Commit All Changes
+
+**Required:** Opus commits directly (never delegate this step).
+
+```bash
+git add -A
+git commit -m "feat({scope}): {description}
+
+{Detailed commit body describing changes}
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+```
+
+### 4.3 Update Request Log (if applicable)
 
 If input was a REQ ID:
 
@@ -163,13 +176,20 @@ meatycapture log item update DOC ITEM --status done
 meatycapture log note add DOC ITEM -c "Completed in quick-feature/{feature-slug}"
 ```
 
-### 4.3 Capture Issues (if any)
+### 4.4 Capture Issues (if any)
 
-If issues arose during implementation:
+If issues arose during implementation, use `mc-quick.sh` for token-efficient capture:
 
 ```bash
-/mc capture {"title": "...", "type": "bug", "domain": "...", "notes": "Context..."}
+# Quick capture (~50 tokens vs ~200+ for JSON)
+mc-quick.sh bug [DOMAIN] [COMPONENT] "Issue title" "What went wrong" "How to fix" "[Context]"
+
+# Examples:
+mc-quick.sh bug api validation "Missing null check" "API crashes on null input" "Add validation"
+mc-quick.sh enhancement web ux "Add loading feedback" "No indication of progress" "Show spinner during fetch"
 ```
+
+**Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 
 ## Error Recovery
 
@@ -180,7 +200,7 @@ If blocked:
 3. Report to user with clear next steps needed
 4. Track blocker if warranted:
    ```bash
-   /mc capture {"title": "...", "type": "bug", "status": "blocked"}
+   MC_STATUS=blocked mc-quick.sh bug [DOMAIN] [COMPONENT] "Blocked: [title]" "[What's blocking]" "[What's needed]"
    ```
 
 ## Output Summary

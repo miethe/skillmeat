@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ShareLink } from './share-link';
-import { useBundles, useDeleteBundle, useBundleAnalytics } from '@/hooks/useBundles';
+import { useBundles, useDeleteBundle, useBundleAnalytics } from '@/hooks';
 import type { BundleListItem } from '@/types/bundle';
 
 export interface BundleListProps {

@@ -6,6 +6,44 @@ Custom React hooks for SkillMeat web frontend using TanStack Query v5.
 
 ---
 
+## Canonical Hooks Registry
+
+**Pattern**: All hooks are exported from `@/hooks` barrel export.
+
+### Import Pattern
+
+```typescript
+// CORRECT - Use barrel import
+import { useCollections, useGroups, useToast } from '@/hooks';
+import type { CollectionFilters } from '@/hooks';
+
+// WRONG - Direct file imports
+import { useCollections } from '@/hooks/use-collections';
+import { useGroups } from '@/hooks/use-groups';
+```
+
+### Barrel Export Location
+
+**File**: `skillmeat/web/hooks/index.ts`
+
+All hooks and their types are exported from this single entry point.
+
+### Why Barrel Imports?
+
+1. **Consistency**: Single import source for all hooks
+2. **Refactoring**: Internal file structure can change without updating imports
+3. **Tree-shaking**: Modern bundlers optimize barrel exports
+4. **Discovery**: IDE autocomplete shows all available hooks
+
+### Adding New Hooks
+
+When creating a new hook:
+1. Create the hook file in `hooks/` (e.g., `hooks/use-my-feature.ts`)
+2. Export it from `hooks/index.ts`
+3. Import from `@/hooks` in components
+
+---
+
 ## Stub Pattern (Not Yet Implemented)
 
 ### Identifying Stubs

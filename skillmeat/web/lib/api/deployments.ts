@@ -10,6 +10,8 @@ import type {
   ArtifactUndeployResponse,
   ArtifactDeploymentListResponse,
   ArtifactDeploymentInfo,
+  ProjectDeploymentRemovalRequest,
+  ProjectDeploymentRemovalResponse,
 } from '@/types/deployments';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -214,4 +216,43 @@ export async function getDeployments(
   }
 
   return deployments;
+}
+
+/**
+ * Remove a deployed artifact from a specific project
+ *
+ * This function removes an artifact deployment from a specific project.
+ * Unlike the general undeployArtifact function, this targets a specific project
+ * and supports optional filesystem file removal.
+ *
+ * @param projectId - Base64-encoded project path
+ * @param artifactName - Name of the artifact to remove
+ * @param artifactType - Type of the artifact to remove
+ * @param removeFiles - Whether to remove files from filesystem (default: true)
+ * @returns Removal response with confirmation
+ * @throws Error if removal fails
+ */
+export async function removeProjectDeployment(
+  projectId: string,
+  artifactName: string,
+  artifactType: string,
+  removeFiles: boolean = true
+): Promise<ProjectDeploymentRemovalResponse> {
+  const params = new URLSearchParams({
+    artifact_type: artifactType,
+    remove_files: String(removeFiles),
+  });
+
+  const url = buildUrl(`/projects/${projectId}/deployments/${artifactName}?${params.toString()}`);
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new Error(`Failed to remove project deployment: ${errorText}`);
+  }
+
+  return response.json();
 }

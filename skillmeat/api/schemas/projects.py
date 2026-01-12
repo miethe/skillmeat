@@ -494,6 +494,77 @@ class ProjectDeleteResponse(BaseModel):
         }
 
 
+class ProjectDeploymentRemovalRequest(BaseModel):
+    """Request to remove a deployed artifact from a specific project."""
+
+    artifact_name: str = Field(
+        description="Name of the artifact to remove",
+        examples=["pdf-processor"],
+    )
+    artifact_type: str = Field(
+        description="Type of the artifact to remove",
+        examples=["skill"],
+    )
+    remove_files: bool = Field(
+        default=True,
+        description="Whether to remove files from filesystem (default: True)",
+    )
+
+    class Config:
+        """Pydantic config."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "remove_files": True,
+            }
+        }
+
+
+class ProjectDeploymentRemovalResponse(BaseModel):
+    """Response for removing a deployed artifact from a project."""
+
+    success: bool = Field(
+        description="Whether the removal was successful",
+        examples=[True],
+    )
+    message: str = Field(
+        description="Human-readable status message",
+        examples=["Artifact 'pdf-processor' removed from project successfully"],
+    )
+    artifact_name: str = Field(
+        description="Name of the removed artifact",
+        examples=["pdf-processor"],
+    )
+    artifact_type: str = Field(
+        description="Type of the removed artifact",
+        examples=["skill"],
+    )
+    project_path: str = Field(
+        description="Path to the project",
+        examples=["/Users/john/projects/my-project"],
+    )
+    files_removed: bool = Field(
+        description="Whether files were removed from filesystem",
+        examples=[True],
+    )
+
+    class Config:
+        """Pydantic config."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Artifact 'pdf-processor' removed from project successfully",
+                "artifact_name": "pdf-processor",
+                "artifact_type": "skill",
+                "project_path": "/Users/john/projects/my-project",
+                "files_removed": True,
+            }
+        }
+
+
 class ContextEntityInfo(BaseModel):
     """Information about a discovered context entity in a project.
 

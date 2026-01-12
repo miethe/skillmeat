@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useDeleteProject } from '@/hooks/useProjects';
-import { useToast } from '@/hooks/use-toast';
+import { useDeleteProject, useToast } from '@/hooks';
 import type { ProjectSummary } from '@/types/project';
 
 export interface DeleteProjectDialogProps {

@@ -6,7 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarketplaceListingDetail } from '@/components/marketplace/MarketplaceListingDetail';
 import { MarketplaceInstallDialog } from '@/components/marketplace/MarketplaceInstallDialog';
-import { useListing, useInstallListing } from '@/hooks/useMarketplace';
+import { useListing, useInstallListing } from '@/hooks';
 
 export default function ListingDetailPage() {
   const params = useParams();

@@ -13,12 +13,14 @@ import { CreateCollectionDialog } from '@/components/collection/create-collectio
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
-import { EntityLifecycleProvider } from '@/hooks/useEntityLifecycle';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useArtifacts } from '@/hooks/useArtifacts';
-import { useCollectionArtifacts } from '@/hooks/use-collections';
-import { useEditArtifactParameters } from '@/hooks/useDiscovery';
-import { useToast } from '@/hooks/use-toast';
+import {
+  EntityLifecycleProvider,
+  useCollectionContext,
+  useArtifacts,
+  useCollectionArtifacts,
+  useEditArtifactParameters,
+  useToast,
+} from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Artifact, ArtifactFilters } from '@/types/artifact';
 import type { Entity } from '@/types/entity';
@@ -41,8 +43,8 @@ function enrichArtifactSummary(
   allArtifacts: Artifact[],
   collectionInfo?: { id: string; name: string }
 ): Artifact {
-  // Try to find matching full artifact by name (primary key for artifacts)
-  const fullArtifact = allArtifacts.find(a => a.name === summary.name);
+  // Try to find matching full artifact by name and type
+  const fullArtifact = allArtifacts.find(a => a.name === summary.name && a.type === summary.type);
 
   if (fullArtifact) {
     // If we have collection context and the full artifact lacks it, add it
@@ -110,15 +112,24 @@ function artifactToEntity(artifact: Artifact): Entity {
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
     aliases: artifact.aliases || [],
-    collections: artifact.collection
-      ? [
-          {
-            id: artifact.collection.id,
-            name: artifact.collection.name,
-            artifact_count: 0, // Not available in artifact context
-          },
-        ]
-      : [],
+    // Collections array for the Collections tab in unified entity modal
+    // Priority: artifact.collections (array) > artifact.collection (single) > empty array
+    // TODO: Backend needs to populate artifact.collections with ALL collections the artifact belongs to
+    collections: artifact.collections && artifact.collections.length > 0
+      ? artifact.collections.map(collection => ({
+          id: collection.id,
+          name: collection.name,
+          artifact_count: collection.artifact_count || 0,
+        }))
+      : artifact.collection
+        ? [
+            {
+              id: artifact.collection.id,
+              name: artifact.collection.name,
+              artifact_count: 0, // Not available in artifact context
+            },
+          ]
+        : [],
   };
 }
 

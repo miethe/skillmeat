@@ -6,7 +6,7 @@ tags: [bug-fix, implementation-plan, harden-polish, caching, discovery, frontend
 created: 2025-12-03
 updated: 2025-12-03
 category: "harden-polish"
-status: draft
+status: done
 ---
 
 # Bug Fix Plan: Discovery Cache & Invalidation Fixes

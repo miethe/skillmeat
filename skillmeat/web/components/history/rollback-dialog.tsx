@@ -35,7 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { useRollbackAnalysis, useRollback, useSnapshot } from '@/hooks/use-snapshots';
+import { useRollbackAnalysis, useRollback, useSnapshot } from '@/hooks';
 import type { RollbackResponse } from '@/types/snapshot';
 
 /**

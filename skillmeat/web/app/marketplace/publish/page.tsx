@@ -5,7 +5,7 @@ import { ChevronLeft, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MarketplacePublishWizard } from '@/components/marketplace/MarketplacePublishWizard';
-import { useBrokers, usePublishBundle } from '@/hooks/useMarketplace';
+import { useBrokers, usePublishBundle } from '@/hooks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PublishFormData, PublishResponse } from '@/types/marketplace';
 import { useState } from 'react';

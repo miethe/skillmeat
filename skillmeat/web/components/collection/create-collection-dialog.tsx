@@ -14,9 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useCreateCollection } from '@/hooks/use-collections';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useToast } from '@/hooks/use-toast';
+import { useCreateCollection, useCollectionContext, useToast } from '@/hooks';
 import type { CreateCollectionRequest } from '@/types/collections';
 
 export interface CreateCollectionDialogProps {

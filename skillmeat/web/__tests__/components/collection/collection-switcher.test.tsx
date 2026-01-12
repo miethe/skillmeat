@@ -4,14 +4,16 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CollectionSwitcher } from '@/components/collection/collection-switcher';
-import { useCollectionContext } from '@/hooks/use-collection-context';
+import { useCollectionContext } from '@/hooks';
 import type { Collection } from '@/types/collections';
 
 // Polyfill scrollIntoView for Radix UI components
 Element.prototype.scrollIntoView = jest.fn();
 
 // Mock the useCollectionContext hook
-jest.mock('@/hooks/use-collection-context');
+jest.mock('@/hooks', () => ({
+  useCollectionContext: jest.fn(),
+}));
 
 const mockUseCollectionContext = useCollectionContext as jest.MockedFunction<
   typeof useCollectionContext

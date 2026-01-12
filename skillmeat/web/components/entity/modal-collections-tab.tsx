@@ -12,12 +12,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollectionContext } from '@/hooks/use-collection-context';
-import { useRemoveArtifactFromCollection } from '@/hooks/use-collections';
+import {
+  useCollectionContext,
+  useRemoveArtifactFromCollection,
+  useToast,
+} from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
-import { useToast } from '@/hooks/use-toast';
 import type { Entity } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
 

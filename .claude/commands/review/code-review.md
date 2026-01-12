@@ -56,8 +56,19 @@ Follow these steps to conduct a thorough code review:
 <!-- MeatyCapture Integration - Project: skillmeat -->
 9. **Capture Findings**
 
-- **1-2 issues**: `/mc capture {"title": "...", "type": "bug"}`
-- **3+ issues**: Use `/meatycapture-capture` skill for batch capture (more token-efficient)
+Use `mc-quick.sh` for token-efficient capture (~50 tokens per item):
+
+```bash
+# Single issue capture
+mc-quick.sh bug [DOMAIN] [COMPONENT] "Issue title" "What's wrong" "Expected behavior"
+
+# Examples:
+mc-quick.sh bug api validation "Missing input sanitization" "User input not validated" "Add validation layer"
+mc-quick.sh enhancement web performance "Optimize bundle size" "Bundle too large" "Implement code splitting"
+```
+
+- **3+ issues**: Use `/meatycapture-capture` skill for batch capture with JSON
+- **Script location**: `.claude/skills/meatycapture-capture/scripts/mc-quick.sh`
 <!-- End MeatyCapture Integration -->
 
 Remember to be constructive and provide specific examples with file paths and line numbers where applicable.

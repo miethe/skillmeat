@@ -32,8 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProgressIndicator, ProgressStep } from '../collection/progress-indicator';
 import { ShareLink } from './share-link';
-import { useArtifacts } from '@/hooks/useArtifacts';
-import { useExportBundle } from '@/hooks/useExportBundle';
+import { useArtifacts, useExportBundle } from '@/hooks';
 import type {
   ExportRequest,
   BundleMetadata,

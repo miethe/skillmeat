@@ -41,6 +41,13 @@ class DeployRequest(BaseModel):
         default=False,
         description="Overwrite existing deployment without prompting",
     )
+    dest_path: Optional[str] = Field(
+        default=None,
+        description="Custom destination path relative to project root "
+        "(e.g., '.claude/skills/dev/'). If provided, artifact will be deployed "
+        "to {dest_path}/{artifact_name}/. Must not contain '..' or be absolute.",
+        examples=[".claude/skills/", ".claude/skills/dev/"],
+    )
 
     class Config:
         """Pydantic config."""
@@ -53,6 +60,7 @@ class DeployRequest(BaseModel):
                 "project_path": "/path/to/project",
                 "collection_name": "default",
                 "overwrite": False,
+                "dest_path": ".claude/skills/dev/",
             }
         }
 
@@ -161,6 +169,7 @@ class DeploymentInfo(BaseModel):
     from_collection: str = Field(description="Source collection name")
     deployed_at: datetime = Field(description="Deployment timestamp")
     artifact_path: str = Field(description="Relative path within .claude/")
+    project_path: str = Field(description="Absolute path to the project directory")
     collection_sha: str = Field(description="SHA at deployment time")
     local_modifications: bool = Field(
         default=False,
@@ -185,6 +194,7 @@ class DeploymentInfo(BaseModel):
                 "from_collection": "default",
                 "deployed_at": "2025-11-18T12:00:00Z",
                 "artifact_path": "skills/pdf",
+                "project_path": "/path/to/project",
                 "collection_sha": "abc123def456",
                 "local_modifications": False,
                 "sync_status": "synced",

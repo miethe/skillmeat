@@ -23,8 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { useCreateSnapshot } from '@/hooks/use-snapshots';
-import { useToast } from '@/hooks/use-toast';
+import { useCreateSnapshot, useToast } from '@/hooks';
 import {
   VersionTimeline,
   VersionComparisonView,

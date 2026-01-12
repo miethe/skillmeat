@@ -252,14 +252,31 @@ Full format spec: `.claude/skills/artifact-tracking/SKILL.md`
 
 <!-- MeatyCapture Integration - Project: skillmeat -->
 
-Track bugs/enhancements via request-logs (replaces loose TODO comments):
+Track bugs/enhancements via request-logs (replaces loose TODO comments).
 
-| Entry Point | Use When | Tokens |
-|-------------|----------|--------|
-| `/mc` | Quick ops: list, search, single capture | ~150 |
-| `/meatycapture-capture` skill | Batch capture (3+ items), validation, templates | ~400 |
+### Script Decision Table
 
-**Quick reference**: `/mc list skillmeat`, `/mc search "keyword" skillmeat`, `/mc capture {...}`
+| Scenario | Script | Location |
+|----------|--------|----------|
+| Single capture | `mc-quick.sh` | `.claude/skills/meatycapture-capture/scripts/mc-quick.sh` |
+| Batch capture (3+) | `batch-file-bugs.sh` | `.claude/scripts/batch-file-bugs.sh` |
+| Post-commit update | `update-bug-docs.py` | `.claude/scripts/update-bug-docs.py` |
+| Status update only | `/mc` command | — |
+
+**Spec**: `.claude/specs/script-usage/bug-automation-scripts.md`
+
+### Quick Patterns
+
+```bash
+# Capture single bug (~50 tokens)
+mc-quick.sh bug api validation "Fix timeout" "Sessions expire" "Extend TTL"
+
+# After commit: update docs + close request-log item
+.claude/scripts/update-bug-docs.py --commits <sha> --req-log REQ-YYYYMMDD-skillmeat
+
+# Batch file from JSON
+.claude/scripts/batch-file-bugs.sh --input /tmp/bugs.json --project skillmeat
+```
 <!-- End MeatyCapture Integration -->
 
 ---
