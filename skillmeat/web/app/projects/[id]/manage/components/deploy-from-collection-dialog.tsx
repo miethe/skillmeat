@@ -17,13 +17,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Entity, EntityType, ENTITY_TYPES, getAllEntityTypes } from '@/types/entity';
 import { apiRequest } from '@/lib/api';
-import { ArtifactListResponse, ArtifactDeployRequest } from '@/sdk';
+import { ArtifactListResponse, DeployRequest } from '@/sdk';
 import { Search, Loader2, Package, CheckCircle2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 interface DeployFromCollectionDialogProps {
   projectPath: string;
+  collection_id?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -31,6 +32,7 @@ interface DeployFromCollectionDialogProps {
 
 export function DeployFromCollectionDialog({
   projectPath,
+  collection_id,
   open,
   onOpenChange,
   onSuccess,
@@ -59,11 +61,12 @@ export function DeployFromCollectionDialog({
 
       const response = await apiRequest<ArtifactListResponse>(`/artifacts?${params.toString()}`);
 
+      const collectionId = collection_id || 'default';
       const mappedEntities: Entity[] = response.items.map((item) => ({
         id: item.id,
         name: item.name,
         type: item.type as EntityType,
-        collection: 'default',
+        collection: collectionId,
         status: 'synced',
         tags: item.metadata?.tags || [],
         description: item.metadata?.description || undefined,
@@ -106,13 +109,22 @@ export function DeployFromCollectionDialog({
 
     setIsDeploying(true);
     try {
+      const collectionId = collection_id || 'default';
+
       // Deploy each selected entity
       const deployPromises = Array.from(selectedEntities).map(async (entityId) => {
-        const request: ArtifactDeployRequest = {
+        const entity = entities.find((e) => e.id === entityId);
+        if (!entity) return;
+
+        const request: DeployRequest = {
+          artifact_id: entity.id,
+          artifact_name: entity.name,
+          artifact_type: entity.type,
           project_path: projectPath,
+          collection_name: collectionId,
         };
 
-        await apiRequest(`/artifacts/${entityId}/deploy`, {
+        await apiRequest('/deploy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request),
