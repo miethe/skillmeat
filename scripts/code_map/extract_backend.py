@@ -7,12 +7,20 @@ from typing import Dict, Optional
 
 try:
     from .graph import Graph
+    from .extract_backend_openapi import extract_backend_openapi
+    from .extract_backend_handlers import extract_backend_handlers
+    from .extract_backend_services import extract_backend_services
+    from .extract_backend_models import extract_backend_models
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
     from pathlib import Path as _Path
 
     sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
     from scripts.code_map.graph import Graph
+    from scripts.code_map.extract_backend_openapi import extract_backend_openapi
+    from scripts.code_map.extract_backend_handlers import extract_backend_handlers
+    from scripts.code_map.extract_backend_services import extract_backend_services
+    from scripts.code_map.extract_backend_models import extract_backend_models
 
 ROUTER_ASSIGN_RE = re.compile(
     r"(?P<name>\w+)\s*=\s*APIRouter\((?P<args>.*?)\)",
@@ -107,6 +115,15 @@ def extract_backend(api_root: Path) -> Graph:
             )
             graph.add_edge(router_id, endpoint_id, "router_exposes")
             graph.add_edge(endpoint_id, handler_id, "handled_by")
+
+    openapi_path = api_root / "openapi.json"
+    try:
+        graph.merge(extract_backend_openapi(openapi_path))
+    except FileNotFoundError:
+        pass
+    graph.merge(extract_backend_handlers(api_root))
+    graph.merge(extract_backend_services(api_root))
+    graph.merge(extract_backend_models(api_root.parents[1]))
 
     return graph
 

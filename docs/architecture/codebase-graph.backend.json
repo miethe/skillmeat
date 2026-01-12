@@ -1,0 +1,4237 @@
+{
+  "edges": [
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:POST /tags/,\n    response_model=TagResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /tags/,\n    response_model=TagResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/tags.py::create_tag",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:GET /tags/,\n    response_model=TagListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /tags/,\n    response_model=TagListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/tags.py::list_tags",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:GET /tags/{tag_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /tags/{tag_id}",
+      "to": "handler:skillmeat/api/routers/tags.py::get_tag",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:GET /tags/slug/{slug}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /tags/slug/{slug}",
+      "to": "handler:skillmeat/api/routers/tags.py::get_tag_by_slug",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:PUT /tags/{tag_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /tags/{tag_id}",
+      "to": "handler:skillmeat/api/routers/tags.py::update_tag",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:DELETE /tags/{tag_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /tags/{tag_id}",
+      "to": "handler:skillmeat/api/routers/tags.py::delete_tag",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/tags.py::router",
+      "to": "endpoint:GET /tags/search",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /tags/search",
+      "to": "handler:skillmeat/api/routers/tags.py::search_tags",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/merge.py::router",
+      "to": "endpoint:POST /merge/analyze",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /merge/analyze",
+      "to": "handler:skillmeat/api/routers/merge.py::analyze_merge",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/merge.py::router",
+      "to": "endpoint:POST /merge/preview",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /merge/preview",
+      "to": "handler:skillmeat/api/routers/merge.py::preview_merge",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/merge.py::router",
+      "to": "endpoint:POST /merge/execute",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /merge/execute",
+      "to": "handler:skillmeat/api/routers/merge.py::execute_merge",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/merge.py::router",
+      "to": "endpoint:POST /merge/resolve",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /merge/resolve",
+      "to": "handler:skillmeat/api/routers/merge.py::resolve_conflict",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:POST /bundles/import",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /bundles/import",
+      "to": "handler:skillmeat/api/routers/bundles.py::import_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:POST /bundles/validate",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /bundles/validate",
+      "to": "handler:skillmeat/api/routers/bundles.py::validate_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:POST /bundles/preview",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /bundles/preview",
+      "to": "handler:skillmeat/api/routers/bundles.py::preview_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:POST /bundles/export",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /bundles/export",
+      "to": "handler:skillmeat/api/routers/bundles.py::export_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:GET /bundles/,\n    response_model=BundleListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /bundles/,\n    response_model=BundleListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "to": "handler:skillmeat/api/routers/bundles.py::list_bundles",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:GET /bundles/{bundle_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /bundles/{bundle_id}",
+      "to": "handler:skillmeat/api/routers/bundles.py::get_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:DELETE /bundles/{bundle_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /bundles/{bundle_id}",
+      "to": "handler:skillmeat/api/routers/bundles.py::delete_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:GET /bundles/{bundle_id}/analytics",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /bundles/{bundle_id}/analytics",
+      "to": "handler:skillmeat/api/routers/bundles.py::get_bundle_analytics",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:PUT /bundles/{bundle_id}/share",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /bundles/{bundle_id}/share",
+      "to": "handler:skillmeat/api/routers/bundles.py::update_bundle_share_link",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/bundles.py::router",
+      "to": "endpoint:DELETE /bundles/{bundle_id}/share",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /bundles/{bundle_id}/share",
+      "to": "handler:skillmeat/api/routers/bundles.py::delete_bundle_share_link",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/health.py::router",
+      "to": "endpoint:GET /health/,\n    response_model=HealthStatus,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /health/,\n    response_model=HealthStatus,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "to": "handler:skillmeat/api/routers/health.py::health_check",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/health.py::router",
+      "to": "endpoint:GET /health/detailed",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /health/detailed",
+      "to": "handler:skillmeat/api/routers/health.py::detailed_health_check",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/health.py::router",
+      "to": "endpoint:GET /health/ready",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /health/ready",
+      "to": "handler:skillmeat/api/routers/health.py::readiness_check",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/health.py::router",
+      "to": "endpoint:GET /health/live",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /health/live",
+      "to": "handler:skillmeat/api/routers/health.py::liveness_check",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:POST /cache/refresh",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /cache/refresh",
+      "to": "handler:skillmeat/api/routers/cache.py::refresh_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/status",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/status",
+      "to": "handler:skillmeat/api/routers/cache.py::get_cache_status",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/projects",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/projects",
+      "to": "handler:skillmeat/api/routers/cache.py::list_cached_projects",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/artifacts",
+      "to": "handler:skillmeat/api/routers/cache.py::list_cached_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/stale-artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/stale-artifacts",
+      "to": "handler:skillmeat/api/routers/cache.py::list_stale_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/search",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/search",
+      "to": "handler:skillmeat/api/routers/cache.py::search_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:POST /cache/invalidate",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /cache/invalidate",
+      "to": "handler:skillmeat/api/routers/cache.py::invalidate_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/cache.py::router",
+      "to": "endpoint:GET /cache/marketplace",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /cache/marketplace",
+      "to": "handler:skillmeat/api/routers/cache.py::get_marketplace_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:POST /groups/,\n    response_model=GroupResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /groups/,\n    response_model=GroupResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/groups.py::create_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:GET /groups/,\n    response_model=GroupListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /groups/,\n    response_model=GroupListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/groups.py::list_groups",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:GET /groups/{group_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /groups/{group_id}",
+      "to": "handler:skillmeat/api/routers/groups.py::get_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:PUT /groups/{group_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /groups/{group_id}",
+      "to": "handler:skillmeat/api/routers/groups.py::update_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:DELETE /groups/{group_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /groups/{group_id}",
+      "to": "handler:skillmeat/api/routers/groups.py::delete_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:PUT /groups/reorder",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /groups/reorder",
+      "to": "handler:skillmeat/api/routers/groups.py::reorder_groups",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:POST /groups/{group_id}/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /groups/{group_id}/artifacts",
+      "to": "handler:skillmeat/api/routers/groups.py::add_artifacts_to_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:DELETE /groups/{group_id}/artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /groups/{group_id}/artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/groups.py::remove_artifact_from_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:PUT /groups/{group_id}/artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /groups/{group_id}/artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/groups.py::update_artifact_position",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/groups.py::router",
+      "to": "endpoint:POST /groups/{group_id}/reorder-artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /groups/{group_id}/reorder-artifacts",
+      "to": "handler:skillmeat/api/routers/groups.py::reorder_artifacts_in_group",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:GET /mcp/servers",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /mcp/servers",
+      "to": "handler:skillmeat/api/routers/mcp.py::list_mcp_servers",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:GET /mcp/servers/{name}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /mcp/servers/{name}",
+      "to": "handler:skillmeat/api/routers/mcp.py::get_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:POST /mcp/servers",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /mcp/servers",
+      "to": "handler:skillmeat/api/routers/mcp.py::create_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:PUT /mcp/servers/{name}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /mcp/servers/{name}",
+      "to": "handler:skillmeat/api/routers/mcp.py::update_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:DELETE /mcp/servers/{name}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /mcp/servers/{name}",
+      "to": "handler:skillmeat/api/routers/mcp.py::delete_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:POST /mcp/servers/{name}/deploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /mcp/servers/{name}/deploy",
+      "to": "handler:skillmeat/api/routers/mcp.py::deploy_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:POST /mcp/servers/{name}/undeploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /mcp/servers/{name}/undeploy",
+      "to": "handler:skillmeat/api/routers/mcp.py::undeploy_mcp_server",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:GET /mcp/servers/{name}/status",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /mcp/servers/{name}/status",
+      "to": "handler:skillmeat/api/routers/mcp.py::get_deployment_status",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:GET /mcp/servers/{name}/health",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /mcp/servers/{name}/health",
+      "to": "handler:skillmeat/api/routers/mcp.py::get_server_health",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/mcp.py::router",
+      "to": "endpoint:GET /mcp/health",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /mcp/health",
+      "to": "handler:skillmeat/api/routers/mcp.py::get_all_servers_health",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/collections.py::router",
+      "to": "endpoint:GET /collections/,\n    response_model=CollectionListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /collections/,\n    response_model=CollectionListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/collections.py::list_collections",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/collections.py::router",
+      "to": "endpoint:GET /collections/{collection_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /collections/{collection_id}",
+      "to": "handler:skillmeat/api/routers/collections.py::get_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/collections.py::router",
+      "to": "endpoint:GET /collections/{collection_id}/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /collections/{collection_id}/artifacts",
+      "to": "handler:skillmeat/api/routers/collections.py::list_collection_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:GET /context-entities/,\n    response_model=ContextEntityListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /context-entities/,\n    response_model=ContextEntityListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/context_entities.py::list_context_entities",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:POST /context-entities/,\n    response_model=ContextEntityResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /context-entities/,\n    response_model=ContextEntityResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/context_entities.py::create_context_entity",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:GET /context-entities/{entity_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /context-entities/{entity_id}",
+      "to": "handler:skillmeat/api/routers/context_entities.py::get_context_entity",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:PUT /context-entities/{entity_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /context-entities/{entity_id}",
+      "to": "handler:skillmeat/api/routers/context_entities.py::update_context_entity",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:DELETE /context-entities/{entity_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /context-entities/{entity_id}",
+      "to": "handler:skillmeat/api/routers/context_entities.py::delete_context_entity",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_entities.py::router",
+      "to": "endpoint:GET /context-entities/{entity_id}/content",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /context-entities/{entity_id}/content",
+      "to": "handler:skillmeat/api/routers/context_entities.py::get_context_entity_content",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/ratings.py::router",
+      "to": "endpoint:POST /ratings/artifacts/{artifact_id}/ratings",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /ratings/artifacts/{artifact_id}/ratings",
+      "to": "handler:skillmeat/api/routers/ratings.py::submit_rating",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/ratings.py::router",
+      "to": "endpoint:GET /ratings/artifacts/{artifact_id}/scores",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /ratings/artifacts/{artifact_id}/scores",
+      "to": "handler:skillmeat/api/routers/ratings.py::get_artifact_scores",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/ratings.py::router",
+      "to": "endpoint:GET /ratings/artifacts/{artifact_id}/ratings",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /ratings/artifacts/{artifact_id}/ratings",
+      "to": "handler:skillmeat/api/routers/ratings.py::list_artifact_ratings",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:GET /marketplace/listings",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/listings",
+      "to": "handler:skillmeat/api/routers/marketplace.py::list_listings",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:GET /marketplace/listings/{listing_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/listings/{listing_id}",
+      "to": "handler:skillmeat/api/routers/marketplace.py::get_listing_detail",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:POST /marketplace/install",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/install",
+      "to": "handler:skillmeat/api/routers/marketplace.py::install_listing",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:POST /marketplace/publish",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/publish",
+      "to": "handler:skillmeat/api/routers/marketplace.py::publish_bundle",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:GET /marketplace/brokers",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/brokers",
+      "to": "handler:skillmeat/api/routers/marketplace.py::list_brokers",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:POST /marketplace/compliance/scan",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/compliance/scan",
+      "to": "handler:skillmeat/api/routers/marketplace.py::compliance_scan",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:POST /marketplace/compliance/checklist",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/compliance/checklist",
+      "to": "handler:skillmeat/api/routers/marketplace.py::compliance_checklist",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:POST /marketplace/compliance/consent",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/compliance/consent",
+      "to": "handler:skillmeat/api/routers/marketplace.py::compliance_consent",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace.py::router",
+      "to": "endpoint:GET /marketplace/compliance/history",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/compliance/history",
+      "to": "handler:skillmeat/api/routers/marketplace.py::compliance_history",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/deployments.py::router",
+      "to": "endpoint:POST /deploy/,\n    response_model=DeploymentResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /deploy/,\n    response_model=DeploymentResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "to": "handler:skillmeat/api/routers/deployments.py::deploy_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/deployments.py::router",
+      "to": "endpoint:POST /deploy/undeploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /deploy/undeploy",
+      "to": "handler:skillmeat/api/routers/deployments.py::undeploy_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/deployments.py::router",
+      "to": "endpoint:GET /deploy/,\n    response_model=DeploymentListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /deploy/,\n    response_model=DeploymentListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "to": "handler:skillmeat/api/routers/deployments.py::list_deployments",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:GET /project-templates/,\n    response_model=ProjectTemplateListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /project-templates/,\n    response_model=ProjectTemplateListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/project_templates.py::list_templates",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:GET /project-templates/{template_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /project-templates/{template_id}",
+      "to": "handler:skillmeat/api/routers/project_templates.py::get_template",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:POST /project-templates/,\n    response_model=ProjectTemplateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /project-templates/,\n    response_model=ProjectTemplateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/project_templates.py::create_template",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:PUT /project-templates/{template_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /project-templates/{template_id}",
+      "to": "handler:skillmeat/api/routers/project_templates.py::update_template",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:DELETE /project-templates/{template_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /project-templates/{template_id}",
+      "to": "handler:skillmeat/api/routers/project_templates.py::delete_template",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/project_templates.py::router",
+      "to": "endpoint:POST /project-templates/{template_id}/deploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /project-templates/{template_id}/deploy",
+      "to": "handler:skillmeat/api/routers/project_templates.py::deploy_template_endpoint",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:GET /versions/snapshots",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /versions/snapshots",
+      "to": "handler:skillmeat/api/routers/versions.py::list_snapshots",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:GET /versions/snapshots/{snapshot_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /versions/snapshots/{snapshot_id}",
+      "to": "handler:skillmeat/api/routers/versions.py::get_snapshot",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:POST /versions/snapshots",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /versions/snapshots",
+      "to": "handler:skillmeat/api/routers/versions.py::create_snapshot",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:DELETE /versions/snapshots/{snapshot_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /versions/snapshots/{snapshot_id}",
+      "to": "handler:skillmeat/api/routers/versions.py::delete_snapshot",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:GET /versions/snapshots/{snapshot_id}/rollback-analysis",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /versions/snapshots/{snapshot_id}/rollback-analysis",
+      "to": "handler:skillmeat/api/routers/versions.py::analyze_rollback_safety",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:POST /versions/snapshots/{snapshot_id}/rollback",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /versions/snapshots/{snapshot_id}/rollback",
+      "to": "handler:skillmeat/api/routers/versions.py::rollback",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/versions.py::router",
+      "to": "endpoint:POST /versions/snapshots/diff",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /versions/snapshots/diff",
+      "to": "handler:skillmeat/api/routers/versions.py::diff_snapshots",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/analytics.py::router",
+      "to": "endpoint:GET /analytics/summary",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /analytics/summary",
+      "to": "handler:skillmeat/api/routers/analytics.py::get_analytics_summary",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/analytics.py::router",
+      "to": "endpoint:GET /analytics/top-artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /analytics/top-artifacts",
+      "to": "handler:skillmeat/api/routers/analytics.py::get_top_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/analytics.py::router",
+      "to": "endpoint:GET /analytics/trends",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /analytics/trends",
+      "to": "handler:skillmeat/api/routers/analytics.py::get_usage_trends",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/discover",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/discover",
+      "to": "handler:skillmeat/api/routers/artifacts.py::discover_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/discover/project/{project_id:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/discover/project/{project_id:path}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::discover_project_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/discover/import",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/discover/import",
+      "to": "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/confirm-duplicates",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/confirm-duplicates",
+      "to": "handler:skillmeat/api/routers/artifacts.py::confirm_duplicates",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/,\n    response_model=ArtifactCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/,\n    response_model=ArtifactCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/artifacts.py::create_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/,\n    response_model=ArtifactListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/,\n    response_model=ArtifactListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/artifacts.py::list_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/upstream",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/upstream",
+      "to": "handler:skillmeat/api/routers/artifacts.py::check_artifact_upstream",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:PUT /artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::update_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:PUT /artifacts/{artifact_id}/parameters",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /artifacts/{artifact_id}/parameters",
+      "to": "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:DELETE /artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::delete_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/{artifact_id}/deploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/{artifact_id}/deploy",
+      "to": "handler:skillmeat/api/routers/artifacts.py::deploy_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/{artifact_id}/sync",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/{artifact_id}/sync",
+      "to": "handler:skillmeat/api/routers/artifacts.py::sync_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/{artifact_id}/undeploy",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/{artifact_id}/undeploy",
+      "to": "handler:skillmeat/api/routers/artifacts.py::undeploy_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/version-graph",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/version-graph",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_version_graph",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/diff",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/diff",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_artifact_diff",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/upstream-diff",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/upstream-diff",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_artifact_upstream_diff",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/files",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/files",
+      "to": "handler:skillmeat/api/routers/artifacts.py::list_artifact_files",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/files/{file_path:path}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_artifact_file_content",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:PUT /artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /artifacts/{artifact_id}/files/{file_path:path}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::update_artifact_file_content",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/{artifact_id}/files/{file_path:path}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::create_artifact_file",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:DELETE /artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /artifacts/{artifact_id}/files/{file_path:path}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::delete_artifact_file",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/metadata/github",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/metadata/github",
+      "to": "handler:skillmeat/api/routers/artifacts.py::fetch_github_metadata",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/metrics/discovery",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/metrics/discovery",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_discovery_metrics",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/health/discovery",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/health/discovery",
+      "to": "handler:skillmeat/api/routers/artifacts.py::discovery_health_check",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/projects/{project_id:path}/skip-preferences",
+      "to": "handler:skillmeat/api/routers/artifacts.py::add_skip_preference",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences/{artifact_key}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences/{artifact_key}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::remove_skip_preference",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences",
+      "to": "handler:skillmeat/api/routers/artifacts.py::clear_skip_preferences",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/projects/{project_id:path}/skip-preferences",
+      "to": "handler:skillmeat/api/routers/artifacts.py::list_skip_preferences",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:GET /artifacts/{artifact_id}/tags",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /artifacts/{artifact_id}/tags",
+      "to": "handler:skillmeat/api/routers/artifacts.py::get_artifact_tags",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:POST /artifacts/{artifact_id}/tags/{tag_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /artifacts/{artifact_id}/tags/{tag_id}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::add_tag_to_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/artifacts.py::router",
+      "to": "endpoint:DELETE /artifacts/{artifact_id}/tags/{tag_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /artifacts/{artifact_id}/tags/{tag_id}",
+      "to": "handler:skillmeat/api/routers/artifacts.py::remove_tag_from_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_sync.py::router",
+      "to": "endpoint:POST /context-sync/pull",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /context-sync/pull",
+      "to": "handler:skillmeat/api/routers/context_sync.py::pull_changes",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_sync.py::router",
+      "to": "endpoint:POST /context-sync/push",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /context-sync/push",
+      "to": "handler:skillmeat/api/routers/context_sync.py::push_changes",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_sync.py::router",
+      "to": "endpoint:GET /context-sync/status",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /context-sync/status",
+      "to": "handler:skillmeat/api/routers/context_sync.py::get_sync_status",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/context_sync.py::router",
+      "to": "endpoint:POST /context-sync/resolve",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /context-sync/resolve",
+      "to": "handler:skillmeat/api/routers/context_sync.py::resolve_conflict",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/,\n    response_model=ProjectListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/,\n    response_model=ProjectListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/projects.py::list_projects",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:POST /projects/,\n    response_model=ProjectCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /projects/,\n    response_model=ProjectCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/projects.py::create_project",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/{project_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/{project_id}",
+      "to": "handler:skillmeat/api/routers/projects.py::get_project",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:PUT /projects/{project_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /projects/{project_id}",
+      "to": "handler:skillmeat/api/routers/projects.py::update_project",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:DELETE /projects/{project_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /projects/{project_id}",
+      "to": "handler:skillmeat/api/routers/projects.py::delete_project",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:DELETE /projects/{project_id}/deployments/{artifact_name}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /projects/{project_id}/deployments/{artifact_name}",
+      "to": "handler:skillmeat/api/routers/projects.py::remove_project_deployment",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:POST /projects/{project_id}/check-modifications",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /projects/{project_id}/check-modifications",
+      "to": "handler:skillmeat/api/routers/projects.py::check_project_modifications",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/{project_id}/modified-artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/{project_id}/modified-artifacts",
+      "to": "handler:skillmeat/api/routers/projects.py::get_modified_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/{project_id}/context-map",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/{project_id}/context-map",
+      "to": "handler:skillmeat/api/routers/projects.py::get_project_context_map",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/{project_id}/drift/summary",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/{project_id}/drift/summary",
+      "to": "handler:skillmeat/api/routers/projects.py::get_project_drift_summary",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:POST /projects/cache/clear",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /projects/cache/clear",
+      "to": "handler:skillmeat/api/routers/projects.py::clear_project_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:POST /projects/cache/refresh",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /projects/cache/refresh",
+      "to": "handler:skillmeat/api/routers/projects.py::refresh_cache",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/projects.py::router",
+      "to": "endpoint:GET /projects/cache/stats",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /projects/cache/stats",
+      "to": "handler:skillmeat/api/routers/projects.py::get_cache_stats",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:POST /marketplace/sources/infer-url",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/sources/infer-url",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::infer_github_url",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:POST /marketplace/sources/,\n    response_model=SourceResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/sources/,\n    response_model=SourceResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::create_source",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/,\n    response_model=SourceListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/,\n    response_model=SourceListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::list_sources",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/{source_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/{source_id}",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::get_source",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:PATCH /marketplace/sources/{source_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PATCH /marketplace/sources/{source_id}",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::update_source",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:DELETE /marketplace/sources/{source_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /marketplace/sources/{source_id}",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::delete_source",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:POST /marketplace/sources/{source_id}/rescan",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/sources/{source_id}/rescan",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::rescan_source",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/{source_id}/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/{source_id}/artifacts",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::list_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::update_catalog_entry_name",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:POST /marketplace/sources/{source_id}/import",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /marketplace/sources/{source_id}/import",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::import_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::exclude_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::restore_excluded_artifact",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::get_path_tags",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::update_path_tag_status",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::get_artifact_file_tree",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "to": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+      "to": "handler:skillmeat/api/routers/marketplace_sources.py::get_artifact_file_content",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:GET /user-collections/,\n    response_model=UserCollectionListResponse,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /user-collections/,\n    response_model=UserCollectionListResponse,\n    summary=",
+      "to": "handler:skillmeat/api/routers/user_collections.py::list_user_collections",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:POST /user-collections/,\n    response_model=UserCollectionResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /user-collections/,\n    response_model=UserCollectionResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "to": "handler:skillmeat/api/routers/user_collections.py::create_user_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:GET /user-collections/{collection_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /user-collections/{collection_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::get_user_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:PUT /user-collections/{collection_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:PUT /user-collections/{collection_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::update_user_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:DELETE /user-collections/{collection_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /user-collections/{collection_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::delete_user_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:GET /user-collections/{collection_id}/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /user-collections/{collection_id}/artifacts",
+      "to": "handler:skillmeat/api/routers/user_collections.py::list_collection_artifacts",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:POST /user-collections/{collection_id}/artifacts",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /user-collections/{collection_id}/artifacts",
+      "to": "handler:skillmeat/api/routers/user_collections.py::add_artifacts_to_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:DELETE /user-collections/{collection_id}/artifacts/{artifact_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /user-collections/{collection_id}/artifacts/{artifact_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::remove_artifact_from_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:POST /user-collections/{collection_id}/entities/{entity_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:POST /user-collections/{collection_id}/entities/{entity_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::add_entity_to_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:DELETE /user-collections/{collection_id}/entities/{entity_id}",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:DELETE /user-collections/{collection_id}/entities/{entity_id}",
+      "to": "handler:skillmeat/api/routers/user_collections.py::remove_entity_from_collection",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/user_collections.py::router",
+      "to": "endpoint:GET /user-collections/{collection_id}/entities",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /user-collections/{collection_id}/entities",
+      "to": "handler:skillmeat/api/routers/user_collections.py::list_collection_entities",
+      "type": "handled_by"
+    },
+    {
+      "from": "router:skillmeat/api/routers/match.py::router",
+      "to": "endpoint:GET /match/",
+      "type": "router_exposes"
+    },
+    {
+      "from": "endpoint:GET /match/",
+      "to": "handler:skillmeat/api/routers/match.py::match_artifacts",
+      "type": "handled_by"
+    }
+  ],
+  "generated_at": "2026-01-12T16:56:23Z",
+  "nodes": [
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "router:skillmeat/api/routers/tags.py::router",
+      "label": "router",
+      "prefix": "/tags",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:POST /tags/,\n    response_model=TagResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /tags/,\n    response_model=TagResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/tags/,\n    response_model=TagResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::create_tag",
+      "label": "create_tag",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:GET /tags/,\n    response_model=TagListResponse,\n    summary=",
+      "label": "GET /tags/,\n    response_model=TagListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/tags/,\n    response_model=TagListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::list_tags",
+      "label": "list_tags",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:GET /tags/{tag_id}",
+      "label": "GET /tags/{tag_id}",
+      "method": "GET",
+      "path": "/tags/{tag_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::get_tag",
+      "label": "get_tag",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:GET /tags/slug/{slug}",
+      "label": "GET /tags/slug/{slug}",
+      "method": "GET",
+      "path": "/tags/slug/{slug}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::get_tag_by_slug",
+      "label": "get_tag_by_slug",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:PUT /tags/{tag_id}",
+      "label": "PUT /tags/{tag_id}",
+      "method": "PUT",
+      "path": "/tags/{tag_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::update_tag",
+      "label": "update_tag",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:DELETE /tags/{tag_id}",
+      "label": "DELETE /tags/{tag_id}",
+      "method": "DELETE",
+      "path": "/tags/{tag_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::delete_tag",
+      "label": "delete_tag",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "endpoint:GET /tags/search",
+      "label": "GET /tags/search",
+      "method": "GET",
+      "path": "/tags/search",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/tags.py",
+      "id": "handler:skillmeat/api/routers/tags.py::search_tags",
+      "label": "search_tags",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "router:skillmeat/api/routers/merge.py::router",
+      "label": "router",
+      "prefix": "/merge",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "endpoint:POST /merge/analyze",
+      "label": "POST /merge/analyze",
+      "method": "POST",
+      "path": "/merge/analyze",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "handler:skillmeat/api/routers/merge.py::analyze_merge",
+      "label": "analyze_merge",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "endpoint:POST /merge/preview",
+      "label": "POST /merge/preview",
+      "method": "POST",
+      "path": "/merge/preview",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "handler:skillmeat/api/routers/merge.py::preview_merge",
+      "label": "preview_merge",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "endpoint:POST /merge/execute",
+      "label": "POST /merge/execute",
+      "method": "POST",
+      "path": "/merge/execute",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "handler:skillmeat/api/routers/merge.py::execute_merge",
+      "label": "execute_merge",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "endpoint:POST /merge/resolve",
+      "label": "POST /merge/resolve",
+      "method": "POST",
+      "path": "/merge/resolve",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/merge.py",
+      "id": "handler:skillmeat/api/routers/merge.py::resolve_conflict",
+      "label": "resolve_conflict",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "router:skillmeat/api/routers/bundles.py::router",
+      "label": "router",
+      "prefix": "/bundles",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:POST /bundles/import",
+      "label": "POST /bundles/import",
+      "method": "POST",
+      "path": "/bundles/import",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::import_bundle",
+      "label": "import_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:POST /bundles/validate",
+      "label": "POST /bundles/validate",
+      "method": "POST",
+      "path": "/bundles/validate",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::validate_bundle",
+      "label": "validate_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:POST /bundles/preview",
+      "label": "POST /bundles/preview",
+      "method": "POST",
+      "path": "/bundles/preview",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::preview_bundle",
+      "label": "preview_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:POST /bundles/export",
+      "label": "POST /bundles/export",
+      "method": "POST",
+      "path": "/bundles/export",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::export_bundle",
+      "label": "export_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:GET /bundles/,\n    response_model=BundleListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "label": "GET /bundles/,\n    response_model=BundleListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "method": "GET",
+      "path": "/bundles/,\n    response_model=BundleListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::list_bundles",
+      "label": "list_bundles",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:GET /bundles/{bundle_id}",
+      "label": "GET /bundles/{bundle_id}",
+      "method": "GET",
+      "path": "/bundles/{bundle_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::get_bundle",
+      "label": "get_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:DELETE /bundles/{bundle_id}",
+      "label": "DELETE /bundles/{bundle_id}",
+      "method": "DELETE",
+      "path": "/bundles/{bundle_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::delete_bundle",
+      "label": "delete_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:GET /bundles/{bundle_id}/analytics",
+      "label": "GET /bundles/{bundle_id}/analytics",
+      "method": "GET",
+      "path": "/bundles/{bundle_id}/analytics",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::get_bundle_analytics",
+      "label": "get_bundle_analytics",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:PUT /bundles/{bundle_id}/share",
+      "label": "PUT /bundles/{bundle_id}/share",
+      "method": "PUT",
+      "path": "/bundles/{bundle_id}/share",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::update_bundle_share_link",
+      "label": "update_bundle_share_link",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "endpoint:DELETE /bundles/{bundle_id}/share",
+      "label": "DELETE /bundles/{bundle_id}/share",
+      "method": "DELETE",
+      "path": "/bundles/{bundle_id}/share",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/bundles.py",
+      "id": "handler:skillmeat/api/routers/bundles.py::delete_bundle_share_link",
+      "label": "delete_bundle_share_link",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "router:skillmeat/api/routers/health.py::router",
+      "label": "router",
+      "prefix": "/health",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "endpoint:GET /health/,\n    response_model=HealthStatus,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "label": "GET /health/,\n    response_model=HealthStatus,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "method": "GET",
+      "path": "/health/,\n    response_model=HealthStatus,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "handler:skillmeat/api/routers/health.py::health_check",
+      "label": "health_check",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "endpoint:GET /health/detailed",
+      "label": "GET /health/detailed",
+      "method": "GET",
+      "path": "/health/detailed",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "handler:skillmeat/api/routers/health.py::detailed_health_check",
+      "label": "detailed_health_check",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "endpoint:GET /health/ready",
+      "label": "GET /health/ready",
+      "method": "GET",
+      "path": "/health/ready",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "handler:skillmeat/api/routers/health.py::readiness_check",
+      "label": "readiness_check",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "endpoint:GET /health/live",
+      "label": "GET /health/live",
+      "method": "GET",
+      "path": "/health/live",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/health.py",
+      "id": "handler:skillmeat/api/routers/health.py::liveness_check",
+      "label": "liveness_check",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "router:skillmeat/api/routers/cache.py::router",
+      "label": "router",
+      "prefix": "/cache",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:POST /cache/refresh",
+      "label": "POST /cache/refresh",
+      "method": "POST",
+      "path": "/cache/refresh",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::refresh_cache",
+      "label": "refresh_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/status",
+      "label": "GET /cache/status",
+      "method": "GET",
+      "path": "/cache/status",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::get_cache_status",
+      "label": "get_cache_status",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/projects",
+      "label": "GET /cache/projects",
+      "method": "GET",
+      "path": "/cache/projects",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::list_cached_projects",
+      "label": "list_cached_projects",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/artifacts",
+      "label": "GET /cache/artifacts",
+      "method": "GET",
+      "path": "/cache/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::list_cached_artifacts",
+      "label": "list_cached_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/stale-artifacts",
+      "label": "GET /cache/stale-artifacts",
+      "method": "GET",
+      "path": "/cache/stale-artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::list_stale_artifacts",
+      "label": "list_stale_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/search",
+      "label": "GET /cache/search",
+      "method": "GET",
+      "path": "/cache/search",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::search_cache",
+      "label": "search_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:POST /cache/invalidate",
+      "label": "POST /cache/invalidate",
+      "method": "POST",
+      "path": "/cache/invalidate",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::invalidate_cache",
+      "label": "invalidate_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "endpoint:GET /cache/marketplace",
+      "label": "GET /cache/marketplace",
+      "method": "GET",
+      "path": "/cache/marketplace",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/cache.py",
+      "id": "handler:skillmeat/api/routers/cache.py::get_marketplace_cache",
+      "label": "get_marketplace_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "router:skillmeat/api/routers/groups.py::router",
+      "label": "router",
+      "prefix": "/groups",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:POST /groups/,\n    response_model=GroupResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /groups/,\n    response_model=GroupResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/groups/,\n    response_model=GroupResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::create_group",
+      "label": "create_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:GET /groups/,\n    response_model=GroupListResponse,\n    summary=",
+      "label": "GET /groups/,\n    response_model=GroupListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/groups/,\n    response_model=GroupListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::list_groups",
+      "label": "list_groups",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:GET /groups/{group_id}",
+      "label": "GET /groups/{group_id}",
+      "method": "GET",
+      "path": "/groups/{group_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::get_group",
+      "label": "get_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:PUT /groups/{group_id}",
+      "label": "PUT /groups/{group_id}",
+      "method": "PUT",
+      "path": "/groups/{group_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::update_group",
+      "label": "update_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:DELETE /groups/{group_id}",
+      "label": "DELETE /groups/{group_id}",
+      "method": "DELETE",
+      "path": "/groups/{group_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::delete_group",
+      "label": "delete_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:PUT /groups/reorder",
+      "label": "PUT /groups/reorder",
+      "method": "PUT",
+      "path": "/groups/reorder",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::reorder_groups",
+      "label": "reorder_groups",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:POST /groups/{group_id}/artifacts",
+      "label": "POST /groups/{group_id}/artifacts",
+      "method": "POST",
+      "path": "/groups/{group_id}/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::add_artifacts_to_group",
+      "label": "add_artifacts_to_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:DELETE /groups/{group_id}/artifacts/{artifact_id}",
+      "label": "DELETE /groups/{group_id}/artifacts/{artifact_id}",
+      "method": "DELETE",
+      "path": "/groups/{group_id}/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::remove_artifact_from_group",
+      "label": "remove_artifact_from_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:PUT /groups/{group_id}/artifacts/{artifact_id}",
+      "label": "PUT /groups/{group_id}/artifacts/{artifact_id}",
+      "method": "PUT",
+      "path": "/groups/{group_id}/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::update_artifact_position",
+      "label": "update_artifact_position",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "endpoint:POST /groups/{group_id}/reorder-artifacts",
+      "label": "POST /groups/{group_id}/reorder-artifacts",
+      "method": "POST",
+      "path": "/groups/{group_id}/reorder-artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/groups.py",
+      "id": "handler:skillmeat/api/routers/groups.py::reorder_artifacts_in_group",
+      "label": "reorder_artifacts_in_group",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "router:skillmeat/api/routers/mcp.py::router",
+      "label": "router",
+      "prefix": "/mcp",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:GET /mcp/servers",
+      "label": "GET /mcp/servers",
+      "method": "GET",
+      "path": "/mcp/servers",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::list_mcp_servers",
+      "label": "list_mcp_servers",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:GET /mcp/servers/{name}",
+      "label": "GET /mcp/servers/{name}",
+      "method": "GET",
+      "path": "/mcp/servers/{name}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::get_mcp_server",
+      "label": "get_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:POST /mcp/servers",
+      "label": "POST /mcp/servers",
+      "method": "POST",
+      "path": "/mcp/servers",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::create_mcp_server",
+      "label": "create_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:PUT /mcp/servers/{name}",
+      "label": "PUT /mcp/servers/{name}",
+      "method": "PUT",
+      "path": "/mcp/servers/{name}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::update_mcp_server",
+      "label": "update_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:DELETE /mcp/servers/{name}",
+      "label": "DELETE /mcp/servers/{name}",
+      "method": "DELETE",
+      "path": "/mcp/servers/{name}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::delete_mcp_server",
+      "label": "delete_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:POST /mcp/servers/{name}/deploy",
+      "label": "POST /mcp/servers/{name}/deploy",
+      "method": "POST",
+      "path": "/mcp/servers/{name}/deploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::deploy_mcp_server",
+      "label": "deploy_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:POST /mcp/servers/{name}/undeploy",
+      "label": "POST /mcp/servers/{name}/undeploy",
+      "method": "POST",
+      "path": "/mcp/servers/{name}/undeploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::undeploy_mcp_server",
+      "label": "undeploy_mcp_server",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:GET /mcp/servers/{name}/status",
+      "label": "GET /mcp/servers/{name}/status",
+      "method": "GET",
+      "path": "/mcp/servers/{name}/status",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::get_deployment_status",
+      "label": "get_deployment_status",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:GET /mcp/servers/{name}/health",
+      "label": "GET /mcp/servers/{name}/health",
+      "method": "GET",
+      "path": "/mcp/servers/{name}/health",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::get_server_health",
+      "label": "get_server_health",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "endpoint:GET /mcp/health",
+      "label": "GET /mcp/health",
+      "method": "GET",
+      "path": "/mcp/health",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/mcp.py",
+      "id": "handler:skillmeat/api/routers/mcp.py::get_all_servers_health",
+      "label": "get_all_servers_health",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "router:skillmeat/api/routers/collections.py::router",
+      "label": "router",
+      "prefix": "/collections",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "endpoint:GET /collections/,\n    response_model=CollectionListResponse,\n    summary=",
+      "label": "GET /collections/,\n    response_model=CollectionListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/collections/,\n    response_model=CollectionListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "handler:skillmeat/api/routers/collections.py::list_collections",
+      "label": "list_collections",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "endpoint:GET /collections/{collection_id}",
+      "label": "GET /collections/{collection_id}",
+      "method": "GET",
+      "path": "/collections/{collection_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "handler:skillmeat/api/routers/collections.py::get_collection",
+      "label": "get_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "endpoint:GET /collections/{collection_id}/artifacts",
+      "label": "GET /collections/{collection_id}/artifacts",
+      "method": "GET",
+      "path": "/collections/{collection_id}/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/collections.py",
+      "id": "handler:skillmeat/api/routers/collections.py::list_collection_artifacts",
+      "label": "list_collection_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "router:skillmeat/api/routers/context_entities.py::router",
+      "label": "router",
+      "prefix": "/context-entities",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:GET /context-entities/,\n    response_model=ContextEntityListResponse,\n    summary=",
+      "label": "GET /context-entities/,\n    response_model=ContextEntityListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/context-entities/,\n    response_model=ContextEntityListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::list_context_entities",
+      "label": "list_context_entities",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:POST /context-entities/,\n    response_model=ContextEntityResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /context-entities/,\n    response_model=ContextEntityResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/context-entities/,\n    response_model=ContextEntityResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::create_context_entity",
+      "label": "create_context_entity",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:GET /context-entities/{entity_id}",
+      "label": "GET /context-entities/{entity_id}",
+      "method": "GET",
+      "path": "/context-entities/{entity_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::get_context_entity",
+      "label": "get_context_entity",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:PUT /context-entities/{entity_id}",
+      "label": "PUT /context-entities/{entity_id}",
+      "method": "PUT",
+      "path": "/context-entities/{entity_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::update_context_entity",
+      "label": "update_context_entity",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:DELETE /context-entities/{entity_id}",
+      "label": "DELETE /context-entities/{entity_id}",
+      "method": "DELETE",
+      "path": "/context-entities/{entity_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::delete_context_entity",
+      "label": "delete_context_entity",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "endpoint:GET /context-entities/{entity_id}/content",
+      "label": "GET /context-entities/{entity_id}/content",
+      "method": "GET",
+      "path": "/context-entities/{entity_id}/content",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_entities.py",
+      "id": "handler:skillmeat/api/routers/context_entities.py::get_context_entity_content",
+      "label": "get_context_entity_content",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "router:skillmeat/api/routers/ratings.py::router",
+      "label": "router",
+      "prefix": "/ratings",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "endpoint:POST /ratings/artifacts/{artifact_id}/ratings",
+      "label": "POST /ratings/artifacts/{artifact_id}/ratings",
+      "method": "POST",
+      "path": "/ratings/artifacts/{artifact_id}/ratings",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "handler:skillmeat/api/routers/ratings.py::submit_rating",
+      "label": "submit_rating",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "endpoint:GET /ratings/artifacts/{artifact_id}/scores",
+      "label": "GET /ratings/artifacts/{artifact_id}/scores",
+      "method": "GET",
+      "path": "/ratings/artifacts/{artifact_id}/scores",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "handler:skillmeat/api/routers/ratings.py::get_artifact_scores",
+      "label": "get_artifact_scores",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "endpoint:GET /ratings/artifacts/{artifact_id}/ratings",
+      "label": "GET /ratings/artifacts/{artifact_id}/ratings",
+      "method": "GET",
+      "path": "/ratings/artifacts/{artifact_id}/ratings",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/ratings.py",
+      "id": "handler:skillmeat/api/routers/ratings.py::list_artifact_ratings",
+      "label": "list_artifact_ratings",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "router:skillmeat/api/routers/marketplace.py::router",
+      "label": "router",
+      "prefix": "/marketplace",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:GET /marketplace/listings",
+      "label": "GET /marketplace/listings",
+      "method": "GET",
+      "path": "/marketplace/listings",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::list_listings",
+      "label": "list_listings",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:GET /marketplace/listings/{listing_id}",
+      "label": "GET /marketplace/listings/{listing_id}",
+      "method": "GET",
+      "path": "/marketplace/listings/{listing_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::get_listing_detail",
+      "label": "get_listing_detail",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:POST /marketplace/install",
+      "label": "POST /marketplace/install",
+      "method": "POST",
+      "path": "/marketplace/install",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::install_listing",
+      "label": "install_listing",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:POST /marketplace/publish",
+      "label": "POST /marketplace/publish",
+      "method": "POST",
+      "path": "/marketplace/publish",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::publish_bundle",
+      "label": "publish_bundle",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:GET /marketplace/brokers",
+      "label": "GET /marketplace/brokers",
+      "method": "GET",
+      "path": "/marketplace/brokers",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::list_brokers",
+      "label": "list_brokers",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:POST /marketplace/compliance/scan",
+      "label": "POST /marketplace/compliance/scan",
+      "method": "POST",
+      "path": "/marketplace/compliance/scan",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::compliance_scan",
+      "label": "compliance_scan",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:POST /marketplace/compliance/checklist",
+      "label": "POST /marketplace/compliance/checklist",
+      "method": "POST",
+      "path": "/marketplace/compliance/checklist",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::compliance_checklist",
+      "label": "compliance_checklist",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:POST /marketplace/compliance/consent",
+      "label": "POST /marketplace/compliance/consent",
+      "method": "POST",
+      "path": "/marketplace/compliance/consent",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::compliance_consent",
+      "label": "compliance_consent",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "endpoint:GET /marketplace/compliance/history",
+      "label": "GET /marketplace/compliance/history",
+      "method": "GET",
+      "path": "/marketplace/compliance/history",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace.py",
+      "id": "handler:skillmeat/api/routers/marketplace.py::compliance_history",
+      "label": "compliance_history",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "router:skillmeat/api/routers/deployments.py::router",
+      "label": "router",
+      "prefix": "/deploy",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "endpoint:POST /deploy/,\n    response_model=DeploymentResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "label": "POST /deploy/,\n    response_model=DeploymentResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "method": "POST",
+      "path": "/deploy/,\n    response_model=DeploymentResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "handler:skillmeat/api/routers/deployments.py::deploy_artifact",
+      "label": "deploy_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "endpoint:POST /deploy/undeploy",
+      "label": "POST /deploy/undeploy",
+      "method": "POST",
+      "path": "/deploy/undeploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "handler:skillmeat/api/routers/deployments.py::undeploy_artifact",
+      "label": "undeploy_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "endpoint:GET /deploy/,\n    response_model=DeploymentListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "label": "GET /deploy/,\n    response_model=DeploymentListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "method": "GET",
+      "path": "/deploy/,\n    response_model=DeploymentListResponse,\n    status_code=status.HTTP_200_OK,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/deployments.py",
+      "id": "handler:skillmeat/api/routers/deployments.py::list_deployments",
+      "label": "list_deployments",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "router:skillmeat/api/routers/project_templates.py::router",
+      "label": "router",
+      "prefix": "/project-templates",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:GET /project-templates/,\n    response_model=ProjectTemplateListResponse,\n    summary=",
+      "label": "GET /project-templates/,\n    response_model=ProjectTemplateListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/project-templates/,\n    response_model=ProjectTemplateListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::list_templates",
+      "label": "list_templates",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:GET /project-templates/{template_id}",
+      "label": "GET /project-templates/{template_id}",
+      "method": "GET",
+      "path": "/project-templates/{template_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::get_template",
+      "label": "get_template",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:POST /project-templates/,\n    response_model=ProjectTemplateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /project-templates/,\n    response_model=ProjectTemplateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/project-templates/,\n    response_model=ProjectTemplateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::create_template",
+      "label": "create_template",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:PUT /project-templates/{template_id}",
+      "label": "PUT /project-templates/{template_id}",
+      "method": "PUT",
+      "path": "/project-templates/{template_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::update_template",
+      "label": "update_template",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:DELETE /project-templates/{template_id}",
+      "label": "DELETE /project-templates/{template_id}",
+      "method": "DELETE",
+      "path": "/project-templates/{template_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::delete_template",
+      "label": "delete_template",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "endpoint:POST /project-templates/{template_id}/deploy",
+      "label": "POST /project-templates/{template_id}/deploy",
+      "method": "POST",
+      "path": "/project-templates/{template_id}/deploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/project_templates.py",
+      "id": "handler:skillmeat/api/routers/project_templates.py::deploy_template_endpoint",
+      "label": "deploy_template_endpoint",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "router:skillmeat/api/routers/versions.py::router",
+      "label": "router",
+      "prefix": "/versions",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:GET /versions/snapshots",
+      "label": "GET /versions/snapshots",
+      "method": "GET",
+      "path": "/versions/snapshots",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::list_snapshots",
+      "label": "list_snapshots",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:GET /versions/snapshots/{snapshot_id}",
+      "label": "GET /versions/snapshots/{snapshot_id}",
+      "method": "GET",
+      "path": "/versions/snapshots/{snapshot_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::get_snapshot",
+      "label": "get_snapshot",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:POST /versions/snapshots",
+      "label": "POST /versions/snapshots",
+      "method": "POST",
+      "path": "/versions/snapshots",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::create_snapshot",
+      "label": "create_snapshot",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:DELETE /versions/snapshots/{snapshot_id}",
+      "label": "DELETE /versions/snapshots/{snapshot_id}",
+      "method": "DELETE",
+      "path": "/versions/snapshots/{snapshot_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::delete_snapshot",
+      "label": "delete_snapshot",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:GET /versions/snapshots/{snapshot_id}/rollback-analysis",
+      "label": "GET /versions/snapshots/{snapshot_id}/rollback-analysis",
+      "method": "GET",
+      "path": "/versions/snapshots/{snapshot_id}/rollback-analysis",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::analyze_rollback_safety",
+      "label": "analyze_rollback_safety",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:POST /versions/snapshots/{snapshot_id}/rollback",
+      "label": "POST /versions/snapshots/{snapshot_id}/rollback",
+      "method": "POST",
+      "path": "/versions/snapshots/{snapshot_id}/rollback",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::rollback",
+      "label": "rollback",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "endpoint:POST /versions/snapshots/diff",
+      "label": "POST /versions/snapshots/diff",
+      "method": "POST",
+      "path": "/versions/snapshots/diff",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/versions.py",
+      "id": "handler:skillmeat/api/routers/versions.py::diff_snapshots",
+      "label": "diff_snapshots",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "router:skillmeat/api/routers/analytics.py::router",
+      "label": "router",
+      "prefix": "/analytics",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "endpoint:GET /analytics/summary",
+      "label": "GET /analytics/summary",
+      "method": "GET",
+      "path": "/analytics/summary",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "handler:skillmeat/api/routers/analytics.py::get_analytics_summary",
+      "label": "get_analytics_summary",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "endpoint:GET /analytics/top-artifacts",
+      "label": "GET /analytics/top-artifacts",
+      "method": "GET",
+      "path": "/analytics/top-artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "handler:skillmeat/api/routers/analytics.py::get_top_artifacts",
+      "label": "get_top_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "endpoint:GET /analytics/trends",
+      "label": "GET /analytics/trends",
+      "method": "GET",
+      "path": "/analytics/trends",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/analytics.py",
+      "id": "handler:skillmeat/api/routers/analytics.py::get_usage_trends",
+      "label": "get_usage_trends",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "router:skillmeat/api/routers/artifacts.py::router",
+      "label": "router",
+      "prefix": "/artifacts",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/discover",
+      "label": "POST /artifacts/discover",
+      "method": "POST",
+      "path": "/artifacts/discover",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::discover_artifacts",
+      "label": "discover_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/discover/project/{project_id:path}",
+      "label": "POST /artifacts/discover/project/{project_id:path}",
+      "method": "POST",
+      "path": "/artifacts/discover/project/{project_id:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::discover_project_artifacts",
+      "label": "discover_project_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/discover/import",
+      "label": "POST /artifacts/discover/import",
+      "method": "POST",
+      "path": "/artifacts/discover/import",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts",
+      "label": "bulk_import_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/confirm-duplicates",
+      "label": "POST /artifacts/confirm-duplicates",
+      "method": "POST",
+      "path": "/artifacts/confirm-duplicates",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::confirm_duplicates",
+      "label": "confirm_duplicates",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/,\n    response_model=ArtifactCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /artifacts/,\n    response_model=ArtifactCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/artifacts/,\n    response_model=ArtifactCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::create_artifact",
+      "label": "create_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/,\n    response_model=ArtifactListResponse,\n    summary=",
+      "label": "GET /artifacts/,\n    response_model=ArtifactListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/artifacts/,\n    response_model=ArtifactListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::list_artifacts",
+      "label": "list_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}",
+      "label": "GET /artifacts/{artifact_id}",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_artifact",
+      "label": "get_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/upstream",
+      "label": "GET /artifacts/{artifact_id}/upstream",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/upstream",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::check_artifact_upstream",
+      "label": "check_artifact_upstream",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:PUT /artifacts/{artifact_id}",
+      "label": "PUT /artifacts/{artifact_id}",
+      "method": "PUT",
+      "path": "/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::update_artifact",
+      "label": "update_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:PUT /artifacts/{artifact_id}/parameters",
+      "label": "PUT /artifacts/{artifact_id}/parameters",
+      "method": "PUT",
+      "path": "/artifacts/{artifact_id}/parameters",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters",
+      "label": "update_artifact_parameters",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:DELETE /artifacts/{artifact_id}",
+      "label": "DELETE /artifacts/{artifact_id}",
+      "method": "DELETE",
+      "path": "/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::delete_artifact",
+      "label": "delete_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/{artifact_id}/deploy",
+      "label": "POST /artifacts/{artifact_id}/deploy",
+      "method": "POST",
+      "path": "/artifacts/{artifact_id}/deploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::deploy_artifact",
+      "label": "deploy_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/{artifact_id}/sync",
+      "label": "POST /artifacts/{artifact_id}/sync",
+      "method": "POST",
+      "path": "/artifacts/{artifact_id}/sync",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::sync_artifact",
+      "label": "sync_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/{artifact_id}/undeploy",
+      "label": "POST /artifacts/{artifact_id}/undeploy",
+      "method": "POST",
+      "path": "/artifacts/{artifact_id}/undeploy",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::undeploy_artifact",
+      "label": "undeploy_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/version-graph",
+      "label": "GET /artifacts/{artifact_id}/version-graph",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/version-graph",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_version_graph",
+      "label": "get_version_graph",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/diff",
+      "label": "GET /artifacts/{artifact_id}/diff",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/diff",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_artifact_diff",
+      "label": "get_artifact_diff",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/upstream-diff",
+      "label": "GET /artifacts/{artifact_id}/upstream-diff",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/upstream-diff",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_artifact_upstream_diff",
+      "label": "get_artifact_upstream_diff",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/files",
+      "label": "GET /artifacts/{artifact_id}/files",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/files",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::list_artifact_files",
+      "label": "list_artifact_files",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/files/{file_path:path}",
+      "label": "GET /artifacts/{artifact_id}/files/{file_path:path}",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_artifact_file_content",
+      "label": "get_artifact_file_content",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:PUT /artifacts/{artifact_id}/files/{file_path:path}",
+      "label": "PUT /artifacts/{artifact_id}/files/{file_path:path}",
+      "method": "PUT",
+      "path": "/artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::update_artifact_file_content",
+      "label": "update_artifact_file_content",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/{artifact_id}/files/{file_path:path}",
+      "label": "POST /artifacts/{artifact_id}/files/{file_path:path}",
+      "method": "POST",
+      "path": "/artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::create_artifact_file",
+      "label": "create_artifact_file",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:DELETE /artifacts/{artifact_id}/files/{file_path:path}",
+      "label": "DELETE /artifacts/{artifact_id}/files/{file_path:path}",
+      "method": "DELETE",
+      "path": "/artifacts/{artifact_id}/files/{file_path:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::delete_artifact_file",
+      "label": "delete_artifact_file",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/metadata/github",
+      "label": "GET /artifacts/metadata/github",
+      "method": "GET",
+      "path": "/artifacts/metadata/github",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::fetch_github_metadata",
+      "label": "fetch_github_metadata",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/metrics/discovery",
+      "label": "GET /artifacts/metrics/discovery",
+      "method": "GET",
+      "path": "/artifacts/metrics/discovery",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_discovery_metrics",
+      "label": "get_discovery_metrics",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/health/discovery",
+      "label": "GET /artifacts/health/discovery",
+      "method": "GET",
+      "path": "/artifacts/health/discovery",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::discovery_health_check",
+      "label": "discovery_health_check",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/projects/{project_id:path}/skip-preferences",
+      "label": "POST /artifacts/projects/{project_id:path}/skip-preferences",
+      "method": "POST",
+      "path": "/artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::add_skip_preference",
+      "label": "add_skip_preference",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences/{artifact_key}",
+      "label": "DELETE /artifacts/projects/{project_id:path}/skip-preferences/{artifact_key}",
+      "method": "DELETE",
+      "path": "/artifacts/projects/{project_id:path}/skip-preferences/{artifact_key}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::remove_skip_preference",
+      "label": "remove_skip_preference",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:DELETE /artifacts/projects/{project_id:path}/skip-preferences",
+      "label": "DELETE /artifacts/projects/{project_id:path}/skip-preferences",
+      "method": "DELETE",
+      "path": "/artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::clear_skip_preferences",
+      "label": "clear_skip_preferences",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/projects/{project_id:path}/skip-preferences",
+      "label": "GET /artifacts/projects/{project_id:path}/skip-preferences",
+      "method": "GET",
+      "path": "/artifacts/projects/{project_id:path}/skip-preferences",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::list_skip_preferences",
+      "label": "list_skip_preferences",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:GET /artifacts/{artifact_id}/tags",
+      "label": "GET /artifacts/{artifact_id}/tags",
+      "method": "GET",
+      "path": "/artifacts/{artifact_id}/tags",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::get_artifact_tags",
+      "label": "get_artifact_tags",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:POST /artifacts/{artifact_id}/tags/{tag_id}",
+      "label": "POST /artifacts/{artifact_id}/tags/{tag_id}",
+      "method": "POST",
+      "path": "/artifacts/{artifact_id}/tags/{tag_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::add_tag_to_artifact",
+      "label": "add_tag_to_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "endpoint:DELETE /artifacts/{artifact_id}/tags/{tag_id}",
+      "label": "DELETE /artifacts/{artifact_id}/tags/{tag_id}",
+      "method": "DELETE",
+      "path": "/artifacts/{artifact_id}/tags/{tag_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/artifacts.py",
+      "id": "handler:skillmeat/api/routers/artifacts.py::remove_tag_from_artifact",
+      "label": "remove_tag_from_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "router:skillmeat/api/routers/context_sync.py::router",
+      "label": "router",
+      "prefix": "/context-sync",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "endpoint:POST /context-sync/pull",
+      "label": "POST /context-sync/pull",
+      "method": "POST",
+      "path": "/context-sync/pull",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "handler:skillmeat/api/routers/context_sync.py::pull_changes",
+      "label": "pull_changes",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "endpoint:POST /context-sync/push",
+      "label": "POST /context-sync/push",
+      "method": "POST",
+      "path": "/context-sync/push",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "handler:skillmeat/api/routers/context_sync.py::push_changes",
+      "label": "push_changes",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "endpoint:GET /context-sync/status",
+      "label": "GET /context-sync/status",
+      "method": "GET",
+      "path": "/context-sync/status",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "handler:skillmeat/api/routers/context_sync.py::get_sync_status",
+      "label": "get_sync_status",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "endpoint:POST /context-sync/resolve",
+      "label": "POST /context-sync/resolve",
+      "method": "POST",
+      "path": "/context-sync/resolve",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/context_sync.py",
+      "id": "handler:skillmeat/api/routers/context_sync.py::resolve_conflict",
+      "label": "resolve_conflict",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "router:skillmeat/api/routers/projects.py::router",
+      "label": "router",
+      "prefix": "/projects",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/,\n    response_model=ProjectListResponse,\n    summary=",
+      "label": "GET /projects/,\n    response_model=ProjectListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/projects/,\n    response_model=ProjectListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::list_projects",
+      "label": "list_projects",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:POST /projects/,\n    response_model=ProjectCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /projects/,\n    response_model=ProjectCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/projects/,\n    response_model=ProjectCreateResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::create_project",
+      "label": "create_project",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/{project_id}",
+      "label": "GET /projects/{project_id}",
+      "method": "GET",
+      "path": "/projects/{project_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::get_project",
+      "label": "get_project",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:PUT /projects/{project_id}",
+      "label": "PUT /projects/{project_id}",
+      "method": "PUT",
+      "path": "/projects/{project_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::update_project",
+      "label": "update_project",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:DELETE /projects/{project_id}",
+      "label": "DELETE /projects/{project_id}",
+      "method": "DELETE",
+      "path": "/projects/{project_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::delete_project",
+      "label": "delete_project",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:DELETE /projects/{project_id}/deployments/{artifact_name}",
+      "label": "DELETE /projects/{project_id}/deployments/{artifact_name}",
+      "method": "DELETE",
+      "path": "/projects/{project_id}/deployments/{artifact_name}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::remove_project_deployment",
+      "label": "remove_project_deployment",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:POST /projects/{project_id}/check-modifications",
+      "label": "POST /projects/{project_id}/check-modifications",
+      "method": "POST",
+      "path": "/projects/{project_id}/check-modifications",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::check_project_modifications",
+      "label": "check_project_modifications",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/{project_id}/modified-artifacts",
+      "label": "GET /projects/{project_id}/modified-artifacts",
+      "method": "GET",
+      "path": "/projects/{project_id}/modified-artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::get_modified_artifacts",
+      "label": "get_modified_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/{project_id}/context-map",
+      "label": "GET /projects/{project_id}/context-map",
+      "method": "GET",
+      "path": "/projects/{project_id}/context-map",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::get_project_context_map",
+      "label": "get_project_context_map",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/{project_id}/drift/summary",
+      "label": "GET /projects/{project_id}/drift/summary",
+      "method": "GET",
+      "path": "/projects/{project_id}/drift/summary",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::get_project_drift_summary",
+      "label": "get_project_drift_summary",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:POST /projects/cache/clear",
+      "label": "POST /projects/cache/clear",
+      "method": "POST",
+      "path": "/projects/cache/clear",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::clear_project_cache",
+      "label": "clear_project_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:POST /projects/cache/refresh",
+      "label": "POST /projects/cache/refresh",
+      "method": "POST",
+      "path": "/projects/cache/refresh",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::refresh_cache",
+      "label": "refresh_cache",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "endpoint:GET /projects/cache/stats",
+      "label": "GET /projects/cache/stats",
+      "method": "GET",
+      "path": "/projects/cache/stats",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/projects.py",
+      "id": "handler:skillmeat/api/routers/projects.py::get_cache_stats",
+      "label": "get_cache_stats",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "router:skillmeat/api/routers/marketplace_sources.py::router",
+      "label": "router",
+      "prefix": "/marketplace/sources",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:POST /marketplace/sources/infer-url",
+      "label": "POST /marketplace/sources/infer-url",
+      "method": "POST",
+      "path": "/marketplace/sources/infer-url",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::infer_github_url",
+      "label": "infer_github_url",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:POST /marketplace/sources/,\n    response_model=SourceResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /marketplace/sources/,\n    response_model=SourceResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/marketplace/sources/,\n    response_model=SourceResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::create_source",
+      "label": "create_source",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/,\n    response_model=SourceListResponse,\n    summary=",
+      "label": "GET /marketplace/sources/,\n    response_model=SourceListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/marketplace/sources/,\n    response_model=SourceListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::list_sources",
+      "label": "list_sources",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/{source_id}",
+      "label": "GET /marketplace/sources/{source_id}",
+      "method": "GET",
+      "path": "/marketplace/sources/{source_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::get_source",
+      "label": "get_source",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:PATCH /marketplace/sources/{source_id}",
+      "label": "PATCH /marketplace/sources/{source_id}",
+      "method": "PATCH",
+      "path": "/marketplace/sources/{source_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::update_source",
+      "label": "update_source",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:DELETE /marketplace/sources/{source_id}",
+      "label": "DELETE /marketplace/sources/{source_id}",
+      "method": "DELETE",
+      "path": "/marketplace/sources/{source_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::delete_source",
+      "label": "delete_source",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:POST /marketplace/sources/{source_id}/rescan",
+      "label": "POST /marketplace/sources/{source_id}/rescan",
+      "method": "POST",
+      "path": "/marketplace/sources/{source_id}/rescan",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::rescan_source",
+      "label": "rescan_source",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/{source_id}/artifacts",
+      "label": "GET /marketplace/sources/{source_id}/artifacts",
+      "method": "GET",
+      "path": "/marketplace/sources/{source_id}/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::list_artifacts",
+      "label": "list_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}",
+      "label": "PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}",
+      "method": "PATCH",
+      "path": "/marketplace/sources/{source_id}/artifacts/{entry_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::update_catalog_entry_name",
+      "label": "update_catalog_entry_name",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:POST /marketplace/sources/{source_id}/import",
+      "label": "POST /marketplace/sources/{source_id}/import",
+      "method": "POST",
+      "path": "/marketplace/sources/{source_id}/import",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::import_artifacts",
+      "label": "import_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "label": "PATCH /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "method": "PATCH",
+      "path": "/marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::exclude_artifact",
+      "label": "exclude_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "label": "DELETE /marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "method": "DELETE",
+      "path": "/marketplace/sources/{source_id}/artifacts/{entry_id}/exclude",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::restore_excluded_artifact",
+      "label": "restore_excluded_artifact",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "label": "GET /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "method": "GET",
+      "path": "/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::get_path_tags",
+      "label": "get_path_tags",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "label": "PATCH /marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "method": "PATCH",
+      "path": "/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::update_path_tag_status",
+      "label": "update_path_tag_status",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files",
+      "label": "GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files",
+      "method": "GET",
+      "path": "/marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::get_artifact_file_tree",
+      "label": "get_artifact_file_tree",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "endpoint:GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+      "label": "GET /marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+      "method": "GET",
+      "path": "/marketplace/sources/{source_id}/artifacts/{artifact_path:path}/files/{file_path:path}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/marketplace_sources.py",
+      "id": "handler:skillmeat/api/routers/marketplace_sources.py::get_artifact_file_content",
+      "label": "get_artifact_file_content",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "router:skillmeat/api/routers/user_collections.py::router",
+      "label": "router",
+      "prefix": "/user-collections",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:GET /user-collections/,\n    response_model=UserCollectionListResponse,\n    summary=",
+      "label": "GET /user-collections/,\n    response_model=UserCollectionListResponse,\n    summary=",
+      "method": "GET",
+      "path": "/user-collections/,\n    response_model=UserCollectionListResponse,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::list_user_collections",
+      "label": "list_user_collections",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:POST /user-collections/,\n    response_model=UserCollectionResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "label": "POST /user-collections/,\n    response_model=UserCollectionResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "method": "POST",
+      "path": "/user-collections/,\n    response_model=UserCollectionResponse,\n    status_code=status.HTTP_201_CREATED,\n    summary=",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::create_user_collection",
+      "label": "create_user_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:GET /user-collections/{collection_id}",
+      "label": "GET /user-collections/{collection_id}",
+      "method": "GET",
+      "path": "/user-collections/{collection_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::get_user_collection",
+      "label": "get_user_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:PUT /user-collections/{collection_id}",
+      "label": "PUT /user-collections/{collection_id}",
+      "method": "PUT",
+      "path": "/user-collections/{collection_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::update_user_collection",
+      "label": "update_user_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:DELETE /user-collections/{collection_id}",
+      "label": "DELETE /user-collections/{collection_id}",
+      "method": "DELETE",
+      "path": "/user-collections/{collection_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::delete_user_collection",
+      "label": "delete_user_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:GET /user-collections/{collection_id}/artifacts",
+      "label": "GET /user-collections/{collection_id}/artifacts",
+      "method": "GET",
+      "path": "/user-collections/{collection_id}/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::list_collection_artifacts",
+      "label": "list_collection_artifacts",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:POST /user-collections/{collection_id}/artifacts",
+      "label": "POST /user-collections/{collection_id}/artifacts",
+      "method": "POST",
+      "path": "/user-collections/{collection_id}/artifacts",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::add_artifacts_to_collection",
+      "label": "add_artifacts_to_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:DELETE /user-collections/{collection_id}/artifacts/{artifact_id}",
+      "label": "DELETE /user-collections/{collection_id}/artifacts/{artifact_id}",
+      "method": "DELETE",
+      "path": "/user-collections/{collection_id}/artifacts/{artifact_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::remove_artifact_from_collection",
+      "label": "remove_artifact_from_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:POST /user-collections/{collection_id}/entities/{entity_id}",
+      "label": "POST /user-collections/{collection_id}/entities/{entity_id}",
+      "method": "POST",
+      "path": "/user-collections/{collection_id}/entities/{entity_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::add_entity_to_collection",
+      "label": "add_entity_to_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:DELETE /user-collections/{collection_id}/entities/{entity_id}",
+      "label": "DELETE /user-collections/{collection_id}/entities/{entity_id}",
+      "method": "DELETE",
+      "path": "/user-collections/{collection_id}/entities/{entity_id}",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::remove_entity_from_collection",
+      "label": "remove_entity_from_collection",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "endpoint:GET /user-collections/{collection_id}/entities",
+      "label": "GET /user-collections/{collection_id}/entities",
+      "method": "GET",
+      "path": "/user-collections/{collection_id}/entities",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/user_collections.py",
+      "id": "handler:skillmeat/api/routers/user_collections.py::list_collection_entities",
+      "label": "list_collection_entities",
+      "type": "handler"
+    },
+    {
+      "file": "skillmeat/api/routers/match.py",
+      "id": "router:skillmeat/api/routers/match.py::router",
+      "label": "router",
+      "prefix": "/match",
+      "type": "router"
+    },
+    {
+      "file": "skillmeat/api/routers/match.py",
+      "id": "endpoint:GET /match/",
+      "label": "GET /match/",
+      "method": "GET",
+      "path": "/match/",
+      "type": "api_endpoint"
+    },
+    {
+      "file": "skillmeat/api/routers/match.py",
+      "id": "handler:skillmeat/api/routers/match.py::match_artifacts",
+      "label": "match_artifacts",
+      "type": "handler"
+    }
+  ],
+  "schema_version": "v1",
+  "source": "backend",
+  "source_commit": "57ae21b84a3a4310f51ec4e8789bf6ac53f4eb9d"
+}

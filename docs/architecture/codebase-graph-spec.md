@@ -25,11 +25,17 @@ Scripts live in `scripts/code_map/`:
 - `extract_frontend_hooks.py`
 - `extract_frontend_api_clients.py`
 - `extract_backend.py`
+- `extract_backend_openapi.py`
+- `extract_backend_handlers.py`
+- `extract_backend_services.py`
+- `extract_backend_models.py`
 - `merge_graphs.py`
 - `apply_overrides.py`
 - `coverage_summary.py`
+- `validate_graph.py`
 - `graph.py` (shared graph model)
 - `frontend_utils.py` (shared frontend helpers)
+- `backend_utils.py` (shared backend helpers)
 
 Run from repo root:
 ```bash
@@ -41,6 +47,7 @@ python -m scripts.code_map.extract_frontend_api_clients
 python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
 python -m scripts.code_map.coverage_summary
+python -m scripts.code_map.validate_graph
 ```
 
 Optional overrides:
@@ -50,9 +57,14 @@ python -m scripts.code_map.extract_frontend_components --web-root skillmeat/web 
 python -m scripts.code_map.extract_frontend_hooks --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.hooks.json
 python -m scripts.code_map.extract_frontend_api_clients --web-root skillmeat/web --out docs/architecture/codebase-graph.frontend.api-clients.json
 python -m scripts.code_map.extract_backend --api-root skillmeat/api --out docs/architecture/codebase-graph.backend.json
+python -m scripts.code_map.extract_backend_openapi --openapi skillmeat/api/openapi.json --out docs/architecture/codebase-graph.backend.openapi.json
+python -m scripts.code_map.extract_backend_handlers --api-root skillmeat/api --out docs/architecture/codebase-graph.backend.handlers.json
+python -m scripts.code_map.extract_backend_services --api-root skillmeat/api --out docs/architecture/codebase-graph.backend.services.json
+python -m scripts.code_map.extract_backend_models --repo-root . --out docs/architecture/codebase-graph.backend.models.json
 python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-graph.frontend.json --backend docs/architecture/codebase-graph.backend.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
+python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
 ```
 
 ## Graph Schema (v1)
@@ -66,7 +78,7 @@ Root metadata:
 Nodes:
 - `id`: stable identifier
 - `type`: one of `route`, `page`, `component`, `hook`, `api_client`, `query_key`, `type`,
-  `api_endpoint`, `router`, `handler`
+  `api_endpoint`, `router`, `handler`, `service`, `repository`, `model`, `migration`, `schema`
 - `label`: human-readable label
 - `file`: file path when known
 - optional metadata per node type (ex: `method`, `path`, `prefix`)
@@ -84,6 +96,11 @@ Edges:
 - `api_client_calls_endpoint`
 - `hook_registers_query_key`
 - `uses_type`
+- `handler_calls_service`
+- `service_calls_repository`
+- `repository_uses_model`
+- `model_migrated_by`
+- `handler_uses_schema`
 - `router_exposes`
 - `handled_by`
 - optional metadata (ex: `file`)
@@ -104,6 +121,36 @@ Primary extractors:
   and type imports.
 - `extract_frontend_api_clients.py`: scans `web/lib/api.ts` + `web/lib/api/**` for
   exported clients, and hook imports of those clients.
+
+## Backend Expansion (Phase 2)
+
+Additional backend coverage includes:
+- OpenAPI-driven endpoint inventory (`extract_backend_openapi.py`)
+- Handler to service edges (`handler_calls_service`)
+- Service to repository edges (`service_calls_repository`)
+- Repository to model edges (`repository_uses_model`)
+- Model to migration edges (`model_migrated_by`)
+- Handler to schema edges (`handler_uses_schema`)
+
+Primary extractors:
+- `extract_backend_openapi.py`: reads `skillmeat/api/openapi.json` (or generates it)
+  and adds `api_endpoint` nodes.
+- `extract_backend_handlers.py`: parses routers for handlers, lines/symbols, and service/schema usage.
+- `extract_backend_services.py`: parses service/core modules for repository usage.
+- `extract_backend_models.py`: parses schemas, models, repositories, and migrations.
+
+## Validation (Phase 3)
+
+Run validation after merging and applying overrides:
+```bash
+python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
+```
+
+Current checks:
+- `calls_api`/`api_client_calls_endpoint` edges point to existing endpoints.
+- `deprecated: true` nodes are not referenced unless `allow_deprecated` is set on the edge.
+- OpenAPI endpoints have `handled_by` edges.
+- Pages have `page_uses_component` edges unless ignored.
 
 ## Unified Graph + Overrides
 
