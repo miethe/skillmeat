@@ -463,60 +463,103 @@ class ArtifactDiscoveryService:
             logger.error(error_msg, exc_info=True)
             errors.append(error_msg)
 
-        # Filter artifacts based on existence check
-        # Strategy: Use pre-scan check to filter out artifacts already in both locations
-        # Fall back to legacy manifest-based filtering if manifest provided
-        importable_artifacts: List[DiscoveredArtifact] = []
-        filtered_count = 0
+        # Check existence and populate collection_match for all artifacts
+        # Strategy: Return ALL artifacts but track which are importable (new)
+        importable_count = 0
+        existing_in_collection_count = 0
 
         for artifact in discovered_artifacts:
             artifact_key = f"{artifact.type}:{artifact.name}"
 
-            # Use the new check_artifact_exists for comprehensive filtering
+            # Use the new check_artifact_exists for comprehensive checking
             existence = self.check_artifact_exists(artifact_key, manifest)
 
-            # Filter logic:
-            # - If in both Collection and Project: exclude (fully installed)
-            # - If in Collection only: include (user might want to deploy to Project)
-            # - If in Project only: include (user might want to add to Collection)
-            # - If in neither: include (new artifact)
-            should_include = existence["location"] != "both"
+            # Determine if artifact is importable (new - not in collection)
+            location = existence["location"]
+            is_in_collection = location in ("collection", "both")
 
-            # Legacy compatibility: If manifest provided and artifact in collection,
-            # consider it as potentially importable to project
-            if should_include:
-                importable_artifacts.append(artifact)
-            else:
-                filtered_count += 1
-                logger.debug(
-                    f"Filtered out {artifact_key} (exists in both Collection and Project)"
+            if is_in_collection:
+                # Artifact exists in collection - populate collection_match
+                existing_in_collection_count += 1
+
+                # Determine match type based on how it was matched
+                # If we have content_hash match, use "hash"; otherwise "exact" for name+type
+                match_type = "exact"  # Default for name+type match
+                confidence = 1.0
+
+                # Update collection_match with existence info
+                artifact.collection_match = CollectionMatchInfo(
+                    type=match_type,
+                    matched_artifact_id=artifact_key,
+                    matched_name=artifact.name,
+                    confidence=confidence,
                 )
 
-        # Log filtering summary
-        if filtered_count > 0:
+                logger.debug(
+                    f"Artifact {artifact_key} exists in Collection (location: {location})"
+                )
+            else:
+                # Artifact is new (not in collection by exact name match) - importable
+                importable_count += 1
+
+                # Check if there's a fuzzy match from earlier scanning
+                # If so, downgrade to name_type match (possible duplicate)
+                # Otherwise, set to none (new artifact)
+                if artifact.collection_match is not None and artifact.collection_match.type in (
+                    "exact",
+                    "hash",
+                ):
+                    # Fuzzy match found something, but exact check says not in collection
+                    # This means it's a similar artifact (e.g., "notebooklm" vs "notebooklm-skill")
+                    # Downgrade to name_type to indicate possible duplicate
+                    artifact.collection_match = CollectionMatchInfo(
+                        type="name_type",
+                        matched_artifact_id=artifact.collection_match.matched_artifact_id,
+                        matched_name=artifact.collection_match.matched_name,
+                        confidence=0.85,  # Lower confidence for fuzzy match
+                    )
+                elif artifact.collection_match is None:
+                    artifact.collection_match = CollectionMatchInfo(
+                        type="none",
+                        matched_artifact_id=None,
+                        matched_name=None,
+                        confidence=0.0,
+                    )
+
+        # Log existence check summary
+        if existing_in_collection_count > 0:
             logger.info(
-                f"Filtered {filtered_count} artifacts that exist in both Collection and Project",
+                f"Found {existing_in_collection_count} artifacts already in Collection",
                 extra={
                     "total_discovered": len(discovered_artifacts),
-                    "importable": len(importable_artifacts),
-                    "filtered": filtered_count,
+                    "importable": importable_count,
+                    "existing_in_collection": existing_in_collection_count,
                 },
             )
 
-        # Filter by skip preferences if project_path provided
+        # Check skip preferences if project_path provided
+        # Note: Skip preferences only apply to importable (new) artifacts
         skipped_artifacts: List[DiscoveredArtifact] = []
         skip_start_time = time.time()
+        skip_filtered_count = 0
 
         if project_path:
             try:
                 skip_mgr = SkipPreferenceManager(project_path)
-                pre_skip_count = len(importable_artifacts)
-                filtered_importable: List[DiscoveredArtifact] = []
 
-                for artifact in importable_artifacts:
+                for artifact in discovered_artifacts:
                     artifact_key = build_artifact_key(artifact.type, artifact.name)
 
-                    if skip_mgr.is_skipped(artifact_key):
+                    # Only check skip for artifacts that are importable (not in collection)
+                    is_importable = (
+                        artifact.collection_match is None
+                        or artifact.collection_match.type == "none"
+                    )
+
+                    if is_importable and skip_mgr.is_skipped(artifact_key):
+                        skip_filtered_count += 1
+                        importable_count -= 1  # Reduce importable count
+
                         if include_skipped:
                             # Get skip preference to add reason
                             skip_pref = skip_mgr.get_skip_by_key(artifact_key)
@@ -524,12 +567,6 @@ class ArtifactDiscoveryService:
                                 artifact.skip_reason = skip_pref.skip_reason
                             skipped_artifacts.append(artifact)
                         logger.debug(f"Filtered skipped artifact: {artifact_key}")
-                    else:
-                        filtered_importable.append(artifact)
-
-                # Update importable_artifacts with filtered list
-                skip_filtered_count = pre_skip_count - len(filtered_importable)
-                importable_artifacts = filtered_importable
 
                 # Log skip filtering performance
                 skip_duration_ms = (time.time() - skip_start_time) * 1000
@@ -539,7 +576,7 @@ class ArtifactDiscoveryService:
                         f"Filtered {skip_filtered_count} skipped artifacts in {skip_duration_ms:.2f}ms",
                         extra={
                             "skip_filtered_count": skip_filtered_count,
-                            "remaining_importable": len(importable_artifacts),
+                            "remaining_importable": importable_count,
                             "skip_duration_ms": round(skip_duration_ms, 2),
                         },
                     )
@@ -554,11 +591,11 @@ class ArtifactDiscoveryService:
                 errors.append(error_msg)
                 # Continue without skip filtering if there's an error
 
-        # Early return if all artifacts are filtered out
-        if len(importable_artifacts) == 0 and len(discovered_artifacts) > 0:
+        # Log if no importable artifacts
+        if importable_count == 0 and len(discovered_artifacts) > 0:
             logger.info(
                 f"All {len(discovered_artifacts)} discovered artifacts already exist in "
-                f"Collection and/or Project or are skipped. Nothing to import."
+                f"Collection or are skipped. Nothing new to import."
             )
 
         # Calculate scan duration
@@ -575,20 +612,24 @@ class ArtifactDiscoveryService:
 
         logger.info(
             f"Discovery scan completed: {len(discovered_artifacts)} artifacts found, "
-            f"{len(importable_artifacts)} importable, {len(skipped_artifacts)} skipped in {scan_duration_ms:.2f}ms",
+            f"{importable_count} importable, {len(skipped_artifacts)} skipped in {scan_duration_ms:.2f}ms",
             extra={
                 "discovered_count": len(discovered_artifacts),
-                "importable_count": len(importable_artifacts),
+                "importable_count": importable_count,
                 "skipped_count": len(skipped_artifacts),
                 "error_count": len(errors),
                 "duration_ms": round(scan_duration_ms, 2),
             },
         )
 
+        # Return ALL discovered artifacts (not just importable ones)
+        # UI uses collection_match.type to determine which section to display:
+        # - "exact" or "hash" -> "Already in Collection" section
+        # - "none" -> "New Artifacts" (importable) section
         return DiscoveryResult(
             discovered_count=len(discovered_artifacts),
-            importable_count=len(importable_artifacts),
-            artifacts=importable_artifacts,
+            importable_count=importable_count,
+            artifacts=discovered_artifacts,
             skipped_artifacts=skipped_artifacts,
             errors=errors,
             scan_duration_ms=scan_duration_ms,
@@ -1418,10 +1459,10 @@ class ArtifactDiscoveryService:
             collection_name = config.get_active_collection()
             collection_base = config.get_collection_path(collection_name)
 
-            # Container directory: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/
-            collection_container_dir = (
-                collection_base / "artifacts" / f"{artifact_type}s"
-            )
+            # Container directory: ~/.skillmeat/collections/{collection_name}/{type}s/
+            # Note: Collection structure uses direct type directories (skills/, commands/, etc.)
+            # not nested under artifacts/ subdirectory
+            collection_container_dir = collection_base / f"{artifact_type}s"
 
             if is_directory_artifact:
                 # Directory-based artifacts (skills): check for artifact directory

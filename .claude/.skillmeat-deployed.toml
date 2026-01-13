@@ -59,5 +59,1312 @@ deployed_at = "2026-01-10T14:47:36.696010"
 artifact_path = "skills/aesthetic"
 content_hash = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
 local_modifications = false
+version_lineage = [
+    "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e",
+]
 merge_base_snapshot = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
 collection_sha = "615241a9b73651094ccfe99f1a3b32ff54f1ba8b90063ec5a6ac3375ddabe36e"
+
+[[deployed]]
+artifact_name = "design-principles"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-12T15:56:07.542943"
+artifact_path = "skills/Design Principles"
+content_hash = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+local_modifications = false
+version_lineage = [
+    "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06",
+]
+collection_sha = "b399371c92d510b4f1dc7c59489ae4ff44db3bbeff6150d1b3b59baf9698bc06"
+
+[[deployed]]
+artifact_name = "dev-execution"
+artifact_type = "skill"
+from_collection = "default"
+deployed_at = "2026-01-12T15:56:07.544172"
+artifact_path = "skills/dev-execution"
+content_hash = "896b14ec6bd13bf69a6f66018f0177f23009b3696aaaae18a91f721b8a08c5b2"
+local_modifications = false
+version_lineage = [
+    "896b14ec6bd13bf69a6f66018f0177f23009b3696aaaae18a91f721b8a08c5b2",
+]
+collection_sha = "896b14ec6bd13bf69a6f66018f0177f23009b3696aaaae18a91f721b8a08c5b2"
+
+[[deployed]]
+artifact_name = "task-decomposition-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.583661"
+artifact_path = "agents/pm/task-decomposition-expert.md"
+content_hash = "61bfa4c32d09ce37901dffc61d5bf1b34b990510e8a5ccd14276b39dbe7a16ab"
+local_modifications = false
+version_lineage = [
+    "61bfa4c32d09ce37901dffc61d5bf1b34b990510e8a5ccd14276b39dbe7a16ab",
+]
+collection_sha = "61bfa4c32d09ce37901dffc61d5bf1b34b990510e8a5ccd14276b39dbe7a16ab"
+
+[[deployed]]
+artifact_name = "code-reviewer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.583806"
+artifact_path = "agents/reviewers/code-reviewer.md"
+content_hash = "fc50d1dc14df412af6ea3a1c3a17f3aaeedbca5793f54151d2d8a07f732bdbef"
+local_modifications = false
+version_lineage = [
+    "fc50d1dc14df412af6ea3a1c3a17f3aaeedbca5793f54151d2d8a07f732bdbef",
+]
+collection_sha = "fc50d1dc14df412af6ea3a1c3a17f3aaeedbca5793f54151d2d8a07f732bdbef"
+
+[[deployed]]
+artifact_name = "api-librarian"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.583932"
+artifact_path = "agents/reviewers/api-librarian.md"
+content_hash = "c0d68d554edaac808643978b7acea8a212615ad820185cf7b48f5963041f4498"
+local_modifications = false
+version_lineage = [
+    "c0d68d554edaac808643978b7acea8a212615ad820185cf7b48f5963041f4498",
+]
+collection_sha = "c0d68d554edaac808643978b7acea8a212615ad820185cf7b48f5963041f4498"
+
+[[deployed]]
+artifact_name = "telemetry-auditor"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584057"
+artifact_path = "agents/reviewers/telemetry-auditor.md"
+content_hash = "80e02bf8cef9b98c4faf903eecee12697248dd5099dfa027316bead180715bad"
+local_modifications = false
+version_lineage = [
+    "80e02bf8cef9b98c4faf903eecee12697248dd5099dfa027316bead180715bad",
+]
+collection_sha = "80e02bf8cef9b98c4faf903eecee12697248dd5099dfa027316bead180715bad"
+
+[[deployed]]
+artifact_name = "react-performance-optimizer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584189"
+artifact_path = "agents/web-optimize-team/react-performance-optimizer.md"
+content_hash = "1b9e4704d707e3bba97d3fcf318566b394dcb44e9f752a55d192f039ef339675"
+local_modifications = false
+version_lineage = [
+    "1b9e4704d707e3bba97d3fcf318566b394dcb44e9f752a55d192f039ef339675",
+]
+collection_sha = "1b9e4704d707e3bba97d3fcf318566b394dcb44e9f752a55d192f039ef339675"
+
+[[deployed]]
+artifact_name = "url-context-validator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584315"
+artifact_path = "agents/web-optimize-team/url-context-validator.md"
+content_hash = "185a7e21876f45583f0441cf895adc6a520f83d65c8602f6a6136e8316505c13"
+local_modifications = false
+version_lineage = [
+    "185a7e21876f45583f0441cf895adc6a520f83d65c8602f6a6136e8316505c13",
+]
+collection_sha = "185a7e21876f45583f0441cf895adc6a520f83d65c8602f6a6136e8316505c13"
+
+[[deployed]]
+artifact_name = "url-link-extractor"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584444"
+artifact_path = "agents/web-optimize-team/url-link-extractor.md"
+content_hash = "462bf5b31a014fde69e654f3e9518d2f6d3d2cea35494047711e3d86e71e696c"
+local_modifications = false
+version_lineage = [
+    "462bf5b31a014fde69e654f3e9518d2f6d3d2cea35494047711e3d86e71e696c",
+]
+collection_sha = "462bf5b31a014fde69e654f3e9518d2f6d3d2cea35494047711e3d86e71e696c"
+
+[[deployed]]
+artifact_name = "web-accessibility-checker"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584570"
+artifact_path = "agents/web-optimize-team/web-accessibility-checker.md"
+content_hash = "49712b3bd06007222fa8cf57b3dd63bc6b8b64e25319e92ba674812826bfac28"
+local_modifications = false
+version_lineage = [
+    "49712b3bd06007222fa8cf57b3dd63bc6b8b64e25319e92ba674812826bfac28",
+]
+collection_sha = "49712b3bd06007222fa8cf57b3dd63bc6b8b64e25319e92ba674812826bfac28"
+
+[[deployed]]
+artifact_name = "python-pro"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584697"
+artifact_path = "agents/dev-team/python-pro.md"
+content_hash = "d1483555b1b7f00b12ca06c82fc76dfb1402bcf4c13dbb9cc4d85f1678f2153d"
+local_modifications = false
+version_lineage = [
+    "d1483555b1b7f00b12ca06c82fc76dfb1402bcf4c13dbb9cc4d85f1678f2153d",
+]
+collection_sha = "d1483555b1b7f00b12ca06c82fc76dfb1402bcf4c13dbb9cc4d85f1678f2153d"
+
+[[deployed]]
+artifact_name = "refactoring-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584819"
+artifact_path = "agents/fix-team/refactoring-expert.md"
+content_hash = "074328d682e6481ad6245da5c892637d132710d7ffc545ccb83a869822ea3d0c"
+local_modifications = false
+version_lineage = [
+    "074328d682e6481ad6245da5c892637d132710d7ffc545ccb83a869822ea3d0c",
+]
+collection_sha = "074328d682e6481ad6245da5c892637d132710d7ffc545ccb83a869822ea3d0c"
+
+[[deployed]]
+artifact_name = "technical-writer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.584939"
+artifact_path = "agents/tech-writers/technical-writer.md"
+content_hash = "c1cd9ec30155d2ec59f5cb74a21d4569e743435b779e36e45acbef9a479d6357"
+local_modifications = false
+version_lineage = [
+    "c1cd9ec30155d2ec59f5cb74a21d4569e743435b779e36e45acbef9a479d6357",
+]
+collection_sha = "c1cd9ec30155d2ec59f5cb74a21d4569e743435b779e36e45acbef9a479d6357"
+
+[[deployed]]
+artifact_name = "api-documenter"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585058"
+artifact_path = "agents/tech-writers/api-documenter.md"
+content_hash = "424798154fafdde89a0584286a53ca6d276f640d317b1c9e050ed0f0d53357da"
+local_modifications = false
+version_lineage = [
+    "424798154fafdde89a0584286a53ca6d276f640d317b1c9e050ed0f0d53357da",
+]
+collection_sha = "424798154fafdde89a0584286a53ca6d276f640d317b1c9e050ed0f0d53357da"
+
+[[deployed]]
+artifact_name = "openapi-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585179"
+artifact_path = "agents/tech-writers/openapi-expert.md"
+content_hash = "deceadc3cf651cd544105682e3d53f9483c245ada9fdf3fee6d01483490247e7"
+local_modifications = false
+version_lineage = [
+    "deceadc3cf651cd544105682e3d53f9483c245ada9fdf3fee6d01483490247e7",
+]
+collection_sha = "deceadc3cf651cd544105682e3d53f9483c245ada9fdf3fee6d01483490247e7"
+
+[[deployed]]
+artifact_name = "changelog-generator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585300"
+artifact_path = "agents/tech-writers/changelog-generator.md"
+content_hash = "11c6c7b2da49b3ca8c7c9397146e86a0d1d325f1a44a17d4a93d2868be8d063a"
+local_modifications = false
+version_lineage = [
+    "11c6c7b2da49b3ca8c7c9397146e86a0d1d325f1a44a17d4a93d2868be8d063a",
+]
+collection_sha = "11c6c7b2da49b3ca8c7c9397146e86a0d1d325f1a44a17d4a93d2868be8d063a"
+
+[[deployed]]
+artifact_name = "nextjs-architecture-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585424"
+artifact_path = "agents/architects/nextjs-architecture-expert.md"
+content_hash = "dbd06e22e0b0998a832b6a09cb379cd29ff23716c4729db5694c01209164ae32"
+local_modifications = false
+version_lineage = [
+    "dbd06e22e0b0998a832b6a09cb379cd29ff23716c4729db5694c01209164ae32",
+]
+collection_sha = "dbd06e22e0b0998a832b6a09cb379cd29ff23716c4729db5694c01209164ae32"
+
+[[deployed]]
+artifact_name = "frontend-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585552"
+artifact_path = "agents/architects/frontend-architect.md"
+content_hash = "0b47fc0374cf7e60bf6b32de8d12d2512c66f3ddf050ce6e743f067a37d98feb"
+local_modifications = false
+version_lineage = [
+    "0b47fc0374cf7e60bf6b32de8d12d2512c66f3ddf050ce6e743f067a37d98feb",
+]
+collection_sha = "0b47fc0374cf7e60bf6b32de8d12d2512c66f3ddf050ce6e743f067a37d98feb"
+
+[[deployed]]
+artifact_name = "devops-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585675"
+artifact_path = "agents/architects/devops-architect.md"
+content_hash = "c341d7a6d145fcadb5c6394cf505ca83829c62fca72d01c6dd5b432f2e074b52"
+local_modifications = false
+version_lineage = [
+    "c341d7a6d145fcadb5c6394cf505ca83829c62fca72d01c6dd5b432f2e074b52",
+]
+collection_sha = "c341d7a6d145fcadb5c6394cf505ca83829c62fca72d01c6dd5b432f2e074b52"
+
+[[deployed]]
+artifact_name = "system-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585796"
+artifact_path = "agents/architects/system-architect.md"
+content_hash = "d0b643737e2f5f2100449dc1545da5fb38f506e7804ae8b70bceb6fced79659e"
+local_modifications = false
+version_lineage = [
+    "d0b643737e2f5f2100449dc1545da5fb38f506e7804ae8b70bceb6fced79659e",
+]
+collection_sha = "d0b643737e2f5f2100449dc1545da5fb38f506e7804ae8b70bceb6fced79659e"
+
+[[deployed]]
+artifact_name = "a11y-sheriff"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.585917"
+artifact_path = "agents/ui-ux/a11y-sheriff.md"
+content_hash = "227959f8064a2227cfb81e29fdafb9ef737821945188d8d9c6b84de8fa6bd89c"
+local_modifications = false
+version_lineage = [
+    "227959f8064a2227cfb81e29fdafb9ef737821945188d8d9c6b84de8fa6bd89c",
+]
+collection_sha = "227959f8064a2227cfb81e29fdafb9ef737821945188d8d9c6b84de8fa6bd89c"
+
+[[deployed]]
+artifact_name = "ui-designer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586178"
+artifact_path = "agents/ui-ux/ui-designer.md"
+content_hash = "aa704f1000c5f105e696c9efafccce05958a2e3ec7c1b836234ce6501d5fa662"
+local_modifications = false
+version_lineage = [
+    "aa704f1000c5f105e696c9efafccce05958a2e3ec7c1b836234ce6501d5fa662",
+]
+collection_sha = "aa704f1000c5f105e696c9efafccce05958a2e3ec7c1b836234ce6501d5fa662"
+
+[[deployed]]
+artifact_name = "prompt-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586370"
+artifact_path = "agents/ai/prompt-engineer.md"
+content_hash = "19a4d74003b2b785198e703a690804cdd82b6dd9d8a0edad02e39ca2f481a2dd"
+local_modifications = false
+version_lineage = [
+    "19a4d74003b2b785198e703a690804cdd82b6dd9d8a0edad02e39ca2f481a2dd",
+]
+collection_sha = "19a4d74003b2b785198e703a690804cdd82b6dd9d8a0edad02e39ca2f481a2dd"
+
+[[deployed]]
+artifact_name = "search-specialist"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586555"
+artifact_path = "agents/ai/search-specialist.md"
+content_hash = "d74f9e7d3368d74672a24968e6e0e11e7ef050c88214554ef9fefec7cb3a999c"
+local_modifications = false
+version_lineage = [
+    "d74f9e7d3368d74672a24968e6e0e11e7ef050c88214554ef9fefec7cb3a999c",
+]
+collection_sha = "d74f9e7d3368d74672a24968e6e0e11e7ef050c88214554ef9fefec7cb3a999c"
+
+[[deployed]]
+artifact_name = "mc"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586689"
+artifact_path = "commands/mc.md"
+content_hash = "65514080cb3ac6ba8acf9102ba8d3e6fa4f9fdb18056c40b476acb0791e816cd"
+local_modifications = false
+version_lineage = [
+    "65514080cb3ac6ba8acf9102ba8d3e6fa4f9fdb18056c40b476acb0791e816cd",
+]
+collection_sha = "65514080cb3ac6ba8acf9102ba8d3e6fa4f9fdb18056c40b476acb0791e816cd"
+
+[[deployed]]
+artifact_name = "user_stories"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586823"
+artifact_path = "commands/pm/user_stories.md"
+content_hash = "66a26f6ae2f93382634b8f6ea05b460c092064aca014bb21615e00a035557c41"
+local_modifications = false
+version_lineage = [
+    "66a26f6ae2f93382634b8f6ea05b460c092064aca014bb21615e00a035557c41",
+]
+collection_sha = "66a26f6ae2f93382634b8f6ea05b460c092064aca014bb21615e00a035557c41"
+
+[[deployed]]
+artifact_name = "pre-pr-validation"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.586966"
+artifact_path = "commands/pm/pre-pr-validation.md"
+content_hash = "1a39fb153b0a3339782404bc053b9eddca4d1e907592d4975fe69b04df5a0a77"
+local_modifications = false
+version_lineage = [
+    "1a39fb153b0a3339782404bc053b9eddca4d1e907592d4975fe69b04df5a0a77",
+]
+collection_sha = "1a39fb153b0a3339782404bc053b9eddca4d1e907592d4975fe69b04df5a0a77"
+
+[[deployed]]
+artifact_name = "task_gen"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587096"
+artifact_path = "commands/pm/task_gen.md"
+content_hash = "bd9cee39546c53ac0aafdabb1f131969b78e68c6dbccb2cefcddfda1d18e08fb"
+local_modifications = false
+version_lineage = [
+    "bd9cee39546c53ac0aafdabb1f131969b78e68c6dbccb2cefcddfda1d18e08fb",
+]
+collection_sha = "bd9cee39546c53ac0aafdabb1f131969b78e68c6dbccb2cefcddfda1d18e08fb"
+
+[[deployed]]
+artifact_name = "create-adr"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587226"
+artifact_path = "commands/pm/create-adr.md"
+content_hash = "49e62f6cb9fa103ae43f03e487e6690aab7915d28276426c671ca37ca239826c"
+local_modifications = false
+version_lineage = [
+    "49e62f6cb9fa103ae43f03e487e6690aab7915d28276426c671ca37ca239826c",
+]
+collection_sha = "49e62f6cb9fa103ae43f03e487e6690aab7915d28276426c671ca37ca239826c"
+
+[[deployed]]
+artifact_name = "load-story"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587348"
+artifact_path = "commands/stubs/load-story.md"
+content_hash = "d3179c740939436028335dc7c28e709b65bc75d2d418fc7a957a956303a4e903"
+local_modifications = false
+version_lineage = [
+    "d3179c740939436028335dc7c28e709b65bc75d2d418fc7a957a956303a4e903",
+]
+collection_sha = "d3179c740939436028335dc7c28e709b65bc75d2d418fc7a957a956303a4e903"
+
+[[deployed]]
+artifact_name = "freeze-api-version"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587479"
+artifact_path = "commands/artifacts/freeze-api-version.md"
+content_hash = "407014e3500fe2edc42cadd72f8ede04c480761f17340d146f93cf61f86a288d"
+local_modifications = false
+version_lineage = [
+    "407014e3500fe2edc42cadd72f8ede04c480761f17340d146f93cf61f86a288d",
+]
+collection_sha = "407014e3500fe2edc42cadd72f8ede04c480761f17340d146f93cf61f86a288d"
+
+[[deployed]]
+artifact_name = "update-readmes"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587601"
+artifact_path = "commands/artifacts/update-readmes.md"
+content_hash = "5679b9fb475eebcf134bade0abc6c591290fd92765524e97eb80f401de0e86e4"
+local_modifications = false
+version_lineage = [
+    "5679b9fb475eebcf134bade0abc6c591290fd92765524e97eb80f401de0e86e4",
+]
+collection_sha = "5679b9fb475eebcf134bade0abc6c591290fd92765524e97eb80f401de0e86e4"
+
+[[deployed]]
+artifact_name = "update-symbols-graph"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587724"
+artifact_path = "commands/artifacts/update-symbols-graph.md"
+content_hash = "13e4708257ed164f80e503d1b3409d5f40308efc49d3ebf317c3af62a2365718"
+local_modifications = false
+version_lineage = [
+    "13e4708257ed164f80e503d1b3409d5f40308efc49d3ebf317c3af62a2365718",
+]
+collection_sha = "13e4708257ed164f80e503d1b3409d5f40308efc49d3ebf317c3af62a2365718"
+
+[[deployed]]
+artifact_name = "post-implementation-updates"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587847"
+artifact_path = "commands/artifacts/post-implementation-updates.md"
+content_hash = "258a2fb568462b3a90c9a384f4c474b71ad79fcbddd42a8ea8dccdd6e51444c8"
+local_modifications = false
+version_lineage = [
+    "258a2fb568462b3a90c9a384f4c474b71ad79fcbddd42a8ea8dccdd6e51444c8",
+]
+collection_sha = "258a2fb568462b3a90c9a384f4c474b71ad79fcbddd42a8ea8dccdd6e51444c8"
+
+[[deployed]]
+artifact_name = "README"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.587976"
+artifact_path = "commands/artifacts/README.md"
+content_hash = "d24a9c42d4b9d928c9c3f53bbea8d8158d1f7560c947cb4a67bdc77cf0221fcf"
+local_modifications = false
+version_lineage = [
+    "d24a9c42d4b9d928c9c3f53bbea8d8158d1f7560c947cb4a67bdc77cf0221fcf",
+]
+collection_sha = "d24a9c42d4b9d928c9c3f53bbea8d8158d1f7560c947cb4a67bdc77cf0221fcf"
+
+[[deployed]]
+artifact_name = "update-ai-hints"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588103"
+artifact_path = "commands/artifacts/update-ai-hints.md"
+content_hash = "4ac27a0a3964327eda292916765eb4eb8fe652fcd29875768ec112ef1dec9133"
+local_modifications = false
+version_lineage = [
+    "4ac27a0a3964327eda292916765eb4eb8fe652fcd29875768ec112ef1dec9133",
+]
+collection_sha = "4ac27a0a3964327eda292916765eb4eb8fe652fcd29875768ec112ef1dec9133"
+
+[[deployed]]
+artifact_name = "generate-api-docs"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588232"
+artifact_path = "commands/artifacts/generate-api-docs.md"
+content_hash = "a0008f8893fa5c09e8817c9d78d1859c067105368f66f1ec0b063c83c367c2fb"
+local_modifications = false
+version_lineage = [
+    "a0008f8893fa5c09e8817c9d78d1859c067105368f66f1ec0b063c83c367c2fb",
+]
+collection_sha = "a0008f8893fa5c09e8817c9d78d1859c067105368f66f1ec0b063c83c367c2fb"
+
+[[deployed]]
+artifact_name = "validate-contracts"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588362"
+artifact_path = "commands/artifacts/validate-contracts.md"
+content_hash = "3994107f0234dc20e9a99bbc93a320e65d8d4c8406b7a61d787a5cbc651630cc"
+local_modifications = false
+version_lineage = [
+    "3994107f0234dc20e9a99bbc93a320e65d8d4c8406b7a61d787a5cbc651630cc",
+]
+collection_sha = "3994107f0234dc20e9a99bbc93a320e65d8d4c8406b7a61d787a5cbc651630cc"
+
+[[deployed]]
+artifact_name = "update-codeowners"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588489"
+artifact_path = "commands/artifacts/update-codeowners.md"
+content_hash = "614261a44a7688c17a7025335ad2e811c5199092d7631fa402b5837a5bad62f9"
+local_modifications = false
+version_lineage = [
+    "614261a44a7688c17a7025335ad2e811c5199092d7631fa402b5837a5bad62f9",
+]
+collection_sha = "614261a44a7688c17a7025335ad2e811c5199092d7631fa402b5837a5bad62f9"
+
+[[deployed]]
+artifact_name = "update-repo-map"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588604"
+artifact_path = "commands/artifacts/update-repo-map.md"
+content_hash = "305baab3982110042cc4227a865c1322cfbb547acacc89aedd771740b759f123"
+local_modifications = false
+version_lineage = [
+    "305baab3982110042cc4227a865c1322cfbb547acacc89aedd771740b759f123",
+]
+collection_sha = "305baab3982110042cc4227a865c1322cfbb547acacc89aedd771740b759f123"
+
+[[deployed]]
+artifact_name = "refresh-ai-artifacts"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588723"
+artifact_path = "commands/artifacts/refresh-ai-artifacts.md"
+content_hash = "c2c6463fcd90fe2bc138594202b8e1df8a66835c4d1ea9c59bfcacf97b853970"
+local_modifications = false
+version_lineage = [
+    "c2c6463fcd90fe2bc138594202b8e1df8a66835c4d1ea9c59bfcacf97b853970",
+]
+collection_sha = "c2c6463fcd90fe2bc138594202b8e1df8a66835c4d1ea9c59bfcacf97b853970"
+
+[[deployed]]
+artifact_name = "validate-chunking"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588840"
+artifact_path = "commands/artifacts/validate-chunking.md"
+content_hash = "9e7740b4d1e6e3d26d4584f44d0ae2712f1dec761f51320b8109dd6a010c1545"
+local_modifications = false
+version_lineage = [
+    "9e7740b4d1e6e3d26d4584f44d0ae2712f1dec761f51320b8109dd6a010c1545",
+]
+collection_sha = "9e7740b4d1e6e3d26d4584f44d0ae2712f1dec761f51320b8109dd6a010c1545"
+
+[[deployed]]
+artifact_name = "write-tests"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.588956"
+artifact_path = "commands/test/write-tests.md"
+content_hash = "e8a41405465161355134051bb01dff767bc01ef89e876f1adec23b78a5a78896"
+local_modifications = false
+version_lineage = [
+    "e8a41405465161355134051bb01dff767bc01ef89e876f1adec23b78a5a78896",
+]
+collection_sha = "e8a41405465161355134051bb01dff767bc01ef89e876f1adec23b78a5a78896"
+
+[[deployed]]
+artifact_name = "test-stories"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589070"
+artifact_path = "commands/test/test-stories.md"
+content_hash = "20080c89a3b1ac67046ba3b987e14bccaf4861f68e678a500cbedc8dffa644d0"
+local_modifications = false
+version_lineage = [
+    "20080c89a3b1ac67046ba3b987e14bccaf4861f68e678a500cbedc8dffa644d0",
+]
+collection_sha = "20080c89a3b1ac67046ba3b987e14bccaf4861f68e678a500cbedc8dffa644d0"
+
+[[deployed]]
+artifact_name = "plan-story"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589193"
+artifact_path = "commands/plan/plan-story.md"
+content_hash = "5297f650d5b2ea6ffd8d9c34a6531c63b20acda043dcd13526b3fd32a7213803"
+local_modifications = false
+version_lineage = [
+    "5297f650d5b2ea6ffd8d9c34a6531c63b20acda043dcd13526b3fd32a7213803",
+]
+collection_sha = "5297f650d5b2ea6ffd8d9c34a6531c63b20acda043dcd13526b3fd32a7213803"
+
+[[deployed]]
+artifact_name = "spike"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589319"
+artifact_path = "commands/plan/spike.md"
+content_hash = "8b6184546e9a8347b3a76307b205c2ed4d6f2f5983c25e76742ebdb0b55e346f"
+local_modifications = false
+version_lineage = [
+    "8b6184546e9a8347b3a76307b205c2ed4d6f2f5983c25e76742ebdb0b55e346f",
+]
+collection_sha = "8b6184546e9a8347b3a76307b205c2ed4d6f2f5983c25e76742ebdb0b55e346f"
+
+[[deployed]]
+artifact_name = "ultra_think"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589435"
+artifact_path = "commands/plan/ultra_think.md"
+content_hash = "e2a983b15479d305e16183f2558fff302ec0120408f4da1157a67e7dc9c1aee2"
+local_modifications = false
+version_lineage = [
+    "e2a983b15479d305e16183f2558fff302ec0120408f4da1157a67e7dc9c1aee2",
+]
+collection_sha = "e2a983b15479d305e16183f2558fff302ec0120408f4da1157a67e7dc9c1aee2"
+
+[[deployed]]
+artifact_name = "plan-feature"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589551"
+artifact_path = "commands/plan/plan-feature.md"
+content_hash = "cbc6d8505ba0557a8db7e6d568bee0db44207b8428abfc49384e5a29452cd663"
+local_modifications = false
+version_lineage = [
+    "cbc6d8505ba0557a8db7e6d568bee0db44207b8428abfc49384e5a29452cd663",
+]
+collection_sha = "cbc6d8505ba0557a8db7e6d568bee0db44207b8428abfc49384e5a29452cd663"
+
+[[deployed]]
+artifact_name = "plan-from-gh"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589665"
+artifact_path = "commands/plan/plan-from-gh.md"
+content_hash = "5b21880c225a2eb0cb0950de7b9652b7822f3eecb458071186af568b991f5f00"
+local_modifications = false
+version_lineage = [
+    "5b21880c225a2eb0cb0950de7b9652b7822f3eecb458071186af568b991f5f00",
+]
+collection_sha = "5b21880c225a2eb0cb0950de7b9652b7822f3eecb458071186af568b991f5f00"
+
+[[deployed]]
+artifact_name = "design"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589780"
+artifact_path = "commands/plan/design.md"
+content_hash = "6a5384f49a8bb7f8fc7241ce908a59cee5d94f5be7d3950f20a9d86e1727f5bc"
+local_modifications = false
+version_lineage = [
+    "6a5384f49a8bb7f8fc7241ce908a59cee5d94f5be7d3950f20a9d86e1727f5bc",
+]
+collection_sha = "6a5384f49a8bb7f8fc7241ce908a59cee5d94f5be7d3950f20a9d86e1727f5bc"
+
+[[deployed]]
+artifact_name = "architecture-scenario-explorer"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.589918"
+artifact_path = "commands/plan/architecture-scenario-explorer.md"
+content_hash = "81d98091c117211a0f818d01603788beaf58a4e26fcb824dc5923065b1ad1893"
+local_modifications = false
+version_lineage = [
+    "81d98091c117211a0f818d01603788beaf58a4e26fcb824dc5923065b1ad1893",
+]
+collection_sha = "81d98091c117211a0f818d01603788beaf58a4e26fcb824dc5923065b1ad1893"
+
+[[deployed]]
+artifact_name = "trello-add-card"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.590182"
+artifact_path = "commands/integrations/trello-add-card.md"
+content_hash = "442cf0a1d317a28e3af3fcb9a264f888f2bbe00fd27079af0a1fca592060609e"
+local_modifications = false
+version_lineage = [
+    "442cf0a1d317a28e3af3fcb9a264f888f2bbe00fd27079af0a1fca592060609e",
+]
+collection_sha = "442cf0a1d317a28e3af3fcb9a264f888f2bbe00fd27079af0a1fca592060609e"
+
+[[deployed]]
+artifact_name = "github-create-issue"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.590445"
+artifact_path = "commands/integrations/github-create-issue.md"
+content_hash = "5c6538386d1642b40116344cb3765d6345c4091602a3101c52f241f48eedeca4"
+local_modifications = false
+version_lineage = [
+    "5c6538386d1642b40116344cb3765d6345c4091602a3101c52f241f48eedeca4",
+]
+collection_sha = "5c6538386d1642b40116344cb3765d6345c4091602a3101c52f241f48eedeca4"
+
+[[deployed]]
+artifact_name = "linear-create-task"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.590621"
+artifact_path = "commands/integrations/linear-create-task.md"
+content_hash = "08cd47ace8786311a0f1acf58964bd043fdfb840b5678b060ab83dc9785f34ea"
+local_modifications = false
+version_lineage = [
+    "08cd47ace8786311a0f1acf58964bd043fdfb840b5678b060ab83dc9785f34ea",
+]
+collection_sha = "08cd47ace8786311a0f1acf58964bd043fdfb840b5678b060ab83dc9785f34ea"
+
+[[deployed]]
+artifact_name = "memory-spring-cleaning"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.590755"
+artifact_path = "commands/ai/memory-spring-cleaning.md"
+content_hash = "8ca9a05d7e417771cf3f7969e4fb77c5171e100bfb9da371d5fde64364d497a8"
+local_modifications = false
+version_lineage = [
+    "8ca9a05d7e417771cf3f7969e4fb77c5171e100bfb9da371d5fde64364d497a8",
+]
+collection_sha = "8ca9a05d7e417771cf3f7969e4fb77c5171e100bfb9da371d5fde64364d497a8"
+
+[[deployed]]
+artifact_name = "lyra"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.590909"
+artifact_path = "commands/ai/lyra.md"
+content_hash = "cf15b8d6fb5ea3a436f3a1fc45419049c9e9e96e76cef59a322fbd82f3b55603"
+local_modifications = false
+version_lineage = [
+    "cf15b8d6fb5ea3a436f3a1fc45419049c9e9e96e76cef59a322fbd82f3b55603",
+]
+collection_sha = "cf15b8d6fb5ea3a436f3a1fc45419049c9e9e96e76cef59a322fbd82f3b55603"
+
+[[deployed]]
+artifact_name = "session-learning-capture"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591106"
+artifact_path = "commands/ai/session-learning-capture.md"
+content_hash = "4c854b91f3ad1b9b82cc682c90b35fbad51e4eb34c4ee2b6877758b9c9c79a44"
+local_modifications = false
+version_lineage = [
+    "4c854b91f3ad1b9b82cc682c90b35fbad51e4eb34c4ee2b6877758b9c9c79a44",
+]
+collection_sha = "4c854b91f3ad1b9b82cc682c90b35fbad51e4eb34c4ee2b6877758b9c9c79a44"
+
+[[deployed]]
+artifact_name = "review-story"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591239"
+artifact_path = "commands/review/review-story.md"
+content_hash = "f0384fd35643c03ffd0a8060407308b5ae7bb54aee508045d2ab66c45e43f167"
+local_modifications = false
+version_lineage = [
+    "f0384fd35643c03ffd0a8060407308b5ae7bb54aee508045d2ab66c45e43f167",
+]
+collection_sha = "f0384fd35643c03ffd0a8060407308b5ae7bb54aee508045d2ab66c45e43f167"
+
+[[deployed]]
+artifact_name = "code-review"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591368"
+artifact_path = "commands/review/code-review.md"
+content_hash = "35a0e40cc71018a791f802b87d3201d0769d32a25ccfb0148d0072fcb26335b9"
+local_modifications = false
+version_lineage = [
+    "35a0e40cc71018a791f802b87d3201d0769d32a25ccfb0148d0072fcb26335b9",
+]
+collection_sha = "35a0e40cc71018a791f802b87d3201d0769d32a25ccfb0148d0072fcb26335b9"
+
+[[deployed]]
+artifact_name = "refractor"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591497"
+artifact_path = "commands/review/refractor.md"
+content_hash = "3b8f4b156b934c5d6b78598910ddea715d213a8c3f9e4062b2e3b401087c9e10"
+local_modifications = false
+version_lineage = [
+    "3b8f4b156b934c5d6b78598910ddea715d213a8c3f9e4062b2e3b401087c9e10",
+]
+collection_sha = "3b8f4b156b934c5d6b78598910ddea715d213a8c3f9e4062b2e3b401087c9e10"
+
+[[deployed]]
+artifact_name = "debug"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591628"
+artifact_path = "commands/fix/debug.md"
+content_hash = "f49a7f3a99adb8366570e5ffcefbeda8e7b3a5cb5ea68e6c581838702f3c3a03"
+local_modifications = false
+version_lineage = [
+    "f49a7f3a99adb8366570e5ffcefbeda8e7b3a5cb5ea68e6c581838702f3c3a03",
+]
+collection_sha = "f49a7f3a99adb8366570e5ffcefbeda8e7b3a5cb5ea68e6c581838702f3c3a03"
+
+[[deployed]]
+artifact_name = "bugfix-commit"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591755"
+artifact_path = "commands/fix/bugfix-commit.md"
+content_hash = "a2ca8c07ac1f13caf2e625a3a6e63f8a86716e6ed5f6b3b8981b03dc4406381c"
+local_modifications = false
+version_lineage = [
+    "a2ca8c07ac1f13caf2e625a3a6e63f8a86716e6ed5f6b3b8981b03dc4406381c",
+]
+collection_sha = "a2ca8c07ac1f13caf2e625a3a6e63f8a86716e6ed5f6b3b8981b03dc4406381c"
+
+[[deployed]]
+artifact_name = "fix-gh-issue"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.591884"
+artifact_path = "commands/fix/fix-gh-issue.md"
+content_hash = "69bf39f91823f64412b95bb2de32578a6b2595f9b8f23ee4e6b1260e8622a1d0"
+local_modifications = false
+version_lineage = [
+    "69bf39f91823f64412b95bb2de32578a6b2595f9b8f23ee4e6b1260e8622a1d0",
+]
+collection_sha = "69bf39f91823f64412b95bb2de32578a6b2595f9b8f23ee4e6b1260e8622a1d0"
+
+[[deployed]]
+artifact_name = "fix-arch-violation"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592011"
+artifact_path = "commands/fix/fix-arch-violation.md"
+content_hash = "1e281c18cff392f83a25f7edc047ba756863f0323ca9031838b12e587ea68ba2"
+local_modifications = false
+version_lineage = [
+    "1e281c18cff392f83a25f7edc047ba756863f0323ca9031838b12e587ea68ba2",
+]
+collection_sha = "1e281c18cff392f83a25f7edc047ba756863f0323ca9031838b12e587ea68ba2"
+
+[[deployed]]
+artifact_name = "new-feature"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592137"
+artifact_path = "commands/dev/new-feature.md"
+content_hash = "97cff1b38200bb0f55747bf4232b9a5dd0629c8697085310f9997e2a7253efe1"
+local_modifications = false
+version_lineage = [
+    "97cff1b38200bb0f55747bf4232b9a5dd0629c8697085310f9997e2a7253efe1",
+]
+collection_sha = "97cff1b38200bb0f55747bf4232b9a5dd0629c8697085310f9997e2a7253efe1"
+
+[[deployed]]
+artifact_name = "implement-story"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592263"
+artifact_path = "commands/dev/implement-story.md"
+content_hash = "c57fabc4dc2b942cfe3596086343ee35b1b34c4f6a01b78c4424426902771599"
+local_modifications = false
+version_lineage = [
+    "c57fabc4dc2b942cfe3596086343ee35b1b34c4f6a01b78c4424426902771599",
+]
+collection_sha = "c57fabc4dc2b942cfe3596086343ee35b1b34c4f6a01b78c4424426902771599"
+
+[[deployed]]
+artifact_name = "complete-user-story"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592393"
+artifact_path = "commands/dev/complete-user-story.md"
+content_hash = "28b91f01aad36044088a611c80ec1b89b7ee79ce7a60c40ed20c4558d62f543d"
+local_modifications = false
+version_lineage = [
+    "28b91f01aad36044088a611c80ec1b89b7ee79ce7a60c40ed20c4558d62f543d",
+]
+collection_sha = "28b91f01aad36044088a611c80ec1b89b7ee79ce7a60c40ed20c4558d62f543d"
+
+[[deployed]]
+artifact_name = "quick-feature"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592517"
+artifact_path = "commands/dev/quick-feature.md"
+content_hash = "470bc87a1bcab9981d833d877e0e45286e306d3767b6d3ba684881a4707d6396"
+local_modifications = false
+version_lineage = [
+    "470bc87a1bcab9981d833d877e0e45286e306d3767b6d3ba684881a4707d6396",
+]
+collection_sha = "470bc87a1bcab9981d833d877e0e45286e306d3767b6d3ba684881a4707d6396"
+
+[[deployed]]
+artifact_name = "execute-phase"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592643"
+artifact_path = "commands/dev/execute-phase.md"
+content_hash = "366933096452b0b5b6cb27a4c0bda719b3b84e3005b30c9df9f64df5cf5cb9bc"
+local_modifications = false
+version_lineage = [
+    "366933096452b0b5b6cb27a4c0bda719b3b84e3005b30c9df9f64df5cf5cb9bc",
+]
+collection_sha = "366933096452b0b5b6cb27a4c0bda719b3b84e3005b30c9df9f64df5cf5cb9bc"
+
+[[deployed]]
+artifact_name = "create-feature"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592776"
+artifact_path = "commands/dev/create-feature.md"
+content_hash = "048944216f6adbbb05f907a0f0ec45797deae93aa9b9f88107cfcab68e06b444"
+local_modifications = false
+version_lineage = [
+    "048944216f6adbbb05f907a0f0ec45797deae93aa9b9f88107cfcab68e06b444",
+]
+collection_sha = "048944216f6adbbb05f907a0f0ec45797deae93aa9b9f88107cfcab68e06b444"
+
+[[deployed]]
+artifact_name = "check-architecture"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.592913"
+artifact_path = "commands/analyze/check-architecture.md"
+content_hash = "dc3cd2b393ae98eb44607cf4f9521a85c7107604fb45ca4c7c8ca93f0b13827c"
+local_modifications = false
+version_lineage = [
+    "dc3cd2b393ae98eb44607cf4f9521a85c7107604fb45ca4c7c8ca93f0b13827c",
+]
+collection_sha = "dc3cd2b393ae98eb44607cf4f9521a85c7107604fb45ca4c7c8ca93f0b13827c"
+
+[[deployed]]
+artifact_name = "check-file"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593038"
+artifact_path = "commands/analyze/check-file.md"
+content_hash = "3bf110fb72ba6419fea50de0a420a4e3a43b5f761cba14f736a1783644fa2024"
+local_modifications = false
+version_lineage = [
+    "3bf110fb72ba6419fea50de0a420a4e3a43b5f761cba14f736a1783644fa2024",
+]
+collection_sha = "3bf110fb72ba6419fea50de0a420a4e3a43b5f761cba14f736a1783644fa2024"
+
+[[deployed]]
+artifact_name = "scan-violations"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593176"
+artifact_path = "commands/analyze/scan-violations.md"
+content_hash = "f4aa60e75075c42c044255ea96c867722e03a42dcd298e9025265442086bc7b1"
+local_modifications = false
+version_lineage = [
+    "f4aa60e75075c42c044255ea96c867722e03a42dcd298e9025265442086bc7b1",
+]
+collection_sha = "f4aa60e75075c42c044255ea96c867722e03a42dcd298e9025265442086bc7b1"
+
+[[deployed]]
+artifact_name = "analyze-codebase"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593302"
+artifact_path = "commands/analyze/analyze-codebase.md"
+content_hash = "d10e25693b3e051513bb3c63450ede86b3b5380fcac860bd7788e623cd4c016e"
+local_modifications = false
+version_lineage = [
+    "d10e25693b3e051513bb3c63450ede86b3b5380fcac860bd7788e623cd4c016e",
+]
+collection_sha = "d10e25693b3e051513bb3c63450ede86b3b5380fcac860bd7788e623cd4c016e"
+
+[[deployed]]
+artifact_name = "symbols-update"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593434"
+artifact_path = "commands/analyze/symbols/symbols-update.md"
+content_hash = "839df5594de7bc7a14edcbc7f6e2f1afb1801cbc2ff1f97fc9c8b29850d7e056"
+local_modifications = false
+version_lineage = [
+    "839df5594de7bc7a14edcbc7f6e2f1afb1801cbc2ff1f97fc9c8b29850d7e056",
+]
+collection_sha = "839df5594de7bc7a14edcbc7f6e2f1afb1801cbc2ff1f97fc9c8b29850d7e056"
+
+[[deployed]]
+artifact_name = "load-symbols"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593577"
+artifact_path = "commands/analyze/symbols/load-symbols.md"
+content_hash = "ac49755ad0b5823eee6401f2186c1edbf7fc697d20f6fc8904ee2d7e9b2f6737"
+local_modifications = false
+version_lineage = [
+    "ac49755ad0b5823eee6401f2186c1edbf7fc697d20f6fc8904ee2d7e9b2f6737",
+]
+collection_sha = "ac49755ad0b5823eee6401f2186c1edbf7fc697d20f6fc8904ee2d7e9b2f6737"
+
+[[deployed]]
+artifact_name = "symbols-search"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593708"
+artifact_path = "commands/analyze/symbols/symbols-search.md"
+content_hash = "85b8e0bb69a4ee0e36f2615edf397698a66a2476ccd69c99912e78b647316036"
+local_modifications = false
+version_lineage = [
+    "85b8e0bb69a4ee0e36f2615edf397698a66a2476ccd69c99912e78b647316036",
+]
+collection_sha = "85b8e0bb69a4ee0e36f2615edf397698a66a2476ccd69c99912e78b647316036"
+
+[[deployed]]
+artifact_name = "architecture-review"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-12T21:16:14.593835"
+artifact_path = "commands/analyze/architecture-review.md"
+content_hash = "7dd204f83a80bedeb63878a5eedaae0f7db0c6ce4911b4d1c35156c391751875"
+local_modifications = false
+version_lineage = [
+    "7dd204f83a80bedeb63878a5eedaae0f7db0c6ce4911b4d1c35156c391751875",
+]
+collection_sha = "7dd204f83a80bedeb63878a5eedaae0f7db0c6ce4911b4d1c35156c391751875"
+
+[[deployed]]
+artifact_name = "lead-pm"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.616508"
+artifact_path = "agents/pm/lead-pm.md"
+content_hash = "a650d67925ff8bcae12224d610fb643b670a1e56c53ce596a9079e65a3dd8494"
+local_modifications = false
+collection_sha = "a650d67925ff8bcae12224d610fb643b670a1e56c53ce596a9079e65a3dd8494"
+
+[[deployed]]
+artifact_name = "feature-planner"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.616748"
+artifact_path = "agents/pm/feature-planner.md"
+content_hash = "d36a84f53d753c8a56565576c2401df55cc3384d40bd82f7cde6ecdcf8bad77a"
+local_modifications = false
+collection_sha = "d36a84f53d753c8a56565576c2401df55cc3384d40bd82f7cde6ecdcf8bad77a"
+
+[[deployed]]
+artifact_name = "spike-writer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.616949"
+artifact_path = "agents/pm/spike-writer.md"
+content_hash = "4ff850df786be763c56fd5a656c9ecad0822c2ea7aca601c4af8caf01e9a38d0"
+local_modifications = false
+collection_sha = "4ff850df786be763c56fd5a656c9ecad0822c2ea7aca601c4af8caf01e9a38d0"
+
+[[deployed]]
+artifact_name = "implementation-planner"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.617149"
+artifact_path = "agents/pm/implementation-planner.md"
+content_hash = "4ea06a4928e4a2382a1c45d77316765431dd8ac9e26f041ea0ba55189da0c53e"
+local_modifications = false
+collection_sha = "4ea06a4928e4a2382a1c45d77316765431dd8ac9e26f041ea0ba55189da0c53e"
+
+[[deployed]]
+artifact_name = "task-completion-validator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.617340"
+artifact_path = "agents/reviewers/task-completion-validator.md"
+content_hash = "cb83d5f04d3e1c64a6460ca1c9fad96ba09f19e8121b0fa72b913158dbbf274f"
+local_modifications = false
+collection_sha = "cb83d5f04d3e1c64a6460ca1c9fad96ba09f19e8121b0fa72b913158dbbf274f"
+
+[[deployed]]
+artifact_name = "senior-code-reviewer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.617518"
+artifact_path = "agents/reviewers/senior-code-reviewer.md"
+content_hash = "cd30d4e21e5715cfa135b23add75ae345cccefe4769e009f98be41361a77bf51"
+local_modifications = false
+collection_sha = "cd30d4e21e5715cfa135b23add75ae345cccefe4769e009f98be41361a77bf51"
+
+[[deployed]]
+artifact_name = "karen"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.617690"
+artifact_path = "agents/reviewers/karen.md"
+content_hash = "ec72ca95fe83aa74b4b47cd00fd687f213bb0ec24975005b02a641018eba414d"
+local_modifications = false
+collection_sha = "ec72ca95fe83aa74b4b47cd00fd687f213bb0ec24975005b02a641018eba414d"
+
+[[deployed]]
+artifact_name = "mobile-app-builder"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.617829"
+artifact_path = "agents/dev-team/mobile-app-builder.md"
+content_hash = "6d91adba3d8676835876e3aca88abe008bccd4493513fba037fe91b0be4820ec"
+local_modifications = false
+collection_sha = "6d91adba3d8676835876e3aca88abe008bccd4493513fba037fe91b0be4820ec"
+
+[[deployed]]
+artifact_name = "python-backend-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.618084"
+artifact_path = "agents/dev-team/python-backend-engineer.md"
+content_hash = "6d45e8494df92e0675f3b15b9203453c20210c9da24d4ec2bc0f8a8b8e764f85"
+local_modifications = false
+collection_sha = "6d45e8494df92e0675f3b15b9203453c20210c9da24d4ec2bc0f8a8b8e764f85"
+
+[[deployed]]
+artifact_name = "ui-engineer-enhanced"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.618239"
+artifact_path = "agents/dev-team/ui-engineer-enhanced.md"
+content_hash = "addeebf8281a947e9045e7dadd8c0b47eccffcfef5fdba3017f809ff3746acce"
+local_modifications = false
+collection_sha = "addeebf8281a947e9045e7dadd8c0b47eccffcfef5fdba3017f809ff3746acce"
+
+[[deployed]]
+artifact_name = "frontend-developer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.618456"
+artifact_path = "agents/dev-team/frontend-developer.md"
+content_hash = "1ef58b8e9645066d3e8d068549a10c2dcac4a0ec778583a362ba3e6962a4db38"
+local_modifications = false
+collection_sha = "1ef58b8e9645066d3e8d068549a10c2dcac4a0ec778583a362ba3e6962a4db38"
+
+[[deployed]]
+artifact_name = "ultrathink-debugger"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.618597"
+artifact_path = "agents/fix-team/ultrathink-debugger.md"
+content_hash = "2d034e122cb743d5cb990fde584cecb8b6f74672a73ea5037ce7f8e70de172a0"
+local_modifications = false
+collection_sha = "2d034e122cb743d5cb990fde584cecb8b6f74672a73ea5037ce7f8e70de172a0"
+
+[[deployed]]
+artifact_name = "documentation-complex"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.618814"
+artifact_path = "agents/tech-writers/documentation-complex.md"
+content_hash = "61a5a231dc04603e2b8c4fdbd721aca83a55fc47845e7d578ce1c546c9441832"
+local_modifications = false
+collection_sha = "61a5a231dc04603e2b8c4fdbd721aca83a55fc47845e7d578ce1c546c9441832"
+
+[[deployed]]
+artifact_name = "documentation-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.619261"
+artifact_path = "agents/tech-writers/documentation-expert.md"
+content_hash = "8573927b3d64ee52b7fd4f8a3283cde64d36dc338b949e75d62d40fce5bfc3fa"
+local_modifications = false
+collection_sha = "8573927b3d64ee52b7fd4f8a3283cde64d36dc338b949e75d62d40fce5bfc3fa"
+
+[[deployed]]
+artifact_name = "documentation-writer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.619595"
+artifact_path = "agents/tech-writers/documentation-writer.md"
+content_hash = "0cec42da93ca463bb3b556534f1de606520e62d88a062a0c42662505fb92e8de"
+local_modifications = false
+collection_sha = "0cec42da93ca463bb3b556534f1de606520e62d88a062a0c42662505fb92e8de"
+
+[[deployed]]
+artifact_name = "documentation-planner"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.619775"
+artifact_path = "agents/tech-writers/documentation-planner.md"
+content_hash = "ef72482c6a32a8a58156a5798439ac5d32c0cbe680f91c03d5eda6a18881cd06"
+local_modifications = false
+collection_sha = "ef72482c6a32a8a58156a5798439ac5d32c0cbe680f91c03d5eda6a18881cd06"
+
+[[deployed]]
+artifact_name = "backend-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.620026"
+artifact_path = "agents/architects/backend-architect.md"
+content_hash = "25f2e335c8f7a529f042cb55b4692757866606ae342cf06e5cfa93cd43f1e6ad"
+local_modifications = false
+collection_sha = "25f2e335c8f7a529f042cb55b4692757866606ae342cf06e5cfa93cd43f1e6ad"
+
+[[deployed]]
+artifact_name = "data-layer-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.620566"
+artifact_path = "agents/architects/data-layer-expert.md"
+content_hash = "00d77d773e356320f0c43e865996f7db9744c78afd485e17b037875dd8c864be"
+local_modifications = false
+collection_sha = "00d77d773e356320f0c43e865996f7db9744c78afd485e17b037875dd8c864be"
+
+[[deployed]]
+artifact_name = "lead-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.620797"
+artifact_path = "agents/architects/lead-architect.md"
+content_hash = "a2d44bef98db66316f475f0ac08aa20436e97594bbdd492447c9efedc7c60309"
+local_modifications = false
+collection_sha = "a2d44bef98db66316f475f0ac08aa20436e97594bbdd492447c9efedc7c60309"
+
+[[deployed]]
+artifact_name = "backend-typescript-architect"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.620985"
+artifact_path = "agents/architects/backend-typescript-architect.md"
+content_hash = "40409d148dd6e32fd2ded57bdb36cbac6a35ca468d2d342b4c9a6ccabad57ed2"
+local_modifications = false
+collection_sha = "40409d148dd6e32fd2ded57bdb36cbac6a35ca468d2d342b4c9a6ccabad57ed2"
+
+[[deployed]]
+artifact_name = "ui-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.621207"
+artifact_path = "agents/ui-ux/ui-engineer.md"
+content_hash = "504c5a08a6d39ca39514f438a77c5bd5e156c72753e463e8154c1ef64691a7bd"
+local_modifications = false
+collection_sha = "504c5a08a6d39ca39514f438a77c5bd5e156c72753e463e8154c1ef64691a7bd"
+
+[[deployed]]
+artifact_name = "ux-researcher"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.621390"
+artifact_path = "agents/ui-ux/ux-researcher.md"
+content_hash = "67d7797b2c4fdc7a24c0f794cf8ee093000f706bfdca9e26b3965deffe89389a"
+local_modifications = false
+collection_sha = "67d7797b2c4fdc7a24c0f794cf8ee093000f706bfdca9e26b3965deffe89389a"
+
+[[deployed]]
+artifact_name = "ai-artifacts-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.621640"
+artifact_path = "agents/ai/ai-artifacts-engineer.md"
+content_hash = "b78d7f27808ed4074015a29cb094b34e80877b3693aadf4c042e44221c79232d"
+local_modifications = false
+collection_sha = "b78d7f27808ed4074015a29cb094b34e80877b3693aadf4c042e44221c79232d"
+
+[[deployed]]
+artifact_name = "codebase-explorer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.621835"
+artifact_path = "agents/ai/codebase-explorer.md"
+content_hash = "3258e8c3a2bdd69ac2cfd9d81448ff32236cad199d1983daf1dd0ca7beb9c8d3"
+local_modifications = false
+collection_sha = "3258e8c3a2bdd69ac2cfd9d81448ff32236cad199d1983daf1dd0ca7beb9c8d3"
+
+[[deployed]]
+artifact_name = "command-creator"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.622060"
+artifact_path = "agents/ai/command-creator.md"
+content_hash = "adfe19fb11ceb2751dff78e6ad0f3799883ea22ada2940d7c93ef5862c144aae"
+local_modifications = false
+collection_sha = "adfe19fb11ceb2751dff78e6ad0f3799883ea22ada2940d7c93ef5862c144aae"
+
+[[deployed]]
+artifact_name = "ai-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.622228"
+artifact_path = "agents/ai/ai-engineer.md"
+content_hash = "1f661cd40116a9ef793827c0165caba23df930b1c87fb4e449792909fbe765ad"
+local_modifications = false
+collection_sha = "1f661cd40116a9ef793827c0165caba23df930b1c87fb4e449792909fbe765ad"
+
+[[deployed]]
+artifact_name = "symbols-engineer"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.622369"
+artifact_path = "agents/ai/symbols-engineer.md"
+content_hash = "5cb78dbbf7aeffc2c2c133907a77eaff9e3d0144cd40c98985716e69f613192a"
+local_modifications = false
+collection_sha = "5cb78dbbf7aeffc2c2c133907a77eaff9e3d0144cd40c98985716e69f613192a"
+
+[[deployed]]
+artifact_name = "agent-expert"
+artifact_type = "agent"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.622525"
+artifact_path = "agents/ai/agent-expert.md"
+content_hash = "b5493f41cc4f99ccf743d3e191770aee68e4faba0fb3e5b391713de0594ed05b"
+local_modifications = false
+collection_sha = "b5493f41cc4f99ccf743d3e191770aee68e4faba0fb3e5b391713de0594ed05b"
+
+[[deployed]]
+artifact_name = "refactor-code"
+artifact_type = "command"
+from_collection = "default"
+deployed_at = "2026-01-13T11:31:17.622704"
+artifact_path = "commands/review/refactor-code.md"
+content_hash = "50cae5572b870db245ea61d501571e8d07ed87ca5128a1c3553add6450dcb3b7"
+local_modifications = false
+collection_sha = "50cae5572b870db245ea61d501571e8d07ed87ca5128a1c3553add6450dcb3b7"
