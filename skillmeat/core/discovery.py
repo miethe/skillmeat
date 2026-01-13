@@ -34,6 +34,7 @@ Timestamp Tracking:
 """
 
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -308,10 +309,11 @@ class ArtifactDiscoveryService:
                                 artifact_name, ArtifactType(artifact_type)
                             )
                             if existing and hasattr(existing, "discovered_at"):
-                                logger.debug(
-                                    f"Artifact {artifact_name} unchanged, preserving timestamp"
-                                )
-                                return existing.discovered_at
+                                if existing.discovered_at is not None:
+                                    logger.debug(
+                                        f"Artifact {artifact_name} unchanged, preserving timestamp"
+                                    )
+                                    return existing.discovered_at
                         except (ValueError, AttributeError) as e:
                             logger.debug(
                                 f"Could not find existing timestamp for {artifact_name}: {e}"
@@ -380,8 +382,8 @@ class ArtifactDiscoveryService:
                 from skillmeat.core.collection import CollectionManager
 
                 collection_mgr = CollectionManager()
-                collection_membership_index = collection_mgr.get_collection_membership_index(
-                    collection_name
+                collection_membership_index = (
+                    collection_mgr.get_collection_membership_index(collection_name)
                 )
                 logger.debug(
                     f"Loaded collection membership index: "
@@ -436,8 +438,11 @@ class ArtifactDiscoveryService:
                 # Scan artifacts in this type directory
                 try:
                     type_artifacts = self._scan_type_directory(
-                        type_dir, artifact_type, errors, manifest,
-                        collection_membership_index
+                        type_dir,
+                        artifact_type,
+                        errors,
+                        manifest,
+                        collection_membership_index,
                     )
                     discovered_artifacts.extend(type_artifacts)
                 except PermissionError as e:
@@ -461,7 +466,7 @@ class ArtifactDiscoveryService:
         # Filter artifacts based on existence check
         # Strategy: Use pre-scan check to filter out artifacts already in both locations
         # Fall back to legacy manifest-based filtering if manifest provided
-        importable_artifacts = []
+        importable_artifacts: List[DiscoveredArtifact] = []
         filtered_count = 0
 
         for artifact in discovered_artifacts:
@@ -499,14 +504,14 @@ class ArtifactDiscoveryService:
             )
 
         # Filter by skip preferences if project_path provided
-        skipped_artifacts = []
+        skipped_artifacts: List[DiscoveredArtifact] = []
         skip_start_time = time.time()
 
         if project_path:
             try:
                 skip_mgr = SkipPreferenceManager(project_path)
                 pre_skip_count = len(importable_artifacts)
-                filtered_importable = []
+                filtered_importable: List[DiscoveredArtifact] = []
 
                 for artifact in importable_artifacts:
                     artifact_key = build_artifact_key(artifact.type, artifact.name)
@@ -672,7 +677,9 @@ class ArtifactDiscoveryService:
         if content_hash and content_hash in membership_index.get("by_hash", {}):
             matched_id = membership_index["by_hash"][content_hash]
             # Extract name from matched_id (format: "type:name")
-            matched_name = matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            matched_name = (
+                matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            )
             return CollectionMatchInfo(
                 type="exact",
                 matched_artifact_id=matched_id,
@@ -684,7 +691,9 @@ class ArtifactDiscoveryService:
         name_type_key = (name.lower(), artifact_type.lower())
         if name_type_key in membership_index.get("by_name_type", {}):
             matched_id = membership_index["by_name_type"][name_type_key]
-            matched_name = matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            matched_name = (
+                matched_id.split(":", 1)[-1] if ":" in matched_id else matched_id
+            )
             return CollectionMatchInfo(
                 type="name_type",
                 matched_artifact_id=matched_id,
@@ -721,10 +730,19 @@ class ArtifactDiscoveryService:
         Returns:
             List of discovered artifacts in this directory
         """
-        discovered = []
-
         # Use scandir for efficient directory traversal
         import os
+
+        # Special handling for hooks: directory-based detection
+        # Hooks can be a mix of file types (.sh, .md, etc.) so we treat:
+        # - If hooks/ has NO subdirectories -> entire hooks/ is ONE artifact named "hooks"
+        # - If hooks/ HAS subdirectories -> each subdirectory is a separate hook artifact
+        if artifact_type == "hook":
+            return self._scan_hooks_directory(
+                type_dir, errors, manifest, collection_membership_index
+            )
+
+        discovered: List[DiscoveredArtifact] = []
 
         try:
             with os.scandir(type_dir) as entries:
@@ -831,12 +849,195 @@ class ArtifactDiscoveryService:
             errors.append(error_msg)
 
         # Scan for nested artifacts (only for types that support nesting)
-        nested = self._discover_nested_artifacts(
+        nested: List[DiscoveredArtifact] = self._discover_nested_artifacts(
             type_dir, artifact_type, errors
         )
         discovered.extend(nested)
 
         return discovered
+
+    def _scan_hooks_directory(
+        self,
+        hooks_dir: Path,
+        errors: List[str],
+        manifest: Optional["Collection"] = None,
+        collection_membership_index: Optional[Dict[str, Any]] = None,
+    ) -> List[DiscoveredArtifact]:
+        """Scan hooks directory with special directory-based detection.
+
+        Hooks can contain a mix of file types (.sh scripts, .md files, etc.).
+        Instead of validating each file individually, we use directory-based detection:
+
+        - If hooks/ has NO subdirectories: treat entire hooks/ as ONE artifact named "hooks"
+        - If hooks/ HAS subdirectories: each subdirectory becomes a separate hook artifact
+          (any loose files at root level are included in the directory content hash but
+          not reported as separate artifacts)
+
+        This avoids validation errors for shell scripts and other non-.md files.
+
+        Args:
+            hooks_dir: Path to hooks directory (e.g., .claude/hooks/)
+            errors: List to append errors to
+            manifest: Optional Collection manifest for timestamp preservation
+            collection_membership_index: Optional pre-built membership index
+
+        Returns:
+            List of discovered hook artifacts
+        """
+        discovered: List[DiscoveredArtifact] = []
+
+        if not hooks_dir.exists():
+            return discovered
+
+        try:
+            # Check if hooks directory has any subdirectories (not files)
+            has_subdirs = False
+            subdirs: List[Path] = []
+            has_root_files = False
+
+            with os.scandir(hooks_dir) as entries:
+                entry: os.DirEntry[str]
+                for entry in entries:
+                    # Skip hidden entries
+                    if entry.name.startswith("."):
+                        continue
+                    if entry.is_dir():
+                        has_subdirs = True
+                        subdirs.append(Path(entry.path))
+                    elif entry.is_file():
+                        has_root_files = True
+
+            if has_subdirs:
+                # Each subdirectory is a separate hook artifact
+                for subdir in subdirs:
+                    artifact = self._create_hook_artifact(
+                        subdir,
+                        subdir.name,  # Use subdirectory name as artifact name
+                        manifest,
+                        collection_membership_index,
+                    )
+                    if artifact:
+                        discovered.append(artifact)
+                        logger.debug(
+                            f"Discovered hook (subdirectory): {artifact.name} at {subdir}"
+                        )
+
+                # If there are also loose files at root level alongside subdirs,
+                # create a "hooks-root" artifact for them
+                if has_root_files:
+                    artifact = self._create_hook_artifact(
+                        hooks_dir,
+                        "hooks-root",  # Distinguish from subdir-based hooks
+                        manifest,
+                        collection_membership_index,
+                    )
+                    if artifact:
+                        discovered.append(artifact)
+                        logger.debug(
+                            f"Discovered hook (root files): {artifact.name} at {hooks_dir}"
+                        )
+            else:
+                # No subdirectories: treat entire hooks/ as a single artifact
+                artifact = self._create_hook_artifact(
+                    hooks_dir,
+                    "hooks",  # Use "hooks" as the artifact name
+                    manifest,
+                    collection_membership_index,
+                )
+                if artifact:
+                    discovered.append(artifact)
+                    logger.debug(
+                        f"Discovered hook (directory): {artifact.name} at {hooks_dir}"
+                    )
+
+        except PermissionError as e:
+            error_msg = f"Permission denied scanning hooks directory {hooks_dir}: {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+        except Exception as e:
+            error_msg = f"Error scanning hooks directory {hooks_dir}: {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
+
+        return discovered
+
+    def _create_hook_artifact(
+        self,
+        hook_path: Path,
+        artifact_name: str,
+        manifest: Optional["Collection"] = None,
+        collection_membership_index: Optional[Dict[str, Any]] = None,
+    ) -> Optional[DiscoveredArtifact]:
+        """Create a DiscoveredArtifact for a hook directory.
+
+        Args:
+            hook_path: Path to the hook directory
+            artifact_name: Name to use for the artifact
+            manifest: Optional Collection manifest for timestamp preservation
+            collection_membership_index: Optional pre-built membership index
+
+        Returns:
+            DiscoveredArtifact or None if creation fails
+        """
+        try:
+            detected_type = "hook"
+
+            # Generate synthetic local source for hooks
+            source = f"local/hook/{artifact_name}"
+
+            # Get timestamp (preserves existing if unchanged)
+            discovered_at = self._get_artifact_timestamp(
+                hook_path, artifact_name, detected_type, manifest
+            )
+
+            # Compute content hash for the directory
+            content_hash = None
+            try:
+                content_hash = compute_content_hash(hook_path)
+            except Exception as hash_err:
+                logger.debug(
+                    f"Failed to compute content hash for hook {hook_path}: {hash_err}"
+                )
+
+            # Determine collection membership status
+            collection_status = None
+            collection_match = None
+            if collection_membership_index is not None:
+                collection_status = self._check_collection_membership(
+                    artifact_name,
+                    detected_type,
+                    source,
+                    collection_membership_index,
+                )
+                # Compute hash-based match with confidence score
+                collection_match = self._compute_collection_match(
+                    content_hash,
+                    artifact_name,
+                    detected_type,
+                    collection_membership_index,
+                )
+
+            # Create DiscoveredArtifact for hook
+            artifact = DiscoveredArtifact(
+                type=detected_type,
+                name=artifact_name,
+                source=source,
+                version=None,
+                scope=None,
+                tags=[],
+                description=f"Hook: {artifact_name}",
+                path=str(hook_path),
+                discovered_at=discovered_at,
+                collection_status=collection_status,
+                content_hash=content_hash,
+                collection_match=collection_match,
+            )
+
+            return artifact
+
+        except Exception as e:
+            logger.warning(f"Error creating hook artifact for {hook_path}: {e}")
+            return None
 
     def _discover_nested_artifacts(
         self,
@@ -1204,7 +1405,9 @@ class ArtifactDiscoveryService:
                 is_directory_artifact = signature.is_directory
         except ValueError:
             # Unknown artifact type - default to directory check
-            logger.debug(f"Unknown artifact type '{artifact_type}', defaulting to directory check")
+            logger.debug(
+                f"Unknown artifact type '{artifact_type}', defaulting to directory check"
+            )
 
         # Check Collection
         try:
@@ -1216,13 +1419,18 @@ class ArtifactDiscoveryService:
             collection_base = config.get_collection_path(collection_name)
 
             # Container directory: ~/.skillmeat/collections/{collection_name}/artifacts/{type}s/
-            collection_container_dir = collection_base / "artifacts" / f"{artifact_type}s"
+            collection_container_dir = (
+                collection_base / "artifacts" / f"{artifact_type}s"
+            )
 
             if is_directory_artifact:
                 # Directory-based artifacts (skills): check for artifact directory
                 # Format: {container}/{name}/
                 collection_artifact_dir = collection_container_dir / artifact_name
-                if collection_artifact_dir.exists() and collection_artifact_dir.is_dir():
+                if (
+                    collection_artifact_dir.exists()
+                    and collection_artifact_dir.is_dir()
+                ):
                     exists_in_collection = True
                     collection_path = str(collection_artifact_dir)
                     logger.debug(
@@ -1242,7 +1450,9 @@ class ArtifactDiscoveryService:
                         )
                     else:
                         # Search for nested file: {container}/**/{name}.md
-                        nested_files = list(collection_container_dir.rglob(f"{artifact_name}.md"))
+                        nested_files = list(
+                            collection_container_dir.rglob(f"{artifact_name}.md")
+                        )
                         if nested_files:
                             exists_in_collection = True
                             collection_path = str(nested_files[0])
@@ -1276,9 +1486,7 @@ class ArtifactDiscoveryService:
                     logger.debug(f"Invalid artifact type in key: {artifact_type}")
                 except Exception as e:
                     # Corrupt manifest or other error
-                    logger.warning(
-                        f"Error checking manifest for {artifact_key}: {e}"
-                    )
+                    logger.warning(f"Error checking manifest for {artifact_key}: {e}")
         except PermissionError as e:
             logger.warning(
                 f"Permission denied accessing collection for {artifact_key}: {e}"
@@ -1315,7 +1523,9 @@ class ArtifactDiscoveryService:
                         )
                     else:
                         # Search for nested file: {container}/**/{name}.md
-                        nested_files = list(project_container_dir.rglob(f"{artifact_name}.md"))
+                        nested_files = list(
+                            project_container_dir.rglob(f"{artifact_name}.md")
+                        )
                         if nested_files:
                             exists_in_project = True
                             project_path = str(nested_files[0])

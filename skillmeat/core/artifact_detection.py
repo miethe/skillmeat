@@ -407,9 +407,9 @@ ARTIFACT_SIGNATURES: Dict[ArtifactType, ArtifactSignature] = {
     ArtifactType.HOOK: ArtifactSignature(
         artifact_type=ArtifactType.HOOK,
         container_names={"hooks", "hook", "claude-hooks"},
-        is_directory=False,
-        requires_manifest=False,
-        manifest_names={"settings.json"},
+        is_directory=True,  # Hooks are directory-based artifacts
+        requires_manifest=False,  # No specific manifest required
+        manifest_names={"settings.json"},  # Optional config file
         allowed_nesting=False,
     ),
     ArtifactType.MCP: ArtifactSignature(
@@ -508,9 +508,10 @@ def normalize_container_name(
         return CANONICAL_CONTAINERS[matched_type]
 
     # Not found in any type
-    all_aliases = set()
-    for aliases in CONTAINER_ALIASES.values():
-        all_aliases.update(aliases)
+    all_aliases: Set[str] = set()
+    aliases_set: Set[str]
+    for aliases_set in CONTAINER_ALIASES.values():
+        all_aliases.update(aliases_set)
     # We need to pick a type for the error - use SKILL as default since it's most common
     raise InvalidContainerError(name, ArtifactType.SKILL, all_aliases)
 
@@ -535,7 +536,7 @@ def get_artifact_type_from_container(container_name: str) -> Optional[ArtifactTy
     return CONTAINER_TO_TYPE.get(container_name.lower())
 
 
-def infer_artifact_type(path: Path) -> Optional[ArtifactType]:
+def infer_artifact_type(path: Path | str) -> Optional[ArtifactType]:
     """Infer artifact type from filesystem path.
 
     Detection priority:
@@ -596,7 +597,9 @@ def infer_artifact_type(path: Path) -> Optional[ArtifactType]:
     return None
 
 
-def extract_manifest_file(path: Path, artifact_type: ArtifactType) -> Optional[Path]:
+def extract_manifest_file(
+    path: Path | str, artifact_type: ArtifactType
+) -> Optional[Path]:
     """Find manifest file for artifact.
 
     Performs case-insensitive search for valid manifest files
@@ -640,7 +643,7 @@ def extract_manifest_file(path: Path, artifact_type: ArtifactType) -> Optional[P
 
 
 def detect_artifact(
-    path: Path,
+    path: Path | str,
     container_type: Optional[str] = None,
     mode: Literal["strict", "heuristic"] = "strict",
 ) -> DetectionResult:

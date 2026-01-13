@@ -44,13 +44,17 @@ def project_base(tmp_path):
 
     Returns:
         Path: Path to project base directory with .claude/ subdirectory
+
+    Note:
+        Does not create hooks/ directory as hooks use directory-based detection
+        (empty hooks/ would be detected as a hook artifact, affecting test counts).
     """
     project_dir = tmp_path / "project"
     claude_dir = project_dir / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create artifact type directories
-    for artifact_type in ["skills", "commands", "agents", "hooks", "mcps"]:
+    # Create artifact type directories (excluding hooks - see note above)
+    for artifact_type in ["skills", "commands", "agents", "mcps"]:
         (claude_dir / artifact_type).mkdir(exist_ok=True)
 
     return project_dir
