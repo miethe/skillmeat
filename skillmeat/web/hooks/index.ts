@@ -50,7 +50,7 @@
  */
 
 // ============================================================================
-// COLLECTIONS (8 hooks)
+// COLLECTIONS (9 hooks)
 // ============================================================================
 // Collection CRUD operations with artifact management
 export {
@@ -58,11 +58,13 @@ export {
   useCollections,
   useCollection,
   useCollectionArtifacts,
+  useInfiniteCollectionArtifacts,
   useCreateCollection,
   useUpdateCollection,
   useDeleteCollection,
   useAddArtifactToCollection,
   useRemoveArtifactFromCollection,
+  type InfiniteArtifactsOptions,
 } from './use-collections';
 
 // ============================================================================
@@ -351,6 +353,18 @@ export {
 export {
   useDebounce,
 } from './use-debounce';
+
+/**
+ * Intersection observer for detecting element visibility
+ * Useful for infinite scroll and lazy loading
+ * @example
+ * const { targetRef, isIntersecting } = useIntersectionObserver({ rootMargin: '100px' });
+ */
+export {
+  useIntersectionObserver,
+  type UseIntersectionObserverOptions,
+  type UseIntersectionObserverResult,
+} from './use-intersection-observer';
 
 /**
  * Toast notification hook (shadcn/ui integration)

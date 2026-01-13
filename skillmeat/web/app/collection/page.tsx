@@ -17,7 +17,8 @@ import {
   EntityLifecycleProvider,
   useCollectionContext,
   useArtifacts,
-  useCollectionArtifacts,
+  useInfiniteCollectionArtifacts,
+  useIntersectionObserver,
   useEditArtifactParameters,
   useToast,
 } from '@/hooks';
@@ -271,18 +272,26 @@ function CollectionPageContent() {
     }
   };
 
+  // Determine if viewing a specific collection or "All Collections"
+  const isSpecificCollection = !!selectedCollectionId && selectedCollectionId !== 'all';
+
   // Conditionally fetch artifacts based on selected collection
-  // When a specific collection is selected, use collection-specific endpoint
+  // When a specific collection is selected, use infinite scroll pagination
   // When "All Collections" or no selection, use general artifacts endpoint
   const {
-    data: collectionArtifactsData,
-    isLoading: isLoadingCollectionArtifacts,
-    error: collectionArtifactsError,
-    refetch: refetchCollectionArtifacts,
-  } = useCollectionArtifacts(
-    selectedCollectionId && selectedCollectionId !== 'all' ? selectedCollectionId : undefined
+    data: infiniteCollectionData,
+    isLoading: isLoadingInfiniteArtifacts,
+    error: infiniteCollectionError,
+    refetch: refetchInfiniteArtifacts,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteCollectionArtifacts(
+    isSpecificCollection ? selectedCollectionId : undefined,
+    { limit: 20, enabled: isSpecificCollection }
   );
 
+  // Fetch all artifacts (used for "All Collections" mode and for enriching collection artifacts)
   const {
     data: allArtifactsData,
     isLoading: isLoadingAllArtifacts,
@@ -290,21 +299,38 @@ function CollectionPageContent() {
     refetch: refetchAllArtifacts,
   } = useArtifacts(filters, { field: sortField as any, order: sortOrder });
 
-  // Select the appropriate data, loading state, and error based on selection
-  const isSpecificCollection = !!selectedCollectionId && selectedCollectionId !== 'all';
-  const data = isSpecificCollection ? collectionArtifactsData : allArtifactsData;
+  // Set up intersection observer for infinite scroll
+  const { targetRef, isIntersecting } = useIntersectionObserver<HTMLDivElement>({
+    rootMargin: '200px',
+    enabled: isSpecificCollection && hasNextPage && !isFetchingNextPage,
+  });
+
+  // Trigger fetch when intersection observer detects scroll near bottom
+  useEffect(() => {
+    if (isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Select the appropriate loading state and error based on selection
   const isLoadingArtifacts = isSpecificCollection
-    ? isLoadingCollectionArtifacts
+    ? isLoadingInfiniteArtifacts
     : isLoadingAllArtifacts;
-  const error = isSpecificCollection ? collectionArtifactsError : allArtifactsError;
-  const refetch = isSpecificCollection ? refetchCollectionArtifacts : refetchAllArtifacts;
+  const error = isSpecificCollection ? infiniteCollectionError : allArtifactsError;
+  const refetch = isSpecificCollection ? refetchInfiniteArtifacts : refetchAllArtifacts;
+
+  // Get total count for display (from first page's page_info)
+  const totalCount = isSpecificCollection
+    ? infiniteCollectionData?.pages[0]?.page_info.total_count ?? 0
+    : allArtifactsData?.artifacts?.length ?? 0;
 
   // Initialize lastUpdated on first load
   useEffect(() => {
-    if (data && !lastUpdated) {
+    const hasData = isSpecificCollection ? infiniteCollectionData : allArtifactsData;
+    if (hasData && !lastUpdated) {
       setLastUpdated(new Date());
     }
-  }, [data, lastUpdated]);
+  }, [infiniteCollectionData, allArtifactsData, isSpecificCollection, lastUpdated]);
 
   // Handle tag selection changes
   const handleTagsChange = (tags: string[]) => {
@@ -319,12 +345,14 @@ function CollectionPageContent() {
 
   // Apply client-side search, tag filter, and sort
   const filteredArtifacts = useMemo(() => {
-    // Handle different response shapes: useArtifacts returns .artifacts, useCollectionArtifacts returns .items
+    // Handle different response shapes:
+    // - Specific collection (infinite scroll): pages array with items
+    // - All collections: artifacts array
     let artifacts: Artifact[] = [];
 
-    if (isSpecificCollection && data && 'items' in data) {
-      // Collection-specific view: Enrich ArtifactSummary objects with full Artifact data
-      const summaries = data.items ?? [];
+    if (isSpecificCollection && infiniteCollectionData?.pages) {
+      // Collection-specific view with infinite scroll: Flatten pages and enrich
+      const allSummaries = infiniteCollectionData.pages.flatMap(page => page.items);
       const fullArtifacts = allArtifactsData?.artifacts ?? [];
 
       // Build collection info from current context to ensure artifacts have collection set
@@ -333,7 +361,7 @@ function CollectionPageContent() {
         : undefined;
 
       // Enrich each summary with full data from catalog, including collection context
-      artifacts = summaries.map(summary => enrichArtifactSummary(summary, fullArtifacts, collectionInfo));
+      artifacts = allSummaries.map(summary => enrichArtifactSummary(summary, fullArtifacts, collectionInfo));
 
       // Deduplicate by ID to prevent React key conflicts
       const seen = new Set<string>();
@@ -344,9 +372,9 @@ function CollectionPageContent() {
         seen.add(artifact.id);
         return true;
       });
-    } else if (!isSpecificCollection && data && 'artifacts' in data) {
+    } else if (!isSpecificCollection && allArtifactsData?.artifacts) {
       // All collections view: Already have full Artifact objects
-      artifacts = data.artifacts ?? [];
+      artifacts = allArtifactsData.artifacts ?? [];
     }
 
     // Search
@@ -394,7 +422,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [isSpecificCollection, data, allArtifactsData, currentCollection, searchQuery, selectedTags, sortField, sortOrder]);
+  }, [isSpecificCollection, infiniteCollectionData, allArtifactsData, currentCollection, searchQuery, selectedTags, sortField, sortOrder]);
 
   const handleArtifactClick = (artifact: Artifact) => {
     // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
@@ -521,6 +549,14 @@ function CollectionPageContent() {
         {/* Artifacts View */}
         {!error && !isLoadingArtifacts && filteredArtifacts.length > 0 && (
           <>
+            {/* Artifact count indicator for specific collections with pagination */}
+            {isSpecificCollection && totalCount > 0 && (
+              <div className="mb-4 text-sm text-muted-foreground">
+                Showing {filteredArtifacts.length} of {totalCount} artifacts
+                {hasNextPage && ' (scroll for more)'}
+              </div>
+            )}
+
             {viewMode === 'grid' ? (
               <ArtifactGrid
                 artifacts={filteredArtifacts}
@@ -553,6 +589,27 @@ function CollectionPageContent() {
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
               />
+            )}
+
+            {/* Infinite scroll trigger element - only for specific collections */}
+            {isSpecificCollection && (
+              <div
+                ref={targetRef}
+                className="flex justify-center py-8"
+                aria-hidden="true"
+              >
+                {isFetchingNextPage && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Loading more artifacts...</span>
+                  </div>
+                )}
+                {!hasNextPage && filteredArtifacts.length > 0 && filteredArtifacts.length === totalCount && (
+                  <span className="text-sm text-muted-foreground">
+                    All {totalCount} artifacts loaded
+                  </span>
+                )}
+              </div>
             )}
           </>
         )}
