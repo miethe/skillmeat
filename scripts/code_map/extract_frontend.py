@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 try:
     from .graph import Graph
+    from .frontend_utils import apply_api_prefix, get_api_prefix, normalize_api_path
     from .extract_frontend_components import extract_frontend_components
     from .extract_frontend_hooks import extract_frontend_hooks
     from .extract_frontend_api_clients import extract_frontend_api_clients
@@ -16,6 +17,7 @@ except ImportError:  # pragma: no cover - fallback for direct script execution
 
     sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
     from scripts.code_map.graph import Graph
+    from scripts.code_map.frontend_utils import apply_api_prefix, get_api_prefix, normalize_api_path
     from scripts.code_map.extract_frontend_components import extract_frontend_components
     from scripts.code_map.extract_frontend_hooks import extract_frontend_hooks
     from scripts.code_map.extract_frontend_api_clients import extract_frontend_api_clients
@@ -130,6 +132,7 @@ def extract_frontend(web_root: Path) -> Graph:
     app_root = web_root / "app"
     hooks_root = web_root / "hooks"
     graph = Graph(source="frontend")
+    api_prefix = get_api_prefix()
 
     hook_exports = parse_hook_exports(hooks_root)
 
@@ -164,15 +167,25 @@ def extract_frontend(web_root: Path) -> Graph:
                 label=hook_name,
                 file=hook_file.as_posix(),
             )
-            for path, method in api_calls:
-                endpoint_label = f"{method} {path}" if method else path
-                endpoint_id = f"endpoint:{endpoint_label}"
+            for raw_path, method in api_calls:
+                normalized_path = normalize_api_path(raw_path)
+                full_path = apply_api_prefix(normalized_path, api_prefix)
+                method_inferred = False
+                raw_method = method
+                if not method:
+                    method = "GET"
+                    method_inferred = True
+                endpoint_label = f"{method} {full_path}"
+                endpoint_id = f"api_endpoint:{endpoint_label}"
                 graph.add_node(
                     endpoint_id,
                     "api_endpoint",
                     label=endpoint_label,
                     method=method,
-                    path=path,
+                    path=full_path,
+                    raw_path=raw_path,
+                    method_inferred=method_inferred,
+                    raw_method="unknown" if method_inferred else raw_method,
                 )
                 graph.add_edge(hook_id, endpoint_id, "calls_api", file=hook_file.as_posix())
 

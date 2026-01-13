@@ -1,5 +1,5 @@
 ---
-name: symbols:query
+name: symbols-query
 description: "Query symbols efficiently by name, kind, or domain context"
 tools: [Read, Write, Bash]
 ---

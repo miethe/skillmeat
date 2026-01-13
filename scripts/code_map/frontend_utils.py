@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -104,3 +106,34 @@ def normalize_literal(value: str) -> str:
 def to_pascal_case(value: str) -> str:
     parts = re.split(r"[-_\s]+", value)
     return "".join(part.capitalize() for part in parts if part)
+
+
+def get_api_prefix() -> str:
+    version = os.environ.get("NEXT_PUBLIC_API_VERSION", "v1")
+    version = version.strip()
+    if "/" in version:
+        return "/" + version.lstrip("/")
+    return f"/api/{version}"
+
+
+def normalize_api_path(path: str) -> str:
+    raw = normalize_literal(path)
+    if raw.startswith("http://") or raw.startswith("https://"):
+        raw = urlsplit(raw).path
+    if "?" in raw:
+        raw = raw.split("?", 1)[0]
+    normalized = re.sub(r"\$\{([^}]+)\}", r"{\1}", raw)
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    return normalized
+
+
+def apply_api_prefix(path: str, api_prefix: str) -> str:
+    if not api_prefix:
+        return path
+    prefix = api_prefix.rstrip("/")
+    if path == prefix or path.startswith(prefix + "/"):
+        return path
+    if path.startswith("/api/"):
+        return path
+    return prefix + path

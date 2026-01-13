@@ -7,13 +7,13 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 try:
     from .graph import Graph
-    from .frontend_utils import parse_imports, resolve_module_path
+    from .frontend_utils import apply_api_prefix, get_api_prefix, normalize_api_path, parse_imports, resolve_module_path
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from scripts.code_map.graph import Graph
-    from scripts.code_map.frontend_utils import parse_imports, resolve_module_path
+    from scripts.code_map.frontend_utils import apply_api_prefix, get_api_prefix, normalize_api_path, parse_imports, resolve_module_path
 
 EXPORT_FUNC_RE = re.compile(r"export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(")
 EXPORT_CONST_RE = re.compile(r"export\s+const\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\(")
@@ -84,6 +84,7 @@ def hook_node_ids(path: Path, names: Sequence[str]) -> List[str]:
 def extract_frontend_api_clients(web_root: Path) -> Graph:
     graph = Graph(source="frontend")
     api_files = iter_api_files(web_root)
+    api_prefix = get_api_prefix()
 
     exported_functions: Dict[Path, List[str]] = {}
     export_to_file: Dict[str, Path] = {}
@@ -105,15 +106,25 @@ def extract_frontend_api_clients(web_root: Path) -> Graph:
             )
         function_slices = slice_functions(text, export_matches)
         for name, body in function_slices.items():
-            for path, method in find_endpoints(body):
-                endpoint_label = f"{method} {path}" if method else path
-                endpoint_id = f"endpoint:{endpoint_label}"
+            for raw_path, method in find_endpoints(body):
+                normalized_path = normalize_api_path(raw_path)
+                full_path = apply_api_prefix(normalized_path, api_prefix)
+                method_inferred = False
+                raw_method = method
+                if not method:
+                    method = "GET"
+                    method_inferred = True
+                endpoint_label = f"{method} {full_path}"
+                endpoint_id = f"api_endpoint:{endpoint_label}"
                 graph.add_node(
                     endpoint_id,
                     "api_endpoint",
                     label=endpoint_label,
                     method=method,
-                    path=path,
+                    path=full_path,
+                    raw_path=raw_path,
+                    method_inferred=method_inferred,
+                    raw_method="unknown" if method_inferred else raw_method,
                     file=api_file.as_posix(),
                 )
                 graph.add_edge(
