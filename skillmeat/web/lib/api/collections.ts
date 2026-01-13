@@ -160,3 +160,68 @@ export async function moveArtifactToCollection(
   // TODO: Backend endpoint not implemented. As workaround, add to target and remove from source
   throw new Error('Move artifact not implemented. Use add + remove as workaround.');
 }
+
+/**
+ * Response type for paginated collection artifacts
+ */
+export interface CollectionArtifactsPaginatedResponse {
+  items: Array<{
+    name: string;
+    type: string;
+    version?: string | null;
+    source: string;
+  }>;
+  page_info: {
+    has_next_page: boolean;
+    has_previous_page: boolean;
+    start_cursor: string | null;
+    end_cursor: string | null;
+    total_count: number;
+  };
+}
+
+/**
+ * Fetch paginated artifacts in a collection
+ *
+ * Used for infinite scroll implementation. Returns cursor-based pagination info.
+ *
+ * @param collectionId - Collection ID to fetch artifacts from
+ * @param options - Pagination and filter options
+ * @returns Paginated response with items and page_info
+ *
+ * @example
+ * ```ts
+ * const page1 = await fetchCollectionArtifactsPaginated('col-123', { limit: 20 });
+ * if (page1.page_info.has_next_page) {
+ *   const page2 = await fetchCollectionArtifactsPaginated('col-123', {
+ *     limit: 20,
+ *     after: page1.page_info.end_cursor
+ *   });
+ * }
+ * ```
+ */
+export async function fetchCollectionArtifactsPaginated(
+  collectionId: string,
+  options?: {
+    limit?: number;
+    after?: string;
+    artifact_type?: string;
+  }
+): Promise<CollectionArtifactsPaginatedResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set('limit', options.limit.toString());
+  if (options?.after) params.set('after', options.after);
+  if (options?.artifact_type) params.set('artifact_type', options.artifact_type);
+
+  const queryString = params.toString();
+  const path = queryString
+    ? `/user-collections/${collectionId}/artifacts?${queryString}`
+    : `/user-collections/${collectionId}/artifacts`;
+
+  const response = await fetch(buildUrl(path));
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to fetch artifacts: ${response.statusText}`);
+  }
+  return response.json();
+}

@@ -5,14 +5,16 @@
  * Uses live API data with proper error handling and cache invalidation.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, ApiError } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/api';
 import {
   createCollection,
   updateCollection,
   deleteCollection,
   addArtifactToCollection,
   removeArtifactFromCollection,
+  fetchCollectionArtifactsPaginated,
+  type CollectionArtifactsPaginatedResponse,
 } from '@/lib/api/collections';
 import type {
   Collection,
@@ -65,6 +67,8 @@ export const collectionKeys = {
   details: () => [...collectionKeys.all, 'detail'] as const,
   detail: (id: string) => [...collectionKeys.details(), id] as const,
   artifacts: (id: string) => [...collectionKeys.detail(id), 'artifacts'] as const,
+  infiniteArtifacts: (id: string, options?: { artifact_type?: string }) =>
+    [...collectionKeys.detail(id), 'infinite-artifacts', options] as const,
 };
 
 /**
@@ -213,6 +217,67 @@ export function useCollectionArtifacts(
       };
     },
     enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Options for infinite collection artifacts query
+ */
+export interface InfiniteArtifactsOptions {
+  /** Number of items to fetch per page */
+  limit?: number;
+  /** Filter by artifact type */
+  artifact_type?: string;
+  /** Whether the query should be enabled */
+  enabled?: boolean;
+}
+
+/**
+ * Fetch collection artifacts with infinite scroll pagination
+ *
+ * Uses cursor-based pagination for efficient loading of large collections.
+ * Returns flattened items from all pages plus pagination controls.
+ *
+ * @param id - Collection ID (undefined will disable the query)
+ * @param options - Pagination and filtering options
+ * @returns Infinite query result with pages array and pagination helpers
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   data,
+ *   fetchNextPage,
+ *   hasNextPage,
+ *   isFetchingNextPage,
+ * } = useInfiniteCollectionArtifacts(collectionId, { limit: 20 });
+ *
+ * // Flatten pages to get all items
+ * const allItems = data?.pages.flatMap(p => p.items) || [];
+ *
+ * // Get total count from first page
+ * const totalCount = data?.pages[0]?.page_info.total_count || 0;
+ * ```
+ */
+export function useInfiniteCollectionArtifacts(
+  id: string | undefined,
+  options?: InfiniteArtifactsOptions
+) {
+  const { limit = 20, artifact_type, enabled = true } = options || {};
+
+  return useInfiniteQuery({
+    queryKey: collectionKeys.infiniteArtifacts(id!, { artifact_type }),
+    queryFn: async ({ pageParam }): Promise<CollectionArtifactsPaginatedResponse> => {
+      return fetchCollectionArtifactsPaginated(id!, {
+        limit,
+        after: pageParam,
+        artifact_type,
+      });
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor ?? undefined : undefined,
+    enabled: !!id && enabled,
     staleTime: 5 * 60 * 1000,
   });
 }
