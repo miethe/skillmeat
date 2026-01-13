@@ -25,15 +25,17 @@ def collection_base(tmp_path):
     """Create a temporary collection base directory structure.
 
     Returns:
-        Path: Path to collection base directory with artifacts/ subdirectory
+        Path: Path to collection base directory with type directories directly
+              (skills/, commands/, etc. - NOT nested under artifacts/)
     """
     collection_dir = tmp_path / "collection"
-    artifacts_dir = collection_dir / "artifacts"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    collection_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create artifact type directories
+    # Create artifact type directories directly under collection
+    # Note: The actual collection structure is ~/.skillmeat/collections/{name}/{type}s/
+    # NOT ~/.skillmeat/collections/{name}/artifacts/{type}s/
     for artifact_type in ["skills", "commands", "agents", "hooks", "mcps"]:
-        (artifacts_dir / artifact_type).mkdir(exist_ok=True)
+        (collection_dir / artifact_type).mkdir(exist_ok=True)
 
     return collection_dir
 
@@ -105,7 +107,7 @@ class TestCheckArtifactExists:
     ):
         """Artifact exists in Collection but not in Project."""
         # Setup: Create artifact in collection only
-        artifact_dir = collection_base / "artifacts" / "skills" / "test-skill"
+        artifact_dir = collection_base / "skills" / "test-skill"
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "SKILL.md").write_text("---\ntitle: Test Skill\n---\n")
 
@@ -148,7 +150,7 @@ class TestCheckArtifactExists:
         """Artifact exists in both Collection and Project."""
         # Setup: Create artifact in both locations
         # Collection
-        collection_artifact_dir = collection_base / "artifacts" / "skills" / "test-skill"
+        collection_artifact_dir = collection_base / "skills" / "test-skill"
         collection_artifact_dir.mkdir(parents=True, exist_ok=True)
         (collection_artifact_dir / "SKILL.md").write_text(
             "---\ntitle: Test Skill\n---\n"
@@ -245,7 +247,7 @@ class TestCheckArtifactExists:
     ):
         """collection_path populated when artifact in collection."""
         # Setup
-        artifact_dir = collection_base / "artifacts" / "commands" / "test-command"
+        artifact_dir = collection_base / "commands" / "test-command"
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "COMMAND.md").write_text("---\ntitle: Test Command\n---\n")
 
@@ -305,9 +307,7 @@ class TestCheckArtifactExists:
 
         for artifact_type, type_plural, metadata_file, content in artifact_types:
             # Setup
-            artifact_dir = (
-                collection_base / "artifacts" / type_plural / f"test-{artifact_type}"
-            )
+            artifact_dir = collection_base / type_plural / f"test-{artifact_type}"
             artifact_dir.mkdir(parents=True, exist_ok=True)
             (artifact_dir / metadata_file).write_text(content)
 
@@ -340,7 +340,7 @@ class TestDiscoveryFiltering:
         """Artifacts in both Collection AND Project are filtered out."""
         # Setup: Create artifact in both locations
         # Collection
-        collection_artifact_dir = collection_base / "artifacts" / "skills" / "test-skill"
+        collection_artifact_dir = collection_base / "skills" / "test-skill"
         collection_artifact_dir.mkdir(parents=True, exist_ok=True)
         (collection_artifact_dir / "SKILL.md").write_text(
             "---\nname: test-skill\ntitle: Test Skill\n---\n"
@@ -356,17 +356,18 @@ class TestDiscoveryFiltering:
         # Execute discovery
         result = discovery_service.discover_artifacts()
 
-        # Assert: Artifact should be discovered but filtered out
+        # Assert: Artifact should be discovered with collection_match indicating it exists
         assert result.discovered_count == 1  # Found during scan
-        assert result.importable_count == 0  # Filtered out (exists in both)
-        assert len(result.artifacts) == 0  # Not in importable list
+        assert result.importable_count == 0  # Not importable (exists in collection)
+        assert len(result.artifacts) == 1  # ALL artifacts returned now
+        assert result.artifacts[0].collection_match.type == "exact"  # Exists in collection
 
     def test_keeps_artifacts_in_collection_only(
         self, discovery_service, collection_base, project_base, mock_collection_config
     ):
         """Artifacts only in Collection are kept (might want to add to Project)."""
         # Setup: Create artifact in collection only
-        collection_artifact_dir = collection_base / "artifacts" / "skills" / "test-skill"
+        collection_artifact_dir = collection_base / "skills" / "test-skill"
         collection_artifact_dir.mkdir(parents=True, exist_ok=True)
         (collection_artifact_dir / "SKILL.md").write_text(
             "---\nname: test-skill\ntitle: Test Skill\n---\n"
@@ -440,7 +441,7 @@ class TestDiscoveryFiltering:
         # - 2 in project only (kept)
 
         # Artifact 1: In both (filtered)
-        collection_dir_1 = collection_base / "artifacts" / "skills" / "skill-both"
+        collection_dir_1 = collection_base / "skills" / "skill-both"
         collection_dir_1.mkdir(parents=True, exist_ok=True)
         (collection_dir_1 / "SKILL.md").write_text(
             "---\nname: skill-both\ntitle: Skill Both\n---\n"
@@ -470,8 +471,14 @@ class TestDiscoveryFiltering:
 
         # Assert
         assert result.discovered_count == 3  # All 3 found
-        assert result.importable_count == 2  # Only 2 kept (skill-both filtered)
-        assert len(result.artifacts) == 2
+        assert result.importable_count == 2  # Only 2 are new (skill-both in collection)
+        assert len(result.artifacts) == 3  # ALL artifacts returned now
+
+        # Verify collection_match distinguishes new vs existing
+        new_artifacts = [a for a in result.artifacts if a.collection_match.type == "none"]
+        existing_artifacts = [a for a in result.artifacts if a.collection_match.type == "exact"]
+        assert len(new_artifacts) == 2
+        assert len(existing_artifacts) == 1
 
     def test_importable_count_reflects_filtered(
         self, discovery_service, collection_base, project_base, mock_collection_config
@@ -479,7 +486,7 @@ class TestDiscoveryFiltering:
         """importable_count reflects only non-filtered artifacts."""
         # Setup: Similar to previous test
         # Artifact 1: In both (filtered)
-        collection_dir_1 = collection_base / "artifacts" / "skills" / "skill-both"
+        collection_dir_1 = collection_base / "skills" / "skill-both"
         collection_dir_1.mkdir(parents=True, exist_ok=True)
         (collection_dir_1 / "SKILL.md").write_text(
             "---\nname: skill-both\ntitle: Skill Both\n---\n"
@@ -501,16 +508,20 @@ class TestDiscoveryFiltering:
         result = discovery_service.discover_artifacts()
 
         # Assert
-        assert result.importable_count == 1  # Only skill-project is importable
-        assert len(result.artifacts) == 1
-        assert result.artifacts[0].name == "skill-project"
+        assert result.importable_count == 1  # Only skill-project is importable (new)
+        assert len(result.artifacts) == 2  # ALL artifacts returned now
+
+        # Verify collection_match distinguishes new vs existing
+        new_artifacts = [a for a in result.artifacts if a.collection_match.type == "none"]
+        assert len(new_artifacts) == 1
+        assert new_artifacts[0].name == "skill-project"
 
     def test_early_return_when_all_filtered(
         self, discovery_service, collection_base, project_base, mock_collection_config
     ):
         """Returns successfully when all artifacts filtered out."""
         # Setup: Create artifact in both locations
-        collection_artifact_dir = collection_base / "artifacts" / "skills" / "test-skill"
+        collection_artifact_dir = collection_base / "skills" / "test-skill"
         collection_artifact_dir.mkdir(parents=True, exist_ok=True)
         (collection_artifact_dir / "SKILL.md").write_text(
             "---\nname: test-skill\ntitle: Test Skill\n---\n"
@@ -525,10 +536,11 @@ class TestDiscoveryFiltering:
         # Execute discovery
         result = discovery_service.discover_artifacts()
 
-        # Assert: Should return successfully with empty importable list
+        # Assert: Should return successfully with importable_count == 0
         assert result.discovered_count == 1
         assert result.importable_count == 0
-        assert len(result.artifacts) == 0
+        assert len(result.artifacts) == 1  # ALL artifacts returned now
+        assert result.artifacts[0].collection_match.type == "exact"  # Exists in collection
         assert result.scan_duration_ms > 0  # Scan completed
 
 

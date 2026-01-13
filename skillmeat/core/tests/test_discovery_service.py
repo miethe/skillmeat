@@ -1118,16 +1118,26 @@ class TestManifestFiltering:
         service = ArtifactDiscoveryService(tmp_path, scan_mode="collection")
         result = service.discover_artifacts(manifest=manifest)
 
-        # New behavior: 5 discovered, 3 importable (5 - 2 in BOTH locations)
-        # skill-0 and skill-2 exist in both collection (manifest) and project (.claude/)
-        # skill-1, skill-3, skill-4 exist only in collection, so they're importable to project
+        # New behavior: ALL artifacts returned, with collection_match indicating status
+        # 5 discovered, 3 importable (5 - 2 in collection)
+        # skill-0 and skill-2 exist in collection (manifest)
+        # skill-1, skill-3, skill-4 are new (not in collection)
         assert result.discovered_count == 5
         assert result.importable_count == 3
-        assert len(result.artifacts) == 3
+        assert len(result.artifacts) == 5  # ALL artifacts returned
 
-        # Verify the importable artifacts are NOT in both locations
-        importable_names = {a.name for a in result.artifacts}
-        assert importable_names == {"skill-1", "skill-3", "skill-4"}
+        # Verify collection_match distinguishes new vs existing
+        new_artifacts = [a for a in result.artifacts if a.collection_match.type == "none"]
+        existing_artifacts = [a for a in result.artifacts if a.collection_match.type == "exact"]
+
+        assert len(new_artifacts) == 3
+        assert len(existing_artifacts) == 2
+
+        new_names = {a.name for a in new_artifacts}
+        assert new_names == {"skill-1", "skill-3", "skill-4"}
+
+        existing_names = {a.name for a in existing_artifacts}
+        assert existing_names == {"skill-0", "skill-2"}
 
     def test_filter_with_full_manifest(self, tmp_path):
         """Test filtering when all artifacts exist in BOTH locations."""
@@ -1175,10 +1185,17 @@ class TestManifestFiltering:
         service = ArtifactDiscoveryService(tmp_path, scan_mode="collection")
         result = service.discover_artifacts(manifest=manifest)
 
-        # New behavior: 3 discovered, 0 importable (all in BOTH locations)
+        # New behavior: ALL artifacts returned, with collection_match indicating status
+        # 3 discovered, 0 importable (all exist in collection)
         assert result.discovered_count == 3
         assert result.importable_count == 0
-        assert len(result.artifacts) == 0
+        assert len(result.artifacts) == 3  # ALL artifacts returned
+
+        # Verify all artifacts have collection_match.type == "exact"
+        for artifact in result.artifacts:
+            assert artifact.collection_match is not None
+            assert artifact.collection_match.type == "exact"
+            assert artifact.collection_match.confidence == 1.0
 
     def test_filter_without_manifest(self, tmp_path):
         """Test that discovery without manifest returns all artifacts."""
@@ -1249,11 +1266,21 @@ class TestManifestFiltering:
         service = ArtifactDiscoveryService(tmp_path, scan_mode="collection")
         result = service.discover_artifacts(manifest=manifest)
 
-        # 2 discovered, 1 importable (GitHub one in BOTH locations, filtered)
+        # New behavior: ALL artifacts returned, with collection_match indicating status
+        # 2 discovered, 1 importable (GitHub one in collection)
         assert result.discovered_count == 2
         assert result.importable_count == 1
-        assert len(result.artifacts) == 1
-        assert result.artifacts[0].name == "skill-local"
+        assert len(result.artifacts) == 2  # ALL artifacts returned
+
+        # Verify collection_match distinguishes new vs existing
+        new_artifacts = [a for a in result.artifacts if a.collection_match.type == "none"]
+        existing_artifacts = [a for a in result.artifacts if a.collection_match.type == "exact"]
+
+        assert len(new_artifacts) == 1
+        assert new_artifacts[0].name == "skill-local"
+
+        assert len(existing_artifacts) == 1
+        assert existing_artifacts[0].name == "skill-github"
 
     def test_filter_by_source_not_name(self, tmp_path):
         """Test filtering with new both-location logic (not source-based filtering)."""

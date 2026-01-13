@@ -1847,12 +1847,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/merge.py::execute_merge",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/merge.py::execute_merge",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -1952,12 +1952,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/bundles.py::export_bundle",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/bundles.py::export_bundle",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2007,12 +2007,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/bundles.py::update_bundle_share_link",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/bundles.py::update_bundle_share_link",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2052,12 +2052,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/cache.py::refresh_cache",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/cache.py::refresh_cache",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -2117,12 +2117,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/cache.py::invalidate_cache",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/cache.py::invalidate_cache",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -2232,12 +2232,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/groups.py::update_artifact_position",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ArtifactPositionUpdate",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupArtifactResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/groups.py::update_artifact_position",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupArtifactResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ArtifactPositionUpdate",
       "type": "handler_uses_schema"
     },
     {
@@ -2247,12 +2247,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/groups.py::reorder_artifacts_in_group",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ReorderArtifactsRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupWithArtifactsResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/groups.py::reorder_artifacts_in_group",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupWithArtifactsResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ReorderArtifactsRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2467,12 +2467,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/context_entities.py::create_context_entity",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityCreateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/context_entities.py::create_context_entity",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityCreateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -2587,12 +2587,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace.py::install_listing",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace.py::install_listing",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -2722,12 +2722,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/project_templates.py::create_template",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateCreateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/project_templates.py::create_template",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateCreateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2737,12 +2737,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/project_templates.py::update_template",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/project_templates.py::update_template",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/project_template.py::ProjectTemplateUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2827,12 +2827,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/versions.py::rollback",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/versions.py::rollback",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -2842,12 +2842,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/versions.py::diff_snapshots",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/versions.py::diff_snapshots",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2917,12 +2917,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::discover_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryResult",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::discover_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryResult",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -2962,12 +2962,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportResult",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportResult",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3012,12 +3012,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::create_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::create_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3082,12 +3082,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3117,12 +3117,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -3172,12 +3172,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::sync_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::sync_artifact",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -3287,12 +3287,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact_file_content",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileContentResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::update_artifact_file_content",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileContentResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -3307,12 +3307,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::create_artifact_file",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileContentResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::create_artifact_file",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::FileContentResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -3382,12 +3382,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::add_skip_preference",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceAddRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/artifacts.py::add_skip_preference",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceAddRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3477,12 +3477,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::pull_changes",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPullRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::pull_changes",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPullRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3492,12 +3492,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::push_changes",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPushRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::push_changes",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPushRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3517,12 +3517,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::resolve_conflict",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResolveRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/context_sync.py::resolve_conflict",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResolveRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
       "type": "handler_uses_schema"
     },
     {
@@ -3567,12 +3567,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/projects.py::update_project",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/projects.py::ProjectDetail",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/projects.py::ProjectUpdateRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/projects.py::update_project",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/projects.py::ProjectUpdateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/projects.py::ProjectDetail",
       "type": "handler_uses_schema"
     },
     {
@@ -3677,12 +3677,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::infer_github_url",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::infer_github_url",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3727,12 +3727,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::update_source",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateSourceRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::SourceResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::update_source",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::SourceResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateSourceRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3777,12 +3777,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::update_catalog_entry_name",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateCatalogEntryNameRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::CatalogEntryResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::update_catalog_entry_name",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::CatalogEntryResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateCatalogEntryNameRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -3802,12 +3802,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::import_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportResultDTO",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportRequest",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/marketplace_sources.py::import_artifacts",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportResultDTO",
       "type": "handler_uses_schema"
     },
     {
@@ -3907,12 +3907,12 @@
     },
     {
       "from": "handler:skillmeat/api/routers/user_collections.py::create_user_collection",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionCreateRequest",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionResponse",
       "type": "handler_uses_schema"
     },
     {
       "from": "handler:skillmeat/api/routers/user_collections.py::create_user_collection",
-      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionResponse",
+      "to": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionCreateRequest",
       "type": "handler_uses_schema"
     },
     {
@@ -4146,7 +4146,7 @@
       "type": "model_migrated_by"
     }
   ],
-  "generated_at": "2026-01-12T19:56:23Z",
+  "generated_at": "2026-01-12T20:00:03Z",
   "nodes": [
     {
       "file": "skillmeat/api/routers/tags.py",
@@ -8301,14 +8301,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteResponse",
-      "label": "MergeExecuteResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteRequest",
+      "label": "MergeExecuteRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteRequest",
-      "label": "MergeExecuteRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/merge.py::MergeExecuteResponse",
+      "label": "MergeExecuteResponse",
       "type": "schema"
     },
     {
@@ -8373,14 +8373,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportRequest",
-      "label": "BundleExportRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportResponse",
+      "label": "BundleExportResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportResponse",
-      "label": "BundleExportResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::BundleExportRequest",
+      "label": "BundleExportRequest",
       "type": "schema"
     },
     {
@@ -8409,14 +8409,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkUpdateRequest",
-      "label": "ShareLinkUpdateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkResponse",
+      "label": "ShareLinkResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkResponse",
-      "label": "ShareLinkResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/bundles.py::ShareLinkUpdateRequest",
+      "label": "ShareLinkUpdateRequest",
       "type": "schema"
     },
     {
@@ -8427,14 +8427,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshResponse",
-      "label": "CacheRefreshResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshRequest",
+      "label": "CacheRefreshRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshRequest",
-      "label": "CacheRefreshRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheRefreshResponse",
+      "label": "CacheRefreshResponse",
       "type": "schema"
     },
     {
@@ -8469,14 +8469,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateResponse",
-      "label": "CacheInvalidateResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateRequest",
+      "label": "CacheInvalidateRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateRequest",
-      "label": "CacheInvalidateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/cache.py::CacheInvalidateResponse",
+      "label": "CacheInvalidateResponse",
       "type": "schema"
     },
     {
@@ -8529,14 +8529,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ArtifactPositionUpdate",
-      "label": "ArtifactPositionUpdate",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupArtifactResponse",
+      "label": "GroupArtifactResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::GroupArtifactResponse",
-      "label": "GroupArtifactResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/groups.py::ArtifactPositionUpdate",
+      "label": "ArtifactPositionUpdate",
       "type": "schema"
     },
     {
@@ -8655,14 +8655,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityResponse",
-      "label": "ContextEntityResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityCreateRequest",
+      "label": "ContextEntityCreateRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityCreateRequest",
-      "label": "ContextEntityCreateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_entity.py::ContextEntityResponse",
+      "label": "ContextEntityResponse",
       "type": "schema"
     },
     {
@@ -8739,14 +8739,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallResponse",
-      "label": "InstallResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallRequest",
+      "label": "InstallRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallRequest",
-      "label": "InstallRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InstallResponse",
+      "label": "InstallResponse",
       "type": "schema"
     },
     {
@@ -8871,26 +8871,26 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackResponse",
-      "label": "RollbackResponse",
-      "type": "schema"
-    },
-    {
-      "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py",
       "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackRequest",
       "label": "RollbackRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffRequest",
-      "label": "VersionDiffRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::RollbackResponse",
+      "label": "RollbackResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py",
       "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffResponse",
       "label": "VersionDiffResponse",
+      "type": "schema"
+    },
+    {
+      "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/version.py::VersionDiffRequest",
+      "label": "VersionDiffRequest",
       "type": "schema"
     },
     {
@@ -8925,14 +8925,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryRequest",
-      "label": "DiscoveryRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryResult",
+      "label": "DiscoveryResult",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryResult",
-      "label": "DiscoveryResult",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::DiscoveryRequest",
+      "label": "DiscoveryRequest",
       "type": "schema"
     },
     {
@@ -8955,14 +8955,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportRequest",
-      "label": "BulkImportRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportResult",
+      "label": "BulkImportResult",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportResult",
-      "label": "BulkImportResult",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::BulkImportRequest",
+      "label": "BulkImportRequest",
       "type": "schema"
     },
     {
@@ -8993,14 +8993,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateRequest",
-      "label": "ArtifactCreateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateResponse",
+      "label": "ArtifactCreateResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateResponse",
-      "label": "ArtifactCreateResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactCreateRequest",
+      "label": "ArtifactCreateRequest",
       "type": "schema"
     },
     {
@@ -9041,14 +9041,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateResponse",
-      "label": "ParameterUpdateResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateRequest",
+      "label": "ParameterUpdateRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateRequest",
-      "label": "ParameterUpdateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::ParameterUpdateResponse",
+      "label": "ParameterUpdateResponse",
       "type": "schema"
     },
     {
@@ -9071,14 +9071,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncResponse",
-      "label": "ArtifactSyncResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncRequest",
+      "label": "ArtifactSyncRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncRequest",
-      "label": "ArtifactSyncRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/artifacts.py::ArtifactSyncResponse",
+      "label": "ArtifactSyncResponse",
       "type": "schema"
     },
     {
@@ -9149,14 +9149,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceAddRequest",
-      "label": "SkipPreferenceAddRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceResponse",
+      "label": "SkipPreferenceResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceResponse",
-      "label": "SkipPreferenceResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/discovery.py::SkipPreferenceAddRequest",
+      "label": "SkipPreferenceAddRequest",
       "type": "schema"
     },
     {
@@ -9173,14 +9173,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPullRequest",
-      "label": "SyncPullRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
+      "label": "SyncResultResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncResultResponse",
-      "label": "SyncResultResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/context_sync.py::SyncPullRequest",
+      "label": "SyncPullRequest",
       "type": "schema"
     },
     {
@@ -9305,14 +9305,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlRequest",
-      "label": "InferUrlRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlResponse",
+      "label": "InferUrlResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlResponse",
-      "label": "InferUrlResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::InferUrlRequest",
+      "label": "InferUrlRequest",
       "type": "schema"
     },
     {
@@ -9373,14 +9373,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateCatalogEntryNameRequest",
-      "label": "UpdateCatalogEntryNameRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::CatalogEntryResponse",
+      "label": "CatalogEntryResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::CatalogEntryResponse",
-      "label": "CatalogEntryResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::UpdateCatalogEntryNameRequest",
+      "label": "UpdateCatalogEntryNameRequest",
       "type": "schema"
     },
     {
@@ -9397,14 +9397,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportResultDTO",
-      "label": "ImportResultDTO",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportRequest",
+      "label": "ImportRequest",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportRequest",
-      "label": "ImportRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/marketplace.py::ImportResultDTO",
+      "label": "ImportResultDTO",
       "type": "schema"
     },
     {
@@ -9505,14 +9505,14 @@
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionCreateRequest",
-      "label": "UserCollectionCreateRequest",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionResponse",
+      "label": "UserCollectionResponse",
       "type": "schema"
     },
     {
       "file": "/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py",
-      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionResponse",
-      "label": "UserCollectionResponse",
+      "id": "schema:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/api/schemas/user_collections.py::UserCollectionCreateRequest",
+      "label": "UserCollectionCreateRequest",
       "type": "schema"
     },
     {
@@ -14681,5 +14681,5 @@
   ],
   "schema_version": "v1",
   "source": "backend",
-  "source_commit": "e39ea595bfe8f6a2cf46e18d0daf158b1ed18131"
+  "source_commit": "1666a5f207fab2e1f15cb6a2e1eb3a0eb72c1aef"
 }
