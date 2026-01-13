@@ -285,7 +285,7 @@ async def create_mcp_server(
             )
 
         # Save collection
-        collection_mgr.save_collection(coll, collection_name)
+        collection_mgr.save_collection(coll)
 
         logger.info(
             f"Created MCP server '{request.name}' in collection '{collection_name}'"
@@ -385,7 +385,7 @@ async def update_mcp_server(
             )
 
         # Save collection
-        collection_mgr.save_collection(coll, collection_name)
+        collection_mgr.save_collection(coll)
 
         logger.info(f"Updated MCP server '{name}'")
         return metadata_to_response(server)
@@ -457,7 +457,7 @@ async def delete_mcp_server(
             )
 
         # Save collection
-        collection_mgr.save_collection(coll, collection_name)
+        collection_mgr.save_collection(coll)
 
         logger.info(f"Deleted MCP server '{name}'")
 
@@ -549,7 +549,7 @@ async def deploy_mcp_server(
 
         # Update collection if deployment succeeded and not dry run
         if result.success and not request.dry_run:
-            collection_mgr.save_collection(coll, collection_name)
+            collection_mgr.save_collection(coll)
 
         # Build response
         if result.success:
@@ -659,7 +659,7 @@ async def undeploy_mcp_server(
                     server = coll.find_mcp_server(name)
                     if server:
                         server.status = MCPServerStatus.NOT_INSTALLED
-                        collection_mgr.save_collection(coll, collection_name)
+                        collection_mgr.save_collection(coll)
                 except Exception as e:
                     logger.warning(f"Failed to update server status: {e}")
 

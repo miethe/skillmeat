@@ -411,7 +411,7 @@ class ArtifactImporter:
             # Update artifact tags if any were added
             if tags_added > 0:
                 target_artifact.tags = list(existing_tags)
-                self.collection_manager.save_collection(collection, collection_name)
+                self.collection_manager.save_collection(collection)
                 logger.info(
                     f"Applied {tags_added} path tags to {artifact_name}: "
                     f"{approved_segments[:3]}{'...' if len(approved_segments) > 3 else ''}"
