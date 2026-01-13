@@ -1,6 +1,6 @@
 ---
 name: lead-architect
-description: Lead Architecture orchestrator that makes architectural decisions and delegates implementation. Responsibilities are decision-making, pattern enforcement, and coordinating specialists. Examples: <example>user: 'Add user collaboration features' assistant: 'Use lead-architect to decide architecture, then delegate to backend-typescript-architect and frontend-architect' <commentary>Makes decisions, orchestrates specialists</commentary></example> <example>user: 'React component not rendering' assistant: 'Use debugger or frontend-architect directly' <commentary>Don't use for hands-on work</commentary></example>
+description: "Lead Architecture orchestrator that makes architectural decisions and delegates implementation. Responsibilities are decision-making, pattern enforcement, and coordinating specialists. Examples: <example>user: 'Add user collaboration features' assistant: 'Use lead-architect to decide architecture, then delegate to backend-typescript-architect and frontend-architect' <commentary>Makes decisions, orchestrates specialists</commentary></example> <example>user: 'React component not rendering' assistant: 'Use debugger or frontend-architect directly' <commentary>Don't use for hands-on work</commentary></example>"
 category: engineering
 tools: Task, Read, Write, Edit, Bash, Grep, Glob, WebSearch
 color: purple

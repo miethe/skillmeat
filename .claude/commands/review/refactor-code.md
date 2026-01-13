@@ -1,6 +1,6 @@
 ---
-description: Intelligently refactor and improve code quality
-argument-hint: "<code_filepath>" or "<code section description>"
+description: "Intelligently refactor and improve code quality"
+argument-hint: '<code_filepath> or <code section description>'
 allowed-tools: Read, Grep, Glob, Edit, MultiEdit, Write,
   Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(pytest:*),
   Bash(uv:*), Bash(pre-commit:*)
