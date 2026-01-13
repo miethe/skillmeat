@@ -591,7 +591,7 @@ function CollectionPageContent() {
     <div className="flex h-full flex-col">
       <CollectionHeader
         collection={currentCollection}
-        artifactCount={filteredArtifacts.length}
+        artifactCount={totalCount}
         isAllCollections={isAllCollections}
         onEdit={currentCollection ? () => setShowEditDialog(true) : undefined}
         onDelete={currentCollection ? () => setShowEditDialog(true) : undefined}
