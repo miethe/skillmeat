@@ -34,13 +34,18 @@ def temp_project_dir():
 
     Yields:
         Path: Temporary project directory with .claude/ subdirectory
+
+    Note:
+        Does not create hooks/ directory by default as hooks use directory-based
+        detection (empty hooks/ would be detected as a hook artifact). Tests that
+        need hooks directory should create it explicitly.
     """
     temp_dir = Path(tempfile.mkdtemp())
     claude_dir = temp_dir / ".claude"
     claude_dir.mkdir(parents=True)
 
-    # Create artifact type directories
-    for artifact_type in ["skills", "commands", "agents", "hooks", "mcp"]:
+    # Create artifact type directories (excluding hooks - see note above)
+    for artifact_type in ["skills", "commands", "agents", "mcp"]:
         (claude_dir / artifact_type).mkdir(exist_ok=True)
 
     yield temp_dir
@@ -75,8 +80,8 @@ def mock_collection_config(temp_project_dir):
     artifacts_dir = collection_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create artifact type directories
-    for artifact_type in ["skills", "commands", "agents", "hooks", "mcps"]:
+    # Create artifact type directories (excluding hooks - see temp_project_dir note)
+    for artifact_type in ["skills", "commands", "agents", "mcps"]:
         (artifacts_dir / artifact_type).mkdir(exist_ok=True)
 
     # ConfigManager is imported inside check_artifact_exists, so patch it there
@@ -378,14 +383,19 @@ class TestNonNestingTypes:
     def test_skip_nested_hooks(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Hooks in subdirectories should NOT be discovered as nested artifacts."""
+        """Hooks use directory-based detection: subdirectories become hook artifacts.
+
+        With the new directory-based hook detection:
+        - If hooks/ has subdirectories, each subdirectory becomes a hook artifact
+        - Nested structures within subdirectories are NOT recursively scanned
+        """
         hooks_dir = temp_project_dir / ".claude" / "hooks"
 
-        # Create top-level hook
+        # Create top-level hook (as a subdirectory - will be detected)
         create_hook_file(hooks_dir, "my-hook")
 
-        # Create nested structure that looks like a hook
-        # (but nesting is not allowed for hooks)
+        # Create nested structure - "category" is a subdirectory so becomes a hook
+        # nested-hook inside category is NOT detected (no recursive nesting for hooks)
         nested_dir = hooks_dir / "category"
         nested_dir.mkdir()
         nested_hook = nested_dir / "nested-hook"
@@ -395,10 +405,11 @@ class TestNonNestingTypes:
         result = discovery_service.discover_artifacts()
 
         hook_names = [a.name for a in result.artifacts if a.type == "hook"]
-        assert "my-hook" in hook_names, "Top-level hook should be found"
+        # With directory-based detection, both my-hook and category are hook artifacts
+        assert "my-hook" in hook_names, "Top-level hook subdirectory should be found"
+        assert "category" in hook_names, "Category subdirectory becomes a hook artifact"
+        # nested-hook is NOT found because hooks don't support recursive nesting
         assert "nested-hook" not in hook_names, "Nested hook should NOT be found"
-        # "category" should not be detected as a hook either
-        assert "category" not in hook_names, "Category dir should not be detected as hook"
 
     def test_skip_nested_mcp(
         self, temp_project_dir, discovery_service, mock_collection_config
@@ -971,15 +982,21 @@ class TestNestingNotAllowedTypes:
     def test_hooks_container_ignores_nested(
         self, temp_project_dir, discovery_service, mock_collection_config
     ):
-        """Hooks directory should ignore any nested structures."""
+        """Hooks directory uses directory-based detection: each subdirectory is a hook.
+
+        With directory-based hook detection:
+        - Each direct subdirectory of hooks/ becomes a hook artifact
+        - Nested structures within those subdirectories are NOT recursively discovered
+        """
         hooks_dir = temp_project_dir / ".claude" / "hooks"
 
-        # Create top-level hook
+        # Create top-level hook (as subdirectory)
         create_hook_file(hooks_dir, "hook-a")
 
-        # Create nested structure
+        # Create another subdirectory - this becomes a hook artifact too
         nested = hooks_dir / "nested"
         nested.mkdir()
+        # Content inside nested is not relevant - the directory itself is the hook
         nested_hook = nested / "nested-hook"
         nested_hook.mkdir()
         (nested_hook / "settings.json").write_text('{"name": "nested-hook"}')
@@ -987,8 +1004,11 @@ class TestNestingNotAllowedTypes:
         result = discovery_service.discover_artifacts()
 
         hook_names = [a.name for a in result.artifacts if a.type == "hook"]
-        assert "hook-a" in hook_names
-        assert len(hook_names) == 1, f"Expected only 1 hook, got {len(hook_names)}"
+        assert "hook-a" in hook_names, "hook-a subdirectory should be found"
+        assert "nested" in hook_names, "nested subdirectory becomes a hook artifact"
+        # nested-hook is NOT found - no recursive nesting for hooks
+        assert "nested-hook" not in hook_names, "nested-hook should NOT be found"
+        assert len(hook_names) == 2, f"Expected 2 hooks, got {len(hook_names)}: {hook_names}"
 
     def test_mcp_container_ignores_nested(
         self, temp_project_dir, discovery_service, mock_collection_config
