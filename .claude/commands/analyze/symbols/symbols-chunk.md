@@ -1,5 +1,5 @@
 ---
-name: symbols:chunk
+name: symbols-chunk
 description: "Split symbols graph into optimized domain-specific chunks with separated test files for efficient agent consumption"
 tools: [Read, Write, Bash]
 ---

@@ -88,6 +88,7 @@ Nodes:
 - `label`: human-readable label
 - `file`: file path when known
 - optional metadata per node type (ex: `method`, `path`, `prefix`)
+  - frontend endpoint extras: `raw_path`, `raw_method`, `method_inferred`
 
 Edges:
 - `from`, `to`: node ids
@@ -119,6 +120,8 @@ Additional frontend coverage includes:
 - Hook to API client mapping (`hook_calls_api_client`, `api_client_calls_endpoint`)
 - React Query keys (`hook_registers_query_key`)
 - Imports of shared types (`uses_type`)
+ - Endpoint normalization to match backend `api_endpoint` IDs (adds API prefix and
+   converts template params like `${id}` to `{id}`).
 
 Primary extractors:
 - `extract_frontend_components.py`: scans `web/app/**/page.tsx` and `web/components/**`
