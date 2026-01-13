@@ -25,10 +25,18 @@ Implement infinite scrolling on the Collection page (`/collection`) to handle la
 
 ## Affected Files
 
-1. `skillmeat/web/lib/api/collections.ts`: Add pagination params to `fetchCollectionArtifacts`
-2. `skillmeat/web/hooks/use-collections.ts`: Create `useInfiniteCollectionArtifacts` hook using `useInfiniteQuery`
-3. `skillmeat/web/app/collection/page.tsx`: Replace `useCollectionArtifacts` with infinite hook, add intersection observer
-4. `skillmeat/web/hooks/use-intersection-observer.ts`: New hook for detecting scroll position (reusable)
+### Initial Implementation (specific collections)
+
+1. `skillmeat/web/lib/api/collections.ts`: Add `fetchCollectionArtifactsPaginated`
+2. `skillmeat/web/hooks/use-collections.ts`: Create `useInfiniteCollectionArtifacts` hook
+3. `skillmeat/web/app/collection/page.tsx`: Add infinite scroll for specific collections
+4. `skillmeat/web/hooks/use-intersection-observer.ts`: New hook for scroll detection
+
+### Fix: All Collections View (follow-up)
+
+5. `skillmeat/web/lib/api/artifacts.ts`: Add `fetchArtifactsPaginated`
+6. `skillmeat/web/hooks/useArtifacts.ts`: Create `useInfiniteArtifacts` hook
+7. `skillmeat/web/app/collection/page.tsx`: Use infinite scroll for BOTH views
 
 ## Implementation Steps
 
@@ -63,9 +71,10 @@ Response:
 ## Completion Criteria
 
 - [x] Intersection observer hook created and exported
-- [x] API client supports pagination parameters
+- [x] API client supports pagination parameters (collections + artifacts)
 - [x] useInfiniteCollectionArtifacts hook implemented
-- [x] Collection page uses infinite scroll
+- [x] useInfiniteArtifacts hook implemented (for "All Collections")
+- [x] Collection page uses infinite scroll for BOTH views
 - [x] Loading states shown during fetch
 - [x] Tests pass (pre-existing failures, not from this change)
 - [x] Build succeeds

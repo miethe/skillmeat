@@ -35,3 +35,100 @@ export async function deleteArtifactFromCollection(
   }
   // DELETE typically returns 204 No Content (no body)
 }
+
+/**
+ * Response type for paginated artifacts list
+ */
+export interface ArtifactsPaginatedResponse {
+  items: Array<{
+    id: string;
+    name: string;
+    type: string;
+    source: string;
+    version?: string;
+    tags?: string[];
+    aliases?: string[];
+    metadata?: {
+      title?: string;
+      description?: string;
+      license?: string;
+      author?: string;
+      version?: string;
+      tags?: string[];
+    };
+    upstream?: {
+      tracking_enabled: boolean;
+      current_sha?: string;
+      upstream_sha?: string;
+      update_available: boolean;
+      has_local_modifications: boolean;
+    };
+    added: string;
+    updated: string;
+    collection?: {
+      id: string;
+      name: string;
+    };
+    collections?: Array<{
+      id: string;
+      name: string;
+      artifact_count?: number;
+    }>;
+  }>;
+  page_info: {
+    has_next_page: boolean;
+    has_previous_page: boolean;
+    start_cursor: string | null;
+    end_cursor: string | null;
+    total_count: number;
+  };
+}
+
+/**
+ * Fetch paginated artifacts from collection
+ *
+ * Used for infinite scroll implementation in "All Collections" view.
+ * Returns cursor-based pagination info.
+ *
+ * @param options - Pagination and filter options
+ * @returns Paginated response with items and page_info
+ *
+ * @example
+ * ```ts
+ * const page1 = await fetchArtifactsPaginated({ limit: 20 });
+ * if (page1.page_info.has_next_page) {
+ *   const page2 = await fetchArtifactsPaginated({
+ *     limit: 20,
+ *     after: page1.page_info.end_cursor
+ *   });
+ * }
+ * ```
+ */
+export async function fetchArtifactsPaginated(
+  options?: {
+    limit?: number;
+    after?: string;
+    artifact_type?: string;
+    status?: string;
+    scope?: string;
+    search?: string;
+  }
+): Promise<ArtifactsPaginatedResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set('limit', options.limit.toString());
+  if (options?.after) params.set('after', options.after);
+  if (options?.artifact_type) params.set('artifact_type', options.artifact_type);
+  if (options?.status) params.set('status', options.status);
+  if (options?.scope) params.set('scope', options.scope);
+  if (options?.search) params.set('search', options.search);
+
+  const queryString = params.toString();
+  const path = queryString ? `/artifacts?${queryString}` : '/artifacts';
+
+  const response = await fetch(buildUrl(path));
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to fetch artifacts: ${response.statusText}`);
+  }
+  return response.json();
+}

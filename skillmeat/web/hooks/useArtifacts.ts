@@ -5,7 +5,7 @@
  * Uses live API data with mock fallbacks to keep the UI responsive offline.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type {
   Artifact,
   ArtifactFilters,
@@ -15,6 +15,10 @@ import type {
   ArtifactType,
 } from '@/types/artifact';
 import { ApiError, apiConfig, apiRequest } from '@/lib/api';
+import {
+  fetchArtifactsPaginated,
+  type ArtifactsPaginatedResponse,
+} from '@/lib/api/artifacts';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -558,5 +562,71 @@ export function useDeleteArtifact() {
       // Invalidate and refetch artifacts
       queryClient.invalidateQueries({ queryKey: artifactKeys.all });
     },
+  });
+}
+
+/**
+ * Options for infinite artifacts query (used for "All Collections" view)
+ */
+export interface InfiniteAllArtifactsOptions {
+  /** Number of items to fetch per page */
+  limit?: number;
+  /** Filter by artifact type */
+  artifact_type?: string;
+  /** Filter by status */
+  status?: string;
+  /** Filter by scope */
+  scope?: string;
+  /** Search query */
+  search?: string;
+  /** Whether the query should be enabled */
+  enabled?: boolean;
+}
+
+/**
+ * Hook to fetch all artifacts with infinite scroll pagination
+ *
+ * Uses cursor-based pagination for efficient loading of large artifact lists.
+ * This is the "All Collections" counterpart to useInfiniteCollectionArtifacts.
+ *
+ * @param options - Pagination and filtering options
+ * @returns Infinite query result with pages array and pagination helpers
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   data,
+ *   fetchNextPage,
+ *   hasNextPage,
+ *   isFetchingNextPage,
+ * } = useInfiniteArtifacts({ limit: 20 });
+ *
+ * // Flatten pages to get all items
+ * const allItems = data?.pages.flatMap(p => p.items) || [];
+ *
+ * // Get total count from first page
+ * const totalCount = data?.pages[0]?.page_info.total_count || 0;
+ * ```
+ */
+export function useInfiniteArtifacts(options?: InfiniteAllArtifactsOptions) {
+  const { limit = 20, enabled = true, ...filters } = options || {};
+
+  return useInfiniteQuery({
+    queryKey: ['artifacts', 'infinite', filters],
+    queryFn: async ({ pageParam }): Promise<ArtifactsPaginatedResponse> => {
+      return fetchArtifactsPaginated({
+        limit,
+        after: pageParam,
+        artifact_type: filters.artifact_type,
+        status: filters.status,
+        scope: filters.scope,
+        search: filters.search,
+      });
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor ?? undefined : undefined,
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

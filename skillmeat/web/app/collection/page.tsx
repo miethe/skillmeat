@@ -16,7 +16,7 @@ import { TagFilterBar } from '@/components/ui/tag-filter-popover';
 import {
   EntityLifecycleProvider,
   useCollectionContext,
-  useArtifacts,
+  useInfiniteArtifacts,
   useInfiniteCollectionArtifacts,
   useIntersectionObserver,
   useEditArtifactParameters,
@@ -276,33 +276,47 @@ function CollectionPageContent() {
   const isSpecificCollection = !!selectedCollectionId && selectedCollectionId !== 'all';
 
   // Conditionally fetch artifacts based on selected collection
-  // When a specific collection is selected, use infinite scroll pagination
-  // When "All Collections" or no selection, use general artifacts endpoint
+  // Both views use infinite scroll pagination for better performance
+
+  // Fetch artifacts for a specific collection (with infinite scroll)
   const {
     data: infiniteCollectionData,
-    isLoading: isLoadingInfiniteArtifacts,
-    error: infiniteCollectionError,
-    refetch: refetchInfiniteArtifacts,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
+    isLoading: isLoadingCollectionArtifacts,
+    error: collectionError,
+    refetch: refetchCollectionArtifacts,
+    fetchNextPage: fetchNextCollectionPage,
+    hasNextPage: hasNextCollectionPage,
+    isFetchingNextPage: isFetchingNextCollectionPage,
   } = useInfiniteCollectionArtifacts(
     isSpecificCollection ? selectedCollectionId : undefined,
     { limit: 20, enabled: isSpecificCollection }
   );
 
-  // Fetch all artifacts (used for "All Collections" mode and for enriching collection artifacts)
+  // Fetch all artifacts with infinite scroll (for "All Collections" mode)
+  // Also used to enrich collection artifacts with full metadata
   const {
-    data: allArtifactsData,
+    data: infiniteAllArtifactsData,
     isLoading: isLoadingAllArtifacts,
     error: allArtifactsError,
     refetch: refetchAllArtifacts,
-  } = useArtifacts(filters, { field: sortField as any, order: sortOrder });
+    fetchNextPage: fetchNextAllPage,
+    hasNextPage: hasNextAllPage,
+    isFetchingNextPage: isFetchingNextAllPage,
+  } = useInfiniteArtifacts({
+    limit: 20,
+    artifact_type: filters.type !== 'all' ? filters.type : undefined,
+    enabled: true, // Always fetch to support enrichment
+  });
 
-  // Set up intersection observer for infinite scroll
+  // Unified pagination state based on current view
+  const fetchNextPage = isSpecificCollection ? fetchNextCollectionPage : fetchNextAllPage;
+  const hasNextPage = isSpecificCollection ? hasNextCollectionPage : hasNextAllPage;
+  const isFetchingNextPage = isSpecificCollection ? isFetchingNextCollectionPage : isFetchingNextAllPage;
+
+  // Set up intersection observer for infinite scroll (works for BOTH views)
   const { targetRef, isIntersecting } = useIntersectionObserver<HTMLDivElement>({
     rootMargin: '200px',
-    enabled: isSpecificCollection && hasNextPage && !isFetchingNextPage,
+    enabled: hasNextPage && !isFetchingNextPage,
   });
 
   // Trigger fetch when intersection observer detects scroll near bottom
@@ -314,23 +328,23 @@ function CollectionPageContent() {
 
   // Select the appropriate loading state and error based on selection
   const isLoadingArtifacts = isSpecificCollection
-    ? isLoadingInfiniteArtifacts
+    ? isLoadingCollectionArtifacts
     : isLoadingAllArtifacts;
-  const error = isSpecificCollection ? infiniteCollectionError : allArtifactsError;
-  const refetch = isSpecificCollection ? refetchInfiniteArtifacts : refetchAllArtifacts;
+  const error = isSpecificCollection ? collectionError : allArtifactsError;
+  const refetch = isSpecificCollection ? refetchCollectionArtifacts : refetchAllArtifacts;
 
   // Get total count for display (from first page's page_info)
   const totalCount = isSpecificCollection
     ? infiniteCollectionData?.pages[0]?.page_info.total_count ?? 0
-    : allArtifactsData?.artifacts?.length ?? 0;
+    : infiniteAllArtifactsData?.pages[0]?.page_info.total_count ?? 0;
 
   // Initialize lastUpdated on first load
   useEffect(() => {
-    const hasData = isSpecificCollection ? infiniteCollectionData : allArtifactsData;
+    const hasData = isSpecificCollection ? infiniteCollectionData : infiniteAllArtifactsData;
     if (hasData && !lastUpdated) {
       setLastUpdated(new Date());
     }
-  }, [infiniteCollectionData, allArtifactsData, isSpecificCollection, lastUpdated]);
+  }, [infiniteCollectionData, infiniteAllArtifactsData, isSpecificCollection, lastUpdated]);
 
   // Handle tag selection changes
   const handleTagsChange = (tags: string[]) => {
@@ -343,17 +357,106 @@ function CollectionPageContent() {
     router.push(`?${params.toString()}`);
   };
 
+  // Helper function to map API artifact response to Artifact type
+  const mapApiArtifactToArtifact = (apiArtifact: {
+    id: string;
+    name: string;
+    type: string;
+    source: string;
+    version?: string;
+    tags?: string[];
+    aliases?: string[];
+    metadata?: {
+      title?: string;
+      description?: string;
+      license?: string;
+      author?: string;
+      version?: string;
+      tags?: string[];
+    };
+    upstream?: {
+      tracking_enabled: boolean;
+      current_sha?: string;
+      upstream_sha?: string;
+      update_available: boolean;
+      has_local_modifications: boolean;
+    };
+    added: string;
+    updated: string;
+    collection?: { id: string; name: string };
+    collections?: Array<{ id: string; name: string; artifact_count?: number }>;
+  }): Artifact => {
+    const metadata = apiArtifact.metadata || {};
+    const upstream = apiArtifact.upstream;
+    const isOutdated = upstream?.update_available ?? false;
+
+    // Merge tags from artifact level and metadata level
+    const artifactTags = apiArtifact.tags || [];
+    const metadataTags = metadata.tags || [];
+    const mergedTags: string[] = [];
+    const seenTags = new Set<string>();
+    for (const tag of [...artifactTags, ...metadataTags]) {
+      const normalized = tag?.trim();
+      if (!normalized || seenTags.has(normalized)) continue;
+      seenTags.add(normalized);
+      mergedTags.push(normalized);
+    }
+
+    return {
+      id: apiArtifact.id,
+      name: apiArtifact.name,
+      type: apiArtifact.type as any,
+      scope: apiArtifact.source === 'local' ? 'local' : 'user',
+      status: isOutdated ? 'outdated' : 'active',
+      version: apiArtifact.version || metadata.version,
+      source: apiArtifact.source,
+      metadata: {
+        title: metadata.title || apiArtifact.name,
+        description: metadata.description || '',
+        license: metadata.license,
+        author: metadata.author,
+        version: metadata.version || apiArtifact.version,
+        tags: mergedTags,
+      },
+      upstreamStatus: {
+        hasUpstream: Boolean(upstream?.tracking_enabled),
+        upstreamUrl: apiArtifact.source?.startsWith('http') || apiArtifact.source?.includes('github.com')
+          ? apiArtifact.source
+          : undefined,
+        upstreamVersion: upstream?.upstream_sha,
+        currentVersion: upstream?.current_sha || apiArtifact.version,
+        isOutdated,
+        lastChecked: apiArtifact.updated,
+      },
+      usageStats: {
+        totalDeployments: 0,
+        activeProjects: 0,
+        lastUsed: apiArtifact.updated,
+        usageCount: 0,
+      },
+      createdAt: apiArtifact.added,
+      updatedAt: apiArtifact.updated,
+      aliases: apiArtifact.aliases || [],
+      collection: apiArtifact.collection,
+      collections: apiArtifact.collections,
+    };
+  };
+
   // Apply client-side search, tag filter, and sort
   const filteredArtifacts = useMemo(() => {
     // Handle different response shapes:
-    // - Specific collection (infinite scroll): pages array with items
-    // - All collections: artifacts array
+    // - Specific collection (infinite scroll): pages array with items (lightweight summaries)
+    // - All collections (infinite scroll): pages array with items (full artifacts)
     let artifacts: Artifact[] = [];
 
     if (isSpecificCollection && infiniteCollectionData?.pages) {
       // Collection-specific view with infinite scroll: Flatten pages and enrich
       const allSummaries = infiniteCollectionData.pages.flatMap(page => page.items);
-      const fullArtifacts = allArtifactsData?.artifacts ?? [];
+
+      // Get full artifacts from infiniteAllArtifactsData for enrichment
+      const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
+        ? infiniteAllArtifactsData.pages.flatMap(page => page.items.map(mapApiArtifactToArtifact))
+        : [];
 
       // Build collection info from current context to ensure artifacts have collection set
       const collectionInfo = currentCollection
@@ -372,9 +475,21 @@ function CollectionPageContent() {
         seen.add(artifact.id);
         return true;
       });
-    } else if (!isSpecificCollection && allArtifactsData?.artifacts) {
-      // All collections view: Already have full Artifact objects
-      artifacts = allArtifactsData.artifacts ?? [];
+    } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
+      // All collections view with infinite scroll: Flatten pages and map to Artifact type
+      artifacts = infiniteAllArtifactsData.pages.flatMap(page =>
+        page.items.map(mapApiArtifactToArtifact)
+      );
+
+      // Deduplicate by ID
+      const seen = new Set<string>();
+      artifacts = artifacts.filter(artifact => {
+        if (seen.has(artifact.id)) {
+          return false;
+        }
+        seen.add(artifact.id);
+        return true;
+      });
     }
 
     // Search
@@ -422,7 +537,7 @@ function CollectionPageContent() {
     }
 
     return artifacts;
-  }, [isSpecificCollection, infiniteCollectionData, allArtifactsData, currentCollection, searchQuery, selectedTags, sortField, sortOrder]);
+  }, [isSpecificCollection, infiniteCollectionData, infiniteAllArtifactsData, currentCollection, searchQuery, selectedTags, sortField, sortOrder]);
 
   const handleArtifactClick = (artifact: Artifact) => {
     // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
@@ -549,8 +664,8 @@ function CollectionPageContent() {
         {/* Artifacts View */}
         {!error && !isLoadingArtifacts && filteredArtifacts.length > 0 && (
           <>
-            {/* Artifact count indicator for specific collections with pagination */}
-            {isSpecificCollection && totalCount > 0 && (
+            {/* Artifact count indicator with pagination info (works for BOTH views) */}
+            {totalCount > 0 && (
               <div className="mb-4 text-sm text-muted-foreground">
                 Showing {filteredArtifacts.length} of {totalCount} artifacts
                 {hasNextPage && ' (scroll for more)'}
@@ -591,26 +706,24 @@ function CollectionPageContent() {
               />
             )}
 
-            {/* Infinite scroll trigger element - only for specific collections */}
-            {isSpecificCollection && (
-              <div
-                ref={targetRef}
-                className="flex justify-center py-8"
-                aria-hidden="true"
-              >
-                {isFetchingNextPage && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="text-sm">Loading more artifacts...</span>
-                  </div>
-                )}
-                {!hasNextPage && filteredArtifacts.length > 0 && filteredArtifacts.length === totalCount && (
-                  <span className="text-sm text-muted-foreground">
-                    All {totalCount} artifacts loaded
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Infinite scroll trigger element - works for BOTH views */}
+            <div
+              ref={targetRef}
+              className="flex justify-center py-8"
+              aria-hidden="true"
+            >
+              {isFetchingNextPage && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Loading more artifacts...</span>
+                </div>
+              )}
+              {!hasNextPage && filteredArtifacts.length > 0 && totalCount > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  All {totalCount} artifacts loaded
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>
