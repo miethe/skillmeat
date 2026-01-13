@@ -107,14 +107,16 @@ export {
 export { useDeploy, useUndeploy } from './useDeploy';
 
 // ============================================================================
-// ARTIFACTS (4 hooks)
+// ARTIFACTS (5 hooks)
 // ============================================================================
-// Core artifact operations and bulk import
+// Core artifact operations, bulk import, and infinite scroll
 export {
   useArtifacts,
   useArtifact,
   useUpdateArtifact,
   useDeleteArtifact,
+  useInfiniteArtifacts,
+  type InfiniteAllArtifactsOptions,
 } from './useArtifacts';
 
 // ============================================================================
