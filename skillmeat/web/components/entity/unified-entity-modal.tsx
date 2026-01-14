@@ -657,6 +657,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
 
+  // Auto-select first deployment's project when viewing from collection mode
+  // This ensures the Sync Status tab shows data immediately instead of "No project deployment found"
+  useEffect(() => {
+    // Only auto-select if:
+    // 1. Entity has no projectPath (collection mode)
+    // 2. selectedProjectForDiff is not already set
+    // 3. We have at least one deployment with a project_path
+    if (!entity?.projectPath && !selectedProjectForDiff && artifactDeployments.length > 0) {
+      const firstProjectPath = artifactDeployments[0].project_path;
+      if (firstProjectPath) {
+        setSelectedProjectForDiff(firstProjectPath);
+      }
+    }
+  }, [entity?.projectPath, selectedProjectForDiff, artifactDeployments]);
+
   // Show toast notification when diff fetch fails (only once per unique error)
   useEffect(() => {
     if (diffError && shouldFetchDiff && activeTab === 'sync') {
