@@ -187,15 +187,7 @@ Current checks:
 
 ## Phase 4 Outputs
 
-Generated from the unified graph:
-- `.claude/context/key-context/hooks.md` inventory table
-- `.claude/context/key-context/api-client.md` inventory table
-- `.claude/context/key-context/schemas.md` inventory table
-
-Run:
-```bash
-python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
-```
+Output generation is currently disabled; `build_outputs` does not write files.
 
 ## Unified Graph + Overrides
 

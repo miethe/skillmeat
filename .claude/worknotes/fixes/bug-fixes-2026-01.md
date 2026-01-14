@@ -466,3 +466,9 @@ The `DeployDialog` component used the broken `useDeploy` hook.
 - `skillmeat/web/components/deployments/deployment-card.tsx` - Updated matching logic
 
 **Status**: RESOLVED
+
+---
+
+## Bug Fixes (2026-01-14)
+
+**Commit(s)**: 3fc94eb
