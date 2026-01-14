@@ -186,24 +186,9 @@ def build_outputs(graph_path: Path, details_path: Optional[Path] = None) -> None
     api_clients_table = build_api_clients_table(nodes, edges, details)
     schemas_table = build_schemas_table(nodes, edges, details)
 
-    _update_section(
-        Path(".claude/context/key-context/hooks.md"),
-        "<!-- CODEBASE_GRAPH:HOOKS:START -->",
-        "<!-- CODEBASE_GRAPH:HOOKS:END -->",
-        hooks_table,
-    )
-    _update_section(
-        Path(".claude/context/key-context/api-client.md"),
-        "<!-- CODEBASE_GRAPH:API_CLIENTS:START -->",
-        "<!-- CODEBASE_GRAPH:API_CLIENTS:END -->",
-        api_clients_table,
-    )
-    _update_section(
-        Path(".claude/context/key-context/schemas.md"),
-        "<!-- CODEBASE_GRAPH:SCHEMAS:START -->",
-        "<!-- CODEBASE_GRAPH:SCHEMAS:END -->",
-        schemas_table,
-    )
+    _ = hooks_table
+    _ = api_clients_table
+    _ = schemas_table
 
 
 def main() -> None:
