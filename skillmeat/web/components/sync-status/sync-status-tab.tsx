@@ -305,7 +305,7 @@ export function SyncStatusTab({
         `/artifacts/${encodeURIComponent(entity.id)}/diff?${params}`
       );
     },
-    enabled: !!entity.id && !!projectPath && mode === 'project' && entity.collection !== 'discovered',
+    enabled: !!entity.id && !!projectPath && entity.collection !== 'discovered',
   });
 
   // ============================================================================
