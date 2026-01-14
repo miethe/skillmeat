@@ -1653,8 +1653,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
-              <div className="flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
+            <TabsContent value="contents" className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
                 <div
                   className={cn(
@@ -1697,7 +1697,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             {/* Sync Status Tab */}
             <TabsContent
               value="sync"
-              className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              className="mt-0 h-full min-h-0 min-w-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
             >
               {/* Context entities use specialized sync logic */}
               {isContextEntity(entity) && entity.projectPath ? (
