@@ -1,0 +1,10 @@
+{
+  "version": "2.0",
+  "domain": "api",
+  "layer": "repository",
+  "language": "python",
+  "generated": "2026-01-14T22:06:53.040104+00:00",
+  "totalModules": 0,
+  "totalSymbols": 0,
+  "modules": []
+}
