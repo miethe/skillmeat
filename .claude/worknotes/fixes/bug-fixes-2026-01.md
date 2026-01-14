@@ -472,3 +472,42 @@ The `DeployDialog` component used the broken `useDeploy` hook.
 ## Bug Fixes (2026-01-14)
 
 **Commit(s)**: 3fc94eb
+
+---
+
+## Sync Status Tab Shows "Local" for Artifacts with Valid Upstream Sources
+
+**Date Fixed**: 2026-01-14
+**Severity**: medium
+**Component**: api, sync-status-tab
+
+**Issue**: When viewing an artifact from the /collection page, the Sync Status tab displays "No upstream source configured" and disables the "Source vs Collection" comparison tab, even for artifacts that have valid GitHub upstream sources configured.
+
+**Root Cause**: In `artifact_to_response()` function (`skillmeat/api/routers/artifacts.py:503`), the source field logic was:
+
+```python
+source=artifact.upstream if artifact.origin == "github" else "local",
+```
+
+This logic only set `source` to the upstream URL if `artifact.origin` exactly matched "github". However, some artifacts may have:
+- `artifact.upstream` set to a valid GitHub URL
+- `artifact.origin` set to a different value (e.g., None, empty, or alternative string)
+
+In these cases, the API incorrectly returned `source: "local"` even though a valid upstream existed.
+
+**Fix**: Changed the condition to check for the presence of `artifact.upstream` directly:
+
+```python
+source=artifact.upstream if artifact.upstream else "local",
+```
+
+This simpler logic:
+- Returns the upstream URL if it exists (truthy value)
+- Falls back to "local" only when there's no upstream configured
+
+**Files Modified**:
+- `skillmeat/api/routers/artifacts.py:503` - Changed source field assignment
+
+**Impact**: Artifacts with valid upstream sources now correctly display their GitHub URL in the source field, enabling the "Source vs Collection" comparison tab in the Sync Status view.
+
+**Status**: RESOLVED

@@ -500,7 +500,7 @@ def artifact_to_response(
         id=f"{artifact.type.value}:{artifact.name}",
         name=artifact.name,
         type=artifact.type.value,
-        source=artifact.upstream if artifact.origin == "github" else "local",
+        source=artifact.upstream if artifact.upstream else "local",
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
         tags=artifact.tags or [],
