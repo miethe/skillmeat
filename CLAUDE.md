@@ -432,19 +432,27 @@ locked_at = "2024-11-29T10:00:00Z"
 
 ## Progressive Disclosure Context
 
-**Path-Specific Guidance** (auto-loaded by Claude Code):
-- `.claude/rules/debugging.md` - Universal debugging methodology (symbol-first)
-- `.claude/rules/web/` - Auto-loaded when editing `skillmeat/web/**`
-- `.claude/rules/api/` - Auto-loaded when editing `skillmeat/api/**`
+**Rules** (always loaded into context):
+- `.claude/rules/debugging.md` - Symbol-first debugging (30 lines)
+- `.claude/rules/development-tracking.md` - MeatyCapture workflow (34 lines)
+- `.claude/rules/api/routers.md` - Router layer contract (44 lines)
+- `.claude/rules/web/` - Component, page, testing conventions (~130 lines)
 
-**Deep Context** (load as needed):
+**Key Context** (read when working in domain):
+- `.claude/context/key-context/debugging-patterns.md` - Bug categories, delegation patterns
+- `.claude/context/key-context/router-patterns.md` - Full FastAPI examples
+- `.claude/context/key-context/component-patterns.md` - React/shadcn patterns
+- `.claude/context/key-context/nextjs-patterns.md` - App Router patterns
+- `.claude/context/key-context/testing-patterns.md` - Jest/Playwright templates
+
+**Reference Context** (load as needed):
 - `.claude/context/api-endpoint-mapping.md` - Full API reference
 - `.claude/context/symbol-usage-guide.md` - Symbol query patterns
 - `.claude/context/stub-patterns.md` - Frontend stubs catalog
+- `.claude/context/key-context/schemas.md` - Schema definitions (76KB)
+- `.claude/context/key-context/hooks.md` - React hooks reference (71KB)
 
 **Staleness Hook**: `.claude/hooks/check-context-staleness.sh` (pre-commit warning)
-
-See `.claude/specs/progressive-disclosure-blueprint.md` for architecture details.
 
 ---
 
