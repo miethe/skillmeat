@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 try:
     from .graph import Graph
@@ -13,6 +13,7 @@ try:
         resolve_module_path,
         to_pascal_case,
     )
+    from .metadata_utils import build_common_metadata, jsdoc_summary, offset_to_line_column, signature_from_line
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
 
@@ -23,6 +24,12 @@ except ImportError:  # pragma: no cover - fallback for direct script execution
         parse_imports,
         resolve_module_path,
         to_pascal_case,
+    )
+    from scripts.code_map.metadata_utils import (
+        build_common_metadata,
+        jsdoc_summary,
+        offset_to_line_column,
+        signature_from_line,
     )
 
 EXPORT_FUNC_RE = re.compile(r"export\s+function\s+(use[A-Za-z0-9_]+)\b")
@@ -58,25 +65,52 @@ def iter_hook_files(hooks_root: Path) -> List[Path]:
     return files
 
 
-def parse_hook_exports(path: Path) -> Set[str]:
+def parse_hook_exports(path: Path) -> Dict[str, Dict[str, Any]]:
     text = path.read_text(encoding="utf-8")
-    names = set(EXPORT_FUNC_RE.findall(text))
-    names.update(EXPORT_CONST_RE.findall(text))
-    return names
+    exports: Dict[str, Dict[str, Any]] = {}
+    for regex in (EXPORT_FUNC_RE, EXPORT_CONST_RE):
+        for match in regex.finditer(text):
+            name = match.group(1)
+            start = match.start()
+            line, column = offset_to_line_column(text, start)
+            end_line, end_column = offset_to_line_column(text, match.end())
+            exports[name] = {
+                "line": line,
+                "span": {
+                    "start": {"line": line, "column": column},
+                    "end": {"line": end_line, "column": end_column},
+                },
+                "signature": signature_from_line(text, start),
+                "doc_summary": jsdoc_summary(text, start),
+            }
+    return exports
 
 
-def parse_component_exports(path: Path) -> Set[str]:
+def parse_component_exports(path: Path) -> Dict[str, Dict[str, Any]]:
     text = path.read_text(encoding="utf-8")
-    names = set(COMPONENT_EXPORT_FUNC_RE.findall(text))
-    names.update(COMPONENT_EXPORT_CLASS_RE.findall(text))
-    names.update(COMPONENT_EXPORT_CONST_RE.findall(text))
-    return names
+    exports: Dict[str, Dict[str, Any]] = {}
+    for regex in (COMPONENT_EXPORT_FUNC_RE, COMPONENT_EXPORT_CLASS_RE, COMPONENT_EXPORT_CONST_RE):
+        for match in regex.finditer(text):
+            name = match.group(1)
+            start = match.start()
+            line, column = offset_to_line_column(text, start)
+            end_line, end_column = offset_to_line_column(text, match.end())
+            exports[name] = {
+                "line": line,
+                "span": {
+                    "start": {"line": line, "column": column},
+                    "end": {"line": end_line, "column": end_column},
+                },
+                "signature": signature_from_line(text, start),
+                "doc_summary": jsdoc_summary(text, start),
+            }
+    return exports
 
 
-def primary_component_name(path: Path, exports: Dict[Path, Set[str]]) -> Optional[str]:
-    names = exports.get(path) or set()
+def primary_component_name(path: Path, exports: Dict[Path, Dict[str, Dict[str, Any]]]) -> Optional[str]:
+    names = exports.get(path) or {}
     if names:
-        return sorted(names)[0]
+        return sorted(names.keys())[0]
     stem = path.stem
     if stem and stem[0].isupper():
         return stem
@@ -101,9 +135,11 @@ def extract_frontend_hooks(web_root: Path) -> Graph:
     hooks_root = web_root / "hooks"
 
     hook_files = iter_hook_files(hooks_root)
-    hook_exports: Dict[Path, Set[str]] = {path: parse_hook_exports(path) for path in hook_files}
+    hook_exports: Dict[Path, Dict[str, Dict[str, Any]]] = {
+        path: parse_hook_exports(path) for path in hook_files
+    }
     component_files = iter_component_files(components_root)
-    component_exports: Dict[Path, Set[str]] = {
+    component_exports: Dict[Path, Dict[str, Dict[str, Any]]] = {
         path: parse_component_exports(path) for path in component_files
     }
 
@@ -125,23 +161,41 @@ def extract_frontend_hooks(web_root: Path) -> Graph:
                 if resolved in hook_exports and name not in hook_exports[resolved]:
                     continue
                 hook_id = hook_node_id(resolved, name)
+                hook_meta = (hook_exports.get(resolved) or {}).get(name, {})
                 graph.add_node(
                     hook_id,
                     "hook",
                     label=name,
                     file=resolved.as_posix(),
+                    **build_common_metadata(
+                        resolved,
+                        symbol=name,
+                        line=hook_meta.get("line"),
+                        span=hook_meta.get("span"),
+                        signature=hook_meta.get("signature"),
+                        doc_summary=hook_meta.get("doc_summary"),
+                    ),
                 )
                 component_id = f"component:{component_path.as_posix()}::{source_name}"
+                component_meta = (component_exports.get(component_path) or {}).get(source_name, {})
                 graph.add_node(
                     component_id,
                     "component",
                     label=source_name,
                     file=component_path.as_posix(),
+                    **build_common_metadata(
+                        component_path,
+                        symbol=source_name,
+                        line=component_meta.get("line"),
+                        span=component_meta.get("span"),
+                        signature=component_meta.get("signature"),
+                        doc_summary=component_meta.get("doc_summary"),
+                    ),
                 )
                 graph.add_edge(component_id, hook_id, "component_uses_hook")
 
     for hook_path in hook_files:
-        exports = hook_exports.get(hook_path) or set()
+        exports = hook_exports.get(hook_path) or {}
         if not exports:
             continue
         text = hook_path.read_text(encoding="utf-8")
@@ -150,13 +204,21 @@ def extract_frontend_hooks(web_root: Path) -> Graph:
         imports = parse_imports(text)
         type_imports = [(names, module) for names, module in imports if module.startswith("@/types")]
 
-        for hook_name in exports:
+        for hook_name, hook_meta in exports.items():
             hook_id = hook_node_id(hook_path, hook_name)
             graph.add_node(
                 hook_id,
                 "hook",
                 label=hook_name,
                 file=hook_path.as_posix(),
+                **build_common_metadata(
+                    hook_path,
+                    symbol=hook_name,
+                    line=hook_meta.get("line"),
+                    span=hook_meta.get("span"),
+                    signature=hook_meta.get("signature"),
+                    doc_summary=hook_meta.get("doc_summary"),
+                ),
             )
             for raw_key in keys:
                 normalized = normalize_literal(raw_key)
@@ -178,6 +240,7 @@ def extract_frontend_hooks(web_root: Path) -> Graph:
                         "type",
                         label=name,
                         file=type_path.as_posix(),
+                        **build_common_metadata(type_path, symbol=name),
                     )
                     graph.add_edge(hook_id, type_id, "uses_type")
 
