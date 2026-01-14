@@ -65,6 +65,17 @@ def _print_bucket(label: str, items: List[str], max_list: int) -> None:
             print(f"    - {item}")
 
 
+def _missing_edge_bucket(
+    nodes: List[Dict[str, Any]],
+    edges: List[Dict[str, Any]],
+    node_type: str,
+    edge_type: str,
+) -> List[str]:
+    node_ids = {node["id"] for node in nodes if node.get("type") == node_type}
+    linked = {edge.get("from") for edge in edges if edge.get("type") == edge_type}
+    return sorted(node_ids - linked)
+
+
 def coverage_summary(graph: Dict[str, Any], max_list: int) -> None:
     nodes = graph.get("nodes", [])
     edges = graph.get("edges", [])
@@ -78,6 +89,14 @@ def coverage_summary(graph: Dict[str, Any], max_list: int) -> None:
     _print_bucket("hooks_direct_api_only", buckets["hooks_direct_api_only"], max_list)
     _print_bucket("hooks_with_both", buckets["hooks_with_both"], max_list)
     _print_bucket("hooks_without_api", buckets["hooks_without_api"], max_list)
+
+    missing_handlers = _missing_edge_bucket(nodes, edges, "handler", "handler_uses_schema")
+    missing_services = _missing_edge_bucket(nodes, edges, "service", "service_calls_repository")
+    missing_models = _missing_edge_bucket(nodes, edges, "model", "model_migrated_by")
+    print("Missing linkage coverage:")
+    _print_bucket("handlers_without_schema", missing_handlers, max_list)
+    _print_bucket("services_without_repo", missing_services, max_list)
+    _print_bucket("models_without_migration", missing_models, max_list)
 
 
 def main() -> None:

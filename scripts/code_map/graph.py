@@ -89,6 +89,12 @@ class Graph:
         for node_id, node in other.nodes.items():
             if node_id not in self.nodes:
                 self.nodes[node_id] = node
+                continue
+            existing = self.nodes[node_id]
+            for key, value in node.items():
+                if key not in existing or existing[key] in (None, "", [], {}):
+                    if value not in (None, "", [], {}):
+                        existing[key] = value
         self.edges.extend(other.edges)
 
     def to_dict(self) -> Dict[str, Any]:

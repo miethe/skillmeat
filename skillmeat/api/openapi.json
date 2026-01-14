@@ -1712,6 +1712,108 @@
         }
       }
     },
+    "/api/v1/artifacts/confirm-duplicates": {
+      "post": {
+        "tags": [
+          "artifacts",
+          "artifacts",
+          "discovery"
+        ],
+        "summary": "Process duplicate review decisions",
+        "description": "Process user decisions from the duplicate review modal.\n\n    Handles three types of decisions:\n    1. **matches**: Link discovered duplicates to existing collection artifacts\n    2. **new_artifacts**: Import selected paths as new artifacts\n    3. **skipped**: Acknowledge paths the user chose to skip (logged for audit)\n\n    All operations are atomic - if any operation fails, the response will\n    indicate partial success with error details.\n\n    This endpoint is idempotent for link operations - calling multiple times\n    with the same matches will not create duplicate links.",
+        "operationId": "confirm_duplicates_api_v1_artifacts_confirm_duplicates_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmDuplicatesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Duplicate decisions processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmDuplicatesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/artifacts": {
       "post": {
         "tags": [
@@ -3372,7 +3474,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileContentResponse"
+                  "$ref": "#/components/schemas/skillmeat__api__schemas__artifacts__FileContentResponse"
                 }
               }
             }
@@ -3499,7 +3601,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileContentResponse"
+                  "$ref": "#/components/schemas/skillmeat__api__schemas__artifacts__FileContentResponse"
                 }
               }
             }
@@ -3626,7 +3728,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileContentResponse"
+                  "$ref": "#/components/schemas/skillmeat__api__schemas__artifacts__FileContentResponse"
                 }
               }
             }
@@ -9517,32 +9619,32 @@
         }
       }
     },
-    "/api/v1/marketplace/sources": {
+    "/api/v1/marketplace/sources/infer-url": {
       "post": {
         "tags": [
           "marketplace-sources",
           "marketplace-sources"
         ],
-        "summary": "Create new GitHub source",
-        "description": "Add a new GitHub repository as a marketplace source for artifact scanning.\n\n    The repository URL must be a valid GitHub URL (https://github.com/owner/repo).\n    After creation, use the /rescan endpoint to trigger the initial scan.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
-        "operationId": "create_source_api_v1_marketplace_sources_post",
+        "summary": "Infer Github Url",
+        "description": "Infer GitHub repository structure from a full URL.\n\nParses GitHub URLs to extract repository URL, branch/tag, and subdirectory path.\nSupports various GitHub URL formats:\n- https://github.com/owner/repo\n- https://github.com/owner/repo/tree/branch\n- https://github.com/owner/repo/tree/branch/path/to/dir\n- https://github.com/owner/repo/blob/ref/path/to/file\n\nArgs:\n    request: URL to parse\n\nReturns:\n    Inferred repository structure or error message\n\nExample:\n    Input: https://github.com/davila7/claude-code-templates/tree/main/cli-tool/components\n    Output: {\n        \"success\": true,\n        \"repo_url\": \"https://github.com/davila7/claude-code-templates\",\n        \"ref\": \"main\",\n        \"root_hint\": \"cli-tool/components\"\n    }",
+        "operationId": "infer_github_url_api_v1_marketplace_sources_infer_url_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateSourceRequest"
+                "$ref": "#/components/schemas/InferUrlRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceResponse"
+                  "$ref": "#/components/schemas/InferUrlResponse"
                 }
               }
             }
@@ -9556,6 +9658,51 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources": {
+      "post": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Create new GitHub source",
+        "description": "Add a new GitHub repository as a marketplace source for artifact scanning.\n\n    The repository URL must be a valid GitHub URL (https://github.com/owner/repo).\n    An initial scan is automatically triggered upon creation. The response includes\n    the scan status and artifact count.\n\n    **Manual Directory Mappings** (Optional):\n    You can provide manual_map during creation to override automatic type detection.\n    This is useful when you know the repository structure in advance.\n\n    **Example Request**:\n    ```json\n    {\n        \"repo_url\": \"https://github.com/user/claude-templates\",\n        \"ref\": \"main\",\n        \"root_hint\": \"artifacts\",\n        \"trust_level\": \"trusted\",\n        \"manual_map\": {\n            \"skills/advanced\": \"skill\",\n            \"tools/cli\": \"command\",\n            \"agents/research\": \"agent\"\n        },\n        \"enable_frontmatter_detection\": true\n    }\n    ```\n\n    **Validation**: All manual_map directory paths are validated against the repository\n    tree during creation. Invalid paths will cause a 422 error.\n\n    If the initial scan fails, the source is still created with scan_status=\"error\".\n    You can retry scanning using the /rescan endpoint.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "create_source_api_v1_marketplace_sources_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Source created and initial scan triggered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid repository URL format"
+          },
+          "409": {
+            "description": "Conflict - repository URL already exists"
+          },
+          "422": {
+            "description": "Validation error - invalid manual_map directory paths"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       },
@@ -9632,7 +9779,7 @@
           "marketplace-sources"
         ],
         "summary": "Get source by ID",
-        "description": "Retrieve a specific GitHub repository source by its unique identifier.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "description": "Retrieve a specific GitHub repository source by its unique identifier.\n\n    Returns all source configuration including manual_map if configured.\n\n    **Response Example**:\n    ```json\n    {\n        \"id\": \"src-abc123\",\n        \"repo_url\": \"https://github.com/user/templates\",\n        \"owner\": \"user\",\n        \"repo_name\": \"templates\",\n        \"ref\": \"main\",\n        \"root_hint\": \"claude-artifacts\",\n        \"trust_level\": \"trusted\",\n        \"visibility\": \"public\",\n        \"scan_status\": \"success\",\n        \"artifact_count\": 42,\n        \"manual_map\": {\n            \"advanced-skills/python-backend\": \"skill\",\n            \"cli-tools/scaffold\": \"command\"\n        },\n        \"enable_frontmatter_detection\": true,\n        \"last_sync_at\": \"2025-01-06T12:00:00Z\",\n        \"created_at\": \"2025-01-06T10:00:00Z\",\n        \"updated_at\": \"2025-01-06T11:30:00Z\"\n    }\n    ```\n\n    **manual_map field**: Dictionary mapping directory paths to artifact types.\n    Empty dictionary or null if no manual mappings configured.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
         "operationId": "get_source_api_v1_marketplace_sources__source_id__get",
         "parameters": [
           {
@@ -9647,7 +9794,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Source details retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -9655,6 +9802,12 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Source not found"
+          },
+          "500": {
+            "description": "Internal server error"
           },
           "422": {
             "description": "Validation Error",
@@ -9674,7 +9827,7 @@
           "marketplace-sources"
         ],
         "summary": "Update source",
-        "description": "Update a GitHub repository source configuration.\n\n    Allows updating ref (branch/tag/SHA), root_hint, trust_level, description, and notes.\n    Changes take effect on the next scan.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "description": "Update a GitHub repository source configuration.\n\n    Allows updating ref (branch/tag/SHA), root_hint, manual_map, trust_level,\n    description, notes, and frontmatter detection settings.\n    Changes take effect on the next scan.\n\n    **Manual Directory Mappings**:\n    Use `manual_map` to override automatic artifact type detection for specific directories.\n    This is useful when heuristic detection fails or when you want to force a directory\n    to be treated as a specific artifact type.\n\n    **Supported artifact types**: `skill`, `command`, `agent`, `mcp_server`, `hook`\n\n    **Example Request with manual_map**:\n    ```json\n    {\n        \"manual_map\": {\n            \"advanced-skills/python-backend\": \"skill\",\n            \"cli-tools/scaffold\": \"command\",\n            \"research-agents/market-analysis\": \"agent\"\n        }\n    }\n    ```\n\n    **Validation**:\n    - All directory paths must exist in the repository (validated against GitHub tree)\n    - Artifact types must be one of: skill, command, agent, mcp_server, hook\n    - Invalid paths or types will return 422 Unprocessable Entity\n\n    **Clear Mapping**:\n    To remove all manual mappings, send an empty dictionary:\n    ```json\n    {\n        \"manual_map\": {}\n    }\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
         "operationId": "update_source_api_v1_marketplace_sources__source_id__patch",
         "parameters": [
           {
@@ -9699,7 +9852,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Source updated successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -9708,15 +9861,17 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request - no update parameters provided"
+          },
+          "404": {
+            "description": "Source not found"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Validation error - invalid directory path or artifact type"
+          },
+          "500": {
+            "description": "Internal server error - GitHub API failure or database error"
           }
         }
       },
@@ -9763,7 +9918,7 @@
           "marketplace-sources"
         ],
         "summary": "Trigger repository rescan",
-        "description": "Trigger a rescan of the GitHub repository to discover new or updated artifacts.\n\n    This operation is currently synchronous (runs in the request lifecycle).\n    For large repositories, this may take several seconds. Future versions may\n    support asynchronous background jobs.\n\n    The scan will:\n    1. Fetch the repository tree from GitHub\n    2. Apply heuristic detection to identify artifacts\n    3. Update the catalog with discovered artifacts\n    4. Update source metadata (artifact_count, last_sync_at, etc.)\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "description": "Trigger a rescan of the GitHub repository to discover new or updated artifacts.\n\n    This operation is currently synchronous (runs in the request lifecycle).\n    For large repositories, this may take several seconds. Future versions may\n    support asynchronous background jobs.\n\n    **Scan Process**:\n    1. Fetch the repository tree from GitHub\n    2. Apply heuristic detection to identify artifacts\n    3. **Apply manual_map overrides** (if configured on source)\n    4. Deduplicate artifacts within the source (same content, different paths)\n    5. Deduplicate artifacts against existing collection (already imported)\n    6. Update the catalog with discovered unique artifacts\n    7. Update source metadata (artifact_count, last_sync_at, etc.)\n\n    **Manual Mappings**:\n    The scan uses any manual_map configured on the source to override automatic type\n    detection. For example, if manual_map contains `{\"advanced-skills\": \"skill\"}`,\n    all artifacts in the `advanced-skills` directory will be treated as skills\n    regardless of heuristic detection results.\n\n    **Response includes deduplication statistics**:\n    - `duplicates_within_source`: Duplicate artifacts found in this repo scan\n    - `duplicates_cross_source`: Artifacts already in collection from other sources\n    - `total_detected`: Total artifacts before deduplication\n    - `total_unique`: Unique artifacts added to catalog\n\n    **Example Response**:\n    ```json\n    {\n        \"source_id\": \"src-abc123\",\n        \"status\": \"success\",\n        \"artifacts_found\": 42,\n        \"new_count\": 5,\n        \"updated_count\": 2,\n        \"removed_count\": 1,\n        \"unchanged_count\": 34,\n        \"scan_duration_ms\": 3421,\n        \"scanned_at\": \"2025-01-06T12:00:00Z\",\n        \"duplicates_within_source\": 3,\n        \"duplicates_cross_source\": 2,\n        \"total_detected\": 52,\n        \"total_unique\": 47\n    }\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
         "operationId": "rescan_source_api_v1_marketplace_sources__source_id__rescan_post",
         "parameters": [
           {
@@ -9787,7 +9942,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Scan completed successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -9795,6 +9950,12 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Source not found"
+          },
+          "500": {
+            "description": "Scan failed - check error message in response"
           },
           "422": {
             "description": "Validation Error",
@@ -9816,8 +9977,8 @@
           "marketplace-sources"
         ],
         "summary": "List artifacts from source",
-        "description": "List all artifacts discovered from a specific source with optional filtering.\n\n    Supports filtering by:\n    - artifact_type: skill, command, agent, etc.\n    - status: new, updated, removed, imported\n    - min_confidence: Minimum confidence score (0-100)\n\n    Results are paginated using cursor-based pagination for efficiency.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
-        "operationId": "list_artifacts_api_v1_marketplace_sources__source_id__artifacts_get",
+        "description": "List all artifacts discovered from a specific source with optional filtering and sorting.\n\n    By default, excluded artifacts are hidden from results. Use `include_excluded=true`\n    to include them in listings (useful for reviewing or restoring excluded entries).\n\n    Supports filtering by:\n    - `artifact_type`: skill, command, agent, etc.\n    - `status`: new, updated, removed, imported, excluded\n    - `min_confidence`: Minimum confidence score (0-100)\n    - `max_confidence`: Maximum confidence score (0-100)\n    - `include_below_threshold`: Include artifacts below 30% confidence threshold (default: false)\n    - `include_excluded`: Include excluded artifacts in results (default: false)\n\n    Supports sorting by:\n    - `sort_by`: Field to sort by - confidence, name, or date (detected_at). Default: confidence\n    - `sort_order`: Sort order - asc or desc. Default: desc (highest confidence first)\n\n    Results are paginated using cursor-based pagination for efficiency.\n\n    **Examples**:\n\n    List only non-excluded artifacts (default):\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts\"\n    ```\n\n    List including excluded artifacts:\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true\"\n    ```\n\n    Filter by artifact type with minimum confidence:\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?artifact_type=skill&min_confidence=70\"\n    ```\n\n    Sort by name ascending:\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?sort_by=name&sort_order=asc\"\n    ```\n\n    Pagination example:\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?limit=25&cursor=abc123\"\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "list_source_artifacts",
         "parameters": [
           {
             "name": "source_id",
@@ -9841,10 +10002,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by artifact type (skill, command, etc.)",
+              "description": "Filter by artifact type (skill, command, agent, etc.)",
               "title": "Artifact Type"
             },
-            "description": "Filter by artifact type (skill, command, etc.)"
+            "description": "Filter by artifact type (skill, command, agent, etc.)"
           },
           {
             "name": "status",
@@ -9859,10 +10020,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by status (new, updated, removed, imported)",
+              "description": "Filter by status (new, updated, removed, imported, excluded)",
               "title": "Status"
             },
-            "description": "Filter by status (new, updated, removed, imported)"
+            "description": "Filter by status (new, updated, removed, imported, excluded)"
           },
           {
             "name": "min_confidence",
@@ -9879,10 +10040,94 @@
                   "type": "null"
                 }
               ],
-              "description": "Minimum confidence score",
+              "description": "Minimum confidence score (0-100)",
               "title": "Min Confidence"
             },
-            "description": "Minimum confidence score"
+            "description": "Minimum confidence score (0-100)"
+          },
+          {
+            "name": "max_confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum confidence score (0-100)",
+              "title": "Max Confidence"
+            },
+            "description": "Maximum confidence score (0-100)"
+          },
+          {
+            "name": "include_below_threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include artifacts below 30% confidence threshold (default: false)",
+              "default": false,
+              "title": "Include Below Threshold"
+            },
+            "description": "Include artifacts below 30% confidence threshold (default: false)"
+          },
+          {
+            "name": "include_excluded",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include excluded artifacts in results (default: false)",
+              "default": false,
+              "title": "Include Excluded"
+            },
+            "description": "Include excluded artifacts in results (default: false)"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(confidence|name|date)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort field: confidence, name, date (detected_at)",
+              "default": "confidence",
+              "title": "Sort By"
+            },
+            "description": "Sort field: confidence, name, date (detected_at)"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(asc|desc)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort order: asc or desc",
+              "default": "desc",
+              "title": "Sort Order"
+            },
+            "description": "Sort order: asc or desc"
           },
           {
             "name": "limit",
@@ -9892,11 +10137,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "Maximum items per page",
+              "description": "Maximum items per page (1-100)",
               "default": 50,
               "title": "Limit"
             },
-            "description": "Maximum items per page"
+            "description": "Maximum items per page (1-100)"
           },
           {
             "name": "cursor",
@@ -9911,10 +10156,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Cursor for next page",
+              "description": "Cursor for pagination (from previous response)",
               "title": "Cursor"
             },
-            "description": "Cursor for next page"
+            "description": "Cursor for pagination (from previous response)"
           }
         ],
         "responses": {
@@ -9924,6 +10169,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/artifacts/{entry_id}": {
+      "patch": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Update catalog entry name",
+        "description": "Update the display name for a catalog entry.\n\n    The updated name is used when importing the artifact into the user's collection\n    and persists until the next rescan of the source.\n\n    **Request Body**:\n    - `name` (string, required): New artifact name (1-100 chars, no path separators)\n\n    **Response**: Updated catalog entry\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "update_catalog_entry_name",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCatalogEntryNameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntryResponse"
                 }
               }
             }
@@ -9981,6 +10289,460 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/artifacts/{entry_id}/exclude": {
+      "patch": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Mark or restore catalog artifact",
+        "description": "Mark a catalog entry as excluded from the catalog or restore a previously excluded entry.\n\n    Use this endpoint to mark artifacts that are false positives (not actually Claude artifacts),\n    documentation-only files, or other entries that shouldn't appear in the default catalog view.\n    Excluded artifacts are hidden unless explicitly requested with `include_excluded=True` when\n    listing artifacts.\n\n    This operation is idempotent - calling it multiple times with the same parameters will\n    return success with the current state.\n\n    **Request Body**:\n    - `excluded` (bool, required): True to mark as excluded, False to restore\n    - `reason` (string, optional): User-provided reason (max 500 chars)\n\n    **Response**: Updated catalog entry with `excluded_at` and `excluded_reason` fields\n\n    **Examples**:\n\n    Mark as excluded with reason:\n    ```bash\n    curl -X PATCH \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude\" \\\n         -H \"Content-Type: application/json\" \\\n         -d '{\n           \"excluded\": true,\n           \"reason\": \"Not a valid skill - documentation only\"\n         }'\n    ```\n\n    Restore previously excluded:\n    ```bash\n    curl -X PATCH \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude\" \\\n         -H \"Content-Type: application/json\" \\\n         -d '{\"excluded\": false}'\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "exclude_or_restore_artifact",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcludeArtifactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Restore excluded catalog artifact",
+        "description": "Remove the exclusion status from a catalog entry, restoring it to the catalog.\n\n    This is a convenience endpoint that performs the same operation as calling\n    PATCH with `excluded=False`. It is idempotent - calling it on a non-excluded\n    entry will return success with the current state.\n\n    Restored entries will be visible in the default catalog view and can be\n    imported to collections.\n\n    **Examples**:\n\n    Restore an excluded artifact:\n    ```bash\n    curl -X DELETE \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts/cat-def456/exclude\"\n    ```\n\n    List artifacts including excluded (before restoring):\n    ```bash\n    curl -X GET \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/artifacts?include_excluded=true\"\n    ```\n\n    After restore, the artifact will appear in both filtered and unfiltered listings.\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "restore_excluded_artifact",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/catalog/{entry_id}/path-tags": {
+      "get": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Get path-based tag suggestions for catalog entry",
+        "description": "Retrieve extracted path segments and their approval status for a catalog entry.\n\n    Returns all extracted segments with their current approval status (pending, approved,\n    rejected, excluded). Only includes entries that have been scanned with path extraction\n    enabled.\n\n    The path_segments field contains a JSON object with:\n    - raw_path: Original artifact path\n    - extracted: Array of {segment, normalized, status, reason} objects\n    - extracted_at: ISO timestamp of extraction\n\n    Path Parameters:\n    - source_id: Marketplace source identifier\n    - entry_id: Catalog entry identifier\n\n    Example: GET /marketplace/sources/src-123/catalog/cat-456/path-tags",
+        "operationId": "get_path_tags_api_v1_marketplace_sources__source_id__catalog__entry_id__path_tags_get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PathSegmentsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source or entry not found"
+          },
+          "400": {
+            "description": "Entry has no path_segments (not extracted yet)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Update approval status of a path segment",
+        "description": "Approve or reject a suggested path-based tag.\n\n    Updates the status field in path_segments JSON for a single segment.\n    Only \"pending\" status segments can be changed. Cannot modify \"excluded\"\n    segments (filtered by extraction rules).\n\n    Status values:\n    - \"pending\": Segment awaiting approval/rejection (default)\n    - \"approved\": Segment will be applied as tag during import\n    - \"rejected\": Segment will not be applied as tag\n    - \"excluded\": Segment filtered by rules (cannot be changed)\n\n    Path Parameters:\n    - source_id: Marketplace source identifier\n    - entry_id: Catalog entry identifier\n\n    Request Body:\n    - segment: Original segment value to update (e.g., \"ui-ux\")\n    - status: New status (\"approved\" or \"rejected\")\n\n    Example: PATCH /marketplace/sources/src-123/catalog/cat-456/path-tags",
+        "operationId": "update_path_tag_status_api_v1_marketplace_sources__source_id__catalog__entry_id__path_tags_patch",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSegmentStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateSegmentStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source, entry, or segment not found"
+          },
+          "409": {
+            "description": "Segment already approved/rejected or is excluded"
+          },
+          "500": {
+            "description": "Malformed path_segments JSON"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/artifacts/{artifact_path}/files": {
+      "get": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Get file tree for artifact",
+        "description": "Retrieve the file tree for a marketplace artifact.\n\n    Returns a list of files and directories within the artifact, suitable\n    for displaying in a file browser UI. Each entry includes the path,\n    type (blob/tree), size (for files), and SHA.\n\n    Results are cached for 1 hour to reduce GitHub API calls.\n\n    Path Parameters:\n    - source_id: Marketplace source identifier\n    - artifact_path: Path to the artifact within the repository (e.g., \"skills/canvas\")\n\n    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files",
+        "operationId": "get_artifact_file_tree_api_v1_marketplace_sources__source_id__artifacts__artifact_path__files_get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "artifact_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileTreeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/marketplace/sources/{source_id}/artifacts/{artifact_path}/files/{file_path}": {
+      "get": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Get file content from artifact",
+        "description": "Retrieve the content of a specific file within a marketplace artifact.\n\n    Returns the file content with metadata including encoding, size, and SHA.\n    For binary files, content is base64-encoded with is_binary=True.\n\n    Results are cached for 2 hours to reduce GitHub API calls.\n\n    Path Parameters:\n    - source_id: Marketplace source identifier\n    - artifact_path: Path to the artifact within the repository (e.g., \"skills/canvas\")\n    - file_path: Path to the file within the artifact (e.g., \"SKILL.md\" or \"src/index.ts\")\n\n    Example: GET /marketplace/sources/src-123/artifacts/skills/canvas/files/SKILL.md",
+        "operationId": "get_artifact_file_content_api_v1_marketplace_sources__source_id__artifacts__artifact_path__files__file_path__get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "artifact_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Path"
+            }
+          },
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/skillmeat__api__schemas__marketplace__FileContentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/match/": {
+      "get": {
+        "tags": [
+          "match",
+          "match"
+        ],
+        "summary": "Match artifacts against query",
+        "description": "Search for artifacts matching a query using confidence scoring.\n\n    This endpoint uses semantic embeddings when available, with graceful\n    degradation to keyword-only matching. Results are sorted by confidence\n    score (descending).\n\n    The confidence score combines:\n    - Trust score: Source reputation/verification\n    - Quality score: Community ratings and metrics\n    - Match score: Semantic + keyword relevance to query\n\n    Semantic matching provides better results but requires API key.\n    Keyword-only mode works without configuration.",
+        "operationId": "match_artifacts_api_v1_match__get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Search query",
+              "examples": [
+                "pdf tool"
+              ],
+              "title": "Q"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum results to return",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "Maximum results to return"
+          },
+          {
+            "name": "min_confidence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "description": "Minimum confidence score threshold",
+              "default": 0.0,
+              "title": "Min Confidence"
+            },
+            "description": "Minimum confidence score threshold"
+          },
+          {
+            "name": "include_breakdown",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include detailed score breakdown for each match",
+              "default": false,
+              "title": "Include Breakdown"
+            },
+            "description": "Include detailed score breakdown for each match"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches found (may be empty list)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query (empty or too short)"
+          },
+          "500": {
+            "description": "Scoring service error"
           },
           "422": {
             "description": "Validation Error",
@@ -11131,6 +11893,133 @@
         }
       }
     },
+    "/api/v1/projects/{project_id}/deployments/{artifact_name}": {
+      "delete": {
+        "tags": [
+          "projects",
+          "projects"
+        ],
+        "summary": "Remove deployment from project",
+        "description": "Remove a specific artifact deployment from a project",
+        "operationId": "remove_project_deployment_api_v1_projects__project_id__deployments__artifact_name__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "artifact_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Name"
+            }
+          },
+          {
+            "name": "artifact_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Type of the artifact to remove",
+              "examples": [
+                "skill"
+              ],
+              "title": "Artifact Type"
+            },
+            "description": "Type of the artifact to remove"
+          },
+          {
+            "name": "remove_files",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to remove files from filesystem (default: True)",
+              "default": true,
+              "title": "Remove Files"
+            },
+            "description": "Whether to remove files from filesystem (default: True)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment removed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDeploymentRemovalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or deployment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/projects/{project_id}/check-modifications": {
       "post": {
         "tags": [
@@ -11477,6 +12366,42 @@
         }
       }
     },
+    "/api/v1/projects/cache/clear": {
+      "post": {
+        "tags": [
+          "projects",
+          "projects"
+        ],
+        "summary": "Clear project cache",
+        "description": "Clear the persistent SQLite cache and force full project rediscovery",
+        "operationId": "clear_project_cache_api_v1_projects_cache_clear_post",
+        "responses": {
+          "200": {
+            "description": "Cache cleared successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Clear Project Cache Api V1 Projects Cache Clear Post"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Cache manager not available"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/projects/cache/refresh": {
       "post": {
         "tags": [
@@ -11571,6 +12496,206 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/ratings/artifacts/{artifact_id}/ratings": {
+      "post": {
+        "tags": [
+          "ratings",
+          "ratings"
+        ],
+        "summary": "Submit artifact rating",
+        "description": "Submit a rating for an artifact (1-5 scale).\n\n    Rate limits apply: maximum 5 ratings per artifact per user per day.\n    Ratings can optionally be shared with the community for aggregate scoring.",
+        "operationId": "submit_rating_api_v1_ratings_artifacts__artifact_id__ratings_post",
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRatingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rating submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRatingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid rating value"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "ratings",
+          "ratings"
+        ],
+        "summary": "List artifact ratings",
+        "description": "Get all ratings for an artifact, ordered by most recent first.",
+        "operationId": "list_artifact_ratings_api_v1_ratings_artifacts__artifact_id__ratings_get",
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum ratings to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum ratings to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ratings retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ratings/artifacts/{artifact_id}/scores": {
+      "get": {
+        "tags": [
+          "ratings",
+          "ratings"
+        ],
+        "summary": "Get artifact scores",
+        "description": "Get confidence scores for an artifact.\n\n    Returns trust score, quality score, and composite confidence.\n    Match score is only included when querying with a search context.",
+        "operationId": "get_artifact_scores_api_v1_ratings_artifacts__artifact_id__scores_get",
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Source type for trust scoring (official, verified, github, local, unknown)",
+              "default": "unknown",
+              "title": "Source Type"
+            },
+            "description": "Source type for trust scoring (official, verified, github, local, unknown)"
+          },
+          {
+            "name": "match_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Query match score from search context (0-100)",
+              "title": "Match Score"
+            },
+            "description": "Query match score from search context (0-100)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scores retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactScoreResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/tags": {
@@ -12909,6 +14034,39 @@
           "total_events": 1337
         }
       },
+      "ArtifactCollectionInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Collection UUID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Collection name"
+          },
+          "artifact_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Count",
+            "description": "Number of artifacts in collection"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ArtifactCollectionInfo",
+        "description": "Embedded collection info for artifact responses."
+      },
       "ArtifactCreateRequest": {
         "properties": {
           "source_type": {
@@ -13662,6 +14820,14 @@
             ],
             "description": "Deployment statistics (included when include_deployments=true)"
           },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactCollectionInfo"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "Collections this artifact belongs to (many-to-many relationship)"
+          },
           "added": {
             "type": "string",
             "format": "date-time",
@@ -13715,6 +14881,102 @@
             "upstream_sha": "def456"
           },
           "version": "latest"
+        }
+      },
+      "ArtifactScoreResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact composite key (type:name)",
+            "examples": [
+              "skill:pdf-processor"
+            ]
+          },
+          "trust_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Trust Score",
+            "description": "Source trust/reputation score (0-100)",
+            "examples": [
+              85.0
+            ]
+          },
+          "quality_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Quality Score",
+            "description": "Aggregated quality score from community ratings (0-100)",
+            "examples": [
+              92.5
+            ]
+          },
+          "match_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Score",
+            "description": "Query-specific relevance score (0-100), None if not query-dependent",
+            "examples": [
+              78.3
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Composite confidence score (weighted combination of factors)",
+            "examples": [
+              84.2
+            ]
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "description": "Scoring schema version",
+            "default": "1.0.0"
+          },
+          "last_updated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated",
+            "description": "Timestamp of last score calculation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "trust_score",
+          "quality_score",
+          "confidence"
+        ],
+        "title": "ArtifactScoreResponse",
+        "description": "Response schema for artifact scoring information.\n\nProvides complete scoring breakdown including individual factors\nand composite confidence score.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "confidence": 84.2,
+          "last_updated": "2025-12-22T10:30:00Z",
+          "match_score": 78.3,
+          "quality_score": 92.5,
+          "schema_version": "1.0.0",
+          "trust_score": 85.0
         }
       },
       "ArtifactSourceType": {
@@ -14787,6 +16049,15 @@
                 "command:my-command"
               ]
             ]
+          },
+          "apply_path_tags": {
+            "type": "boolean",
+            "title": "Apply Path Tags",
+            "description": "Apply approved path-based tags to imported artifacts. If true, segments with status='approved' in entry.path_segments will be created/found and linked as tags to the imported artifact.",
+            "default": true,
+            "examples": [
+              true
+            ]
           }
         },
         "type": "object",
@@ -14796,6 +16067,7 @@
         "title": "BulkImportRequest",
         "description": "Request to import multiple artifacts.",
         "example": {
+          "apply_path_tags": true,
           "artifacts": [
             {
               "artifact_type": "skill",
@@ -14883,6 +16155,16 @@
               7
             ]
           },
+          "total_tags_applied": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Tags Applied",
+            "description": "Total number of path-based tags applied across all artifacts. Sum of tags_applied from all ImportResult entries.",
+            "default": 0,
+            "examples": [
+              15
+            ]
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/ImportResult"
@@ -14925,20 +16207,23 @@
             {
               "artifact_id": "skill:canvas-design",
               "message": "Artifact 'canvas-design' imported successfully",
-              "status": "success"
+              "status": "success",
+              "tags_applied": 3
             },
             {
               "artifact_id": "skill:existing-skill",
               "message": "Artifact already exists",
               "skip_reason": "Artifact already exists in collection",
-              "status": "skipped"
+              "status": "skipped",
+              "tags_applied": 0
             }
           ],
           "summary": "7 imported, 2 skipped, 1 failed",
           "total_failed": 1,
           "total_imported": 7,
           "total_requested": 10,
-          "total_skipped": 2
+          "total_skipped": 2,
+          "total_tags_applied": 15
         }
       },
       "BundleAnalyticsResponse": {
@@ -16665,6 +17950,7 @@
               "skill",
               "command",
               "agent",
+              "mcp",
               "mcp_server",
               "hook"
             ],
@@ -16747,13 +18033,56 @@
               95
             ]
           },
+          "raw_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Score",
+            "description": "Raw score before normalization (0-120 typical)",
+            "examples": [
+              60
+            ]
+          },
+          "score_breakdown": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Breakdown",
+            "description": "Detailed signal breakdown: dir_name_score (0-10), manifest_score (0-20), extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), depth_penalty (negative), raw_total, normalized_score (0-100)",
+            "examples": [
+              {
+                "depth_penalty": -5,
+                "dir_name_score": 10,
+                "extensions_score": 5,
+                "frontmatter_score": 15,
+                "manifest_score": 20,
+                "normalized_score": 92,
+                "parent_hint_score": 15,
+                "raw_total": 60
+              }
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
               "new",
               "updated",
               "removed",
-              "imported"
+              "imported",
+              "excluded"
             ],
             "title": "Status",
             "description": "Lifecycle status of the catalog entry",
@@ -16785,6 +18114,47 @@
             ],
             "title": "Import Id",
             "description": "ID of import operation if imported"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At",
+            "description": "ISO 8601 timestamp when artifact was marked as excluded from catalog. Null if not excluded.",
+            "examples": [
+              "2025-12-07T14:30:00Z",
+              null
+            ]
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason",
+            "description": "User-provided reason for exclusion (max 500 chars). Null if not excluded or no reason provided.",
+            "examples": [
+              "Not a valid skill - documentation only",
+              "False positive detection",
+              "Duplicate artifact"
+            ]
+          },
+          "is_duplicate": {
+            "type": "boolean",
+            "title": "Is Duplicate",
+            "description": "Whether this artifact was excluded as a duplicate (within-source or cross-source)",
+            "default": false
           }
         },
         "type": "object",
@@ -16810,6 +18180,17 @@
           "id": "cat_canvas_design",
           "name": "canvas-design",
           "path": "skills/canvas-design",
+          "raw_score": 60,
+          "score_breakdown": {
+            "depth_penalty": -5,
+            "dir_name_score": 10,
+            "extensions_score": 5,
+            "frontmatter_score": 15,
+            "manifest_score": 20,
+            "normalized_score": 92,
+            "parent_hint_score": 15,
+            "raw_total": 60
+          },
           "source_id": "src_anthropics_quickstarts",
           "status": "new",
           "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
@@ -16838,6 +18219,7 @@
             "description": "Count of entries by status",
             "examples": [
               {
+                "excluded": 5,
                 "imported": 33,
                 "new": 45,
                 "updated": 12
@@ -16869,6 +18251,7 @@
         "description": "Paginated list of catalog entries with statistics.\n\nIncludes aggregated counts by status and artifact type.",
         "example": {
           "counts_by_status": {
+            "excluded": 5,
             "imported": 33,
             "new": 45,
             "updated": 12
@@ -16886,6 +18269,17 @@
               "id": "cat_canvas_design",
               "name": "canvas-design",
               "path": "skills/canvas-design",
+              "raw_score": 60,
+              "score_breakdown": {
+                "depth_penalty": -5,
+                "dir_name_score": 10,
+                "extensions_score": 5,
+                "frontmatter_score": 15,
+                "manifest_score": 20,
+                "normalized_score": 92,
+                "parent_hint_score": 15,
+                "raw_total": 60
+              },
               "source_id": "src_anthropics_quickstarts",
               "status": "new",
               "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
@@ -16922,6 +18316,71 @@
         ],
         "title": "CollectionListResponse",
         "description": "Paginated response for collection listings.\n\nExtends the generic paginated response with collection-specific items."
+      },
+      "CollectionMatch": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Match type: 'exact' (hash match, 1.0 confidence), 'hash' (alias for exact), 'name_type' (0.85 confidence), 'none' (no match, 0.0 confidence)",
+            "examples": [
+              "exact"
+            ]
+          },
+          "matched_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Artifact Id",
+            "description": "ID of matched artifact in collection (format: type:name)",
+            "examples": [
+              "skill:canvas-design"
+            ]
+          },
+          "matched_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Name",
+            "description": "Name of the matched artifact",
+            "examples": [
+              "canvas-design"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Confidence score from 0.0 (no match) to 1.0 (exact hash match)",
+            "examples": [
+              1.0
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "confidence"
+        ],
+        "title": "CollectionMatch",
+        "description": "Hash-based collection matching result for a discovered artifact.\n\nProvides detailed information about how an artifact matches against\nthe collection using content hash and name+type matching.\n\nAttributes:\n    type: Type of match found:\n        - \"exact\": Content hash exact match (confidence: 1.0)\n        - \"hash\": Legacy alias for exact hash match (confidence: 1.0)\n        - \"name_type\": Name and type match but different content (confidence: 0.85)\n        - \"none\": No match found (confidence: 0.0)\n    matched_artifact_id: ID of matched artifact if found (format: type:name)\n    matched_name: Name of the matched artifact\n    confidence: Confidence score (0.0-1.0) indicating match quality",
+        "example": {
+          "confidence": 1.0,
+          "matched_artifact_id": "skill:canvas-design",
+          "matched_name": "canvas-design",
+          "type": "exact"
+        }
       },
       "CollectionResponse": {
         "properties": {
@@ -16989,6 +18448,171 @@
           "updated": "2024-11-16T15:30:00Z",
           "version": "1.0.0"
         }
+      },
+      "ConfirmDuplicatesRequest": {
+        "properties": {
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Base64-encoded or absolute path to the project being scanned",
+            "examples": [
+              "/Users/me/myproject"
+            ]
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateMatch"
+            },
+            "type": "array",
+            "title": "Matches",
+            "description": "Duplicate artifacts to link to collection entries"
+          },
+          "new_artifacts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "New Artifacts",
+            "description": "Filesystem paths of artifacts to import as new",
+            "examples": [
+              [
+                "/Users/me/.claude/skills/new-skill"
+              ]
+            ]
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped",
+            "description": "Filesystem paths of artifacts the user chose to skip",
+            "examples": [
+              [
+                "/Users/me/.claude/skills/unwanted-skill"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_path"
+        ],
+        "title": "ConfirmDuplicatesRequest",
+        "description": "Request to process duplicate review decisions.\n\nHandles three types of decisions:\n1. matches: Duplicates to link to existing collection artifacts\n2. new_artifacts: Paths to import as new artifacts\n3. skipped: Paths the user chose to skip",
+        "example": {
+          "matches": [
+            {
+              "action": "link",
+              "collection_artifact_id": "skill:canvas-design",
+              "discovered_path": "/Users/me/.claude/skills/my-canvas"
+            }
+          ],
+          "new_artifacts": [
+            "/Users/me/.claude/skills/new-skill"
+          ],
+          "project_path": "/Users/me/myproject",
+          "skipped": [
+            "/Users/me/.claude/skills/unwanted-skill"
+          ]
+        }
+      },
+      "ConfirmDuplicatesResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ConfirmDuplicatesStatus",
+            "description": "Overall status: 'success', 'partial', or 'failed'",
+            "examples": [
+              "success"
+            ]
+          },
+          "linked_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Linked Count",
+            "description": "Number of artifacts successfully linked to collection entries",
+            "examples": [
+              3
+            ]
+          },
+          "imported_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Imported Count",
+            "description": "Number of new artifacts successfully imported",
+            "examples": [
+              2
+            ]
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skipped Count",
+            "description": "Number of artifacts marked as skipped",
+            "examples": [
+              1
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable summary message",
+            "examples": [
+              "Processed 6 artifacts: 3 linked, 2 imported, 1 skipped"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "ISO 8601 timestamp of when the operation completed",
+            "examples": [
+              "2025-01-09T10:30:00Z"
+            ]
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "description": "List of error messages for failed operations",
+            "examples": [
+              [
+                "Failed to import /path/to/artifact: permission denied"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "linked_count",
+          "imported_count",
+          "skipped_count",
+          "message",
+          "timestamp"
+        ],
+        "title": "ConfirmDuplicatesResponse",
+        "description": "Response from processing duplicate review decisions.\n\nProvides summary counts and status of all operations performed.",
+        "example": {
+          "errors": [],
+          "imported_count": 2,
+          "linked_count": 3,
+          "message": "Processed 6 artifacts: 3 linked, 2 imported, 1 skipped",
+          "skipped_count": 1,
+          "status": "success",
+          "timestamp": "2025-01-09T10:30:00Z"
+        }
+      },
+      "ConfirmDuplicatesStatus": {
+        "type": "string",
+        "enum": [
+          "success",
+          "partial",
+          "failed"
+        ],
+        "title": "ConfirmDuplicatesStatus",
+        "description": "Status of duplicate confirmation operation."
       },
       "ConflictInfo": {
         "properties": {
@@ -17818,6 +19442,12 @@
             "examples": [
               "Contact: team@example.com for access issues"
             ]
+          },
+          "enable_frontmatter_detection": {
+            "type": "boolean",
+            "title": "Enable Frontmatter Detection",
+            "description": "Enable parsing markdown frontmatter for artifact type hints",
+            "default": false
           }
         },
         "type": "object",
@@ -17890,6 +19520,22 @@
             "title": "Overwrite",
             "description": "Overwrite existing deployment without prompting",
             "default": false
+          },
+          "dest_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dest Path",
+            "description": "Custom destination path relative to project root (e.g., '.claude/skills/dev/'). If provided, artifact will be deployed to {dest_path}/{artifact_name}/. Must not contain '..' or be absolute.",
+            "examples": [
+              ".claude/skills/",
+              ".claude/skills/dev/"
+            ]
           }
         },
         "type": "object",
@@ -17905,6 +19551,7 @@
           "artifact_name": "pdf",
           "artifact_type": "skill",
           "collection_name": "default",
+          "dest_path": ".claude/skills/dev/",
           "overwrite": false,
           "project_path": "/path/to/project"
         }
@@ -18158,6 +19805,11 @@
             "title": "Artifact Path",
             "description": "Relative path within .claude/"
           },
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Absolute path to the project directory"
+          },
           "collection_sha": {
             "type": "string",
             "title": "Collection Sha",
@@ -18201,6 +19853,7 @@
           "from_collection",
           "deployed_at",
           "artifact_path",
+          "project_path",
           "collection_sha"
         ],
         "title": "DeploymentInfo",
@@ -18213,6 +19866,7 @@
           "deployed_at": "2025-11-18T12:00:00Z",
           "from_collection": "default",
           "local_modifications": false,
+          "project_path": "/path/to/project",
           "sync_status": "synced"
         }
       },
@@ -18619,6 +20273,216 @@
         "title": "DetailedHealthStatus",
         "description": "Detailed health check response with component status."
       },
+      "DetectedArtifact": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Type of artifact detected",
+            "examples": [
+              "skill"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name",
+            "examples": [
+              "canvas-design"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to artifact within repository",
+            "examples": [
+              "skills/canvas-design"
+            ]
+          },
+          "upstream_url": {
+            "type": "string",
+            "title": "Upstream Url",
+            "description": "Full URL to artifact in source repository",
+            "examples": [
+              "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+            ]
+          },
+          "confidence_score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Confidence Score",
+            "description": "Confidence score of detection (0-100)",
+            "examples": [
+              95
+            ]
+          },
+          "detected_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected Sha",
+            "description": "Git commit SHA at time of detection",
+            "examples": [
+              "abc123def456"
+            ]
+          },
+          "detected_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected Version",
+            "description": "Version extracted from manifest",
+            "examples": [
+              "1.2.0"
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Additional metadata extracted during detection"
+          },
+          "raw_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Score",
+            "description": "Raw unscaled confidence score before normalization (0-120 typical)"
+          },
+          "score_breakdown": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Breakdown",
+            "description": "Detailed breakdown of heuristic signal scores"
+          },
+          "excluded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded",
+            "description": "Whether this artifact was excluded during deduplication"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason",
+            "description": "Reason for exclusion (e.g., 'within_source_duplicate', 'cross_source_duplicate')"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At",
+            "description": "ISO timestamp when artifact was marked as excluded"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of",
+            "description": "Path of the artifact this is a duplicate of (for within-source duplicates)"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash",
+            "description": "SHA256 content hash of artifact files (for deduplication)"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Artifact status (e.g., 'new', 'excluded')"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_type",
+          "name",
+          "path",
+          "upstream_url",
+          "confidence_score"
+        ],
+        "title": "DetectedArtifact",
+        "description": "An artifact detected during scanning.\n\nInternal model used by scanning service, not directly exposed via API.",
+        "example": {
+          "artifact_type": "skill",
+          "confidence_score": 95,
+          "detected_sha": "abc123def456",
+          "detected_version": "1.2.0",
+          "metadata": {
+            "description": "Canvas design skill"
+          },
+          "name": "canvas-design",
+          "path": "skills/canvas-design",
+          "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        }
+      },
       "DiscoveredArtifact": {
         "properties": {
           "type": {
@@ -18732,6 +20596,32 @@
             "format": "date-time",
             "title": "Discovered At",
             "description": "When artifact was discovered"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash",
+            "description": "SHA256 content hash of the artifact for deduplication",
+            "examples": [
+              "abc123def456789..."
+            ]
+          },
+          "collection_match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionMatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hash-based collection matching result. Populated when collection context is provided during discovery. Shows if artifact content matches an existing collection artifact."
           }
         },
         "type": "object",
@@ -18744,6 +20634,13 @@
         "title": "DiscoveredArtifact",
         "description": "An artifact discovered during scanning.",
         "example": {
+          "collection_match": {
+            "confidence": 1.0,
+            "matched_artifact_id": "skill:canvas-design",
+            "matched_name": "canvas-design",
+            "type": "exact"
+          },
+          "content_hash": "a1b2c3d4e5f6...",
           "description": "Create beautiful visual art in .png and .pdf documents",
           "discovered_at": "2025-11-30T10:30:00Z",
           "name": "canvas-design",
@@ -19258,6 +21155,74 @@
           "version_mismatch_count": 0
         }
       },
+      "DuplicateDecisionAction": {
+        "type": "string",
+        "enum": [
+          "link",
+          "skip"
+        ],
+        "title": "DuplicateDecisionAction",
+        "description": "Action to take for a duplicate match."
+      },
+      "DuplicateMatch": {
+        "properties": {
+          "discovered_path": {
+            "type": "string",
+            "title": "Discovered Path",
+            "description": "Full filesystem path to the discovered artifact",
+            "examples": [
+              "/Users/me/.claude/skills/my-canvas"
+            ]
+          },
+          "collection_artifact_id": {
+            "type": "string",
+            "title": "Collection Artifact Id",
+            "description": "ID of the matching collection artifact (format: type:name)",
+            "examples": [
+              "skill:canvas-design"
+            ]
+          },
+          "action": {
+            "$ref": "#/components/schemas/DuplicateDecisionAction",
+            "description": "Action to take: 'link' to create association, 'skip' to ignore",
+            "default": "link",
+            "examples": [
+              "link"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "discovered_path",
+          "collection_artifact_id"
+        ],
+        "title": "DuplicateMatch",
+        "description": "A single duplicate match decision from the user.\n\nRepresents the user's decision to link a discovered artifact\nto an existing artifact in their collection.",
+        "example": {
+          "action": "link",
+          "collection_artifact_id": "skill:canvas-design",
+          "discovered_path": "/Users/me/.claude/skills/my-canvas"
+        }
+      },
+      "ErrorReasonCode": {
+        "type": "string",
+        "enum": [
+          "invalid_structure",
+          "yaml_parse_error",
+          "missing_metadata",
+          "invalid_type",
+          "invalid_source",
+          "import_error",
+          "network_error",
+          "permission_error",
+          "io_error",
+          "already_exists",
+          "in_skip_list",
+          "duplicate"
+        ],
+        "title": "ErrorReasonCode",
+        "description": "Reason codes for import failures and skips.\n\nThese codes provide machine-readable reasons for why an artifact\nwas skipped or failed during bulk import, enabling frontend\nerror handling and reporting."
+      },
       "ErrorResponse": {
         "title": "ErrorResponse",
         "type": "object",
@@ -19275,44 +21240,84 @@
           "detail"
         ]
       },
-      "FileContentResponse": {
+      "ExcludeArtifactRequest": {
         "properties": {
-          "artifact_id": {
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "description": "True to mark as excluded, False to restore",
+            "examples": [
+              true,
+              false
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "User-provided reason for exclusion (max 500 chars, optional)",
+            "examples": [
+              "Not a valid artifact - documentation file",
+              "False positive detection",
+              "Not a Claude artifact"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "excluded"
+        ],
+        "title": "ExcludeArtifactRequest",
+        "description": "Request body for excluding or restoring a catalog entry.\n\nUsed to mark artifacts as excluded from the catalog (e.g., false positives,\ndocumentation files, non-Claude artifacts) or to restore previously excluded\nentries.\n\nWhen `excluded=True`: Marks the entry as excluded with optional reason.\nExcluded artifacts are hidden from default catalog views but can be restored.\n\nWhen `excluded=False`: Removes exclusion status and restores entry to default\nview (status changes to \"new\" or \"imported\" depending on history).\n\nBoth operations are idempotent - calling multiple times succeeds.",
+        "example": {
+          "excluded": true,
+          "reason": "This is a documentation file, not an actual skill"
+        }
+      },
+      "ExtractedSegmentResponse": {
+        "properties": {
+          "segment": {
             "type": "string",
-            "title": "Artifact Id",
-            "description": "Artifact identifier"
+            "title": "Segment",
+            "description": "Original segment from path",
+            "examples": [
+              "canvas-design",
+              "UI-UX",
+              "test_utils"
+            ]
           },
-          "artifact_name": {
+          "normalized": {
             "type": "string",
-            "title": "Artifact Name",
-            "description": "Artifact name"
+            "title": "Normalized",
+            "description": "Normalized segment value",
+            "examples": [
+              "canvas-design",
+              "ui-ux",
+              "test-utils"
+            ]
           },
-          "artifact_type": {
+          "status": {
             "type": "string",
-            "title": "Artifact Type",
-            "description": "Artifact type"
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "excluded"
+            ],
+            "title": "Status",
+            "description": "Approval status",
+            "examples": [
+              "pending"
+            ]
           },
-          "collection_name": {
-            "type": "string",
-            "title": "Collection Name",
-            "description": "Collection name"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path",
-            "description": "Relative file path within artifact"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content",
-            "description": "File content (UTF-8 encoded)"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size",
-            "description": "File size in bytes"
-          },
-          "mime_type": {
+          "reason": {
             "anyOf": [
               {
                 "type": "string"
@@ -19321,31 +21326,25 @@
                 "type": "null"
               }
             ],
-            "title": "Mime Type",
-            "description": "MIME type of the file"
+            "title": "Reason",
+            "description": "Reason if excluded",
+            "examples": [
+              "Excluded: too generic"
+            ]
           }
         },
         "type": "object",
         "required": [
-          "artifact_id",
-          "artifact_name",
-          "artifact_type",
-          "collection_name",
-          "path",
-          "content",
-          "size"
+          "segment",
+          "normalized",
+          "status"
         ],
-        "title": "FileContentResponse",
-        "description": "Response for artifact file content.",
+        "title": "ExtractedSegmentResponse",
+        "description": "Single extracted path segment with approval status.\n\nRepresents a single segment from an artifact path with its normalized\nvalue and approval/rejection status for tag creation.",
         "example": {
-          "artifact_id": "skill:pdf-processor",
-          "artifact_name": "pdf-processor",
-          "artifact_type": "skill",
-          "collection_name": "default",
-          "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
-          "mime_type": "text/markdown",
-          "path": "SKILL.md",
-          "size": 2048
+          "normalized": "canvas-design",
+          "segment": "canvas-design",
+          "status": "pending"
         }
       },
       "FileDiff": {
@@ -19549,6 +21548,122 @@
           "name": "src",
           "path": "src",
           "type": "directory"
+        }
+      },
+      "FileTreeEntry": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "File path relative to artifact root",
+            "examples": [
+              "README.md",
+              "src/main.py"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "tree"
+            ],
+            "title": "Type",
+            "description": "Entry type: 'file' for files, 'tree' for directories",
+            "examples": [
+              "file"
+            ]
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "File size in bytes (only for blobs/files)",
+            "examples": [
+              1024
+            ]
+          },
+          "sha": {
+            "type": "string",
+            "title": "Sha",
+            "description": "Git SHA for the blob or tree",
+            "examples": [
+              "abc123def456789"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "type",
+          "sha"
+        ],
+        "title": "FileTreeEntry",
+        "description": "A single entry in a file tree (file or directory).\n\nRepresents a file or directory from the GitHub repository tree,\nused for browsing artifact file structures in the catalog modal.",
+        "example": {
+          "path": "SKILL.md",
+          "sha": "abc123def456789",
+          "size": 2048,
+          "type": "file"
+        }
+      },
+      "FileTreeResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FileTreeEntry"
+            },
+            "type": "array",
+            "title": "Entries",
+            "description": "List of file and directory entries"
+          },
+          "artifact_path": {
+            "type": "string",
+            "title": "Artifact Path",
+            "description": "Path to artifact within repository",
+            "examples": [
+              "skills/canvas-design"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Marketplace source ID",
+            "examples": [
+              "src_abc123"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "artifact_path",
+          "source_id"
+        ],
+        "title": "FileTreeResponse",
+        "description": "Response containing file tree entries for an artifact.\n\nReturns the list of files and directories within a marketplace\nartifact, used for file browsing in the catalog entry modal.",
+        "example": {
+          "artifact_path": "skills/canvas-design",
+          "entries": [
+            {
+              "path": "SKILL.md",
+              "sha": "abc123def456",
+              "size": 2048,
+              "type": "blob"
+            },
+            {
+              "path": "src",
+              "sha": "def789abc123",
+              "type": "tree"
+            }
+          ],
+          "source_id": "src_anthropics_quickstarts"
         }
       },
       "FileUpdateRequest": {
@@ -20432,6 +22547,21 @@
               "skill:canvas-design"
             ]
           },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path",
+            "description": "Path to the artifact (for local imports)",
+            "examples": [
+              "/Users/me/.claude/skills/canvas-design"
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/ImportStatus",
             "description": "Import status: success, skipped, or failed",
@@ -20462,6 +22592,20 @@
               "Artifact already exists and auto_resolve_conflicts is False"
             ]
           },
+          "reason_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Machine-readable reason code for failures/skips. Use this for programmatic error handling.",
+            "examples": [
+              "yaml_parse_error"
+            ]
+          },
           "skip_reason": {
             "anyOf": [
               {
@@ -20475,6 +22619,31 @@
             "description": "Reason artifact was skipped (if status=skipped)",
             "examples": [
               "Artifact already exists in collection"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Additional details about the error, such as line numbers for YAML parse errors or specific validation failures.",
+            "examples": [
+              "Line 5: expected ':' but found '-'"
+            ]
+          },
+          "tags_applied": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tags Applied",
+            "description": "Number of path-based tags applied to this artifact during import. Only non-zero when apply_path_tags=True and approved segments exist.",
+            "default": 0,
+            "examples": [
+              3
             ]
           },
           "success": {
@@ -20496,7 +22665,9 @@
         "example": {
           "artifact_id": "skill:canvas-design",
           "message": "Artifact 'canvas-design' imported successfully",
-          "status": "success"
+          "path": "/Users/me/.claude/skills/canvas-design",
+          "status": "success",
+          "tags_applied": 3
         }
       },
       "ImportResultDTO": {
@@ -20664,6 +22835,116 @@
         ],
         "title": "ImportedArtifactResponse",
         "description": "Single imported artifact in import result."
+      },
+      "InferUrlRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "GitHub URL to parse (full URL with branch/path or basic repo URL)",
+            "examples": [
+              "https://github.com/owner/repo",
+              "https://github.com/owner/repo/tree/main",
+              "https://github.com/owner/repo/tree/main/path/to/dir"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "InferUrlRequest",
+        "description": "Request to infer GitHub source structure from a full URL.\n\nSupports parsing GitHub URLs to extract repository, ref, and subdirectory.",
+        "example": {
+          "url": "https://github.com/davila7/claude-code-templates/tree/main/cli-tool/components"
+        }
+      },
+      "InferUrlResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether URL was successfully parsed",
+            "examples": [
+              true
+            ]
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url",
+            "description": "Base repository URL (e.g., https://github.com/owner/repo)",
+            "examples": [
+              "https://github.com/owner/repo"
+            ]
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref",
+            "description": "Branch, tag, or SHA extracted from URL (defaults to 'main' if not specified)",
+            "examples": [
+              "main",
+              "v1.0.0",
+              "abc123"
+            ]
+          },
+          "root_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Hint",
+            "description": "Subdirectory path within repository (None if URL points to repo root)",
+            "examples": [
+              "cli-tool/components",
+              "skills"
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if parsing failed (None on success)",
+            "examples": [
+              "Invalid GitHub URL format"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "InferUrlResponse",
+        "description": "Response containing inferred GitHub source structure.\n\nReturns parsed components or error message if parsing failed.",
+        "example": {
+          "ref": "main",
+          "repo_url": "https://github.com/davila7/claude-code-templates",
+          "root_hint": "cli-tool/components",
+          "success": true
+        }
       },
       "InstallRequest": {
         "properties": {
@@ -21616,6 +23897,222 @@
         "title": "MarketplaceListResponse",
         "description": "Paginated list of marketplace entries.\n\nAttributes:\n    items: List of marketplace entries\n    total: Total number of entries\n    skip: Number of items skipped\n    limit: Maximum items per page"
       },
+      "MatchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Original search query",
+            "examples": [
+              "pdf tool"
+            ]
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/MatchedArtifact"
+            },
+            "type": "array",
+            "title": "Matches",
+            "description": "Matched artifacts ordered by confidence (descending)"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total number of matches before limit applied",
+            "examples": [
+              47
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Maximum results requested",
+            "examples": [
+              10
+            ]
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Confidence",
+            "description": "Minimum confidence threshold applied",
+            "examples": [
+              0.0
+            ]
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "description": "Schema version for future migrations",
+            "default": "1.0.0"
+          },
+          "scored_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scored At",
+            "description": "Timestamp when scoring was performed"
+          },
+          "degraded": {
+            "type": "boolean",
+            "title": "Degraded",
+            "description": "Whether semantic scoring was unavailable (degraded to keyword-only)",
+            "default": false
+          },
+          "degradation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degradation Reason",
+            "description": "Reason for degradation (if degraded=true)",
+            "examples": [
+              "Embedding service unavailable",
+              "Semantic scoring timeout"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "matches",
+          "total",
+          "limit",
+          "min_confidence",
+          "scored_at"
+        ],
+        "title": "MatchResponse",
+        "description": "Response schema for artifact matching endpoint.\n\nReturns list of artifacts matching the query, sorted by confidence score.",
+        "example": {
+          "degraded": false,
+          "limit": 10,
+          "matches": [
+            {
+              "artifact_id": "skill:pdf-processor",
+              "artifact_type": "skill",
+              "confidence": 84.2,
+              "description": "Extract and manipulate PDF documents",
+              "name": "pdf-processor",
+              "title": "PDF Processing Tool"
+            }
+          ],
+          "min_confidence": 0.0,
+          "query": "pdf tool",
+          "schema_version": "1.0.0",
+          "scored_at": "2025-12-22T10:30:00Z",
+          "total": 47
+        }
+      },
+      "MatchedArtifact": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact composite key (type:name)",
+            "examples": [
+              "skill:pdf-processor"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Artifact name",
+            "examples": [
+              "pdf-processor"
+            ]
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Type of artifact (skill, command, agent, etc.)",
+            "examples": [
+              "skill"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Composite confidence score (0-100)",
+            "examples": [
+              84.2
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Human-readable title from artifact metadata",
+            "examples": [
+              "PDF Processing Tool"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Brief description from artifact metadata",
+            "examples": [
+              "Extract and manipulate PDF documents"
+            ]
+          },
+          "breakdown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreBreakdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Detailed score breakdown (only if requested)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "name",
+          "artifact_type",
+          "confidence"
+        ],
+        "title": "MatchedArtifact",
+        "description": "Single matched artifact with confidence score.\n\nRepresents an artifact that matched the search query with its\nrelevance score and optional breakdown.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "artifact_type": "skill",
+          "breakdown": {
+            "context_boost_applied": false,
+            "match_score": 78.3,
+            "quality_score": 92.5,
+            "semantic_used": true,
+            "trust_score": 85.0
+          },
+          "confidence": 84.2,
+          "description": "Extract and manipulate PDF documents",
+          "name": "pdf-processor",
+          "title": "PDF Processing Tool"
+        }
+      },
       "MergeAnalyzeRequest": {
         "properties": {
           "base_snapshot_id": {
@@ -22445,6 +24942,69 @@
           ]
         }
       },
+      "PathSegmentsResponse": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id",
+            "description": "Catalog entry ID",
+            "examples": [
+              "cat_canvas_design"
+            ]
+          },
+          "raw_path": {
+            "type": "string",
+            "title": "Raw Path",
+            "description": "Full artifact path",
+            "examples": [
+              "skills/ui-ux/canvas-design"
+            ]
+          },
+          "extracted": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractedSegmentResponse"
+            },
+            "type": "array",
+            "title": "Extracted",
+            "description": "Extracted segments with status"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At",
+            "description": "Extraction timestamp",
+            "examples": [
+              "2025-12-07T14:30:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "raw_path",
+          "extracted",
+          "extracted_at"
+        ],
+        "title": "PathSegmentsResponse",
+        "description": "All path segments for a catalog entry.\n\nContains the full path and all extracted segments with their approval\nstatus for tag management.",
+        "example": {
+          "entry_id": "cat_canvas_design",
+          "extracted": [
+            {
+              "normalized": "ui-ux",
+              "segment": "ui-ux",
+              "status": "pending"
+            },
+            {
+              "normalized": "canvas-design",
+              "segment": "canvas-design",
+              "status": "pending"
+            }
+          ],
+          "extracted_at": "2025-12-07T14:30:00Z",
+          "raw_path": "skills/ui-ux/canvas-design"
+        }
+      },
       "PreviewArtifact": {
         "properties": {
           "name": {
@@ -22689,6 +25249,77 @@
           "is_modified": true,
           "project_name": "my-project",
           "project_path": "/Users/me/my-project"
+        }
+      },
+      "ProjectDeploymentRemovalResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the removal was successful",
+            "examples": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable status message",
+            "examples": [
+              "Artifact 'pdf-processor' removed from project successfully"
+            ]
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Name of the removed artifact",
+            "examples": [
+              "pdf-processor"
+            ]
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Type of the removed artifact",
+            "examples": [
+              "skill"
+            ]
+          },
+          "project_path": {
+            "type": "string",
+            "title": "Project Path",
+            "description": "Path to the project",
+            "examples": [
+              "/Users/john/projects/my-project"
+            ]
+          },
+          "files_removed": {
+            "type": "boolean",
+            "title": "Files Removed",
+            "description": "Whether files were removed from filesystem",
+            "examples": [
+              true
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "artifact_name",
+          "artifact_type",
+          "project_path",
+          "files_removed"
+        ],
+        "title": "ProjectDeploymentRemovalResponse",
+        "description": "Response for removing a deployed artifact from a project.",
+        "example": {
+          "artifact_name": "pdf-processor",
+          "artifact_type": "skill",
+          "files_removed": true,
+          "message": "Artifact 'pdf-processor' removed from project successfully",
+          "project_path": "/Users/john/projects/my-project",
+          "success": true
         }
       },
       "ProjectDetail": {
@@ -23721,6 +26352,14 @@
               12
             ]
           },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedArtifact"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "description": "List of detected artifacts"
+          },
           "new_count": {
             "type": "integer",
             "minimum": 0.0,
@@ -23766,6 +26405,46 @@
               1234.56
             ]
           },
+          "duplicates_within_source": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Duplicates Within Source",
+            "description": "Number of duplicate artifacts detected within this source and excluded from catalog. These are artifacts with identical content (same SHA256 hash) found multiple times in the same repository scan.",
+            "default": 0,
+            "examples": [
+              2
+            ]
+          },
+          "duplicates_cross_source": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Duplicates Cross Source",
+            "description": "Number of duplicate artifacts detected that already exist in the collection (from other sources or previous scans) and excluded from catalog. These are artifacts matching existing collection entries by content hash.",
+            "default": 0,
+            "examples": [
+              3
+            ]
+          },
+          "total_detected": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Detected",
+            "description": "Total number of artifacts initially detected before deduplication. Equals: total_unique + duplicates_within_source + duplicates_cross_source",
+            "default": 0,
+            "examples": [
+              15
+            ]
+          },
+          "total_unique": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Unique",
+            "description": "Number of unique artifacts after deduplication that were added to the catalog. These are new artifacts not previously seen in this source or the existing collection.",
+            "default": 0,
+            "examples": [
+              10
+            ]
+          },
           "errors": {
             "items": {
               "type": "string"
@@ -23805,6 +26484,8 @@
         "description": "Result of scanning a GitHub repository.\n\nContains scan statistics, duration, and any errors encountered.",
         "example": {
           "artifacts_found": 12,
+          "duplicates_cross_source": 3,
+          "duplicates_within_source": 2,
           "errors": [],
           "new_count": 3,
           "removed_count": 1,
@@ -23812,8 +26493,71 @@
           "scanned_at": "2025-12-06T10:35:00Z",
           "source_id": "src_anthropics_quickstarts",
           "status": "success",
+          "total_detected": 15,
+          "total_unique": 10,
           "unchanged_count": 6,
           "updated_count": 2
+        }
+      },
+      "ScoreBreakdown": {
+        "properties": {
+          "trust_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Trust Score",
+            "description": "Source trust/reputation score (0-100)",
+            "examples": [
+              85.0
+            ]
+          },
+          "quality_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Quality Score",
+            "description": "Aggregated quality score from community ratings (0-100)",
+            "examples": [
+              92.5
+            ]
+          },
+          "match_score": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Match Score",
+            "description": "Query-specific relevance score (0-100)",
+            "examples": [
+              78.3
+            ]
+          },
+          "semantic_used": {
+            "type": "boolean",
+            "title": "Semantic Used",
+            "description": "Whether semantic embeddings were used for matching",
+            "default": false
+          },
+          "context_boost_applied": {
+            "type": "boolean",
+            "title": "Context Boost Applied",
+            "description": "Whether contextual boost was applied to score",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "trust_score",
+          "quality_score",
+          "match_score"
+        ],
+        "title": "ScoreBreakdown",
+        "description": "Detailed breakdown of scoring components.\n\nProvides transparency into how the confidence score was calculated.",
+        "example": {
+          "context_boost_applied": false,
+          "match_score": 78.3,
+          "quality_score": 92.5,
+          "semantic_used": true,
+          "trust_score": 85.0
         }
       },
       "SearchResult": {
@@ -24623,6 +27367,32 @@
             "examples": [
               "Contains verified skills from Anthropic team. Updated weekly."
             ]
+          },
+          "enable_frontmatter_detection": {
+            "type": "boolean",
+            "title": "Enable Frontmatter Detection",
+            "description": "Whether frontmatter detection is enabled for this source"
+          },
+          "manual_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Map",
+            "description": "Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.",
+            "examples": [
+              {
+                "commands/dev": "command",
+                "skills/python": "skill"
+              }
+            ]
           }
         },
         "type": "object",
@@ -24637,7 +27407,8 @@
           "scan_status",
           "artifact_count",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "enable_frontmatter_detection"
         ],
         "title": "SourceResponse",
         "description": "Response model for a GitHub repository source.\n\nContains source metadata, scan status, and artifact statistics.",
@@ -25830,6 +28601,129 @@
           "success": true
         }
       },
+      "UpdateCatalogEntryNameRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Updated artifact name to use for display and import",
+            "examples": [
+              "custom-skill-name"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "UpdateCatalogEntryNameRequest",
+        "description": "Request body for updating the display name of a catalog entry.",
+        "example": {
+          "name": "custom-skill-name"
+        }
+      },
+      "UpdateSegmentStatusRequest": {
+        "properties": {
+          "segment": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segment",
+            "description": "Original segment value to update",
+            "examples": [
+              "ui-ux",
+              "canvas-design"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Status",
+            "description": "New status (approved or rejected)",
+            "examples": [
+              "approved"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "segment",
+          "status"
+        ],
+        "title": "UpdateSegmentStatusRequest",
+        "description": "Request to update a segment's approval status.\n\nUsed to approve or reject a path segment for tag creation.",
+        "example": {
+          "segment": "ui-ux",
+          "status": "approved"
+        }
+      },
+      "UpdateSegmentStatusResponse": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id",
+            "description": "Catalog entry ID",
+            "examples": [
+              "cat_canvas_design"
+            ]
+          },
+          "raw_path": {
+            "type": "string",
+            "title": "Raw Path",
+            "description": "Full artifact path",
+            "examples": [
+              "skills/ui-ux/canvas-design"
+            ]
+          },
+          "extracted": {
+            "items": {
+              "$ref": "#/components/schemas/ExtractedSegmentResponse"
+            },
+            "type": "array",
+            "title": "Extracted",
+            "description": "Updated segments with status"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "Update timestamp",
+            "examples": [
+              "2025-12-07T15:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "raw_path",
+          "extracted",
+          "updated_at"
+        ],
+        "title": "UpdateSegmentStatusResponse",
+        "description": "Response after updating segment status.\n\nReturns the updated entry with all segments and their new statuses.",
+        "example": {
+          "entry_id": "cat_canvas_design",
+          "extracted": [
+            {
+              "normalized": "ui-ux",
+              "segment": "ui-ux",
+              "status": "approved"
+            },
+            {
+              "normalized": "canvas-design",
+              "segment": "canvas-design",
+              "status": "pending"
+            }
+          ],
+          "raw_path": "skills/ui-ux/canvas-design",
+          "updated_at": "2025-12-07T15:00:00Z"
+        }
+      },
       "UpdateSourceRequest": {
         "properties": {
           "ref": {
@@ -25863,6 +28757,27 @@
             "examples": [
               "skills",
               "src/artifacts"
+            ]
+          },
+          "manual_map": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Map",
+            "description": "Manual directory-to-type mappings (directory path → artifact_type). Example: {\"path/to/dir\": \"skill\", \"other/path\": \"command\"}",
+            "examples": [
+              {
+                "commands/dev": "command",
+                "skills/python": "skill"
+              }
             ]
           },
           "trust_level": {
@@ -25914,6 +28829,18 @@
             "examples": [
               "Contains verified skills. Contact: team@example.com"
             ]
+          },
+          "enable_frontmatter_detection": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable Frontmatter Detection",
+            "description": "Enable parsing markdown frontmatter for artifact type hints"
           }
         },
         "type": "object",
@@ -26347,6 +29274,131 @@
           "updated_at": "2024-11-16T15:30:00Z"
         }
       },
+      "UserRatingRequest": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating",
+            "description": "Numeric rating from 1 (poor) to 5 (excellent)",
+            "examples": [
+              4
+            ]
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback",
+            "description": "Optional text feedback from user",
+            "examples": [
+              "Great skill, very useful for my workflow!"
+            ]
+          },
+          "share_with_community": {
+            "type": "boolean",
+            "title": "Share With Community",
+            "description": "Whether to share rating with community (opt-in)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "UserRatingRequest",
+        "description": "Request schema for submitting artifact rating.\n\nAllows users to rate artifacts and optionally provide feedback.",
+        "example": {
+          "feedback": "Very helpful for PDF processing tasks",
+          "rating": 4,
+          "share_with_community": true
+        }
+      },
+      "UserRatingResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Database-assigned rating ID",
+            "examples": [
+              123
+            ]
+          },
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact that was rated (type:name)",
+            "examples": [
+              "skill:pdf-processor"
+            ]
+          },
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating",
+            "description": "Submitted rating value (1-5)",
+            "examples": [
+              4
+            ]
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback",
+            "description": "Submitted feedback text"
+          },
+          "share_with_community": {
+            "type": "boolean",
+            "title": "Share With Community",
+            "description": "Whether rating is shared with community"
+          },
+          "rated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Rated At",
+            "description": "Timestamp when rating was recorded"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "description": "Schema version for future migrations",
+            "default": "1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "artifact_id",
+          "rating",
+          "share_with_community",
+          "rated_at"
+        ],
+        "title": "UserRatingResponse",
+        "description": "Response schema for rating submission confirmation.\n\nConfirms successful rating submission and provides server-assigned metadata.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "feedback": "Very helpful for PDF processing tasks",
+          "id": 123,
+          "rated_at": "2025-12-22T10:35:00Z",
+          "rating": 4,
+          "schema_version": "1.0.0",
+          "share_with_community": true
+        }
+      },
       "ValidationError": {
         "title": "ValidationError",
         "required": [
@@ -26721,6 +29773,79 @@
           }
         }
       },
+      "skillmeat__api__schemas__artifacts__FileContentResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id",
+            "description": "Artifact identifier"
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Artifact name"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Artifact type"
+          },
+          "collection_name": {
+            "type": "string",
+            "title": "Collection Name",
+            "description": "Collection name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative file path within artifact"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "File content (UTF-8 encoded)"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "File size in bytes"
+          },
+          "mime_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime Type",
+            "description": "MIME type of the file"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "artifact_name",
+          "artifact_type",
+          "collection_name",
+          "path",
+          "content",
+          "size"
+        ],
+        "title": "FileContentResponse",
+        "description": "Response for artifact file content.",
+        "example": {
+          "artifact_id": "skill:pdf-processor",
+          "artifact_name": "pdf-processor",
+          "artifact_type": "skill",
+          "collection_name": "default",
+          "content": "# PDF Processor Skill\n\nThis skill processes PDF files...",
+          "mime_type": "text/markdown",
+          "path": "SKILL.md",
+          "size": 2048
+        }
+      },
       "skillmeat__api__schemas__collections__ArtifactSummary": {
         "properties": {
           "name": {
@@ -26885,6 +30010,135 @@
           "message": "Artifact deployed successfully",
           "project_path": "/path/to/project",
           "success": true
+        }
+      },
+      "skillmeat__api__schemas__marketplace__FileContentResponse": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "File content (text or base64-encoded for binary files)",
+            "examples": [
+              "# My Skill\n\nThis is a sample skill..."
+            ]
+          },
+          "encoding": {
+            "type": "string",
+            "title": "Encoding",
+            "description": "Content encoding: 'none' for text, 'base64' for binary",
+            "examples": [
+              "none",
+              "base64"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size",
+            "description": "File size in bytes (may be truncated size if truncated=True)",
+            "examples": [
+              1024
+            ]
+          },
+          "sha": {
+            "type": "string",
+            "title": "Sha",
+            "description": "Git blob SHA",
+            "examples": [
+              "abc123def456789..."
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "File name",
+            "examples": [
+              "SKILL.md"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Full path within repository",
+            "examples": [
+              "skills/canvas/SKILL.md"
+            ]
+          },
+          "is_binary": {
+            "type": "boolean",
+            "title": "Is Binary",
+            "description": "Whether the file is binary (content is base64)",
+            "examples": [
+              false
+            ]
+          },
+          "artifact_path": {
+            "type": "string",
+            "title": "Artifact Path",
+            "description": "Path to the artifact this file belongs to",
+            "examples": [
+              "skills/canvas"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "ID of the marketplace source",
+            "examples": [
+              "src_abc123"
+            ]
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "Whether the content was truncated due to size (>1MB)",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "original_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Size",
+            "description": "Original file size in bytes (only set when truncated=True)",
+            "examples": [
+              2097152
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "encoding",
+          "size",
+          "sha",
+          "name",
+          "path",
+          "is_binary",
+          "artifact_path",
+          "source_id"
+        ],
+        "title": "FileContentResponse",
+        "description": "Response model for file content from a marketplace artifact.\n\nContains the file content along with metadata for rendering in the UI.\nBinary files will have base64-encoded content with is_binary=True.\nLarge files (>1MB) are truncated to 10,000 lines with truncated=True.",
+        "example": {
+          "artifact_path": "skills/canvas",
+          "content": "# Canvas Design Skill\n\nA skill for designing...",
+          "encoding": "none",
+          "is_binary": false,
+          "name": "SKILL.md",
+          "path": "skills/canvas/SKILL.md",
+          "sha": "abc123def456789abcdef0123456789abcdef01",
+          "size": 2048,
+          "source_id": "src_anthropics_quickstarts",
+          "truncated": false
         }
       },
       "skillmeat__api__schemas__mcp__DeploymentResponse": {
