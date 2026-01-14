@@ -140,6 +140,44 @@ def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
     return None
 
 
+def _get_possible_artifact_paths(artifact_type: ArtifactType, name: str) -> List[str]:
+    """Get possible project paths for an artifact without deployment record.
+
+    When an artifact exists in a project but has no deployment record (e.g.,
+    manually deployed or deployed before tracking was implemented), this
+    function returns candidate paths based on artifact type conventions.
+
+    Args:
+        artifact_type: The type of artifact (skill, command, agent, etc.)
+        name: The artifact name
+
+    Returns:
+        List of possible relative paths within .claude/ directory, ordered by
+        likelihood. The first matching path should be used.
+    """
+    type_val = artifact_type.value
+    paths: List[str] = []
+
+    if type_val == "skill":
+        paths = [f"skills/{name}"]
+    elif type_val == "command":
+        paths = [f"commands/{name}"]
+    elif type_val == "agent":
+        # Agents can be single files or directories
+        paths = [
+            f"agents/{name}.md",
+            f"agents/{name}",
+            f"agents/pm/{name}.md",
+            f"agents/dev/{name}.md",
+        ]
+    elif type_val == "hook":
+        paths = [f"hooks/{name}"]
+    elif type_val == "mcp":
+        paths = [f"mcp/{name}"]
+
+    return paths
+
+
 router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
@@ -3561,14 +3599,33 @@ async def get_artifact_diff(
             proj_path, artifact_name, artifact_type.value
         )
 
-        if not deployment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not deployed in project {project_path}",
+        # Handle case when no deployment record exists (manually deployed or legacy)
+        if deployment:
+            collection_name = collection or deployment.from_collection
+            inferred_artifact_path = deployment.artifact_path
+        else:
+            # No deployment record - try to infer paths
+            logger.debug(
+                f"No deployment record for {artifact_id}, attempting to infer paths"
             )
+            collection_name = collection or "default"
 
-        # Determine collection name from deployment if not specified
-        collection_name = collection or deployment.from_collection
+            # Find artifact in project using standard conventions
+            possible_paths = _get_possible_artifact_paths(artifact_type, artifact_name)
+            inferred_artifact_path = None
+
+            for path in possible_paths:
+                full_path = proj_path / ".claude" / path
+                if full_path.exists():
+                    inferred_artifact_path = path
+                    logger.debug(f"Found artifact at inferred path: {path}")
+                    break
+
+            if not inferred_artifact_path:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact '{artifact_id}' not found in project {project_path}",
+                )
 
         # Verify collection exists
         if collection_name not in collection_mgr.list_collections():
@@ -3590,7 +3647,7 @@ async def get_artifact_diff(
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
         collection_artifact_path = collection_path / artifact.path
-        project_artifact_path = proj_path / ".claude" / deployment.artifact_path
+        project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
         if not collection_artifact_path.exists():
             raise HTTPException(

@@ -422,7 +422,10 @@ class TestGetArtifactDiff:
         )
 
         assert response.status_code == 404
-        assert "not deployed" in response.json()["detail"].lower()
+        # Error can be "not deployed" (has tracking record but path missing)
+        # or "not found in project" (no tracking record and can't infer path)
+        detail_lower = response.json()["detail"].lower()
+        assert "not found" in detail_lower or "not deployed" in detail_lower
 
     def test_get_diff_missing_project_path(self, client):
         """Test getting diff without providing project_path."""
