@@ -28,7 +28,7 @@ import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -325,11 +325,39 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
     )
 
 
-def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
+def get_collection_artifact_keys(collection_mgr) -> Set[str]:
+    """Get set of 'type:name' keys for all artifacts in active collection.
+
+    Used for efficient lookup when enriching catalog entries with in_collection status.
+
+    Args:
+        collection_mgr: CollectionManager instance
+
+    Returns:
+        Set of strings in format 'artifact_type:name' for each artifact in collection.
+        Returns empty set if collection artifacts cannot be retrieved.
+    """
+    try:
+        from skillmeat.core.artifact import ArtifactManager
+
+        artifact_mgr = ArtifactManager(collection_mgr)
+        artifacts = artifact_mgr.list_artifacts()
+        return {f"{a.type.value}:{a.name}" for a in artifacts}
+    except Exception as e:
+        logger.warning(f"Failed to get collection artifacts: {e}")
+        return set()
+
+
+def entry_to_response(
+    entry: MarketplaceCatalogEntry,
+    collection_artifact_keys: Optional[Set[str]] = None,
+) -> CatalogEntryResponse:
     """Convert MarketplaceCatalogEntry ORM model to API response.
 
     Args:
         entry: MarketplaceCatalogEntry ORM instance
+        collection_artifact_keys: Optional set of 'type:name' keys for collection artifacts.
+            Used to determine if the entry exists in the user's collection.
 
     Returns:
         CatalogEntryResponse DTO for API
@@ -344,6 +372,13 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         if entry.excluded_reason
         else False
     )
+
+    # Check if artifact exists in collection
+    in_collection = False
+    if collection_artifact_keys is not None:
+        # Key format: "artifact_type:name"
+        key = f"{entry.artifact_type}:{entry.name}"
+        in_collection = key in collection_artifact_keys
 
     return CatalogEntryResponse(
         id=entry.id,
@@ -364,6 +399,7 @@ def entry_to_response(entry: MarketplaceCatalogEntry) -> CatalogEntryResponse:
         excluded_at=entry.excluded_at,
         excluded_reason=entry.excluded_reason,
         is_duplicate=is_duplicate,
+        in_collection=in_collection,
     )
 
 
@@ -1647,6 +1683,7 @@ async def list_artifacts(
     cursor: Optional[str] = Query(
         None, description="Cursor for pagination (from previous response)"
     ),
+    collection_mgr: CollectionManagerDep = None,
 ) -> CatalogListResponse:
     """List artifacts from a source with optional filters and sorting.
 
@@ -1793,8 +1830,17 @@ async def list_artifacts(
 
             items = entries
 
+        # Get collection artifact keys for in_collection check
+        collection_keys = (
+            get_collection_artifact_keys(collection_mgr)
+            if collection_mgr
+            else set()
+        )
+
         # Convert to response DTOs
-        response_items = [entry_to_response(entry) for entry in items]
+        response_items = [
+            entry_to_response(entry, collection_keys) for entry in items
+        ]
 
         # Get aggregated counts (needed for total_count in page_info)
         counts_by_status = catalog_repo.count_by_status(source_id=source_id)
@@ -1856,10 +1902,14 @@ async def update_catalog_entry_name(
     source_id: str,
     entry_id: str,
     request: UpdateCatalogEntryNameRequest,
+    collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Update the name for a catalog entry."""
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
+    collection_keys = (
+        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+    )
 
     normalized_name = request.name.strip()
     is_valid, error = validate_artifact_name(normalized_name)
@@ -1906,7 +1956,7 @@ async def update_catalog_entry_name(
             session.refresh(entry)
 
             logger.info(f"Updated catalog entry name: {entry_id} -> {normalized_name}")
-            return entry_to_response(entry)
+            return entry_to_response(entry, collection_keys)
 
         except HTTPException:
             session.rollback()
@@ -2157,6 +2207,7 @@ async def exclude_artifact(
     source_id: str,
     entry_id: str,
     request: ExcludeArtifactRequest,
+    collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Mark or restore a catalog entry as excluded.
 
@@ -2168,6 +2219,7 @@ async def exclude_artifact(
         source_id: Unique source identifier
         entry_id: Unique catalog entry identifier
         request: Exclusion request with excluded flag and optional reason
+        collection_mgr: Collection manager for in_collection lookup
 
     Returns:
         Updated catalog entry with exclusion metadata
@@ -2189,6 +2241,9 @@ async def exclude_artifact(
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
+    collection_keys = (
+        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+    )
 
     try:
         # Verify source exists
@@ -2249,7 +2304,7 @@ async def exclude_artifact(
             # Refresh to get updated timestamps
             session.refresh(entry)
 
-            return entry_to_response(entry)
+            return entry_to_response(entry, collection_keys)
 
         except HTTPException:
             session.rollback()
@@ -2308,6 +2363,7 @@ async def exclude_artifact(
 async def restore_excluded_artifact(
     source_id: str,
     entry_id: str,
+    collection_mgr: CollectionManagerDep = None,
 ) -> CatalogEntryResponse:
     """Restore an excluded catalog entry to the catalog.
 
@@ -2317,6 +2373,7 @@ async def restore_excluded_artifact(
     Args:
         source_id: Unique source identifier
         entry_id: Unique catalog entry identifier
+        collection_mgr: Collection manager for in_collection lookup
 
     Returns:
         Updated catalog entry with exclusion removed (excluded_at=None, excluded_reason=None)
@@ -2335,6 +2392,9 @@ async def restore_excluded_artifact(
     """
     source_repo = MarketplaceSourceRepository()
     catalog_repo = MarketplaceCatalogRepository()
+    collection_keys = (
+        get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
+    )
 
     try:
         # Verify source exists
@@ -2386,7 +2446,7 @@ async def restore_excluded_artifact(
             # Refresh to get updated timestamps
             session.refresh(entry)
 
-            return entry_to_response(entry)
+            return entry_to_response(entry, collection_keys)
 
         except HTTPException:
             session.rollback()
