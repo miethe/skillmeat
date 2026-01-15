@@ -11,12 +11,7 @@
   "permissions": {
     "_comment_deny": "Dangerous operations that are always blocked. Customize based on your security requirements.",
     "deny": [
-      "Read(./secrets/**)",
-      "Read(./.env*)",
-      "Read(./credentials.json)",
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)",
-      "Bash(chmod 777:*)"
+      "Bash(rm -rf:*)"
     ],
     "_comment_ask": "Operations requiring user confirmation. Customize based on your workflow (e.g., deployments, package installs).",
     "ask": [
@@ -26,7 +21,12 @@
       "Bash({{PACKAGE_MANAGER}} add:*)",
       "Bash(npm install:*)",
       "Bash(yarn add:*)",
-      "Bash(kubectl:*)"
+      "Read(./.env*)",
+      "Read(./secrets/**)",
+      "Read(./credentials.json)",
+      "Bash(sudo:*)",
+      "Bash(kubectl:*)",
+      "Bash(chmod 777:*)"
     ],
     "_ask_examples": {
       "pnpm": ["Bash(pnpm install:*)", "Bash(pnpm add:*)"],

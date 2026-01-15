@@ -334,7 +334,7 @@ app = create_app()
 
 def main(
     host: str = "127.0.0.1",
-    port: int = 8000,
+    port: int = 8080,
     reload: bool = False,
     log_level: str = "info",
 ) -> None:
