@@ -475,7 +475,7 @@ export default function SourceDetailPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useSourceCatalog(sourceId, mergedFilters);
+  } = useSourceCatalog(sourceId, mergedFilters, itemsPerPage);
   const rescanMutation = useRescanSource(sourceId);
   const importMutation = useImportArtifacts(sourceId);
   const updateSourceMutation = useUpdateSource(sourceId);
@@ -524,11 +524,21 @@ export default function SourceDetailPage() {
     return excluded;
   }, [allEntries, showOnlyDuplicates]);
 
+  // Get counts from first page (needed for totalCount calculation)
+  const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
+
+  // Get total count from first page (stays consistent across pagination)
+  // Fallback to summing counts_by_status if total_count is null
+  const totalCount = catalogData?.pages[0]?.page_info?.total_count
+    ?? (countsByStatus ? Object.values(countsByStatus).reduce((sum: number, count) => sum + (count as number), 0) : undefined);
+
   // Pagination calculations
+  // Use server totalCount for total pages, fallback to loaded data count
   const totalFilteredCount = filteredEntries.length;
-  const totalPages = Math.ceil(totalFilteredCount / itemsPerPage);
+  const effectiveTotalCount = totalCount ?? totalFilteredCount;
+  const totalPages = Math.ceil(effectiveTotalCount / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalFilteredCount);
+  const endIndex = Math.min(startIndex + itemsPerPage, effectiveTotalCount);
 
   // Paginated entries for display
   const paginatedEntries = useMemo(() => {
@@ -543,21 +553,25 @@ export default function SourceDetailPage() {
   }, [totalPages, currentPage]);
 
   // Fetch more pages if needed for pagination
-  // Load more data when user navigates to a page beyond loaded data
-  // Use > (not >=) to prevent re-fetching when we have exactly enough data
+  // This effect re-runs whenever the data or pagination state changes
   useEffect(() => {
-    if (hasNextPage && endIndex > allEntries.length && !isFetchingNextPage) {
+    const loadedCount = allEntries.length;
+    const neededCount = endIndex;
+    const serverTotal = effectiveTotalCount;
+
+    // Guard conditions to prevent fetch loops:
+    // 1. Need more data than we have loaded
+    // 2. Haven't loaded all items that exist (server total)
+    // 3. There are more pages available from API
+    // 4. Not currently fetching (either initial or next page)
+    const needsMoreData = neededCount > loadedCount;
+    const notFullyLoaded = loadedCount < serverTotal;
+    const canFetchMore = hasNextPage && !isFetchingNextPage && !catalogFetching;
+
+    if (needsMoreData && notFullyLoaded && canFetchMore) {
       fetchNextPage();
     }
-  }, [hasNextPage, endIndex, allEntries.length, isFetchingNextPage, fetchNextPage]);
-
-  // Get counts from first page
-  const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
-
-  // Get total count from first page (stays consistent across pagination)
-  // Fallback to summing counts_by_status if total_count is null
-  const totalCount = catalogData?.pages[0]?.page_info?.total_count
-    ?? (countsByStatus ? Object.values(countsByStatus).reduce((sum: number, count) => sum + (count as number), 0) : undefined);
+  }, [endIndex, allEntries.length, effectiveTotalCount, hasNextPage, isFetchingNextPage, catalogFetching, fetchNextPage]);
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -1106,6 +1120,9 @@ export default function SourceDetailPage() {
         <div className="flex items-center py-2 text-sm text-muted-foreground">
           <span>
             Showing {startIndex + 1}-{endIndex} of{' '}
+            {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
+            {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
+              <> ({totalFilteredCount.toLocaleString()} matching search)</>
             {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
             {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
               <> ({totalFilteredCount.toLocaleString()} matching search)</>
