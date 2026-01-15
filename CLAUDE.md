@@ -72,7 +72,17 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 | `/dev:complete-user-story` | dev-execution, artifact-tracking | `Skill("dev-execution")` then `Skill("artifact-tracking")` |
 | `/dev:create-feature`      | dev-execution                    | `Skill("dev-execution")`                                   |
 | `/plan:*`                  | planning                         | `Skill("planning")`                                        |
+| `/analyze:symbols:*`       | symbols                          | CLI scripts (automatic via commands)                       |
 | `/mc`                      | (self-contained)                 | No additional skills needed                                |
+
+### Symbol-First Exploration
+
+**Pattern discovery uses symbols automatically** via `codebase-explorer` agent delegation.
+
+When exploring code patterns before implementation:
+1. Delegate to `Task("codebase-explorer", "Find [pattern]")` - uses symbols internally
+2. Direct queries: `jq '.symbols[] | select(.layer == "service")' ai/symbols-api.json`
+3. Token savings: ~150 tokens (symbols) vs 5-15K tokens (file reads)
 
 ### Enforcement Protocol
 

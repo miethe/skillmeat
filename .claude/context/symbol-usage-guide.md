@@ -2,9 +2,11 @@
 title: Symbol Usage Guide
 purpose: Master guide for symbol-based investigation - load when starting bug investigation
 references:
-  - .claude/specs/symbols-spec.md (when created)
-  - ai/symbols-*.json (when created)
-last_verified: 2025-12-13
+  - .claude/specs/symbols-spec.md
+  - ai/symbols-api.json (30 symbols, 15KB)
+  - ai/symbols-web.json (167 symbols, 73KB)
+  - ai/symbols-api-cores.json (layer split, 17KB)
+last_verified: 2026-01-15
 ---
 
 # Symbol Usage Guide
@@ -17,264 +19,226 @@ Guide for using symbol-based code investigation to achieve 96% token reduction v
 |----------|-------|------------|----------|
 | **Full Read** | 5-10 files | ~60,000 tokens | Initial codebase learning |
 | **Codebase Explorer** | Query-based | ~5,000 tokens | Pattern discovery |
-| **Symbols** | Symbol graph | ~2,400 tokens | Targeted investigation |
-| **Symbols + Context** | Graph + 2-3 files | ~8,000 tokens | Bug fixing |
+| **Symbols** | 30 API + 167 web symbols | ~2,400 tokens | Targeted investigation |
+| **Symbols + Context** | Symbols + 2-3 files | ~8,000 tokens | Bug fixing |
 
 **Best Practice**: Start with symbols, load files only when needed.
 
-## Symbol File Inventory (Planned)
+**Current SkillMeat Symbols**:
+- `ai/symbols-api.json` - 30 backend symbols (15KB) - routers, services, repositories
+- `ai/symbols-web.json` - 167 frontend symbols (73KB) - components, hooks, utilities
+- `ai/symbols-api-cores.json` - Layer-split symbols (17KB) - observability, config
 
-SkillMeat does not yet have symbol files. When created by `symbols-engineer`, expect:
+## Symbol File Inventory
 
-### Core Domain Symbols
+SkillMeat has symbol files created by the `symbols` skill:
 
-**File**: `ai/symbols-core.json`
-**Purpose**: Core business logic (artifact, collection, deployment, sync)
-**Scope**: `skillmeat/core/`
-**Size**: ~500 symbols
-**Example Structure**:
-```json
-{
-  "classes": {
-    "ArtifactManager": {
-      "file": "skillmeat/core/artifact.py",
-      "methods": ["install_artifact", "list_artifacts", "get_artifact"],
-      "dependencies": ["ManifestManager", "LockfileManager"]
-    },
-    "CollectionManager": {
-      "file": "skillmeat/core/collection.py",
-      "methods": ["add_artifact", "remove_artifact", "list_collections"],
-      "dependencies": ["ArtifactManager", "ManifestManager"]
-    }
-  },
-  "functions": {
-    "parse_artifact_source": {
-      "file": "skillmeat/core/artifact.py",
-      "signature": "parse_artifact_source(source: str) -> ArtifactSource",
-      "calls": []
-    }
-  }
-}
-```
-
-### API Symbols
+### API Backend Symbols
 
 **File**: `ai/symbols-api.json`
-**Purpose**: FastAPI routers, schemas, dependencies
+**Purpose**: FastAPI routers, services, repositories, schemas
 **Scope**: `skillmeat/api/`
-**Size**: ~800 symbols
+**Status**: ✓ Created (30 symbols, 15KB)
 **Example Structure**:
 ```json
 {
-  "routers": {
-    "user_collections": {
+  "symbols": [
+    {
+      "name": "CollectionManager",
+      "kind": "class",
+      "file": "skillmeat/api/managers/collection_manager.py",
+      "layer": "service",
+      "summary": "Manages user collections with artifact orchestration and validation",
+      "methods": ["create_collection", "list_collections", "add_artifact_to_collection"]
+    },
+    {
+      "name": "create_collection",
+      "kind": "function",
       "file": "skillmeat/api/routers/user_collections.py",
-      "endpoints": [
-        {
-          "path": "/api/v1/user-collections",
-          "method": "POST",
-          "handler": "create_collection",
-          "schema": "UserCollectionCreateRequest"
-        }
-      ],
-      "dependencies": ["CollectionManagerDep", "get_db"]
+      "layer": "router",
+      "summary": "POST /api/v1/user-collections endpoint handler",
+      "async": true
     }
-  },
-  "schemas": {
-    "UserCollectionCreateRequest": {
-      "file": "skillmeat/api/schemas/user_collections.py",
-      "fields": ["name", "description", "is_public"],
-      "validators": []
-    }
-  }
+  ]
 }
 ```
+
+### API Layer Split Symbols
+
+**File**: `ai/symbols-api-cores.json`
+**Purpose**: Layer-specific symbols (observability, config, middleware)
+**Scope**: Core layers in `skillmeat/api/`
+**Status**: ✓ Created (17KB)
+**Contains**: Symbols from observability, config, middleware layers
 
 ### Web Frontend Symbols
 
 **File**: `ai/symbols-web.json`
-**Purpose**: React components, hooks, API clients
+**Purpose**: React components, hooks, API clients, utilities
 **Scope**: `skillmeat/web/`
-**Size**: ~600 symbols
+**Status**: ✓ Created (167 symbols, 73KB)
 **Example Structure**:
 ```json
 {
-  "components": {
-    "CollectionBrowser": {
+  "symbols": [
+    {
+      "name": "CollectionBrowser",
+      "kind": "component",
       "file": "skillmeat/web/components/collection/collection-browser.tsx",
-      "props": ["filters", "onSelect"],
-      "hooks": ["useCollections", "useRouter"],
-      "exports": ["default"]
-    }
-  },
-  "hooks": {
-    "useCreateCollection": {
-      "file": "skillmeat/web/hooks/use-collections.ts",
-      "type": "mutation",
-      "api_call": "createCollection",
-      "invalidates": ["collectionKeys.lists()"]
-    }
-  }
-}
-```
-
-### Database Symbols
-
-**File**: `ai/symbols-database.json`
-**Purpose**: SQLAlchemy models, relationships, queries
-**Scope**: `skillmeat/api/models/`
-**Size**: ~400 symbols
-**Example Structure**:
-```json
-{
-  "models": {
-    "UserCollection": {
-      "file": "skillmeat/api/models/user_collection.py",
-      "table": "user_collections",
-      "fields": ["id", "name", "description", "created_at"],
-      "relationships": ["artifacts", "groups"],
-      "indexes": ["name"]
+      "summary": "Main collection browsing interface with filtering and pagination",
+      "exports": ["CollectionBrowser"]
     },
-    "CollectionArtifact": {
-      "file": "skillmeat/api/models/collection_artifact.py",
-      "table": "collection_artifacts",
-      "fields": ["collection_id", "artifact_id", "position"],
-      "relationships": ["collection", "artifact"]
+    {
+      "name": "useCollection",
+      "kind": "hook",
+      "file": "skillmeat/web/hooks/use-collections.ts",
+      "summary": "Query hook for fetching single collection with artifacts",
+      "returns": "UseQueryResult<Collection>"
     }
-  }
+  ]
 }
 ```
+
+### Layer Split Files (Additional)
+
+**Files**:
+- `ai/symbols-api-routers.json` (empty - routers in main file)
+- `ai/symbols-api-services.json` (empty - services in main file)
+- `ai/symbols-api-repositorys.json` (empty - repositories in main file)
+- `ai/symbols-api-schemas.json` (empty - schemas in main file)
+
+**Note**: Layer split files are primarily populated in `symbols-api-cores.json`. Main symbols are in `symbols-api.json`.
 
 ## Query Patterns
 
 ### Pattern 1: Find Handler for API Endpoint
 
-**Goal**: User reports 422 error on POST /api/v1/user-collections
+**Goal**: User reports error on POST /api/v1/user-collections
 
 **Symbol Query**:
 ```bash
-# Query symbols instead of reading files
-jq '.routers.user_collections.endpoints[] |
-    select(.method == "POST" and .path == "/api/v1/user-collections")' \
-    ai/symbols-api.json
+# Find router layer functions
+jq '.symbols[] | select(.kind == "function" and .layer == "router")' ai/symbols-api.json
 ```
 
 **Result** (~100 tokens):
 ```json
 {
-  "path": "/api/v1/user-collections",
-  "method": "POST",
-  "handler": "create_collection",
-  "schema": "UserCollectionCreateRequest",
-  "line": 281
+  "name": "create_collection",
+  "kind": "function",
+  "file": "skillmeat/api/routers/user_collections.py",
+  "layer": "router",
+  "summary": "POST /api/v1/user-collections endpoint handler",
+  "async": true
 }
 ```
 
-**Next Step**: Load only the handler function and schema (~2,000 tokens total vs 15,000 for full file).
+**Next Step**: Read only the specific function from the file (~1,500 tokens vs 15,000 for full router file).
 
-### Pattern 2: Find Schema Dependencies
+### Pattern 2: Find Service Layer Classes
 
-**Goal**: What fields does UserCollectionCreateRequest require?
-
-**Symbol Query**:
-```bash
-jq '.schemas.UserCollectionCreateRequest' ai/symbols-api.json
-```
-
-**Result** (~50 tokens):
-```json
-{
-  "file": "skillmeat/api/schemas/user_collections.py",
-  "fields": ["name", "description", "is_public"],
-  "required": ["name"],
-  "validators": ["validate_name_length"]
-}
-```
-
-**Insight**: Only `name` is required, but API might expect more. Check handler.
-
-### Pattern 3: Find Frontend Hook Implementation
-
-**Goal**: Which hook calls the createCollection API?
+**Goal**: What service/manager handles collection logic?
 
 **Symbol Query**:
 ```bash
-jq '.hooks | to_entries[] |
-    select(.value.api_call == "createCollection")' \
-    ai/symbols-web.json
+# Find all service layer classes
+jq '.symbols[] | select(.kind == "class" and .layer == "service")' ai/symbols-api.json
 ```
 
 **Result** (~80 tokens):
 ```json
 {
-  "key": "useCreateCollection",
-  "value": {
-    "file": "skillmeat/web/hooks/use-collections.ts",
-    "type": "mutation",
-    "api_call": "createCollection",
-    "invalidates": ["collectionKeys.lists()"],
-    "line": 225
-  }
+  "name": "CollectionManager",
+  "kind": "class",
+  "file": "skillmeat/api/managers/collection_manager.py",
+  "layer": "service",
+  "summary": "Manages user collections with artifact orchestration and validation"
 }
 ```
 
-### Pattern 4: Find All Collection API Endpoints
+**Insight**: Business logic lives in CollectionManager. Check there for validation rules.
 
-**Goal**: What endpoints exist for collections?
+### Pattern 3: Find Frontend Hook Implementation
+
+**Goal**: Which hook handles collection data fetching?
 
 **Symbol Query**:
 ```bash
-jq '.routers | to_entries[] |
-    select(.key | contains("collection"))' \
-    ai/symbols-api.json
+# Find all hooks in the web symbols
+jq '.symbols[] | select(.kind == "hook")' ai/symbols-web.json | grep -A5 "useCollection"
 ```
 
-**Result** (~300 tokens):
+**Alternative (faster)**:
+```bash
+# Direct grep on the symbols file
+grep -A3 '"name": "useCollection"' ai/symbols-web.json
+```
+
+**Result** (~80 tokens):
+```json
+{
+  "name": "useCollection",
+  "kind": "hook",
+  "file": "skillmeat/web/hooks/use-collections.ts",
+  "summary": "Query hook for fetching single collection with artifacts"
+}
+```
+
+### Pattern 4: Find All Observability Layer Symbols
+
+**Goal**: What logging/monitoring infrastructure exists?
+
+**Symbol Query**:
+```bash
+# Query the layer-split file for observability
+jq '.symbols[] | select(.layer == "observability")' ai/symbols-api-cores.json
+```
+
+**Result** (~200 tokens):
 ```json
 [
   {
-    "key": "collections",
-    "value": {
-      "file": "skillmeat/api/routers/collections.py",
-      "endpoints": [...]
-    }
+    "name": "setup_logging",
+    "kind": "function",
+    "file": "skillmeat/api/observability/logging.py",
+    "layer": "observability",
+    "summary": "Configures logging with JSON formatting and log rotation"
   },
   {
-    "key": "user_collections",
-    "value": {
-      "file": "skillmeat/api/routers/user_collections.py",
-      "endpoints": [...]
-    }
+    "name": "HealthRouter",
+    "kind": "class",
+    "file": "skillmeat/api/routers/health.py",
+    "layer": "observability",
+    "summary": "Health check endpoints for monitoring"
   }
 ]
 ```
 
-**Insight**: Two separate routers - collections (legacy) vs user_collections (active).
+**Insight**: Observability infrastructure is centralized. Use for debugging patterns.
 
-### Pattern 5: Find Database Model Relationships
+### Pattern 5: Find All React Components
 
-**Goal**: What relationships does UserCollection have?
+**Goal**: What components exist in the web frontend?
 
 **Symbol Query**:
 ```bash
-jq '.models.UserCollection.relationships' ai/symbols-database.json
+# Find all component symbols
+jq '.symbols[] | select(.kind == "component") | .name' ai/symbols-web.json
 ```
 
-**Result** (~100 tokens):
+**Result** (~150 tokens - showing subset):
 ```json
-{
-  "artifacts": {
-    "type": "many-to-many",
-    "through": "collection_artifacts",
-    "cascade": "all, delete-orphan"
-  },
-  "groups": {
-    "type": "one-to-many",
-    "model": "CollectionGroup",
-    "back_populates": "collection"
-  }
-}
+[
+  "CollectionBrowser",
+  "ArtifactCard",
+  "CollectionDetail",
+  "SearchBar",
+  "FilterPanel",
+  "NavigationMenu"
+]
 ```
+
+**Usage**: Quickly discover available UI components without reading full files. SkillMeat has 167 web symbols total (73KB), but querying for just component names returns minimal tokens.
 
 ## Progressive Loading Strategy
 
@@ -314,23 +278,22 @@ jq '.models.UserCollection.relationships' ai/symbols-database.json
 
 ```
 Starting Investigation
-├─ Do symbols exist? (ai/symbols-*.json)
-│  ├─ YES
-│  │  ├─ Query symbols for target (Pattern 1-5)
-│  │  ├─ Symbols sufficient?
-│  │  │  ├─ YES → Done (2,000 tokens)
-│  │  │  └─ NO → Read 2-3 files from symbol results (5,000 tokens)
-│  │  └─ Still need more?
-│  │     └─ Codebase Explorer for broader patterns (5,000 tokens)
-│  └─ NO
-│     ├─ Use Codebase Explorer for discovery (5,000 tokens)
-│     └─ Consider creating symbols (symbols-engineer)
-└─ Need architectural understanding?
-   └─ Read CLAUDE.md files (2,000 tokens each)
-      ├─ CLAUDE.md (root)
-      ├─ skillmeat/api/CLAUDE.md
-      └─ skillmeat/web/CLAUDE.md
+├─ Query symbols for target (Pattern 1-5)
+│  ├─ Symbols sufficient?
+│  │  ├─ YES → Done (~200 tokens)
+│  │  └─ NO → Read 2-3 specific files from symbol results (~5,000 tokens)
+│  └─ Still need broader context?
+│     └─ Codebase Explorer for pattern discovery (~5,000 tokens)
+├─ Need architectural understanding?
+│  └─ Read CLAUDE.md files (~2,000 tokens each)
+│     ├─ CLAUDE.md (root - architecture overview)
+│     ├─ skillmeat/api/CLAUDE.md (backend patterns)
+│     └─ skillmeat/web/CLAUDE.md (frontend patterns)
+└─ Symbols stale or incomplete?
+   └─ Regenerate: Task("symbols-engineer", "Update symbol files")
 ```
+
+**Key Change**: With symbols now available, ALWAYS start with symbol queries. No longer need to check if they exist.
 
 ## Example Investigation: 422 Error on Collection Creation
 
@@ -373,22 +336,21 @@ Total: ~60,000 tokens
 Total: ~8,000 tokens (87% reduction)
 ```
 
-## Symbol Creation
+## Symbol Regeneration
 
-When symbols don't exist, create them:
+When symbols become stale (after major refactoring, new features, etc.), regenerate them:
 
 ```bash
-# Delegate to symbols-engineer agent
-Task("symbols-engineer", "Create symbol graph for SkillMeat codebase:
-  - ai/symbols-core.json (skillmeat/core/)
-  - ai/symbols-api.json (skillmeat/api/)
-  - ai/symbols-web.json (skillmeat/web/)
-  - ai/symbols-database.json (skillmeat/api/models/)
+# Regenerate all symbols using symbols skill
+Task("symbols-engineer", "Regenerate symbol files for SkillMeat:
+  - Update ai/symbols-api.json (skillmeat/api/)
+  - Update ai/symbols-web.json (skillmeat/web/)
+  - Update layer split files as needed
 
-Include: classes, functions, API endpoints, schemas, components, hooks")
+Ensure all new classes, functions, components, and hooks are included")
 ```
 
-**Output**: JSON files in `ai/` directory, ~20KB total (~6,000 tokens to load all).
+**Output**: Updated JSON files in `ai/` directory. Current total: ~105KB across 3 main files (~31,500 tokens to load all, but typically only load 1-2 files per investigation).
 
 ## Best Practices
 
@@ -464,25 +426,31 @@ jq '.metadata.generated_at' ai/symbols-*.json
 ### Verify Symbol Accuracy
 
 ```bash
-# Check if symbol references are still valid
-jq -r '.routers.user_collections.endpoints[].file' ai/symbols-api.json | \
-xargs ls -l
+# Check if symbol file references are still valid
+jq -r '.symbols[].file' ai/symbols-api.json | sort -u | xargs ls -l
 
-# Verify line numbers still match
-jq -r '.functions | to_entries[] |
-       "\(.value.file):\(.value.line)"' ai/symbols-core.json | \
-xargs -I {} sh -c 'echo "Checking: {}"; head -n $(echo {} | cut -d: -f2) $(echo {} | cut -d: -f1) | tail -1'
+# Count symbols by kind
+jq -r '.symbols[] | .kind' ai/symbols-api.json | sort | uniq -c
+
+# Count web symbols by kind
+jq -r '.symbols[] | .kind' ai/symbols-web.json | sort | uniq -c
+
+# Check layer distribution in API
+jq -r '.symbols[] | .layer' ai/symbols-api.json | sort | uniq -c
 ```
 
 ### Symbol File Status
 
-As of 2025-12-13:
-- ❌ ai/symbols-core.json (not yet created)
-- ❌ ai/symbols-api.json (not yet created)
-- ❌ ai/symbols-web.json (not yet created)
-- ❌ ai/symbols-database.json (not yet created)
+As of 2026-01-15:
+- ✓ ai/symbols-api.json (30 symbols, 15KB)
+- ✓ ai/symbols-web.json (167 symbols, 73KB)
+- ✓ ai/symbols-api-cores.json (layer split, 17KB)
+- ⚪ ai/symbols-api-routers.json (empty - symbols in main file)
+- ⚪ ai/symbols-api-services.json (empty - symbols in main file)
+- ⚪ ai/symbols-api-repositorys.json (empty - symbols in main file)
+- ⚪ ai/symbols-api-schemas.json (empty - symbols in main file)
 
-**Action Required**: Create symbols using symbols-engineer before symbol-based investigation can be used.
+**Status**: Symbol-based investigation is fully operational. Use symbols-first approach for all debugging and investigation tasks.
 
 ## Token Savings Breakdown
 
