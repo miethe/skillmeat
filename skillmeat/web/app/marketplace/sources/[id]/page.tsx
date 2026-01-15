@@ -555,8 +555,9 @@ export default function SourceDetailPage() {
   const countsByStatus = catalogData?.pages[0]?.counts_by_status || {};
 
   // Get total count from first page (stays consistent across pagination)
-  // This is the total number of catalog entries matching current filters
-  const totalCount = catalogData?.pages[0]?.page_info?.total_count;
+  // Fallback to summing counts_by_status if total_count is null
+  const totalCount = catalogData?.pages[0]?.page_info?.total_count
+    ?? (countsByStatus ? Object.values(countsByStatus).reduce((sum: number, count) => sum + (count as number), 0) : undefined);
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -1105,9 +1106,9 @@ export default function SourceDetailPage() {
         <div className="flex items-center py-2 text-sm text-muted-foreground">
           <span>
             Showing {startIndex + 1}-{endIndex} of{' '}
-            {totalFilteredCount.toLocaleString()} artifacts
-            {totalCount && totalFilteredCount !== totalCount && (
-              <> (filtered from {totalCount.toLocaleString()} total)</>
+            {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
+            {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
+              <> ({totalFilteredCount.toLocaleString()} matching search)</>
             )}
           </span>
         </div>
