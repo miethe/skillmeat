@@ -1218,6 +1218,152 @@ class ConfirmDuplicatesResponse(BaseModel):
 
 
 # =============================================================================
+# Bulk Sync Schemas
+# =============================================================================
+
+
+class BulkSyncRequest(BaseModel):
+    """Request to sync multiple imported artifacts from a marketplace source.
+
+    Used to update imported artifacts with their upstream versions when
+    changes are detected during a rescan.
+    """
+
+    artifact_ids: List[str] = Field(
+        ...,
+        description="Catalog entry IDs to sync with upstream",
+        min_length=1,
+        examples=[["cat_canvas_design", "cat_my_skill"]],
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "artifact_ids": ["cat_canvas_design", "cat_my_skill"],
+            }
+        },
+    )
+
+
+class BulkSyncItemResult(BaseModel):
+    """Result for a single artifact sync operation.
+
+    Provides detailed status for each artifact in a bulk sync request,
+    including success/failure status, conflicts, and error messages.
+    """
+
+    entry_id: str = Field(
+        ...,
+        description="Catalog entry ID that was synced",
+        examples=["cat_canvas_design"],
+    )
+    artifact_name: str = Field(
+        ...,
+        description="Name of the artifact",
+        examples=["canvas-design"],
+    )
+    success: bool = Field(
+        ...,
+        description="Whether the sync succeeded",
+        examples=[True],
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable result message",
+        examples=["Successfully synced artifact 'canvas-design' with upstream"],
+    )
+    has_conflicts: bool = Field(
+        default=False,
+        description="Whether there were merge conflicts during sync",
+        examples=[False],
+    )
+    conflicts: Optional[List[str]] = Field(
+        default=None,
+        description="File paths with merge conflicts (if any)",
+        examples=[["SKILL.md", "scripts/main.py"]],
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "entry_id": "cat_canvas_design",
+                "artifact_name": "canvas-design",
+                "success": True,
+                "message": "Successfully synced artifact 'canvas-design' with upstream",
+                "has_conflicts": False,
+                "conflicts": None,
+            }
+        },
+    )
+
+
+class BulkSyncResponse(BaseModel):
+    """Response from bulk sync operation.
+
+    Provides summary statistics and per-artifact results for a bulk
+    sync operation on imported marketplace artifacts.
+    """
+
+    total: int = Field(
+        ...,
+        description="Total number of artifacts requested for sync",
+        ge=0,
+        examples=[5],
+    )
+    synced: int = Field(
+        ...,
+        description="Number of artifacts successfully synced",
+        ge=0,
+        examples=[4],
+    )
+    skipped: int = Field(
+        ...,
+        description="Number of artifacts skipped (not imported or no changes)",
+        ge=0,
+        examples=[0],
+    )
+    failed: int = Field(
+        ...,
+        description="Number of artifacts that failed to sync",
+        ge=0,
+        examples=[1],
+    )
+    results: List[BulkSyncItemResult] = Field(
+        default_factory=list,
+        description="Per-artifact sync results",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total": 5,
+                "synced": 4,
+                "skipped": 0,
+                "failed": 1,
+                "results": [
+                    {
+                        "entry_id": "cat_canvas_design",
+                        "artifact_name": "canvas-design",
+                        "success": True,
+                        "message": "Successfully synced with upstream",
+                        "has_conflicts": False,
+                        "conflicts": None,
+                    },
+                    {
+                        "entry_id": "cat_broken_skill",
+                        "artifact_name": "broken-skill",
+                        "success": False,
+                        "message": "Failed to sync: network error",
+                        "has_conflicts": False,
+                        "conflicts": None,
+                    },
+                ],
+            }
+        },
+    )
+
+
+# =============================================================================
 # Forward Reference Resolution
 # =============================================================================
 # Rebuild models that have forward references to classes defined later in the file

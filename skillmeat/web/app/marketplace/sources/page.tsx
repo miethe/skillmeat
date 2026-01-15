@@ -15,12 +15,15 @@ import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
+import {
+  RescanUpdatesDialog,
+  type UpdatedImport,
+} from '@/components/marketplace/rescan-updates-dialog';
 import { useSources, sourceKeys } from '@/hooks';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
-import type { ScanResult } from '@/types/marketplace';
-import type { GitHubSource } from '@/types/marketplace';
+import type { ScanResult, CatalogListResponse, GitHubSource } from '@/types/marketplace';
 
 export default function MarketplaceSourcesPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +32,12 @@ export default function MarketplaceSourcesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<GitHubSource | null>(null);
   const [rescanningSourceId, setRescanningSourceId] = useState<string | null>(null);
+  const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState<{
+    sourceId: string;
+    sourceName: string;
+    updates: UpdatedImport[];
+  } | null>(null);
 
   // Fetch sources
   const {
@@ -50,11 +59,12 @@ export default function MarketplaceSourcesPage() {
         method: 'POST',
         body: JSON.stringify({}),
       }),
-    onSuccess: (result, { sourceId }) => {
+    onSuccess: async (result, { sourceId }) => {
       queryClient.invalidateQueries({ queryKey: sourceKeys.detail(sourceId) });
       queryClient.invalidateQueries({ queryKey: sourceKeys.lists() });
       queryClient.invalidateQueries({ queryKey: sourceKeys.catalogs() });
 
+      // Show standard toast for scan results
       if (result.status === 'success') {
         toast({
           title: 'Scan complete',
@@ -67,6 +77,47 @@ export default function MarketplaceSourcesPage() {
           variant: 'destructive',
         });
       }
+
+      // Check for updated imports and show dialog
+      if (result.updated_imports && result.updated_imports.length > 0) {
+        try {
+          // Fetch catalog entries for the updated imports
+          const catalogResponse = await apiRequest<CatalogListResponse>(
+            `/marketplace/sources/${sourceId}/artifacts?include_below_threshold=true&limit=100`
+          );
+
+          const updatedEntries = catalogResponse.items.filter((item) =>
+            result.updated_imports?.includes(item.id)
+          );
+
+          if (updatedEntries.length > 0) {
+            const updates: UpdatedImport[] = updatedEntries.map((entry) => ({
+              entryId: entry.id,
+              name: entry.name,
+              artifactType: entry.artifact_type,
+              // We don't track import_sha, so show "imported" as placeholder
+              currentSha: 'imported',
+              newSha: entry.detected_sha?.slice(0, 7) || 'latest',
+              hasLocalChanges: false, // Would need diff API to determine this
+              importId: entry.import_id || '',
+            }));
+
+            // Find source name from cached data
+            const source = allSources.find((s) => s.id === sourceId);
+
+            setPendingUpdates({
+              sourceId,
+              sourceName: source ? `${source.owner}/${source.repo_name}` : sourceId,
+              updates,
+            });
+            setUpdatesDialogOpen(true);
+          }
+        } catch (err) {
+          // Log error but don't fail the rescan - updates dialog is optional
+          console.error('Failed to fetch updated import details:', err);
+        }
+      }
+
       setRescanningSourceId(null);
     },
     onError: (error: Error) => {
@@ -290,6 +341,24 @@ export default function MarketplaceSourcesPage() {
           refetch();
         }}
       />
+
+      {/* Rescan Updates Dialog */}
+      {pendingUpdates && (
+        <RescanUpdatesDialog
+          open={updatesDialogOpen}
+          onOpenChange={(open) => {
+            setUpdatesDialogOpen(open);
+            if (!open) setPendingUpdates(null);
+          }}
+          sourceId={pendingUpdates.sourceId}
+          sourceName={pendingUpdates.sourceName}
+          updatedImports={pendingUpdates.updates}
+          onSyncComplete={() => {
+            queryClient.invalidateQueries({ queryKey: sourceKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: sourceKeys.catalogs() });
+          }}
+        />
+      )}
     </div>
   );
 }
