@@ -196,6 +196,8 @@ export interface CatalogEntry {
   is_duplicate?: boolean;
   duplicate_reason?: 'within_source' | 'cross_source';
   duplicate_of?: string; // Path of original artifact
+  // Collection match field
+  in_collection?: boolean;
 }
 
 export interface UpdateCatalogEntryNameRequest {

@@ -197,6 +197,16 @@ function CatalogCard({
                 Duplicate
               </Badge>
             )}
+            {/* In Collection Badge */}
+            {entry.in_collection && entry.status !== 'imported' && (
+              <Badge
+                variant="outline"
+                className="border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950"
+                title="An artifact with this name and type already exists in your collection"
+              >
+                In Collection
+              </Badge>
+            )}
           </div>
           <h3 className="font-semibold truncate">{entry.name}</h3>
           <p className="text-xs text-muted-foreground truncate">{entry.path}</p>

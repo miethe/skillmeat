@@ -297,6 +297,16 @@ function CatalogRow({
                 Duplicate
               </Badge>
             )}
+            {/* In Collection Badge */}
+            {entry.in_collection && entry.status !== 'imported' && (
+              <Badge
+                variant="outline"
+                className="border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950"
+                title="An artifact with this name and type already exists in your collection"
+              >
+                In Collection
+              </Badge>
+            )}
           </div>
         </TableCell>
 
