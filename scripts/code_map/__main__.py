@@ -4,6 +4,8 @@ import argparse
 from pathlib import Path
 
 from .apply_overrides import main as apply_overrides_main
+from .apply_semantic_tags import main as apply_semantic_tags_main
+from .build_groupings import main as build_groupings_main
 from .build_outputs import main as build_outputs_main
 from .coverage_summary import main as coverage_summary_main
 from .extract_backend import main as extract_backend_main
@@ -32,7 +34,9 @@ def main() -> None:
     run_step("merge_graphs", merge_graphs_main)
     run_step("apply_overrides", apply_overrides_main)
     run_step("extract_details", extract_details_main)
+    run_step("apply_semantic_tags", apply_semantic_tags_main)
     run_step("validate_graph", validate_graph_main)
+    run_step("build_groupings", build_groupings_main)
     run_step("build_outputs", build_outputs_main)
     if not args.skip_coverage:
         run_step("coverage_summary", coverage_summary_main)
