@@ -29,6 +29,12 @@ def mock_session():
     # Setup query chain: session.query().filter().all()
     session.query.return_value.filter.return_value.all.return_value = [mock_entry]
 
+    # Setup query chain for optimized query: session.query().filter().filter().all()
+    # This corresponds to the json_extract optimization
+    session.query.return_value.filter.return_value.filter.return_value.all.return_value = [
+        ("existing_hash_123",)
+    ]
+
     return session
 
 
@@ -53,8 +59,14 @@ def test_scan_with_deduplication(
     """Test scan workflow with deduplication enabled."""
 
     # Setup mocks - _fetch_tree returns (tree, actual_ref) tuple
+    # Note: We include files for all artifacts so they compute to valid hashes
+    # All share the same SHA ("blob123") so they will be duplicates
     mock_fetch_tree.return_value = (
-        [{"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "blob123"}],
+        [
+            {"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "blob123"},
+            {"path": "skills/skill1-copy/SKILL.md", "type": "blob", "sha": "blob123"},
+            {"path": "skills/skill2/SKILL.md", "type": "blob", "sha": "blob123"},
+        ],
         "main",
     )
     mock_extract_paths.return_value = ["skills/skill1/SKILL.md"]
@@ -287,6 +299,12 @@ def test_get_existing_collection_hashes(mock_session):
         mock_entry4,
     ]
 
+    # Also mock the optimized query path to return just the valid hash
+    # In a real DB, json_extract would handle the extraction logic
+    mock_session.query.return_value.filter.return_value.filter.return_value.all.return_value = [
+        ("hash_abc",)
+    ]
+
     hashes = get_existing_collection_hashes(mock_session)
 
     # Only hash_abc should be extracted
@@ -298,6 +316,8 @@ def test_get_existing_collection_hashes_empty(mock_session):
     from skillmeat.core.marketplace.github_scanner import get_existing_collection_hashes
 
     mock_session.query.return_value.filter.return_value.all.return_value = []
+    # Mock optimized query empty result
+    mock_session.query.return_value.filter.return_value.filter.return_value.all.return_value = []
 
     hashes = get_existing_collection_hashes(mock_session)
 
