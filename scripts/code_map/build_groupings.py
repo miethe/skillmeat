@@ -93,6 +93,42 @@ def _hash_group_id(nodes: Iterable[str]) -> str:
     return sha1(joined.encode("utf-8")).hexdigest()[:10]
 
 
+def _common_path_prefix(paths: Iterable[str]) -> Optional[str]:
+    parts_list = [path.split("/") for path in paths if path]
+    if not parts_list:
+        return None
+    prefix: list[str] = []
+    for items in zip(*parts_list):
+        if len(set(items)) != 1:
+            break
+        prefix.append(items[0])
+    if not prefix:
+        return None
+    return "/".join(prefix)
+
+
+def _label_for_component(component_nodes: List[Dict[str, Any]]) -> str:
+    packages = [node.get("package") for node in component_nodes if node.get("package")]
+    if packages and len(set(packages)) == 1:
+        return f"package:{packages[0]}"
+    directories = [
+        _dir_for_path(node.get("file"))
+        for node in component_nodes
+        if node.get("file")
+    ]
+    common_dir = _common_path_prefix([d for d in directories if d])
+    if common_dir:
+        return f"dir:{common_dir}"
+    types = [node.get("type") for node in component_nodes if node.get("type")]
+    if types:
+        counts: Dict[str, int] = {}
+        for node_type in types:
+            counts[node_type] = counts.get(node_type, 0) + 1
+        top_type = max(counts.items(), key=lambda item: item[1])[0]
+        return f"type:{top_type}"
+    return "cluster"
+
+
 @dataclass
 class GroupSet:
     id: str
@@ -185,7 +221,10 @@ def build_groupings(graph: Dict[str, Any]) -> Dict[str, Any]:
             id="computed",
             label="Computed Clusters",
             source="analysis",
-            metadata={"algorithm": "connected_components"},
+            metadata={
+                "algorithm": "connected_components",
+                "singletons_excluded": True,
+            },
         ),
     ]
 
@@ -249,7 +288,9 @@ def build_groupings(graph: Dict[str, Any]) -> Dict[str, Any]:
         for module in modules:
             add_group("semantic_module", f"module:{module}", module, node_id)
 
-    adjacency: Dict[str, List[str]] = {node.get("id"): [] for node in nodes if node.get("id")}
+    adjacency: Dict[str, List[str]] = {
+        node.get("id"): [] for node in nodes if node.get("id")
+    }
     for edge in edges:
         from_id = edge.get("from")
         to_id = edge.get("to")
@@ -274,12 +315,15 @@ def build_groupings(graph: Dict[str, Any]) -> Dict[str, Any]:
                     queue.append(neighbor)
         components.append(sorted(component))
 
+    node_index = {node.get("id"): node for node in nodes if node.get("id")}
     for component in components:
-        if not component:
+        if not component or len(component) <= 1:
             continue
         group_hash = _hash_group_id(component)
+        component_nodes = [node_index[node_id] for node_id in component if node_id in node_index]
         group_id = f"component:{group_hash}"
-        label = f"cluster {group_hash}"
+        label_root = _label_for_component(component_nodes)
+        label = f"{label_root} ({len(component)})"
         for node_id in component:
             add_group(
                 "computed",

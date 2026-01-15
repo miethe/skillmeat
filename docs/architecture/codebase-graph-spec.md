@@ -18,6 +18,8 @@ Outputs live in `docs/architecture/` as JSON graphs:
 - `docs/architecture/codebase-graph.unified.json` (merged + overrides applied)
 - `docs/architecture/codebase-graph.details.json` (optional deep metadata)
 - `docs/architecture/codebase-graph.groupings.json` (optional grouping sets)
+- `docs/architecture/codebase-graph.git-metadata.json` (optional git metadata)
+- `docs/architecture/codebase-graph.dependencies.json` (optional external dependencies)
 
 ## Source Scripts
 
@@ -32,12 +34,14 @@ Scripts live in `scripts/code_map/`:
 - `extract_backend_services.py`
 - `extract_backend_models.py`
 - `extract_details.py`
+- `extract_git_metadata.py`
 - `merge_graphs.py`
 - `apply_overrides.py`
 - `apply_semantic_tags.py`
 - `coverage_summary.py`
 - `validate_graph.py`
 - `build_groupings.py`
+- `scan_dependencies.py`
 - `build_outputs.py`
 - `__main__.py` (pipeline orchestrator)
 - `graph.py` (shared graph model)
@@ -59,6 +63,8 @@ python -m scripts.code_map.extract_details
 python -m scripts.code_map.coverage_summary
 python -m scripts.code_map.validate_graph
 python -m scripts.code_map.build_groupings
+python -m scripts.code_map.extract_git_metadata
+python -m scripts.code_map.scan_dependencies
 python -m scripts.code_map.build_outputs
 ```
 
@@ -81,6 +87,8 @@ python -m scripts.code_map.apply_semantic_tags --graph docs/architecture/codebas
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.build_groupings --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.groupings.json
+python -m scripts.code_map.extract_git_metadata --out docs/architecture/codebase-graph.git-metadata.json
+python -m scripts.code_map.scan_dependencies --repo-root . --out docs/architecture/codebase-graph.dependencies.json
 python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
 ```
 
@@ -230,6 +238,44 @@ Shape:
       "metadata": {"package": "skillmeat.web", "directory": "web/app"}
     }
   ]
+}
+```
+
+## Git Metadata Artifact (Optional)
+
+To enable change/churn visualizations, git metadata is emitted to a parallel file:
+`docs/architecture/codebase-graph.git-metadata.json`.
+
+Shape:
+```json
+{
+  "path/to/file.ts": {
+    "last_modified": 1715000000000,
+    "change_count": 42,
+    "unique_authors": 3
+  }
+}
+```
+
+## Dependencies Artifact (Optional)
+
+External dependencies (from `package.json`) are emitted to:
+`docs/architecture/codebase-graph.dependencies.json`.
+
+Shape:
+```json
+{
+  "nodes": [
+    {
+      "id": "node_modules/react",
+      "type": "external_dependency",
+      "label": "react",
+      "file": "package.json",
+      "modulePath": ["External", "Production"],
+      "details": { "version": "^18.2.0", "deptype": "dependencies" }
+    }
+  ],
+  "edges": []
 }
 ```
 

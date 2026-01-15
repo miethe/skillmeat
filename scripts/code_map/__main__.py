@@ -11,7 +11,9 @@ from .coverage_summary import main as coverage_summary_main
 from .extract_backend import main as extract_backend_main
 from .extract_details import main as extract_details_main
 from .extract_frontend import main as extract_frontend_main
+from .extract_git_metadata import main as extract_git_metadata_main
 from .merge_graphs import main as merge_graphs_main
+from .scan_dependencies import main as scan_dependencies_main
 from .validate_graph import main as validate_graph_main
 
 
@@ -37,6 +39,8 @@ def main() -> None:
     run_step("apply_semantic_tags", apply_semantic_tags_main)
     run_step("validate_graph", validate_graph_main)
     run_step("build_groupings", build_groupings_main)
+    run_step("extract_git_metadata", extract_git_metadata_main)
+    run_step("scan_dependencies", scan_dependencies_main)
     run_step("build_outputs", build_outputs_main)
     if not args.skip_coverage:
         run_step("coverage_summary", coverage_summary_main)
