@@ -112,7 +112,7 @@ async def match_artifacts(
     ) as span:
         try:
             # Get all artifacts from collection
-            # TODO: This loads all artifacts - optimize for large collections
+            # Optimized via in-memory caching in CollectionManager
             artifacts = artifact_mgr.list_artifacts()
             span.set_attribute("total_artifacts", len(artifacts))
             span.add_event("artifacts_loaded")
