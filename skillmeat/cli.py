@@ -40,6 +40,9 @@ console = Console(force_terminal=True, legacy_windows=False)
 # Logger for error tracking
 logger = logging.getLogger(__name__)
 
+# Config Manager
+config_mgr = ConfigManager()
+
 
 # ====================
 # Main Entry Point
@@ -10230,7 +10233,7 @@ def context_add(
         - Verify path pattern matches entity type expectations
       * "Could not connect to API server": API server is not running
         - Start API: skillmeat web dev --api-only
-        - Check API is listening on http://localhost:8080
+        - Check API is listening on the configured URL (default: http://localhost:8080)
       * "Entity name already exists": Name is already used in collection
         - Use --name to specify a different name
         - Or remove the existing entity first: skillmeat context remove old-name
@@ -10339,7 +10342,7 @@ def context_add(
             name = filename.replace(".md", "").replace("_", "-")
 
         # Prepare API request
-        api_base = "http://localhost:8080"  # TODO: Make this configurable
+        api_base = config_mgr.get_api_base_url()
         api_url = f"{api_base}/api/v1/context-entities"
 
         request_data = {
@@ -10392,7 +10395,7 @@ def context_add(
             console.print(f"[red]Error: {error_detail}[/red]")
             sys.exit(1)
         except requests.exceptions.RequestException as e:
-            console.print(f"[red]Error: Could not connect to API server[/red]")
+            console.print(f"[red]Error: Could not connect to API server at {api_base}[/red]")
             console.print(f"[red]Details: {str(e)}[/red]")
             console.print(
                 "[yellow]Make sure the API server is running: skillmeat web dev --api-only[/yellow]"
@@ -10456,7 +10459,7 @@ def context_list(
     """
     from rich.table import Table
 
-    api_base = "http://localhost:8080/api/v1"
+    api_base = f"{config_mgr.get_api_base_url()}/api/v1"
 
     # Build query params
     params = {}
@@ -10506,7 +10509,7 @@ def context_list(
         console.print(table)
 
     except requests.exceptions.ConnectionError:
-        console.print("[red]Error: Could not connect to API server.[/red]")
+        console.print(f"[red]Error: Could not connect to API server at {api_base}[/red]")
         console.print(
             "[dim]Make sure the API is running: skillmeat web dev --api-only[/dim]"
         )
@@ -10565,9 +10568,7 @@ def context_show(name_or_id: str, full: bool, output_format: str):
           Try again in a moment or restart the API server
     """
     # API configuration
-    api_host = "127.0.0.1"
-    api_port = 8080
-    api_base = f"http://{api_host}:{api_port}/api/v1"
+    api_base = f"{config_mgr.get_api_base_url()}/api/v1"
 
     try:
         # First try to find by name using query parameter
@@ -10724,7 +10725,7 @@ def context_remove(name_or_id: str, force: bool):
     """
     from rich.prompt import Confirm
 
-    api_base = "http://localhost:8080/api/v1"
+    api_base = f"{config_mgr.get_api_base_url()}/api/v1"
 
     try:
         # Lookup entity by name or ID
