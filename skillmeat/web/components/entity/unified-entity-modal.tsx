@@ -2020,9 +2020,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             type: entity.type as any,
             source: entity.source,
             version: entity.version,
-            // FIX: Determine scope based on entity location, not collection name
-            // 'user' = global/collection-level (~/.skillmeat/collection/)
-            // 'local' = project-level (.claude/)
+            // Determine scope based on entity location:
+            // - If projectPath is present, it's a project-local entity ('local')
+            // - Otherwise, it's a global collection entity ('user')
             scope: entity.projectPath ? 'local' : 'user',
             tags: entity.tags,
             aliases: entity.aliases,
