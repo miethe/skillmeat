@@ -764,6 +764,9 @@ class CacheRepository:
 
         Returns:
             Number of artifacts updated
+ 
+        Raises:
+            CacheError: If any update dict is missing an 'id'
 
         Example:
             >>> updates = [
@@ -773,25 +776,41 @@ class CacheRepository:
             >>> count = repo.bulk_update_artifacts(updates)
             >>> print(f"Updated {count} artifacts")
         """
-        session = self._get_session()
-        try:
-            count = 0
-            for update_dict in updates:
-                # Make a copy to avoid modifying input
-                update = update_dict.copy()
-                artifact_id = update.pop("id")
-                result = (
-                    session.query(Artifact)
-                    .filter(Artifact.id == artifact_id)
-                    .update(update, synchronize_session=False)
-                )
-                count += result
+        if not updates:
+            return 0
 
-            session.commit()
+        with self.transaction() as session:
+            if any("id" not in u for u in updates):
+                raise CacheError(
+                    "bulk_update_artifacts requires an 'id' in each update dict"
+                )
+
+            # Extract artifact IDs to check for existence, preventing updates on non-existent rows.
+            artifact_ids = [u["id"] for u in updates]
+
+            # Query for existing artifact IDs to ensure we only update what's there.
+            existing_ids_q = session.query(Artifact.id).filter(
+                Artifact.id.in_(artifact_ids)
+            )
+            existing_ids = {pk[0] for pk in existing_ids_q}
+
+            # Filter the updates to only include those for existing artifacts.
+            updates_to_apply = [u for u in updates if u.get("id") in existing_ids]
+            missing_ids = set(artifact_ids) - existing_ids
+            if missing_ids:
+                logger.warning(
+                    f"bulk_update_artifacts skipping {len(missing_ids)} "
+                    "updates for missing artifacts"
+                )
+
+            if not updates_to_apply:
+                return 0
+
+            # Perform a bulk update, which is much more performant than N+1 queries.
+            session.bulk_update_mappings(Artifact, updates_to_apply)
+            count = len(updates_to_apply)
             logger.debug(f"Bulk updated {count} artifacts")
             return count
-        finally:
-            session.close()
 
     def search_artifacts(
         self,
