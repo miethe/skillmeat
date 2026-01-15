@@ -1452,12 +1452,14 @@ async def list_artifacts(
             # Manual pagination for filtered results
             # Convert to list and apply cursor
             if cursor:
-                # Find cursor position
+                # Find cursor position - cursor is the last item ID from previous page
+                # We need to find it and start from the NEXT item
                 cursor_idx = next(
-                    (i for i, e in enumerate(entries) if e.id > cursor),
-                    len(entries),
+                    (i for i, e in enumerate(entries) if str(e.id) == cursor),
+                    -1,
                 )
-                entries = entries[cursor_idx:]
+                if cursor_idx >= 0:
+                    entries = entries[cursor_idx + 1:]  # Skip cursor item, start from next
 
             # Apply limit
             has_more = len(entries) > limit
