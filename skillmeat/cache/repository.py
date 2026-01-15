@@ -764,6 +764,9 @@ class CacheRepository:
 
         Returns:
             Number of artifacts updated
+ 
+        Raises:
+            CacheError: If any update dict is missing an 'id'
 
         Example:
             >>> updates = [
@@ -777,10 +780,13 @@ class CacheRepository:
             return 0
 
         with self.transaction() as session:
+            if any("id" not in u for u in updates):
+                raise CacheError(
+                    "bulk_update_artifacts requires an 'id' in each update dict"
+                )
+
             # Extract artifact IDs to check for existence, preventing updates on non-existent rows.
-            artifact_ids = [u["id"] for u in updates if "id" in u]
-            if not artifact_ids:
-                return 0
+            artifact_ids = [u["id"] for u in updates]
 
             # Query for existing artifact IDs to ensure we only update what's there.
             existing_ids_q = session.query(Artifact.id).filter(
@@ -790,6 +796,12 @@ class CacheRepository:
 
             # Filter the updates to only include those for existing artifacts.
             updates_to_apply = [u for u in updates if u.get("id") in existing_ids]
+            missing_ids = set(artifact_ids) - existing_ids
+            if missing_ids:
+                logger.warning(
+                    f"bulk_update_artifacts skipping {len(missing_ids)} "
+                    "updates for missing artifacts"
+                )
 
             if not updates_to_apply:
                 return 0
