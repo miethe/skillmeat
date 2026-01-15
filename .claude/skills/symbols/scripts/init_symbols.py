@@ -168,6 +168,82 @@ def detect_monorepo_type(project_root: Path) -> Optional[str]:
     return None
 
 
+def detect_python_packages(project_root: Path) -> List[str]:
+    """
+    Detect top-level Python packages that might contain code.
+
+    Looks for directories with __init__.py or checks pyproject.toml for package name.
+    Excludes hidden directories and common non-code directories.
+
+    Returns:
+        List of package names (directory names that are Python packages)
+    """
+    packages = []
+
+    # Directories to exclude from package detection
+    excluded_dirs = {
+        "tests", "test", "docs", "doc", "documentation",
+        "scripts", "bin", "build", "dist", "node_modules",
+        ".git", ".github", ".venv", "venv", "env", ".env",
+        "__pycache__", ".pytest_cache", ".mypy_cache",
+        ".tox", ".nox", "htmlcov", "coverage", ".coverage",
+        "site-packages", "migrations", "alembic",
+    }
+
+    # Look for directories with __init__.py
+    for item in project_root.iterdir():
+        if not item.is_dir():
+            continue
+        # Skip hidden directories (starting with .)
+        if item.name.startswith('.'):
+            continue
+        # Skip excluded directories
+        if item.name.lower() in excluded_dirs:
+            continue
+        # Check for __init__.py (Python package marker)
+        if (item / '__init__.py').exists():
+            packages.append(item.name)
+
+    # Also check pyproject.toml for package name if no packages found via __init__.py
+    if not packages:
+        pyproject_path = project_root / "pyproject.toml"
+        if pyproject_path.exists():
+            try:
+                # Try tomllib (Python 3.11+) or tomli
+                try:
+                    import tomllib
+                except ImportError:
+                    try:
+                        import tomli as tomllib
+                    except ImportError:
+                        tomllib = None
+
+                if tomllib:
+                    with open(pyproject_path, "rb") as f:
+                        pyproject = tomllib.load(f)
+
+                    # Check [project] name
+                    project_name = pyproject.get("project", {}).get("name")
+                    if project_name:
+                        # Convert package name to directory name (replace - with _)
+                        pkg_dir = project_name.replace("-", "_")
+                        pkg_path = project_root / pkg_dir
+                        if pkg_path.exists() and pkg_path.is_dir():
+                            packages.append(pkg_dir)
+
+                    # Check [tool.poetry] name
+                    poetry_name = pyproject.get("tool", {}).get("poetry", {}).get("name")
+                    if poetry_name and poetry_name not in packages:
+                        pkg_dir = poetry_name.replace("-", "_")
+                        pkg_path = project_root / pkg_dir
+                        if pkg_path.exists() and pkg_path.is_dir():
+                            packages.append(pkg_dir)
+            except Exception:
+                pass
+
+    return packages
+
+
 def count_files_by_extension(directory: Path, extensions: List[str]) -> int:
     """Count files with given extensions in a directory."""
     count = 0
@@ -195,6 +271,16 @@ def detect_backend_paths(project_root: Path) -> List[Dict[str, Any]]:
         "api", "backend", "server", "services", "services/api",
         "apps/api", "packages/api", "src/api", "src/server"
     ]
+
+    # Add package-based patterns (e.g., skillmeat/api, myproject/backend)
+    packages = detect_python_packages(project_root)
+    for pkg in packages:
+        backend_patterns.extend([
+            f"{pkg}/api",
+            f"{pkg}/backend",
+            f"{pkg}/server",
+            f"{pkg}/services",
+        ])
 
     for pattern in backend_patterns:
         path = project_root / pattern
@@ -244,6 +330,16 @@ def detect_frontend_paths(project_root: Path) -> List[Dict[str, Any]]:
         "web", "frontend", "client", "app", "apps/web", "apps/frontend",
         "packages/web", "src", "src/client"
     ]
+
+    # Add package-based patterns (e.g., skillmeat/web, myproject/frontend)
+    packages = detect_python_packages(project_root)
+    for pkg in packages:
+        frontend_patterns.extend([
+            f"{pkg}/web",
+            f"{pkg}/frontend",
+            f"{pkg}/client",
+            f"{pkg}/app",
+        ])
 
     for pattern in frontend_patterns:
         path = project_root / pattern
@@ -330,6 +426,16 @@ def detect_shared_paths(project_root: Path) -> List[Dict[str, Any]]:
         "packages/ui", "packages/shared", "packages/common",
         "libs/shared", "libs/common", "shared", "common"
     ]
+
+    # Add package-based patterns (e.g., skillmeat/shared, myproject/core)
+    packages = detect_python_packages(project_root)
+    for pkg in packages:
+        shared_patterns.extend([
+            f"{pkg}/shared",
+            f"{pkg}/common",
+            f"{pkg}/core",
+            f"{pkg}/utils",
+        ])
 
     for pattern in shared_patterns:
         path = project_root / pattern

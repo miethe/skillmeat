@@ -54,7 +54,7 @@ export class SkillMeatClient {
     public readonly request: BaseHttpRequest;
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = FetchHttpRequest) {
         this.request = new HttpRequest({
-            BASE: config?.BASE ?? 'http://localhost:8000',
+            BASE: config?.BASE ?? 'http://localhost:8080',
             VERSION: config?.VERSION ?? '0.1.0-alpha',
             WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
             CREDENTIALS: config?.CREDENTIALS ?? 'include',

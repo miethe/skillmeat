@@ -140,6 +140,44 @@ def _decode_project_id_param(raw_project_id: str) -> Optional[PathLib]:
     return None
 
 
+def _get_possible_artifact_paths(artifact_type: ArtifactType, name: str) -> List[str]:
+    """Get possible project paths for an artifact without deployment record.
+
+    When an artifact exists in a project but has no deployment record (e.g.,
+    manually deployed or deployed before tracking was implemented), this
+    function returns candidate paths based on artifact type conventions.
+
+    Args:
+        artifact_type: The type of artifact (skill, command, agent, etc.)
+        name: The artifact name
+
+    Returns:
+        List of possible relative paths within .claude/ directory, ordered by
+        likelihood. The first matching path should be used.
+    """
+    type_val = artifact_type.value
+    paths: List[str] = []
+
+    if type_val == "skill":
+        paths = [f"skills/{name}"]
+    elif type_val == "command":
+        paths = [f"commands/{name}"]
+    elif type_val == "agent":
+        # Agents can be single files or directories
+        paths = [
+            f"agents/{name}.md",
+            f"agents/{name}",
+            f"agents/pm/{name}.md",
+            f"agents/dev/{name}.md",
+        ]
+    elif type_val == "hook":
+        paths = [f"hooks/{name}"]
+    elif type_val == "mcp":
+        paths = [f"mcp/{name}"]
+
+    return paths
+
+
 router = APIRouter(
     prefix="/artifacts",
     tags=["artifacts"],
@@ -500,7 +538,7 @@ def artifact_to_response(
         id=f"{artifact.type.value}:{artifact.name}",
         name=artifact.name,
         type=artifact.type.value,
-        source=artifact.upstream if artifact.origin == "github" else "local",
+        source=artifact.upstream if artifact.upstream else "local",
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
         tags=artifact.tags or [],
@@ -874,9 +912,7 @@ async def bulk_import_artifacts(
                 # Extract validation error messages
                 detail = error.detail
                 if isinstance(detail, dict) and "details" in detail:
-                    messages = [
-                        d.get("message", str(d)) for d in detail["details"]
-                    ]
+                    messages = [d.get("message", str(d)) for d in detail["details"]]
                     validation_failures[i] = "; ".join(messages)
                 else:
                     validation_failures[i] = str(detail)
@@ -951,9 +987,7 @@ async def bulk_import_artifacts(
 
         # Build results: combine validation failures + import results in original order
         # Create a mapping from valid artifact index to its import result
-        import_results_by_valid_idx = {
-            i: r for i, r in enumerate(result_data.results)
-        }
+        import_results_by_valid_idx = {i: r for i, r in enumerate(result_data.results)}
 
         results: list[ImportResult] = []
         valid_idx = 0  # Track position in valid artifacts list
@@ -991,7 +1025,9 @@ async def bulk_import_artifacts(
                                 r.status
                                 if r.status
                                 else (
-                                    ImportStatus.SUCCESS if r.success else ImportStatus.FAILED
+                                    ImportStatus.SUCCESS
+                                    if r.success
+                                    else ImportStatus.FAILED
                                 )
                             ),
                             message=r.message,
@@ -1104,7 +1140,9 @@ async def bulk_import_artifacts(
         total_imported = sum(1 for r in results if r.status == ImportStatus.SUCCESS)
 
         return BulkImportResult(
-            total_requested=len(request.artifacts),  # All requested, including validation failures
+            total_requested=len(
+                request.artifacts
+            ),  # All requested, including validation failures
             total_imported=total_imported,
             total_skipped=total_skipped,
             total_failed=total_failed,  # Includes validation failures + import failures
@@ -1801,11 +1839,13 @@ async def list_artifacts(
                                 .filter_by(collection_id=coll.id)
                                 .count()
                             )
-                            collections_map[assoc.artifact_id].append({
-                                "id": coll.id,
-                                "name": coll.name,
-                                "artifact_count": artifact_count,
-                            })
+                            collections_map[assoc.artifact_id].append(
+                                {
+                                    "id": coll.id,
+                                    "name": coll.name,
+                                    "artifact_count": artifact_count,
+                                }
+                            )
 
                 db_session.close()
             except Exception as e:
@@ -3559,14 +3599,33 @@ async def get_artifact_diff(
             proj_path, artifact_name, artifact_type.value
         )
 
-        if not deployment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not deployed in project {project_path}",
+        # Handle case when no deployment record exists (manually deployed or legacy)
+        if deployment:
+            collection_name = collection or deployment.from_collection
+            inferred_artifact_path = deployment.artifact_path
+        else:
+            # No deployment record - try to infer paths
+            logger.debug(
+                f"No deployment record for {artifact_id}, attempting to infer paths"
             )
+            collection_name = collection or "default"
 
-        # Determine collection name from deployment if not specified
-        collection_name = collection or deployment.from_collection
+            # Find artifact in project using standard conventions
+            possible_paths = _get_possible_artifact_paths(artifact_type, artifact_name)
+            inferred_artifact_path = None
+
+            for path in possible_paths:
+                full_path = proj_path / ".claude" / path
+                if full_path.exists():
+                    inferred_artifact_path = path
+                    logger.debug(f"Found artifact at inferred path: {path}")
+                    break
+
+            if not inferred_artifact_path:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact '{artifact_id}' not found in project {project_path}",
+                )
 
         # Verify collection exists
         if collection_name not in collection_mgr.list_collections():
@@ -3588,7 +3647,7 @@ async def get_artifact_diff(
         # Get paths
         collection_path = collection_mgr.config.get_collection_path(collection_name)
         collection_artifact_path = collection_path / artifact.path
-        project_artifact_path = proj_path / ".claude" / deployment.artifact_path
+        project_artifact_path = proj_path / ".claude" / inferred_artifact_path
 
         if not collection_artifact_path.exists():
             raise HTTPException(
@@ -4562,6 +4621,10 @@ async def get_artifact_file_content(
                 detail=f"Artifact path does not exist: {artifact_root}",
             )
 
+        # Handle single-file artifacts (e.g., agents stored as agents/prd-writer.md)
+        # For single-file artifacts, artifact_root IS the file, not a directory
+        is_single_file_artifact = artifact_root.is_file()
+
         # CRITICAL SECURITY: Validate and normalize the file path to prevent path traversal
         # This prevents attacks like: ../../etc/passwd
         try:
@@ -4579,16 +4642,30 @@ async def get_artifact_file_content(
                     detail="Invalid file path: path traversal attempt detected",
                 )
 
-            # Construct the full path
-            full_path = (artifact_root / normalized_file_path).resolve()
+            if is_single_file_artifact:
+                # For single-file artifacts, the file_path must match the artifact's filename
+                # or be "." (root indicator). The full_path IS the artifact_root itself.
+                artifact_filename = artifact_root.name
+                if normalized_file_path in (".", artifact_filename):
+                    # Valid request for the single file
+                    full_path = artifact_root.resolve()
+                else:
+                    # Requested file doesn't exist in this single-file artifact
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"File not found: {file_path}. This is a single-file artifact containing only '{artifact_filename}'",
+                    )
+            else:
+                # Directory-based artifact: construct path normally
+                full_path = (artifact_root / normalized_file_path).resolve()
 
-            # Ensure the resolved path is still within the artifact directory
-            artifact_root_resolved = artifact_root.resolve()
-            if not str(full_path).startswith(str(artifact_root_resolved)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid file path: path escapes artifact directory",
-                )
+                # Ensure the resolved path is still within the artifact directory
+                artifact_root_resolved = artifact_root.resolve()
+                if not str(full_path).startswith(str(artifact_root_resolved)):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid file path: path escapes artifact directory",
+                    )
 
         except HTTPException:
             raise
@@ -4810,6 +4887,16 @@ async def update_artifact_file_content(
         collection_path = collection_mgr.config.get_collection_path(collection_name)
         artifact_root = collection_path / artifact.path
 
+        if not artifact_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Artifact path does not exist: {artifact_root}",
+            )
+
+        # Handle single-file artifacts (e.g., agents stored as agents/prd-writer.md)
+        # For single-file artifacts, artifact_root IS the file, not a directory
+        is_single_file_artifact = artifact_root.is_file()
+
         # Validate file path (path traversal protection)
         try:
             # Normalize the requested path to remove any .., ., etc.
@@ -4826,16 +4913,30 @@ async def update_artifact_file_content(
                     detail="Invalid file path: path traversal attempt detected",
                 )
 
-            # Construct the full path
-            full_path = (artifact_root / normalized_file_path).resolve()
+            if is_single_file_artifact:
+                # For single-file artifacts, the file_path must match the artifact's filename
+                # or be "." (root indicator). The full_path IS the artifact_root itself.
+                artifact_filename = artifact_root.name
+                if normalized_file_path in (".", artifact_filename):
+                    # Valid request for the single file - update is allowed
+                    full_path = artifact_root.resolve()
+                else:
+                    # Requested file doesn't exist in this single-file artifact
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"File not found: {file_path}. This is a single-file artifact containing only '{artifact_filename}'",
+                    )
+            else:
+                # Directory-based artifact: construct path normally
+                full_path = (artifact_root / normalized_file_path).resolve()
 
-            # Ensure the resolved path is still within the artifact directory
-            artifact_root_resolved = artifact_root.resolve()
-            if not str(full_path).startswith(str(artifact_root_resolved)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid file path: path escapes artifact directory",
-                )
+                # Ensure the resolved path is still within the artifact directory
+                artifact_root_resolved = artifact_root.resolve()
+                if not str(full_path).startswith(str(artifact_root_resolved)):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid file path: path escapes artifact directory",
+                    )
 
         except HTTPException:
             raise
@@ -5068,6 +5169,10 @@ async def create_artifact_file(
                 detail=f"Artifact path does not exist: {artifact_root}",
             )
 
+        # Handle single-file artifacts (e.g., agents stored as agents/prd-writer.md)
+        # For single-file artifacts, artifact_root IS the file, not a directory
+        is_single_file_artifact = artifact_root.is_file()
+
         # Validate file path (path traversal protection)
         try:
             # Normalize the requested path to remove any .., ., etc.
@@ -5084,16 +5189,35 @@ async def create_artifact_file(
                     detail="Invalid file path: path traversal attempt detected",
                 )
 
-            # Construct the full path
-            full_path = (artifact_root / normalized_file_path).resolve()
+            if is_single_file_artifact:
+                # Single-file artifacts cannot have new files created
+                # They can only contain one file (the artifact itself)
+                artifact_filename = artifact_root.name
+                if normalized_file_path in (".", artifact_filename):
+                    # Trying to create the file that already exists
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"File already exists: {file_path}. This is a single-file artifact.",
+                    )
+                else:
+                    # Trying to create a different file in a single-file artifact
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Cannot create new files in single-file artifacts. "
+                        f"This artifact contains only '{artifact_filename}'. "
+                        f"To add multiple files, convert to a directory-based artifact.",
+                    )
+            else:
+                # Directory-based artifact: construct path normally
+                full_path = (artifact_root / normalized_file_path).resolve()
 
-            # Ensure the resolved path is still within the artifact directory
-            artifact_root_resolved = artifact_root.resolve()
-            if not str(full_path).startswith(str(artifact_root_resolved)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid file path: path escapes artifact directory",
-                )
+                # Ensure the resolved path is still within the artifact directory
+                artifact_root_resolved = artifact_root.resolve()
+                if not str(full_path).startswith(str(artifact_root_resolved)):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid file path: path escapes artifact directory",
+                    )
 
         except HTTPException:
             raise
@@ -5313,6 +5437,10 @@ async def delete_artifact_file(
                 detail=f"Artifact path does not exist: {artifact_root}",
             )
 
+        # Handle single-file artifacts (e.g., agents stored as agents/prd-writer.md)
+        # For single-file artifacts, artifact_root IS the file, not a directory
+        is_single_file_artifact = artifact_root.is_file()
+
         # Validate file path (path traversal protection)
         try:
             # Normalize the requested path to remove any .., ., etc.
@@ -5329,16 +5457,34 @@ async def delete_artifact_file(
                     detail="Invalid file path: path traversal attempt detected",
                 )
 
-            # Construct the full path
-            full_path = (artifact_root / normalized_file_path).resolve()
+            if is_single_file_artifact:
+                # Single-file artifacts cannot have their only file deleted
+                # Deleting it would effectively delete the entire artifact
+                artifact_filename = artifact_root.name
+                if normalized_file_path in (".", artifact_filename):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Cannot delete the only file in a single-file artifact. "
+                        f"This would effectively delete the entire artifact '{artifact_id}'. "
+                        f"Use the artifact deletion endpoint (DELETE /api/v1/artifacts/{artifact_id}) instead.",
+                    )
+                else:
+                    # Requested file doesn't exist in this single-file artifact
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"File not found: {file_path}. This is a single-file artifact containing only '{artifact_filename}'",
+                    )
+            else:
+                # Directory-based artifact: construct path normally
+                full_path = (artifact_root / normalized_file_path).resolve()
 
-            # Ensure the resolved path is still within the artifact directory
-            artifact_root_resolved = artifact_root.resolve()
-            if not str(full_path).startswith(str(artifact_root_resolved)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid file path: path escapes artifact directory",
-                )
+                # Ensure the resolved path is still within the artifact directory
+                artifact_root_resolved = artifact_root.resolve()
+                if not str(full_path).startswith(str(artifact_root_resolved)):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid file path: path escapes artifact directory",
+                    )
 
         except HTTPException:
             raise

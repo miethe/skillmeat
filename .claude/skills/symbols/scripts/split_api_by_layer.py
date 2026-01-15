@@ -9,6 +9,11 @@ Configuration:
     Uses symbols.config.json for input/output paths. Falls back to 'ai/'
     directory if configuration is not available.
 
+Input Format Support:
+    Automatically detects and handles two formats:
+    - Flat format: {"symbols": [...]} (produced by Python extractor)
+    - Module format: {"modules": [...]} (legacy/TypeScript extractor)
+
 Layer Mapping:
 - router: HTTP endpoints (app/api/, app/api/endpoints/)
 - service: Business logic (app/services/)
@@ -35,7 +40,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 import argparse
 
 
@@ -83,13 +88,14 @@ def validate_split(
     Validate that no symbols were lost during split.
 
     Args:
-        original_modules: Original modules list from symbols-api.json
+        original_modules: Original modules list (normalized to module format)
         layers: Dictionary of layer -> modules mapping
 
     Returns:
         Validation results dictionary with status and details
     """
     # Count original symbols
+    # Works with both flat and module format since we normalize in split_api_by_layer
     original_symbol_count = sum(
         len(module.get('symbols', []))
         for module in original_modules
@@ -152,7 +158,7 @@ def create_layer_file_metadata(layer: str, modules: List[Dict]) -> Dict[str, Any
         'domain': 'api',
         'layer': layer,
         'language': 'python',
-        'generated': datetime.utcnow().isoformat() + 'Z',
+        'generated': datetime.now(timezone.utc).isoformat(),
         'totalModules': len(modules),
         'totalSymbols': total_symbols,
         'modules': modules
@@ -181,8 +187,29 @@ def split_api_by_layer(
     with open(input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    modules = data.get('modules', [])
-    print(f"Loaded {len(modules)} modules with {data.get('totalSymbols', 0)} symbols")
+    # Detect format and normalize to module-based structure
+    if 'symbols' in data:
+        # Flat format from Python extractor - group by path to create modules
+        print("Detected flat symbol format, converting to module structure...")
+        symbols_by_path = defaultdict(list)
+        for symbol in data['symbols']:
+            path = symbol.get('path', 'unknown.py')
+            symbols_by_path[path].append(symbol)
+
+        modules = [
+            {'path': path, 'symbols': syms}
+            for path, syms in symbols_by_path.items()
+        ]
+        total_symbols = len(data['symbols'])
+    elif 'modules' in data:
+        # Already in module format (legacy or TypeScript extractor)
+        modules = data['modules']
+        total_symbols = data.get('totalSymbols', sum(len(m.get('symbols', [])) for m in modules))
+    else:
+        print("❌ Error: Unknown symbol file format (missing 'symbols' or 'modules' key)")
+        return {'success': False, 'error': 'Unknown format'}
+
+    print(f"Loaded {len(modules)} modules with {total_symbols} symbols")
 
     # Group modules by layer
     layers: Dict[str, List[Dict]] = defaultdict(list)
@@ -227,7 +254,7 @@ def split_api_by_layer(
     layer_files = {}
     for layer in ['router', 'service', 'repository', 'schema', 'core']:
         module_count = len(layers[layer])
-        symbol_count = validation['layer_counts'][layer]
+        symbol_count = validation['layer_counts'].get(layer, 0)
 
         # Estimate file size (rough: 550 bytes per symbol)
         est_size_kb = (symbol_count * 550) // 1024

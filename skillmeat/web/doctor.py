@@ -228,7 +228,7 @@ class WebDoctor:
         import socket
 
         ports_to_check = {
-            8000: "FastAPI",
+            8080: "FastAPI",
             3000: "Next.js",
         }
 
@@ -246,7 +246,7 @@ class WebDoctor:
             return DiagnosticResult(
                 name="Port Availability",
                 status="pass",
-                message="Ports 8000 and 3000 available",
+                message="Ports 8080 and 3000 available",
                 details="No port conflicts detected",
             )
         else:

@@ -11,6 +11,7 @@ try:
     from .extract_frontend_components import extract_frontend_components
     from .extract_frontend_hooks import extract_frontend_hooks
     from .extract_frontend_api_clients import extract_frontend_api_clients
+    from .metadata_utils import build_common_metadata, offset_to_line_column
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
     from pathlib import Path as _Path
@@ -21,6 +22,7 @@ except ImportError:  # pragma: no cover - fallback for direct script execution
     from scripts.code_map.extract_frontend_components import extract_frontend_components
     from scripts.code_map.extract_frontend_hooks import extract_frontend_hooks
     from scripts.code_map.extract_frontend_api_clients import extract_frontend_api_clients
+    from scripts.code_map.metadata_utils import build_common_metadata, offset_to_line_column
 
 IMPORT_RE = re.compile(
     r"import\s+\{([^}]+)\}\s+from\s+['\"]([^'\"]+)['\"]",
@@ -114,17 +116,17 @@ def hook_node_id(name: str, hook_file: Optional[Path]) -> str:
     return f"hook:{name}"
 
 
-def parse_api_calls(text: str) -> List[Tuple[str, Optional[str]]]:
-    calls: List[Tuple[str, Optional[str]]] = []
+def parse_api_calls(text: str) -> List[Tuple[str, Optional[str], int, str]]:
+    calls: List[Tuple[str, Optional[str], int, str]] = []
     for match in API_REQUEST_RE.finditer(text):
         path = match.group(2)
         window = text[match.end() : match.end() + 300]
         method_match = METHOD_RE.search(window)
         method = method_match.group(1) if method_match else None
-        calls.append((path, method))
+        calls.append((path, method, match.start(), "apiRequest"))
     for match in FETCH_RE.finditer(text):
         path = match.group(2)
-        calls.append((path, None))
+        calls.append((path, None, match.start(), "fetch"))
     return calls
 
 
@@ -141,7 +143,12 @@ def extract_frontend(web_root: Path) -> Graph:
         route_id = f"route:{route}"
         page_id = f"page:{page_path.as_posix()}"
         graph.add_node(route_id, "route", label=route)
-        graph.add_node(page_id, "page", file=page_path.as_posix())
+        graph.add_node(
+            page_id,
+            "page",
+            file=page_path.as_posix(),
+            **build_common_metadata(page_path),
+        )
         graph.add_edge(route_id, page_id, "route_to_page")
 
         for hook_name, hook_file in parse_hook_imports(web_root, page_path, hook_exports):
@@ -151,6 +158,7 @@ def extract_frontend(web_root: Path) -> Graph:
                 "hook",
                 label=hook_name,
                 file=hook_file.as_posix() if hook_file else None,
+                **build_common_metadata(hook_file, symbol=hook_name) if hook_file else {},
             )
             graph.add_edge(page_id, hook_id, "uses_hook")
 
@@ -166,8 +174,9 @@ def extract_frontend(web_root: Path) -> Graph:
                 "hook",
                 label=hook_name,
                 file=hook_file.as_posix(),
+                **build_common_metadata(hook_file, symbol=hook_name),
             )
-            for raw_path, method in api_calls:
+            for raw_path, method, offset, method_name in api_calls:
                 normalized_path = normalize_api_path(raw_path)
                 full_path = apply_api_prefix(normalized_path, api_prefix)
                 method_inferred = False
@@ -177,6 +186,7 @@ def extract_frontend(web_root: Path) -> Graph:
                     method_inferred = True
                 endpoint_label = f"{method} {full_path}"
                 endpoint_id = f"api_endpoint:{endpoint_label}"
+                call_line, _ = offset_to_line_column(text, offset)
                 graph.add_node(
                     endpoint_id,
                     "api_endpoint",
@@ -184,10 +194,24 @@ def extract_frontend(web_root: Path) -> Graph:
                     method=method,
                     path=full_path,
                     raw_path=raw_path,
+                    normalized_path=full_path,
                     method_inferred=method_inferred,
                     raw_method="unknown" if method_inferred else raw_method,
+                    **build_common_metadata(hook_file),
                 )
-                graph.add_edge(hook_id, endpoint_id, "calls_api", file=hook_file.as_posix())
+                graph.add_edge(
+                    hook_id,
+                    endpoint_id,
+                    "calls_api",
+                    file=hook_file.as_posix(),
+                    callsite_file=hook_file.as_posix(),
+                    callsite_line=call_line,
+                    method_name=method_name,
+                    via="direct",
+                    raw_path=raw_path,
+                    normalized_path=full_path,
+                    method_inferred=method_inferred,
+                )
 
     graph.merge(extract_frontend_components(web_root))
     graph.merge(extract_frontend_hooks(web_root))

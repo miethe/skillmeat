@@ -63,7 +63,7 @@ except ImportError:
 
 # Schema validation rules (required fields per Schema v2.0)
 REQUIRED_FIELDS = {"name", "kind", "line", "signature", "summary", "layer"}
-VALID_KINDS = {"function", "class", "method", "component", "hook", "interface", "type", "variable"}
+VALID_KINDS = {"function", "async_function", "class", "method", "async_method", "component", "hook", "interface", "type", "variable"}
 VALID_LAYERS = {
     "router", "service", "repository", "schema", "model", "core",
     "auth", "middleware", "observability", "component", "hook",

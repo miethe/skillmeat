@@ -1,0 +1,380 @@
+{
+  "version": "2.0",
+  "domain": "api",
+  "layer": "core",
+  "language": "python",
+  "generated": "2026-01-15T01:38:05.829837+00:00",
+  "totalModules": 4,
+  "totalSymbols": 30,
+  "modules": [
+    {
+      "path": "metrics.py",
+      "symbols": [
+        {
+          "name": "track_operation",
+          "kind": "function",
+          "path": "metrics.py",
+          "line": 285,
+          "signature": "track_operation(metric_name: str, operation: str)",
+          "summary": "Decorator to track operation metrics.",
+          "layer": "observability",
+          "docstring": "Decorator to track operation metrics.\n\nArgs:\n    metric_name: Name of the metric to track (e.g., \"bundle\", \"mcp\")\n    operation: Operation name (e.g., \"export\", \"import\")\n\nExample:\n    >>> @track_operation(\"bundle\", \"export\")\n    ... def export_bundle(bundle_id: str):\n    ...     # Function code\n    ...     pass",
+          "category": "business_logic"
+        },
+        {
+          "name": "track_async_operation",
+          "kind": "function",
+          "path": "metrics.py",
+          "line": 342,
+          "signature": "track_async_operation(metric_name: str, operation: str)",
+          "summary": "Decorator to track async operation metrics.",
+          "layer": "observability",
+          "docstring": "Decorator to track async operation metrics.\n\nArgs:\n    metric_name: Name of the metric to track\n    operation: Operation name\n\nExample:\n    >>> @track_async_operation(\"marketplace\", \"search\")\n    ... async def search_marketplace(query: str):\n    ...     # Async function code\n    ...     pass",
+          "category": "business_logic"
+        }
+      ]
+    },
+    {
+      "path": "tracing.py",
+      "symbols": [
+        {
+          "name": "Span",
+          "kind": "class",
+          "path": "tracing.py",
+          "line": 18,
+          "signature": "class Span",
+          "summary": "Represents a traced operation.",
+          "layer": "observability",
+          "docstring": "Represents a traced operation.\n\nA span tracks the execution of a single operation, including timing,\nattributes, and events that occur during the operation.",
+          "category": "business_logic"
+        },
+        {
+          "name": "__init__",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 25,
+          "signature": "__init__(self, name: str, parent_span_id: Optional[str])",
+          "summary": "Initialize a new span.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "Initialize a new span.\n\nArgs:\n    name: Name of the operation being traced\n    parent_span_id: Optional parent span ID for hierarchical tracing",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_attribute",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 41,
+          "signature": "set_attribute(self, key: str, value: Any)",
+          "summary": "Add attribute to span.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "Add attribute to span.\n\nArgs:\n    key: Attribute name\n    value: Attribute value",
+          "category": "business_logic"
+        },
+        {
+          "name": "add_event",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 50,
+          "signature": "add_event(self, name: str, attributes: Optional[Dict])",
+          "summary": "Add event to span.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "Add event to span.\n\nEvents mark significant occurrences during span execution.\n\nArgs:\n    name: Event name\n    attributes: Optional event attributes",
+          "category": "business_logic"
+        },
+        {
+          "name": "end",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 67,
+          "signature": "end(self, status: str) -> float",
+          "summary": "End span and record duration.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "End span and record duration.\n\nArgs:\n    status: Final status (\"success\", \"error\", \"cancelled\")\n\nReturns:\n    Duration in milliseconds",
+          "category": "business_logic"
+        },
+        {
+          "name": "__enter__",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 99,
+          "signature": "__enter__(self)",
+          "summary": "Context manager entry.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "Context manager entry.",
+          "category": "business_logic"
+        },
+        {
+          "name": "__exit__",
+          "kind": "method",
+          "path": "tracing.py",
+          "line": 103,
+          "signature": "__exit__(self, exc_type, exc_val, exc_tb)",
+          "summary": "Context manager exit.",
+          "layer": "observability",
+          "parent": "Span",
+          "docstring": "Context manager exit.",
+          "category": "business_logic"
+        },
+        {
+          "name": "trace_operation",
+          "kind": "function",
+          "path": "tracing.py",
+          "line": 120,
+          "signature": "trace_operation(operation_name: str)",
+          "summary": "Context manager for tracing operations.",
+          "layer": "observability",
+          "docstring": "Context manager for tracing operations.\n\nCreates a span for the operation and automatically handles span lifecycle,\nincluding timing, error tracking, and context propagation.\n\nArgs:\n    operation_name: Name of the operation to trace\n    **attributes: Additional attributes to attach to the span\n\nYields:\n    Span instance for the operation\n\nExample:\n    >>> with trace_operation(\"bundle.export\", bundle_id=\"abc123\") as span:\n    ...     span.set_attribute(\"artifact_count\", 5)\n    ...     span.add_event(\"validation_complete\")\n    ...     # Do work",
+          "category": "business_logic"
+        },
+        {
+          "name": "trace_function",
+          "kind": "function",
+          "path": "tracing.py",
+          "line": 202,
+          "signature": "trace_function(operation_name: Optional[str])",
+          "summary": "Decorator for tracing function calls.",
+          "layer": "observability",
+          "docstring": "Decorator for tracing function calls.\n\nArgs:\n    operation_name: Optional operation name (uses function name if not provided)\n\nExample:\n    >>> @trace_function(\"process_bundle\")\n    ... def process_bundle(bundle_id: str):\n    ...     # Function code\n    ...     pass",
+          "category": "business_logic"
+        },
+        {
+          "name": "trace_async_function",
+          "kind": "async_function",
+          "path": "tracing.py",
+          "line": 230,
+          "signature": "async trace_async_function(operation_name: Optional[str])",
+          "summary": "Decorator for tracing async function calls.",
+          "layer": "observability",
+          "docstring": "Decorator for tracing async function calls.\n\nArgs:\n    operation_name: Optional operation name (uses function name if not provided)\n\nExample:\n    >>> @trace_async_function(\"fetch_bundle\")\n    ... async def fetch_bundle(bundle_id: str):\n    ...     # Async function code\n    ...     pass",
+          "category": "business_logic"
+        }
+      ]
+    },
+    {
+      "path": "logging_config.py",
+      "symbols": [
+        {
+          "name": "StructuredFormatter",
+          "kind": "class",
+          "path": "logging_config.py",
+          "line": 16,
+          "signature": "class StructuredFormatter(logging.Formatter)",
+          "summary": "JSON formatter for structured logging.",
+          "layer": "observability",
+          "docstring": "JSON formatter for structured logging.\n\nFormats log records as JSON with standard fields plus any extra context\nsuch as trace_id, span_id, user_id, and request_id.",
+          "category": "business_logic"
+        },
+        {
+          "name": "format",
+          "kind": "method",
+          "path": "logging_config.py",
+          "line": 23,
+          "signature": "format(self, record: logging.LogRecord) -> str",
+          "summary": "Format log record as JSON.",
+          "layer": "observability",
+          "parent": "StructuredFormatter",
+          "docstring": "Format log record as JSON.\n\nArgs:\n    record: Log record to format\n\nReturns:\n    JSON-formatted log string",
+          "category": "business_logic"
+        },
+        {
+          "name": "HumanReadableFormatter",
+          "kind": "class",
+          "path": "logging_config.py",
+          "line": 107,
+          "signature": "class HumanReadableFormatter(logging.Formatter)",
+          "summary": "Human-readable formatter for development mode.",
+          "layer": "observability",
+          "docstring": "Human-readable formatter for development mode.\n\nFormats logs in a readable format with optional trace context.",
+          "category": "business_logic"
+        },
+        {
+          "name": "format",
+          "kind": "method",
+          "path": "logging_config.py",
+          "line": 113,
+          "signature": "format(self, record: logging.LogRecord) -> str",
+          "summary": "Format log record in human-readable format.",
+          "layer": "observability",
+          "parent": "HumanReadableFormatter",
+          "docstring": "Format log record in human-readable format.\n\nArgs:\n    record: Log record to format\n\nReturns:\n    Formatted log string",
+          "category": "business_logic"
+        },
+        {
+          "name": "setup_logging",
+          "kind": "function",
+          "path": "logging_config.py",
+          "line": 145,
+          "signature": "setup_logging(level: int, structured: bool, logger_name: Optional[str]) -> logging.Logger",
+          "summary": "Configure logging for application.",
+          "layer": "observability",
+          "docstring": "Configure logging for application.\n\nSets up either structured JSON logging or human-readable logging\ndepending on the environment and configuration.\n\nArgs:\n    level: Logging level (default: INFO)\n    structured: Use structured JSON logging (default: True)\n    logger_name: Optional logger name to configure (default: root logger)\n\nReturns:\n    Configured logger instance",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_logger_with_context",
+          "kind": "function",
+          "path": "logging_config.py",
+          "line": 195,
+          "signature": "get_logger_with_context(name: str) -> logging.Logger",
+          "summary": "Get a logger that automatically includes trace context.",
+          "layer": "observability",
+          "docstring": "Get a logger that automatically includes trace context.\n\nArgs:\n    name: Logger name\n\nReturns:\n    Logger configured to include trace context",
+          "category": "business_logic"
+        }
+      ]
+    },
+    {
+      "path": "context.py",
+      "symbols": [
+        {
+          "name": "LogContext",
+          "kind": "class",
+          "path": "context.py",
+          "line": 20,
+          "signature": "class LogContext",
+          "summary": "Manage logging context for requests.",
+          "layer": "observability",
+          "docstring": "Manage logging context for requests.\n\nProvides static methods for setting and getting context variables\nthat are automatically propagated through async operations.",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_trace_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 28,
+          "signature": "set_trace_id(trace_id: Optional[str]) -> str",
+          "summary": "Set trace ID for distributed tracing.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Set trace ID for distributed tracing.\n\nArgs:\n    trace_id: Optional trace ID (generates UUID if not provided)\n\nReturns:\n    The trace ID that was set",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_trace_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 43,
+          "signature": "get_trace_id() -> Optional[str]",
+          "summary": "Get current trace ID.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Get current trace ID.\n\nReturns:\n    Current trace ID or None",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_span_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 52,
+          "signature": "set_span_id(span_id: Optional[str]) -> str",
+          "summary": "Set span ID for current operation.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Set span ID for current operation.\n\nArgs:\n    span_id: Optional span ID (generates short UUID if not provided)\n\nReturns:\n    The span ID that was set",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_span_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 67,
+          "signature": "get_span_id() -> Optional[str]",
+          "summary": "Get current span ID.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Get current span ID.\n\nReturns:\n    Current span ID or None",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_user_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 76,
+          "signature": "set_user_id(user_id: Optional[str]) -> Optional[str]",
+          "summary": "Set user ID for current request.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Set user ID for current request.\n\nArgs:\n    user_id: User ID to set\n\nReturns:\n    The user ID that was set",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_user_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 89,
+          "signature": "get_user_id() -> Optional[str]",
+          "summary": "Get current user ID.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Get current user ID.\n\nReturns:\n    Current user ID or None",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_request_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 98,
+          "signature": "set_request_id(request_id: Optional[str]) -> str",
+          "summary": "Set request ID.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Set request ID.\n\nArgs:\n    request_id: Optional request ID (generates UUID if not provided)\n\nReturns:\n    The request ID that was set",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_request_id",
+          "kind": "method",
+          "path": "context.py",
+          "line": 113,
+          "signature": "get_request_id() -> Optional[str]",
+          "summary": "Get current request ID.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Get current request ID.\n\nReturns:\n    Current request ID or None",
+          "category": "business_logic"
+        },
+        {
+          "name": "get_context",
+          "kind": "method",
+          "path": "context.py",
+          "line": 122,
+          "signature": "get_context() -> Dict[str, Any]",
+          "summary": "Get all context variables.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Get all context variables.\n\nReturns:\n    Dictionary with all context variables",
+          "category": "business_logic"
+        },
+        {
+          "name": "clear_context",
+          "kind": "method",
+          "path": "context.py",
+          "line": 136,
+          "signature": "clear_context()",
+          "summary": "Clear all context variables.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Clear all context variables.\n\nUseful for cleanup after request processing.",
+          "category": "business_logic"
+        },
+        {
+          "name": "set_context",
+          "kind": "method",
+          "path": "context.py",
+          "line": 147,
+          "signature": "set_context(trace_id: Optional[str], span_id: Optional[str], user_id: Optional[str], request_id: Optional[str])",
+          "summary": "Set multiple context variables at once.",
+          "layer": "observability",
+          "parent": "LogContext",
+          "docstring": "Set multiple context variables at once.\n\nArgs:\n    trace_id: Optional trace ID\n    span_id: Optional span ID\n    user_id: Optional user ID\n    request_id: Optional request ID",
+          "category": "business_logic"
+        }
+      ]
+    }
+  ]
+}

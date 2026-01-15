@@ -11,6 +11,7 @@ try:
     from .extract_backend_handlers import extract_backend_handlers
     from .extract_backend_services import extract_backend_services
     from .extract_backend_models import extract_backend_models
+    from .metadata_utils import build_common_metadata
 except ImportError:  # pragma: no cover - fallback for direct script execution
     import sys
     from pathlib import Path as _Path
@@ -21,6 +22,7 @@ except ImportError:  # pragma: no cover - fallback for direct script execution
     from scripts.code_map.extract_backend_handlers import extract_backend_handlers
     from scripts.code_map.extract_backend_services import extract_backend_services
     from scripts.code_map.extract_backend_models import extract_backend_models
+    from scripts.code_map.metadata_utils import build_common_metadata
 
 ROUTER_ASSIGN_RE = re.compile(
     r"(?P<name>\w+)\s*=\s*APIRouter\((?P<args>.*?)\)",
@@ -99,7 +101,8 @@ def extract_backend(api_root: Path) -> Graph:
             path_match = STRING_RE.search(args)
             if not path_match:
                 continue
-            raw_path = normalize_path_params(path_match.group(1))
+            decorator_path = path_match.group(1)
+            raw_path = normalize_path_params(decorator_path)
             prefix = prefixes.get(router_name, "")
             full_path = join_paths(prefix, raw_path)
             if apply_prefix:
@@ -110,7 +113,7 @@ def extract_backend(api_root: Path) -> Graph:
                 continue
 
             router_id = f"router:{router_file.as_posix()}::{router_name}"
-            endpoint_id = f"endpoint:{method} {full_path}"
+            endpoint_id = f"api_endpoint:{method} {full_path}"
             handler_id = f"handler:{router_file.as_posix()}::{handler_name}"
 
             graph.add_node(
@@ -119,6 +122,7 @@ def extract_backend(api_root: Path) -> Graph:
                 label=router_name,
                 file=router_file.as_posix(),
                 prefix=prefix or None,
+                **build_common_metadata(router_file, symbol=router_name),
             )
             graph.add_node(
                 endpoint_id,
@@ -126,13 +130,17 @@ def extract_backend(api_root: Path) -> Graph:
                 label=f"{method} {full_path}",
                 method=method,
                 path=full_path,
+                raw_path=decorator_path,
+                normalized_path=full_path,
                 file=router_file.as_posix(),
+                **build_common_metadata(router_file),
             )
             graph.add_node(
                 handler_id,
                 "handler",
                 label=handler_name,
                 file=router_file.as_posix(),
+                **build_common_metadata(router_file, symbol=handler_name),
             )
             graph.add_edge(router_id, endpoint_id, "router_exposes")
             graph.add_edge(endpoint_id, handler_id, "handled_by")

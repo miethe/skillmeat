@@ -111,8 +111,8 @@ jest.mock('next/headers', () => ({
 }));
 
 // Mock environment variables
-process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8000';
-process.env.NEXT_PUBLIC_WS_URL = 'ws://localhost:8000';
+process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8080';
+process.env.NEXT_PUBLIC_WS_URL = 'ws://localhost:8080';
 process.env.NODE_ENV = 'test';
 
 // Suppress console errors/warnings in tests (optional)

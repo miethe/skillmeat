@@ -26,7 +26,7 @@ class APISettings(BaseSettings):
     """API service configuration.
 
     Configuration is loaded from environment variables with SKILLMEAT_ prefix.
-    Example: SKILLMEAT_ENV=production, SKILLMEAT_PORT=8000
+    Example: SKILLMEAT_ENV=production, SKILLMEAT_PORT=8080
 
     For development, a .env file can be used in the project root.
     """
@@ -52,7 +52,7 @@ class APISettings(BaseSettings):
     )
 
     port: int = Field(
-        default=8000,
+        default=8080,
         ge=1024,
         le=65535,
         description="Port number to bind the server",
