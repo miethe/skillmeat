@@ -1156,9 +1156,6 @@ export default function SourceDetailPage() {
             {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
             {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
               <> ({totalFilteredCount.toLocaleString()} matching search)</>
-            {(totalCount ?? totalFilteredCount).toLocaleString()} artifacts
-            {searchQuery.trim() && totalCount && totalFilteredCount !== totalCount && (
-              <> ({totalFilteredCount.toLocaleString()} matching search)</>
             )}
           </span>
         </div>
