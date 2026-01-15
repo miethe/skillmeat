@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -432,19 +433,50 @@ class ContextSyncService:
                 continue
 
             try:
-                # TODO: Read collection entity content from cache database
-                # For now, we skip the actual write
-                logger.info(
-                    f"Would write collection content for {entity_id} to {deployed_path}"
+                # Read collection entity content from cache database
+                artifacts = self.cache_mgr.repository.get_artifacts_by_type(
+                    entity_info["entity_type"]
+                )
+                collection_artifact = next(
+                    (a for a in artifacts if a.name == entity_info["entity_name"]),
+                    None,
                 )
 
-                # TODO: Write content to deployed file
-                # deployed_path.write_text(collection_content, encoding="utf-8")
-                # new_hash = compute_content_hash(collection_content)
+                if not collection_artifact:
+                    raise ValueError(f"Artifact {entity_name} not found in cache")
 
-                # TODO: Update deployment record with new hash
-                # deployment.content_hash = new_hash
-                # DeploymentTracker.write_deployments(project, deployments)
+                collection_content = collection_artifact.content or ""
+
+                logger.info(
+                    f"Writing collection content for {entity_id} to {deployed_path}"
+                )
+
+                # Write content to deployed file
+                deployed_path.parent.mkdir(parents=True, exist_ok=True)
+                deployed_path.write_text(collection_content, encoding="utf-8")
+                new_hash = compute_content_hash(collection_content)
+
+                # Update deployment record with new hash
+                deployments = DeploymentTracker.read_deployments(project)
+                updated_deployments = []
+                found_deployment = False
+                for dep in deployments:
+                    if (
+                        dep.artifact_name == entity_name
+                        and dep.artifact_type == entity_info["entity_type"]
+                    ):
+                        dep.content_hash = new_hash
+                        dep.deployed_at = datetime.now()
+                        dep.local_modifications = False
+                        found_deployment = True
+                    updated_deployments.append(dep)
+
+                if found_deployment:
+                    DeploymentTracker.write_deployments(project, updated_deployments)
+                else:
+                    logger.warning(
+                        f"Deployment record for {entity_name} not found to update hash"
+                    )
 
                 results.append(
                     SyncResult(
