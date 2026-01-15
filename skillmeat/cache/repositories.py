@@ -470,13 +470,17 @@ class ScanUpdateContext:
             >>> if result.updated_imports:
             ...     print(f"Imports with changes: {result.updated_imports}")
         """
-        # Build lookup dict of new entries by upstream_url for O(1) matching
+        # Build lookup dicts of new entries for O(1) matching
         new_by_url: Dict[str, MarketplaceCatalogEntry] = {}
         new_by_path: Dict[str, MarketplaceCatalogEntry] = {}
+        new_by_type_name: Dict[str, MarketplaceCatalogEntry] = {}
         for entry in entries:
             new_by_url[entry.upstream_url] = entry
             # Fallback key: path (unique within a source)
             new_by_path[entry.path] = entry
+            # Secondary fallback: artifact_type:name (stable across URL changes)
+            type_name_key = f"{entry.artifact_type}:{entry.name}"
+            new_by_type_name[type_name_key] = entry
 
         # Get existing entries for this source
         existing_entries = (
@@ -488,6 +492,7 @@ class ScanUpdateContext:
         # Track which new entries have been matched
         matched_urls: set = set()
         matched_paths: set = set()
+        matched_type_names: set = set()
 
         # Counters
         inserted_count = 0
@@ -500,15 +505,24 @@ class ScanUpdateContext:
 
         # Process existing entries
         for existing in existing_entries:
-            # Try to find matching new entry
+            # Try to find matching new entry (priority: URL > path > type:name)
             new_entry = new_by_url.get(existing.upstream_url)
             if new_entry:
                 matched_urls.add(existing.upstream_url)
             else:
-                # Fallback: match by path
+                # Fallback 1: match by path
                 new_entry = new_by_path.get(existing.path)
                 if new_entry:
                     matched_paths.add(existing.path)
+                else:
+                    # Fallback 2: match by artifact_type:name (handles URL changes)
+                    type_name_key = f"{existing.artifact_type}:{existing.name}"
+                    new_entry = new_by_type_name.get(type_name_key)
+                    if new_entry:
+                        matched_type_names.add(type_name_key)
+                        logger.debug(
+                            f"Matched entry by type:name fallback: {existing.id} ({existing.name})"
+                        )
 
             if new_entry is None:
                 # Entry no longer detected - mark as removed
@@ -533,7 +547,7 @@ class ScanUpdateContext:
                 if sha_changed and existing.status == "imported":
                     updated_imports.append(existing.id)
 
-                # Update detection metadata only
+                # Update detection metadata and URLs (URLs may change due to ref fixes)
                 existing.detected_sha = new_entry.detected_sha
                 existing.confidence_score = new_entry.confidence_score
                 existing.raw_score = new_entry.raw_score
@@ -541,6 +555,8 @@ class ScanUpdateContext:
                 existing.detected_at = new_entry.detected_at
                 existing.detected_version = new_entry.detected_version
                 existing.path_segments = new_entry.path_segments
+                existing.upstream_url = new_entry.upstream_url  # Update URL (may have changed)
+                existing.path = new_entry.path  # Update path for consistency
                 existing.updated_at = now
 
                 # Preserve: status, import_date, import_id, excluded_at, excluded_reason
@@ -571,8 +587,10 @@ class ScanUpdateContext:
         for entry in entries:
             url_matched = entry.upstream_url in matched_urls
             path_matched = entry.path in matched_paths
+            type_name_key = f"{entry.artifact_type}:{entry.name}"
+            type_name_matched = type_name_key in matched_type_names
 
-            if not url_matched and not path_matched:
+            if not url_matched and not path_matched and not type_name_matched:
                 # New entry - insert it
                 self.session.add(entry)
                 inserted_count += 1
