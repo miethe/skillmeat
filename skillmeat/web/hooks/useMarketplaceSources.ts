@@ -37,8 +37,8 @@ export const sourceKeys = {
   details: () => [...sourceKeys.all, 'detail'] as const,
   detail: (id: string) => [...sourceKeys.details(), id] as const,
   catalogs: () => [...sourceKeys.all, 'catalog'] as const,
-  catalog: (id: string, filters?: CatalogFilters) =>
-    [...sourceKeys.catalogs(), id, filters] as const,
+  catalog: (id: string, filters?: CatalogFilters, limit?: number) =>
+    [...sourceKeys.catalogs(), id, filters, limit] as const,
 };
 
 // ============================================================================
@@ -243,7 +243,7 @@ export function useSourceCatalog(
   limit = 50
 ) {
   return useInfiniteQuery({
-    queryKey: sourceKeys.catalog(sourceId, filters),
+    queryKey: sourceKeys.catalog(sourceId, filters, limit),
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       if (pageParam) params.append('cursor', pageParam);
