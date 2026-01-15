@@ -1487,18 +1487,18 @@ async def list_artifacts(
         # Convert to response DTOs
         response_items = [entry_to_response(entry) for entry in items]
 
+        # Get aggregated counts (needed for total_count in page_info)
+        counts_by_status = catalog_repo.count_by_status(source_id=source_id)
+        counts_by_type = catalog_repo.count_by_type(source_id=source_id)
+
         # Build page info
         page_info = PageInfo(
             has_next_page=has_more,
             has_previous_page=cursor is not None,
             start_cursor=response_items[0].id if response_items else None,
             end_cursor=response_items[-1].id if response_items else None,
-            total_count=None,
+            total_count=sum(counts_by_status.values()),
         )
-
-        # Get aggregated counts
-        counts_by_status = catalog_repo.count_by_status(source_id=source_id)
-        counts_by_type = catalog_repo.count_by_type(source_id=source_id)
 
         logger.debug(f"Listed {len(response_items)} artifacts for source {source_id}")
         return CatalogListResponse(
