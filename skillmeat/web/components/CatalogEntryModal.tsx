@@ -553,7 +553,7 @@ export function CatalogEntryModal({
                     breakdown={entry.score_breakdown}
                   />
                   <div className="overflow-x-auto flex-1 min-w-0">
-                    <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded whitespace-nowrap">
+                    <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded break-all">
                       {entry.path}
                     </code>
                   </div>
@@ -597,7 +597,7 @@ export function CatalogEntryModal({
                   <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
                     <span className="text-muted-foreground font-medium">Path:</span>
                     <div className="overflow-x-auto">
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
                         {entry.path}
                       </code>
                     </div>
@@ -610,7 +610,7 @@ export function CatalogEntryModal({
                         href={entry.upstream_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
+                        className="text-primary hover:underline inline-flex items-center gap-1 break-all"
                         aria-label={`View source repository for ${entry.name} on GitHub`}
                       >
                         <span>{entry.upstream_url}</span>
@@ -626,7 +626,7 @@ export function CatalogEntryModal({
                         Version:
                       </span>
                       <div className="overflow-x-auto">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
                           {entry.detected_version}
                         </code>
                       </div>
@@ -640,7 +640,7 @@ export function CatalogEntryModal({
                         SHA:
                       </span>
                       <div className="overflow-x-auto">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
                           {shortenSha(entry.detected_sha)}
                         </code>
                       </div>
