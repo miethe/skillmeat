@@ -15,6 +15,27 @@ The symbols system pre-generates structured metadata (symbols) about all code en
 
 ## Scripts Overview
 
+### Unified Pipeline
+
+| Script | Purpose |
+|--------|---------|
+| `__main__.py` | **Unified pipeline orchestrator** - runs extract → tag → split → validate in one command |
+
+```bash
+# Run full pipeline
+python .claude/skills/symbols/scripts/__main__.py
+
+# Domain-specific
+python .claude/skills/symbols/scripts/__main__.py --domain=api
+python .claude/skills/symbols/scripts/__main__.py --domain=web
+
+# Incremental update (for hooks)
+python .claude/skills/symbols/scripts/__main__.py --changed-only --skip-validate
+
+# Skip optional steps
+python .claude/skills/symbols/scripts/__main__.py --skip-split --skip-validate
+```
+
 ### Configuration & Setup
 
 | Script | Purpose |
@@ -155,8 +176,29 @@ The wizard detects:
 - Frontend code (React, Next.js, Vue)
 - Mobile code (React Native, Expo)
 - Shared packages
+- **Package-based structures** (e.g., `mypackage/api/`, `mypackage/web/`) - detects Python packages with `__init__.py` and looks for code subdirectories within them
 
 ## Complete Lifecycle
+
+### Quick Start: Unified Pipeline
+
+The fastest way to generate symbols is using the unified pipeline:
+
+```bash
+# 1. Initialize configuration (one-time)
+python .claude/skills/symbols/scripts/init_symbols.py --auto-detect
+
+# 2. Run full pipeline (extract → tag → split → validate)
+python .claude/skills/symbols/scripts/__main__.py
+
+# Or domain-specific
+python .claude/skills/symbols/scripts/__main__.py --domain=api
+python .claude/skills/symbols/scripts/__main__.py --domain=web
+```
+
+### Manual Steps (Alternative)
+
+For more control, you can run individual scripts:
 
 ### 1. Initialize Configuration
 

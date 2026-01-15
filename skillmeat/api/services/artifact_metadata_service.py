@@ -18,6 +18,25 @@ from skillmeat.cache.models import Artifact, MarketplaceCatalogEntry
 logger = logging.getLogger(__name__)
 
 
+def _parse_artifact_id(artifact_id: str) -> tuple[str, str]:
+    """Parse artifact_id into (type, name).
+
+    Artifact IDs follow format 'type:name' (e.g., 'agent:my-agent').
+    Falls back to ('unknown', artifact_id) if format doesn't match.
+
+    Args:
+        artifact_id: Artifact identifier to parse
+
+    Returns:
+        Tuple of (artifact_type, artifact_name)
+    """
+    if ":" in artifact_id:
+        parts = artifact_id.split(":", 1)
+        if len(parts) == 2 and parts[0] and parts[1]:
+            return parts[0], parts[1]
+    return "unknown", artifact_id
+
+
 def _lookup_in_cache(session: Session, artifact_id: str) -> Optional[Artifact]:
     """Look up artifact in cache table by ID.
 
@@ -103,9 +122,10 @@ def get_artifact_metadata(session: Session, artifact_id: str) -> ArtifactSummary
 
     # Step 3: Fallback to minimal metadata
     logger.debug(f"Fallback metadata for artifact_id={artifact_id}")
+    parsed_type, parsed_name = _parse_artifact_id(artifact_id)
     return ArtifactSummary(
-        name=artifact_id,
-        type="unknown",
+        name=parsed_name,
+        type=parsed_type,
         version=None,
         source=artifact_id,
     )

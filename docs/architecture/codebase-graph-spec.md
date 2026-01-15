@@ -16,6 +16,7 @@ Outputs live in `docs/architecture/` as JSON graphs:
 - `docs/architecture/codebase-graph.frontend.json`
 - `docs/architecture/codebase-graph.backend.json`
 - `docs/architecture/codebase-graph.unified.json` (merged + overrides applied)
+- `docs/architecture/codebase-graph.details.json` (optional deep metadata)
 
 ## Source Scripts
 
@@ -29,6 +30,7 @@ Scripts live in `scripts/code_map/`:
 - `extract_backend_handlers.py`
 - `extract_backend_services.py`
 - `extract_backend_models.py`
+- `extract_details.py`
 - `merge_graphs.py`
 - `apply_overrides.py`
 - `coverage_summary.py`
@@ -49,6 +51,7 @@ python -m scripts.code_map.extract_frontend_hooks
 python -m scripts.code_map.extract_frontend_api_clients
 python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
+python -m scripts.code_map.extract_details
 python -m scripts.code_map.coverage_summary
 python -m scripts.code_map.validate_graph
 python -m scripts.code_map.build_outputs
@@ -68,6 +71,7 @@ python -m scripts.code_map.extract_backend_services --api-root skillmeat/api --o
 python -m scripts.code_map.extract_backend_models --repo-root . --out docs/architecture/codebase-graph.backend.models.json
 python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-graph.frontend.json --backend docs/architecture/codebase-graph.backend.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
+python -m scripts.code_map.extract_details --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.details.json
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
@@ -87,8 +91,22 @@ Nodes:
   `api_endpoint`, `router`, `handler`, `service`, `repository`, `model`, `migration`, `schema`
 - `label`: human-readable label
 - `file`: file path when known
+- common optional metadata:
+  - `symbol`: symbol name (function/class/component)
+  - `line`: primary line (1-based)
+  - `span`: `{ start: { line, column }, end: { line, column } }`
+  - `signature`: compact signature
+  - `doc_summary`: first line of docstring/JSdoc
+  - `module`: module path (python module, TS module)
+  - `package`: package/bundle (ex: `skillmeat.api`, `skillmeat.web`)
 - optional metadata per node type (ex: `method`, `path`, `prefix`)
   - frontend endpoint extras: `raw_path`, `raw_method`, `method_inferred`
+  - API endpoint extras: `operation_id`, `tags`, `auth_required`, `request_schema`,
+    `response_schema`, `status_codes`, `openapi`
+  - handler extras: `is_async`, `decorators`, `dependencies`, `response_model`
+  - service/repo extras: `is_async`, `base_class`, `dependencies`, `side_effects`
+  - model extras: `table`, `columns`, `relationships`, `indexes`
+  - migration extras: `revision`, `down_revision`, `tables`
 
 Edges:
 - `from`, `to`: node ids
@@ -110,7 +128,11 @@ Edges:
 - `handler_uses_schema`
 - `router_exposes`
 - `handled_by`
-- optional metadata (ex: `file`)
+- optional metadata:
+  - `callsite_file`, `callsite_line`, `awaited`, `method_name`
+  - `role` (for schema edges: `request`, `response`, `param`)
+  - `via` (for hook -> endpoint edges: `direct`, `api_client`)
+  - `raw_path`, `normalized_path`, `method_inferred`
 
 ## Frontend Expansion (Phase 1)
 
@@ -159,19 +181,13 @@ Current checks:
 - `calls_api`/`api_client_calls_endpoint` edges point to existing endpoints.
 - `deprecated: true` nodes are not referenced unless `allow_deprecated` is set on the edge.
 - OpenAPI endpoints have `handled_by` edges.
+- Handler-linked endpoints exist in OpenAPI.
 - Pages have `page_uses_component` edges unless ignored.
+- Schema edges include `role`.
 
 ## Phase 4 Outputs
 
-Generated from the unified graph:
-- `.claude/rules/web/hooks.md` inventory table
-- `.claude/rules/web/api-client.md` inventory table
-- `.claude/rules/api/schemas.md` inventory table
-
-Run:
-```bash
-python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
-```
+Output generation is currently disabled; `build_outputs` does not write files.
 
 ## Unified Graph + Overrides
 
@@ -201,6 +217,38 @@ Hook API coverage buckets:
 - `hooks_direct_api_only`: hook calls API endpoint directly (refactor signal).
 - `hooks_with_both`: hook calls both client and endpoint (refactor signal).
 - `hooks_without_api`: hook does not call API (utility/UI hooks).
+- `handlers_without_schema`: handlers missing schema edges.
+- `services_without_repo`: services missing repository edges.
+- `models_without_migration`: models missing migration edges.
+
+## Details Artifact (Optional)
+
+To keep the unified graph compact, deeper metadata is emitted to a parallel file:
+`docs/architecture/codebase-graph.details.json`.
+
+Shape:
+```json
+{
+  "generated_at": "...",
+  "source_commit": "...",
+  "nodes": {
+    "node_id": {
+      "docstring": "...",
+      "signature": "...",
+      "decorators": ["..."],
+      "params": ["..."],
+      "returns": "...",
+      "imports": ["..."]
+    }
+  },
+  "edges": {
+    "from->to:type": {
+      "callsite": { "file": "...", "line": 0 },
+      "notes": "..."
+    }
+  }
+}
+```
 
 ## What It Enables (Use Cases)
 

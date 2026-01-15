@@ -657,6 +657,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Track if we've shown the error toast to prevent spam
   const shownErrorRef = useRef<string | null>(null);
 
+  // Auto-select first deployment's project when viewing from collection mode
+  // This ensures the Sync Status tab shows data immediately instead of "No project deployment found"
+  useEffect(() => {
+    // Only auto-select if:
+    // 1. Entity has no projectPath (collection mode)
+    // 2. selectedProjectForDiff is not already set
+    // 3. We have at least one deployment with a project_path
+    if (!entity?.projectPath && !selectedProjectForDiff && artifactDeployments.length > 0) {
+      const firstProjectPath = artifactDeployments[0].project_path;
+      if (firstProjectPath) {
+        setSelectedProjectForDiff(firstProjectPath);
+      }
+    }
+  }, [entity?.projectPath, selectedProjectForDiff, artifactDeployments]);
+
   // Show toast notification when diff fetch fails (only once per unique error)
   useEffect(() => {
     if (diffError && shouldFetchDiff && activeTab === 'sync') {
@@ -1653,8 +1668,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="mt-0 min-h-0 flex-1 overflow-hidden">
-              <div className="flex h-[calc(90vh-12rem)] min-w-0 gap-0 overflow-hidden">
+            <TabsContent value="contents" className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
                 <div
                   className={cn(
@@ -1697,7 +1712,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             {/* Sync Status Tab */}
             <TabsContent
               value="sync"
-              className="mt-0 flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              className="mt-0 h-full min-h-0 min-w-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
             >
               {/* Context entities use specialized sync logic */}
               {isContextEntity(entity) && entity.projectPath ? (

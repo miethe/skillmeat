@@ -47,7 +47,7 @@ def validate_graph(graph: Dict[str, Any]) -> List[str]:
     for node in nodes:
         if node.get("type") != "api_endpoint":
             continue
-        if not (node.get("file") or "").endswith("openapi.json"):
+        if not (node.get("openapi") or (node.get("file") or "").endswith("openapi.json")):
             continue
         endpoint_id = node["id"]
         has_handler = any(
@@ -55,6 +55,24 @@ def validate_graph(graph: Dict[str, Any]) -> List[str]:
         )
         if not has_handler:
             errors.append(f"openapi_endpoint_missing_handler:{endpoint_id}")
+
+    handled_endpoints = {
+        edge.get("from")
+        for edge in edges
+        if edge.get("type") == "handled_by" and edge.get("from")
+    }
+    for endpoint_id in handled_endpoints:
+        node = node_index.get(endpoint_id)
+        if not node or node.get("type") != "api_endpoint":
+            continue
+        if not node.get("openapi"):
+            errors.append(f"endpoint_missing_openapi:{endpoint_id}")
+
+    for edge in edges:
+        if edge.get("type") != "handler_uses_schema":
+            continue
+        if not edge.get("role"):
+            errors.append(f"schema_edge_missing_role:{edge.get('from')}->{edge.get('to')}")
 
     for node in nodes:
         if node.get("type") != "page":

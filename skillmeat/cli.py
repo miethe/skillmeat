@@ -6567,8 +6567,8 @@ def web():
 @click.option(
     "--api-port",
     type=int,
-    default=8000,
-    help="Port for FastAPI server (default: 8000)",
+    default=8080,
+    help="Port for FastAPI server (default: 8080)",
 )
 @click.option(
     "--web-port",
@@ -6590,7 +6590,7 @@ def dev(
 ):
     """Start development servers with auto-reload.
 
-    Starts both FastAPI backend (port 8000) and Next.js frontend (port 3000)
+    Starts both FastAPI backend (port 8080) and Next.js frontend (port 3000)
     in development mode with auto-reload on file changes.
 
     Examples:
@@ -6678,8 +6678,8 @@ def build(check: bool):
 @click.option(
     "--api-port",
     type=int,
-    default=8000,
-    help="Port for FastAPI server (default: 8000)",
+    default=8080,
+    help="Port for FastAPI server (default: 8080)",
 )
 @click.option(
     "--web-port",

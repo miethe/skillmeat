@@ -1,0 +1,10 @@
+{
+  "version": "2.0",
+  "domain": "api",
+  "layer": "router",
+  "language": "python",
+  "generated": "2026-01-15T01:38:05.830800+00:00",
+  "totalModules": 0,
+  "totalSymbols": 0,
+  "modules": []
+}

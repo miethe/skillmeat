@@ -45,11 +45,11 @@ def generate_openapi_spec(app, api_version: str = "v1") -> Dict:
     # Add server URLs
     openapi_schema["servers"] = [
         {
-            "url": "http://localhost:8000",
+            "url": "http://localhost:8080",
             "description": "Local development server",
         },
         {
-            "url": "http://localhost:8000/api/v1",
+            "url": "http://localhost:8080/api/v1",
             "description": "Local development API",
         },
     ]
