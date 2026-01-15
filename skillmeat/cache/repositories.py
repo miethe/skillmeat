@@ -89,6 +89,33 @@ T = TypeVar("T", bound=Base)
 
 
 # =============================================================================
+# Merge Result
+# =============================================================================
+
+
+@dataclass
+class MergeResult:
+    """Result of a catalog entry merge operation.
+
+    Tracks counts for different merge outcomes and identifies entries
+    that had SHA changes while preserving import status.
+
+    Attributes:
+        inserted_count: Number of new entries inserted
+        updated_count: Number of existing entries updated (non-imported/excluded)
+        preserved_count: Number of imported/excluded entries that were updated
+        removed_count: Number of entries marked as removed (no longer detected)
+        updated_imports: Entry IDs of imported artifacts that have SHA changes
+    """
+
+    inserted_count: int
+    updated_count: int
+    preserved_count: int
+    removed_count: int
+    updated_imports: List[str]
+
+
+# =============================================================================
 # Pagination Result
 # =============================================================================
 
@@ -411,6 +438,165 @@ class ScanUpdateContext:
             )
 
         return len(entries)
+
+    def merge_catalog_entries(
+        self, entries: List[MarketplaceCatalogEntry]
+    ) -> MergeResult:
+        """Merge new catalog entries with existing ones, preserving import metadata.
+
+        Unlike replace_catalog_entries(), this method preserves import-related
+        metadata for entries that have been imported or excluded. It matches
+        entries by upstream_url (primary) or path + source_id (fallback).
+
+        Merge behavior by existing entry status:
+            - "imported": Preserves status, import_date, import_id, excluded_at,
+              excluded_reason. Updates detection metadata (SHA, scores, etc.)
+            - "excluded": Preserves all exclusion data. Updates detection metadata.
+            - "new"/"updated": Full update with new entry data.
+            - Not in new entries: Marked as "removed" (not deleted).
+
+        Args:
+            entries: List of newly detected MarketplaceCatalogEntry instances
+
+        Returns:
+            MergeResult with counts and list of imported entry IDs with SHA changes
+
+        Example:
+            >>> result = ctx.merge_catalog_entries(detected_entries)
+            >>> print(f"Inserted: {result.inserted_count}")
+            >>> print(f"Updated: {result.updated_count}")
+            >>> print(f"Preserved: {result.preserved_count}")
+            >>> print(f"Removed: {result.removed_count}")
+            >>> if result.updated_imports:
+            ...     print(f"Imports with changes: {result.updated_imports}")
+        """
+        # Build lookup dict of new entries by upstream_url for O(1) matching
+        new_by_url: Dict[str, MarketplaceCatalogEntry] = {}
+        new_by_path: Dict[str, MarketplaceCatalogEntry] = {}
+        for entry in entries:
+            new_by_url[entry.upstream_url] = entry
+            # Fallback key: path (unique within a source)
+            new_by_path[entry.path] = entry
+
+        # Get existing entries for this source
+        existing_entries = (
+            self.session.query(MarketplaceCatalogEntry)
+            .filter_by(source_id=self.source_id)
+            .all()
+        )
+
+        # Track which new entries have been matched
+        matched_urls: set = set()
+        matched_paths: set = set()
+
+        # Counters
+        inserted_count = 0
+        updated_count = 0
+        preserved_count = 0
+        removed_count = 0
+        updated_imports: List[str] = []
+
+        now = datetime.utcnow()
+
+        # Process existing entries
+        for existing in existing_entries:
+            # Try to find matching new entry
+            new_entry = new_by_url.get(existing.upstream_url)
+            if new_entry:
+                matched_urls.add(existing.upstream_url)
+            else:
+                # Fallback: match by path
+                new_entry = new_by_path.get(existing.path)
+                if new_entry:
+                    matched_paths.add(existing.path)
+
+            if new_entry is None:
+                # Entry no longer detected - mark as removed
+                if existing.status != "removed":
+                    existing.status = "removed"
+                    existing.updated_at = now
+                    removed_count += 1
+                    logger.debug(
+                        f"Marked entry as removed: {existing.id} ({existing.name})"
+                    )
+                continue
+
+            # Track SHA changes for imported entries
+            sha_changed = (
+                existing.detected_sha is not None
+                and new_entry.detected_sha is not None
+                and existing.detected_sha != new_entry.detected_sha
+            )
+
+            if existing.status in ("imported", "excluded"):
+                # Preserve import/exclusion metadata, update detection data
+                if sha_changed and existing.status == "imported":
+                    updated_imports.append(existing.id)
+
+                # Update detection metadata only
+                existing.detected_sha = new_entry.detected_sha
+                existing.confidence_score = new_entry.confidence_score
+                existing.raw_score = new_entry.raw_score
+                existing.score_breakdown = new_entry.score_breakdown
+                existing.detected_at = new_entry.detected_at
+                existing.detected_version = new_entry.detected_version
+                existing.path_segments = new_entry.path_segments
+                existing.updated_at = now
+
+                # Preserve: status, import_date, import_id, excluded_at, excluded_reason
+                preserved_count += 1
+                logger.debug(
+                    f"Preserved {existing.status} entry: {existing.id} ({existing.name})"
+                    + (f" [SHA changed]" if sha_changed else "")
+                )
+            else:
+                # Full update for non-imported/excluded entries
+                existing.artifact_type = new_entry.artifact_type
+                existing.name = new_entry.name
+                existing.path = new_entry.path
+                existing.upstream_url = new_entry.upstream_url
+                existing.detected_version = new_entry.detected_version
+                existing.detected_sha = new_entry.detected_sha
+                existing.detected_at = new_entry.detected_at
+                existing.confidence_score = new_entry.confidence_score
+                existing.raw_score = new_entry.raw_score
+                existing.score_breakdown = new_entry.score_breakdown
+                existing.path_segments = new_entry.path_segments
+                existing.status = "updated" if existing.status != "new" else "new"
+                existing.updated_at = now
+                updated_count += 1
+                logger.debug(f"Updated entry: {existing.id} ({existing.name})")
+
+        # Insert new entries that weren't matched
+        for entry in entries:
+            url_matched = entry.upstream_url in matched_urls
+            path_matched = entry.path in matched_paths
+
+            if not url_matched and not path_matched:
+                # New entry - insert it
+                self.session.add(entry)
+                inserted_count += 1
+                logger.debug(f"Inserted new entry: {entry.id} ({entry.name})")
+
+        logger.info(
+            f"Merged catalog entries for source {self.source_id}: "
+            f"inserted={inserted_count}, updated={updated_count}, "
+            f"preserved={preserved_count}, removed={removed_count}"
+        )
+
+        if updated_imports:
+            logger.info(
+                f"Found {len(updated_imports)} imported entries with SHA changes: "
+                f"{updated_imports[:5]}{'...' if len(updated_imports) > 5 else ''}"
+            )
+
+        return MergeResult(
+            inserted_count=inserted_count,
+            updated_count=updated_count,
+            preserved_count=preserved_count,
+            removed_count=removed_count,
+            updated_imports=updated_imports,
+        )
 
     def update_entry_statuses(self, status_updates: Dict[str, str]) -> int:
         """Bulk update entry statuses.

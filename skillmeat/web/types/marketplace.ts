@@ -241,6 +241,9 @@ export interface ScanResult {
   duplicates_cross_source?: number;
   total_detected?: number;
   total_unique?: number;
+  // Updated imports tracking
+  updated_imports?: string[];
+  preserved_count?: number;
 }
 
 export interface ImportRequest {

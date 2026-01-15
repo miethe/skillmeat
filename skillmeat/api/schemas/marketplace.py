@@ -1413,6 +1413,17 @@ class ScanResultDTO(BaseModel):
         description="Timestamp when scan completed",
         examples=["2025-12-06T10:35:00Z"],
     )
+    updated_imports: List[str] = Field(
+        default_factory=list,
+        description="Entry IDs of imported artifacts with upstream changes (SHA changed since import)",
+        examples=[["cat_canvas_design", "cat_my_skill"]],
+    )
+    preserved_count: int = Field(
+        default=0,
+        description="Number of imported/excluded entries preserved during merge (their status and import metadata retained)",
+        ge=0,
+        examples=[5],
+    )
 
     @model_validator(mode="after")
     def validate_dedup_counts(self) -> "ScanResultDTO":
@@ -1462,6 +1473,8 @@ class ScanResultDTO(BaseModel):
                 "scan_duration_ms": 1234.56,
                 "errors": [],
                 "scanned_at": "2025-12-06T10:35:00Z",
+                "updated_imports": ["cat_canvas_design"],
+                "preserved_count": 5,
             }
         }
 
