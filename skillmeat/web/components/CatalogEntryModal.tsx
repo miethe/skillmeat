@@ -661,7 +661,7 @@ export function CatalogEntryModal({
 
           {/* Contents Tab - FileTree + ContentPane split layout */}
           <TabsContent value="contents" className="mt-0 flex-1 overflow-hidden min-h-0">
-            <div className="flex h-full">
+            <div className="flex min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
               {/* Left Panel - File Tree */}
               <div className="w-[280px] flex-shrink-0 border-r overflow-hidden flex flex-col">
                 {treeError ? (

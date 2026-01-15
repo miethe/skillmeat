@@ -84,6 +84,13 @@
       },
       "notes": "method_name=buildApiUrl"
     },
+    "api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity->api_endpoint:POST /api/v1/context-entities/{id}/deploy:api_client_calls_endpoint": {
+      "callsite": {
+        "file": "skillmeat/web/lib/api/context-entities.ts",
+        "line": 156
+      },
+      "notes": "method_name=buildApiUrl"
+    },
     "api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities->api_endpoint:GET /api/v1/context-entities${params.toString() :api_client_calls_endpoint": {
       "callsite": {
         "file": "skillmeat/web/lib/api/context-entities.ts",
@@ -487,14 +494,14 @@
     "handler:skillmeat/api/routers/artifacts.py::add_skip_preference->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/skip_preferences.py::SkipPreferenceManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5690
+        "line": 5836
       },
       "notes": "method_name=SkipPreferenceManager"
     },
     "handler:skillmeat/api/routers/artifacts.py::add_tag_to_artifact->service:skillmeat.core.services::TagService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 6022
+        "line": 6168
       },
       "notes": "method_name=TagService"
     },
@@ -507,28 +514,28 @@
     "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/deployment.py::Deployment:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1068
+        "line": 1104
       },
       "notes": "method_name=Deployment"
     },
     "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/importer.py::ArtifactImporter:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 889
+        "line": 925
       },
       "notes": "method_name=ArtifactImporter"
     },
     "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/importer.py::BulkImportArtifactData:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 902
+        "line": 938
       },
       "notes": "method_name=BulkImportArtifactData"
     },
     "handler:skillmeat/api/routers/artifacts.py::bulk_import_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/importer.py::BulkImportResultData:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 943
+        "line": 979
       },
       "notes": "method_name=BulkImportResultData"
     },
@@ -538,7 +545,7 @@
     "handler:skillmeat/api/routers/artifacts.py::check_artifact_upstream->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2038
+        "line": 2078
       },
       "notes": "method_name=ArtifactType"
     },
@@ -548,7 +555,7 @@
     "handler:skillmeat/api/routers/artifacts.py::clear_skip_preferences->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/skip_preferences.py::SkipPreferenceManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5859
+        "line": 6005
       },
       "notes": "method_name=SkipPreferenceManager"
     },
@@ -561,21 +568,21 @@
     "handler:skillmeat/api/routers/artifacts.py::confirm_duplicates->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact_detection.py::detect_artifact_type:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1253
+        "line": 1291
       },
       "notes": "method_name=detect_artifact_type"
     },
     "handler:skillmeat/api/routers/artifacts.py::confirm_duplicates->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/importer.py::ArtifactImporter:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1241
+        "line": 1279
       },
       "notes": "method_name=ArtifactImporter"
     },
     "handler:skillmeat/api/routers/artifacts.py::confirm_duplicates->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/importer.py::BulkImportArtifactData:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1261
+        "line": 1299
       },
       "notes": "method_name=BulkImportArtifactData"
     },
@@ -588,7 +595,7 @@
     "handler:skillmeat/api/routers/artifacts.py::create_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1404
+        "line": 1442
       },
       "notes": "method_name=ArtifactType"
     },
@@ -601,21 +608,21 @@
     "handler:skillmeat/api/routers/artifacts.py::create_artifact_file->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5022
+        "line": 5123
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::delete_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2633
+        "line": 2673
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::delete_artifact_file->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5267
+        "line": 5391
       },
       "notes": "method_name=ArtifactType"
     },
@@ -628,14 +635,14 @@
     "handler:skillmeat/api/routers/artifacts.py::deploy_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2754
+        "line": 2794
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::deploy_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/deployment.py::DeploymentManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2797
+        "line": 2837
       },
       "notes": "method_name=DeploymentManager"
     },
@@ -648,7 +655,7 @@
     "handler:skillmeat/api/routers/artifacts.py::discover_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/discovery.py::ArtifactDiscoveryService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 599
+        "line": 637
       },
       "notes": "method_name=ArtifactDiscoveryService"
     },
@@ -658,14 +665,14 @@
     "handler:skillmeat/api/routers/artifacts.py::discover_project_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/discovery.py::ArtifactDiscoveryService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 734
+        "line": 772
       },
       "notes": "method_name=ArtifactDiscoveryService"
     },
     "handler:skillmeat/api/routers/artifacts.py::discovery_health_check->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/discovery_metrics.py::discovery_metrics:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5615
+        "line": 5761
       },
       "notes": "method_name=get_stats"
     },
@@ -675,21 +682,21 @@
     "handler:skillmeat/api/routers/artifacts.py::fetch_github_metadata->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/cache.py::MetadataCache:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5456
+        "line": 5602
       },
       "notes": "method_name=MetadataCache"
     },
     "handler:skillmeat/api/routers/artifacts.py::fetch_github_metadata->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/github_metadata.py::GitHubMetadataExtractor:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5472
+        "line": 5618
       },
       "notes": "method_name=GitHubMetadataExtractor"
     },
     "handler:skillmeat/api/routers/artifacts.py::fetch_github_metadata->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/validation.py::validate_github_source:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5444
+        "line": 5590
       },
       "notes": "method_name=validate_github_source"
     },
@@ -699,7 +706,7 @@
     "handler:skillmeat/api/routers/artifacts.py::get_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1923
+        "line": 1963
       },
       "notes": "method_name=ArtifactType"
     },
@@ -709,7 +716,7 @@
     "handler:skillmeat/api/routers/artifacts.py::get_artifact_diff->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 3542
+        "line": 3582
       },
       "notes": "method_name=ArtifactType"
     },
@@ -719,7 +726,7 @@
     "handler:skillmeat/api/routers/artifacts.py::get_artifact_file_content->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 4516
+        "line": 4575
       },
       "notes": "method_name=ArtifactType"
     },
@@ -729,7 +736,7 @@
     "handler:skillmeat/api/routers/artifacts.py::get_artifact_tags->service:skillmeat.core.services::TagService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5993
+        "line": 6139
       },
       "notes": "method_name=TagService"
     },
@@ -739,14 +746,14 @@
     "handler:skillmeat/api/routers/artifacts.py::get_artifact_upstream_diff->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 3888
+        "line": 3947
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::get_discovery_metrics->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/discovery_metrics.py::discovery_metrics:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5561
+        "line": 5707
       },
       "notes": "method_name=get_stats"
     },
@@ -756,7 +763,7 @@
     "handler:skillmeat/api/routers/artifacts.py::get_version_graph->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 3409
+        "line": 3449
       },
       "notes": "method_name=ArtifactType"
     },
@@ -766,7 +773,7 @@
     "handler:skillmeat/api/routers/artifacts.py::list_artifact_files->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 4282
+        "line": 4341
       },
       "notes": "method_name=ArtifactType"
     },
@@ -776,7 +783,7 @@
     "handler:skillmeat/api/routers/artifacts.py::list_artifacts->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 1667
+        "line": 1705
       },
       "notes": "method_name=ArtifactType"
     },
@@ -786,7 +793,7 @@
     "handler:skillmeat/api/routers/artifacts.py::list_skip_preferences->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/skip_preferences.py::SkipPreferenceManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5939
+        "line": 6085
       },
       "notes": "method_name=SkipPreferenceManager"
     },
@@ -796,14 +803,14 @@
     "handler:skillmeat/api/routers/artifacts.py::remove_skip_preference->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/skip_preferences.py::SkipPreferenceManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 5779
+        "line": 5925
       },
       "notes": "method_name=SkipPreferenceManager"
     },
     "handler:skillmeat/api/routers/artifacts.py::remove_tag_from_artifact->service:skillmeat.core.services::TagService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 6053
+        "line": 6199
       },
       "notes": "method_name=TagService"
     },
@@ -816,7 +823,7 @@
     "handler:skillmeat/api/routers/artifacts.py::sync_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2906
+        "line": 2946
       },
       "notes": "method_name=ArtifactType"
     },
@@ -826,14 +833,14 @@
     "handler:skillmeat/api/routers/artifacts.py::undeploy_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 3260
+        "line": 3300
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::undeploy_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/deployment.py::DeploymentManager:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 3276
+        "line": 3316
       },
       "notes": "method_name=DeploymentManager"
     },
@@ -846,14 +853,14 @@
     "handler:skillmeat/api/routers/artifacts.py::update_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactMetadata:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2265
+        "line": 2305
       },
       "notes": "method_name=ArtifactMetadata"
     },
     "handler:skillmeat/api/routers/artifacts.py::update_artifact->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2207
+        "line": 2247
       },
       "notes": "method_name=ArtifactType"
     },
@@ -866,7 +873,7 @@
     "handler:skillmeat/api/routers/artifacts.py::update_artifact_file_content->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 4770
+        "line": 4847
       },
       "notes": "method_name=ArtifactType"
     },
@@ -879,28 +886,28 @@
     "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactMetadata:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2521
+        "line": 2561
       },
       "notes": "method_name=ArtifactMetadata"
     },
     "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/artifact.py::ArtifactType:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2396
+        "line": 2436
       },
       "notes": "method_name=ArtifactType"
     },
     "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters->service:/Users/miethe/dev/homelab/development/skillmeat/skillmeat/core/github_metadata.py::GitHubMetadataExtractor:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2451
+        "line": 2491
       },
       "notes": "method_name=GitHubMetadataExtractor"
     },
     "handler:skillmeat/api/routers/artifacts.py::update_artifact_parameters->service:skillmeat.core.services::TagService:handler_calls_service": {
       "callsite": {
         "file": "skillmeat/api/routers/artifacts.py",
-        "line": 2562
+        "line": 2602
       },
       "notes": "method_name=TagService"
     },
@@ -2365,6 +2372,13 @@
       },
       "notes": "via=api_client"
     },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntities->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntities->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
@@ -2401,6 +2415,13 @@
       "notes": "via=api_client"
     },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deleteContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
         "line": null
@@ -2449,6 +2470,13 @@
       },
       "notes": "via=api_client"
     },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntityContent->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useContextEntityContent->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
@@ -2485,6 +2513,13 @@
       "notes": "via=api_client"
     },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useCreateContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deleteContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useCreateContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
         "line": null
@@ -2533,6 +2568,13 @@
       },
       "notes": "via=api_client"
     },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeleteContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useDeleteContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
@@ -2561,6 +2603,55 @@
       },
       "notes": "via=api_client"
     },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::createContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deleteContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntityContent:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::updateContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useUpdateContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::createContextEntity:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
@@ -2569,6 +2660,13 @@
       "notes": "via=api_client"
     },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useUpdateContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deleteContextEntity:hook_calls_api_client": {
+      "callsite": {
+        "file": "skillmeat/web/hooks/use-context-entities.ts",
+        "line": null
+      },
+      "notes": "via=api_client"
+    },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useUpdateContextEntity->api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity:hook_calls_api_client": {
       "callsite": {
         "file": "skillmeat/web/hooks/use-context-entities.ts",
         "line": null
@@ -9009,7 +9107,7 @@
       "notes": "method_name=TagRepository"
     }
   },
-  "generated_at": "2026-01-14T14:49:33Z",
+  "generated_at": "2026-01-15T17:02:08Z",
   "nodes": {
     "api_client:skillmeat/web/hooks/use-toast.tsx::useToast": {
       "docstring": null,
@@ -9204,6 +9302,15 @@
         "id: string"
       ],
       "signature": "export async function deleteContextEntity(id: string): Promise<void>"
+    },
+    "api_client:skillmeat/web/lib/api/context-entities.ts::deployContextEntity": {
+      "doc_summary": "Deploy context entity to a project",
+      "docstring": "Deploy context entity to a project\n/",
+      "imports": [
+        "@/types/context-entity"
+      ],
+      "params": null,
+      "signature": "export async function deployContextEntity("
     },
     "api_client:skillmeat/web/lib/api/context-entities.ts::fetchContextEntities": {
       "doc_summary": "Fetch context entities with optional filtering",
@@ -11112,13 +11219,14 @@
     },
     "component:skillmeat/web/components/context/deploy-to-project-dialog.tsx::DeployToProjectDialog": {
       "doc_summary": "Dialog for deploying context entities to projects",
-      "docstring": "Dialog for deploying context entities to projects\n\nAllows users to select a project and deploy a context entity to the appropriate\npath within the project's .claude directory. Shows preview of target path and\noverwrite warnings.\n\nTODO: Implement when backend APIs are ready:\n- GET /api/v1/projects - List registered projects\n- POST /api/v1/context-entities/{id}/deploy - Deploy entity to project\n/",
+      "docstring": "Dialog for deploying context entities to projects\n\nAllows users to select a project and deploy a context entity to the appropriate\npath within the project's .claude directory. Shows preview of target path and\noverwrite warnings.\n/",
       "imports": [
         "@/components/ui/alert",
         "@/components/ui/badge",
         "@/components/ui/button",
         "@/components/ui/dialog",
         "@/components/ui/select",
+        "@/hooks",
         "@/types/context-entity",
         "lucide-react",
         "react"
@@ -19608,6 +19716,17 @@
       "params": null,
       "signature": "export function useDeleteContextEntity()"
     },
+    "hook:skillmeat/web/hooks/use-context-entities.ts::useDeployContextEntity": {
+      "doc_summary": "Deploy context entity mutation",
+      "docstring": "Deploy context entity mutation\n\n@returns Mutation function for deploying context entities\n\n@example\n```tsx\nconst deployEntity = useDeployContextEntity();\n\nawait deployEntity.mutateAsync({ id: 'entity-id', projectPath: '/path/to/project' });\n```\n/",
+      "imports": [
+        "@/lib/api/context-entities",
+        "@/types/context-entity",
+        "@tanstack/react-query"
+      ],
+      "params": null,
+      "signature": "export function useDeployContextEntity()"
+    },
     "hook:skillmeat/web/hooks/use-context-entities.ts::useUpdateContextEntity": {
       "doc_summary": "Update existing context entity mutation",
       "docstring": "Update existing context entity mutation\n\n@returns Mutation function for updating context entities\n\n@example\n```tsx\nconst updateEntity = useUpdateContextEntity();\n\nawait updateEntity.mutateAsync({\nid: 'entity-id',\ndata: {\nname: 'Updated Name',\ncontent: '# Updated content...',\nauto_load: false\n}\n});\n```\n/",
@@ -26627,6 +26746,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -27005,6 +27125,23 @@
       ],
       "returns": "Optional[MarketplaceCatalogEntry]",
       "signature": "_lookup_in_marketplace(session: Session, artifact_id: str) -> Optional[MarketplaceCatalogEntry]"
+    },
+    "service:skillmeat/api/services/artifact_metadata_service.py::_parse_artifact_id": {
+      "decorators": null,
+      "doc_summary": "Parse artifact_id into (type, name).",
+      "docstring": "Parse artifact_id into (type, name).\n\nArtifact IDs follow format 'type:name' (e.g., 'agent:my-agent').\nFalls back to ('unknown', artifact_id) if format doesn't match.\n\nArgs:\n    artifact_id: Artifact identifier to parse\n\nReturns:\n    Tuple of (artifact_type, artifact_name)",
+      "imports": [
+        "logging",
+        "skillmeat.api.schemas.user_collections",
+        "skillmeat.cache.models",
+        "sqlalchemy.orm",
+        "typing"
+      ],
+      "params": [
+        "artifact_id"
+      ],
+      "returns": "tuple[str, str]",
+      "signature": "_parse_artifact_id(artifact_id: str) -> tuple[str, str]"
     },
     "service:skillmeat/api/services/artifact_metadata_service.py::get_artifact_metadata": {
       "decorators": null,
@@ -28299,6 +28436,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28323,6 +28461,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28347,6 +28486,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28373,6 +28513,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28397,6 +28538,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28426,6 +28568,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -28454,6 +28597,7 @@
         "skillmeat.core.marketplace.heuristic_detector",
         "skillmeat.core.marketplace.observability",
         "skillmeat.observability.metrics",
+        "sqlalchemy",
         "time",
         "typing"
       ],
@@ -29705,6 +29849,7 @@
         "pathlib",
         "skillmeat.core.scoring.embedding_provider",
         "sqlite3",
+        "struct",
         "typing"
       ],
       "signature": "HaikuEmbedder(EmbeddingProvider)"
@@ -33472,5 +33617,5 @@
       "signature": "export function getEntityTypeConfig(type: EntityType): EntityTypeConfig"
     }
   },
-  "source_commit": "9f856e44b1ef14741685830d5b7dabe2b57177fe"
+  "source_commit": "1218856ce545cde014b308f0b21632cabea6be70"
 }
