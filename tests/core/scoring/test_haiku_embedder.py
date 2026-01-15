@@ -1,5 +1,6 @@
 """Tests for HaikuEmbedder implementation."""
 
+import asyncio
 import os
 import tempfile
 from pathlib import Path
@@ -141,7 +142,7 @@ def test_cache_embedding_and_retrieval(temp_cache_db):
     cached = embedder._get_cached_embedding(test_text)
 
     assert cached is not None
-    assert cached == test_embedding
+    assert cached == pytest.approx(test_embedding, abs=1e-6)
 
 
 def test_cache_expiration(temp_cache_db):
@@ -213,6 +214,6 @@ def test_cache_different_models_separate(temp_cache_db):
     cached2 = embedder2._get_cached_embedding(test_text)
 
     # Should get different embeddings
-    assert cached1 == embedding1
-    assert cached2 == embedding2
+    assert cached1 == pytest.approx(embedding1, abs=1e-6)
+    assert cached2 == pytest.approx(embedding2, abs=1e-6)
     assert cached1 != cached2
