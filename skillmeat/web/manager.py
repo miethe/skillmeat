@@ -66,7 +66,7 @@ class WebManager:
         self,
         api_only: bool = False,
         web_only: bool = False,
-        api_port: int = 8000,
+        api_port: int = 8080,
         web_port: int = 3000,
         api_host: str = "127.0.0.1",
     ):
