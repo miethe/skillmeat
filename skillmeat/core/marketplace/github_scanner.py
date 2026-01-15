@@ -288,7 +288,7 @@ class GitHubScanner:
                 detected_artifacts = detect_artifacts_in_tree(
                     file_paths,
                     repo_url=base_url,
-                    _ref=actual_ref,
+                    ref=actual_ref,
                     root_hint=root_hint,
                     detected_sha=commit_sha,
                     manual_mappings=manual_mappings,
