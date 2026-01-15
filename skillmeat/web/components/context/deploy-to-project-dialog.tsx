@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Folder, AlertTriangle, FileText } from 'lucide-react';
+import { Upload, Folder, AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import type { ContextEntity } from '@/types/context-entity';
+import { useProjects, useDeployContextEntity, useToast } from '@/hooks';
 
 export interface DeployToProjectDialogProps {
   entity: ContextEntity | null;
@@ -35,10 +36,6 @@ export interface DeployToProjectDialogProps {
  * Allows users to select a project and deploy a context entity to the appropriate
  * path within the project's .claude directory. Shows preview of target path and
  * overwrite warnings.
- *
- * TODO: Implement when backend APIs are ready:
- * - GET /api/v1/projects - List registered projects
- * - POST /api/v1/context-entities/{id}/deploy - Deploy entity to project
  */
 export function DeployToProjectDialog({
   entity,
@@ -47,19 +44,18 @@ export function DeployToProjectDialog({
   onSuccess,
 }: DeployToProjectDialogProps) {
   const [selectedProject, setSelectedProject] = useState<string>('');
-  const [isDeploying, setIsDeploying] = useState(false);
 
-  // TODO: Replace with real projects API hook once implemented
-  // const { data: projects, isLoading: projectsLoading } = useProjects();
-  const mockProjects = [
-    { id: '1', name: 'My Project', path: '/Users/dev/my-project' },
-    { id: '2', name: 'Other Project', path: '/Users/dev/other-project' },
-  ];
+  // Real hooks for projects and deployment
+  const { data: projects, isLoading: projectsLoading, error: projectsError } = useProjects();
+  const deployEntity = useDeployContextEntity();
+  const { toast } = useToast();
+
+  const isDeploying = deployEntity.isPending;
 
   // Compute target path based on selected project and entity path pattern
   const getTargetPath = () => {
-    if (!selectedProject || !entity) return null;
-    const project = mockProjects.find((p) => p.id === selectedProject);
+    if (!selectedProject || !entity || !projects) return null;
+    const project = projects.find((p) => p.id === selectedProject);
     if (!project) return null;
     return `${project.path}/${entity.path_pattern}`;
   };
@@ -67,31 +63,26 @@ export function DeployToProjectDialog({
   const targetPath = getTargetPath();
 
   const handleDeploy = async () => {
-    if (!entity || !selectedProject) return;
-
-    setIsDeploying(true);
+    if (!entity || !selectedProject || !projects) return;
+    const project = projects.find((p) => p.id === selectedProject);
+    if (!project) return;
 
     try {
-      // TODO: Implement deployment API call
-      // Example:
-      // await deployContextEntity({
-      //   entityId: entity.id,
-      //   projectPath: mockProjects.find(p => p.id === selectedProject)?.path
-      // });
-
-      // Simulate deployment for now
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      console.log('Deploy entity:', entity.id, 'to project:', selectedProject);
+      await deployEntity.mutateAsync({
+        id: entity.id,
+        projectPath: project.path
+      });
 
       // Show success and close
       onSuccess?.();
       handleClose();
     } catch (error) {
       console.error('Deploy failed:', error);
-      // TODO: Show error toast
-    } finally {
-      setIsDeploying(false);
+      toast({
+        title: 'Deploy Failed',
+        description: error instanceof Error ? error.message : 'Failed to deploy context entity',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -153,18 +144,30 @@ export function DeployToProjectDialog({
               <Folder className="h-4 w-4" aria-hidden="true" />
               Target Project
             </label>
-            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isDeploying}>
-              <SelectTrigger id="project" aria-label="Select target project for deployment">
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockProjects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {projectsLoading ? (
+              <div className="flex items-center gap-2 rounded-md border p-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading projects...
+              </div>
+            ) : projectsError ? (
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive">
+                Failed to load projects
+              </div>
+            ) : (
+              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isDeploying || !projects || projects.length === 0}>
+                <SelectTrigger id="project" aria-label="Select target project for deployment">
+                  <SelectValue placeholder={projects && projects.length === 0 ? "No projects found" : "Select a project"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects?.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <p className="text-xs text-muted-foreground">
               The entity will be deployed to the project&apos;s .claude directory
             </p>
@@ -207,7 +210,14 @@ export function DeployToProjectDialog({
             disabled={!selectedProject || isDeploying}
             aria-label={isDeploying ? 'Deploying entity to project' : `Deploy ${entity.name} to selected project`}
           >
-            {isDeploying ? 'Deploying...' : 'Deploy'}
+            {isDeploying ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deploying...
+              </>
+            ) : (
+              'Deploy'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
