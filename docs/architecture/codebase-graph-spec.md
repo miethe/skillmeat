@@ -38,6 +38,7 @@ Scripts live in `scripts/code_map/`:
 - `merge_graphs.py`
 - `apply_overrides.py`
 - `apply_semantic_tags.py`
+- `link_openapi_schemas.py`
 - `coverage_summary.py`
 - `validate_graph.py`
 - `build_groupings.py`
@@ -59,6 +60,7 @@ python -m scripts.code_map.extract_frontend_api_clients
 python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
 python -m scripts.code_map.apply_semantic_tags
+python -m scripts.code_map.link_openapi_schemas
 python -m scripts.code_map.extract_details
 python -m scripts.code_map.coverage_summary
 python -m scripts.code_map.validate_graph
@@ -84,6 +86,7 @@ python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-gr
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.extract_details --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.details.json
 python -m scripts.code_map.apply_semantic_tags --graph docs/architecture/codebase-graph.unified.json --details docs/architecture/codebase-graph.details.json --out docs/architecture/codebase-graph.unified.json
+python -m scripts.code_map.link_openapi_schemas --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.build_groupings --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.groupings.json
@@ -147,6 +150,7 @@ Edges:
 - `repository_uses_model`
 - `model_migrated_by`
 - `handler_uses_schema`
+- `api_endpoint_uses_schema`
 - `router_exposes`
 - `handled_by`
 - optional metadata:

@@ -32,15 +32,16 @@ except ImportError:  # pragma: no cover - fallback for direct script execution
     )
 
 REPO_MODULES = ("skillmeat.cache.repositories", "skillmeat.cache.repository")
-SERVICE_ROOTS = ("services", "core")
 
 
 def iter_service_files(api_root: Path) -> Iterable[Path]:
-    for root in SERVICE_ROOTS:
-        path = api_root.parent / root
-        if path.exists():
-            yield from path.rglob("*.py")
-    services_root = api_root / "services"
+    core_services = api_root.parent / "core" / "services"
+    if core_services.exists():
+        yield from core_services.rglob("*.py")
+    api_services = api_root / "services"
+    if api_services.exists():
+        yield from api_services.rglob("*.py")
+    services_root = api_root.parent / "services"
     if services_root.exists():
         yield from services_root.rglob("*.py")
 
