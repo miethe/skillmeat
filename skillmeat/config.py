@@ -283,3 +283,11 @@ class ConfigManager:
             raise ValueError(f"Weights must sum to 1.0, got {total}")
 
         self.set("scoring.weights", weights)
+
+    def get_api_base_url(self) -> str:
+        """Get API server base URL from config or default.
+
+        Returns:
+            API base URL string
+        """
+        return self.get("api.base_url", "http://localhost:8080")
