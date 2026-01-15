@@ -546,7 +546,7 @@ export function ContentPane({
               className="mb-4"
             />
           )}
-          <div className="max-w-full overflow-x-auto">
+          <div className="max-w-full">
             <ContentDisplay content={content} showLineNumbers={false} />
           </div>
         </div>
