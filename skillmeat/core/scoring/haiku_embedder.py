@@ -239,10 +239,13 @@ class HaikuEmbedder(EmbeddingProvider):
 
                 # Deserialize embedding
                 data = row[0]
-                if isinstance(data, bytes):
-                    # Optimized binary format
-                    count = len(data) // 4  # float is 4 bytes
-                    return list(struct.unpack(f"{count}f", data))
+                if isinstance(data, (bytes, bytearray, memoryview)):
+                    # Optimized binary format (little-endian float32)
+                    data_bytes = bytes(data)
+                    if len(data_bytes) % 4 != 0:
+                        return None
+                    count = len(data_bytes) // 4  # float is 4 bytes
+                    return list(struct.unpack(f"<{count}f", data_bytes))
                 else:
                     # Legacy JSON string format
                     return json.loads(data)
@@ -263,7 +266,7 @@ class HaikuEmbedder(EmbeddingProvider):
 
         text_hash = self._hash_text(text)
         # Store as binary blob (more efficient)
-        embedding_blob = struct.pack(f"{len(embedding)}f", *embedding)
+        embedding_blob = struct.pack(f"<{len(embedding)}f", *embedding)
         now = datetime.utcnow().isoformat()
 
         conn = sqlite3.connect(str(self.cache_db))
