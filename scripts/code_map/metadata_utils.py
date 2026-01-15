@@ -128,6 +128,37 @@ def jsdoc_summary(text: str, start_index: int) -> Optional[str]:
     return None
 
 
+def parse_semantic_tags(text: Optional[str]) -> Dict[str, list[str]]:
+    if not text:
+        return {}
+    domains: list[str] = []
+    modules: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("*"):
+            line = line.lstrip("*").strip()
+        if not line.startswith("@"):
+            continue
+        match = re.match(r"^@(domain|module)\s+(.*)$", line, re.IGNORECASE)
+        if not match:
+            continue
+        key = match.group(1).lower()
+        value = match.group(2).strip()
+        if not value:
+            continue
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+        if key == "domain":
+            domains.extend(parts)
+        else:
+            modules.extend(parts)
+    result: Dict[str, list[str]] = {}
+    if domains:
+        result["domains"] = domains
+    if modules:
+        result["modules"] = modules
+    return result
+
+
 def format_python_signature(node: ast.AST) -> Optional[str]:
     if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return None

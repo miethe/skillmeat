@@ -17,6 +17,7 @@ Outputs live in `docs/architecture/` as JSON graphs:
 - `docs/architecture/codebase-graph.backend.json`
 - `docs/architecture/codebase-graph.unified.json` (merged + overrides applied)
 - `docs/architecture/codebase-graph.details.json` (optional deep metadata)
+- `docs/architecture/codebase-graph.groupings.json` (optional grouping sets)
 
 ## Source Scripts
 
@@ -33,8 +34,10 @@ Scripts live in `scripts/code_map/`:
 - `extract_details.py`
 - `merge_graphs.py`
 - `apply_overrides.py`
+- `apply_semantic_tags.py`
 - `coverage_summary.py`
 - `validate_graph.py`
+- `build_groupings.py`
 - `build_outputs.py`
 - `__main__.py` (pipeline orchestrator)
 - `graph.py` (shared graph model)
@@ -51,9 +54,11 @@ python -m scripts.code_map.extract_frontend_hooks
 python -m scripts.code_map.extract_frontend_api_clients
 python -m scripts.code_map.merge_graphs
 python -m scripts.code_map.apply_overrides
+python -m scripts.code_map.apply_semantic_tags
 python -m scripts.code_map.extract_details
 python -m scripts.code_map.coverage_summary
 python -m scripts.code_map.validate_graph
+python -m scripts.code_map.build_groupings
 python -m scripts.code_map.build_outputs
 ```
 
@@ -72,8 +77,10 @@ python -m scripts.code_map.extract_backend_models --repo-root . --out docs/archi
 python -m scripts.code_map.merge_graphs --frontend docs/architecture/codebase-graph.frontend.json --backend docs/architecture/codebase-graph.backend.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.apply_overrides --in docs/architecture/codebase-graph.unified.json --overrides docs/architecture/codebase-graph.overrides.yaml --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.extract_details --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.details.json
+python -m scripts.code_map.apply_semantic_tags --graph docs/architecture/codebase-graph.unified.json --details docs/architecture/codebase-graph.details.json --out docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.coverage_summary --graph docs/architecture/codebase-graph.unified.json
 python -m scripts.code_map.validate_graph --graph docs/architecture/codebase-graph.unified.json
+python -m scripts.code_map.build_groupings --graph docs/architecture/codebase-graph.unified.json --out docs/architecture/codebase-graph.groupings.json
 python -m scripts.code_map.build_outputs --graph docs/architecture/codebase-graph.unified.json
 ```
 
@@ -99,6 +106,12 @@ Nodes:
   - `doc_summary`: first line of docstring/JSdoc
   - `module`: module path (python module, TS module)
   - `package`: package/bundle (ex: `skillmeat.api`, `skillmeat.web`)
+  - `domain`: primary domain tag (from overrides or `@domain`)
+  - `domains`: domain tag list
+  - `module_tag`: primary module tag (from overrides or `@module`)
+  - `module_tags`: module tag list
+  - `owner`: primary owner (from overrides or CODEOWNERS)
+  - `owners`: owner list
 - optional metadata per node type (ex: `method`, `path`, `prefix`)
   - frontend endpoint extras: `raw_path`, `raw_method`, `method_inferred`
   - API endpoint extras: `operation_id`, `tags`, `auth_required`, `request_schema`,
@@ -188,6 +201,37 @@ Current checks:
 ## Phase 4 Outputs
 
 Output generation is currently disabled; `build_outputs` does not write files.
+
+## Groupings Artifact (Optional)
+
+To keep the unified graph stable while enabling multiple grouping views, grouping sets
+are emitted to a parallel file: `docs/architecture/codebase-graph.groupings.json`.
+
+Shape:
+```json
+{
+  "generated_at": "...",
+  "source_commit": "...",
+  "group_sets": [
+    {
+      "id": "structure",
+      "label": "Workspace/Package/Directory",
+      "source": "extractor",
+      "multi_membership": false,
+      "metadata": {}
+    }
+  ],
+  "groups": [
+    {
+      "group_set": "structure",
+      "id": "package:skillmeat.web/dir:web/app",
+      "label": "skillmeat.web/web/app",
+      "nodes": ["page:/marketplace/sources"],
+      "metadata": {"package": "skillmeat.web", "directory": "web/app"}
+    }
+  ]
+}
+```
 
 ## Unified Graph + Overrides
 
@@ -321,6 +365,7 @@ Once both graphs are generated, the next steps are:
 2) Use them directly for analysis (routes, hooks, endpoints).
 3) Feed them into downstream outputs (docs, rules tables, visuals).
 4) Add overrides for semantics (canonical/deprecated/owner).
+5) Generate grouping sets with `build_groupings` for visualization clustering.
 
 ### Direct Usage Example (Query the JSON)
 
