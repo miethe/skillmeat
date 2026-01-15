@@ -227,6 +227,10 @@ class CollectionManager:
         self.manifest_mgr = ManifestManager()
         self.lock_mgr = LockManager()
 
+        # In-memory cache for collection objects
+        self._collection_cache: Dict[str, Collection] = {}
+        self._collection_mtime: Dict[str, float] = {}
+
     def init(self, name: str = "default") -> Collection:
         """Initialize new collection.
 
@@ -301,7 +305,7 @@ class CollectionManager:
         self.config.set_active_collection(name)
 
     def load_collection(self, name: Optional[str] = None) -> Collection:
-        """Load collection from disk.
+        """Load collection from disk (with caching).
 
         Args:
             name: Collection name (uses active if None)
@@ -318,6 +322,26 @@ class CollectionManager:
         if not collection_path.exists():
             raise ValueError(f"Collection '{name}' not found at {collection_path}")
 
+        # Check for cached version
+        try:
+            manifest_path = collection_path / self.manifest_mgr.MANIFEST_FILENAME
+            if manifest_path.exists():
+                mtime = manifest_path.stat().st_mtime
+                if (
+                    name in self._collection_cache
+                    and self._collection_mtime.get(name) == mtime
+                ):
+                    return self._collection_cache[name]
+
+                # Load from disk and cache
+                collection = self.manifest_mgr.read(collection_path)
+                self._collection_cache[name] = collection
+                self._collection_mtime[name] = mtime
+                return collection
+        except Exception:
+            # Fallback to direct read on error (e.g. permission issues)
+            pass
+
         return self.manifest_mgr.read(collection_path)
 
     def save_collection(self, collection: Collection) -> None:
@@ -329,6 +353,13 @@ class CollectionManager:
         collection_path = self.config.get_collection_path(collection.name)
         collection.updated = datetime.utcnow()
         self.manifest_mgr.write(collection_path, collection)
+
+        # Invalidate cache to ensure consistency (force reload on next access)
+        # This avoids race conditions where we might cache stale data or mtime mismatch
+        if collection.name in self._collection_cache:
+            del self._collection_cache[collection.name]
+        if collection.name in self._collection_mtime:
+            del self._collection_mtime[collection.name]
 
     def delete_collection(self, name: str, confirm: bool = True) -> None:
         """Delete collection.
@@ -355,6 +386,12 @@ class CollectionManager:
 
         # Delete collection directory
         shutil.rmtree(collection_path)
+
+        # Remove from cache
+        if name in self._collection_cache:
+            del self._collection_cache[name]
+        if name in self._collection_mtime:
+            del self._collection_mtime[name]
 
     def artifact_in_collection(
         self,
