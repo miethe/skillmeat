@@ -208,6 +208,7 @@ class HaikuEmbedder(EmbeddingProvider):
         """
         import json
         import sqlite3
+        import struct
 
         text_hash = self._hash_text(text)
         cutoff_time = (datetime.utcnow() - self.cache_ttl).isoformat()
@@ -237,8 +238,17 @@ class HaikuEmbedder(EmbeddingProvider):
                 conn.commit()
 
                 # Deserialize embedding
-                embedding_json = row[0]
-                return json.loads(embedding_json)
+                data = row[0]
+                if isinstance(data, (bytes, bytearray, memoryview)):
+                    # Optimized binary format (little-endian float32)
+                    data_bytes = bytes(data)
+                    if len(data_bytes) % 4 != 0:
+                        return None
+                    count = len(data_bytes) // 4  # float is 4 bytes
+                    return list(struct.unpack(f"<{count}f", data_bytes))
+                else:
+                    # Legacy JSON string format
+                    return json.loads(data)
 
             return None
         finally:
@@ -251,11 +261,12 @@ class HaikuEmbedder(EmbeddingProvider):
             text: Original text
             embedding: Embedding vector to cache
         """
-        import json
         import sqlite3
+        import struct
 
         text_hash = self._hash_text(text)
-        embedding_json = json.dumps(embedding)
+        # Store as binary blob (more efficient)
+        embedding_blob = struct.pack(f"<{len(embedding)}f", *embedding)
         now = datetime.utcnow().isoformat()
 
         conn = sqlite3.connect(str(self.cache_db))
@@ -268,7 +279,7 @@ class HaikuEmbedder(EmbeddingProvider):
                 (text_hash, text, embedding, model, created_at, accessed_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """,
-                (text_hash, text, embedding_json, self.model, now, now),
+                (text_hash, text, embedding_blob, self.model, now, now),
             )
             conn.commit()
         finally:
