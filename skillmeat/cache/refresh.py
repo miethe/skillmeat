@@ -57,6 +57,7 @@ Performance:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -65,7 +66,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -1064,8 +1065,8 @@ class RefreshJob:
         # Initialize GitHub client
         github_client = GitHubClient()
 
-        # Fetch versions for each artifact
-        for artifact in github_artifacts:
+        async def fetch_single_artifact(artifact: Artifact) -> Optional[Tuple[str, str]]:
+            """Helper to fetch version for a single artifact."""
             try:
                 # Parse source to get spec
                 # Format: github:username/repo/path[@version]
@@ -1075,23 +1076,35 @@ class RefreshJob:
                 spec = ArtifactSpec.parse(source)
 
                 # Resolve version to get latest SHA/version
-                resolved_sha, resolved_version = github_client.resolve_version(spec)
+                # Run blocking call in thread pool to avoid blocking event loop
+                resolved_sha, resolved_version = await asyncio.to_thread(
+                    github_client.resolve_version, spec
+                )
 
                 # Use resolved_version if available, otherwise use SHA
                 upstream_version = resolved_version or resolved_sha[:7]
 
-                version_map[artifact.id] = upstream_version
-
                 logger.debug(
                     f"Fetched upstream version for {artifact.name}: {upstream_version}"
                 )
+                return artifact.id, upstream_version
 
             except Exception as e:
                 logger.error(
                     f"Failed to fetch upstream version for {artifact.name} ({artifact.id}): {e}",
                     exc_info=True,
                 )
-                # Continue with other artifacts even if one fails
+                return None
+
+        # Fetch versions for each artifact concurrently
+        tasks = [fetch_single_artifact(artifact) for artifact in github_artifacts]
+        results = await asyncio.gather(*tasks)
+
+        # process results
+        for result in results:
+            if result:
+                artifact_id, upstream_version = result
+                version_map[artifact_id] = upstream_version
 
         logger.info(
             f"Fetched upstream versions for {len(version_map)}/{len(github_artifacts)} GitHub artifacts"
