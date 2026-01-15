@@ -14,6 +14,7 @@ import {
   updateContextEntity,
   deleteContextEntity,
   fetchContextEntityContent,
+  deployContextEntity,
 } from '@/lib/api/context-entities';
 import type {
   ContextEntity,
@@ -219,6 +220,34 @@ export function useDeleteContextEntity() {
     onSuccess: () => {
       // Invalidate context entities list to remove deleted item
       queryClient.invalidateQueries({ queryKey: contextEntityKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Deploy context entity mutation
+ *
+ * @returns Mutation function for deploying context entities
+ *
+ * @example
+ * ```tsx
+ * const deployEntity = useDeployContextEntity();
+ *
+ * await deployEntity.mutateAsync({ id: 'entity-id', projectPath: '/path/to/project' });
+ * ```
+ */
+export function useDeployContextEntity() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, projectPath }: { id: string; projectPath: string }): Promise<void> => {
+      return deployContextEntity(id, projectPath);
+    },
+    onSuccess: () => {
+      // Invalidate context entities lists to reflect changes if any (e.g. usage stats)
+      queryClient.invalidateQueries({ queryKey: contextEntityKeys.lists() });
+      // Also invalidate deployments list if we have one
+      queryClient.invalidateQueries({ queryKey: ['deployments'] });
     },
   });
 }

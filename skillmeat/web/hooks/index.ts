@@ -287,6 +287,7 @@ export {
   useCreateContextEntity,
   useUpdateContextEntity,
   useDeleteContextEntity,
+  useDeployContextEntity,
 } from './use-context-entities';
 
 // ============================================================================
