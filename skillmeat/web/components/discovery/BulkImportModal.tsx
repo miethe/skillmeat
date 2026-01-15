@@ -35,6 +35,7 @@ import {
 import { useToastNotification } from '@/hooks';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
+import { ParameterEditorModal } from './ParameterEditorModal';
 import { cn } from '@/lib/utils';
 import type {
   BulkImportResult,
@@ -44,6 +45,8 @@ import type {
 } from '@/types/discovery';
 import { getReasonCodeMessage as getReasonMessage } from '@/types/discovery';
 import type { ArtifactImportResult } from '@/types/notification';
+import type { ArtifactType, ArtifactScope } from '@/types/artifact';
+import type { ArtifactParameters } from './ParameterEditorModal';
 
 /**
  * Discovered artifact from local filesystem with import status
@@ -53,8 +56,9 @@ export interface DiscoveredArtifact {
   name: string;
   source?: string;
   version?: string;
-  scope?: string;
+  scope?: string | ArtifactScope;
   tags?: string[];
+  aliases?: string[];
   description?: string;
   path: string;
   discovered_at: string;
@@ -430,6 +434,11 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<BulkImportResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+
+  // Parameter editor state
+  const [editingArtifact, setEditingArtifact] = useState<DiscoveredArtifact | null>(null);
+  const [artifactOverrides, setArtifactOverrides] = useState<Map<string, ArtifactParameters>>(new Map());
+
   const tracking = useTrackDiscovery();
   const { showImportResult, showError } = useToastNotification();
 
@@ -447,6 +456,8 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
       setShowDetails(false);
       setSelected(new Set());
       setSkippedArtifacts(new Set());
+      setEditingArtifact(null);
+      setArtifactOverrides(new Map());
     }
   }, [open]);
 
@@ -490,7 +501,17 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
     setIsImporting(true);
     const startTime = Date.now();
     try {
-      const selectedArtifacts = artifacts.filter((a) => selected.has(a.path));
+      // Get selected artifacts and apply overrides
+      const selectedArtifacts = artifacts
+        .filter((a) => selected.has(a.path))
+        .map((artifact) => {
+          const override = artifactOverrides.get(artifact.path);
+          if (override) {
+            return { ...artifact, ...override };
+          }
+          return artifact;
+        });
+
       const skipList = Array.from(skippedArtifacts);
       const result = await onImport(selectedArtifacts, skipList, applyPathTags);
 
@@ -547,13 +568,28 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
       setSkippedArtifacts(new Set());
       setImportResults(null);
       setShowDetails(false);
+      setEditingArtifact(null);
+      setArtifactOverrides(new Map());
       onClose();
     }
   };
 
   const handleEdit = (artifact: DiscoveredArtifact) => {
-    // TODO: Implement parameter editor
-    console.log('Edit artifact:', artifact);
+    // Get existing overrides if any
+    const override = artifactOverrides.get(artifact.path);
+    const effectiveArtifact = override ? { ...artifact, ...override } : artifact;
+    setEditingArtifact(effectiveArtifact);
+  };
+
+  const handleParameterSave = async (parameters: ArtifactParameters) => {
+    if (editingArtifact) {
+      setArtifactOverrides((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(editingArtifact.path, parameters);
+        return newMap;
+      });
+      setEditingArtifact(null);
+    }
   };
 
   // Determine which view to show
@@ -650,6 +686,11 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                         const isSkipped = artifact.status === 'skipped';
                         const isMarkedToSkip = skippedArtifacts.has(artifactKey);
 
+                        // Apply overrides for display
+                        const override = artifactOverrides.get(artifact.path);
+                        const effectiveArtifact = override ? { ...artifact, ...override } : artifact;
+                        const isModified = !!override;
+
                         return (
                           <TableRow
                             key={artifact.path}
@@ -667,18 +708,25 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                             <TableCell>
                               <Badge variant="secondary">{artifact.type}</Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{artifact.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {artifact.name}
+                              {isModified && (
+                                <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1 text-primary border-primary/20">
+                                  Edited
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>
-                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                                {artifact.version || '---'}
+                              <code className={cn("text-xs bg-muted px-1.5 py-0.5 rounded", isModified && override?.version && override.version !== artifact.version && "bg-primary/10 text-primary")}>
+                                {effectiveArtifact.version || '---'}
                               </code>
                             </TableCell>
                             <TableCell>
                               <span
-                                className="font-mono text-xs truncate block max-w-[200px]"
-                                title={artifact.source}
+                                className={cn("font-mono text-xs truncate block max-w-[200px]", isModified && override?.source && override.source !== artifact.source && "text-primary")}
+                                title={effectiveArtifact.source}
                               >
-                                {artifact.source || '---'}
+                                {effectiveArtifact.source || '---'}
                               </span>
                             </TableCell>
                             <TableCell onClick={(e) => e.stopPropagation()}>
@@ -712,6 +760,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                                 onClick={() => handleEdit(artifact)}
                                 disabled={isImporting}
                                 aria-label={`Edit ${artifact.name}`}
+                                className={cn(isModified && "text-primary")}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -766,6 +815,24 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
           </>
         )}
       </DialogContent>
+
+      {/* Parameter Editor */}
+      {editingArtifact && (
+        <ParameterEditorModal
+          artifact={{
+            name: editingArtifact.name,
+            type: editingArtifact.type as ArtifactType,
+            source: editingArtifact.source,
+            version: editingArtifact.version,
+            scope: (editingArtifact.scope as ArtifactScope) || 'user',
+            tags: editingArtifact.tags,
+            aliases: editingArtifact.aliases,
+          }}
+          open={!!editingArtifact}
+          onClose={() => setEditingArtifact(null)}
+          onSave={handleParameterSave}
+        />
+      )}
     </Dialog>
   );
 }
