@@ -33,8 +33,13 @@ from typing import List, Literal, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from skillmeat.api.dependencies import CollectionManagerDep
+from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
 from skillmeat.api.schemas.common import PageInfo
+from skillmeat.api.schemas.discovery import (
+    BulkSyncItemResult,
+    BulkSyncRequest,
+    BulkSyncResponse,
+)
 from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
@@ -70,8 +75,10 @@ from skillmeat.cache.repositories import (
     MarketplaceCatalogRepository,
     MarketplaceSourceRepository,
     MarketplaceTransactionHandler,
+    MergeResult,
     NotFoundError,
 )
+from skillmeat.core.artifact import ArtifactType
 from skillmeat.core.marketplace.github_scanner import (
     GitHubScanner,
     RateLimitError,
@@ -510,16 +517,21 @@ async def _perform_scan(
                 )
                 new_entries.append(entry)
 
-            # Replace with new entries (full replacement for now)
-            # TODO: Implement incremental diff updates in future
-            ctx.replace_catalog_entries(new_entries)
+            # Merge new entries with existing (preserves import metadata)
+            merge_result = ctx.merge_catalog_entries(new_entries)
 
         # Set source_id in result
         scan_result.source_id = source_id
 
+        # Add merge result info to scan result
+        scan_result.updated_imports = merge_result.updated_imports
+        scan_result.preserved_count = merge_result.preserved_count
+
         logger.info(
             f"Scan completed for {source.repo_url}: "
-            f"{scan_result.artifacts_found} artifacts found"
+            f"{scan_result.artifacts_found} artifacts found, "
+            f"{merge_result.preserved_count} preserved, "
+            f"{len(merge_result.updated_imports)} imports with upstream changes"
         )
         return scan_result
 
@@ -1244,6 +1256,301 @@ async def rescan_source(source_id: str, request: ScanRequest = None) -> ScanResu
 
 
 # =============================================================================
+# API-002a: Bulk Sync Imported Artifacts
+# =============================================================================
+
+
+@router.post(
+    "/{source_id}/sync-imported",
+    response_model=BulkSyncResponse,
+    summary="Sync imported artifacts from source",
+    operation_id="sync_imported_artifacts",
+    description="""
+    Sync one or more imported artifacts from this source with their upstream versions.
+
+    This endpoint is used after a rescan detects that imported artifacts have upstream
+    changes (SHA mismatch). It fetches the latest version from GitHub and updates the
+    artifacts in the collection.
+
+    **Prerequisites**:
+    - Artifacts must have status="imported" in the catalog
+    - Artifacts must have a valid import_id linking to the collection artifact
+
+    **Sync behavior**:
+    - Fetches the latest version from the upstream GitHub source
+    - Applies changes using "overwrite" strategy (upstream wins)
+    - Reports conflicts if merge is not possible
+
+    **Example**:
+    ```bash
+    curl -X POST "http://localhost:8080/api/v1/marketplace/sources/src-abc123/sync-imported" \\
+        -H "Content-Type: application/json" \\
+        -d '{"artifact_ids": ["cat_canvas_design", "cat_my_skill"]}'
+    ```
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+)
+async def sync_imported_artifacts(
+    source_id: str,
+    request: BulkSyncRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+) -> BulkSyncResponse:
+    """Sync imported artifacts from a marketplace source with upstream.
+
+    Args:
+        source_id: Unique source identifier
+        request: Sync request with artifact entry IDs
+
+    Returns:
+        Bulk sync response with per-artifact results
+
+    Raises:
+        HTTPException 400: If artifact_ids is empty or invalid
+        HTTPException 404: If source not found or entry IDs invalid
+        HTTPException 500: If sync operation fails
+    """
+    if not request.artifact_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="artifact_ids cannot be empty",
+        )
+
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Track results
+        results: List[BulkSyncItemResult] = []
+        synced_count = 0
+        skipped_count = 0
+        failed_count = 0
+
+        # Get collection name for sync operations
+        collection_name = collection_mgr.get_active_collection_name()
+
+        # Process each artifact
+        for entry_id in request.artifact_ids:
+            entry = catalog_repo.get_by_id(entry_id)
+
+            # Verify entry exists
+            if not entry:
+                logger.warning(f"Catalog entry not found: {entry_id}")
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name="unknown",
+                        success=False,
+                        message=f"Catalog entry '{entry_id}' not found",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Verify entry belongs to this source
+            if entry.source_id != source_id:
+                logger.warning(
+                    f"Entry {entry_id} does not belong to source {source_id}"
+                )
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name=entry.name,
+                        success=False,
+                        message=f"Entry does not belong to source '{source_id}'",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Verify entry is imported
+            if entry.status != "imported":
+                logger.info(
+                    f"Entry {entry_id} is not imported (status={entry.status}), skipping"
+                )
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name=entry.name,
+                        success=True,
+                        message=f"Skipped: entry status is '{entry.status}', not 'imported'",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                skipped_count += 1
+                continue
+
+            # Verify entry has import_id linking to collection artifact
+            if not entry.import_id:
+                logger.warning(f"Entry {entry_id} has no import_id")
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name=entry.name,
+                        success=False,
+                        message="Entry has no import_id linking to collection artifact",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Parse artifact type
+            try:
+                artifact_type = ArtifactType(entry.artifact_type)
+            except ValueError:
+                logger.error(f"Invalid artifact type for entry {entry_id}: {entry.artifact_type}")
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name=entry.name,
+                        success=False,
+                        message=f"Invalid artifact type: {entry.artifact_type}",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Perform sync using ArtifactManager
+            try:
+                # Fetch update from upstream
+                fetch_result = artifact_mgr.fetch_update(
+                    artifact_name=entry.name,
+                    artifact_type=artifact_type,
+                    collection_name=collection_name,
+                )
+
+                # Check if fetch was successful
+                if fetch_result.error:
+                    results.append(
+                        BulkSyncItemResult(
+                            entry_id=entry_id,
+                            artifact_name=entry.name,
+                            success=False,
+                            message=f"Failed to fetch update: {fetch_result.error}",
+                            has_conflicts=False,
+                            conflicts=None,
+                        )
+                    )
+                    failed_count += 1
+                    continue
+
+                # If no update available
+                if not fetch_result.has_update:
+                    results.append(
+                        BulkSyncItemResult(
+                            entry_id=entry_id,
+                            artifact_name=entry.name,
+                            success=True,
+                            message="Already up to date with upstream",
+                            has_conflicts=False,
+                            conflicts=None,
+                        )
+                    )
+                    synced_count += 1
+                    continue
+
+                # Apply update using "overwrite" strategy (upstream wins)
+                update_result = artifact_mgr.apply_update_strategy(
+                    fetch_result=fetch_result,
+                    strategy="overwrite",
+                    interactive=False,
+                    auto_resolve="theirs",
+                    collection_name=collection_name,
+                )
+
+                # Check result
+                if update_result.updated:
+                    logger.info(
+                        f"Successfully synced artifact '{entry.name}' from source {source_id}"
+                    )
+                    results.append(
+                        BulkSyncItemResult(
+                            entry_id=entry_id,
+                            artifact_name=entry.name,
+                            success=True,
+                            message="Successfully synced with upstream",
+                            has_conflicts=False,
+                            conflicts=None,
+                        )
+                    )
+                    synced_count += 1
+                else:
+                    # Update may have conflicts
+                    conflict_files = (
+                        update_result.conflicted_files
+                        if hasattr(update_result, "conflicted_files")
+                        else None
+                    )
+                    results.append(
+                        BulkSyncItemResult(
+                            entry_id=entry_id,
+                            artifact_name=entry.name,
+                            success=False,
+                            message="Sync failed: conflicts detected or update rejected",
+                            has_conflicts=bool(conflict_files),
+                            conflicts=conflict_files,
+                        )
+                    )
+                    failed_count += 1
+
+            except Exception as sync_error:
+                logger.error(
+                    f"Failed to sync artifact '{entry.name}': {sync_error}",
+                    exc_info=True,
+                )
+                results.append(
+                    BulkSyncItemResult(
+                        entry_id=entry_id,
+                        artifact_name=entry.name,
+                        success=False,
+                        message=f"Sync error: {str(sync_error)}",
+                        has_conflicts=False,
+                        conflicts=None,
+                    )
+                )
+                failed_count += 1
+
+        return BulkSyncResponse(
+            total=len(request.artifact_ids),
+            synced=synced_count,
+            skipped=skipped_count,
+            failed=failed_count,
+            results=results,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to sync imported artifacts from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync imported artifacts: {str(e)}",
+        ) from e
+
+
+# =============================================================================
 # API-003: Artifacts Listing
 # =============================================================================
 
@@ -1730,6 +2037,7 @@ async def import_artifacts(
             entries=entries_data,
             source_id=source_id,
             strategy=strategy,
+            source_ref=source.ref,
         )
 
         # Update catalog entry statuses atomically

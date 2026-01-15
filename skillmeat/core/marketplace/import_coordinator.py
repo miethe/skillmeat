@@ -149,6 +149,7 @@ class ImportCoordinator:
         entries: List[Dict],
         source_id: str,
         strategy: ConflictStrategy = ConflictStrategy.SKIP,
+        source_ref: Optional[str] = None,
     ) -> ImportResult:
         """Import catalog entries to local collection.
 
@@ -157,10 +158,13 @@ class ImportCoordinator:
                 Each should have: id, artifact_type, name, upstream_url, path
             source_id: ID of the marketplace source
             strategy: Conflict resolution strategy
+            source_ref: Optional branch/ref override from source config.
+                If provided, overrides the ref parsed from upstream_url.
 
         Returns:
             ImportResult with status for each entry
         """
+        self.source_ref = source_ref
         import_id = str(uuid.uuid4())
         # Use timezone-aware UTC datetime
         now = (
@@ -225,8 +229,8 @@ class ImportCoordinator:
 
             if strategy == ConflictStrategy.SKIP:
                 entry.status = ImportStatus.SKIPPED
-                logger.debug(
-                    f"Skipping {entry.name}: conflict with {entry.conflict_with}"
+                logger.info(
+                    f"Skipping {entry.name}: already exists at {entry.conflict_with}"
                 )
                 return
 
@@ -449,6 +453,10 @@ class ImportCoordinator:
             )
 
         owner, repo, ref, path = url_parts
+
+        # Use source ref if provided (overrides ref parsed from URL)
+        ref = self.source_ref or ref
+        logger.debug(f"Using ref={ref} for download (source_ref={self.source_ref})")
 
         # Get GitHub token for API requests
         github_token = os.environ.get("SKILLMEAT_GITHUB_TOKEN") or os.environ.get(
