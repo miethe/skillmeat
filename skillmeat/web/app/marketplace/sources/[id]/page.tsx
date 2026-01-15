@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
@@ -338,6 +338,13 @@ export default function SourceDetailPage() {
   const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(() =>
     searchParams.get('showOnlyDuplicates') === 'true'
   );
+
+  // Ref to prevent duplicate fetch requests during state transitions
+  // Tracks the target endIndex we're fetching for; reset when data arrives
+  const fetchTargetRef = useRef<number | null>(null);
+  // Track previous length to detect when new data arrives
+  const prevEntriesLengthRef = useRef<number>(0);
+
   // Helper function to convert between SortOption and filters
   const parseSortOption = (option: SortOption): { sort_by: 'confidence' | 'name' | 'date'; sort_order: 'asc' | 'desc' } => {
     switch (option) {
@@ -452,10 +459,16 @@ export default function SourceDetailPage() {
     updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage);
   }, [updateURLParams, confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage]);
 
-  // Reset to page 1 when filters change (but not when page/limit change)
+  // Reset to page 1 and clear fetch target when filters change (but not when page/limit change)
   useEffect(() => {
     setCurrentPage(1);
+    fetchTargetRef.current = null; // Clear stale fetch target on filter change
   }, [confidenceFilters, filters, sortOption, showOnlyDuplicates, searchQuery]);
+
+  // Clear fetch target when itemsPerPage changes (triggers query key change)
+  useEffect(() => {
+    fetchTargetRef.current = null;
+  }, [itemsPerPage]);
 
   // Data fetching
   const { data: source, isLoading: sourceLoading, error: sourceError } = useSource(sourceId);
@@ -545,6 +558,9 @@ export default function SourceDetailPage() {
     return filteredEntries.slice(startIndex, endIndex);
   }, [filteredEntries, startIndex, endIndex]);
 
+  // Determine if we need more data for the current page view
+  const needsMoreDataForPage = filteredEntries.length < endIndex && filteredEntries.length < (totalCount ?? Infinity);
+
   // Ensure current page is valid when data changes
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
@@ -552,8 +568,19 @@ export default function SourceDetailPage() {
     }
   }, [totalPages, currentPage]);
 
+  // Reset fetch target ref when new data arrives (fetch completed)
+  // This allows sequential page loading when jumping multiple pages
+  useEffect(() => {
+    const loadedCount = allEntries.length;
+    // Reset ref when new data arrives (length increased) to allow next fetch
+    if (loadedCount > prevEntriesLengthRef.current && fetchTargetRef.current !== null) {
+      fetchTargetRef.current = null;
+    }
+    prevEntriesLengthRef.current = loadedCount;
+  }, [allEntries.length]);
+
   // Fetch more pages if needed for pagination
-  // This effect re-runs whenever the data or pagination state changes
+  // Uses ref-based guard to prevent duplicate fetch requests during state transitions
   useEffect(() => {
     const loadedCount = allEntries.length;
     const neededCount = endIndex;
@@ -564,14 +591,20 @@ export default function SourceDetailPage() {
     // 2. Haven't loaded all items that exist (server total)
     // 3. There are more pages available from API
     // 4. Not currently fetching (either initial or next page)
+    // 5. Haven't already initiated a fetch for this target (ref-based guard)
     const needsMoreData = neededCount > loadedCount;
     const notFullyLoaded = loadedCount < serverTotal;
     const canFetchMore = hasNextPage && !isFetchingNextPage && !catalogFetching;
+    const notAlreadyFetching = fetchTargetRef.current === null || fetchTargetRef.current < neededCount;
 
-    if (needsMoreData && notFullyLoaded && canFetchMore) {
+    if (needsMoreData && notFullyLoaded && canFetchMore && notAlreadyFetching) {
+      // Set the target we're fetching for to prevent duplicate requests
+      fetchTargetRef.current = neededCount;
       fetchNextPage();
     }
-  }, [endIndex, allEntries.length, effectiveTotalCount, hasNextPage, isFetchingNextPage, catalogFetching, fetchNextPage]);
+    // Note: fetchNextPage is intentionally omitted - it's stable from React Query
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endIndex, allEntries.length, effectiveTotalCount, hasNextPage, isFetchingNextPage, catalogFetching]);
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -1167,7 +1200,16 @@ export default function SourceDetailPage() {
       ) : (
         <>
           <div className="max-h-[600px] overflow-y-auto">
-            {viewMode === 'grid' ? (
+            {/* Show loading state when we need data for the current page but don't have it yet */}
+            {paginatedEntries.length === 0 && needsMoreDataForPage ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Loader2 className="mb-4 h-12 w-12 animate-spin text-muted-foreground" />
+                <h3 className="mb-2 text-lg font-semibold">Loading page {currentPage}...</h3>
+                <p className="text-sm text-muted-foreground">
+                  Fetching artifacts {startIndex + 1} to {endIndex}
+                </p>
+              </div>
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {paginatedEntries.map((entry) => (
                   <CatalogCard
