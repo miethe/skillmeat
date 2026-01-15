@@ -105,20 +105,33 @@ def get_existing_collection_hashes(session) -> Set[str]:
     # This avoids fetching full objects and parsing JSON in Python
     # which gives ~10x performance improvement for large catalogs
     try:
-        results = (
-            session.query(func.json_extract(MarketplaceCatalogEntry.metadata_json, '$.content_hash'))
-            .filter(MarketplaceCatalogEntry.excluded_at.is_(None))
-            .filter(MarketplaceCatalogEntry.metadata_json.isnot(None))
-            .all()
-        )
+        bind = session.get_bind()
+        dialect_name = bind.dialect.name if bind is not None else None
 
-        for (content_hash,) in results:
-            if content_hash:
-                hashes.add(content_hash)
+        if dialect_name == "sqlite":
+            results = (
+                session.query(
+                    func.json_extract(
+                        MarketplaceCatalogEntry.metadata_json, "$.content_hash"
+                    )
+                )
+                .filter(MarketplaceCatalogEntry.excluded_at.is_(None))
+                .filter(MarketplaceCatalogEntry.metadata_json.isnot(None))
+                .all()
+            )
+
+            for (content_hash,) in results:
+                if content_hash:
+                    hashes.add(content_hash)
+        else:
+            raise RuntimeError(
+                f"json_extract optimization not supported for dialect '{dialect_name}'"
+            )
 
     except Exception as e:
         # Fallback for databases that don't support json_extract or other errors
         logger.warning(f"Optimized hash query failed, falling back to slow method: {e}")
+        session.rollback()
 
         entries = (
             session.query(MarketplaceCatalogEntry)
