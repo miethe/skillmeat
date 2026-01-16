@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
-import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast } from '@/hooks';
+import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast, useCollections } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 // Mock hooks
@@ -11,12 +11,14 @@ jest.mock('@/hooks', () => ({
   useAddArtifactToGroup: jest.fn(),
   useCreateGroup: jest.fn(),
   useToast: jest.fn(),
+  useCollections: jest.fn(),
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
 const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<typeof useAddArtifactToGroup>;
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
+const mockUseCollections = useCollections as jest.MockedFunction<typeof useCollections>;
 
 describe('AddToGroupDialog', () => {
   const mockToast = jest.fn();
@@ -82,8 +84,14 @@ describe('AddToGroupDialog', () => {
       position: 1,
       artifact_count: 5,
       created_at: '2024-01-02T00:00:00Z',
-      updated_at: '2024-01-02T00:00:00Z',
+      updated_at: '2024-02-02T00:00:00Z',
     },
+  ];
+
+  const mockAllCollections = [
+    { id: 'c1', name: 'Collection A', artifact_count: 5 },
+    { id: 'c2', name: 'Collection B', artifact_count: 3 },
+    { id: 'c3', name: 'Collection C', artifact_count: 1 },
   ];
 
   const createQueryClient = () =>
@@ -129,6 +137,12 @@ describe('AddToGroupDialog', () => {
       mutateAsync: jest.fn().mockResolvedValue({ id: 'new-group', name: 'New Group' }),
       isPending: false,
     } as any);
+
+    mockUseCollections.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    } as any);
   });
 
   describe('Collection Picker Step', () => {
@@ -154,15 +168,53 @@ describe('AddToGroupDialog', () => {
       expect(screen.getByText('3 artifacts')).toBeInTheDocument();
     });
 
-    it('shows empty state when artifact has no collection info', () => {
-      // When artifact has no collections array and no collection object,
-      // the dialog should show an empty state message instead of trying to use a fake collection
+    it('fetches all collections when artifact has no collection info', () => {
+      // Mock useCollections to return all available collections
+      mockUseCollections.mockReturnValue({
+        data: { items: mockAllCollections, total: mockAllCollections.length },
+        isLoading: false,
+        error: null,
+      } as any);
+
       renderDialog({ artifact: mockArtifactNoCollections });
 
-      // Should stay on collection picker step and show empty state
+      // Should stay on collection picker step and show all collections
       expect(screen.getByText('Select a collection')).toBeInTheDocument();
-      expect(screen.getByText('This artifact is not in any collections yet.')).toBeInTheDocument();
-      expect(screen.getByText('Add it to a collection first, then you can organize it into groups.')).toBeInTheDocument();
+      expect(screen.getByText('Collection A')).toBeInTheDocument();
+      expect(screen.getByText('Collection B')).toBeInTheDocument();
+      expect(screen.getByText('Collection C')).toBeInTheDocument();
+    });
+
+    it('shows loading state when fetching all collections', () => {
+      // Mock useCollections to be in loading state
+      mockUseCollections.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as any);
+
+      renderDialog({ artifact: mockArtifactNoCollections });
+
+      // Should show loading skeletons
+      expect(screen.getByText('Select a collection')).toBeInTheDocument();
+      const container = document.querySelector('[class*="animate-pulse"]');
+      expect(container).toBeInTheDocument();
+    });
+
+    it('shows empty state when no collections exist anywhere', () => {
+      // Mock useCollections to return empty collections
+      mockUseCollections.mockReturnValue({
+        data: { items: [], total: 0 },
+        isLoading: false,
+        error: null,
+      } as any);
+
+      renderDialog({ artifact: mockArtifactNoCollections });
+
+      // Should show empty state
+      expect(screen.getByText('Select a collection')).toBeInTheDocument();
+      expect(screen.getByText('No collections available.')).toBeInTheDocument();
+      expect(screen.getByText('Create a collection first to organize artifacts into groups.')).toBeInTheDocument();
     });
 
     it('shows Next button disabled until collection selected', async () => {
@@ -176,6 +228,47 @@ describe('AddToGroupDialog', () => {
       await user.click(screen.getByText('Collection A'));
 
       expect(nextButton).toBeEnabled();
+    });
+
+    it('shows Next button disabled while loading all collections', () => {
+      // Mock useCollections to be in loading state
+      mockUseCollections.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as any);
+
+      renderDialog({ artifact: mockArtifactNoCollections });
+
+      const nextButton = screen.getByRole('button', { name: 'Loading...' });
+      expect(nextButton).toBeDisabled();
+    });
+
+    it('can select from all collections when artifact has no collections', async () => {
+      const user = userEvent.setup();
+
+      // Mock useCollections to return all available collections
+      mockUseCollections.mockReturnValue({
+        data: { items: mockAllCollections, total: mockAllCollections.length },
+        isLoading: false,
+        error: null,
+      } as any);
+
+      renderDialog({ artifact: mockArtifactNoCollections });
+
+      // Should be able to select any collection
+      await user.click(screen.getByText('Collection C'));
+
+      const nextButton = screen.getByRole('button', { name: 'Next' });
+      expect(nextButton).toBeEnabled();
+
+      // Click Next to advance to groups
+      await user.click(nextButton);
+
+      // Should now be on groups step
+      await waitFor(() => {
+        expect(screen.getByText('Development')).toBeInTheDocument();
+      });
     });
 
     it('advances to groups step after selecting collection and clicking Next', async () => {
