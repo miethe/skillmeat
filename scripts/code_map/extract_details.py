@@ -239,12 +239,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Extract detailed node/edge metadata.")
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.details.json",
+        default="docs/architecture/codebase-graph/codebase-graph.details.json",
         help="Output details JSON path",
     )
     args = parser.parse_args()

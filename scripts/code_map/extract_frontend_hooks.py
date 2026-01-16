@@ -256,7 +256,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.frontend.hooks.json",
+        default="docs/architecture/codebase-graph/codebase-graph.frontend.hooks.json",
         help="Output JSON path",
     )
     args = parser.parse_args()

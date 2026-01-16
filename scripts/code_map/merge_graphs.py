@@ -60,17 +60,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Merge frontend and backend graphs.")
     parser.add_argument(
         "--frontend",
-        default="docs/architecture/codebase-graph.frontend.json",
+        default="docs/architecture/codebase-graph/codebase-graph.frontend.json",
         help="Path to frontend graph JSON",
     )
     parser.add_argument(
         "--backend",
-        default="docs/architecture/codebase-graph.backend.json",
+        default="docs/architecture/codebase-graph/codebase-graph.backend.json",
         help="Path to backend graph JSON",
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Output unified graph JSON path",
     )
     args = parser.parse_args()

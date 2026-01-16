@@ -355,12 +355,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build grouping sets for the codebase graph.")
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.groupings.json",
+        default="docs/architecture/codebase-graph/codebase-graph.groupings.json",
         help="Output groupings JSON path",
     )
     args = parser.parse_args()

@@ -48,7 +48,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.dependencies.json",
+        default="docs/architecture/codebase-graph/codebase-graph.dependencies.json",
         help="Output JSON path",
     )
     parser.add_argument(

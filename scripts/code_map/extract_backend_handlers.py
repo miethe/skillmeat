@@ -510,7 +510,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.backend.handlers.json",
+        default="docs/architecture/codebase-graph/codebase-graph.backend.handlers.json",
         help="Output JSON path",
     )
     args = parser.parse_args()

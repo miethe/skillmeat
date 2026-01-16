@@ -9970,6 +9970,60 @@
         }
       }
     },
+    "/api/v1/marketplace/sources/{source_id}/sync-imported": {
+      "post": {
+        "tags": [
+          "marketplace-sources",
+          "marketplace-sources"
+        ],
+        "summary": "Sync imported artifacts from source",
+        "description": "Sync one or more imported artifacts from this source with their upstream versions.\n\n    This endpoint is used after a rescan detects that imported artifacts have upstream\n    changes (SHA mismatch). It fetches the latest version from GitHub and updates the\n    artifacts in the collection.\n\n    **Prerequisites**:\n    - Artifacts must have status=\"imported\" in the catalog\n    - Artifacts must have a valid import_id linking to the collection artifact\n\n    **Sync behavior**:\n    - Fetches the latest version from the upstream GitHub source\n    - Applies changes using \"overwrite\" strategy (upstream wins)\n    - Reports conflicts if merge is not possible\n\n    **Example**:\n    ```bash\n    curl -X POST \"http://localhost:8080/api/v1/marketplace/sources/src-abc123/sync-imported\" \\\n        -H \"Content-Type: application/json\" \\\n        -d '{\"artifact_ids\": [\"cat_canvas_design\", \"cat_my_skill\"]}'\n    ```\n\n    Authentication: TODO - Add authentication when multi-user support is implemented.",
+        "operationId": "sync_imported_artifacts",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkSyncResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/marketplace/sources/{source_id}/artifacts": {
       "get": {
         "tags": [
@@ -16226,6 +16280,198 @@
           "total_tags_applied": 15
         }
       },
+      "BulkSyncItemResult": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id",
+            "description": "Catalog entry ID that was synced",
+            "examples": [
+              "cat_canvas_design"
+            ]
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Name of the artifact",
+            "examples": [
+              "canvas-design"
+            ]
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the sync succeeded",
+            "examples": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable result message",
+            "examples": [
+              "Successfully synced artifact 'canvas-design' with upstream"
+            ]
+          },
+          "has_conflicts": {
+            "type": "boolean",
+            "title": "Has Conflicts",
+            "description": "Whether there were merge conflicts during sync",
+            "default": false,
+            "examples": [
+              false
+            ]
+          },
+          "conflicts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflicts",
+            "description": "File paths with merge conflicts (if any)",
+            "examples": [
+              [
+                "SKILL.md",
+                "scripts/main.py"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "artifact_name",
+          "success",
+          "message"
+        ],
+        "title": "BulkSyncItemResult",
+        "description": "Result for a single artifact sync operation.\n\nProvides detailed status for each artifact in a bulk sync request,\nincluding success/failure status, conflicts, and error messages.",
+        "example": {
+          "artifact_name": "canvas-design",
+          "entry_id": "cat_canvas_design",
+          "has_conflicts": false,
+          "message": "Successfully synced artifact 'canvas-design' with upstream",
+          "success": true
+        }
+      },
+      "BulkSyncRequest": {
+        "properties": {
+          "artifact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Artifact Ids",
+            "description": "Catalog entry IDs to sync with upstream",
+            "examples": [
+              [
+                "cat_canvas_design",
+                "cat_my_skill"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_ids"
+        ],
+        "title": "BulkSyncRequest",
+        "description": "Request to sync multiple imported artifacts from a marketplace source.\n\nUsed to update imported artifacts with their upstream versions when\nchanges are detected during a rescan.",
+        "example": {
+          "artifact_ids": [
+            "cat_canvas_design",
+            "cat_my_skill"
+          ]
+        }
+      },
+      "BulkSyncResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "description": "Total number of artifacts requested for sync",
+            "examples": [
+              5
+            ]
+          },
+          "synced": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Synced",
+            "description": "Number of artifacts successfully synced",
+            "examples": [
+              4
+            ]
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skipped",
+            "description": "Number of artifacts skipped (not imported or no changes)",
+            "examples": [
+              0
+            ]
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failed",
+            "description": "Number of artifacts that failed to sync",
+            "examples": [
+              1
+            ]
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkSyncItemResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Per-artifact sync results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "synced",
+          "skipped",
+          "failed"
+        ],
+        "title": "BulkSyncResponse",
+        "description": "Response from bulk sync operation.\n\nProvides summary statistics and per-artifact results for a bulk\nsync operation on imported marketplace artifacts.",
+        "example": {
+          "failed": 1,
+          "results": [
+            {
+              "artifact_name": "canvas-design",
+              "entry_id": "cat_canvas_design",
+              "has_conflicts": false,
+              "message": "Successfully synced with upstream",
+              "success": true
+            },
+            {
+              "artifact_name": "broken-skill",
+              "entry_id": "cat_broken_skill",
+              "has_conflicts": false,
+              "message": "Failed to sync: network error",
+              "success": false
+            }
+          ],
+          "skipped": 0,
+          "synced": 4,
+          "total": 5
+        }
+      },
       "BundleAnalyticsResponse": {
         "properties": {
           "bundle_id": {
@@ -18154,6 +18400,12 @@
             "type": "boolean",
             "title": "Is Duplicate",
             "description": "Whether this artifact was excluded as a duplicate (within-source or cross-source)",
+            "default": false
+          },
+          "in_collection": {
+            "type": "boolean",
+            "title": "In Collection",
+            "description": "Whether an artifact with matching name and type exists in the active collection",
             "default": false
           }
         },
@@ -26466,6 +26718,30 @@
             "examples": [
               "2025-12-06T10:35:00Z"
             ]
+          },
+          "updated_imports": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Imports",
+            "description": "Entry IDs of imported artifacts with upstream changes (SHA changed since import)",
+            "examples": [
+              [
+                "cat_canvas_design",
+                "cat_my_skill"
+              ]
+            ]
+          },
+          "preserved_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Preserved Count",
+            "description": "Number of imported/excluded entries preserved during merge (their status and import metadata retained)",
+            "default": 0,
+            "examples": [
+              5
+            ]
           }
         },
         "type": "object",
@@ -26488,6 +26764,7 @@
           "duplicates_within_source": 2,
           "errors": [],
           "new_count": 3,
+          "preserved_count": 5,
           "removed_count": 1,
           "scan_duration_ms": 1234.56,
           "scanned_at": "2025-12-06T10:35:00Z",
@@ -26496,7 +26773,10 @@
           "total_detected": 15,
           "total_unique": 10,
           "unchanged_count": 6,
-          "updated_count": 2
+          "updated_count": 2,
+          "updated_imports": [
+            "cat_canvas_design"
+          ]
         }
       },
       "ScoreBreakdown": {
