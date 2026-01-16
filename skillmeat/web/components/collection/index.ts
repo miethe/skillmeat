@@ -9,6 +9,7 @@ export { CollectionSwitcherWithDialogs } from './collection-switcher-with-dialog
 export { CreateCollectionDialog } from './create-collection-dialog';
 export { EditCollectionDialog } from './edit-collection-dialog';
 export { ManageGroupsDialog } from './manage-groups-dialog';
+export { CopyGroupDialog } from './copy-group-dialog';
 export { MoveCopyDialog } from './move-copy-dialog';
 export { ArtifactDetail } from './artifact-detail';
 export { ArtifactGrid } from './artifact-grid';

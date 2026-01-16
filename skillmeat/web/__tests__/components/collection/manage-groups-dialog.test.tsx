@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ManageGroupsDialog } from '@/components/collection/manage-groups-dialog';
-import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useToast } from '@/hooks';
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useToast, useCollections, useCopyGroup } from '@/hooks';
 
 // Mock hooks
 jest.mock('@/hooks', () => ({
@@ -10,6 +10,8 @@ jest.mock('@/hooks', () => ({
   useUpdateGroup: jest.fn(),
   useDeleteGroup: jest.fn(),
   useToast: jest.fn(),
+  useCollections: jest.fn(),
+  useCopyGroup: jest.fn(),
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
@@ -17,6 +19,8 @@ const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreat
 const mockUseUpdateGroup = useUpdateGroup as jest.MockedFunction<typeof useUpdateGroup>;
 const mockUseDeleteGroup = useDeleteGroup as jest.MockedFunction<typeof useDeleteGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
+const mockUseCollections = useCollections as jest.MockedFunction<typeof useCollections>;
+const mockUseCopyGroup = useCopyGroup as jest.MockedFunction<typeof useCopyGroup>;
 
 describe('ManageGroupsDialog', () => {
   const mockToast = jest.fn();
@@ -43,6 +47,24 @@ describe('ManageGroupsDialog', () => {
       artifact_count: 3,
       created_at: '2024-01-02T00:00:00Z',
       updated_at: '2024-01-02T00:00:00Z',
+    },
+  ];
+
+  const mockCollections = [
+    {
+      id: collectionId,
+      name: 'Current Collection',
+      artifact_count: 10,
+    },
+    {
+      id: 'other-collection-1',
+      name: 'Other Collection',
+      artifact_count: 5,
+    },
+    {
+      id: 'other-collection-2',
+      name: 'Another Collection',
+      artifact_count: 3,
     },
   ];
 
@@ -79,6 +101,17 @@ describe('ManageGroupsDialog', () => {
       mutateAsync: jest.fn(),
       isPending: false,
     } as any);
+
+    mockUseCollections.mockReturnValue({
+      data: { items: mockCollections, total: mockCollections.length },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseCopyGroup.mockReturnValue({
+      mutateAsync: jest.fn(),
+      isPending: false,
+    } as any);
   });
 
   const renderDialog = (open = true) => {
@@ -92,6 +125,19 @@ describe('ManageGroupsDialog', () => {
         />
       </QueryClientProvider>
     );
+  };
+
+  // Find the first group's action buttons container
+  const findFirstGroupActions = () => {
+    // Find group cards by looking for the group name
+    const devGroup = screen.getByText('Development').closest('[class*="card"]');
+    if (devGroup) {
+      const actionContainer = devGroup.querySelector('.flex.gap-1');
+      if (actionContainer) {
+        return within(actionContainer as HTMLElement).getAllByRole('button');
+      }
+    }
+    return [];
   };
 
   describe('Rendering', () => {
@@ -111,8 +157,8 @@ describe('ManageGroupsDialog', () => {
       } as any);
 
       renderDialog();
-      // Skeleton components are rendered (check for multiple skeleton elements)
-      const skeletons = document.querySelectorAll('[class*="skeleton"]');
+      // Skeleton components use animate-pulse class
+      const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
       expect(skeletons.length).toBeGreaterThan(0);
     });
 
@@ -146,7 +192,7 @@ describe('ManageGroupsDialog', () => {
   describe('Create Group', () => {
     it('shows create form when Create Group button is clicked', () => {
       renderDialog();
-      const createButton = screen.getByText('Create Group');
+      const createButton = screen.getByRole('button', { name: /Create Group/i });
       fireEvent.click(createButton);
 
       expect(screen.getByText('Create New Group')).toBeInTheDocument();
@@ -156,10 +202,14 @@ describe('ManageGroupsDialog', () => {
 
     it('validates required name field', async () => {
       renderDialog();
-      fireEvent.click(screen.getByText('Create Group'));
+      // Click the outline button to open form
+      fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
-      // Try to submit without name
-      const submitButton = screen.getAllByText('Create Group')[1]; // Second one is in form
+      // Find the submit button in the form by its text content
+      const formButtons = screen.getAllByRole('button').filter(btn =>
+        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
+      );
+      const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -169,12 +219,15 @@ describe('ManageGroupsDialog', () => {
 
     it('validates name length', async () => {
       renderDialog();
-      fireEvent.click(screen.getByText('Create Group'));
+      fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
       const nameInput = screen.getByLabelText(/Name/i);
       fireEvent.change(nameInput, { target: { value: 'a'.repeat(256) } });
 
-      const submitButton = screen.getAllByText('Create Group')[1];
+      const formButtons = screen.getAllByRole('button').filter(btn =>
+        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
+      );
+      const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -184,7 +237,7 @@ describe('ManageGroupsDialog', () => {
 
     it('validates description length', async () => {
       renderDialog();
-      fireEvent.click(screen.getByText('Create Group'));
+      fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
       const nameInput = screen.getByLabelText(/Name/i);
       const descInput = screen.getByLabelText(/Description/i);
@@ -192,7 +245,10 @@ describe('ManageGroupsDialog', () => {
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
       fireEvent.change(descInput, { target: { value: 'a'.repeat(1001) } });
 
-      const submitButton = screen.getAllByText('Create Group')[1];
+      const formButtons = screen.getAllByRole('button').filter(btn =>
+        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
+      );
+      const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -215,7 +271,7 @@ describe('ManageGroupsDialog', () => {
       } as any);
 
       renderDialog();
-      fireEvent.click(screen.getByText('Create Group'));
+      fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
       const nameInput = screen.getByLabelText(/Name/i);
       const descInput = screen.getByLabelText(/Description/i);
@@ -223,7 +279,10 @@ describe('ManageGroupsDialog', () => {
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
       fireEvent.change(descInput, { target: { value: 'Test description' } });
 
-      const submitButton = screen.getAllByText('Create Group')[1];
+      const formButtons = screen.getAllByRole('button').filter(btn =>
+        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
+      );
+      const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -250,12 +309,15 @@ describe('ManageGroupsDialog', () => {
       } as any);
 
       renderDialog();
-      fireEvent.click(screen.getByText('Create Group'));
+      fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
       const nameInput = screen.getByLabelText(/Name/i);
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
 
-      const submitButton = screen.getAllByText('Create Group')[1];
+      const formButtons = screen.getAllByRole('button').filter(btn =>
+        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
+      );
+      const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -272,12 +334,12 @@ describe('ManageGroupsDialog', () => {
     it('enters edit mode when edit button is clicked', () => {
       renderDialog();
 
-      // Find and click first edit button
-      const editButtons = screen.getAllByRole('button', { name: '' });
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="lucide-edit"]')
-      );
+      // Get the first group's action buttons (Copy, Edit, Delete)
+      const actionButtons = findFirstGroupActions();
+      // Edit button is second (index 1): Copy=0, Edit=1, Delete=2
+      const editButton = actionButtons[1];
 
+      expect(editButton).toBeTruthy();
       fireEvent.click(editButton!);
 
       // Should show Save and Cancel buttons
@@ -296,10 +358,8 @@ describe('ManageGroupsDialog', () => {
       renderDialog();
 
       // Enter edit mode
-      const editButtons = screen.getAllByRole('button', { name: '' });
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="lucide-edit"]')
-      );
+      const actionButtons = findFirstGroupActions();
+      const editButton = actionButtons[1];
       fireEvent.click(editButton!);
 
       // Change name
@@ -330,10 +390,8 @@ describe('ManageGroupsDialog', () => {
       renderDialog();
 
       // Enter edit mode
-      const editButtons = screen.getAllByRole('button', { name: '' });
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="lucide-edit"]')
-      );
+      const actionButtons = findFirstGroupActions();
+      const editButton = actionButtons[1];
       fireEvent.click(editButton!);
 
       // Save without changes
@@ -353,12 +411,12 @@ describe('ManageGroupsDialog', () => {
     it('shows confirmation dialog when delete button is clicked', () => {
       renderDialog();
 
-      // Find and click first delete button
-      const deleteButtons = screen.getAllByRole('button', { name: '' });
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="lucide-trash"]')
-      );
+      // Get the first group's action buttons
+      const actionButtons = findFirstGroupActions();
+      // Delete button is third (index 2)
+      const deleteButton = actionButtons[2];
 
+      expect(deleteButton).toBeTruthy();
       fireEvent.click(deleteButton!);
 
       expect(screen.getByText('Delete Group?')).toBeInTheDocument();
@@ -381,10 +439,8 @@ describe('ManageGroupsDialog', () => {
       renderDialog();
 
       // Click delete button
-      const deleteButtons = screen.getAllByRole('button', { name: '' });
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="lucide-trash"]')
-      );
+      const actionButtons = findFirstGroupActions();
+      const deleteButton = actionButtons[2];
       fireEvent.click(deleteButton!);
 
       // Confirm deletion
@@ -401,6 +457,102 @@ describe('ManageGroupsDialog', () => {
       expect(mockToast).toHaveBeenCalledWith({
         title: 'Group deleted',
         description: 'Successfully deleted group "Development"',
+      });
+    });
+  });
+
+  describe('Copy Group', () => {
+    it('shows copy button for each group', () => {
+      renderDialog();
+
+      // Find copy buttons by aria-label
+      const copyButtons = screen.getAllByRole('button', { name: /Copy group/i });
+      expect(copyButtons).toHaveLength(2); // One for each group
+    });
+
+    it('opens copy dialog when copy button is clicked', () => {
+      renderDialog();
+
+      // Find and click first copy button
+      const copyButton = screen.getByRole('button', {
+        name: /Copy group "Development" to another collection/i,
+      });
+      fireEvent.click(copyButton);
+
+      // Copy dialog should open
+      expect(screen.getByText('Copy Group to Collection')).toBeInTheDocument();
+    });
+
+    it('shows available collections in copy dialog (excluding source)', () => {
+      renderDialog();
+
+      // Open copy dialog
+      const copyButton = screen.getByRole('button', {
+        name: /Copy group "Development" to another collection/i,
+      });
+      fireEvent.click(copyButton);
+
+      // Should show other collections but not the source collection
+      expect(screen.getByText('Other Collection')).toBeInTheDocument();
+      expect(screen.getByText('Another Collection')).toBeInTheDocument();
+      // Source collection should not be in the list
+      expect(screen.queryByText('Current Collection')).not.toBeInTheDocument();
+    });
+
+    it('copy button is disabled when editing a group', () => {
+      renderDialog();
+
+      // Enter edit mode on first group
+      const actionButtons = findFirstGroupActions();
+      const editButton = actionButtons[1];
+      fireEvent.click(editButton!);
+
+      // Copy buttons should be disabled
+      const copyButtons = screen.getAllByRole('button', { name: /Copy group/i });
+      copyButtons.forEach((button) => {
+        expect(button).toBeDisabled();
+      });
+    });
+
+    it('copies group successfully', async () => {
+      const copyMutateAsync = jest.fn().mockResolvedValue({
+        id: 'copied-group',
+        name: 'Development',
+      });
+
+      mockUseCopyGroup.mockReturnValue({
+        mutateAsync: copyMutateAsync,
+        isPending: false,
+      } as any);
+
+      renderDialog();
+
+      // Open copy dialog
+      const copyButton = screen.getByRole('button', {
+        name: /Copy group "Development" to another collection/i,
+      });
+      fireEvent.click(copyButton);
+
+      // Select a target collection
+      const targetOption = screen.getByLabelText(/Select Other Collection/i);
+      fireEvent.click(targetOption);
+
+      // Click Copy Group button
+      const submitButton = screen.getByRole('button', {
+        name: /Copy group to selected collection/i,
+      });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(copyMutateAsync).toHaveBeenCalledWith({
+          groupId: 'group-1',
+          targetCollectionId: 'other-collection-1',
+        });
+      });
+
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Group copied',
+        description: '"Development" has been copied to Other Collection.',
       });
     });
   });
