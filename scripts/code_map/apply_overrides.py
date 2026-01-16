@@ -105,17 +105,17 @@ def main() -> None:
     parser.add_argument(
         "--in",
         dest="in_path",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Input unified graph JSON path",
     )
     parser.add_argument(
         "--overrides",
-        default="docs/architecture/codebase-graph.overrides.yaml",
+        default="docs/architecture/codebase-graph/codebase-graph.overrides.yaml",
         help="Overrides YAML path",
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Output graph JSON path",
     )
     args = parser.parse_args()

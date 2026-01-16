@@ -94,7 +94,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Validate the unified graph.")
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     args = parser.parse_args()

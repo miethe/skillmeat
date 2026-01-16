@@ -67,7 +67,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.git-metadata.json",
+        default="docs/architecture/codebase-graph/codebase-graph.git-metadata.json",
         help="Output JSON path",
     )
     args = parser.parse_args()

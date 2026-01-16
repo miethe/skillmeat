@@ -103,7 +103,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Summarize graph coverage.")
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     parser.add_argument(

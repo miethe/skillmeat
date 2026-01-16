@@ -195,12 +195,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build rule inventory outputs from the graph.")
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     parser.add_argument(
         "--details",
-        default="docs/architecture/codebase-graph.details.json",
+        default="docs/architecture/codebase-graph/codebase-graph.details.json",
         help="Optional details JSON path",
     )
     args = parser.parse_args()

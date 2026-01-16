@@ -59,17 +59,17 @@ def main() -> None:
     )
     parser.add_argument(
         "--graph",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Unified graph JSON path",
     )
     parser.add_argument(
         "--details",
-        default="docs/architecture/codebase-graph.details.json",
+        default="docs/architecture/codebase-graph/codebase-graph.details.json",
         help="Details JSON path",
     )
     parser.add_argument(
         "--out",
-        default="docs/architecture/codebase-graph.unified.json",
+        default="docs/architecture/codebase-graph/codebase-graph.unified.json",
         help="Output graph JSON path",
     )
     args = parser.parse_args()
