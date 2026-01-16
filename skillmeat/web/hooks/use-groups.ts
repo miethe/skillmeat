@@ -379,8 +379,11 @@ export function useAddArtifactToGroup(): UseMutationResult<void, Error, { groupI
   return useMutation({
     mutationFn: async ({ groupId, artifactId, position }: { groupId: string; artifactId: string; position?: number }): Promise<void> => {
       try {
-        const body = position !== undefined ? { position } : {};
-        await apiRequest<void>(`/groups/${groupId}/artifacts/${artifactId}`, {
+        const body: { artifact_ids: string[]; position?: number } = { artifact_ids: [artifactId] };
+        if (position !== undefined) {
+          body.position = position;
+        }
+        await apiRequest<void>(`/groups/${groupId}/artifacts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),

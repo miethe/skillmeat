@@ -3,6 +3,7 @@
  */
 import type {
   Group,
+  GroupWithArtifacts,
   CreateGroupRequest,
   UpdateGroupRequest,
   GroupArtifact,
@@ -83,20 +84,21 @@ export async function deleteGroup(id: string): Promise<void> {
 }
 
 /**
- * Add artifact to group
+ * Add artifact(s) to group
  * @param groupId - Group ID
- * @param artifactId - Artifact ID to add
+ * @param artifactIds - Artifact ID(s) to add (single string or array)
  * @param position - Optional position in the group (default: append)
  */
 export async function addArtifactToGroup(
   groupId: string,
-  artifactId: string,
+  artifactIds: string | string[],
   position?: number
-): Promise<GroupArtifact> {
-  const response = await fetch(buildUrl(`/groups/${groupId}/artifacts/${artifactId}`), {
+): Promise<GroupWithArtifacts> {
+  const ids = Array.isArray(artifactIds) ? artifactIds : [artifactIds];
+  const response = await fetch(buildUrl(`/groups/${groupId}/artifacts`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ position }),
+    body: JSON.stringify({ artifact_ids: ids, position }),
   });
   if (!response.ok) {
     throw new Error(`Failed to add artifact to group: ${response.statusText}`);

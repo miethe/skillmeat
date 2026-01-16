@@ -10,6 +10,8 @@ import { ArtifactList } from '@/components/collection/artifact-list';
 import { UnifiedEntityModal } from '@/components/entity/unified-entity-modal';
 import { EditCollectionDialog } from '@/components/collection/edit-collection-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
+import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-dialog';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
 import { TagFilterBar } from '@/components/ui/tag-filter-popover';
@@ -230,6 +232,14 @@ function CollectionPageContent() {
   const [showDeletionDialog, setShowDeletionDialog] = useState(false);
   const [showParameterEditor, setShowParameterEditor] = useState(false);
 
+  // State for Move/Copy dialog
+  const [showMoveCopyDialog, setShowMoveCopyDialog] = useState(false);
+  const [artifactForCollection, setArtifactForCollection] = useState<Artifact | null>(null);
+
+  // State for Manage Groups dialog
+  const [showGroupsDialog, setShowGroupsDialog] = useState(false);
+  const [artifactForGroups, setArtifactForGroups] = useState<Artifact | null>(null);
+
   // Hook for editing artifact parameters
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
 
@@ -243,6 +253,18 @@ function CollectionPageContent() {
   const handleDeleteFromDropdown = (artifact: Artifact) => {
     setArtifactToDelete(artifact);
     setShowDeletionDialog(true);
+  };
+
+  // Handler for Move to Collection action from dropdown
+  const handleMoveToCollection = (artifact: Artifact) => {
+    setArtifactForCollection(artifact);
+    setShowMoveCopyDialog(true);
+  };
+
+  // Handler for Manage Groups action from dropdown
+  const handleManageGroups = (artifact: Artifact) => {
+    setArtifactForGroups(artifact);
+    setShowGroupsDialog(true);
   };
 
   // Handler to save parameters (same pattern as unified-entity-modal.tsx)
@@ -679,6 +701,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionBadge={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onMoveToCollection={handleMoveToCollection}
+                onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
               />
@@ -689,6 +713,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionColumn={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onMoveToCollection={handleMoveToCollection}
+                onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
               />
@@ -701,6 +727,8 @@ function CollectionPageContent() {
                 onArtifactClick={handleArtifactClick}
                 showCollectionBadge={isAllCollections}
                 onCollectionClick={handleCollectionClick}
+                onMoveToCollection={handleMoveToCollection}
+                onManageGroups={handleManageGroups}
                 onEdit={handleEditFromDropdown}
                 onDelete={handleDeleteFromDropdown}
               />
@@ -787,6 +815,34 @@ function CollectionPageContent() {
             setArtifactToDelete(null);
             refetch(); // Refresh artifact list
           }}
+        />
+      )}
+
+      {/* Move/Copy to Collection Dialog */}
+      {artifactForCollection && (
+        <MoveCopyDialog
+          open={showMoveCopyDialog}
+          onOpenChange={(open) => {
+            setShowMoveCopyDialog(open);
+            if (!open) setArtifactForCollection(null);
+          }}
+          artifacts={[artifactForCollection]}
+          sourceCollectionId={artifactForCollection.collection?.id}
+          onSuccess={() => refetch()}
+        />
+      )}
+
+      {/* Add to Group Dialog */}
+      {artifactForGroups && selectedCollectionId && selectedCollectionId !== 'all' && (
+        <AddToGroupDialog
+          open={showGroupsDialog}
+          onOpenChange={(open) => {
+            setShowGroupsDialog(open);
+            if (!open) setArtifactForGroups(null);
+          }}
+          artifact={artifactForGroups}
+          collectionId={selectedCollectionId}
+          onSuccess={() => refetch()}
         />
       )}
     </div>
