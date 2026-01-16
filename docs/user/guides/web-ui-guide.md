@@ -135,16 +135,16 @@ The Collection Switcher lets you switch between different collections:
 
 **Location:** Within each collection (sidebar under selected collection)
 
-Groups allow you to organize artifacts within a collection for easier browsing and management.
+Groups allow you to organize artifacts within a collection for easier browsing and management. You can also manage groups from the "All Collections" view using a two-step selection process.
 
-**Creating Groups:**
+#### Creating Groups
 
 1. Click the "Manage Groups" option in the sidebar or collection menu
 2. Click "Add Group" button
 3. Enter group name and optional description
 4. Click "Create"
 
-**Managing Groups:**
+#### Managing Groups
 
 1. Click "Manage Groups" to open the groups dialog
 2. **Edit**: Click edit icon next to any group to modify name/description
@@ -152,18 +152,48 @@ Groups allow you to organize artifacts within a collection for easier browsing a
 4. **Reorder**: Drag and drop groups to change their order
 5. Click "Save" to apply changes
 
-**Viewing Grouped Artifacts:**
+##### Copying a Group to Another Collection
+
+1. In the group list, click the menu icon (⋮) on the group you want to copy
+2. Select "Copy Group"
+3. Choose the target collection from the dropdown
+4. Click "Confirm Copy"
+5. The group will be copied with all its artifacts to the target collection
+6. The new group will be named with " (Copy)" suffix (e.g., "Frontend Development (Copy)")
+
+**What Happens During Copy:**
+- The group structure and metadata are copied to the target collection
+- All artifacts in the group are automatically added to the target collection (if not already present)
+- Duplicate artifacts are not created - existing artifacts are simply added to the new group
+- The copy is atomic - either the entire operation succeeds or nothing changes
+
+#### Viewing Grouped Artifacts
 
 1. Select a group from the sidebar to view artifacts in that group
 2. Artifacts within a group are displayed in a dedicated view
 3. All standard filtering, searching, and sorting options apply
 
-**Moving Artifacts Between Groups:**
+#### Adding Artifacts to Groups
+
+**From a Specific Collection:**
 
 1. Click artifact card or open details drawer
-2. Select "Move to Group" option
-3. Choose destination group
+2. Select "Add to Group" option
+3. Choose destination group(s)
 4. Changes sync automatically
+
+**From All Collections View (No Collection Selected):**
+
+1. Click artifact card or open details drawer
+2. Select "Add to Group" option
+3. **First Step - Select Collection**: Choose which collection to add the group to
+   - Only collections containing the artifact are shown
+   - This ensures you're adding to a group in a collection where the artifact exists
+4. **Second Step - Select Group**: Choose one or more groups in that collection to add the artifact to
+5. Click "Add" to confirm
+6. The artifact is now in the selected group(s)
+
+**Tip:** This two-step process in All Collections view helps you organize artifacts across multiple collections without needing to navigate to each collection individually.
 
 ### Discovery Banner
 
