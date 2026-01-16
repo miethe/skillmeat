@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast } from '@/hooks';
+import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast, useCollections } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 type DialogStep = 'collection' | 'group';
@@ -85,8 +85,14 @@ export function AddToGroupDialog({
   // Determine effective collection ID (prop takes precedence over selection)
   const effectiveCollectionId = collectionId ?? selectedCollectionId;
 
+  // Fetch all collections when artifact has no collection membership
+  const { data: allCollectionsData, isLoading: isLoadingAllCollections } = useCollections(
+    // Only fetch when we need it (artifact has no collections)
+    artifact.collections?.length === 0 && !artifact.collection ? {} : undefined
+  );
+
   // Build effective collections array - prefer artifact.collections, fallback to artifact.collection
-  // Return empty array when no collections exist (artifact in "All Collections" view without membership)
+  // When artifact has no collections, use all available collections
   const artifactCollections = useMemo(() => {
     if (artifact.collections && artifact.collections.length > 0) {
       return artifact.collections;
@@ -99,9 +105,17 @@ export function AddToGroupDialog({
         artifact_count: undefined, // Not available on single collection reference
       }];
     }
-    // No collections available - return empty array to show "not in any collections" message
+    // No collections on artifact - use all available collections if fetched
+    if (allCollectionsData?.items) {
+      return allCollectionsData.items.map(collection => ({
+        id: collection.id,
+        name: collection.name,
+        artifact_count: collection.artifact_count,
+      }));
+    }
+    // Fallback to empty array while loading or if no collections exist
     return [];
-  }, [artifact.collections, artifact.collection]);
+  }, [artifact.collections, artifact.collection, allCollectionsData]);
 
   const { data: groupsData, isLoading, refetch: refetchGroups } = useGroups(effectiveCollectionId ?? '');
   const addArtifactToGroup = useAddArtifactToGroup();
@@ -135,8 +149,8 @@ export function AddToGroupDialog({
       // Only one collection available - auto-select and skip to group step
       setSelectedCollectionId(artifactCollections[0].id);
       setStep('group');
-    } else if (artifactCollections.length === 0) {
-      // No collections available - stay on collection step to show empty state
+    } else if (artifactCollections.length === 0 && !isLoadingAllCollections) {
+      // No collections available and not loading - stay on collection step to show empty state
       setStep('collection');
     }
   }, [open, collectionId, artifactCollections]);
@@ -266,14 +280,20 @@ export function AddToGroupDialog({
         {showCollectionPicker && (
           <div className="py-4">
             <Label className="text-sm font-medium">Select a collection</Label>
-            {artifactCollections.length === 0 ? (
+            {isLoadingAllCollections ? (
+              <div className="mt-2 space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : artifactCollections.length === 0 ? (
               <div className="mt-2 rounded-lg border border-dashed border-muted-foreground/25 p-6 text-center">
                 <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This artifact is not in any collections yet.
+                  No collections available.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add it to a collection first, then you can organize it into groups.
+                  Create a collection first to organize artifacts into groups.
                 </p>
               </div>
             ) : (
@@ -499,9 +519,9 @@ export function AddToGroupDialog({
           {showCollectionPicker ? (
             <Button
               onClick={handleNextStep}
-              disabled={!selectedCollectionId || artifactCollections.length === 0}
+              disabled={!selectedCollectionId || (artifactCollections.length === 0 && !isLoadingAllCollections) || isLoadingAllCollections}
             >
-              Next
+              {isLoadingAllCollections ? 'Loading...' : 'Next'}
             </Button>
           ) : (
             <Button
