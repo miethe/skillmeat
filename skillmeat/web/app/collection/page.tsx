@@ -832,8 +832,10 @@ function CollectionPageContent() {
         />
       )}
 
-      {/* Add to Group Dialog */}
-      {artifactForGroups && selectedCollectionId && selectedCollectionId !== 'all' && (
+      {/* Add to Group Dialog - Now works for both specific collection and All Collections view */}
+      {/* When viewing a specific collection, collectionId is passed directly */}
+      {/* When viewing All Collections, no collectionId is passed and dialog shows collection picker */}
+      {artifactForGroups && (
         <AddToGroupDialog
           open={showGroupsDialog}
           onOpenChange={(open) => {
@@ -841,7 +843,7 @@ function CollectionPageContent() {
             if (!open) setArtifactForGroups(null);
           }}
           artifact={artifactForGroups}
-          collectionId={selectedCollectionId}
+          collectionId={isSpecificCollection ? selectedCollectionId : undefined}
           onSuccess={() => refetch()}
         />
       )}
