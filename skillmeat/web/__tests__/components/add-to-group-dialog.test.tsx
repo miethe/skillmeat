@@ -2,18 +2,20 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
-import { useGroups, useAddArtifactToGroup, useToast } from '@/hooks';
+import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 // Mock hooks
 jest.mock('@/hooks', () => ({
   useGroups: jest.fn(),
   useAddArtifactToGroup: jest.fn(),
+  useCreateGroup: jest.fn(),
   useToast: jest.fn(),
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
 const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<typeof useAddArtifactToGroup>;
+const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 
 describe('AddToGroupDialog', () => {
@@ -122,6 +124,11 @@ describe('AddToGroupDialog', () => {
       mutateAsync: mockMutateAsync,
       isPending: false,
     } as any);
+
+    mockUseCreateGroup.mockReturnValue({
+      mutateAsync: jest.fn().mockResolvedValue({ id: 'new-group', name: 'New Group' }),
+      isPending: false,
+    } as any);
   });
 
   describe('Collection Picker Step', () => {
@@ -147,13 +154,15 @@ describe('AddToGroupDialog', () => {
       expect(screen.getByText('3 artifacts')).toBeInTheDocument();
     });
 
-    it('shows empty state when artifact has no collections', () => {
+    it('shows empty state when artifact has no collection info', () => {
+      // When artifact has no collections array and no collection object,
+      // the dialog should show an empty state message instead of trying to use a fake collection
       renderDialog({ artifact: mockArtifactNoCollections });
 
+      // Should stay on collection picker step and show empty state
+      expect(screen.getByText('Select a collection')).toBeInTheDocument();
       expect(screen.getByText('This artifact is not in any collections yet.')).toBeInTheDocument();
-      expect(
-        screen.getByText('Add it to a collection first, then you can organize it into groups.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Add it to a collection first, then you can organize it into groups.')).toBeInTheDocument();
     });
 
     it('shows Next button disabled until collection selected', async () => {
@@ -223,7 +232,7 @@ describe('AddToGroupDialog', () => {
 
       expect(screen.getByText('No groups in this collection yet.')).toBeInTheDocument();
       expect(
-        screen.getByText('Create a group first to organize your artifacts.')
+        screen.getByText('Create a group to organize your artifacts.')
       ).toBeInTheDocument();
     });
 
