@@ -140,7 +140,7 @@ function ArtifactRowActions({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onManageGroups}>
           <Layers className="mr-2 h-4 w-4" />
-          Manage Groups
+          Add to Group
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onEdit}>
