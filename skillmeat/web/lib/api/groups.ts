@@ -178,3 +178,24 @@ export async function reorderGroups(collectionId: string, groupIds: string[]): P
   }
   return response.json();
 }
+
+/**
+ * Copy group to another collection
+ * @param groupId - Group ID to copy
+ * @param targetCollectionId - Target collection ID
+ * @returns The newly created group copy
+ */
+export async function copyGroup(
+  groupId: string,
+  targetCollectionId: string
+): Promise<Group> {
+  const response = await fetch(buildUrl(`/groups/${groupId}/copy`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_collection_id: targetCollectionId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to copy group: ${response.statusText}`);
+  }
+  return response.json();
+}
