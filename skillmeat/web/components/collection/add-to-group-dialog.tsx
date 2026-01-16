@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layers, Plus, Loader2, ChevronLeft, FolderOpen } from 'lucide-react';
 import {
   Dialog,
@@ -16,7 +16,8 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useGroups, useAddArtifactToGroup, useToast } from '@/hooks';
+import { Input } from '@/components/ui/input';
+import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 type DialogStep = 'collection' | 'group';
@@ -78,15 +79,33 @@ export function AddToGroupDialog({
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<DialogStep>('collection');
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
 
   // Determine effective collection ID (prop takes precedence over selection)
   const effectiveCollectionId = collectionId ?? selectedCollectionId;
 
-  // Get collections the artifact belongs to (for collection picker)
-  const artifactCollections = artifact.collections || [];
+  // Build effective collections array - prefer artifact.collections, fallback to artifact.collection
+  // Return empty array when no collections exist (artifact in "All Collections" view without membership)
+  const artifactCollections = useMemo(() => {
+    if (artifact.collections && artifact.collections.length > 0) {
+      return artifact.collections;
+    }
+    // Fallback to single collection if available (artifact.collection only has id and name)
+    if (artifact.collection) {
+      return [{
+        id: artifact.collection.id,
+        name: artifact.collection.name,
+        artifact_count: undefined, // Not available on single collection reference
+      }];
+    }
+    // No collections available - return empty array to show "not in any collections" message
+    return [];
+  }, [artifact.collections, artifact.collection]);
 
-  const { data: groupsData, isLoading } = useGroups(effectiveCollectionId ?? '');
+  const { data: groupsData, isLoading, refetch: refetchGroups } = useGroups(effectiveCollectionId ?? '');
   const addArtifactToGroup = useAddArtifactToGroup();
+  const createGroup = useCreateGroup();
   const { toast } = useToast();
 
   const groups = groupsData?.groups || [];
@@ -100,15 +119,27 @@ export function AddToGroupDialog({
       setSelectedGroupIds(new Set());
       setStep('collection');
       setSelectedCollectionId(null);
+      setIsCreatingGroup(false);
+      setNewGroupName('');
     }
   }, [open]);
 
-  // If collectionId is provided, skip to group step
+  // Auto-select collection and skip to group step when appropriate
   useEffect(() => {
-    if (collectionId && step === 'collection') {
+    if (!open) return;
+
+    if (collectionId) {
+      // Collection ID provided via prop - skip to group step
       setStep('group');
+    } else if (artifactCollections.length === 1 && artifactCollections[0]) {
+      // Only one collection available - auto-select and skip to group step
+      setSelectedCollectionId(artifactCollections[0].id);
+      setStep('group');
+    } else if (artifactCollections.length === 0) {
+      // No collections available - stay on collection step to show empty state
+      setStep('collection');
     }
-  }, [collectionId, step]);
+  }, [open, collectionId, artifactCollections]);
 
   const handleCollectionSelect = (id: string) => {
     setSelectedCollectionId(id);
@@ -141,6 +172,39 @@ export function AddToGroupDialog({
       }
       return next;
     });
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || !effectiveCollectionId) return;
+
+    try {
+      const newGroup = await createGroup.mutateAsync({
+        collection_id: effectiveCollectionId,
+        name: newGroupName.trim(),
+      });
+
+      // Auto-select the newly created group
+      setSelectedGroupIds((prev) => new Set([...prev, newGroup.id]));
+
+      // Reset create group state
+      setIsCreatingGroup(false);
+      setNewGroupName('');
+
+      // Refetch groups to ensure the new group appears in the list
+      await refetchGroups();
+
+      toast({
+        title: 'Group created',
+        description: `"${newGroup.name}" has been created.`,
+      });
+    } catch (error) {
+      console.error('Failed to create group:', error);
+      toast({
+        title: 'Failed to create group',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -178,12 +242,13 @@ export function AddToGroupDialog({
   };
 
   const handleClose = () => {
-    if (!addArtifactToGroup.isPending) {
+    if (!addArtifactToGroup.isPending && !createGroup.isPending) {
       onOpenChange(false);
     }
   };
 
   const isPending = addArtifactToGroup.isPending;
+  const isCreatingGroupPending = createGroup.isPending;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -252,8 +317,8 @@ export function AddToGroupDialog({
         {/* Groups selection step */}
         {!showCollectionPicker && (
           <div className="py-4">
-            {/* Back button (only show when we came from collection picker) */}
-            {!collectionId && selectedCollectionId && (
+            {/* Back button (only show when we came from collection picker with multiple options) */}
+            {!collectionId && selectedCollectionId && artifactCollections.length > 1 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -280,21 +345,112 @@ export function AddToGroupDialog({
                   No groups in this collection yet.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Create a group first to organize your artifacts.
+                  Create a group to organize your artifacts.
                 </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 text-primary hover:text-primary/90"
-                  onClick={() => onOpenChange(false)}
-                  aria-label="Close dialog and create a group"
-                >
-                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Create a group
-                </Button>
+                {isCreatingGroup ? (
+                  <div className="mt-3 flex items-center gap-2 justify-center">
+                    <Input
+                      placeholder="Group name"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !isCreatingGroupPending && handleCreateGroup()}
+                      autoFocus
+                      className="max-w-[180px]"
+                      disabled={isCreatingGroupPending}
+                      aria-label="New group name"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleCreateGroup}
+                      disabled={!newGroupName.trim() || isCreatingGroupPending}
+                      aria-label="Create group"
+                    >
+                      {isCreatingGroupPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        'Create'
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsCreatingGroup(false);
+                        setNewGroupName('');
+                      }}
+                      disabled={isCreatingGroupPending}
+                      aria-label="Cancel creating group"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 text-primary hover:text-primary/90"
+                    onClick={() => setIsCreatingGroup(true)}
+                    aria-label="Create a new group"
+                  >
+                    <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Create a group
+                  </Button>
+                )}
               </div>
             ) : (
               <ScrollArea className="h-[200px] rounded-md border">
+                {/* Create new group section */}
+                <div className="p-2 border-b">
+                  {isCreatingGroup ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Group name"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !isCreatingGroupPending && handleCreateGroup()}
+                        autoFocus
+                        disabled={isCreatingGroupPending}
+                        aria-label="New group name"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleCreateGroup}
+                        disabled={!newGroupName.trim() || isCreatingGroupPending}
+                        aria-label="Create group"
+                      >
+                        {isCreatingGroupPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          'Create'
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setIsCreatingGroup(false);
+                          setNewGroupName('');
+                        }}
+                        disabled={isCreatingGroupPending}
+                        aria-label="Cancel creating group"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setIsCreatingGroup(true)}
+                      disabled={isPending}
+                      aria-label="Create a new group"
+                    >
+                      <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Create new group
+                    </Button>
+                  )}
+                </div>
                 <div className="p-2 space-y-1">
                   {groups.map((group) => (
                     <div
@@ -337,7 +493,7 @@ export function AddToGroupDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isPending}>
+          <Button variant="outline" onClick={handleClose} disabled={isPending || isCreatingGroupPending}>
             Cancel
           </Button>
           {showCollectionPicker ? (
