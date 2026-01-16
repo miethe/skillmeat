@@ -7542,6 +7542,60 @@
         }
       }
     },
+    "/api/v1/groups/{group_id}/copy": {
+      "post": {
+        "tags": [
+          "groups",
+          "groups"
+        ],
+        "summary": "Copy group to another collection",
+        "description": "Copy a group with all its artifacts to another collection.\n\n    The new group will have the same name with \" (Copy)\" suffix.\n    If an artifact is not already in the target collection, it will be added.\n    Duplicate artifacts (already in target collection) are silently skipped.",
+        "operationId": "copy_group_api_v1_groups__group_id__copy_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyGroupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/groups/reorder": {
       "put": {
         "tags": [
@@ -19575,6 +19629,24 @@
           ],
           "total_auto_load_tokens": 2300
         }
+      },
+      "CopyGroupRequest": {
+        "properties": {
+          "target_collection_id": {
+            "type": "string",
+            "title": "Target Collection Id",
+            "description": "ID of the collection to copy the group to",
+            "examples": [
+              "target-collection-123"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_collection_id"
+        ],
+        "title": "CopyGroupRequest",
+        "description": "Request schema for copying a group to another collection.\n\nCreates a copy of the group (with name + \" (Copy)\") in the target collection,\nincluding all artifacts from the source group."
       },
       "CreateSourceRequest": {
         "properties": {
