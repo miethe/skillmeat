@@ -563,3 +563,67 @@ export function useMoveArtifactToGroup(): UseMutationResult<void, Error, {
     },
   });
 }
+
+/**
+ * Copy group to another collection
+ *
+ * Creates a copy of the group (with all its artifacts) in the target collection
+ *
+ * @param groupId - Group ID to copy
+ * @param targetCollectionId - Target collection ID
+ *
+ * @example
+ * ```tsx
+ * const copyGroup = useCopyGroup();
+ *
+ * await copyGroup.mutateAsync({
+ *   groupId,
+ *   targetCollectionId,
+ * });
+ * ```
+ */
+export function useCopyGroup(): UseMutationResult<Group, Error, {
+  groupId: string;
+  targetCollectionId: string;
+}> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      groupId,
+      targetCollectionId,
+    }: {
+      groupId: string;
+      targetCollectionId: string;
+    }): Promise<Group> => {
+      try {
+        const group = await apiRequest<Group>(`/groups/${groupId}/copy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_collection_id: targetCollectionId }),
+        });
+        return group;
+      } catch (error) {
+        if (USE_MOCKS) {
+          console.warn(`[groups] Copy group API failed for group ${groupId}`, error);
+          // Return mock group for development
+          return {
+            id: `mock-copy-${Date.now()}`,
+            collection_id: targetCollectionId,
+            name: 'Copied Group',
+            description: undefined,
+            position: 0,
+            artifact_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        throw error;
+      }
+    },
+    onSuccess: (_, { targetCollectionId }) => {
+      // Invalidate the target collection's groups list to show the new copy
+      queryClient.invalidateQueries({ queryKey: groupKeys.list(targetCollectionId) });
+    },
+  });
+}

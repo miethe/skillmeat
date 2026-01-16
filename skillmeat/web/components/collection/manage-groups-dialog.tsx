@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Folders, Plus, Edit, Trash2, Package, X, Check } from 'lucide-react';
+import { Folders, Plus, Edit, Trash2, Package, X, Check, Copy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ import {
   useDeleteGroup,
   useToast,
 } from '@/hooks';
+import { CopyGroupDialog } from '@/components/collection/copy-group-dialog';
 import type { Group } from '@/types/groups';
 
 export interface ManageGroupsDialogProps {
@@ -50,6 +51,8 @@ export function ManageGroupsDialog({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [groupToCopy, setGroupToCopy] = useState<Group | null>(null);
 
   // Form state for create
   const [createName, setCreateName] = useState('');
@@ -252,6 +255,16 @@ export function ManageGroupsDialog({
     }
   };
 
+  // Copy handlers
+  const handleStartCopy = (group: Group) => {
+    setGroupToCopy(group);
+    setCopyDialogOpen(true);
+  };
+
+  const handleCopySuccess = () => {
+    setGroupToCopy(null);
+  };
+
   const handleClose = () => {
     if (!createMutation.isPending && !updateMutation.isPending && !deleteMutation.isPending) {
       handleCancelCreate();
@@ -415,6 +428,19 @@ export function ManageGroupsDialog({
                                   <Button
                                     size="sm"
                                     variant="ghost"
+                                    onClick={() => handleStartCopy(group)}
+                                    disabled={
+                                      editingGroupId !== null ||
+                                      updateMutation.isPending ||
+                                      deleteMutation.isPending
+                                    }
+                                    aria-label={`Copy group "${group.name}" to another collection`}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
                                     onClick={() => handleStartEdit(group)}
                                     disabled={
                                       editingGroupId !== null ||
@@ -567,6 +593,17 @@ export function ManageGroupsDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Copy Group Dialog */}
+      {groupToCopy && (
+        <CopyGroupDialog
+          open={copyDialogOpen}
+          onOpenChange={setCopyDialogOpen}
+          group={groupToCopy}
+          sourceCollectionId={collectionId}
+          onSuccess={handleCopySuccess}
+        />
+      )}
     </>
   );
 }

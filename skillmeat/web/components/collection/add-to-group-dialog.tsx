@@ -203,7 +203,7 @@ export function AddToGroupDialog({
             <Label className="text-sm font-medium">Select a collection</Label>
             {artifactCollections.length === 0 ? (
               <div className="mt-2 rounded-lg border border-dashed border-muted-foreground/25 p-6 text-center">
-                <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                 <p className="mt-2 text-sm text-muted-foreground">
                   This artifact is not in any collections yet.
                 </p>
@@ -217,18 +217,23 @@ export function AddToGroupDialog({
                   value={selectedCollectionId ?? ''}
                   onValueChange={handleCollectionSelect}
                   className="p-2"
+                  aria-label="Collection selection"
                 >
                   {artifactCollections.map((collection) => (
                     <div
                       key={collection.id}
                       className="flex items-center space-x-2 py-2 px-2 rounded-md hover:bg-accent"
                     >
-                      <RadioGroupItem value={collection.id} id={`collection-${collection.id}`} />
+                      <RadioGroupItem
+                        value={collection.id}
+                        id={`collection-${collection.id}`}
+                        aria-label={`Select ${collection.name}`}
+                      />
                       <Label
                         htmlFor={`collection-${collection.id}`}
                         className="flex items-center gap-2 cursor-pointer flex-1"
                       >
-                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                        <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         <span>{collection.name}</span>
                         {collection.artifact_count !== undefined && (
                           <span className="text-xs text-muted-foreground ml-auto">
@@ -255,8 +260,9 @@ export function AddToGroupDialog({
                 onClick={handleBackToCollections}
                 className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
                 disabled={isPending}
+                aria-label={`Go back to collection selection, currently in ${selectedCollectionName || 'selected collection'}`}
               >
-                <ChevronLeft className="mr-1 h-4 w-4" />
+                <ChevronLeft className="mr-1 h-4 w-4" aria-hidden="true" />
                 {selectedCollectionName || 'Back'}
               </Button>
             )}
@@ -269,7 +275,7 @@ export function AddToGroupDialog({
               </div>
             ) : groups.length === 0 ? (
               <div className="rounded-lg border border-dashed border-muted-foreground/25 p-6 text-center">
-                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                <Layers className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                 <p className="mt-2 text-sm text-muted-foreground">
                   No groups in this collection yet.
                 </p>
@@ -281,8 +287,9 @@ export function AddToGroupDialog({
                   size="sm"
                   className="mt-3 text-primary hover:text-primary/90"
                   onClick={() => onOpenChange(false)}
+                  aria-label="Close dialog and create a group"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                   Create a group
                 </Button>
               </div>
@@ -347,12 +354,12 @@ export function AddToGroupDialog({
             >
               {isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  <span>Adding...</span>
                 </>
               ) : (
                 <>
-                  <Layers className="mr-2 h-4 w-4" />
+                  <Layers className="mr-2 h-4 w-4" aria-hidden="true" />
                   Add to Group{selectedGroupIds.size > 1 ? 's' : ''}
                 </>
               )}

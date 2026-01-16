@@ -68,7 +68,7 @@ export {
 } from './use-collections';
 
 // ============================================================================
-// GROUPS (11 hooks)
+// GROUPS (12 hooks)
 // ============================================================================
 // Group CRUD operations with artifact ordering and management
 export {
@@ -84,6 +84,7 @@ export {
   useRemoveArtifactFromGroup,
   useReorderArtifactsInGroup,
   useMoveArtifactToGroup,
+  useCopyGroup,
 } from './use-groups';
 
 // ============================================================================
