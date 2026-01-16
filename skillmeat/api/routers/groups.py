@@ -10,6 +10,7 @@ API Endpoints:
     GET /groups/{id} - Get group by ID with artifacts
     PUT /groups/{id} - Update group metadata
     DELETE /groups/{id} - Delete group
+    POST /groups/{id}/copy - Copy group to another collection
     PUT /groups/reorder - Bulk reorder groups
     POST /groups/{id}/artifacts - Add artifacts to group
     DELETE /groups/{id}/artifacts/{artifact_id} - Remove artifact from group
@@ -27,6 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from skillmeat.api.schemas.groups import (
     AddGroupArtifactsRequest,
     ArtifactPositionUpdate,
+    CopyGroupRequest,
     GroupArtifactResponse,
     GroupCreateRequest,
     GroupListResponse,
@@ -37,7 +39,13 @@ from skillmeat.api.schemas.groups import (
     GroupWithArtifactsResponse,
     ReorderArtifactsRequest,
 )
-from skillmeat.cache.models import Collection, Group, GroupArtifact, get_session
+from skillmeat.cache.models import (
+    Collection,
+    CollectionArtifact,
+    Group,
+    GroupArtifact,
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +473,178 @@ async def delete_group(group_id: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete group",
+        ) from e
+    finally:
+        session.close()
+
+
+# =============================================================================
+# Group Copy Operations
+# =============================================================================
+
+
+@router.post(
+    "/{group_id}/copy",
+    response_model=GroupResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Copy group to another collection",
+    description="""
+    Copy a group with all its artifacts to another collection.
+
+    The new group will have the same name with " (Copy)" suffix.
+    If an artifact is not already in the target collection, it will be added.
+    Duplicate artifacts (already in target collection) are silently skipped.
+    """,
+)
+async def copy_group(
+    group_id: str,
+    request: CopyGroupRequest,
+) -> GroupResponse:
+    """Copy a group to another collection.
+
+    Args:
+        group_id: Source group ID to copy
+        request: Copy request with target_collection_id
+
+    Returns:
+        The newly created group in the target collection
+
+    Raises:
+        HTTPException 404: If source group or target collection not found
+        HTTPException 400: If group name already exists in target collection
+        HTTPException 500: If database operation fails
+    """
+    session = get_session()
+    try:
+        # Verify source group exists and load its artifacts
+        source_group = session.query(Group).filter_by(id=group_id).first()
+        if not source_group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Group '{group_id}' not found",
+            )
+
+        # Verify target collection exists
+        target_collection = (
+            session.query(Collection).filter_by(id=request.target_collection_id).first()
+        )
+        if not target_collection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Target collection '{request.target_collection_id}' not found",
+            )
+
+        # Create new group name with " (Copy)" suffix
+        new_group_name = f"{source_group.name} (Copy)"
+
+        # Check if group name already exists in target collection
+        existing_group = (
+            session.query(Group)
+            .filter_by(collection_id=request.target_collection_id, name=new_group_name)
+            .first()
+        )
+        if existing_group:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Group '{new_group_name}' already exists in target collection",
+            )
+
+        # Determine position for new group (append to end)
+        max_position = (
+            session.query(Group.position)
+            .filter_by(collection_id=request.target_collection_id)
+            .order_by(Group.position.desc())
+            .first()
+        )
+        new_position = (max_position[0] + 1) if max_position else 0
+
+        # Create new group in target collection
+        new_group = Group(
+            id=uuid.uuid4().hex,
+            collection_id=request.target_collection_id,
+            name=new_group_name,
+            description=source_group.description,
+            position=new_position,
+        )
+        session.add(new_group)
+        session.flush()  # Get the new group ID
+
+        # Get source group artifacts
+        source_artifacts = (
+            session.query(GroupArtifact)
+            .filter_by(group_id=group_id)
+            .order_by(GroupArtifact.position)
+            .all()
+        )
+
+        # Get existing artifacts in target collection
+        existing_collection_artifacts = {
+            ca.artifact_id
+            for ca in session.query(CollectionArtifact)
+            .filter_by(collection_id=request.target_collection_id)
+            .all()
+        }
+
+        # Copy artifacts to new group and add to collection if needed
+        for source_ga in source_artifacts:
+            # Add artifact to target collection if not already there
+            if source_ga.artifact_id not in existing_collection_artifacts:
+                collection_artifact = CollectionArtifact(
+                    collection_id=request.target_collection_id,
+                    artifact_id=source_ga.artifact_id,
+                )
+                session.add(collection_artifact)
+                existing_collection_artifacts.add(source_ga.artifact_id)
+
+            # Add artifact to new group with same position
+            new_group_artifact = GroupArtifact(
+                group_id=new_group.id,
+                artifact_id=source_ga.artifact_id,
+                position=source_ga.position,
+            )
+            session.add(new_group_artifact)
+
+        session.commit()
+        session.refresh(new_group)
+
+        logger.info(
+            f"Copied group '{source_group.name}' ({group_id}) to collection "
+            f"'{request.target_collection_id}' as '{new_group_name}' ({new_group.id}) "
+            f"with {len(source_artifacts)} artifacts"
+        )
+
+        # Get artifact count for response
+        artifact_count = (
+            session.query(GroupArtifact).filter_by(group_id=new_group.id).count()
+        )
+
+        return GroupResponse(
+            id=new_group.id,
+            collection_id=new_group.collection_id,
+            name=new_group.name,
+            description=new_group.description,
+            position=new_group.position,
+            created_at=new_group.created_at,
+            updated_at=new_group.updated_at,
+            artifact_count=artifact_count,
+        )
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as e:
+        session.rollback()
+        logger.error(f"Integrity error copying group: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Group name must be unique within collection",
+        ) from e
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to copy group {group_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to copy group",
         ) from e
     finally:
         session.close()
