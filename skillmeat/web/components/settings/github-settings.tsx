@@ -53,7 +53,8 @@ export function GitHubSettings() {
       }
     }
     fetchStatus();
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount - toast is stable enough for error handling
 
   // Client-side token format validation
   const isValidTokenFormat = (value: string): boolean => {
