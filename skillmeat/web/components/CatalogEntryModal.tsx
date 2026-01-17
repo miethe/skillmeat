@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
-import { ContentPane, type TruncationInfo } from '@/components/entity/content-pane';
+import { ContentPane } from '@/components/entity/content-pane';
 import { useCatalogFileTree, useCatalogFileContent, useUpdateCatalogEntryName } from '@/hooks';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
@@ -77,6 +77,7 @@ const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
   skill: { label: 'Skill', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
   command: { label: 'Command', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
   agent: { label: 'Agent', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+  mcp: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
   mcp_server: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
   hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
 };
@@ -716,7 +717,7 @@ export function CatalogEntryModal({
               </div>
 
               {/* Right Panel - Content Pane with enhanced error handling */}
-              <div className="flex-1 min-w-0 flex flex-col">
+              <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
                 {contentError ? (
                   <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
                     <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
