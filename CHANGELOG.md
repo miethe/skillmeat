@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Settings API & GitHub Authentication
+- **GitHub PAT Settings**: Settings page now allows users to configure a GitHub Personal Access Token
+  - Improves API rate limits from 60 req/hr (unauthenticated) to 5,000 req/hr (authenticated)
+  - Token validation against GitHub API before storage
+  - Secure storage in ConfigManager (`~/.skillmeat/config.toml`)
+  - Supports both classic (`ghp_`) and fine-grained (`github_pat_`) PAT formats
+- **Settings API**: New `/api/v1/settings/` router with endpoints:
+  - `POST /github-token` - Set token (validates format and GitHub API access)
+  - `GET /github-token/status` - Check if token is configured (returns masked token, username)
+  - `POST /github-token/validate` - Validate token without storing
+  - `DELETE /github-token` - Clear configured token
+- **Settings UI**: GitHub Settings component on `/settings` page with:
+  - Token input with show/hide toggle
+  - Client-side format validation
+  - Status display showing configured username
+  - Clear token functionality
+
 #### Unified Artifact Detection System (feat/artifact-detection-standardization)
 
 - **Core Detection Module**: New `skillmeat/core/artifact_detection.py` (771 lines) provides single source of truth for artifact type definitions, structural signatures, and detection logic
