@@ -88,6 +88,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     set_service_start_time()
 
+    # Ensure default collection exists and migrate existing artifacts
+    try:
+        from skillmeat.api.routers.user_collections import (
+            ensure_default_collection,
+            migrate_artifacts_to_default_collection,
+        )
+        from skillmeat.cache.models import get_session
+
+        session = get_session()
+        try:
+            ensure_default_collection(session)
+            logger.info("Default collection verified/created")
+
+            # Migrate existing artifacts to default collection
+            if app_state.artifact_manager and app_state.collection_manager:
+                result = migrate_artifacts_to_default_collection(
+                    session=session,
+                    artifact_mgr=app_state.artifact_manager,
+                    collection_mgr=app_state.collection_manager,
+                )
+                logger.info(
+                    f"Artifact migration: {result['migrated_count']} migrated, "
+                    f"{result['already_present_count']} already present, "
+                    f"{result['total_artifacts']} total"
+                )
+        finally:
+            session.close()
+    except Exception as e:
+        logger.warning(f"Could not ensure default collection or migrate artifacts: {e}")
+
     logger.info(f"SkillMeat API v{skillmeat_version} started successfully")
 
     yield

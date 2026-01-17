@@ -64,7 +64,10 @@ export function CollectionSwitcher({
     ? collections.find((c) => c.id === selectedCollectionId)
     : null;
 
-  const displayName = currentCollection?.name ?? 'All Collections';
+  // Show "All Collections" only when explicitly viewing all, otherwise show collection name
+  const displayName = selectedCollectionId === null || selectedCollectionId === 'all'
+    ? 'All Collections'
+    : currentCollection?.name ?? 'Default Collection';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -97,6 +100,7 @@ export function CollectionSwitcher({
               >
                 <Layers className="mr-2 h-4 w-4" />
                 <span>All Collections</span>
+                {/* Show check when explicitly viewing "all" (null means user selected all collections) */}
                 {selectedCollectionId === null && (
                   <Check className="ml-auto h-4 w-4" />
                 )}

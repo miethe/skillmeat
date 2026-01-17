@@ -73,6 +73,15 @@ from sqlalchemy.orm import (
 
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+# Default collection for artifacts not explicitly assigned to a collection
+DEFAULT_COLLECTION_ID = "default"
+DEFAULT_COLLECTION_NAME = "Default Collection"
+
+
+# =============================================================================
 # Base Class
 # =============================================================================
 
