@@ -13,6 +13,7 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
@@ -28,6 +29,9 @@ from skillmeat.api.schemas.user_collections import (
 )
 from skillmeat.api.services import get_artifact_metadata
 from skillmeat.cache.models import (
+    DEFAULT_COLLECTION_ID,
+    DEFAULT_COLLECTION_NAME,
+    Artifact,
     Collection,
     CollectionArtifact,
     Group,
@@ -169,6 +173,175 @@ def collection_to_response_with_groups(
         **base_response.model_dump(),
         groups=groups,
     )
+
+
+def ensure_default_collection(session: Session) -> Collection:
+    """Ensure the default collection exists, creating it if necessary.
+
+    This function should be called during server startup to guarantee
+    the default collection exists for artifact assignments.
+
+    Args:
+        session: Database session
+
+    Returns:
+        The default Collection instance (existing or newly created)
+    """
+    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
+    if existing:
+        logger.debug(f"Default collection '{DEFAULT_COLLECTION_ID}' already exists")
+        return existing
+
+    default_collection = Collection(
+        id=DEFAULT_COLLECTION_ID,
+        name=DEFAULT_COLLECTION_NAME,
+        description="Default collection for all artifacts. Artifacts are automatically added here when no specific collection is specified.",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    session.add(default_collection)
+    session.commit()
+    logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
+    return default_collection
+
+
+def migrate_artifacts_to_default_collection(
+    session: Session,
+    artifact_mgr,
+    collection_mgr,
+) -> dict:
+    """Migrate all existing artifacts to the default collection.
+
+    This function ensures all artifacts from file-system collections
+    are also registered in the default database collection, enabling
+    them to use Groups and other collection features.
+
+    Args:
+        session: Database session
+        artifact_mgr: Artifact manager for listing artifacts
+        collection_mgr: Collection manager for listing collections
+
+    Returns:
+        dict with migration stats: migrated_count, already_present_count, total_artifacts
+    """
+    # Ensure default collection exists first
+    ensure_default_collection(session)
+
+    # Get all artifacts from all file-system collections
+    all_artifact_ids = set()
+    for coll_name in collection_mgr.list_collections():
+        try:
+            artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
+            for artifact in artifacts:
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+                all_artifact_ids.add(artifact_id)
+        except Exception as e:
+            logger.warning(f"Failed to load artifacts from collection '{coll_name}': {e}")
+            continue
+
+    logger.info(f"Found {len(all_artifact_ids)} unique artifacts across all collections")
+
+    # Get existing associations for the default collection
+    existing_associations = session.query(CollectionArtifact.artifact_id).filter_by(
+        collection_id=DEFAULT_COLLECTION_ID
+    ).all()
+    existing_artifact_ids = {row[0] for row in existing_associations}
+
+    # Find artifacts not yet in default collection
+    missing_artifact_ids = all_artifact_ids - existing_artifact_ids
+
+    # Add missing artifacts to default collection
+    migrated_count = 0
+    for artifact_id in missing_artifact_ids:
+        try:
+            new_association = CollectionArtifact(
+                collection_id=DEFAULT_COLLECTION_ID,
+                artifact_id=artifact_id,
+                added_at=datetime.utcnow(),
+            )
+            session.add(new_association)
+            migrated_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to add artifact '{artifact_id}' to default collection: {e}")
+            continue
+
+    if migrated_count > 0:
+        session.commit()
+        logger.info(f"Migrated {migrated_count} artifacts to default collection")
+
+    return {
+        "migrated_count": migrated_count,
+        "already_present_count": len(existing_artifact_ids),
+        "total_artifacts": len(all_artifact_ids),
+    }
+
+
+# =============================================================================
+# Migration Endpoint
+# =============================================================================
+
+
+@router.post(
+    "/migrate-to-default",
+    summary="Migrate all artifacts to default collection",
+    description=(
+        "Ensures all existing artifacts from file-system collections are registered "
+        "in the default database collection. This enables Groups and other collection "
+        "features for all artifacts. Safe to run multiple times - only adds missing entries."
+    ),
+    responses={
+        200: {"description": "Migration completed successfully"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def migrate_to_default_collection(
+    session: DbSessionDep,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+) -> dict:
+    """Migrate all artifacts to the default collection.
+
+    This endpoint ensures all artifacts from file-system collections are
+    registered in the default database collection, enabling them to use
+    Groups and other collection features.
+
+    Args:
+        session: Database session
+        artifact_mgr: Artifact manager for listing artifacts
+        collection_mgr: Collection manager for listing collections
+        token: Authentication token
+
+    Returns:
+        Migration statistics with counts
+
+    Note:
+        This operation is idempotent - running it multiple times will not
+        create duplicate entries.
+    """
+    try:
+        result = migrate_artifacts_to_default_collection(
+            session=session,
+            artifact_mgr=artifact_mgr,
+            collection_mgr=collection_mgr,
+        )
+
+        logger.info(
+            f"Migration completed: {result['migrated_count']} migrated, "
+            f"{result['already_present_count']} already present"
+        )
+
+        return {
+            "success": True,
+            "message": f"Migrated {result['migrated_count']} artifacts to default collection",
+            **result,
+        }
+    except Exception as e:
+        logger.exception(f"Migration failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Migration failed: {str(e)}",
+        )
 
 
 # =============================================================================
