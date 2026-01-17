@@ -43,11 +43,20 @@ class TestUpdateSourceManualMapValidation:
         source.created_at = datetime(2025, 1, 6, 12, 0, 0)
         source.updated_at = datetime(2025, 1, 6, 12, 0, 0)
 
-        # Add set_manual_map_dict method to mock
+        # Add set_manual_map_dict and get_manual_map_dict methods to mock
         def set_manual_map_dict(manual_map_dict):
             source.manual_map = json.dumps(manual_map_dict)
 
+        def get_manual_map_dict():
+            if not source.manual_map:
+                return None
+            try:
+                return json.loads(source.manual_map)
+            except json.JSONDecodeError:
+                return None
+
         source.set_manual_map_dict = set_manual_map_dict
+        source.get_manual_map_dict = get_manual_map_dict
         return source
 
     @pytest.fixture
@@ -87,7 +96,7 @@ class TestUpdateSourceManualMapValidation:
 
             # Setup scanner mock
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_with_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Execute update
@@ -128,7 +137,7 @@ class TestUpdateSourceManualMapValidation:
 
             # Setup scanner mock
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_with_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Execute update - should raise 422
@@ -171,7 +180,7 @@ class TestUpdateSourceManualMapValidation:
 
             # Setup scanner mock
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_with_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_with_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Execute update

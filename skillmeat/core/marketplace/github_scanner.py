@@ -5,15 +5,18 @@ and returns discovered artifacts with metadata.
 """
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import requests
-
 from skillmeat.api.schemas.marketplace import DetectedArtifact, ScanResultDTO
+from skillmeat.core.github_client import (
+    GitHubClient,
+    GitHubClientError,
+    GitHubRateLimitError,
+    GitHubNotFoundError,
+)
 from skillmeat.core.marketplace.observability import (
     MarketplaceOperation,
     operation_context,
@@ -69,7 +72,7 @@ def compute_artifact_hash_from_tree(
             if item_path == artifact_path:
                 rel_path = item_path.split("/")[-1]  # Just filename
             else:
-                rel_path = item_path[len(artifact_path) + 1:]  # Remove prefix
+                rel_path = item_path[len(artifact_path) + 1 :]  # Remove prefix
             blob_sha = item.get("sha", "")
             if blob_sha:
                 file_entries.append(f"{rel_path}:{blob_sha}")
@@ -175,7 +178,7 @@ class ScanConfig:
 class GitHubScanner:
     """Scans GitHub repositories for Claude Code artifacts.
 
-    Uses GitHub's Contents API to fetch repository tree and applies
+    Uses the centralized GitHubClient to fetch repository tree and applies
     heuristic detection to identify artifacts.
 
     Example:
@@ -188,8 +191,6 @@ class GitHubScanner:
         >>> print(f"Found {result.artifacts_found} artifacts")
     """
 
-    API_BASE = "https://api.github.com"
-
     def __init__(
         self,
         token: Optional[str] = None,
@@ -198,24 +199,30 @@ class GitHubScanner:
         """Initialize scanner with optional authentication.
 
         Args:
-            token: GitHub Personal Access Token (recommended for higher rate limits)
+            token: GitHub Personal Access Token (recommended for higher rate limits).
+                If not provided, token is resolved from ConfigManager,
+                SKILLMEAT_GITHUB_TOKEN, or GITHUB_TOKEN environment variables.
             config: Optional scanning configuration
         """
-        self.token = (
-            token
-            or os.environ.get("SKILLMEAT_GITHUB_TOKEN")
-            or os.environ.get("GITHUB_TOKEN")
-        )
         self.config = config or ScanConfig()
-        self.session = requests.Session()
-
-        if self.token:
-            self.session.headers["Authorization"] = f"token {self.token}"
-
-        self.session.headers["Accept"] = "application/vnd.github.v3+json"
-        self.session.headers["User-Agent"] = "SkillMeat/1.0"
-
+        self._client = GitHubClient(token)
         self.detector = HeuristicDetector()
+
+    @property
+    def token(self) -> Optional[str]:
+        """Get the resolved GitHub token (for backward compatibility)."""
+        return self._client.token
+
+    def get_rate_limit(self) -> Dict[str, Any]:
+        """Get current GitHub API rate limit information.
+
+        Returns:
+            Dictionary containing:
+                - remaining: int - Requests remaining
+                - limit: int - Total request limit
+                - reset: datetime - When limit resets (UTC)
+        """
+        return self._client.get_rate_limit()
 
     def scan_repository(
         self,
@@ -453,37 +460,30 @@ class GitHubScanner:
         Raises:
             GitHubAPIError: If API call fails
         """
-        url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
+        owner_repo = f"{owner}/{repo}"
         actual_ref = ref  # Track which ref was actually used
 
         try:
-            response = self._request_with_retry(url)
-        except GitHubAPIError as e:
+            tree = self._client.get_repo_tree(owner_repo, ref=ref, recursive=True)
+            return tree, actual_ref
+        except GitHubNotFoundError:
             # If ref="main" fails with 404, try actual default branch
-            if "404" in str(e) and ref == "main":
+            if ref == "main":
                 logger.warning(
-                    f"Branch 'main' not found for {owner}/{repo}, "
+                    f"Branch 'main' not found for {owner_repo}, "
                     "fetching actual default branch"
                 )
                 actual_default = self._get_default_branch(owner, repo)
                 if actual_default != "main":
                     logger.info(
                         f"Retrying with default branch '{actual_default}' "
-                        f"for {owner}/{repo}"
+                        f"for {owner_repo}"
                     )
-                    url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{actual_default}?recursive=1"
-                    response = self._request_with_retry(url)
-                    actual_ref = actual_default  # Update to reflect actual branch used
-                else:
-                    raise
-            else:
-                raise
-
-        data = response.json()
-        if "tree" not in data:
-            raise GitHubAPIError(f"Invalid tree response: {data}")
-
-        return data["tree"], actual_ref
+                    tree = self._client.get_repo_tree(
+                        owner_repo, ref=actual_default, recursive=True
+                    )
+                    return tree, actual_default
+            raise
 
     def _extract_file_paths(
         self,
@@ -538,72 +538,10 @@ class GitHubScanner:
             Commit SHA
 
         Raises:
-            GitHubAPIError: If API call fails
+            GitHubClientError: If API call fails
         """
-        url = f"{self.API_BASE}/repos/{owner}/{repo}/commits/{ref}"
-        response = self._request_with_retry(url)
-        data = response.json()
-        return data.get("sha", "")
-
-    def _request_with_retry(self, url: str) -> requests.Response:
-        """Make HTTP request with retry logic for rate limits.
-
-        Implements exponential backoff for transient failures and handles
-        GitHub rate limiting with appropriate wait times.
-
-        Args:
-            url: URL to request
-
-        Returns:
-            Response object
-
-        Raises:
-            GitHubAPIError: If request fails after retries
-            RateLimitError: If rate limited and cannot wait
-        """
-        for attempt in range(self.config.retry_count):
-            try:
-                response = self.session.get(url, timeout=self.config.timeout)
-
-                # Check for rate limiting (403 with rate limit headers)
-                if response.status_code == 403:
-                    remaining = response.headers.get("X-RateLimit-Remaining", "0")
-                    if remaining == "0":
-                        reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
-                        wait_time = max(reset_time - time.time(), 0)
-                        if wait_time < 60:  # Only wait if less than 1 minute
-                            logger.warning(f"Rate limited, waiting {wait_time:.0f}s")
-                            time.sleep(wait_time + 1)
-                            continue
-                        raise RateLimitError(f"Rate limited, reset in {wait_time:.0f}s")
-
-                # Check for explicit rate limit response (429)
-                if response.status_code == 429:
-                    retry_after = int(
-                        response.headers.get("Retry-After", self.config.retry_delay)
-                    )
-                    if retry_after < 60:
-                        time.sleep(retry_after)
-                        continue
-                    raise RateLimitError(f"Rate limited for {retry_after}s")
-
-                response.raise_for_status()
-                return response
-
-            except requests.exceptions.RequestException as e:
-                if attempt < self.config.retry_count - 1:
-                    wait_time = self.config.retry_delay * (2**attempt)
-                    logger.warning(
-                        f"Request failed (attempt {attempt + 1}), "
-                        f"retrying in {wait_time}s: {e}"
-                    )
-                    time.sleep(wait_time)
-                else:
-                    raise GitHubAPIError(
-                        f"Request failed after {self.config.retry_count} attempts: {e}"
-                    ) from e
-
-        raise GitHubAPIError("Max retries exceeded")
+        owner_repo = f"{owner}/{repo}"
+        return self._client.resolve_version(owner_repo, ref)
 
     def get_file_tree(
         self,
@@ -631,8 +569,8 @@ class GitHubScanner:
                 - sha: Git blob/tree SHA
 
         Raises:
-            GitHubAPIError: If API call fails
-            RateLimitError: If rate limited and retries exhausted
+            GitHubClientError: If API call fails
+            GitHubRateLimitError: If rate limited
 
         Example:
             >>> scanner = GitHubScanner(token="ghp_...")
@@ -644,50 +582,22 @@ class GitHubScanner:
             >>> for f in files:
             ...     print(f"{f['type']}: {f['path']} ({f.get('size', 'dir')})")
         """
-        # If no SHA provided, get the default branch SHA
-        if sha is None:
-            sha = self._get_default_branch_sha(owner, repo)
+        owner_repo = f"{owner}/{repo}"
 
-        # Fetch recursive tree
-        url = f"{self.API_BASE}/repos/{owner}/{repo}/git/trees/{sha}?recursive=1"
-        response = self._request_with_retry(url)
-        data = response.json()
-
-        if "tree" not in data:
-            raise GitHubAPIError(f"Invalid tree response: missing 'tree' key")
-
-        tree = data["tree"]
+        # Fetch recursive tree using the ref (sha) if provided
+        tree = self._client.get_repo_tree(owner_repo, ref=sha, recursive=True)
 
         # Filter by path prefix if provided
         if path:
             path_normalized = path.rstrip("/")
-            filtered_tree = []
-            for item in tree:
-                item_path = item.get("path", "")
-                # Include items that:
-                # 1. Start with the path prefix followed by /
-                # 2. Exactly match the path (for the directory itself)
-                if (
-                    item_path.startswith(f"{path_normalized}/")
-                    or item_path == path_normalized
-                ):
-                    filtered_tree.append(item)
-            tree = filtered_tree
+            tree = [
+                item
+                for item in tree
+                if item["path"].startswith(f"{path_normalized}/")
+                or item["path"] == path_normalized
+            ]
 
-        # Return normalized entries
-        result = []
-        for item in tree:
-            entry = {
-                "path": item.get("path", ""),
-                "type": item.get("type", ""),
-                "sha": item.get("sha", ""),
-            }
-            # Only include size for blobs (files)
-            if item.get("type") == "blob" and "size" in item:
-                entry["size"] = item["size"]
-            result.append(entry)
-
-        return result
+        return tree
 
     def _get_default_branch(self, owner: str, repo: str) -> str:
         """Get the repository's default branch name.
@@ -700,12 +610,11 @@ class GitHubScanner:
             Name of the default branch (e.g., "main", "master")
 
         Raises:
-            GitHubAPIError: If API call fails
+            GitHubClientError: If API call fails
         """
-        url = f"{self.API_BASE}/repos/{owner}/{repo}"
-        response = self._request_with_retry(url)
-        data = response.json()
-        return data.get("default_branch", "main")
+        owner_repo = f"{owner}/{repo}"
+        metadata = self._client.get_repo_metadata(owner_repo)
+        return metadata["default_branch"]
 
     def _get_default_branch_sha(self, owner: str, repo: str) -> str:
         """Get the SHA of the repository's default branch.
@@ -718,12 +627,11 @@ class GitHubScanner:
             SHA of the default branch HEAD commit
 
         Raises:
-            GitHubAPIError: If API call fails
+            GitHubClientError: If API call fails
         """
-        default_branch = self._get_default_branch(owner, repo)
-
-        # Get the SHA for the default branch
-        return self._get_ref_sha(owner, repo, default_branch)
+        owner_repo = f"{owner}/{repo}"
+        # "latest" resolves to the default branch HEAD
+        return self._client.resolve_version(owner_repo, "latest")
 
     # File content truncation constants
     MAX_FILE_SIZE = 1_048_576  # 1MB
@@ -738,7 +646,7 @@ class GitHubScanner:
     ) -> Dict[str, Any] | None:
         """Fetch content and metadata of a specific file from GitHub.
 
-        Uses the GitHub Contents API to retrieve file content along with
+        Uses the centralized GitHubClient to retrieve file content along with
         metadata like size, SHA, and encoding information.
 
         Large text files (>1MB) are automatically truncated to the first
@@ -755,9 +663,8 @@ class GitHubScanner:
         Returns:
             Dict containing:
                 - content: Decoded file content (str for text, base64 for binary)
-                - encoding: Original encoding from API ("base64" or "none")
+                - encoding: "utf-8" for text, "base64" for binary
                 - size: File size in bytes (truncated size if truncated)
-                - sha: Git blob SHA
                 - name: File name
                 - path: Full path within repo
                 - is_binary: Whether file appears to be binary
@@ -767,8 +674,8 @@ class GitHubScanner:
             Returns None if file not found (404).
 
         Raises:
-            GitHubAPIError: If API call fails (non-404 errors)
-            RateLimitError: If rate limited and retries exhausted
+            GitHubClientError: If API call fails (non-404 errors)
+            GitHubRateLimitError: If rate limited
 
         Example:
             >>> scanner = GitHubScanner(token="ghp_...")
@@ -784,38 +691,16 @@ class GitHubScanner:
         """
         import base64
 
-        # Build URL with optional ref parameter
-        url = f"{self.API_BASE}/repos/{owner}/{repo}/contents/{path}"
-        if ref:
-            url = f"{url}?ref={ref}"
+        owner_repo = f"{owner}/{repo}"
+        name = path.split("/")[-1] if "/" in path else path
 
         try:
-            response = self._request_with_retry(url)
-        except GitHubAPIError as e:
-            # Check if this is a 404 error (file not found)
-            if "404" in str(e):
-                logger.debug(f"File not found: {owner}/{repo}/{path}")
-                return None
-            raise
-
-        # Handle 404 response that didn't raise (edge case)
-        if response.status_code == 404:
-            logger.debug(f"File not found: {owner}/{repo}/{path}")
+            content_bytes = self._client.get_file_content(owner_repo, path, ref=ref)
+        except GitHubNotFoundError:
+            logger.debug(f"File not found: {owner_repo}/{path}")
             return None
 
-        data = response.json()
-
-        # Ensure this is a file, not a directory
-        if data.get("type") != "file":
-            logger.warning(f"Path is not a file: {owner}/{repo}/{path}")
-            return None
-
-        encoding = data.get("encoding", "none")
-        raw_content = data.get("content", "")
-        size = data.get("size", 0)
-        sha = data.get("sha", "")
-        name = data.get("name", "")
-        file_path = data.get("path", path)
+        size = len(content_bytes)
 
         # Determine if file is binary based on common binary extensions
         binary_extensions = {
@@ -856,21 +741,22 @@ class GitHubScanner:
 
         # Decode content
         decoded_content: str
-        if encoding == "base64" and raw_content:
-            if is_binary:
-                # For binary files, keep as base64 to avoid encoding issues
-                decoded_content = raw_content.replace("\n", "")
-            else:
-                # For text files, decode to UTF-8 string
-                try:
-                    decoded_content = base64.b64decode(raw_content).decode("utf-8")
-                except UnicodeDecodeError:
-                    # File is binary despite extension, keep as base64
-                    logger.debug(f"Binary content detected for: {path}")
-                    is_binary = True
-                    decoded_content = raw_content.replace("\n", "")
+        encoding: str
+        if is_binary:
+            # For binary files, keep as base64 to avoid encoding issues
+            decoded_content = base64.b64encode(content_bytes).decode("ascii")
+            encoding = "base64"
         else:
-            decoded_content = raw_content
+            # For text files, decode to UTF-8 string
+            try:
+                decoded_content = content_bytes.decode("utf-8")
+                encoding = "utf-8"
+            except UnicodeDecodeError:
+                # File is binary despite extension, keep as base64
+                logger.debug(f"Binary content detected for: {path}")
+                is_binary = True
+                decoded_content = base64.b64encode(content_bytes).decode("ascii")
+                encoding = "base64"
 
         # Apply truncation for large text files
         truncated = False
@@ -890,23 +776,33 @@ class GitHubScanner:
             "content": decoded_content,
             "encoding": encoding,
             "size": len(decoded_content) if truncated else size,
-            "sha": sha,
             "name": name,
-            "path": file_path,
+            "path": path,
             "is_binary": is_binary,
             "truncated": truncated,
             "original_size": original_size,
         }
 
 
-class GitHubAPIError(Exception):
-    """Error from GitHub API."""
+class GitHubAPIError(GitHubClientError):
+    """Error from GitHub API.
+
+    Deprecated: Use GitHubClientError from skillmeat.core.github_client instead.
+    This class is kept for backward compatibility.
+    """
 
     pass
 
 
-class RateLimitError(GitHubAPIError):
-    """Rate limit exceeded."""
+class RateLimitError(GitHubRateLimitError, GitHubAPIError):
+    """Rate limit exceeded.
+
+    Deprecated: Use GitHubRateLimitError from skillmeat.core.github_client instead.
+    This class is kept for backward compatibility.
+
+    Note: Inherits from both GitHubRateLimitError (new) and GitHubAPIError (legacy)
+    to maintain backward compatibility with code that catches GitHubAPIError.
+    """
 
     pass
 
@@ -950,7 +846,7 @@ def scan_github_source(
     artifacts = detect_artifacts_in_tree(
         file_paths,
         repo_url=repo_url,
-        _ref=actual_ref,
+        ref=actual_ref,
         root_hint=root_hint,
         detected_sha=commit_sha,
     )
