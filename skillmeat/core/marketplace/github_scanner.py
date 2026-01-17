@@ -695,7 +695,9 @@ class GitHubScanner:
         name = path.split("/")[-1] if "/" in path else path
 
         try:
-            content_bytes = self._client.get_file_content(owner_repo, path, ref=ref)
+            file_data = self._client.get_file_with_metadata(owner_repo, path, ref=ref)
+            content_bytes = file_data["content"]
+            file_sha = file_data["sha"]
         except GitHubNotFoundError:
             logger.debug(f"File not found: {owner_repo}/{path}")
             return None
@@ -776,6 +778,7 @@ class GitHubScanner:
             "content": decoded_content,
             "encoding": encoding,
             "size": len(decoded_content) if truncated else size,
+            "sha": file_sha,
             "name": name,
             "path": path,
             "is_binary": is_binary,

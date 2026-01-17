@@ -445,6 +445,58 @@ class GitHubClient:
             self._handle_exception(e, context=f"get_file_content({owner_repo}, {path})")
             raise
 
+    def get_file_with_metadata(
+        self, owner_repo: str, path: str, ref: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get file content with metadata from a repository.
+
+        Unlike get_file_content() which returns only bytes, this method
+        returns a dictionary with content, SHA, and other metadata.
+
+        Args:
+            owner_repo: Repository in "owner/repo" format
+            path: Path to file within repository
+            ref: Git ref (branch, tag, SHA). Defaults to default branch.
+
+        Returns:
+            Dictionary containing:
+                - content: bytes - Raw file content
+                - sha: str - Git blob SHA
+                - size: int - File size in bytes
+                - name: str - File name
+
+        Raises:
+            GitHubNotFoundError: If file or repository not found
+            GitHubRateLimitError: If rate limit exceeded
+            GitHubClientError: For other errors (e.g., path is a directory)
+        """
+        repo = self.get_repo(owner_repo)
+        try:
+            content_file = repo.get_contents(
+                path, ref=ref if ref is not None else NotSet
+            )
+
+            if isinstance(content_file, ContentFile):
+                if content_file.type != "file":
+                    raise GitHubClientError(
+                        f"Path '{path}' is not a file (type: {content_file.type})"
+                    )
+                return {
+                    "content": content_file.decoded_content,
+                    "sha": content_file.sha,
+                    "size": content_file.size,
+                    "name": content_file.name,
+                }
+
+            if isinstance(content_file, list):
+                raise GitHubClientError(f"Path '{path}' is a directory, not a file")
+
+            raise GitHubClientError(f"Unexpected content type for '{path}'")
+
+        except GithubException as e:
+            self._handle_exception(e, context=f"get_file_with_metadata({owner_repo}, {path})")
+            raise
+
     def get_repo_tree(
         self, owner_repo: str, ref: Optional[str] = None, recursive: bool = True
     ) -> List[Dict[str, Any]]:
