@@ -84,7 +84,7 @@ class TestManualMapErrorResponses:
                 "skillmeat.api.routers.marketplace_sources.GitHubScanner"
             ) as mock_scanner_class:
                 mock_scanner = Mock()
-                mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+                mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
                 mock_scanner_class.return_value = mock_scanner
 
                 response = client.patch(
@@ -116,7 +116,7 @@ class TestManualMapErrorResponses:
                 "skillmeat.api.routers.marketplace_sources.GitHubScanner"
             ) as mock_scanner_class:
                 mock_scanner = Mock()
-                mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+                mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
                 mock_scanner_class.return_value = mock_scanner
 
                 response = client.patch(
@@ -291,7 +291,7 @@ class TestManualMapErrorResponses:
                 "skillmeat.api.routers.marketplace_sources.GitHubScanner"
             ) as mock_scanner_class:
                 mock_scanner = Mock()
-                mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+                mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
                 mock_scanner_class.return_value = mock_scanner
 
                 response = client.patch(
@@ -349,7 +349,7 @@ class TestManualMapErrorResponses:
                     "skillmeat.api.routers.marketplace_sources.GitHubScanner"
                 ) as mock_scanner_class:
                     mock_scanner = Mock()
-                    mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+                    mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
                     mock_scanner_class.return_value = mock_scanner
 
                     response = client.patch(

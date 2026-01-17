@@ -8,7 +8,6 @@ import logging
 import re
 from typing import Optional
 
-import requests
 from fastapi import APIRouter, HTTPException, status
 
 from skillmeat.api.dependencies import ConfigManagerDep
@@ -17,6 +16,11 @@ from skillmeat.api.schemas.settings import (
     GitHubTokenStatusResponse,
     GitHubTokenValidationResponse,
     MessageResponse,
+)
+from skillmeat.core.github_client import (
+    GitHubAuthError,
+    GitHubClientWrapper,
+    GitHubRateLimitError,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,67 +66,6 @@ def _mask_token(token: str) -> str:
     return f"{token[:7]}..."
 
 
-async def _validate_github_token(
-    token: str,
-) -> tuple[bool, Optional[str], Optional[list[str]], Optional[int], Optional[int]]:
-    """Validate a GitHub token against the GitHub API.
-
-    Args:
-        token: GitHub Personal Access Token to validate
-
-    Returns:
-        Tuple of (valid, username, scopes, rate_limit, rate_remaining)
-    """
-    try:
-        response = requests.get(
-            "https://api.github.com/user",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-            timeout=10,
-        )
-
-        if response.status_code == 200:
-            user_data = response.json()
-            username = user_data.get("login")
-
-            # Parse rate limit headers
-            rate_limit = response.headers.get("X-RateLimit-Limit")
-            rate_remaining = response.headers.get("X-RateLimit-Remaining")
-
-            # Parse OAuth scopes
-            scopes_header = response.headers.get("X-OAuth-Scopes", "")
-            scopes = [s.strip() for s in scopes_header.split(",") if s.strip()]
-
-            return (
-                True,
-                username,
-                scopes if scopes else None,
-                int(rate_limit) if rate_limit else None,
-                int(rate_remaining) if rate_remaining else None,
-            )
-
-        logger.warning(
-            f"GitHub token validation failed with status {response.status_code}"
-        )
-        return (False, None, None, None, None)
-
-    except requests.exceptions.Timeout:
-        logger.error("GitHub API request timed out during token validation")
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="GitHub API request timed out",
-        )
-    except requests.exceptions.RequestException as e:
-        logger.error(f"GitHub API request failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to connect to GitHub API: {str(e)}",
-        )
-
-
 @router.post(
     "/github-token",
     response_model=MessageResponse,
@@ -157,6 +100,7 @@ async def set_github_token(
     Raises:
         HTTPException 400: If token format is invalid
         HTTPException 401: If token is not valid with GitHub
+        HTTPException 429: If rate limited by GitHub
         HTTPException 502/504: If GitHub API is unreachable
     """
     token = request.token.strip()
@@ -169,15 +113,37 @@ async def set_github_token(
             detail="Invalid token format. Token must start with 'ghp_' (classic) or 'github_pat_' (fine-grained)",
         )
 
-    # Validate token against GitHub API
-    valid, username, _, _, _ = await _validate_github_token(token)
+    # Validate token against GitHub API using wrapper
+    try:
+        wrapper = GitHubClientWrapper(token=token)
+        result = wrapper.validate_token()
+    except GitHubAuthError as e:
+        logger.warning(f"GitHub token validation failed - auth error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid GitHub token. The token could not be authenticated with GitHub.",
+        )
+    except GitHubRateLimitError as e:
+        logger.warning(f"GitHub API rate limit exceeded: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"GitHub API rate limit exceeded. {e}",
+        )
+    except Exception as e:
+        logger.error(f"GitHub API request failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to GitHub API: {str(e)}",
+        )
 
-    if not valid:
+    if not result.get("valid"):
         logger.warning("GitHub token validation failed - invalid credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid GitHub token. The token could not be authenticated with GitHub.",
         )
+
+    username = result.get("username")
 
     # Store the token
     config.set(GITHUB_TOKEN_CONFIG_KEY, token)
@@ -213,6 +179,7 @@ async def get_github_token_status(
     Returns:
         Token status with masked token and username if configured
     """
+    # Check ConfigManager first (ensures CLI-set tokens are visible in web UI)
     token = config.get(GITHUB_TOKEN_CONFIG_KEY)
 
     if not token:
@@ -222,11 +189,12 @@ async def get_github_token_status(
             username=None,
         )
 
-    # Get username from GitHub API
+    # Get username from GitHub API using wrapper
     username = None
     try:
-        valid, username, _, _, _ = await _validate_github_token(token)
-        if not valid:
+        wrapper = GitHubClientWrapper(token=token)
+        result = wrapper.validate_token()
+        if not result.get("valid"):
             # Token exists but is no longer valid
             logger.warning("Stored GitHub token is no longer valid")
             return GitHubTokenStatusResponse(
@@ -234,7 +202,16 @@ async def get_github_token_status(
                 masked_token=_mask_token(token),
                 username=None,
             )
-    except HTTPException:
+        username = result.get("username")
+    except GitHubAuthError:
+        # Token exists but is invalid
+        logger.warning("Stored GitHub token failed authentication")
+        return GitHubTokenStatusResponse(
+            is_set=True,
+            masked_token=_mask_token(token),
+            username=None,
+        )
+    except (GitHubRateLimitError, Exception):
         # API error - still report token exists
         logger.warning("Could not verify stored GitHub token with API")
 
@@ -271,6 +248,7 @@ async def validate_github_token(
 
     Raises:
         HTTPException 400: If token format is invalid
+        HTTPException 429: If rate limited by GitHub
         HTTPException 502/504: If GitHub API is unreachable
     """
     token = request.token.strip()
@@ -283,17 +261,41 @@ async def validate_github_token(
             detail="Invalid token format. Token must start with 'ghp_' (classic) or 'github_pat_' (fine-grained)",
         )
 
-    # Validate against GitHub API
-    valid, username, scopes, rate_limit, rate_remaining = await _validate_github_token(
-        token
-    )
+    # Validate against GitHub API using wrapper
+    try:
+        wrapper = GitHubClientWrapper(token=token)
+        result = wrapper.validate_token()
+    except GitHubAuthError:
+        # Return validation failure (not an HTTP error for this endpoint)
+        return GitHubTokenValidationResponse(
+            valid=False,
+            username=None,
+            scopes=None,
+            rate_limit=None,
+            rate_remaining=None,
+        )
+    except GitHubRateLimitError as e:
+        logger.warning(f"GitHub API rate limit exceeded: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"GitHub API rate limit exceeded. {e}",
+        )
+    except Exception as e:
+        logger.error(f"GitHub API request failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to GitHub API: {str(e)}",
+        )
+
+    # Extract rate limit info from result
+    rate_limit_info = result.get("rate_limit", {})
 
     return GitHubTokenValidationResponse(
-        valid=valid,
-        username=username,
-        scopes=scopes,
-        rate_limit=rate_limit,
-        rate_remaining=rate_remaining,
+        valid=result.get("valid", False),
+        username=result.get("username"),
+        scopes=result.get("scopes"),
+        rate_limit=rate_limit_info.get("limit") if rate_limit_info else None,
+        rate_remaining=rate_limit_info.get("remaining") if rate_limit_info else None,
     )
 
 

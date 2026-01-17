@@ -1,19 +1,23 @@
 """GitHub artifact source implementation."""
 
-import os
 import shutil
 import subprocess
 import tempfile
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
-import requests
 from rich.console import Console
 
 from skillmeat.core.artifact import Artifact, ArtifactType
+from skillmeat.core.github_client import GitHubClient as GitHubClientWrapper
+from skillmeat.core.github_client import (
+    GitHubAuthError,
+    GitHubClientError,
+    GitHubNotFoundError,
+    GitHubRateLimitError,
+)
 from skillmeat.sources.base import ArtifactSource, FetchResult, UpdateInfo
 from skillmeat.utils.metadata import extract_artifact_metadata
 from skillmeat.utils.validator import ArtifactValidator
@@ -89,43 +93,26 @@ class ArtifactSpec:
 
 
 class GitHubClient:
-    """Handles GitHub API and repository operations."""
+    """Handles GitHub API and repository operations.
+
+    This class delegates to GitHubClientWrapper for API operations while
+    maintaining backward compatibility with the existing interface.
+    """
 
     def __init__(self, github_token: Optional[str] = None):
         """Initialize GitHub client.
 
         Args:
-            github_token: GitHub personal access token for authentication
+            github_token: GitHub personal access token for authentication.
+                If not provided, the wrapper handles token resolution from
+                ConfigManager, SKILLMEAT_GITHUB_TOKEN, or GITHUB_TOKEN.
         """
-        self.token = github_token or os.environ.get("GITHUB_TOKEN")
-        self.session = requests.Session()
-        if self.token:
-            self.session.headers["Authorization"] = f"token {self.token}"
+        self._wrapper = GitHubClientWrapper(token=github_token)
 
-    def _retry_with_backoff(self, func, max_retries: int = 3):
-        """Retry function with exponential backoff.
-
-        Args:
-            func: Function to retry
-            max_retries: Maximum number of retries
-
-        Returns:
-            Function result
-
-        Raises:
-            Last exception if all retries fail
-        """
-        for attempt in range(max_retries):
-            try:
-                return func()
-            except requests.exceptions.RequestException as e:
-                if attempt == max_retries - 1:
-                    raise
-                wait_time = 2**attempt
-                console.print(
-                    f"[yellow]Request failed, retrying in {wait_time}s...[/yellow]"
-                )
-                time.sleep(wait_time)
+    @property
+    def token(self) -> Optional[str]:
+        """Get the resolved GitHub token."""
+        return self._wrapper.token
 
     def resolve_version(self, spec: ArtifactSpec) -> Tuple[str, Optional[str]]:
         """Resolve version spec to concrete SHA and version tag.
@@ -145,64 +132,29 @@ class GitHubClient:
         Raises:
             RuntimeError: If version resolution fails
         """
-        if spec.version == "latest":
-            # Get default branch and latest commit
-            def get_default_branch():
-                url = f"https://api.github.com/repos/{spec.username}/{spec.repo}"
-                response = self.session.get(url, timeout=10)
-                response.raise_for_status()
-                return response.json()["default_branch"]
+        owner_repo = f"{spec.username}/{spec.repo}"
 
-            default_branch = self._retry_with_backoff(get_default_branch)
+        try:
+            sha = self._wrapper.resolve_version(owner_repo, spec.version)
 
-            def get_latest_commit():
-                url = f"https://api.github.com/repos/{spec.username}/{spec.repo}/commits/{default_branch}"
-                response = self.session.get(url, timeout=10)
-                response.raise_for_status()
-                return response.json()["sha"]
+            # Determine resolved_version: only set for tags
+            resolved_version = None
+            if spec.version.startswith("v") or "." in spec.version:
+                # If it looks like a tag and we got here, it's a valid tag
+                resolved_version = spec.version
 
-            sha = self._retry_with_backoff(get_latest_commit)
-            return sha, None
+            return sha, resolved_version
 
-        elif spec.version.startswith("v") or "." in spec.version:
-            # Assume it's a tag
-            def get_tag_sha():
-                url = f"https://api.github.com/repos/{spec.username}/{spec.repo}/git/ref/tags/{spec.version}"
-                response = self.session.get(url, timeout=10)
-                response.raise_for_status()
-                return response.json()["object"]["sha"]
-
-            try:
-                sha = self._retry_with_backoff(get_tag_sha)
-                return sha, spec.version
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 404:
-                    raise RuntimeError(f"Tag '{spec.version}' not found in repository")
-                raise
-
-        elif len(spec.version) >= 7 and all(
-            c in "0123456789abcdef" for c in spec.version
-        ):
-            # Assume it's a SHA - validate it exists
-            def validate_sha():
-                url = f"https://api.github.com/repos/{spec.username}/{spec.repo}/commits/{spec.version}"
-                response = self.session.get(url, timeout=10)
-                response.raise_for_status()
-                return response.json()["sha"]
-
-            sha = self._retry_with_backoff(validate_sha)
-            return sha, None
-
-        else:
-            # Assume it's a branch name
-            def get_branch_sha():
-                url = f"https://api.github.com/repos/{spec.username}/{spec.repo}/commits/{spec.version}"
-                response = self.session.get(url, timeout=10)
-                response.raise_for_status()
-                return response.json()["sha"]
-
-            sha = self._retry_with_backoff(get_branch_sha)
-            return sha, None
+        except GitHubNotFoundError as e:
+            raise RuntimeError(
+                f"Version '{spec.version}' not found in repository: {e.message}"
+            )
+        except GitHubRateLimitError as e:
+            raise RuntimeError(f"GitHub rate limit exceeded: {e.message}")
+        except GitHubAuthError as e:
+            raise RuntimeError(f"GitHub authentication failed: {e.message}")
+        except GitHubClientError as e:
+            raise RuntimeError(f"Failed to resolve version: {e.message}")
 
     def clone_repo(self, spec: ArtifactSpec, dest_dir: Path, sha: str) -> None:
         """Clone repository to destination and checkout specific SHA.
