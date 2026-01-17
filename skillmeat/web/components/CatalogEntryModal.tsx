@@ -716,7 +716,7 @@ export function CatalogEntryModal({
               </div>
 
               {/* Right Panel - Content Pane with enhanced error handling */}
-              <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex-1 min-w-0 flex flex-col">
                 {contentError ? (
                   <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
                     <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
