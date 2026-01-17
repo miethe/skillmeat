@@ -440,6 +440,29 @@ python -c "from skillmeat.api.server import app; import json; print(json.dumps(a
 
 ---
 
+## External Services
+
+### GitHub API
+
+Use the centralized GitHub client for all GitHub API operations:
+
+```python
+from skillmeat.core.github_client import get_github_client
+
+@router.get("/artifacts/from-github/{owner}/{repo}")
+async def fetch_from_github(
+    owner: str,
+    repo: str,
+) -> ArtifactMetadataResponse:
+    client = get_github_client()
+    metadata = client.get_repo_metadata(f"{owner}/{repo}")
+    return ArtifactMetadataResponse(**metadata)
+```
+
+See `CLAUDE.md` → "GitHub Client" section for full API and error handling patterns.
+
+---
+
 ## Key Patterns
 
 ### Async Handlers
