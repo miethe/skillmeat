@@ -13,3 +13,4 @@ export * from './snapshots';
 export * from './merge';
 export * from './tags';
 export * from './marketplace';
+export * from './settings';
