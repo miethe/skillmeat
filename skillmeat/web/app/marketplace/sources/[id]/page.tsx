@@ -11,6 +11,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
+import { RepoDetailsModal } from '@/components/marketplace/repo-details-modal';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -32,6 +33,7 @@ import {
   Tags,
   MoreVertical,
   FolderTree,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -337,6 +339,7 @@ export default function SourceDetailPage() {
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [directoryMapModalOpen, setDirectoryMapModalOpen] = useState(false);
+  const [repoDetailsModalOpen, setRepoDetailsModalOpen] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(false);
   const [treeError, setTreeError] = useState<string>();
@@ -748,6 +751,13 @@ export default function SourceDetailPage() {
     return pages;
   };
 
+  // Check if source has repo details content to show
+  const hasRepoDetails = source && (
+    source.description ||
+    source.repo_description ||
+    (source as any).readme_content
+  );
+
   // Loading state
   if (sourceLoading) {
     return (
@@ -827,6 +837,27 @@ export default function SourceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Repo Details Button - only show if content is available */}
+          {hasRepoDetails && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setRepoDetailsModalOpen(true)}
+                    aria-label="View repository details"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Repo Details</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           {/* Icon-only buttons with tooltips */}
           <TooltipProvider>
             <Tooltip>
@@ -1385,6 +1416,15 @@ export default function SourceDetailPage() {
         onConfirm={handleConfirmMappings}
         onConfirmAndRescan={handleConfirmAndRescan}
       />
+
+      {/* Repo Details Modal */}
+      {source && (
+        <RepoDetailsModal
+          isOpen={repoDetailsModalOpen}
+          onClose={() => setRepoDetailsModalOpen(false)}
+          source={source}
+        />
+      )}
 
       {/* Bulk Tag Dialog */}
       <BulkTagDialogWithHook
