@@ -153,6 +153,9 @@ export interface CreateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
 }
 
 export interface UpdateSourceRequest {
@@ -163,6 +166,9 @@ export interface UpdateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
 }
 
 export interface CatalogEntry {
