@@ -810,6 +810,244 @@ class RateLimitError(GitHubRateLimitError, GitHubAPIError):
     pass
 
 
+# =============================================================================
+# Repository Metadata Fetching
+# =============================================================================
+
+# Truncation limits for fetched metadata
+MAX_REPO_DESCRIPTION_CHARS = 2000
+MAX_REPO_README_CHARS = 50000  # 50KB
+
+# Common README file names in priority order
+README_FILENAMES = [
+    "README.md",
+    "readme.md",
+    "README.MD",
+    "Readme.md",
+    "README.rst",
+    "readme.rst",
+    "README.txt",
+    "readme.txt",
+    "README",
+]
+
+
+async def fetch_repo_description(
+    client: GitHubClient,
+    owner: str,
+    repo: str,
+    timeout_seconds: float = 5.0,
+) -> Optional[str]:
+    """Fetch repository description from GitHub API.
+
+    Uses the centralized GitHubClient wrapper to fetch repository metadata
+    and extract the description field.
+
+    Args:
+        client: GitHubClient instance to use for the request
+        owner: Repository owner/organization
+        repo: Repository name
+        timeout_seconds: Request timeout in seconds (default: 5.0)
+
+    Returns:
+        Description string truncated to 2000 chars, or None on error
+
+    Note:
+        Errors are logged as warnings but do not raise exceptions.
+        This allows scans to continue even if metadata fetch fails.
+    """
+    import asyncio
+
+    owner_repo = f"{owner}/{repo}"
+
+    try:
+        # Run synchronous GitHub client in executor with timeout
+        loop = asyncio.get_event_loop()
+        metadata = await asyncio.wait_for(
+            loop.run_in_executor(None, client.get_repo_metadata, owner_repo),
+            timeout=timeout_seconds,
+        )
+
+        description = metadata.get("description")
+        if description:
+            # Truncate to max length
+            if len(description) > MAX_REPO_DESCRIPTION_CHARS:
+                logger.debug(
+                    f"Truncating description for {owner_repo}: "
+                    f"{len(description)} -> {MAX_REPO_DESCRIPTION_CHARS} chars"
+                )
+                description = description[:MAX_REPO_DESCRIPTION_CHARS]
+            return description
+        return None
+
+    except asyncio.TimeoutError:
+        logger.warning(
+            f"Timeout fetching repo description for {owner_repo} "
+            f"(>{timeout_seconds}s)"
+        )
+        return None
+    except GitHubNotFoundError:
+        logger.warning(f"Repository not found when fetching description: {owner_repo}")
+        return None
+    except GitHubRateLimitError as e:
+        logger.warning(f"Rate limit hit fetching description for {owner_repo}: {e}")
+        return None
+    except GitHubClientError as e:
+        logger.warning(f"Error fetching repo description for {owner_repo}: {e}")
+        return None
+    except Exception as e:
+        logger.warning(
+            f"Unexpected error fetching repo description for {owner_repo}: {e}"
+        )
+        return None
+
+
+async def fetch_repo_readme(
+    client: GitHubClient,
+    owner: str,
+    repo: str,
+    ref: str = "main",
+    timeout_seconds: float = 5.0,
+) -> Optional[str]:
+    """Fetch README content from GitHub.
+
+    Tries common README filenames in priority order (README.md, readme.md, etc.)
+    and returns the content of the first one found.
+
+    Args:
+        client: GitHubClient instance to use for the request
+        owner: Repository owner/organization
+        repo: Repository name
+        ref: Git reference (branch, tag, SHA) to fetch from (default: "main")
+        timeout_seconds: Request timeout in seconds (default: 5.0)
+
+    Returns:
+        README content truncated to 50KB, or None if not found or on error
+
+    Note:
+        Errors are logged as warnings but do not raise exceptions.
+        This allows scans to continue even if README fetch fails.
+    """
+    import asyncio
+
+    owner_repo = f"{owner}/{repo}"
+
+    async def try_fetch_readme(filename: str) -> Optional[str]:
+        """Try to fetch a specific README file."""
+        try:
+            loop = asyncio.get_event_loop()
+            content_bytes = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: client.get_file_content(owner_repo, filename, ref=ref),
+                ),
+                timeout=timeout_seconds,
+            )
+
+            # Decode bytes to string
+            try:
+                content = content_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                logger.debug(f"Non-UTF-8 README in {owner_repo}/{filename}")
+                return None
+
+            # Truncate to max length
+            if len(content) > MAX_REPO_README_CHARS:
+                logger.debug(
+                    f"Truncating README for {owner_repo}: "
+                    f"{len(content)} -> {MAX_REPO_README_CHARS} chars"
+                )
+                content = content[:MAX_REPO_README_CHARS]
+
+            return content
+
+        except asyncio.TimeoutError:
+            logger.debug(
+                f"Timeout fetching {filename} for {owner_repo} (>{timeout_seconds}s)"
+            )
+            return None
+        except GitHubNotFoundError:
+            # Expected for some README variants - try next one
+            return None
+        except GitHubRateLimitError as e:
+            logger.warning(f"Rate limit hit fetching README for {owner_repo}: {e}")
+            return None
+        except GitHubClientError as e:
+            logger.debug(f"Error fetching {filename} for {owner_repo}: {e}")
+            return None
+        except Exception as e:
+            logger.debug(f"Unexpected error fetching {filename} for {owner_repo}: {e}")
+            return None
+
+    # Try each README filename in priority order
+    for filename in README_FILENAMES:
+        content = await try_fetch_readme(filename)
+        if content is not None:
+            logger.debug(f"Found README at {owner_repo}/{filename}")
+            return content
+
+    logger.debug(f"No README found in {owner_repo}")
+    return None
+
+
+async def fetch_repo_metadata_for_source(
+    client: GitHubClient,
+    owner: str,
+    repo: str,
+    ref: str = "main",
+    import_description: bool = False,
+    import_readme: bool = False,
+) -> Dict[str, Optional[str]]:
+    """Fetch repository description and README from GitHub.
+
+    Conditionally fetches metadata based on the import flags.
+    Uses the centralized GitHubClient wrapper.
+
+    Args:
+        client: GitHubClient instance to use for requests
+        owner: Repository owner/organization
+        repo: Repository name
+        ref: Git reference for README fetch (default: "main")
+        import_description: If True, fetch repository description
+        import_readme: If True, fetch README content
+
+    Returns:
+        Dict with 'repo_description' and 'repo_readme' keys.
+        Values may be None if not requested or on error.
+
+    Note:
+        Each fetch has a 5 second timeout. Errors are logged but
+        don't cause the operation to fail.
+    """
+    import asyncio
+
+    result: Dict[str, Optional[str]] = {
+        "repo_description": None,
+        "repo_readme": None,
+    }
+
+    tasks = []
+
+    if import_description:
+        tasks.append(("repo_description", fetch_repo_description(client, owner, repo)))
+
+    if import_readme:
+        tasks.append(("repo_readme", fetch_repo_readme(client, owner, repo, ref=ref)))
+
+    if not tasks:
+        return result
+
+    # Run fetches concurrently
+    for key, coro in tasks:
+        try:
+            result[key] = await coro
+        except Exception as e:
+            logger.warning(f"Error in fetch_repo_metadata_for_source ({key}): {e}")
+            result[key] = None
+
+    return result
+
+
 def scan_github_source(
     repo_url: str,
     ref: str = "main",

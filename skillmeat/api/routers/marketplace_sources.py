@@ -88,6 +88,7 @@ from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
     ImportCoordinator,
 )
+from skillmeat.core.marketplace.source_manager import SourceManager
 from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 from skillmeat.core.validation import validate_artifact_name
 
@@ -545,9 +546,11 @@ async def _perform_scan(
                     detected_at=datetime.utcnow(),
                     # Copy exclusion status from deduplication engine
                     status=artifact.status if artifact.status else "new",
-                    excluded_at=datetime.fromisoformat(artifact.excluded_at)
-                    if artifact.excluded_at
-                    else None,
+                    excluded_at=(
+                        datetime.fromisoformat(artifact.excluded_at)
+                        if artifact.excluded_at
+                        else None
+                    ),
                     excluded_reason=artifact.excluded_reason,
                     path_segments=path_segments_json,
                 )
@@ -788,7 +791,23 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 
     try:
         created = source_repo.create(source)
-        logger.info(f"Created marketplace source: {created.id} ({created.repo_url})")
+
+        # Structured logging for source creation
+        logger.info(
+            "create_source_request",
+            extra={
+                "source_id": created.id,
+                "repo_url": created.repo_url,
+                "ref": created.ref,
+                "root_hint": created.root_hint,
+                "trust_level": created.trust_level,
+                "has_manual_map": bool(request.manual_map),
+                "manual_map_count": (
+                    len(request.manual_map) if request.manual_map else 0
+                ),
+                "has_description": bool(request.description),
+            },
+        )
 
         # Trigger initial scan
         logger.info(f"Triggering initial scan for source: {created.id}")
@@ -824,10 +843,16 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     response_model=SourceListResponse,
     summary="List all GitHub sources",
     description="""
-    List all GitHub repository sources with cursor-based pagination.
+    List all GitHub repository sources with cursor-based pagination and optional filtering.
 
     Returns sources ordered by ID for stable pagination. Use the `cursor`
     parameter from the previous response to fetch the next page.
+
+    **Filters** (all use AND logic - source must match all provided filters):
+    - `artifact_type`: Filter sources containing artifacts of this type
+    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)
+    - `trust_level`: Filter by trust level
+    - `search`: Search in repo name, description, and tags
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -835,39 +860,131 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 async def list_sources(
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
+    artifact_type: Optional[str] = Query(
+        None,
+        description="Filter by artifact type (skill, command, agent, hook, mcp-server)",
+    ),
+    tags: Optional[List[str]] = Query(
+        None, description="Filter by tags (AND logic - must match all)"
+    ),
+    trust_level: Optional[str] = Query(
+        None, description="Filter by trust level (untrusted, basic, verified, official)"
+    ),
+    search: Optional[str] = Query(
+        None, description="Search in repo name, description, tags"
+    ),
 ) -> SourceListResponse:
-    """List all marketplace sources with pagination.
+    """List all marketplace sources with pagination and filtering.
 
     Args:
         limit: Maximum number of items per page (1-100)
         cursor: Cursor for pagination (from previous response)
+        artifact_type: Filter by artifact type (skill, command, agent, hook, mcp-server)
+        tags: Filter by tags (AND logic - must match all provided tags)
+        trust_level: Filter by trust level (untrusted, basic, verified, official)
+        search: Search in repo name, description, tags
 
     Returns:
-        Paginated list of sources with page info
+        Paginated list of sources with page info including total_count
 
     Raises:
         HTTPException 500: If database operation fails
     """
     source_repo = MarketplaceSourceRepository()
+    source_manager = SourceManager()
 
     try:
-        result = source_repo.list_paginated(limit=limit, cursor=cursor)
+        # Check if any filters are provided
+        has_filters = any([artifact_type, tags, trust_level, search])
 
-        # Convert ORM models to API responses
-        items = [source_to_response(source) for source in result.items]
+        if has_filters:
+            # With filters: fetch all sources, filter in-memory, then paginate
+            all_sources = source_repo.list_all()
 
-        # Build page info
-        page_info = PageInfo(
-            has_next_page=result.has_more,
-            has_previous_page=cursor is not None,
-            start_cursor=items[0].id if items else None,
-            end_cursor=items[-1].id if items else None,
-            total_count=None,  # Not computed for efficiency
-        )
+            # Apply filters using SourceManager
+            filtered_sources = source_manager.apply_filters(
+                sources=all_sources,
+                artifact_type=artifact_type,
+                tags=tags,
+                trust_level=trust_level,
+                search=search,
+            )
 
-        logger.debug(
-            f"Listed {len(items)} sources (cursor={cursor}, has_more={result.has_more})"
-        )
+            # Sort by ID for stable pagination
+            filtered_sources.sort(key=lambda s: s.id)
+
+            total_count = len(filtered_sources)
+
+            # Apply cursor-based pagination manually
+            start_idx = 0
+            if cursor:
+                # Find the index after the cursor
+                for idx, source in enumerate(filtered_sources):
+                    if source.id == cursor:
+                        start_idx = idx + 1
+                        break
+
+            # Slice for current page
+            end_idx = start_idx + limit
+            page_sources = filtered_sources[start_idx:end_idx]
+            has_more = end_idx < len(filtered_sources)
+
+            # Convert ORM models to API responses
+            items = [source_to_response(source) for source in page_sources]
+
+            # Build page info
+            page_info = PageInfo(
+                has_next_page=has_more,
+                has_previous_page=cursor is not None,
+                start_cursor=items[0].id if items else None,
+                end_cursor=items[-1].id if items else None,
+                total_count=total_count,
+            )
+
+            # Structured logging for filtered list request
+            logger.info(
+                "list_sources_request",
+                extra={
+                    "filters": {
+                        "artifact_type": artifact_type,
+                        "tags": tags,
+                        "trust_level": trust_level,
+                        "search": search,
+                    },
+                    "result_count": len(items),
+                    "total_count": total_count,
+                    "has_more": has_more,
+                    "cursor": cursor,
+                },
+            )
+        else:
+            # Without filters: use repository's paginated query for efficiency
+            result = source_repo.list_paginated(limit=limit, cursor=cursor)
+
+            # Convert ORM models to API responses
+            items = [source_to_response(source) for source in result.items]
+
+            # Build page info
+            page_info = PageInfo(
+                has_next_page=result.has_more,
+                has_previous_page=cursor is not None,
+                start_cursor=items[0].id if items else None,
+                end_cursor=items[-1].id if items else None,
+                total_count=None,  # Not computed for efficiency without filters
+            )
+
+            # Structured logging for unfiltered list request
+            logger.info(
+                "list_sources_request",
+                extra={
+                    "filters": None,
+                    "result_count": len(items),
+                    "total_count": None,
+                    "has_more": result.has_more,
+                    "cursor": cursor,
+                },
+            )
+
         return SourceListResponse(items=items, page_info=page_info)
     except Exception as e:
         logger.error(f"Failed to list sources: {e}", exc_info=True)
@@ -1114,7 +1231,36 @@ async def update_source(
 
         # Save updates
         updated = source_repo.update(source)
-        logger.info(f"Updated marketplace source: {source_id}")
+
+        # Structured logging for source update
+        logger.info(
+            "update_source_request",
+            extra={
+                "source_id": source_id,
+                "repo_url": updated.repo_url,
+                "updated_fields": [
+                    field
+                    for field, value in [
+                        ("ref", request.ref),
+                        ("root_hint", request.root_hint),
+                        ("manual_map", request.manual_map),
+                        ("trust_level", request.trust_level),
+                        ("description", request.description),
+                        ("notes", request.notes),
+                        (
+                            "enable_frontmatter_detection",
+                            request.enable_frontmatter_detection,
+                        ),
+                    ]
+                    if value is not None
+                ],
+                "has_manual_map": bool(request.manual_map),
+                "manual_map_count": (
+                    len(request.manual_map) if request.manual_map else 0
+                ),
+            },
+        )
+
         return source_to_response(updated)
     except HTTPException:
         raise
@@ -1451,7 +1597,9 @@ async def sync_imported_artifacts(
             try:
                 artifact_type = ArtifactType(entry.artifact_type)
             except ValueError:
-                logger.error(f"Invalid artifact type for entry {entry_id}: {entry.artifact_type}")
+                logger.error(
+                    f"Invalid artifact type for entry {entry_id}: {entry.artifact_type}"
+                )
                 results.append(
                     BulkSyncItemResult(
                         entry_id=entry_id,
@@ -1803,7 +1951,9 @@ async def list_artifacts(
                     -1,
                 )
                 if cursor_idx >= 0:
-                    entries = entries[cursor_idx + 1:]  # Skip cursor item, start from next
+                    entries = entries[
+                        cursor_idx + 1 :
+                    ]  # Skip cursor item, start from next
 
             # Apply limit
             has_more = len(entries) > limit
@@ -1832,15 +1982,11 @@ async def list_artifacts(
 
         # Get collection artifact keys for in_collection check
         collection_keys = (
-            get_collection_artifact_keys(collection_mgr)
-            if collection_mgr
-            else set()
+            get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
         )
 
         # Convert to response DTOs
-        response_items = [
-            entry_to_response(entry, collection_keys) for entry in items
-        ]
+        response_items = [entry_to_response(entry, collection_keys) for entry in items]
 
         # Get aggregated counts (needed for total_count in page_info)
         counts_by_status = catalog_repo.count_by_status(source_id=source_id)
@@ -2743,7 +2889,10 @@ async def update_path_tag_status(
             segment_found = False
             request_lower = request.segment.lower()
             for seg in segments_data["extracted"]:
-                if seg["segment"].lower() == request_lower or seg.get("normalized", "").lower() == request_lower:
+                if (
+                    seg["segment"].lower() == request_lower
+                    or seg.get("normalized", "").lower() == request_lower
+                ):
                     segment_found = True
 
                     # Cannot change "excluded" segments

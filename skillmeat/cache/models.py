@@ -1194,6 +1194,9 @@ class MarketplaceSource(Base):
         root_hint: Optional subdirectory path within repository
         description: User-provided description for this source (max 500 chars)
         notes: Internal notes/documentation for this source (max 2000 chars)
+        repo_description: Description fetched from GitHub API (max 2000 chars)
+        repo_readme: README content from GitHub (up to 50KB)
+        tags: JSON-serialized list of tags for categorization
         manual_map: JSON string for manual override catalog
         access_token_id: Optional encrypted PAT reference
         trust_level: Trust level ("untrusted", "basic", "verified", "official")
@@ -1202,6 +1205,7 @@ class MarketplaceSource(Base):
         last_error: Last error message if scan failed
         scan_status: Current scan status ("pending", "scanning", "success", "error")
         artifact_count: Cached count of discovered artifacts
+        counts_by_type: JSON-serialized dict mapping artifact type to count
         created_at: Timestamp when source was added
         updated_at: Timestamp when source was last updated
         entries: List of catalog entries discovered from this source
@@ -1238,6 +1242,23 @@ class MarketplaceSource(Base):
         comment="Internal notes/documentation for this source",
     )
 
+    # GitHub-fetched metadata
+    repo_description: Mapped[Optional[str]] = mapped_column(
+        String(2000),
+        nullable=True,
+        comment="Description fetched from GitHub API",
+    )
+    repo_readme: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="README content from GitHub (up to 50KB)",
+    )
+    tags: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-serialized list of tags for categorization",
+    )
+
     # Extended configuration
     manual_map: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     access_token_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -1272,6 +1293,11 @@ class MarketplaceSource(Base):
     )
     artifact_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
+    )
+    counts_by_type: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-serialized dict mapping artifact type to count (e.g., {'skill': 5, 'command': 3})",
     )
 
     # Timestamps
@@ -1327,6 +1353,9 @@ class MarketplaceSource(Base):
             except json.JSONDecodeError:
                 manual_map_dict = None
 
+        # Parse tags JSON if present
+        tags_list = self.get_tags_list()
+
         return {
             "id": self.id,
             "repo_url": self.repo_url,
@@ -1336,6 +1365,9 @@ class MarketplaceSource(Base):
             "root_hint": self.root_hint,
             "description": self.description,
             "notes": self.notes,
+            "repo_description": self.repo_description,
+            "repo_readme": self.repo_readme,
+            "tags": tags_list,
             "manual_map": manual_map_dict,
             "access_token_id": self.access_token_id,
             "trust_level": self.trust_level,
@@ -1347,6 +1379,7 @@ class MarketplaceSource(Base):
             "last_error": self.last_error,
             "scan_status": self.scan_status,
             "artifact_count": self.artifact_count,
+            "counts_by_type": self.get_counts_by_type_dict(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -1372,6 +1405,50 @@ class MarketplaceSource(Base):
             manual_map_dict: Dictionary to serialize as JSON
         """
         self.manual_map = json.dumps(manual_map_dict)
+
+    def get_counts_by_type_dict(self) -> Dict[str, int]:
+        """Parse counts_by_type JSON to dict.
+
+        Returns:
+            Dictionary mapping artifact type to count, or empty dict if null/invalid
+        """
+        if not self.counts_by_type:
+            return {}
+        try:
+            return json.loads(self.counts_by_type)
+        except json.JSONDecodeError:
+            return {}
+
+    def set_counts_by_type_dict(self, counts_dict: Dict[str, int]) -> None:
+        """Serialize counts dict to JSON and store.
+
+        Args:
+            counts_dict: Dictionary mapping artifact type (skill, command, agent,
+                        hook, mcp-server) to count
+        """
+        self.counts_by_type = json.dumps(counts_dict)
+
+    def get_tags_list(self) -> Optional[List[str]]:
+        """Parse and return tags as list.
+
+        Returns:
+            Parsed tags list or None if invalid/missing
+        """
+        if not self.tags:
+            return None
+
+        try:
+            return json.loads(self.tags)
+        except json.JSONDecodeError:
+            return None
+
+    def set_tags_list(self, tags_list: List[str]) -> None:
+        """Set tags from list.
+
+        Args:
+            tags_list: List of tag strings to serialize as JSON
+        """
+        self.tags = json.dumps(tags_list)
 
 
 class MarketplaceCatalogEntry(Base):
