@@ -97,16 +97,16 @@ function artifactToEntity(artifact: Artifact): Entity {
     error: 'conflict',
   };
 
-  // Use artifact's collection name, or 'default' if not available
+  // Use artifact's collection ID, or 'default' if not available
   // Note: 'discovered' is only for marketplace artifacts on /marketplace page
   // On /collection page, artifacts should always have a collection context
-  const collectionName = artifact.collection?.name || 'default';
+  const collectionId = artifact.collection?.id || 'default';
 
   return {
     id: artifact.id,
     name: artifact.name,
     type: artifact.type,
-    collection: collectionName,
+    collection: collectionId,
     status: statusMap[artifact.status] || 'synced',
     tags: artifact.metadata?.tags || [],
     description: artifact.metadata?.description,
