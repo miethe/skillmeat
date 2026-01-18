@@ -7,11 +7,12 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Plus, RefreshCw, Search as SearchIcon, Loader2, Github } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-card';
+import { SourceFilterBar, type FilterState } from '@/components/marketplace/source-filter-bar';
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
@@ -27,6 +28,7 @@ import type { ScanResult, CatalogListResponse, GitHubSource } from '@/types/mark
 
 export default function MarketplaceSourcesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<FilterState>({});
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -135,16 +137,66 @@ export default function MarketplaceSourcesPage() {
     return data?.pages.flatMap((page) => page.items) || [];
   }, [data]);
 
-  // Filter by search
+  // Extract all unique tags from sources for the filter bar
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allSources.forEach((source) => {
+      source.tags?.forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [allSources]);
+
+  // Filter by search and filters
   const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return allSources;
-    const query = searchQuery.toLowerCase();
-    return allSources.filter(
-      (source) =>
-        source.owner.toLowerCase().includes(query) ||
-        source.repo_name.toLowerCase().includes(query)
-    );
-  }, [allSources, searchQuery]);
+    let result = allSources;
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (source) =>
+          source.owner.toLowerCase().includes(query) ||
+          source.repo_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply trust level filter
+    if (filters.trust_level) {
+      result = result.filter((source) => source.trust_level === filters.trust_level);
+    }
+
+    // Apply tag filters (source must have ALL selected tags)
+    if (filters.tags && filters.tags.length > 0) {
+      result = result.filter((source) =>
+        filters.tags!.every((tag) => source.tags?.includes(tag))
+      );
+    }
+
+    // Apply artifact type filter (source must have at least one artifact of that type)
+    if (filters.artifact_type) {
+      result = result.filter((source) => {
+        const counts = source.counts_by_type ?? { skill: source.artifact_count };
+        return (counts[filters.artifact_type!] ?? 0) > 0;
+      });
+    }
+
+    return result;
+  }, [allSources, searchQuery, filters]);
+
+  // Handler for clicking a tag on a source card
+  const handleTagClick = useCallback((tag: string) => {
+    setFilters((prev) => {
+      const currentTags = prev.tags || [];
+      // Toggle the tag: add if not present, remove if already present
+      const newTags = currentTags.includes(tag)
+        ? currentTags.filter((t) => t !== tag)
+        : [...currentTags, tag];
+      return {
+        ...prev,
+        tags: newTags.length > 0 ? newTags : undefined,
+      };
+    });
+  }, []);
 
   // Handler functions
   const handleEdit = (source: GitHubSource) => {
@@ -187,14 +239,24 @@ export default function MarketplaceSourcesPage() {
 
       {/* Search Bar */}
       <div className="relative max-w-md">
-        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <Input
           placeholder="Search repositories..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
+          aria-label="Search repositories by owner or name"
         />
       </div>
+
+      {/* Filter Bar */}
+      {availableTags.length > 0 && (
+        <SourceFilterBar
+          currentFilters={filters}
+          onFilterChange={setFilters}
+          availableTags={availableTags}
+        />
+      )}
 
       {/* Stats Summary */}
       {!isLoading && !error && allSources.length > 0 && (
@@ -209,7 +271,11 @@ export default function MarketplaceSourcesPage() {
 
       {/* Error State */}
       {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+        <div
+          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+          role="alert"
+          aria-live="polite"
+        >
           <p className="text-sm text-destructive">
             Failed to load sources. Please try again later.
           </p>
@@ -221,6 +287,7 @@ export default function MarketplaceSourcesPage() {
             size="sm"
             className="mt-2"
             onClick={() => refetch()}
+            aria-label="Retry loading sources"
           >
             Retry
           </Button>
@@ -229,7 +296,11 @@ export default function MarketplaceSourcesPage() {
 
       {/* Loading State */}
       {isLoading && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+          aria-busy="true"
+          aria-label="Loading source repositories"
+        >
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <SourceCardSkeleton key={i} />
           ))}
@@ -239,7 +310,7 @@ export default function MarketplaceSourcesPage() {
       {/* Empty State */}
       {!isLoading && !error && filteredSources.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Github className="mb-4 h-12 w-12 text-muted-foreground" />
+          <Github className="mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
           {allSources.length === 0 ? (
             <>
               <h3 className="mb-2 text-lg font-semibold">No sources added yet</h3>
@@ -248,7 +319,7 @@ export default function MarketplaceSourcesPage() {
                 skills, commands, agents, and more.
               </p>
               <Button className="mt-4" onClick={() => setAddModalOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Add Your First Source
               </Button>
             </>
@@ -256,14 +327,17 @@ export default function MarketplaceSourcesPage() {
             <>
               <h3 className="mb-2 text-lg font-semibold">No matching sources</h3>
               <p className="max-w-md text-sm text-muted-foreground">
-                Try adjusting your search term.
+                Try adjusting your search term or filters.
               </p>
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilters({});
+                }}
               >
-                Clear Search
+                Clear Search and Filters
               </Button>
             </>
           )}
@@ -273,16 +347,22 @@ export default function MarketplaceSourcesPage() {
       {/* Sources Grid */}
       {!isLoading && !error && filteredSources.length > 0 && (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            role="list"
+            aria-label="GitHub source repositories"
+          >
             {filteredSources.map((source) => (
-              <SourceCard
-                key={source.id}
-                source={source}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onRescan={handleRescan}
-                isRescanning={rescanningSourceId === source.id}
-              />
+              <div key={source.id} role="listitem">
+                <SourceCard
+                  source={source}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onRescan={handleRescan}
+                  isRescanning={rescanningSourceId === source.id}
+                  onTagClick={handleTagClick}
+                />
+              </div>
             ))}
           </div>
 
