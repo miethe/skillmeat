@@ -130,9 +130,12 @@ export interface GitHubSource {
   created_at: string;
   updated_at: string;
   description?: string;
+  repo_description?: string; // GitHub repository description (fallback)
   notes?: string;
   enable_frontmatter_detection?: boolean;
   manual_map?: Record<string, string>; // Directory path -> artifact type
+  tags?: string[]; // User-assigned tags for filtering
+  counts_by_type?: Record<string, number>; // Artifact counts by type
 }
 
 export interface GitHubSourceListResponse {
