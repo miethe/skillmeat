@@ -275,21 +275,24 @@ export function SourceCard({
           </div>
         </div>
 
-        {/* Description (with fallback to repo_description) */}
-        {displayDescription && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {displayDescription}
-          </p>
-        )}
+        {/* Content - Fixed-height rows for consistent card heights */}
+        <div className="flex min-h-[80px] flex-col">
+          {/* Description - flex-grow to fill available space */}
+          <div className="min-h-[40px] flex-grow">
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {displayDescription || '\u00A0'}
+            </p>
+          </div>
 
-        {/* Tags and artifact counts */}
-        <div className="flex items-center justify-between gap-2">
-          <TagBadge
-            tags={source.tags ?? []}
-            maxDisplay={3}
-            onTagClick={onTagClick}
-          />
-          <CountBadge countsByType={countsByType} />
+          {/* Tags and artifact counts - fixed height */}
+          <div className="flex h-6 items-center justify-between gap-2">
+            <TagBadge
+              tags={source.tags ?? []}
+              maxDisplay={3}
+              onTagClick={onTagClick}
+            />
+            <CountBadge countsByType={countsByType} />
+          </div>
         </div>
 
         {/* Footer: Last sync + actions */}
@@ -376,18 +379,23 @@ export function SourceCardSkeleton() {
           </div>
         </div>
 
-        {/* Description */}
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-
-        {/* Tags and counts */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-1">
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-5 w-14 rounded-full" />
-            <Skeleton className="h-5 w-18 rounded-full" />
+        {/* Content - Fixed-height to match card */}
+        <div className="flex min-h-[80px] flex-col">
+          {/* Description skeleton */}
+          <div className="min-h-[40px] flex-grow space-y-1">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
           </div>
-          <Skeleton className="h-5 w-8 rounded-full" />
+
+          {/* Tags and counts skeleton - fixed height */}
+          <div className="flex h-6 items-center justify-between gap-2">
+            <div className="flex gap-1">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-14 rounded-full" />
+              <Skeleton className="h-5 w-18 rounded-full" />
+            </div>
+            <Skeleton className="h-5 w-8 rounded-full" />
+          </div>
         </div>
 
         {/* Footer */}
