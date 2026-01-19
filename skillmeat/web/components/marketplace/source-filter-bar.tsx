@@ -5,14 +5,18 @@
  *
  * Filter bar for marketplace sources list with:
  * - Artifact type filter (skill, command, agent, mcp, hook)
- * - Tags multi-select filter
+ * - Tags multi-select filter with searchable popover
  * - Trust level filter
  * - Clear individual and all filters
  */
 
-import { X, Sparkles, Bot, Terminal, Server, Webhook, Filter } from 'lucide-react';
+import * as React from 'react';
+import { X, Sparkles, Bot, Terminal, Server, Webhook, Filter, Check, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -33,12 +37,73 @@ export interface FilterState {
   trust_level?: string;
 }
 
+export interface TagWithCount {
+  name: string;
+  count: number;
+}
+
 export interface SourceFilterBarProps {
   currentFilters: FilterState;
   onFilterChange: (filters: FilterState) => void;
   availableTags?: string[];
+  /** Optional tag counts - map of tag name to source count */
+  tagCounts?: Record<string, number>;
   trustLevels?: string[];
   className?: string;
+}
+
+interface SourceTagFilterPopoverProps {
+  selectedTags: string[];
+  availableTags: string[];
+  tagCounts?: Record<string, number>;
+  onChange: (tags: string[]) => void;
+  className?: string;
+}
+
+// ============================================================================
+// Color Utilities (from tag-badge.tsx pattern)
+// ============================================================================
+
+/**
+ * Predefined color palette for tags.
+ * Selected for WCAG AA contrast compliance.
+ */
+const TAG_COLORS = [
+  '#6366f1', // Indigo
+  '#8b5cf6', // Violet
+  '#d946ef', // Fuchsia
+  '#ec4899', // Pink
+  '#f43f5e', // Rose
+  '#ef4444', // Red
+  '#f97316', // Orange
+  '#eab308', // Yellow
+  '#84cc16', // Lime
+  '#22c55e', // Green
+  '#14b8a6', // Teal
+  '#06b6d4', // Cyan
+  '#0ea5e9', // Sky
+  '#3b82f6', // Blue
+] as const;
+
+/**
+ * Generate a deterministic hash from a string.
+ */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Get a consistent color for a tag based on its name.
+ */
+function getTagColor(tag: string): string {
+  const hash = hashString(tag.toLowerCase());
+  return TAG_COLORS[hash % TAG_COLORS.length] ?? TAG_COLORS[0];
 }
 
 // ============================================================================
@@ -65,13 +130,171 @@ const DEFAULT_TRUST_LEVELS: Array<{ value: TrustLevel; label: string }> = [
 ];
 
 // ============================================================================
-// Component
+// SourceTagFilterPopover Component
+// ============================================================================
+
+/**
+ * Tag filter popover component with search and multi-select for source tags.
+ *
+ * Shows a searchable dropdown with all available source tags and their counts.
+ * Uses consistent color hashing for tag badge colors.
+ *
+ * @example
+ * ```tsx
+ * <SourceTagFilterPopover
+ *   selectedTags={['python', 'testing']}
+ *   availableTags={['python', 'testing', 'automation']}
+ *   tagCounts={{ python: 5, testing: 3, automation: 2 }}
+ *   onChange={(tags) => setSelectedTags(tags)}
+ * />
+ * ```
+ */
+export function SourceTagFilterPopover({
+  selectedTags,
+  availableTags,
+  tagCounts,
+  onChange,
+  className,
+}: SourceTagFilterPopoverProps) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+
+  // Filter tags by search query
+  const filteredTags = React.useMemo(() => {
+    if (!search.trim()) return availableTags;
+    const query = search.toLowerCase();
+    return availableTags.filter((tag) => tag.toLowerCase().includes(query));
+  }, [availableTags, search]);
+
+  const toggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      onChange(selectedTags.filter((t) => t !== tag));
+    } else {
+      onChange([...selectedTags, tag]);
+    }
+  };
+
+  const clearAll = () => {
+    onChange([]);
+    setSearch('');
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn('h-9 gap-2', className)}
+          aria-label="Filter by tags"
+        >
+          <Filter className="h-4 w-4" aria-hidden="true" />
+          Tags
+          {selectedTags.length > 0 && (
+            <Badge variant="secondary" className="ml-1 rounded-full px-2">
+              {selectedTags.length}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <div className="border-b p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Filter by tags</span>
+            {selectedTags.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                className="h-6 px-2 text-xs"
+                aria-label="Clear all selected tags"
+              >
+                Clear all
+              </Button>
+            )}
+          </div>
+          <div className="relative">
+            <Search
+              className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              placeholder="Search tags..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 pl-8"
+              aria-label="Search tags"
+            />
+          </div>
+        </div>
+        <ScrollArea className="h-60">
+          <div className="p-2">
+            {filteredTags.length === 0 ? (
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                {search ? 'No tags found' : 'No tags available'}
+              </div>
+            ) : (
+              filteredTags.map((tag) => {
+                const isSelected = selectedTags.includes(tag);
+                const color = getTagColor(tag);
+                const count = tagCounts?.[tag];
+
+                return (
+                  <div
+                    key={tag}
+                    className={cn(
+                      'flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent',
+                      isSelected && 'bg-accent'
+                    )}
+                    onClick={() => toggleTag(tag)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleTag(tag);
+                      }
+                    }}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={0}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          'flex h-4 w-4 items-center justify-center rounded border',
+                          isSelected ? 'border-primary bg-primary' : 'border-input'
+                        )}
+                      >
+                        {isSelected && (
+                          <Check className="h-3 w-3 text-primary-foreground" aria-hidden="true" />
+                        )}
+                      </div>
+                      <Badge colorStyle={color} className="text-xs">
+                        {tag}
+                      </Badge>
+                    </div>
+                    {count !== undefined && (
+                      <span className="text-xs text-muted-foreground">{count}</span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ============================================================================
+// SourceFilterBar Component
 // ============================================================================
 
 export function SourceFilterBar({
   currentFilters,
   onFilterChange,
   availableTags = [],
+  tagCounts,
   trustLevels,
   className,
 }: SourceFilterBarProps) {
@@ -95,18 +318,6 @@ export function SourceFilterBar({
     onFilterChange({
       ...currentFilters,
       trust_level: value === 'all' ? undefined : value,
-    });
-  };
-
-  const handleTagToggle = (tag: string) => {
-    const currentTags = currentFilters.tags || [];
-    const newTags = currentTags.includes(tag)
-      ? currentTags.filter((t) => t !== tag)
-      : [...currentTags, tag];
-
-    onFilterChange({
-      ...currentFilters,
-      tags: newTags.length > 0 ? newTags : undefined,
     });
   };
 
@@ -206,42 +417,19 @@ export function SourceFilterBar({
           </Select>
         </div>
 
-        {/* Tags Filter - Available Tags as clickable badges */}
+        {/* Tags Filter - Popover with search and multi-select */}
         {availableTags.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <span className="text-sm font-medium text-muted-foreground">Tags</span>
-            <div className="flex flex-wrap gap-1.5">
-              {availableTags.slice(0, 8).map((tag) => {
-                const isSelected = currentFilters.tags?.includes(tag);
-                return (
-                  <Badge
-                    key={tag}
-                    variant={isSelected ? 'secondary' : 'outline'}
-                    className={cn(
-                      'cursor-pointer transition-colors',
-                      isSelected
-                        ? 'bg-secondary hover:bg-secondary/80'
-                        : 'hover:bg-secondary/50'
-                    )}
-                    onClick={() => handleTagToggle(tag)}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={isSelected}
-                    aria-label={`${isSelected ? 'Remove' : 'Add'} tag filter: ${tag}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleTagToggle(tag);
-                      }
-                    }}
-                  >
-                    {tag}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
+          <SourceTagFilterPopover
+            selectedTags={currentFilters.tags || []}
+            availableTags={availableTags}
+            tagCounts={tagCounts}
+            onChange={(tags) =>
+              onFilterChange({
+                ...currentFilters,
+                tags: tags.length > 0 ? tags : undefined,
+              })
+            }
+          />
         )}
 
         {/* Clear All Button */}
@@ -292,13 +480,13 @@ export function SourceFilterBar({
             </Badge>
           )}
 
-          {/* Tag Badges */}
+          {/* Tag Badges - with consistent color styling */}
           {currentFilters.tags?.map((tag) => (
-            <Badge key={tag} variant="secondary" className="gap-1">
+            <Badge key={tag} colorStyle={getTagColor(tag)} className="gap-1">
               {tag}
               <button
                 onClick={() => handleRemoveTag(tag)}
-                className="rounded-full hover:text-destructive focus:outline-none focus:ring-2 focus:ring-ring"
+                className="rounded-full opacity-80 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label={`Remove tag filter: ${tag}`}
               >
                 <X className="h-3 w-3" />

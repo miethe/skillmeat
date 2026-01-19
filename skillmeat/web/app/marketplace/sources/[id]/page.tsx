@@ -84,6 +84,7 @@ import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';
 import { ScoreBadge } from '@/components/ScoreBadge';
+import { TagBadge } from '@/components/marketplace/tag-badge';
 import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
 
 // ============================================================================
@@ -755,7 +756,7 @@ export default function SourceDetailPage() {
   const hasRepoDetails = source && (
     source.description ||
     source.repo_description ||
-    (source as any).readme_content
+    source.repo_readme
   );
 
   // Loading state
@@ -954,6 +955,21 @@ export default function SourceDetailPage() {
           </Badge>
         ))}
       </div>
+
+      {/* Source Tags */}
+      {source.tags && source.tags.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Tags:</span>
+          <TagBadge
+            tags={source.tags}
+            maxDisplay={5}
+            onTagClick={(tag) => {
+              // Navigate to sources list with tag filter
+              router.push(`/marketplace/sources?tag=${encodeURIComponent(tag)}`);
+            }}
+          />
+        </div>
+      )}
 
       {/* Manual Mappings Display (P4.3a) - Collapsible */}
       {source.manual_map && Object.keys(source.manual_map).length > 0 && (

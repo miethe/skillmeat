@@ -131,6 +131,7 @@ export interface GitHubSource {
   updated_at: string;
   description?: string;
   repo_description?: string; // GitHub repository description (fallback)
+  repo_readme?: string; // GitHub repository README content
   notes?: string;
   enable_frontmatter_detection?: boolean;
   manual_map?: Record<string, string>; // Directory path -> artifact type
