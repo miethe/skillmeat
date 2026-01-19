@@ -19,12 +19,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { GitHubSource } from '@/types/marketplace';
 
-// Extended interface for GitHubSource with optional README content
-// These fields may be added to the API response in the future
-interface GitHubSourceWithReadme extends GitHubSource {
-  repo_description?: string;
-  readme_content?: string;
-}
+// GitHubSource already includes repo_description and repo_readme fields
+// This alias maintains backward compatibility with existing component props
+type GitHubSourceWithReadme = GitHubSource;
 
 interface RepoDetailsModalProps {
   isOpen: boolean;
@@ -53,7 +50,7 @@ interface RepoDetailsModalProps {
 export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalProps) {
   // Prefer user-provided description, fall back to GitHub repo description
   const description = source.description || source.repo_description;
-  const readmeContent = source.readme_content;
+  const readmeContent = source.repo_readme;
 
   // Check if we have any content to display
   const hasContent = description || readmeContent;

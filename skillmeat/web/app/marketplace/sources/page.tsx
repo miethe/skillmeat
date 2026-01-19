@@ -417,13 +417,18 @@ function MarketplaceSourcesPageInner() {
     },
   });
 
-  // Extract all unique tags from sources for the filter bar
-  const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
+  // Extract all unique tags and their counts from sources for the filter bar
+  const { availableTags, tagCounts } = useMemo(() => {
+    const countMap: Record<string, number> = {};
     allSources.forEach((source) => {
-      source.tags?.forEach((tag) => tagSet.add(tag));
+      source.tags?.forEach((tag) => {
+        countMap[tag] = (countMap[tag] || 0) + 1;
+      });
     });
-    return Array.from(tagSet).sort();
+    return {
+      availableTags: Object.keys(countMap).sort(),
+      tagCounts: countMap,
+    };
   }, [allSources]);
 
   // Filter by search and filters (client-side filtering)
@@ -607,6 +612,7 @@ function MarketplaceSourcesPageInner() {
           currentFilters={filters}
           onFilterChange={handleFilterChange}
           availableTags={availableTags}
+          tagCounts={tagCounts}
         />
       )}
 
