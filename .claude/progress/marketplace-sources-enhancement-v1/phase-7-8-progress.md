@@ -3,13 +3,13 @@ type: progress
 prd: marketplace-sources-enhancement-v1
 phase: 7-8
 title: Testing and Documentation
-status: pending
-completed_at: null
-progress: 57
+status: completed
+completed_at: "2026-01-18"
+progress: 100
 total_tasks: 19
-completed_tasks: 11
+completed_tasks: 19
 total_story_points: 29
-completed_story_points: 0
+completed_story_points: 2
 tasks:
 - id: TEST-001
   title: Backend Unit Tests
@@ -125,7 +125,7 @@ tasks:
 - id: DOC-001
   title: API Documentation
   description: Complete OpenAPI spec documentation for all new endpoints
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - api-documenter
@@ -135,7 +135,7 @@ tasks:
 - id: DOC-002
   title: Component Documentation
   description: Create Storybook docs for new components
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
@@ -145,7 +145,7 @@ tasks:
 - id: DOC-003
   title: User Guide - Source Import
   description: Write user guide for importing sources with details and tags
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
@@ -155,7 +155,7 @@ tasks:
 - id: DOC-004
   title: User Guide - Filtering
   description: Write user guide for filtering sources in marketplace
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
@@ -165,7 +165,7 @@ tasks:
 - id: DOC-005
   title: ADR - Repository Metadata Storage
   description: Create ADR documenting decision on storing description/README in manifest
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
@@ -175,7 +175,7 @@ tasks:
 - id: DOC-006
   title: ADR - Filtering Implementation
   description: Create ADR documenting filter design and AND logic choice
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
@@ -185,23 +185,25 @@ tasks:
 - id: DOC-007
   title: Release Notes
   description: Write release notes with migration guidance
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
   dependencies:
   - TEST-011
   created_at: '2026-01-18'
+  completed_at: '2026-01-18'
 - id: DOC-008
   title: Development Guide - Extending
   description: Write guide for developers to extend filtering or add new source metadata
-  status: pending
+  status: completed
   story_points: 1
   assigned_to:
   - documentation-writer
   dependencies:
   - TEST-011
   created_at: '2026-01-18'
+  completed_at: '2026-01-18'
 parallelization:
   batch_1:
   - TEST-001
