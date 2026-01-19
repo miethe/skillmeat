@@ -58,7 +58,7 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[85vh] flex-col sm:max-w-2xl"
+        className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl"
         aria-describedby={description ? 'repo-description' : undefined}
       >
         <DialogHeader className="flex-shrink-0">
@@ -76,14 +76,14 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
         {!hasContent ? (
           <EmptyState />
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
             {/* README Section */}
             {readmeContent ? (
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 <h3 className="mb-2 flex-shrink-0 text-sm font-medium text-muted-foreground">
                   README
                 </h3>
-                <ScrollArea className="min-h-0 flex-1 rounded-md border bg-card">
+                <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-md border bg-card">
                   <div className="prose prose-sm max-w-none break-words p-4 dark:prose-invert prose-headings:break-words prose-p:break-words prose-code:break-all prose-pre:overflow-x-auto [overflow-wrap:anywhere] [word-break:break-word]">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {readmeContent}
