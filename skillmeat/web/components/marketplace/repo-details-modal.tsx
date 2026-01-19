@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -58,7 +57,7 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl"
+        className="flex h-[85vh] max-h-[85vh] min-h-0 flex-col overflow-hidden sm:max-w-2xl"
         aria-describedby={description ? 'repo-description' : undefined}
       >
         <DialogHeader className="flex-shrink-0">
@@ -83,13 +82,13 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
                 <h3 className="mb-2 flex-shrink-0 text-sm font-medium text-muted-foreground">
                   README
                 </h3>
-                <ScrollArea className="min-h-0 min-w-0 flex-1 rounded-md border bg-card">
+                <div className="min-h-0 flex-1 overflow-y-auto rounded-md border bg-card">
                   <div className="prose prose-sm max-w-none break-words p-4 dark:prose-invert prose-headings:break-words prose-p:break-words prose-code:break-all prose-pre:overflow-x-auto [overflow-wrap:anywhere] [word-break:break-word]">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {readmeContent}
                     </ReactMarkdown>
                   </div>
-                </ScrollArea>
+                </div>
               </div>
             ) : (
               // Show message if we have description but no README
