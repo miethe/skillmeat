@@ -28,7 +28,7 @@ import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import List, Literal, Optional, Set
+from typing import Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -323,6 +323,10 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         notes=source.notes,
         enable_frontmatter_detection=source.enable_frontmatter_detection,
         manual_map=source.get_manual_map_dict(),
+        repo_description=source.repo_description,
+        repo_readme=source.repo_readme,
+        tags=source.get_tags_list() or [],
+        counts_by_type=source.get_counts_by_type_dict(),
     )
 
 
@@ -502,6 +506,12 @@ async def _perform_scan(
         # Create extractor if enabled
         extractor = PathSegmentExtractor(config) if config.enabled else None
 
+        # Compute counts_by_type from scan results
+        counts_by_type: Dict[str, int] = {}
+        for artifact in scan_result.artifacts:
+            artifact_type = artifact.artifact_type
+            counts_by_type[artifact_type] = counts_by_type.get(artifact_type, 0) + 1
+
         # Update source and catalog atomically
         with transaction_handler.scan_update_transaction(source_id) as ctx:
             # Update source status
@@ -510,6 +520,13 @@ async def _perform_scan(
                 artifact_count=scan_result.artifacts_found,
                 error_message=None,
             )
+
+            # Update counts_by_type on source
+            source_in_session = ctx.session.query(MarketplaceSource).filter_by(
+                id=source_id
+            ).first()
+            if source_in_session:
+                source_in_session.set_counts_by_type_dict(counts_by_type)
 
             # Convert detected artifacts to catalog entries
             new_entries = []
@@ -783,11 +800,61 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
         artifact_count=0,
         description=request.description,
         notes=request.notes,
+        enable_frontmatter_detection=request.enable_frontmatter_detection,
     )
 
     # Store manual_map if provided
     if request.manual_map:
         source.set_manual_map_dict(request.manual_map)
+
+    # Store tags if provided
+    if request.tags:
+        source.set_tags_list(request.tags)
+
+    # Handle import_repo_description: fetch from GitHub if True
+    if request.import_repo_description:
+        try:
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            metadata = client.get_repo_metadata(f"{owner}/{repo_name}")
+            source.repo_description = metadata.get("description")
+            logger.info(f"Fetched repo description for {owner}/{repo_name}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch repo description for {owner}/{repo_name}: {e}")
+            # Don't fail creation - continue without repo_description
+
+    # Handle import_repo_readme: fetch from GitHub if True
+    if request.import_repo_readme:
+        try:
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            # Try common README filenames
+            readme_content = None
+            for readme_name in ["README.md", "README.rst", "README.txt", "README"]:
+                try:
+                    content_bytes = client.get_file_content(
+                        f"{owner}/{repo_name}",
+                        readme_name,
+                        ref=request.ref,
+                    )
+                    readme_content = content_bytes.decode("utf-8")
+                    # Truncate to 50KB if needed
+                    if len(readme_content) > 50000:
+                        readme_content = readme_content[:50000] + "\n... [truncated]"
+                    break
+                except Exception:
+                    continue
+
+            source.repo_readme = readme_content
+            if readme_content:
+                logger.info(f"Fetched README for {owner}/{repo_name}")
+            else:
+                logger.info(f"No README found for {owner}/{repo_name}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch README for {owner}/{repo_name}: {e}")
+            # Don't fail creation - continue without repo_readme
 
     try:
         created = source_repo.create(source)
@@ -1180,6 +1247,9 @@ async def update_source(
             request.description,
             request.notes,
             request.enable_frontmatter_detection,
+            request.import_repo_description,
+            request.import_repo_readme,
+            request.tags,
         ]
     ):
         raise HTTPException(
@@ -1228,6 +1298,63 @@ async def update_source(
             source.notes = request.notes
         if request.enable_frontmatter_detection is not None:
             source.enable_frontmatter_detection = request.enable_frontmatter_detection
+        if request.tags is not None:
+            source.set_tags_list(request.tags)
+
+        # Handle import_repo_description: fetch from GitHub if True
+        if request.import_repo_description is True:
+            try:
+                from skillmeat.core.github_client import get_github_client
+
+                client = get_github_client()
+                metadata = client.get_repo_metadata(f"{source.owner}/{source.repo_name}")
+                source.repo_description = metadata.get("description")
+                logger.info(
+                    f"Fetched repo description for {source.owner}/{source.repo_name}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch repo description for {source.owner}/{source.repo_name}: {e}"
+                )
+                # Don't fail the update - continue with other fields
+
+        # Handle import_repo_readme: fetch from GitHub if True
+        if request.import_repo_readme is True:
+            try:
+                from skillmeat.core.github_client import get_github_client
+
+                client = get_github_client()
+                # Try common README filenames
+                readme_content = None
+                for readme_name in ["README.md", "README.rst", "README.txt", "README"]:
+                    try:
+                        content_bytes = client.get_file_content(
+                            f"{source.owner}/{source.repo_name}",
+                            readme_name,
+                            ref=source.ref,
+                        )
+                        readme_content = content_bytes.decode("utf-8")
+                        # Truncate to 50KB if needed
+                        if len(readme_content) > 50000:
+                            readme_content = readme_content[:50000] + "\n... [truncated]"
+                        break
+                    except Exception:
+                        continue
+
+                source.repo_readme = readme_content
+                if readme_content:
+                    logger.info(
+                        f"Fetched README for {source.owner}/{source.repo_name}"
+                    )
+                else:
+                    logger.info(
+                        f"No README found for {source.owner}/{source.repo_name}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch README for {source.owner}/{source.repo_name}: {e}"
+                )
+                # Don't fail the update - continue with other fields
 
         # Save updates
         updated = source_repo.update(source)
@@ -1251,6 +1378,9 @@ async def update_source(
                             "enable_frontmatter_detection",
                             request.enable_frontmatter_detection,
                         ),
+                        ("import_repo_description", request.import_repo_description),
+                        ("import_repo_readme", request.import_repo_readme),
+                        ("tags", request.tags),
                     ]
                     if value is not None
                 ],
