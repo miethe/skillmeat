@@ -41,12 +41,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { apiRequest } from '@/lib/api';
 import { useToast, sourceKeys } from '@/hooks';
@@ -151,21 +146,16 @@ export function RescanUpdatesDialog({
 
   // Check if any selected items have local changes
   const selectedWithLocalChanges = useMemo(() => {
-    return updatedImports.filter(
-      (item) => selectedIds.has(item.entryId) && item.hasLocalChanges
-    );
+    return updatedImports.filter((item) => selectedIds.has(item.entryId) && item.hasLocalChanges);
   }, [updatedImports, selectedIds]);
 
   // Sync mutation
   const syncMutation = useMutation({
     mutationFn: async (entryIds: string[]) => {
-      return apiRequest<BulkSyncResponse>(
-        `/marketplace/sources/${sourceId}/sync-imported`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ artifact_ids: entryIds }),
-        }
-      );
+      return apiRequest<BulkSyncResponse>(`/marketplace/sources/${sourceId}/sync-imported`, {
+        method: 'POST',
+        body: JSON.stringify({ artifact_ids: entryIds }),
+      });
     },
     onSuccess: (data) => {
       // Invalidate relevant queries
@@ -266,8 +256,8 @@ export function RescanUpdatesDialog({
             <div>
               <DialogTitle>Upstream Updates Available</DialogTitle>
               <DialogDescription>
-                {updatedImports.length} imported artifact{updatedImports.length !== 1 ? 's' : ''} from{' '}
-                {sourceName} {updatedImports.length !== 1 ? 'have' : 'has'} updates available
+                {updatedImports.length} imported artifact{updatedImports.length !== 1 ? 's' : ''}{' '}
+                from {sourceName} {updatedImports.length !== 1 ? 'have' : 'has'} updates available
               </DialogDescription>
             </div>
           </div>
@@ -288,10 +278,7 @@ export function RescanUpdatesDialog({
                   }
                 }}
               />
-              <label
-                htmlFor="select-all"
-                className="cursor-pointer text-sm font-medium"
-              >
+              <label htmlFor="select-all" className="cursor-pointer text-sm font-medium">
                 {isAllSelected ? 'Deselect All' : 'Select All'}
               </label>
             </div>
@@ -308,11 +295,9 @@ export function RescanUpdatesDialog({
             )}
           >
             {updatedImports.map((item) => {
-              const Icon =
-                artifactTypeIcons[item.artifactType as ArtifactType] || Package;
+              const Icon = artifactTypeIcons[item.artifactType as ArtifactType] || Package;
               const iconColor =
-                artifactTypeIconColors[item.artifactType as ArtifactType] ||
-                'text-gray-500';
+                artifactTypeIconColors[item.artifactType as ArtifactType] || 'text-gray-500';
               const isSelected = selectedIds.has(item.entryId);
 
               return (
@@ -320,9 +305,7 @@ export function RescanUpdatesDialog({
                   key={item.entryId}
                   className={cn(
                     'flex items-center gap-3 rounded-lg border p-3 transition-colors',
-                    isSelected
-                      ? 'border-primary/50 bg-primary/5'
-                      : 'border-border'
+                    isSelected ? 'border-primary/50 bg-primary/5' : 'border-border'
                   )}
                 >
                   <Checkbox
@@ -336,9 +319,7 @@ export function RescanUpdatesDialog({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-medium text-sm">
-                        {item.name}
-                      </span>
+                      <span className="truncate text-sm font-medium">{item.name}</span>
                       {item.hasLocalChanges && (
                         <TooltipProvider>
                           <Tooltip>
@@ -353,9 +334,8 @@ export function RescanUpdatesDialog({
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
                               <p className="text-sm">
-                                This artifact has local modifications. Syncing may
-                                overwrite your changes. Consider managing sync from
-                                the artifact detail page.
+                                This artifact has local modifications. Syncing may overwrite your
+                                changes. Consider managing sync from the artifact detail page.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -363,13 +343,9 @@ export function RescanUpdatesDialog({
                       )}
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <code className="rounded bg-muted px-1.5 py-0.5">
-                        {item.currentSha}
-                      </code>
+                      <code className="rounded bg-muted px-1.5 py-0.5">{item.currentSha}</code>
                       <span aria-hidden="true">→</span>
-                      <code className="rounded bg-muted px-1.5 py-0.5">
-                        {item.newSha}
-                      </code>
+                      <code className="rounded bg-muted px-1.5 py-0.5">{item.newSha}</code>
                     </div>
                   </div>
 
@@ -377,12 +353,7 @@ export function RescanUpdatesDialog({
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0"
-                            asChild
-                          >
+                          <Button variant="ghost" size="sm" className="shrink-0" asChild>
                             <Link
                               href={`/collection/artifact/${item.importId}`}
                               aria-label={`View ${item.name} details`}
@@ -413,9 +384,8 @@ export function RescanUpdatesDialog({
                   </p>
                   <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
                     {selectedWithLocalChanges.length} selected artifact
-                    {selectedWithLocalChanges.length !== 1 ? 's have' : ' has'}{' '}
-                    local modifications that may be overwritten. Click &quot;Sync
-                    Selected&quot; again to confirm.
+                    {selectedWithLocalChanges.length !== 1 ? 's have' : ' has'} local modifications
+                    that may be overwritten. Click &quot;Sync Selected&quot; again to confirm.
                   </p>
                 </div>
               </div>
@@ -424,17 +394,10 @@ export function RescanUpdatesDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={syncMutation.isPending}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={syncMutation.isPending}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSync}
-            disabled={selectedIds.size === 0 || syncMutation.isPending}
-          >
+          <Button onClick={handleSync} disabled={selectedIds.size === 0 || syncMutation.isPending}>
             {syncMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />

@@ -70,12 +70,11 @@ export function ExcludeArtifactDialog({
           <AlertDialogDescription className="space-y-2">
             <span className="block">
               Are you sure you want to mark{' '}
-              <strong className="text-foreground">{entry.name}</strong> as
-              excluded?
+              <strong className="text-foreground">{entry.name}</strong> as excluded?
             </span>
             <span className="block">
-              This will hide it from the catalog. You can restore it later from
-              the Excluded Artifacts list.
+              This will hide it from the catalog. You can restore it later from the Excluded
+              Artifacts list.
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>

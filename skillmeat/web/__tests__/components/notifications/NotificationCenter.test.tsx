@@ -5,7 +5,12 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NotificationBell } from '@/components/notifications/NotificationCenter';
-import type { NotificationData, ImportResultDetails, ErrorDetails, GenericDetails } from '@/types/notification';
+import type {
+  NotificationData,
+  ImportResultDetails,
+  ErrorDetails,
+  GenericDetails,
+} from '@/types/notification';
 
 // Mock date-fns at the top level before any other imports
 jest.mock('date-fns', () => {
@@ -75,7 +80,7 @@ function createGenericDetails(overrides: Partial<GenericDetails> = {}): GenericD
     metadata: {
       'Key 1': 'Value 1',
       'Key 2': 42,
-      'Enabled': true,
+      Enabled: true,
     },
     ...overrides,
   };
@@ -268,11 +273,7 @@ describe('NotificationDropdown', () => {
     const onClearAll = jest.fn();
     const notification = createNotification();
     render(
-      <NotificationBell
-        {...defaultProps}
-        notifications={[notification]}
-        onClearAll={onClearAll}
-      />
+      <NotificationBell {...defaultProps} notifications={[notification]} onClearAll={onClearAll} />
     );
 
     await user.click(screen.getByRole('button', { name: /notifications/i }));
@@ -966,7 +967,9 @@ describe('ErrorDetail', () => {
     const stackTrace = 'Error: Test\n  at testFunc (test.js:1)\n  at main (test.js:2)';
     const details = createErrorDetails({ stack: stackTrace });
     const notification = createNotification({ type: 'error', details });
-    const { container } = render(<NotificationBell {...defaultProps} notifications={[notification]} />);
+    const { container } = render(
+      <NotificationBell {...defaultProps} notifications={[notification]} />
+    );
 
     await user.click(screen.getByRole('button', { name: /notifications/i }));
     await user.click(screen.getByText('Show details'));
@@ -1045,9 +1048,9 @@ describe('GenericDetail', () => {
     const user = userEvent.setup();
     const details = createGenericDetails({
       metadata: {
-        'Source': 'github.com/user/repo',
-        'Version': '1.2.3',
-        'Size': '2.5 MB',
+        Source: 'github.com/user/repo',
+        Version: '1.2.3',
+        Size: '2.5 MB',
       },
     });
     const notification = createNotification({ type: 'info', details });
@@ -1068,8 +1071,8 @@ describe('GenericDetail', () => {
     const user = userEvent.setup();
     const details = createGenericDetails({
       metadata: {
-        'Enabled': true,
-        'Cached': false,
+        Enabled: true,
+        Cached: false,
       },
     });
     const notification = createNotification({ type: 'info', details });
@@ -1115,8 +1118,8 @@ describe('GenericDetail', () => {
     const user = userEvent.setup();
     const details = createGenericDetails({
       metadata: {
-        'Count': 42,
-        'Progress': 75.5,
+        Count: 42,
+        Progress: 75.5,
       },
     });
     const notification = createNotification({ type: 'info', details });
@@ -1184,8 +1187,8 @@ describe('Detail Type Detection', () => {
     const user = userEvent.setup();
     const details = createGenericDetails({
       metadata: {
-        'Status': 'Complete',
-        'Duration': '2.5s',
+        Status: 'Complete',
+        Duration: '2.5s',
       },
     });
     const notification = createNotification({ type: 'info', details });
@@ -1232,7 +1235,7 @@ describe('Detail Type Detection', () => {
   it('correctly identifies generic details by structure', async () => {
     const user = userEvent.setup();
     const details = createGenericDetails({
-      metadata: { 'Type': 'Generic' },
+      metadata: { Type: 'Generic' },
     });
     const notification = createNotification({ type: 'success', details });
     render(<NotificationBell {...defaultProps} notifications={[notification]} />);

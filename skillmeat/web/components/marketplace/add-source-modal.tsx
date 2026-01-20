@@ -26,12 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react';
 import { useCreateSource, useInferUrl } from '@/hooks';
 import { Loader2, AlertCircle, X, HelpCircle } from 'lucide-react';
@@ -55,16 +50,16 @@ function validateTag(tag: string): { valid: boolean; error?: string } {
     return { valid: false, error: `Tag must be ${MAX_TAG_LENGTH} characters or less` };
   }
   if (!TAG_PATTERN.test(tag)) {
-    return { valid: false, error: 'Tag must start with alphanumeric and contain only letters, numbers, hyphens, and underscores' };
+    return {
+      valid: false,
+      error:
+        'Tag must start with alphanumeric and contain only letters, numbers, hyphens, and underscores',
+    };
   }
   return { valid: true };
 }
 
-export function AddSourceModal({
-  open,
-  onOpenChange,
-  onSuccess,
-}: AddSourceModalProps) {
+export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModalProps) {
   // Quick import state
   const [quickImportUrl, setQuickImportUrl] = useState('');
   const [inferError, setInferError] = useState<string | null>(null);
@@ -122,55 +117,64 @@ export function AddSourceModal({
     return () => clearTimeout(timer);
   }, [quickImportUrl]);
 
-  const addTag = useCallback((value: string) => {
-    const trimmedTag = value.trim().toLowerCase();
-    if (!trimmedTag) {
-      setTagInput('');
-      return;
-    }
-
-    // Check max tags limit
-    if (tags.length >= MAX_TAGS) {
-      setTagError(`Maximum ${MAX_TAGS} tags allowed`);
-      return;
-    }
-
-    // Validate tag format
-    const validation = validateTag(trimmedTag);
-    if (!validation.valid) {
-      setTagError(validation.error || 'Invalid tag');
-      return;
-    }
-
-    // Check for duplicates
-    if (tags.includes(trimmedTag)) {
-      setTagError('Tag already added');
-      setTagInput('');
-      return;
-    }
-
-    setTags([...tags, trimmedTag]);
-    setTagInput('');
-    setTagError(null);
-  }, [tags]);
-
-  const removeTag = useCallback((tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-    setTagError(null);
-  }, [tags]);
-
-  const handleTagInputKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addTag(tagInput);
-    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-      // Remove last tag when backspace is pressed on empty input
-      const lastTag = tags[tags.length - 1];
-      if (lastTag) {
-        removeTag(lastTag);
+  const addTag = useCallback(
+    (value: string) => {
+      const trimmedTag = value.trim().toLowerCase();
+      if (!trimmedTag) {
+        setTagInput('');
+        return;
       }
-    }
-  }, [tagInput, tags, addTag, removeTag]);
+
+      // Check max tags limit
+      if (tags.length >= MAX_TAGS) {
+        setTagError(`Maximum ${MAX_TAGS} tags allowed`);
+        return;
+      }
+
+      // Validate tag format
+      const validation = validateTag(trimmedTag);
+      if (!validation.valid) {
+        setTagError(validation.error || 'Invalid tag');
+        return;
+      }
+
+      // Check for duplicates
+      if (tags.includes(trimmedTag)) {
+        setTagError('Tag already added');
+        setTagInput('');
+        return;
+      }
+
+      setTags([...tags, trimmedTag]);
+      setTagInput('');
+      setTagError(null);
+    },
+    [tags]
+  );
+
+  const removeTag = useCallback(
+    (tagToRemove: string) => {
+      setTags(tags.filter((tag) => tag !== tagToRemove));
+      setTagError(null);
+    },
+    [tags]
+  );
+
+  const handleTagInputKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addTag(tagInput);
+      } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+        // Remove last tag when backspace is pressed on empty input
+        const lastTag = tags[tags.length - 1];
+        if (lastTag) {
+          removeTag(lastTag);
+        }
+      }
+    },
+    [tagInput, tags, addTag, removeTag]
+  );
 
   const handleTagInputBlur = useCallback(() => {
     if (tagInput.trim()) {
@@ -246,7 +250,7 @@ export function AddSourceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add GitHub Source</DialogTitle>
           <DialogDescription>
@@ -316,9 +320,7 @@ export function AddSourceModal({
               <div className="grid gap-4">
                 <div className="space-y-1">
                   <Label className="text-base font-semibold">Manual Entry</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enter repository details manually
-                  </p>
+                  <p className="text-xs text-muted-foreground">Enter repository details manually</p>
                 </div>
 
                 <div className="grid gap-2">
@@ -361,28 +363,30 @@ export function AddSourceModal({
                 </div>
 
                 {/* Shared Settings */}
-                <div className="border-t pt-4 mt-2">
-                  <div className="space-y-1 mb-3">
+                <div className="mt-2 border-t pt-4">
+                  <div className="mb-3 space-y-1">
                     <Label className="text-base font-semibold">Settings</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Applied to the source
-                    </p>
+                    <p className="text-xs text-muted-foreground">Applied to the source</p>
                   </div>
 
                   <div className="grid gap-4">
                     {/* Frontmatter Detection Toggle */}
                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5 flex-1">
+                      <div className="flex-1 space-y-0.5">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="frontmatter-detection" className="text-sm">
                             Enable frontmatter detection
                           </Label>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
-                              <p>When enabled, markdown files will be scanned for YAML frontmatter containing artifact type hints (e.g., type: skill). This can improve detection accuracy for well-structured repositories.</p>
+                              <p>
+                                When enabled, markdown files will be scanned for YAML frontmatter
+                                containing artifact type hints (e.g., type: skill). This can improve
+                                detection accuracy for well-structured repositories.
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -399,17 +403,21 @@ export function AddSourceModal({
 
                     {/* Import Repository Description Toggle */}
                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5 flex-1">
+                      <div className="flex-1 space-y-0.5">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="import-repo-description" className="text-sm">
                             Include repository description
                           </Label>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
-                              <p>Repository description will be fetched from the GitHub API and stored as source metadata. Useful for understanding the purpose of the source at a glance.</p>
+                              <p>
+                                Repository description will be fetched from the GitHub API and
+                                stored as source metadata. Useful for understanding the purpose of
+                                the source at a glance.
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -426,17 +434,21 @@ export function AddSourceModal({
 
                     {/* Import Repository README Toggle */}
                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5 flex-1">
+                      <div className="flex-1 space-y-0.5">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="import-repo-readme" className="text-sm">
                             Include repository README
                           </Label>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
-                              <p>README content will be fetched from GitHub and stored locally (up to 50KB). This provides documentation context for the source without needing to visit GitHub.</p>
+                              <p>
+                                README content will be fetched from GitHub and stored locally (up to
+                                50KB). This provides documentation context for the source without
+                                needing to visit GitHub.
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -457,15 +469,18 @@ export function AddSourceModal({
                         <Label htmlFor="tags">Tags</Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>Tags help organize sources for discovery and filtering. Add tags like "official", "testing", or "work" to group related sources together.</p>
+                            <p>
+                              Tags help organize sources for discovery and filtering. Add tags like
+                              "official", "testing", or "work" to group related sources together.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <div
-                        className={`flex flex-wrap gap-2 p-2 border rounded-lg min-h-[42px] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${tagError ? 'border-destructive' : ''}`}
+                        className={`flex min-h-[42px] flex-wrap gap-2 rounded-lg border p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${tagError ? 'border-destructive' : ''}`}
                       >
                         {tags.map((tag) => (
                           <Badge
@@ -493,20 +508,26 @@ export function AddSourceModal({
                           }}
                           onKeyDown={handleTagInputKeyDown}
                           onBlur={handleTagInputBlur}
-                          placeholder={tags.length === 0 ? "Type and press Enter or comma to add" : ""}
-                          className="flex-1 min-w-[120px] border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                          placeholder={
+                            tags.length === 0 ? 'Type and press Enter or comma to add' : ''
+                          }
+                          className="h-auto min-w-[120px] flex-1 border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                           disabled={tags.length >= MAX_TAGS}
                           aria-describedby={tagError ? 'tag-error' : 'tag-help'}
                         />
                       </div>
                       {tagError && (
-                        <p id="tag-error" className="text-xs text-destructive flex items-center gap-1">
+                        <p
+                          id="tag-error"
+                          className="flex items-center gap-1 text-xs text-destructive"
+                        >
                           <AlertCircle className="h-3 w-3" />
                           {tagError}
                         </p>
                       )}
                       <p id="tag-help" className="text-xs text-muted-foreground">
-                        {tags.length}/{MAX_TAGS} tags. Use letters, numbers, hyphens, and underscores. Press Enter or comma to add.
+                        {tags.length}/{MAX_TAGS} tags. Use letters, numbers, hyphens, and
+                        underscores. Press Enter or comma to add.
                       </p>
                     </div>
 
@@ -516,14 +537,21 @@ export function AddSourceModal({
                         <Label htmlFor="trust-level">Trust Level</Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>Trust level indicates the verification status of the source. Basic is for unverified sources, Verified for sources you have reviewed, and Official for first-party or well-known sources.</p>
+                            <p>
+                              Trust level indicates the verification status of the source. Basic is
+                              for unverified sources, Verified for sources you have reviewed, and
+                              Official for first-party or well-known sources.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select value={trustLevel} onValueChange={(v) => setTrustLevel(v as TrustLevel)}>
+                      <Select
+                        value={trustLevel}
+                        onValueChange={(v) => setTrustLevel(v as TrustLevel)}
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -538,17 +566,10 @@ export function AddSourceModal({
                 </div>
 
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                  >
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit}
-                  >
+                  <Button type="submit" disabled={!canSubmit}>
                     {createSource.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

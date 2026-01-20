@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import * as React from 'react';
+import { X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export interface Tag {
   id: string;
@@ -56,13 +56,13 @@ export function TagInput({
   onChange,
   suggestions = [],
   onSearch,
-  placeholder = "Add tags...",
+  placeholder = 'Add tags...',
   disabled = false,
   maxTags,
   allowCreate = true,
   className,
 }: TagInputProps) {
-  const [inputValue, setInputValue] = React.useState("");
+  const [inputValue, setInputValue] = React.useState('');
   const [isOpen, setIsOpen] = React.useState(false);
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -107,7 +107,7 @@ export function TagInput({
 
       if (!value.includes(tagToAdd)) {
         onChange([...value, tagToAdd]);
-        setInputValue("");
+        setInputValue('');
         setIsOpen(false);
         setHighlightedIndex(-1);
       }
@@ -139,7 +139,7 @@ export function TagInput({
   // Handle keyboard navigation
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") {
+      if (e.key === 'Enter') {
         e.preventDefault();
         if (highlightedIndex >= 0 && filteredSuggestions[highlightedIndex]) {
           // Select highlighted suggestion
@@ -148,20 +148,18 @@ export function TagInput({
           // Create new tag from input
           addTag(inputValue.trim());
         }
-      } else if (e.key === "Backspace" && !inputValue) {
+      } else if (e.key === 'Backspace' && !inputValue) {
         // Remove last tag when backspace on empty input
         if (value.length > 0) {
           removeTag(value[value.length - 1]);
         }
-      } else if (e.key === "ArrowDown") {
+      } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setHighlightedIndex((prev) =>
-          prev < filteredSuggestions.length - 1 ? prev + 1 : prev
-        );
-      } else if (e.key === "ArrowUp") {
+        setHighlightedIndex((prev) => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev));
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         setIsOpen(false);
         setHighlightedIndex(-1);
       }
@@ -172,14 +170,14 @@ export function TagInput({
   // Handle paste (support CSV - comma-separated values)
   const handlePaste = React.useCallback(
     (e: React.ClipboardEvent<HTMLInputElement>) => {
-      const pastedText = e.clipboardData.getData("text");
+      const pastedText = e.clipboardData.getData('text');
 
       // Check if pasted text contains commas (CSV format)
-      if (pastedText.includes(",")) {
+      if (pastedText.includes(',')) {
         e.preventDefault();
 
         const tags = pastedText
-          .split(",")
+          .split(',')
           .map((tag) => tag.trim())
           .filter((tag) => tag.length > 0);
 
@@ -193,7 +191,7 @@ export function TagInput({
           }
         }
 
-        setInputValue("");
+        setInputValue('');
         setIsOpen(false);
       }
     },
@@ -218,19 +216,19 @@ export function TagInput({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const isMaxTagsReached = maxTags && value.length >= maxTags;
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
+    <div ref={containerRef} className={cn('relative', className)}>
       <div
         className={cn(
-          "flex flex-wrap gap-1 p-2 border rounded-md min-h-[42px] bg-background",
-          "focus-within:ring-1 focus-within:ring-ring focus-within:outline-none",
-          disabled && "opacity-50 cursor-not-allowed"
+          'flex min-h-[42px] flex-wrap gap-1 rounded-md border bg-background p-2',
+          'focus-within:outline-none focus-within:ring-1 focus-within:ring-ring',
+          disabled && 'cursor-not-allowed opacity-50'
         )}
       >
         {value.map((tagIdOrName) => {
@@ -240,13 +238,13 @@ export function TagInput({
               key={tagIdOrName}
               variant="secondary"
               colorStyle={tag?.color}
-              className="gap-1 h-6"
+              className="h-6 gap-1"
             >
               {tag?.name || tagIdOrName}
               {!disabled && (
                 <button
                   type="button"
-                  className="ml-1 hover:bg-black/10 rounded-full p-0.5 transition-colors"
+                  className="ml-1 rounded-full p-0.5 transition-colors hover:bg-black/10"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeTag(tagIdOrName);
@@ -266,12 +264,12 @@ export function TagInput({
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onFocus={() => inputValue.trim() && setIsOpen(true)}
-          placeholder={value.length === 0 ? placeholder : ""}
+          placeholder={value.length === 0 ? placeholder : ''}
           disabled={disabled || isMaxTagsReached}
           className={cn(
-            "flex-1 min-w-[100px] outline-none bg-transparent text-sm",
-            "placeholder:text-muted-foreground",
-            "disabled:cursor-not-allowed"
+            'min-w-[100px] flex-1 bg-transparent text-sm outline-none',
+            'placeholder:text-muted-foreground',
+            'disabled:cursor-not-allowed'
           )}
           aria-label="Tag input"
           aria-expanded={isOpen}
@@ -289,9 +287,9 @@ export function TagInput({
           id="tag-suggestions"
           role="listbox"
           className={cn(
-            "absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md",
-            "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2",
-            "max-h-[300px] overflow-y-auto"
+            'absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md',
+            'animate-in fade-in-0 zoom-in-95 slide-in-from-top-2',
+            'max-h-[300px] overflow-y-auto'
           )}
         >
           {filteredSuggestions.map((tag, index) => (
@@ -301,9 +299,9 @@ export function TagInput({
               role="option"
               aria-selected={index === highlightedIndex}
               className={cn(
-                "px-3 py-2 cursor-pointer transition-colors",
-                "hover:bg-accent hover:text-accent-foreground",
-                index === highlightedIndex && "bg-accent text-accent-foreground"
+                'cursor-pointer px-3 py-2 transition-colors',
+                'hover:bg-accent hover:text-accent-foreground',
+                index === highlightedIndex && 'bg-accent text-accent-foreground'
               )}
               onClick={() => handleSuggestionClick(tag)}
               onMouseEnter={() => setHighlightedIndex(index)}
@@ -318,7 +316,7 @@ export function TagInput({
 
       {/* Max tags reached message */}
       {isMaxTagsReached && (
-        <p className="text-xs text-muted-foreground mt-1" role="status" aria-live="polite">
+        <p className="mt-1 text-xs text-muted-foreground" role="status" aria-live="polite">
           Maximum {maxTags} tags reached
         </p>
       )}

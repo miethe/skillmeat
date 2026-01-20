@@ -29,12 +29,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { GitHubSource, TrustLevel, ScanStatus } from '@/types/marketplace';
 import { TagBadge } from './tag-badge';
@@ -134,9 +129,10 @@ function StatusBadge({ status, errorMessage }: StatusBadgeProps) {
   }[status];
 
   const Icon = config.icon;
-  const ariaLabel = status === 'error' && errorMessage
-    ? `Scan status: ${config.label}. ${errorMessage}`
-    : `Scan status: ${config.label}. ${config.description}`;
+  const ariaLabel =
+    status === 'error' && errorMessage
+      ? `Scan status: ${config.label}. ${errorMessage}`
+      : `Scan status: ${config.label}. ${config.description}`;
 
   return (
     <TooltipProvider>
@@ -254,13 +250,13 @@ export function SourceCard({
       }}
       aria-label={`View source: ${source.owner}/${source.repo_name}`}
     >
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 p-4">
         {/* Header: Repo name + badges */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <Github className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="min-w-0">
-              <h3 className="font-semibold truncate">
+              <h3 className="truncate font-semibold">
                 {source.owner}/{source.repo_name}
               </h3>
               <p className="text-xs text-muted-foreground">
@@ -269,7 +265,7 @@ export function SourceCard({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-1">
             <StatusBadge status={source.scan_status} errorMessage={source.last_error} />
             <TrustBadge level={source.trust_level} />
           </div>
@@ -286,29 +282,20 @@ export function SourceCard({
 
           {/* Tags and artifact counts - fixed height */}
           <div className="flex h-6 items-center justify-between gap-2">
-            <TagBadge
-              tags={source.tags ?? []}
-              maxDisplay={3}
-              onTagClick={onTagClick}
-            />
+            <TagBadge tags={source.tags ?? []} maxDisplay={3} onTagClick={onTagClick} />
             <CountBadge countsByType={countsByType} />
           </div>
         </div>
 
         {/* Footer: Last sync + actions */}
-        <div className="flex items-center justify-between pt-2 border-t">
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
+        <div className="flex items-center justify-between border-t pt-2">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" aria-hidden="true" />
             <span aria-label={`Last synced: ${lastSyncFormatted}`}>{lastSyncFormatted}</span>
           </span>
           <div className="flex items-center gap-1">
             {onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleEdit}
-                aria-label="Edit source"
-              >
+              <Button variant="ghost" size="sm" onClick={handleEdit} aria-label="Edit source">
                 <Pencil className="h-4 w-4" />
                 <span className="sr-only">Edit</span>
               </Button>
@@ -363,7 +350,7 @@ export function SourceCard({
 export function SourceCardSkeleton() {
   return (
     <Card className="border-l-4 border-l-muted">
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 p-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -392,14 +379,14 @@ export function SourceCardSkeleton() {
             <div className="flex gap-1">
               <Skeleton className="h-5 w-16 rounded-full" />
               <Skeleton className="h-5 w-14 rounded-full" />
-              <Skeleton className="h-5 w-18 rounded-full" />
+              <Skeleton className="w-18 h-5 rounded-full" />
             </div>
             <Skeleton className="h-5 w-8 rounded-full" />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between border-t pt-2">
           <Skeleton className="h-4 w-32" />
           <div className="flex gap-1">
             <Skeleton className="h-8 w-8 rounded-md" />

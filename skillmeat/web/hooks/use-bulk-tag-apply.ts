@@ -78,13 +78,7 @@ export interface BulkTagProgress {
  * ```
  */
 export function useBulkTagApply(options: UseBulkTagApplyOptions) {
-  const {
-    entries,
-    sourceId,
-    onSuccess,
-    onError,
-    simulationMode = false,
-  } = options;
+  const { entries, sourceId, onSuccess, onError, simulationMode = false } = options;
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -160,9 +154,10 @@ export function useBulkTagApply(options: UseBulkTagApplyOptions) {
 
       // Show success toast
       if (result.totalUpdated > 0) {
-        const message = result.totalFailed > 0
-          ? `Applied tags to ${result.totalUpdated} artifacts (${result.totalFailed} failed)`
-          : `Applied tags to ${result.totalUpdated} artifacts`;
+        const message =
+          result.totalFailed > 0
+            ? `Applied tags to ${result.totalUpdated} artifacts (${result.totalFailed} failed)`
+            : `Applied tags to ${result.totalUpdated} artifacts`;
 
         toast({
           title: 'Tags applied',

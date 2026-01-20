@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { FileText, AlertCircle, AlertTriangle, Edit, ChevronRight, Save, X, ExternalLink } from 'lucide-react';
+import {
+  FileText,
+  AlertCircle,
+  AlertTriangle,
+  Edit,
+  ChevronRight,
+  Save,
+  X,
+  ExternalLink,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -183,9 +192,7 @@ function TruncationBanner({ originalSize, fullFileUrl }: TruncationBannerProps) 
       <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
       <AlertTitle className="text-amber-800 dark:text-amber-300">Large file truncated</AlertTitle>
       <AlertDescription className="text-amber-700 dark:text-amber-400">
-        <span>
-          This file ({sizeText}) has been truncated. Showing first 10,000 lines.
-        </span>
+        <span>This file ({sizeText}) has been truncated. Showing first 10,000 lines.</span>
         {fullFileUrl && (
           <a
             href={fullFileUrl}
@@ -337,7 +344,9 @@ export function ContentPane({
   ariaLabel,
 }: ContentPaneProps) {
   // Generate unique ID for breadcrumb to use in aria-labelledby
-  const breadcrumbId = path ? `content-pane-breadcrumb-${path.replace(/[^a-zA-Z0-9]/g, '-')}` : undefined;
+  const breadcrumbId = path
+    ? `content-pane-breadcrumb-${path.replace(/[^a-zA-Z0-9]/g, '-')}`
+    : undefined;
   const [isSaving, setIsSaving] = useState(false);
 
   // Editing is disabled in read-only mode
@@ -437,7 +446,10 @@ export function ContentPane({
         {/* Empty content message */}
         <div className="flex flex-1 items-center justify-center text-center">
           <div>
-            <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50" aria-hidden="true" />
+            <FileText
+              className="mx-auto mb-2 h-8 w-8 text-muted-foreground opacity-50"
+              aria-hidden="true"
+            />
             <p className="text-sm text-muted-foreground">This file is empty</p>
           </div>
         </div>
@@ -471,7 +483,12 @@ export function ContentPane({
             </div>
           ) : (
             canEdit && (
-              <Button variant="ghost" size="sm" onClick={handleEditClick} aria-label={`Edit ${path}`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEditClick}
+                aria-label={`Edit ${path}`}
+              >
                 <Edit className="mr-2 h-4 w-4" aria-hidden="true" />
                 Edit
               </Button>

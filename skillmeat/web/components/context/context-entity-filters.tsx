@@ -3,7 +3,13 @@
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -63,10 +69,7 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
   };
 
   const hasActiveFilters =
-    filters.search ||
-    filters.entity_type ||
-    filters.category ||
-    filters.auto_load !== undefined;
+    filters.search || filters.entity_type || filters.category || filters.auto_load !== undefined;
 
   const activeFilterCount = [
     filters.search,
@@ -96,9 +99,7 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
 
       {/* Entity Type Filter */}
       <div>
-        <Label className="mb-3 block text-sm font-medium">
-          Entity Type
-        </Label>
+        <Label className="mb-3 block text-sm font-medium">Entity Type</Label>
         <div className="space-y-3">
           {ENTITY_TYPES.map((type) => (
             <div key={type.value} className="flex items-center space-x-2">
@@ -123,10 +124,7 @@ export function ContextEntityFilters({ filters, onFiltersChange }: ContextEntity
         <Label htmlFor="category" className="mb-2 block text-sm font-medium">
           Category
         </Label>
-        <Select
-          value={filters.category || '__all__'}
-          onValueChange={handleCategoryChange}
-        >
+        <Select value={filters.category || '__all__'} onValueChange={handleCategoryChange}>
           <SelectTrigger id="category">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>

@@ -198,7 +198,6 @@ function hasSelectedDescendants(
   return false;
 }
 
-
 /**
  * Get inherited artifact type from parent path
  */
@@ -231,8 +230,8 @@ function filterTree(nodes: DirectoryNode[], query: string): DirectoryNode[] {
   const filtered: DirectoryNode[] = [];
 
   for (const node of nodes) {
-    const matches = node.name.toLowerCase().includes(lowerQuery) ||
-                    node.path.toLowerCase().includes(lowerQuery);
+    const matches =
+      node.name.toLowerCase().includes(lowerQuery) || node.path.toLowerCase().includes(lowerQuery);
 
     if (node.children && node.children.length > 0) {
       const filteredChildren = filterTree(node.children, query);
@@ -319,7 +318,7 @@ function TreeNode({
     <div role="none">
       <div
         className={cn(
-          'flex items-center gap-2 rounded px-2 py-1.5 hover:bg-accent transition-colors',
+          'flex items-center gap-2 rounded px-2 py-1.5 transition-colors hover:bg-accent',
           isSelected && 'bg-accent/50',
           isInherited && 'bg-accent/20'
         )}
@@ -329,7 +328,7 @@ function TreeNode({
         <button
           type="button"
           onClick={handleToggle}
-          className="flex-shrink-0 p-0.5 hover:bg-accent-foreground/10 rounded transition-colors"
+          className="flex-shrink-0 rounded p-0.5 transition-colors hover:bg-accent-foreground/10"
           aria-label={isExpanded ? 'Collapse directory' : 'Expand directory'}
           aria-expanded={isExpanded}
         >
@@ -357,14 +356,12 @@ function TreeNode({
         {/* Directory name and path */}
         <div className="min-w-0 flex-1">
           <span className="text-sm font-medium">{node.name}</span>
-          <span className="ml-2 text-xs text-muted-foreground truncate">
-            {node.path}
-          </span>
+          <span className="ml-2 truncate text-xs text-muted-foreground">{node.path}</span>
         </div>
 
         {/* Child count badge */}
         {childCount > 0 && (
-          <span className="flex-shrink-0 text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
+          <span className="flex-shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             {childCount}
           </span>
         )}
@@ -378,7 +375,7 @@ function TreeNode({
             }
           >
             <SelectTrigger
-              className="w-[140px] h-8"
+              className="h-8 w-[140px]"
               aria-label={`Select artifact type for ${node.name}`}
               onClick={(e) => e.stopPropagation()}
             >
@@ -396,8 +393,8 @@ function TreeNode({
 
         {/* Inherited type indicator (shown when not selected but has inherited type) */}
         {isInherited && displayType && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground italic">
-            <span className="px-2 py-0.5 rounded-full bg-muted/50 border border-dashed">
+          <div className="flex items-center gap-1.5 text-xs italic text-muted-foreground">
+            <span className="rounded-full border border-dashed bg-muted/50 px-2 py-0.5">
               {ARTIFACT_TYPE_LABELS[displayType]}
             </span>
             <span className="text-[10px]">(inherited)</span>
@@ -555,39 +552,42 @@ export function DirectoryMapModal({
     }
   }, [searchQuery, filteredTree]);
 
-  const handleToggleSelect = useCallback((path: string) => {
-    setSelectedPaths((prev) => {
-      const next = new Map(prev);
-      const node = findNodeByPath(tree, path);
+  const handleToggleSelect = useCallback(
+    (path: string) => {
+      setSelectedPaths((prev) => {
+        const next = new Map(prev);
+        const node = findNodeByPath(tree, path);
 
-      if (!node) return next;
+        if (!node) return next;
 
-      if (next.has(path)) {
-        // Deselecting: remove this path and all descendants
-        next.delete(path);
-        const descendantPaths = getAllDescendantPaths(node);
-        for (const descendantPath of descendantPaths) {
-          next.delete(descendantPath);
-        }
-      } else {
-        // Selecting: add this path and all descendants with same type
-        const currentType = next.get(path) || null;
-        next.set(path, currentType);
+        if (next.has(path)) {
+          // Deselecting: remove this path and all descendants
+          next.delete(path);
+          const descendantPaths = getAllDescendantPaths(node);
+          for (const descendantPath of descendantPaths) {
+            next.delete(descendantPath);
+          }
+        } else {
+          // Selecting: add this path and all descendants with same type
+          const currentType = next.get(path) || null;
+          next.set(path, currentType);
 
-        // Auto-select all descendants with the same type (or null if parent has no type)
-        const descendantPaths = getAllDescendantPaths(node);
-        for (const descendantPath of descendantPaths) {
-          // Only auto-select if not already explicitly selected with a different type
-          if (!next.has(descendantPath)) {
-            next.set(descendantPath, currentType);
+          // Auto-select all descendants with the same type (or null if parent has no type)
+          const descendantPaths = getAllDescendantPaths(node);
+          for (const descendantPath of descendantPaths) {
+            // Only auto-select if not already explicitly selected with a different type
+            if (!next.has(descendantPath)) {
+              next.set(descendantPath, currentType);
+            }
           }
         }
-      }
 
-      return next;
-    });
-    setIsDirty(true); // Mark as dirty when selection changes
-  }, [tree]);
+        return next;
+      });
+      setIsDirty(true); // Mark as dirty when selection changes
+    },
+    [tree]
+  );
 
   const handleToggleExpand = useCallback((path: string) => {
     setExpandedPaths((prev) => {
@@ -601,34 +601,37 @@ export function DirectoryMapModal({
     });
   }, []);
 
-  const handleTypeChange = useCallback((path: string, type: ArtifactType | null) => {
-    setSelectedPaths((prev) => {
-      const next = new Map(prev);
-      const node = findNodeByPath(tree, path);
+  const handleTypeChange = useCallback(
+    (path: string, type: ArtifactType | null) => {
+      setSelectedPaths((prev) => {
+        const next = new Map(prev);
+        const node = findNodeByPath(tree, path);
 
-      if (!node) {
-        // Simple case: just update this path
-        next.set(path, type);
-        return next;
-      }
-
-      // Update this path
-      next.set(path, type);
-
-      // Propagate type to descendants that don't have an explicit override
-      const descendantPaths = getAllDescendantPaths(node);
-      for (const descendantPath of descendantPaths) {
-        // Only propagate if the child is selected but has no type set (null)
-        // This allows children to override the parent type
-        if (next.has(descendantPath) && next.get(descendantPath) === null) {
-          next.set(descendantPath, type);
+        if (!node) {
+          // Simple case: just update this path
+          next.set(path, type);
+          return next;
         }
-      }
 
-      return next;
-    });
-    setIsDirty(true); // Mark as dirty when type changes
-  }, [tree]);
+        // Update this path
+        next.set(path, type);
+
+        // Propagate type to descendants that don't have an explicit override
+        const descendantPaths = getAllDescendantPaths(node);
+        for (const descendantPath of descendantPaths) {
+          // Only propagate if the child is selected but has no type set (null)
+          // This allows children to override the parent type
+          if (next.has(descendantPath) && next.get(descendantPath) === null) {
+            next.set(descendantPath, type);
+          }
+        }
+
+        return next;
+      });
+      setIsDirty(true); // Mark as dirty when type changes
+    },
+    [tree]
+  );
 
   const handleCancel = () => {
     if (isDirty) {
@@ -716,7 +719,7 @@ export function DirectoryMapModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-4xl max-h-[85vh] flex flex-col"
+        className="flex max-h-[85vh] flex-col sm:max-w-4xl"
         aria-describedby="directory-map-description"
       >
         <DialogHeader>
@@ -725,7 +728,7 @@ export function DirectoryMapModal({
             {repoInfo ? (
               <>
                 Select directories containing artifacts in{' '}
-                <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                   {repoInfo.owner}/{repoInfo.repo}@{repoInfo.ref}
                 </code>
               </>
@@ -737,7 +740,7 @@ export function DirectoryMapModal({
 
         {/* Search input */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search directories..."
@@ -749,17 +752,19 @@ export function DirectoryMapModal({
         </div>
 
         {/* Directory tree */}
-        <div className="flex-1 overflow-auto rounded-md border min-h-[350px] max-h-[450px]">
+        <div className="max-h-[450px] min-h-[350px] flex-1 overflow-auto rounded-md border">
           {isLoadingTree ? (
             <TreeSkeleton />
           ) : treeError ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
               <AlertCircle className="mb-4 h-12 w-12 text-destructive opacity-50" />
-              <h3 className="mb-2 text-sm font-medium text-destructive">Failed to load directories</h3>
-              <p className="text-xs text-muted-foreground max-w-md">{treeError}</p>
+              <h3 className="mb-2 text-sm font-medium text-destructive">
+                Failed to load directories
+              </h3>
+              <p className="max-w-md text-xs text-muted-foreground">{treeError}</p>
             </div>
           ) : filteredTree.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
               <Folder className="mb-4 h-12 w-12 text-muted-foreground opacity-50" />
               <h3 className="mb-2 text-sm font-medium text-muted-foreground">
                 {searchQuery ? 'No directories match your search' : 'No directories found'}
@@ -788,7 +793,7 @@ export function DirectoryMapModal({
         </div>
 
         {/* Summary and stats */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-3">
+        <div className="flex items-center justify-between border-t pt-3 text-sm text-muted-foreground">
           <div>
             {totalDirectories > 0 && (
               <span>
@@ -806,12 +811,7 @@ export function DirectoryMapModal({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isSaving}
-          >
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={isSaving}>
             <X className="mr-2 h-4 w-4" />
             Cancel
           </Button>

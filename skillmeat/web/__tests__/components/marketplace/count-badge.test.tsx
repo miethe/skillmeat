@@ -47,9 +47,7 @@ describe('CountBadge', () => {
 
     it('calculates sum across all types', () => {
       render(
-        <CountBadge
-          countsByType={{ skill: 1, command: 2, agent: 3, hook: 4, mcp_server: 5 }}
-        />
+        <CountBadge countsByType={{ skill: 1, command: 2, agent: 3, hook: 4, mcp_server: 5 }} />
       );
 
       expect(screen.getByText('15')).toBeInTheDocument();

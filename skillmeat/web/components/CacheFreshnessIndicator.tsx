@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { Badge } from "@/components/ui/badge";
-import { Clock, AlertCircle } from "lucide-react";
+import { Badge } from '@/components/ui/badge';
+import { Clock, AlertCircle } from 'lucide-react';
 
 interface CacheFreshnessIndicatorProps {
   lastFetched: Date | null;
@@ -11,7 +11,7 @@ interface CacheFreshnessIndicatorProps {
 
 function formatTimeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
@@ -46,7 +46,7 @@ export function CacheFreshnessIndicator({
     <Badge variant="secondary" className="gap-1">
       <Clock className="h-3 w-3" />
       Updated {formatTimeAgo(lastFetched)}
-      {cacheHit && " (cached)"}
+      {cacheHit && ' (cached)'}
     </Badge>
   );
 }

@@ -4,11 +4,7 @@
  * Tests YAML frontmatter detection, parsing, and stripping from markdown content.
  */
 
-import {
-  detectFrontmatter,
-  parseFrontmatter,
-  stripFrontmatter,
-} from '@/lib/frontmatter';
+import { detectFrontmatter, parseFrontmatter, stripFrontmatter } from '@/lib/frontmatter';
 
 describe('detectFrontmatter', () => {
   describe('valid frontmatter', () => {

@@ -389,10 +389,7 @@ export function SourceFilterBar({
 
         {/* Trust Level Filter */}
         <div className="flex items-center gap-2">
-          <label
-            htmlFor="trust-level-filter"
-            className="text-sm font-medium text-muted-foreground"
-          >
+          <label htmlFor="trust-level-filter" className="text-sm font-medium text-muted-foreground">
             Trust
           </label>
           <Select

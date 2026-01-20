@@ -80,7 +80,11 @@ test.describe('Discovery Flow E2E', () => {
   /**
    * Mock the discovery API with specific artifacts
    */
-  async function mockDiscoveryApi(page: Page, artifacts: any[], options?: { importable_count?: number }) {
+  async function mockDiscoveryApi(
+    page: Page,
+    artifacts: any[],
+    options?: { importable_count?: number }
+  ) {
     const encodedPath = encodeURIComponent(TEST_PROJECT_PATH);
     await page.route(`**/api/v1/artifacts/discover/project/${encodedPath}`, async (route) => {
       await route.fulfill({
@@ -347,9 +351,9 @@ test.describe('Discovery Flow E2E', () => {
       await expect(page.getByRole('dialog')).toBeVisible();
 
       // Close modal - try X button or Cancel button
-      const closeButton = page.getByRole('button', { name: /Cancel|Close/i }).or(
-        page.getByRole('dialog').getByRole('button').first()
-      );
+      const closeButton = page
+        .getByRole('button', { name: /Cancel|Close/i })
+        .or(page.getByRole('dialog').getByRole('button').first());
       await closeButton.click();
 
       // Verify modal is closed
@@ -431,10 +435,12 @@ test.describe('Discovery Flow E2E', () => {
 
       // Verify success - could be toast or modal message
       const successIndicator = page.getByText(/import.*success|success.*import/i);
-      await expect(successIndicator).toBeVisible({ timeout: 5000 }).catch(() => {
-        // Alternative: verify import was requested even if UI doesn't show success message
-        expect(importRequested).toBe(true);
-      });
+      await expect(successIndicator)
+        .toBeVisible({ timeout: 5000 })
+        .catch(() => {
+          // Alternative: verify import was requested even if UI doesn't show success message
+          expect(importRequested).toBe(true);
+        });
     });
 
     test('can select all artifacts', async ({ page }) => {
@@ -488,7 +494,10 @@ test.describe('Discovery Flow E2E', () => {
 
     test('handles partial import success', async ({ page }) => {
       await page.route('**/api/v1/artifacts/discover/project/*', async (route) => {
-        if (route.request().method() === 'POST' && route.request().url().includes('/discover/import')) {
+        if (
+          route.request().method() === 'POST' &&
+          route.request().url().includes('/discover/import')
+        ) {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -625,7 +634,10 @@ test.describe('Discovery Flow E2E', () => {
 
     test('handles import API errors', async ({ page }) => {
       await page.route('**/api/v1/artifacts/discover/project/*', async (route) => {
-        if (route.request().method() === 'POST' && route.request().url().includes('/discover/import')) {
+        if (
+          route.request().method() === 'POST' &&
+          route.request().url().includes('/discover/import')
+        ) {
           await route.fulfill({
             status: 500,
             contentType: 'application/json',
@@ -890,7 +902,10 @@ test.describe('Discovery Flow E2E', () => {
       });
 
       // Start on Deployed tab
-      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
 
       // Click Discovery tab (URL changes)
       await page.getByRole('tab', { name: /Discovery/i }).click();
@@ -900,7 +915,10 @@ test.describe('Discovery Flow E2E', () => {
       await page.goBack();
 
       // Verify Deployed tab is active again
-      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
       await expect(page).not.toHaveURL(/tab=discovery/);
     });
 

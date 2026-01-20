@@ -39,7 +39,7 @@ export default function ManagePage() {
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Manage Artifacts</h1>
+      <h1 className="mb-6 text-3xl font-bold">Manage Artifacts</h1>
 
       {/* Discovery Banner - only shows when artifacts are found */}
       {!isLoading && (
@@ -51,9 +51,7 @@ export default function ManagePage() {
       )}
 
       {/* Rest of your manage page content */}
-      <div className="mt-6">
-        {/* Your artifact list, filters, etc. */}
-      </div>
+      <div className="mt-6">{/* Your artifact list, filters, etc. */}</div>
 
       {/* Bulk Import Modal */}
       <BulkImportModal
@@ -112,18 +110,14 @@ import { apiRequest } from '@/lib/api';
 
 export default async function ManagePage() {
   // Fetch on server
-  const discoveredArtifacts = await apiRequest<DiscoveredArtifact[]>(
-    '/api/artifacts/discover'
-  );
+  const discoveredArtifacts = await apiRequest<DiscoveredArtifact[]>('/api/artifacts/discover');
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Manage Artifacts</h1>
+      <h1 className="mb-6 text-3xl font-bold">Manage Artifacts</h1>
 
       {/* Client component wrapper */}
-      <DiscoveryBannerClient
-        discoveredCount={discoveredArtifacts.length}
-      />
+      <DiscoveryBannerClient discoveredCount={discoveredArtifacts.length} />
 
       {/* Rest of page */}
     </div>
@@ -166,24 +160,14 @@ import { DiscoveryBanner } from '@/components/discovery';
 describe('DiscoveryBanner', () => {
   it('displays correct artifact count', () => {
     const onReview = jest.fn();
-    render(
-      <DiscoveryBanner
-        discoveredCount={5}
-        onReview={onReview}
-      />
-    );
+    render(<DiscoveryBanner discoveredCount={5} onReview={onReview} />);
 
     expect(screen.getByText(/Found 5 Artifacts/i)).toBeInTheDocument();
   });
 
   it('handles singular artifact correctly', () => {
     const onReview = jest.fn();
-    render(
-      <DiscoveryBanner
-        discoveredCount={1}
-        onReview={onReview}
-      />
-    );
+    render(<DiscoveryBanner discoveredCount={1} onReview={onReview} />);
 
     expect(screen.getByText(/Found 1 Artifact/i)).toBeInTheDocument();
     expect(screen.queryByText(/Artifacts/i)).not.toBeInTheDocument();
@@ -191,12 +175,7 @@ describe('DiscoveryBanner', () => {
 
   it('calls onReview when button is clicked', () => {
     const onReview = jest.fn();
-    render(
-      <DiscoveryBanner
-        discoveredCount={3}
-        onReview={onReview}
-      />
-    );
+    render(<DiscoveryBanner discoveredCount={3} onReview={onReview} />);
 
     fireEvent.click(screen.getByText('Review & Import'));
     expect(onReview).toHaveBeenCalledTimes(1);
@@ -204,13 +183,7 @@ describe('DiscoveryBanner', () => {
 
   it('dismisses when close button is clicked', () => {
     const onReview = jest.fn();
-    render(
-      <DiscoveryBanner
-        discoveredCount={2}
-        onReview={onReview}
-        dismissible={true}
-      />
-    );
+    render(<DiscoveryBanner discoveredCount={2} onReview={onReview} dismissible={true} />);
 
     fireEvent.click(screen.getByLabelText('Close'));
     expect(screen.queryByText(/Found 2 Artifacts/i)).not.toBeInTheDocument();
@@ -218,13 +191,7 @@ describe('DiscoveryBanner', () => {
 
   it('hides dismiss button when dismissible is false', () => {
     const onReview = jest.fn();
-    render(
-      <DiscoveryBanner
-        discoveredCount={2}
-        onReview={onReview}
-        dismissible={false}
-      />
-    );
+    render(<DiscoveryBanner discoveredCount={2} onReview={onReview} dismissible={false} />);
 
     expect(screen.queryByLabelText('Close')).not.toBeInTheDocument();
     expect(screen.queryByText('Dismiss')).not.toBeInTheDocument();
@@ -232,12 +199,7 @@ describe('DiscoveryBanner', () => {
 
   it('does not render when count is zero', () => {
     const onReview = jest.fn();
-    const { container } = render(
-      <DiscoveryBanner
-        discoveredCount={0}
-        onReview={onReview}
-      />
-    );
+    const { container } = render(<DiscoveryBanner discoveredCount={0} onReview={onReview} />);
 
     expect(container.firstChild).toBeNull();
   });

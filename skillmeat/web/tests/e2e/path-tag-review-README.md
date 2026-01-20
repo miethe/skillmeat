@@ -11,61 +11,74 @@ End-to-end tests for the path-based tag extraction review workflow (Phase 2).
 ## Test Coverage
 
 ### 1. Opening and Viewing (3 tests)
+
 - ✅ User can open catalog entry and navigate to Suggested Tags tab
 - ✅ Displays all extracted segments with correct statuses
 - ✅ Displays summary with correct counts
 
 ### 2. Approving Segments (3 tests)
+
 - ✅ User can approve a pending segment
 - ✅ Approve button shows loading state while request is pending
 - ✅ Summary counts update after approving segment
 
 ### 3. Rejecting Segments (2 tests)
+
 - ✅ User can reject a pending segment
 - ✅ Summary counts update after rejecting segment
 
 ### 4. Excluded Segments (2 tests)
+
 - ✅ Excluded segments display with badge and no action buttons
 - ✅ Excluded segments are included in summary counts
 
 ### 5. Persistence (1 test)
+
 - ✅ Changes persist after closing and reopening modal
 
 ### 6. Error Handling (2 tests)
+
 - ✅ Displays error state when path segments fail to load
 - ✅ Displays error when status update fails
 
 ### 7. Loading States (1 test)
+
 - ✅ Displays loading skeleton while path segments are loading
 
 ### 8. Accessibility (2 tests)
+
 - ✅ Approve and reject buttons have proper ARIA labels
 - ✅ Tab navigation works correctly
 
 ## Running Tests
 
 ### Run all path tag review tests
+
 ```bash
 cd skillmeat/web
 pnpm test:e2e tests/e2e/path-tag-review.spec.ts
 ```
 
 ### Run specific test suite
+
 ```bash
 pnpm test:e2e tests/e2e/path-tag-review.spec.ts -g "Approving Segments"
 ```
 
 ### Run in UI mode (interactive)
+
 ```bash
 pnpm test:e2e:ui tests/e2e/path-tag-review.spec.ts
 ```
 
 ### Run in debug mode
+
 ```bash
 pnpm test:e2e:debug tests/e2e/path-tag-review.spec.ts
 ```
 
 ### Run with specific browser
+
 ```bash
 pnpm test:e2e tests/e2e/path-tag-review.spec.ts --project=chromium
 ```
@@ -75,22 +88,26 @@ pnpm test:e2e tests/e2e/path-tag-review.spec.ts --project=chromium
 The tests use comprehensive mock data to simulate the entire workflow:
 
 ### Mock Source
+
 - GitHub repository: `anthropics/skills`
 - Trust level: `official`
 - Contains catalog entries with path segments
 
 ### Mock Catalog Entry
+
 - Name: `ai-engineer`
 - Path: `categories/05-data-ai/ai-engineer`
 - Status: `new`
 - Confidence score: 95
 
 ### Mock Path Segments
+
 - **Pending segments**: `categories`, `05-data-ai`, `ai-engineer`
 - **Excluded segments**: `src`, `lib` (with exclusion reasons)
 - **Normalized values**: `05-data-ai` → `data-ai`
 
 ### Mock API Endpoints
+
 - `GET /api/v1/marketplace/sources` - List sources
 - `GET /api/v1/marketplace/sources/{id}` - Get source detail
 - `GET /api/v1/marketplace/sources/{id}/catalog` - List catalog entries
@@ -111,11 +128,13 @@ The tests use shared helper functions from `tests/helpers/test-utils.ts`:
 The tests rely on the following component structure:
 
 ### CatalogEntryModal
+
 - **Modal**: `[role="dialog"]`
 - **Tabs**: `[role="tab"]` with text filters
 - **Tab Content**: `[role="tabpanel"]`
 
 ### PathTagReview Component
+
 - **Segment rows**: `div` with nested `text="segment-name"`
 - **Approve button**: `button[aria-label="Approve segment"]`
 - **Reject button**: `button[aria-label="Reject segment"]`
@@ -125,6 +144,7 @@ The tests rely on the following component structure:
 ## Accessibility Testing
 
 The tests verify:
+
 - ✅ Proper ARIA labels on action buttons
 - ✅ Keyboard navigation through tabs
 - ✅ Focus management
@@ -168,21 +188,25 @@ These tests run automatically in CI:
 ## Debugging Failed Tests
 
 ### View test trace
+
 ```bash
 pnpm exec playwright show-trace test-results/.../trace.zip
 ```
 
 ### View HTML report
+
 ```bash
 pnpm exec playwright show-report
 ```
 
 ### Run with headed browser
+
 ```bash
 pnpm test:e2e tests/e2e/path-tag-review.spec.ts --headed
 ```
 
 ### Run with slow-mo
+
 ```bash
 pnpm test:e2e tests/e2e/path-tag-review.spec.ts --headed --slow-mo=1000
 ```

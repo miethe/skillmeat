@@ -343,10 +343,9 @@ describe('Filter URL Synchronization', () => {
       // Simulate the router.replace call from updateURLParams
       mockRouter.replace(expectedUrl, { scroll: false });
 
-      expect(mockRouter.replace).toHaveBeenCalledWith(
-        '/marketplace/sources/123?minConfidence=70',
-        { scroll: false }
-      );
+      expect(mockRouter.replace).toHaveBeenCalledWith('/marketplace/sources/123?minConfidence=70', {
+        scroll: false,
+      });
     });
 
     it('should call router.replace without scroll to preserve position', () => {

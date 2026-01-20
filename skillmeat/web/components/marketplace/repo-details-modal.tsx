@@ -83,10 +83,8 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
                   README
                 </h3>
                 <div className="min-h-0 flex-1 overflow-y-auto rounded-md border bg-card">
-                  <div className="prose prose-sm max-w-none break-words p-4 dark:prose-invert prose-headings:break-words prose-p:break-words prose-code:break-all prose-pre:overflow-x-auto [overflow-wrap:anywhere] [word-break:break-word]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {readmeContent}
-                    </ReactMarkdown>
+                  <div className="prose prose-sm max-w-none break-words p-4 [overflow-wrap:anywhere] [word-break:break-word] dark:prose-invert prose-headings:break-words prose-p:break-words prose-code:break-all prose-pre:overflow-x-auto">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent}</ReactMarkdown>
                   </div>
                 </div>
               </div>
@@ -115,10 +113,7 @@ export function RepoDetailsModal({ isOpen, onClose, source }: RepoDetailsModalPr
 function EmptyState() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-      <FileText
-        className="mb-4 h-12 w-12 text-muted-foreground opacity-50"
-        aria-hidden="true"
-      />
+      <FileText className="mb-4 h-12 w-12 text-muted-foreground opacity-50" aria-hidden="true" />
       <h3 className="mb-1 text-sm font-medium text-muted-foreground">
         No repository details available
       </h3>

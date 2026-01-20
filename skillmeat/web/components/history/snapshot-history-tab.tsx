@@ -24,11 +24,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useCreateSnapshot, useToast } from '@/hooks';
-import {
-  VersionTimeline,
-  VersionComparisonView,
-  RollbackDialog,
-} from '@/components/history';
+import { VersionTimeline, VersionComparisonView, RollbackDialog } from '@/components/history';
 import { cn } from '@/lib/utils';
 
 /**
@@ -65,10 +61,7 @@ export interface SnapshotHistoryTabProps {
  * />
  * ```
  */
-export function SnapshotHistoryTab({
-  collectionName,
-  className,
-}: SnapshotHistoryTabProps) {
+export function SnapshotHistoryTab({ collectionName, className }: SnapshotHistoryTabProps) {
   // State for managing different views and dialogs
   const [compareSnapshots, setCompareSnapshots] = useState<{
     id1: string;
@@ -176,7 +169,7 @@ export function SnapshotHistoryTab({
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Create Snapshot
             </Button>
           </DialogTrigger>
@@ -189,9 +182,7 @@ export function SnapshotHistoryTab({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="snapshot-message">
-                  Message (optional)
-                </Label>
+                <Label htmlFor="snapshot-message">Message (optional)</Label>
                 <Input
                   id="snapshot-message"
                   placeholder="e.g., Before major update"

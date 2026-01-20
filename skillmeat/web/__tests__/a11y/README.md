@@ -11,6 +11,7 @@ This directory contains accessibility tests and audit documentation for the Skil
 **Last Audited**: 2024-12-20
 
 #### Test Results
+
 ```
 ✅ 23/23 tests passed
 ✅ 0 axe-core violations
@@ -18,11 +19,13 @@ This directory contains accessibility tests and audit documentation for the Skil
 ```
 
 #### Documentation
+
 - [Accessibility Audit Summary](./ACCESSIBILITY_AUDIT_SUMMARY.md) - Comprehensive audit report
 - [Accessibility Checklist](./ACCESSIBILITY_CHECKLIST.md) - Quick reference checklist
 - [Task Completion Report](./TASK_FE-016_COMPLETION_REPORT.md) - Task FE-016 summary
 
 #### Test File
+
 - [artifact-deletion-dialog.a11y.test.tsx](./artifact-deletion-dialog.a11y.test.tsx) - 23 comprehensive test cases
 
 ---
@@ -138,15 +141,16 @@ describe('[ComponentName] Accessibility', () => {
 
 ## Audit History
 
-| Date | Component | Status | Violations | Notes |
-|------|-----------|--------|------------|-------|
-| 2024-12-20 | Artifact Deletion Dialog | ✅ Pass | 0 | Task FE-016 complete |
+| Date       | Component                | Status  | Violations | Notes                |
+| ---------- | ------------------------ | ------- | ---------- | -------------------- |
+| 2024-12-20 | Artifact Deletion Dialog | ✅ Pass | 0          | Task FE-016 complete |
 
 ---
 
 ## Contact
 
 For questions about accessibility testing or WCAG compliance, refer to:
+
 - Project documentation: `docs/dev/`
 - Component rules: `.claude/rules/web/`
 - Testing guide: `skillmeat/web/CLAUDE.md`

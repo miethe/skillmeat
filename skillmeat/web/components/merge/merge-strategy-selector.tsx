@@ -28,8 +28,7 @@ const strategies: StrategyOption[] = [
     value: 'auto',
     icon: GitMerge,
     label: 'Auto-merge where possible',
-    description:
-      'Automatically merge non-conflicting changes and prompt only for conflicts',
+    description: 'Automatically merge non-conflicting changes and prompt only for conflicts',
     color: 'text-green-600',
   },
   {
@@ -43,8 +42,7 @@ const strategies: StrategyOption[] = [
     value: 'abort_on_conflict',
     icon: XCircle,
     label: 'Abort on any conflict',
-    description:
-      'Stop the merge process if any conflicts are detected, no partial merges',
+    description: 'Stop the merge process if any conflicts are detected, no partial merges',
     color: 'text-red-600',
   },
 ];
@@ -74,33 +72,27 @@ export function MergeStrategySelector({
                 onClick={() => onChange(strategy.value)}
                 disabled={disabled}
                 className={cn(
-                  'w-full text-left rounded-lg border p-4 transition-colors',
-                  'hover:bg-accent hover:border-accent-foreground/20',
-                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'w-full rounded-lg border p-4 text-left transition-colors',
+                  'hover:border-accent-foreground/20 hover:bg-accent',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
                   isSelected && 'border-primary bg-primary/5'
                 )}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={cn(
-                      'h-5 w-5 rounded-full border-2 mt-0.5 flex-shrink-0',
-                      isSelected
-                        ? 'border-primary bg-primary'
-                        : 'border-muted-foreground'
+                      'mt-0.5 h-5 w-5 flex-shrink-0 rounded-full border-2',
+                      isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'
                     )}
                   >
-                    {isSelected && (
-                      <div className="h-full w-full rounded-full bg-white scale-50" />
-                    )}
+                    {isSelected && <div className="h-full w-full scale-50 rounded-full bg-white" />}
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <Icon className={cn('h-4 w-4', strategy.color)} />
                       <p className="font-semibold">{strategy.label}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {strategy.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{strategy.description}</p>
                   </div>
                 </div>
               </button>
@@ -110,7 +102,7 @@ export function MergeStrategySelector({
 
         {/* Current Selection Summary */}
         {value && (
-          <div className="mt-4 rounded-lg bg-blue-50 border border-blue-200 p-3">
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
             <p className="text-sm font-semibold text-blue-900">Selected Strategy:</p>
             <p className="text-sm text-blue-700">
               {strategies.find((s) => s.value === value)?.label}

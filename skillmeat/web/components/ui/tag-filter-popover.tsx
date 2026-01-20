@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Filter, X, Check, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
-import { useTags } from "@/hooks/use-tags";
+import * as React from 'react';
+import { Filter, X, Check, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { useTags } from '@/hooks/use-tags';
 
 interface TagFilterPopoverProps {
   selectedTags: string[];
@@ -28,13 +28,9 @@ interface TagFilterPopoverProps {
  * <TagFilterPopover selectedTags={selectedTags} onChange={setSelectedTags} />
  * ```
  */
-export function TagFilterPopover({
-  selectedTags,
-  onChange,
-  className,
-}: TagFilterPopoverProps) {
+export function TagFilterPopover({ selectedTags, onChange, className }: TagFilterPopoverProps) {
   const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = React.useState('');
   const { data: tagsData, isLoading } = useTags(100);
 
   const tags = tagsData?.items || [];
@@ -42,14 +38,12 @@ export function TagFilterPopover({
   // Filter tags by search
   const filteredTags = React.useMemo(() => {
     if (!search) return tags;
-    return tags.filter(tag =>
-      tag.name.toLowerCase().includes(search.toLowerCase())
-    );
+    return tags.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
   }, [tags, search]);
 
   const toggleTag = (tagId: string) => {
     if (selectedTags.includes(tagId)) {
-      onChange(selectedTags.filter(id => id !== tagId));
+      onChange(selectedTags.filter((id) => id !== tagId));
     } else {
       onChange([...selectedTags, tagId]);
     }
@@ -57,17 +51,13 @@ export function TagFilterPopover({
 
   const clearAll = () => {
     onChange([]);
-    setSearch("");
+    setSearch('');
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn("gap-2", className)}
-        >
+        <Button variant="outline" size="sm" className={cn('gap-2', className)}>
           <Filter className="h-4 w-4" />
           Tags
           {selectedTags.length > 0 && (
@@ -78,16 +68,11 @@ export function TagFilterPopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
-        <div className="p-3 border-b">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium text-sm">Filter by tags</span>
+        <div className="border-b p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Filter by tags</span>
             {selectedTags.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAll}
-                className="h-6 px-2 text-xs"
-              >
+              <Button variant="ghost" size="sm" onClick={clearAll} className="h-6 px-2 text-xs">
                 Clear all
               </Button>
             )}
@@ -98,37 +83,33 @@ export function TagFilterPopover({
               placeholder="Search tags..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9"
+              className="h-9 pl-8"
             />
           </div>
         </div>
         <ScrollArea className="h-60">
           <div className="p-2">
             {isLoading ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                Loading tags...
-              </div>
+              <div className="py-4 text-center text-sm text-muted-foreground">Loading tags...</div>
             ) : filteredTags.length === 0 ? (
-              <div className="text-center py-4 text-sm text-muted-foreground">
-                No tags found
-              </div>
+              <div className="py-4 text-center text-sm text-muted-foreground">No tags found</div>
             ) : (
-              filteredTags.map(tag => {
+              filteredTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag.id);
                 return (
                   <div
                     key={tag.id}
                     className={cn(
-                      "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent",
-                      isSelected && "bg-accent"
+                      'flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent',
+                      isSelected && 'bg-accent'
                     )}
                     onClick={() => toggleTag(tag.id)}
                   >
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
-                          "w-4 h-4 rounded border flex items-center justify-center",
-                          isSelected ? "bg-primary border-primary" : "border-input"
+                          'flex h-4 w-4 items-center justify-center rounded border',
+                          isSelected ? 'border-primary bg-primary' : 'border-input'
                         )}
                       >
                         {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
@@ -138,9 +119,7 @@ export function TagFilterPopover({
                       </Badge>
                     </div>
                     {tag.artifact_count !== undefined && (
-                      <span className="text-xs text-muted-foreground">
-                        {tag.artifact_count}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{tag.artifact_count}</span>
                     )}
                   </div>
                 );
@@ -165,41 +144,27 @@ export function TagFilterPopover({
  * <TagFilterBar selectedTags={selectedTags} onChange={setSelectedTags} />
  * ```
  */
-export function TagFilterBar({
-  selectedTags,
-  onChange,
-  className,
-}: TagFilterPopoverProps) {
+export function TagFilterBar({ selectedTags, onChange, className }: TagFilterPopoverProps) {
   const { data: tagsData } = useTags(100);
   const tags = tagsData?.items || [];
 
-  const selectedTagDetails = tags.filter(t => selectedTags.includes(t.id));
+  const selectedTagDetails = tags.filter((t) => selectedTags.includes(t.id));
 
   if (selectedTags.length === 0) return null;
 
   return (
-    <div className={cn("flex items-center gap-2 flex-wrap", className)}>
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <span className="text-sm text-muted-foreground">Filtering by:</span>
-      {selectedTagDetails.map(tag => (
-        <Badge
-          key={tag.id}
-          variant="secondary"
-          colorStyle={tag.color}
-          className="gap-1"
-        >
+      {selectedTagDetails.map((tag) => (
+        <Badge key={tag.id} variant="secondary" colorStyle={tag.color} className="gap-1">
           {tag.name}
           <X
             className="h-3 w-3 cursor-pointer hover:opacity-70"
-            onClick={() => onChange(selectedTags.filter(id => id !== tag.id))}
+            onClick={() => onChange(selectedTags.filter((id) => id !== tag.id))}
           />
         </Badge>
       ))}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onChange([])}
-        className="h-6 text-xs"
-      >
+      <Button variant="ghost" size="sm" onClick={() => onChange([])} className="h-6 text-xs">
         Clear all
       </Button>
     </div>

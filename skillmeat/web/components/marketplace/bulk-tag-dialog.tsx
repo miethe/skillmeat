@@ -170,7 +170,10 @@ export function BulkTagDialog({
     setDirTags((prev) => {
       const next = new Map(prev);
       const existing = next.get(path) || [];
-      next.set(path, existing.filter((t) => t !== tag));
+      next.set(
+        path,
+        existing.filter((t) => t !== tag)
+      );
       return next;
     });
   }, []);
@@ -231,8 +234,8 @@ export function BulkTagDialog({
         <DialogHeader>
           <DialogTitle>Bulk Tag Application</DialogTitle>
           <DialogDescription id="bulk-tag-dialog-description">
-            Apply tags to all artifacts in selected directories. Tags will be
-            merged with existing tags on each artifact.
+            Apply tags to all artifacts in selected directories. Tags will be merged with existing
+            tags on each artifact.
           </DialogDescription>
         </DialogHeader>
 
@@ -245,17 +248,11 @@ export function BulkTagDialog({
             >
               <FolderOpen className="mb-2 h-8 w-8" aria-hidden="true" />
               <p>No directories found in catalog entries.</p>
-              <p className="text-sm">
-                Root-level artifacts cannot be bulk-tagged.
-              </p>
+              <p className="text-sm">Root-level artifacts cannot be bulk-tagged.</p>
             </div>
           ) : (
             <ScrollArea className="h-[400px] pr-4">
-              <div
-                className="space-y-4"
-                role="group"
-                aria-label="Directory list for bulk tagging"
-              >
+              <div className="space-y-4" role="group" aria-label="Directory list for bulk tagging">
                 {directoryInfo.map((dir) => {
                   const isSelected = selectedDirs.has(dir.path);
                   const currentTags = dirTags.get(dir.path) || [];
@@ -265,9 +262,7 @@ export function BulkTagDialog({
                       key={dir.path}
                       className={cn(
                         'rounded-lg border p-4 transition-colors',
-                        isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border'
+                        isSelected ? 'border-primary bg-primary/5' : 'border-border'
                       )}
                     >
                       {/* Directory header with checkbox */}
@@ -278,24 +273,19 @@ export function BulkTagDialog({
                           onCheckedChange={() => toggleDirectory(dir.path)}
                           aria-label={`Select ${dir.path}`}
                         />
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <Label
                             htmlFor={`dir-${dir.path}`}
-                            className="flex items-center gap-2 cursor-pointer font-medium"
+                            className="flex cursor-pointer items-center gap-2 font-medium"
                           >
                             <FolderOpen
-                              className="h-4 w-4 text-muted-foreground shrink-0"
+                              className="h-4 w-4 shrink-0 text-muted-foreground"
                               aria-hidden="true"
                             />
                             <span className="truncate">{dir.path}</span>
-                            <Badge
-                              variant="secondary"
-                              className="ml-auto shrink-0"
-                            >
+                            <Badge variant="secondary" className="ml-auto shrink-0">
                               {dir.artifactCount}{' '}
-                              {dir.artifactCount === 1
-                                ? 'artifact'
-                                : 'artifacts'}
+                              {dir.artifactCount === 1 ? 'artifact' : 'artifacts'}
                             </Badge>
                           </Label>
 
@@ -307,9 +297,7 @@ export function BulkTagDialog({
                               suggestedTags={dir.suggestedTags}
                               onAddTag={(tag) => addTag(dir.path, tag)}
                               onRemoveTag={(tag) => removeTag(dir.path, tag)}
-                              onAddSuggestedTag={(tag) =>
-                                addSuggestedTag(dir.path, tag)
-                              }
+                              onAddSuggestedTag={(tag) => addSuggestedTag(dir.path, tag)}
                             />
                           </div>
                         </div>
@@ -323,18 +311,13 @@ export function BulkTagDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isApplying}
-          >
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={isApplying}>
             Cancel
           </Button>
           <div className="flex items-center gap-4">
             {/* Progress indicator */}
             {isApplying && progress && progress.total > 0 && (
-              <div className="flex items-center gap-2 min-w-[120px]">
+              <div className="flex min-w-[120px] items-center gap-2">
                 <Progress
                   value={progress.percentage}
                   className="h-2 w-20"
@@ -349,18 +332,11 @@ export function BulkTagDialog({
               type="button"
               onClick={handleApply}
               disabled={isApplyDisabled}
-              aria-describedby={
-                isApplyDisabled && !isApplying
-                  ? 'apply-button-hint'
-                  : undefined
-              }
+              aria-describedby={isApplyDisabled && !isApplying ? 'apply-button-hint' : undefined}
             >
               {isApplying ? (
                 <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                   Applying...
                 </>
               ) : (

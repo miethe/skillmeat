@@ -34,18 +34,9 @@ export function ExampleWithSource() {
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">With Source Info</h3>
       <div className="flex gap-2">
-        <TrustBadges
-          trustLevel="official"
-          source="anthropics/skills/canvas-design"
-        />
-        <TrustBadges
-          trustLevel="verified"
-          source="verified/community-skills"
-        />
-        <TrustBadges
-          trustLevel="community"
-          source="user/my-custom-skills"
-        />
+        <TrustBadges trustLevel="official" source="anthropics/skills/canvas-design" />
+        <TrustBadges trustLevel="verified" source="verified/community-skills" />
+        <TrustBadges trustLevel="community" source="user/my-custom-skills" />
       </div>
     </div>
   );
@@ -70,7 +61,7 @@ export function ExampleAutoDetect() {
           const trustLevel = getTrustLevelFromSource(source);
           return (
             <div key={source} className="flex items-center gap-2">
-              <code className="text-sm bg-muted px-2 py-1 rounded">{source}</code>
+              <code className="rounded bg-muted px-2 py-1 text-sm">{source}</code>
               <span>→</span>
               <TrustBadges trustLevel={trustLevel} source={source} />
             </div>
@@ -105,14 +96,14 @@ export function ArtifactCardExample({ artifact }: ArtifactCardExampleProps) {
         <div className="flex items-start justify-between gap-2">
           <CardTitle>{artifact.name}</CardTitle>
           {/* Trust badge alongside other badges */}
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 gap-1">
             <Badge variant="secondary">{artifact.type}</Badge>
             <TrustBadges trustLevel={trustLevel} source={artifact.source} />
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-2">{artifact.description}</p>
+        <p className="mb-2 text-sm text-muted-foreground">{artifact.description}</p>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           {artifact.version && <span>v{artifact.version}</span>}
           <span>{artifact.source}</span>
@@ -132,7 +123,7 @@ export function ExampleMultipleBadges() {
         <div className="flex items-start justify-between gap-2">
           <CardTitle>Canvas Design Skill</CardTitle>
           {/* Multiple badges together */}
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex flex-wrap gap-1">
             <TrustBadges trustLevel="official" source="anthropics/skills/canvas" />
             <Badge variant="secondary">skill</Badge>
             <Badge variant="outline">v2.1.0</Badge>
@@ -157,7 +148,7 @@ export function TrustBadgesExamplesPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto space-y-8 p-6">
       <h1 className="text-3xl font-bold">TrustBadges Examples</h1>
 
       <ExampleSimple />

@@ -43,9 +43,7 @@ export function usePendingContextChanges(
   const hasCollectionChanges = syncStatus.modified_in_collection.includes(entityId);
   const hasConflict = syncStatus.conflicts.some((c) => c.entity_id === entityId);
 
-  return (
-    (hasProjectChanges ? 1 : 0) + (hasCollectionChanges ? 1 : 0) + (hasConflict ? 1 : 0)
-  );
+  return (hasProjectChanges ? 1 : 0) + (hasCollectionChanges ? 1 : 0) + (hasConflict ? 1 : 0);
 }
 
 /**

@@ -30,16 +30,8 @@ jest.mock('@/components/entity/unified-entity-modal', () => {
         'div',
         { role: 'dialog', 'aria-label': 'Entity Modal' },
         React.createElement('div', {}, entity.name),
-        React.createElement(
-          'button',
-          { onClick: () => {} },
-          'Delete'
-        ),
-        React.createElement(
-          'button',
-          { onClick: onClose },
-          'Close'
-        )
+        React.createElement('button', { onClick: () => {} }, 'Delete'),
+        React.createElement('button', { onClick: onClose }, 'Close')
       );
     },
   };
@@ -186,9 +178,7 @@ describe('Artifact Deletion Integration Tests', () => {
       const user = userEvent.setup();
       const onDelete = jest.fn();
 
-      renderWithProviders(
-        <EntityActions entity={mockEntity} onDelete={onDelete} />
-      );
+      renderWithProviders(<EntityActions entity={mockEntity} onDelete={onDelete} />);
 
       // Open dropdown menu
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -208,9 +198,7 @@ describe('Artifact Deletion Integration Tests', () => {
     it('shows collection context messaging when entity has no projectPath', async () => {
       const user = userEvent.setup();
 
-      renderWithProviders(
-        <EntityActions entity={mockEntity} onDelete={jest.fn()} />
-      );
+      renderWithProviders(<EntityActions entity={mockEntity} onDelete={jest.fn()} />);
 
       // Open menu and click delete
       await user.click(screen.getByRole('button', { name: /open menu/i }));
@@ -226,9 +214,7 @@ describe('Artifact Deletion Integration Tests', () => {
       const user = userEvent.setup();
       const projectEntity = { ...mockEntity, projectPath: '/test/project' };
 
-      renderWithProviders(
-        <EntityActions entity={projectEntity} onDelete={jest.fn()} />
-      );
+      renderWithProviders(<EntityActions entity={projectEntity} onDelete={jest.fn()} />);
 
       // Open menu and click delete
       await user.click(screen.getByRole('button', { name: /open menu/i }));
@@ -244,9 +230,7 @@ describe('Artifact Deletion Integration Tests', () => {
       const user = userEvent.setup();
       const onDelete = jest.fn();
 
-      renderWithProviders(
-        <EntityActions entity={mockEntity} onDelete={onDelete} />
-      );
+      renderWithProviders(<EntityActions entity={mockEntity} onDelete={onDelete} />);
 
       // Open menu and click delete
       await user.click(screen.getByRole('button', { name: /open menu/i }));
@@ -270,9 +254,7 @@ describe('Artifact Deletion Integration Tests', () => {
     it('closes dialog on cancel', async () => {
       const user = userEvent.setup();
 
-      renderWithProviders(
-        <EntityActions entity={mockEntity} onDelete={jest.fn()} />
-      );
+      renderWithProviders(<EntityActions entity={mockEntity} onDelete={jest.fn()} />);
 
       // Open dialog
       await user.click(screen.getByRole('button', { name: /open menu/i }));
@@ -312,9 +294,7 @@ describe('Artifact Deletion Integration Tests', () => {
       const user = userEvent.setup();
       const onClose = jest.fn();
 
-      renderWithProviders(
-        <UnifiedEntityModal entity={mockEntity} open={true} onClose={onClose} />
-      );
+      renderWithProviders(<UnifiedEntityModal entity={mockEntity} open={true} onClose={onClose} />);
 
       // Click close button
       const closeButton = screen.getByRole('button', { name: /close/i });
@@ -383,7 +363,9 @@ describe('Artifact Deletion Integration Tests', () => {
 
       // Verify RED warning section appears
       await waitFor(() => {
-        expect(screen.getByText(/permanently delete files from your filesystem/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/permanently delete files from your filesystem/i)
+        ).toBeInTheDocument();
         expect(screen.getByText(/this cannot be undone!/i)).toBeInTheDocument();
       });
     });
@@ -405,9 +387,9 @@ describe('Artifact Deletion Integration Tests', () => {
 
       // Verify all projects are auto-selected
       await waitFor(() => {
-        const projectCheckboxes = screen.getAllByRole('checkbox').filter(
-          (cb) => cb.getAttribute('id')?.startsWith('project-')
-        );
+        const projectCheckboxes = screen
+          .getAllByRole('checkbox')
+          .filter((cb) => cb.getAttribute('id')?.startsWith('project-'));
         projectCheckboxes.forEach((checkbox) => {
           expect(checkbox).toBeChecked();
         });
@@ -435,9 +417,9 @@ describe('Artifact Deletion Integration Tests', () => {
       });
 
       // Deselect first project
-      const projectCheckboxes = screen.getAllByRole('checkbox').filter(
-        (cb) => cb.getAttribute('id')?.startsWith('project-')
-      );
+      const projectCheckboxes = screen
+        .getAllByRole('checkbox')
+        .filter((cb) => cb.getAttribute('id')?.startsWith('project-'));
 
       if (projectCheckboxes.length > 0) {
         await user.click(projectCheckboxes[0]);
@@ -630,9 +612,7 @@ describe('Artifact Deletion Integration Tests', () => {
         collectionDeleted: true,
         projectsUndeployed: 1,
         deploymentsDeleted: 0,
-        errors: [
-          { operation: 'undeploy:/project/b', error: 'File not found' },
-        ],
+        errors: [{ operation: 'undeploy:/project/b', error: 'File not found' }],
       });
 
       renderWithProviders(

@@ -105,7 +105,7 @@ export interface BulkImportRequest {
 /**
  * Import status enum matching backend
  */
-export type ImportStatus = "success" | "skipped" | "failed";
+export type ImportStatus = 'success' | 'skipped' | 'failed';
 
 /**
  * Error reason codes matching backend ErrorReasonCode enum
@@ -171,9 +171,9 @@ export interface BulkImportResult {
  * Used to persist user's decision to skip certain artifacts
  */
 export interface SkipPreference {
-  artifact_key: string;  // Format: "type:name" e.g., "skill:canvas-design"
+  artifact_key: string; // Format: "type:name" e.g., "skill:canvas-design"
   skip_reason: string;
-  added_date: string;  // ISO 8601 datetime string
+  added_date: string; // ISO 8601 datetime string
 }
 
 /**

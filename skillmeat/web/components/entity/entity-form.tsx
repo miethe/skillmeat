@@ -93,7 +93,11 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // GitHub metadata auto-population
-  const { mutate: fetchMetadata, data: metadata, isPending: isMetadataLoading } = useGitHubMetadata();
+  const {
+    mutate: fetchMetadata,
+    data: metadata,
+    isPending: isMetadataLoading,
+  } = useGitHubMetadata();
 
   // Fetch available tags for suggestions
   const { data: tagsData } = useTags(100);
@@ -105,12 +109,13 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   const createTag = useCreateTag();
 
   // Transform tags for TagInput
-  const tagSuggestions: Tag[] = tagsData?.items?.map(t => ({
-    id: t.id,
-    name: t.name,
-    slug: t.slug,
-    color: t.color,
-  })) || [];
+  const tagSuggestions: Tag[] =
+    tagsData?.items?.map((t) => ({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      color: t.color,
+    })) || [];
 
   // Determine the entity type config
   const typeConfig = entityType
@@ -139,12 +144,12 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
   // Initialize selected tags when entity or current tags change
   useEffect(() => {
     if (currentTags && currentTags.length > 0) {
-      setSelectedTagIds(currentTags.map(tag => tag.id));
+      setSelectedTagIds(currentTags.map((tag) => tag.id));
     } else if (entity?.tags) {
       // If we have tag names but not IDs, try to match them
       const matchedTagIds = entity.tags
-        .map(tagName => {
-          const tag = tagSuggestions.find(t => t.name === tagName || t.slug === tagName);
+        .map((tagName) => {
+          const tag = tagSuggestions.find((t) => t.name === tagName || t.slug === tagName);
           return tag?.id;
         })
         .filter((id): id is string => id !== undefined);
@@ -169,8 +174,8 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
       if (metadata.topics && metadata.topics.length > 0 && selectedTagIds.length === 0) {
         // Try to match GitHub topics to existing tags
         const matchedTagIds = metadata.topics
-          .map(topic => {
-            const tag = tagSuggestions.find(t => t.slug === topic.toLowerCase());
+          .map((topic) => {
+            const tag = tagSuggestions.find((t) => t.slug === topic.toLowerCase());
             return tag?.id;
           })
           .filter((id): id is string => id !== undefined);
@@ -195,13 +200,11 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
 
     if (mode === 'edit') {
       // In edit mode, only show editable fields (description, but NOT tags - we handle that separately)
-      return typeConfig.formSchema.fields.filter(
-        (field) => field.name === 'description'
-      );
+      return typeConfig.formSchema.fields.filter((field) => field.name === 'description');
     }
 
     // In create mode, filter out tags field (we handle it separately with TagInput)
-    return typeConfig.formSchema.fields.filter(field => field.name !== 'tags');
+    return typeConfig.formSchema.fields.filter((field) => field.name !== 'tags');
   };
 
   const fields = getFields();
@@ -217,9 +220,9 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
     // In edit mode, apply changes to backend
     try {
       // Find added tags
-      const added = newTagIds.filter(id => !selectedTagIds.includes(id));
+      const added = newTagIds.filter((id) => !selectedTagIds.includes(id));
       // Find removed tags
-      const removed = selectedTagIds.filter(id => !newTagIds.includes(id));
+      const removed = selectedTagIds.filter((id) => !newTagIds.includes(id));
 
       // Apply changes
       for (const tagId of added) {
@@ -249,7 +252,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
 
         // Convert tag IDs to tag names for creation
         const tagNames = selectedTagIds
-          .map(id => tagSuggestions.find(t => t.id === id)?.name)
+          .map((id) => tagSuggestions.find((t) => t.id === id)?.name)
           .filter((name): name is string => name !== undefined);
 
         await createEntity({
@@ -445,7 +448,9 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                   onChange: (e) => handleSourceChange(e.target.value),
                 })}
                 placeholder={
-                  sourceType === 'github' ? 'owner/repo/path[@version]' : '/absolute/path/to/artifact'
+                  sourceType === 'github'
+                    ? 'owner/repo/path[@version]'
+                    : '/absolute/path/to/artifact'
                 }
               />
               {isMetadataLoading && (
@@ -461,7 +466,7 @@ export function EntityForm({ mode, entityType, entity, onSuccess, onCancel }: En
                 : 'Provide the absolute path to the artifact directory'}
             </p>
             {metadata && !isMetadataLoading && (
-              <p className="text-sm text-green-600 flex items-center gap-1">
+              <p className="flex items-center gap-1 text-sm text-green-600">
                 <CheckCircle2 className="h-3 w-3" />
                 Metadata fetched - fields auto-populated
               </p>

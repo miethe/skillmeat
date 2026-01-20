@@ -70,7 +70,8 @@ const mockExcludedEntry = {
   path: '.claude/skills/not-an-artifact.md',
   status: 'excluded',
   confidence_score: 45,
-  upstream_url: 'https://github.com/anthropics/test-repo/blob/main/.claude/skills/not-an-artifact.md',
+  upstream_url:
+    'https://github.com/anthropics/test-repo/blob/main/.claude/skills/not-an-artifact.md',
   detected_at: '2024-12-07T10:00:00Z',
   excluded_at: '2024-12-08T12:00:00Z',
 };
@@ -122,29 +123,34 @@ async function setupMockApiRoutes(page: Page, includeExcluded: boolean = false) 
   );
 
   // Mock exclude endpoint
-  await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, message: 'Entry excluded' }),
-    });
-  });
+  await page.route(
+    `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, message: 'Entry excluded' }),
+      });
+    }
+  );
 
   // Mock restore endpoint
-  await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, message: 'Entry restored' }),
-    });
-  });
+  await page.route(
+    `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, message: 'Entry restored' }),
+      });
+    }
+  );
 
   // Mock import endpoint
-  await mockApiRoute(
-    page,
-    `/api/v1/marketplace/sources/${mockSource.id}/import`,
-    { success: true, imported_count: 1 }
-  );
+  await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/import`, {
+    success: true,
+    imported_count: 1,
+  });
 }
 
 async function navigateToSourceDetailPage(page: Page, sourceId: string = mockSource.id) {
@@ -186,7 +192,9 @@ test.describe('Marketplace Exclusion Workflow', () => {
     await expectModalOpen(page, '[role="alertdialog"]');
     await expect(page.getByText('Mark as Not an Artifact?')).toBeVisible();
     await expect(page.getByText('canvas-design')).toBeVisible();
-    await expect(page.getByText('You can restore it later from the Excluded Artifacts list')).toBeVisible();
+    await expect(
+      page.getByText('You can restore it later from the Excluded Artifacts list')
+    ).toBeVisible();
   });
 
   test('can cancel exclusion dialog', async ({ page }) => {
@@ -210,14 +218,17 @@ test.describe('Marketplace Exclusion Workflow', () => {
     let excludeRequestMade = false;
 
     // Intercept exclude request
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`, async (route) => {
-      excludeRequestMade = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, message: 'Entry excluded' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`,
+      async (route) => {
+        excludeRequestMade = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, message: 'Entry excluded' }),
+        });
+      }
+    );
 
     await navigateToSourceDetailPage(page);
 
@@ -240,14 +251,17 @@ test.describe('Marketplace Exclusion Workflow', () => {
 
   test('shows loading state during exclusion', async ({ page }) => {
     // Add delay to exclude request
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, message: 'Entry excluded' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`,
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, message: 'Entry excluded' }),
+        });
+      }
+    );
 
     await navigateToSourceDetailPage(page);
 
@@ -274,7 +288,9 @@ test.describe('Marketplace Exclusion Workflow', () => {
 // ============================================================================
 
 test.describe('Excluded Artifacts List', () => {
-  test('displays "Show Excluded Artifacts" button when excluded entries exist', async ({ page }) => {
+  test('displays "Show Excluded Artifacts" button when excluded entries exist', async ({
+    page,
+  }) => {
     await setupMockApiRoutes(page, true); // Include excluded entry
     await navigateToSourceDetailPage(page);
 
@@ -360,15 +376,18 @@ test.describe('Restore Excluded Artifacts', () => {
     let restoredEntryId = '';
 
     // Intercept restore request
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`, async (route) => {
-      restoreRequestMade = true;
-      restoredEntryId = route.request().url().split('/').slice(-2)[0];
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, message: 'Entry restored' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`,
+      async (route) => {
+        restoreRequestMade = true;
+        restoredEntryId = route.request().url().split('/').slice(-2)[0];
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, message: 'Entry restored' }),
+        });
+      }
+    );
 
     await setupMockApiRoutes(page, true);
     await navigateToSourceDetailPage(page);
@@ -390,14 +409,17 @@ test.describe('Restore Excluded Artifacts', () => {
 
   test('shows loading state during restore', async ({ page }) => {
     // Add delay to restore request
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, message: 'Entry restored' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`,
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, message: 'Entry restored' }),
+        });
+      }
+    );
 
     await setupMockApiRoutes(page, true);
     await navigateToSourceDetailPage(page);
@@ -489,13 +511,16 @@ test.describe('Exclusion Impact on Selection', () => {
 test.describe('Exclusion Error Handling', () => {
   test('handles exclusion API error gracefully', async ({ page }) => {
     // Mock exclude endpoint to return error
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`, async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Internal server error' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/exclude`,
+      async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Internal server error' }),
+        });
+      }
+    );
 
     await setupMockApiRoutes(page);
     await navigateToSourceDetailPage(page);
@@ -514,13 +539,16 @@ test.describe('Exclusion Error Handling', () => {
 
   test('handles restore API error gracefully', async ({ page }) => {
     // Mock restore endpoint to return error
-    await page.route(`**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`, async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Internal server error' }),
-      });
-    });
+    await page.route(
+      `**/api/v1/marketplace/sources/${mockSource.id}/catalog/*/restore`,
+      async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Internal server error' }),
+        });
+      }
+    );
 
     await setupMockApiRoutes(page, true);
     await navigateToSourceDetailPage(page);

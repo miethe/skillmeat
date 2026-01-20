@@ -9,12 +9,7 @@
 
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -38,10 +33,12 @@ export interface CountBadgeProps {
  * @example "skill" -> "Skills", "mcp_server" -> "Mcp Servers"
  */
 function formatTypeName(type: string): string {
-  return type
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ') + 's';
+  return (
+    type
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') + 's'
+  );
 }
 
 /**

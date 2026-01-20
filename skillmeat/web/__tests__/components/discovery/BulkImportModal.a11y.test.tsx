@@ -363,7 +363,9 @@ describe('BulkImportModal - Accessibility (DIS-5.7)', () => {
 
   describe('5. Focus Management', () => {
     it('focuses first focusable element when modal opens', () => {
-      const { rerender } = render(<BulkImportModal {...defaultProps} open={false} />, { wrapper: TestWrapper });
+      const { rerender } = render(<BulkImportModal {...defaultProps} open={false} />, {
+        wrapper: TestWrapper,
+      });
 
       // Modal closed, nothing focused
       expect(document.activeElement).toBe(document.body);
@@ -484,7 +486,9 @@ describe('BulkImportModal - Accessibility (DIS-5.7)', () => {
     });
 
     it('has no accessibility violations with empty state', async () => {
-      const { container } = render(<BulkImportModal {...defaultProps} artifacts={[]} />, { wrapper: TestWrapper });
+      const { container } = render(<BulkImportModal {...defaultProps} artifacts={[]} />, {
+        wrapper: TestWrapper,
+      });
 
       const results = await axe(container);
       expect(results).toHaveNoViolations();
@@ -502,7 +506,9 @@ describe('BulkImportModal - Accessibility (DIS-5.7)', () => {
         },
       ];
 
-      render(<BulkImportModal {...defaultProps} artifacts={artifactsWithMissingName} />, { wrapper: TestWrapper });
+      render(<BulkImportModal {...defaultProps} artifacts={artifactsWithMissingName} />, {
+        wrapper: TestWrapper,
+      });
 
       // Should still render - checkbox exists even with empty name
       const checkbox = document.querySelector('[aria-label^="Select"]');
@@ -519,7 +525,9 @@ describe('BulkImportModal - Accessibility (DIS-5.7)', () => {
         },
       ];
 
-      render(<BulkImportModal {...defaultProps} artifacts={longNameArtifact} />, { wrapper: TestWrapper });
+      render(<BulkImportModal {...defaultProps} artifacts={longNameArtifact} />, {
+        wrapper: TestWrapper,
+      });
 
       const skipCheckbox = document.getElementById('skip-/path/to/long') as HTMLElement;
       const ariaLabel = skipCheckbox.getAttribute('aria-label');

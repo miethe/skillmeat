@@ -64,7 +64,7 @@ const errorSource: GitHubSource = {
 export function BasicExample() {
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Basic Source Card</h2>
+      <h2 className="mb-4 text-2xl font-bold">Basic Source Card</h2>
       <SourceCard source={exampleSource} />
     </div>
   );
@@ -82,7 +82,7 @@ export function CustomClickExample() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Custom Click Handler</h2>
+      <h2 className="mb-4 text-2xl font-bold">Custom Click Handler</h2>
       <SourceCard source={exampleSource} onClick={handleClick} />
     </div>
   );
@@ -101,7 +101,7 @@ export function RescanExample() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">With Rescan Action</h2>
+      <h2 className="mb-4 text-2xl font-bold">With Rescan Action</h2>
       <SourceCard source={exampleSource} onRescan={handleRescan} />
     </div>
   );
@@ -113,30 +113,27 @@ export function RescanExample() {
 
 export function StateVariantsExample() {
   return (
-    <div className="p-4 space-y-4">
-      <h2 className="text-2xl font-bold mb-4">Different States</h2>
+    <div className="space-y-4 p-4">
+      <h2 className="mb-4 text-2xl font-bold">Different States</h2>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Success State</h3>
+        <h3 className="mb-2 text-lg font-semibold">Success State</h3>
         <SourceCard source={exampleSource} />
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Pending State</h3>
+        <h3 className="mb-2 text-lg font-semibold">Pending State</h3>
         <SourceCard source={pendingSource} />
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Error State</h3>
+        <h3 className="mb-2 text-lg font-semibold">Error State</h3>
         <SourceCard source={errorSource} />
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">Scanning State</h3>
-        <SourceCard
-          source={{ ...exampleSource, scan_status: 'scanning' }}
-          isRescanning
-        />
+        <h3 className="mb-2 text-lg font-semibold">Scanning State</h3>
+        <SourceCard source={{ ...exampleSource, scan_status: 'scanning' }} isRescanning />
       </div>
     </div>
   );
@@ -149,7 +146,7 @@ export function StateVariantsExample() {
 export function LoadingExample() {
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Loading State</h2>
+      <h2 className="mb-4 text-2xl font-bold">Loading State</h2>
       <div className="space-y-4">
         <SourceCardSkeleton />
         <SourceCardSkeleton />
@@ -168,8 +165,8 @@ export function GridLayoutExample() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Grid Layout</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <h2 className="mb-4 text-2xl font-bold">Grid Layout</h2>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {sources.map((source) => (
           <SourceCard key={source.id} source={source} />
         ))}
@@ -212,10 +209,8 @@ export function QueryIntegrationExample() {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">TanStack Query Integration</h2>
-      <p className="text-muted-foreground">
-        See commented code for integration pattern
-      </p>
+      <h2 className="mb-4 text-2xl font-bold">TanStack Query Integration</h2>
+      <p className="text-muted-foreground">See commented code for integration pattern</p>
     </div>
   );
 }

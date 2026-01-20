@@ -2,7 +2,13 @@
 
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
 interface FiltersProps {
@@ -120,10 +126,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
             Sort By
           </label>
           <div className="flex gap-2">
-            <Select
-              value={sort.field}
-              onValueChange={handleSortFieldChange}
-            >
+            <Select value={sort.field} onValueChange={handleSortFieldChange}>
               <SelectTrigger id="sort-field" className="flex-1">
                 <SelectValue placeholder="Name" />
               </SelectTrigger>
@@ -133,10 +136,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
                 <SelectItem value="usageCount">Usage Count</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={sort.order}
-              onValueChange={handleSortOrderChange}
-            >
+            <Select value={sort.order} onValueChange={handleSortOrderChange}>
               <SelectTrigger id="sort-order" aria-label="Sort order">
                 <SelectValue placeholder="A-Z" />
               </SelectTrigger>

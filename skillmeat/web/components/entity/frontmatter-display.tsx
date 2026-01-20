@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // ============================================================================
 // Types
@@ -32,7 +28,7 @@ export interface FrontmatterDisplayProps {
  */
 function renderValue(value: unknown): React.ReactNode {
   if (value === null || value === undefined) {
-    return <span className="text-muted-foreground italic">null</span>;
+    return <span className="italic text-muted-foreground">null</span>;
   }
 
   if (typeof value === 'boolean') {

@@ -60,7 +60,7 @@ export function CustomPlacementExample() {
 export function CustomDelayExample() {
   return (
     <ScoreBreakdownTooltip breakdown={exampleBreakdown} delayDuration={500}>
-      <span className="text-sm text-muted-foreground cursor-help underline decoration-dotted">
+      <span className="cursor-help text-sm text-muted-foreground underline decoration-dotted">
         View score breakdown
       </span>
     </ScoreBreakdownTooltip>
@@ -96,7 +96,7 @@ export function IconTriggerExample() {
   return (
     <ScoreBreakdownTooltip breakdown={exampleBreakdown} side="right">
       <button
-        className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20"
         aria-label="View score breakdown"
       >
         <span className="text-xs font-semibold">{exampleBreakdown.normalized_score}</span>
@@ -134,16 +134,13 @@ export function MarketplaceMatchExample() {
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg">
+    <div className="flex items-center justify-between rounded-lg border p-4">
       <div>
         <h3 className="font-semibold">{match.name}</h3>
         <p className="text-sm text-muted-foreground">{match.path}</p>
       </div>
       <ScoreBreakdownTooltip breakdown={match.score_breakdown}>
-        <Badge
-          variant={match.confidence >= 70 ? 'default' : 'secondary'}
-          className="cursor-help"
-        >
+        <Badge variant={match.confidence >= 70 ? 'default' : 'secondary'} className="cursor-help">
           {match.confidence}% match
         </Badge>
       </ScoreBreakdownTooltip>

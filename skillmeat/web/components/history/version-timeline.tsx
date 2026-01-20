@@ -59,9 +59,7 @@ export function VersionTimeline({
   const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set());
 
   // Fetch snapshots with optional collection filter
-  const { data, isLoading, error } = useSnapshots(
-    collectionName ? { collectionName } : undefined
-  );
+  const { data, isLoading, error } = useSnapshots(collectionName ? { collectionName } : undefined);
 
   /**
    * Toggle snapshot selection for comparison
@@ -107,7 +105,7 @@ export function VersionTimeline({
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return {
-      absolute: format(date, 'MMM d, yyyy \'at\' h:mm a'),
+      absolute: format(date, "MMM d, yyyy 'at' h:mm a"),
       relative: formatDistanceToNow(date, { addSuffix: true }),
     };
   };
@@ -120,12 +118,12 @@ export function VersionTimeline({
           <div key={i} className="flex gap-4">
             <div className="flex flex-col items-center">
               <Skeleton className="h-3 w-3 rounded-full" />
-              {i < 2 && <Skeleton className="h-16 w-0.5 my-2" />}
+              {i < 2 && <Skeleton className="my-2 h-16 w-0.5" />}
             </div>
             <Card className="flex-1">
               <CardContent className="p-4">
-                <Skeleton className="h-4 w-48 mb-2" />
-                <Skeleton className="h-3 w-32 mb-2" />
+                <Skeleton className="mb-2 h-4 w-48" />
+                <Skeleton className="mb-2 h-3 w-32" />
                 <Skeleton className="h-3 w-24" />
               </CardContent>
             </Card>
@@ -138,7 +136,7 @@ export function VersionTimeline({
   // Error state
   if (error) {
     return (
-      <div className={cn('text-center py-8', className)}>
+      <div className={cn('py-8 text-center', className)}>
         <p className="text-sm text-destructive">
           Failed to load snapshots: {error instanceof Error ? error.message : 'Unknown error'}
         </p>
@@ -149,10 +147,10 @@ export function VersionTimeline({
   // Empty state
   if (!data || data.items.length === 0) {
     return (
-      <div className={cn('text-center py-8', className)}>
-        <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+      <div className={cn('py-8 text-center', className)}>
+        <Clock className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No snapshots found</p>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="mt-1 text-xs text-muted-foreground">
           {collectionName
             ? `Create your first snapshot for the "${collectionName}" collection`
             : 'Create your first snapshot'}
@@ -165,13 +163,9 @@ export function VersionTimeline({
     <div className={cn('space-y-6', className)}>
       {/* Compare button (shown when 2 snapshots selected) */}
       {selectedForCompare.size === 2 && onCompare && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4">
-          <Button
-            onClick={handleCompare}
-            className="w-full"
-            variant="default"
-          >
-            <GitCompare className="h-4 w-4 mr-2" />
+        <div className="sticky top-0 z-10 border-b bg-background/95 pb-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <Button onClick={handleCompare} className="w-full" variant="default">
+            <GitCompare className="mr-2 h-4 w-4" />
             Compare Selected Snapshots
           </Button>
         </div>
@@ -193,30 +187,30 @@ export function VersionTimeline({
                   className={cn(
                     'h-3 w-3 rounded-full border-2 transition-colors',
                     isSelected
-                      ? 'bg-primary border-primary'
-                      : 'bg-background border-muted-foreground'
+                      ? 'border-primary bg-primary'
+                      : 'border-muted-foreground bg-background'
                   )}
                   aria-hidden="true"
                 />
                 {/* Vertical line */}
                 {!isLast && (
-                  <div className="w-0.5 h-full min-h-[4rem] bg-border my-2" aria-hidden="true" />
+                  <div className="my-2 h-full min-h-[4rem] w-0.5 bg-border" aria-hidden="true" />
                 )}
               </div>
 
               {/* Snapshot card */}
               <Card
                 className={cn(
-                  'flex-1 mb-6 transition-shadow hover:shadow-md',
+                  'mb-6 flex-1 transition-shadow hover:shadow-md',
                   isSelected && 'ring-2 ring-primary'
                 )}
               >
                 <CardContent className="p-4">
                   {/* Header with timestamp and selection */}
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="mb-3 flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <Clock className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                         <time
                           dateTime={snapshot.timestamp}
                           className="text-sm font-medium"
@@ -225,16 +219,14 @@ export function VersionTimeline({
                           {timestamp.relative}
                         </time>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {timestamp.absolute}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{timestamp.absolute}</p>
                     </div>
 
                     {onCompare && (
                       <div className="flex items-center gap-2">
                         <label
                           htmlFor={`compare-${snapshot.id}`}
-                          className="text-xs text-muted-foreground cursor-pointer"
+                          className="cursor-pointer text-xs text-muted-foreground"
                         >
                           Compare
                         </label>
@@ -250,14 +242,17 @@ export function VersionTimeline({
                   </div>
 
                   {/* Message */}
-                  <p className="text-sm mb-3 line-clamp-2" title={snapshot.message}>
-                    {snapshot.message || <span className="text-muted-foreground italic">No message</span>}
+                  <p className="mb-3 line-clamp-2 text-sm" title={snapshot.message}>
+                    {snapshot.message || (
+                      <span className="italic text-muted-foreground">No message</span>
+                    )}
                   </p>
 
                   {/* Metadata badges */}
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="mb-4 flex flex-wrap gap-2">
                     <Badge variant="secondary" className="text-xs">
-                      {snapshot.artifactCount} {snapshot.artifactCount === 1 ? 'artifact' : 'artifacts'}
+                      {snapshot.artifactCount}{' '}
+                      {snapshot.artifactCount === 1 ? 'artifact' : 'artifacts'}
                     </Badge>
                     {!collectionName && (
                       <Badge variant="outline" className="text-xs">
@@ -267,7 +262,7 @@ export function VersionTimeline({
                   </div>
 
                   {/* Snapshot ID */}
-                  <div className="flex items-center gap-2 mb-4 p-2 bg-muted rounded text-xs font-mono">
+                  <div className="mb-4 flex items-center gap-2 rounded bg-muted p-2 font-mono text-xs">
                     <span className="text-muted-foreground">ID:</span>
                     <code className="flex-1 truncate" title={snapshot.id}>
                       {snapshot.id.substring(0, 8)}...
@@ -292,7 +287,7 @@ export function VersionTimeline({
                         onClick={() => onSelectSnapshot(snapshot.id)}
                         className="flex-1"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye className="mr-2 h-4 w-4" />
                         View
                       </Button>
                     )}
@@ -303,7 +298,7 @@ export function VersionTimeline({
                         onClick={() => onRestore(snapshot.id)}
                         className="flex-1"
                       >
-                        <RotateCcw className="h-4 w-4 mr-2" />
+                        <RotateCcw className="mr-2 h-4 w-4" />
                         Restore
                       </Button>
                     )}
@@ -317,7 +312,7 @@ export function VersionTimeline({
 
       {/* Pagination info */}
       {data.pageInfo.total > data.items.length && (
-        <div className="text-center pt-4 border-t">
+        <div className="border-t pt-4 text-center">
           <p className="text-xs text-muted-foreground">
             Showing {data.items.length} of {data.pageInfo.total} snapshots
           </p>

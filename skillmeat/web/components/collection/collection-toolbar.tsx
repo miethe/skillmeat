@@ -1,16 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Grid3x3,
-  List,
-  Layers,
-  Search,
-  RefreshCw,
-  Filter,
-  X,
-  ArrowUpDown,
-} from 'lucide-react';
+import { Grid3x3, List, Layers, Search, RefreshCw, Filter, X, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -139,9 +130,10 @@ export function CollectionToolbar({
   }, [onFiltersChange, onTagsChange]);
 
   // Calculate active filter count
-  const activeFilterCount = Object.entries(filters).filter(
-    ([, value]) => value !== undefined && value !== 'all' && value !== ''
-  ).length + (selectedTags.length > 0 ? 1 : 0);
+  const activeFilterCount =
+    Object.entries(filters).filter(
+      ([, value]) => value !== undefined && value !== 'all' && value !== ''
+    ).length + (selectedTags.length > 0 ? 1 : 0);
 
   const hasActiveFilters = activeFilterCount > 0 || localSearch.length > 0;
 
@@ -164,9 +156,7 @@ export function CollectionToolbar({
           </div>
 
           {/* Tag Filter Popover */}
-          {onTagsChange && (
-            <TagFilterPopover selectedTags={selectedTags} onChange={onTagsChange} />
-          )}
+          {onTagsChange && <TagFilterPopover selectedTags={selectedTags} onChange={onTagsChange} />}
 
           {/* Filter Dropdown */}
           <DropdownMenu>
@@ -277,9 +267,7 @@ export function CollectionToolbar({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() =>
-                  onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
-                }
+                onClick={() => onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')}
               >
                 {sortOrder === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
               </DropdownMenuItem>

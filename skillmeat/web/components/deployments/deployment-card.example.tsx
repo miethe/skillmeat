@@ -147,17 +147,14 @@ export function DeploymentCardLoadingExample() {
  */
 export function DeploymentStatusesExample() {
   return (
-    <div className="space-y-4 max-w-md">
+    <div className="max-w-md space-y-4">
       <div>
-        <h3 className="text-sm font-medium mb-2">Up to Date</h3>
-        <DeploymentCard
-          deployment={currentDeployment}
-          onRemove={() => console.log('Remove')}
-        />
+        <h3 className="mb-2 text-sm font-medium">Up to Date</h3>
+        <DeploymentCard deployment={currentDeployment} onRemove={() => console.log('Remove')} />
       </div>
 
       <div>
-        <h3 className="text-sm font-medium mb-2">Update Available</h3>
+        <h3 className="mb-2 text-sm font-medium">Update Available</h3>
         <DeploymentCard
           deployment={outdatedDeployment}
           onUpdate={() => console.log('Update')}
@@ -166,7 +163,7 @@ export function DeploymentStatusesExample() {
       </div>
 
       <div>
-        <h3 className="text-sm font-medium mb-2">Local Modifications</h3>
+        <h3 className="mb-2 text-sm font-medium">Local Modifications</h3>
         <DeploymentCard
           deployment={modifiedDeployment}
           onViewDiff={() => console.log('View diff')}
@@ -175,11 +172,8 @@ export function DeploymentStatusesExample() {
       </div>
 
       <div>
-        <h3 className="text-sm font-medium mb-2">Error State</h3>
-        <DeploymentCard
-          deployment={errorDeployment}
-          onRemove={() => console.log('Remove')}
-        />
+        <h3 className="mb-2 text-sm font-medium">Error State</h3>
+        <DeploymentCard deployment={errorDeployment} onRemove={() => console.log('Remove')} />
       </div>
     </div>
   );
@@ -198,11 +192,7 @@ export function DeploymentWithQueryExample() {
   }
 
   if (!deployment) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No deployment found
-      </div>
-    );
+    return <div className="py-8 text-center text-muted-foreground">No deployment found</div>;
   }
 
   return (
@@ -228,12 +218,7 @@ export function DeploymentWithQueryExample() {
  * Example 6: Filtered deployments by status
  */
 export function FilteredDeploymentsExample() {
-  const deployments = [
-    currentDeployment,
-    outdatedDeployment,
-    modifiedDeployment,
-    errorDeployment,
-  ];
+  const deployments = [currentDeployment, outdatedDeployment, modifiedDeployment, errorDeployment];
 
   // Filter to show only deployments that need attention
   const needsAttention = deployments.filter(

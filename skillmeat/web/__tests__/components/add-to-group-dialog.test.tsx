@@ -2,7 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
-import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast, useCollections } from '@/hooks';
+import {
+  useGroups,
+  useAddArtifactToGroup,
+  useCreateGroup,
+  useToast,
+  useCollections,
+} from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 // Mock hooks
@@ -15,7 +21,9 @@ jest.mock('@/hooks', () => ({
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
-const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<typeof useAddArtifactToGroup>;
+const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<
+  typeof useAddArtifactToGroup
+>;
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 const mockUseCollections = useCollections as jest.MockedFunction<typeof useCollections>;
@@ -214,7 +222,9 @@ describe('AddToGroupDialog', () => {
       // Should show empty state
       expect(screen.getByText('Select a collection')).toBeInTheDocument();
       expect(screen.getByText('No collections available.')).toBeInTheDocument();
-      expect(screen.getByText('Create a collection first to organize artifacts into groups.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Create a collection first to organize artifacts into groups.')
+      ).toBeInTheDocument();
     });
 
     it('shows Next button disabled until collection selected', async () => {
@@ -324,9 +334,7 @@ describe('AddToGroupDialog', () => {
       renderDialog({ collectionId: 'c1' });
 
       expect(screen.getByText('No groups in this collection yet.')).toBeInTheDocument();
-      expect(
-        screen.getByText('Create a group to organize your artifacts.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Create a group to organize your artifacts.')).toBeInTheDocument();
     });
 
     it('displays group list with checkboxes', () => {
@@ -410,9 +418,9 @@ describe('AddToGroupDialog', () => {
       renderDialog({ collectionId: 'c1' });
 
       // Should not have a back button since we skipped collection picker
-      const backButtons = screen.queryAllByRole('button').filter((btn) =>
-        btn.textContent?.includes('Collection')
-      );
+      const backButtons = screen
+        .queryAllByRole('button')
+        .filter((btn) => btn.textContent?.includes('Collection'));
       expect(backButtons).toHaveLength(0);
     });
   });

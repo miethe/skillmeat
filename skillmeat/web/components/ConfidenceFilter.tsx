@@ -134,14 +134,11 @@ export function ConfidenceFilter({
             onCheckedChange={(checked) => onIncludeBelowThresholdChange(checked === true)}
             aria-describedby="threshold-help"
           />
-          <Label
-            htmlFor="include-below-threshold"
-            className="text-sm font-medium cursor-pointer"
-          >
+          <Label htmlFor="include-below-threshold" className="cursor-pointer text-sm font-medium">
             Include low-confidence artifacts
           </Label>
         </div>
-        <p id="threshold-help" className="text-xs text-muted-foreground ml-6">
+        <p id="threshold-help" className="ml-6 text-xs text-muted-foreground">
           Shows artifacts below the 30% confidence threshold
         </p>
       </div>

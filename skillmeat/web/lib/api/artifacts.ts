@@ -22,9 +22,7 @@ function buildUrl(path: string): string {
  * @param artifactId - Artifact ID to delete
  * @throws Error if deletion fails
  */
-export async function deleteArtifactFromCollection(
-  artifactId: string
-): Promise<void> {
+export async function deleteArtifactFromCollection(artifactId: string): Promise<void> {
   const response = await fetch(buildUrl(`/artifacts/${artifactId}`), {
     method: 'DELETE',
   });
@@ -104,16 +102,14 @@ export interface ArtifactsPaginatedResponse {
  * }
  * ```
  */
-export async function fetchArtifactsPaginated(
-  options?: {
-    limit?: number;
-    after?: string;
-    artifact_type?: string;
-    status?: string;
-    scope?: string;
-    search?: string;
-  }
-): Promise<ArtifactsPaginatedResponse> {
+export async function fetchArtifactsPaginated(options?: {
+  limit?: number;
+  after?: string;
+  artifact_type?: string;
+  status?: string;
+  scope?: string;
+  search?: string;
+}): Promise<ArtifactsPaginatedResponse> {
   const params = new URLSearchParams();
   if (options?.limit) params.set('limit', options.limit.toString());
   if (options?.after) params.set('after', options.after);

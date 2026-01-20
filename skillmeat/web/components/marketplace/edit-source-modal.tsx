@@ -28,12 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffect, useState, useCallback, KeyboardEvent } from 'react';
 import { useUpdateSource, useRescanSource } from '@/hooks';
 import { Loader2, X, Plus, HelpCircle, AlertCircle } from 'lucide-react';
@@ -50,12 +45,7 @@ const MAX_TAGS = 20;
 const MAX_TAG_LENGTH = 50;
 const TAG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
-export function EditSourceModal({
-  source,
-  open,
-  onOpenChange,
-  onSuccess,
-}: EditSourceModalProps) {
+export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditSourceModalProps) {
   const [ref, setRef] = useState('');
   const [rootHint, setRootHint] = useState('');
   const [trustLevel, setTrustLevel] = useState<TrustLevel>('basic');
@@ -92,24 +82,27 @@ export function EditSourceModal({
   }, [source]);
 
   // Tag validation: alphanumeric with hyphens/underscores, 1-50 chars
-  const validateTag = useCallback((tag: string): string | null => {
-    if (tag.length < 1) {
-      return 'Tag cannot be empty';
-    }
-    if (tag.length > MAX_TAG_LENGTH) {
-      return `Tag must be ${MAX_TAG_LENGTH} characters or less`;
-    }
-    if (!TAG_PATTERN.test(tag)) {
-      return 'Tag must start with alphanumeric and contain only letters, numbers, hyphens, and underscores';
-    }
-    if (tags.length >= MAX_TAGS) {
-      return `Maximum ${MAX_TAGS} tags allowed`;
-    }
-    if (tags.includes(tag.toLowerCase())) {
-      return 'Tag already exists';
-    }
-    return null;
-  }, [tags]);
+  const validateTag = useCallback(
+    (tag: string): string | null => {
+      if (tag.length < 1) {
+        return 'Tag cannot be empty';
+      }
+      if (tag.length > MAX_TAG_LENGTH) {
+        return `Tag must be ${MAX_TAG_LENGTH} characters or less`;
+      }
+      if (!TAG_PATTERN.test(tag)) {
+        return 'Tag must start with alphanumeric and contain only letters, numbers, hyphens, and underscores';
+      }
+      if (tags.length >= MAX_TAGS) {
+        return `Maximum ${MAX_TAGS} tags allowed`;
+      }
+      if (tags.includes(tag.toLowerCase())) {
+        return 'Tag already exists';
+      }
+      return null;
+    },
+    [tags]
+  );
 
   const addTag = useCallback(() => {
     const trimmedTag = tagInput.trim();
@@ -185,12 +178,13 @@ export function EditSourceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Edit Source</DialogTitle>
             <DialogDescription>
-              Edit {source.owner}/{source.repo_name} configuration. A rescan will be triggered after saving.
+              Edit {source.owner}/{source.repo_name} configuration. A rescan will be triggered after
+              saving.
             </DialogDescription>
           </DialogHeader>
 
@@ -220,8 +214,8 @@ export function EditSourceModal({
               </div>
 
               {/* Detection Settings */}
-              <div className="border-t pt-4 mt-2">
-                <div className="space-y-1 mb-3">
+              <div className="mt-2 border-t pt-4">
+                <div className="mb-3 space-y-1">
                   <Label className="text-base font-semibold">Detection Settings</Label>
                   <p className="text-xs text-muted-foreground">
                     Configure how artifacts are detected in this source
@@ -229,17 +223,21 @@ export function EditSourceModal({
                 </div>
 
                 <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5 flex-1">
+                  <div className="flex-1 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <Label htmlFor="frontmatter-detection" className="text-sm">
                         Enable frontmatter detection
                       </Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          <p>When enabled, markdown files will be scanned for YAML frontmatter containing artifact type hints (e.g., type: skill). This can improve detection accuracy for well-structured repositories.</p>
+                          <p>
+                            When enabled, markdown files will be scanned for YAML frontmatter
+                            containing artifact type hints (e.g., type: skill). This can improve
+                            detection accuracy for well-structured repositories.
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -256,8 +254,8 @@ export function EditSourceModal({
               </div>
 
               {/* Import Options */}
-              <div className="border-t pt-4 mt-2">
-                <div className="space-y-1 mb-3">
+              <div className="mt-2 border-t pt-4">
+                <div className="mb-3 space-y-1">
                   <Label className="text-base font-semibold">Import Options</Label>
                   <p className="text-xs text-muted-foreground">
                     Control what metadata to fetch from GitHub on next scan
@@ -266,17 +264,21 @@ export function EditSourceModal({
 
                 <div className="grid gap-3">
                   <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5 flex-1">
+                    <div className="flex-1 space-y-0.5">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="import-repo-description" className="text-sm">
                           Re-fetch repository description
                         </Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>Repository description will be fetched from the GitHub API and stored as source metadata. Enable this to update the cached description from GitHub.</p>
+                            <p>
+                              Repository description will be fetched from the GitHub API and stored
+                              as source metadata. Enable this to update the cached description from
+                              GitHub.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -292,17 +294,20 @@ export function EditSourceModal({
                   </div>
 
                   <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5 flex-1">
+                    <div className="flex-1 space-y-0.5">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="import-repo-readme" className="text-sm">
                           Re-fetch README content
                         </Label>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>README content will be fetched from GitHub and stored locally (up to 50KB). Enable this to update the cached README from the repository.</p>
+                            <p>
+                              README content will be fetched from GitHub and stored locally (up to
+                              50KB). Enable this to update the cached README from the repository.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -320,16 +325,19 @@ export function EditSourceModal({
               </div>
 
               {/* Tags Management */}
-              <div className="border-t pt-4 mt-2">
-                <div className="space-y-1 mb-3">
+              <div className="mt-2 border-t pt-4">
+                <div className="mb-3 space-y-1">
                   <div className="flex items-center gap-2">
                     <Label className="text-base font-semibold">Tags</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p>Tags help organize sources for discovery and filtering. Add tags like "official", "testing", or "work" to group related sources together.</p>
+                        <p>
+                          Tags help organize sources for discovery and filtering. Add tags like
+                          "official", "testing", or "work" to group related sources together.
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -366,24 +374,20 @@ export function EditSourceModal({
                     </Button>
                   </div>
                   {tagError && (
-                    <p id="tag-error" className="text-xs text-destructive flex items-center gap-1">
+                    <p id="tag-error" className="flex items-center gap-1 text-xs text-destructive">
                       <AlertCircle className="h-3 w-3" />
                       {tagError}
                     </p>
                   )}
 
                   {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="gap-1 pr-1"
-                        >
+                        <Badge key={tag} variant="secondary" className="gap-1 pr-1">
                           {tag}
                           <button
                             type="button"
-                            className="ml-1 hover:bg-black/10 rounded-full p-0.5 transition-colors"
+                            className="ml-1 rounded-full p-0.5 transition-colors hover:bg-black/10"
                             onClick={() => removeTag(tag)}
                             aria-label={`Remove tag ${tag}`}
                           >
@@ -394,14 +398,15 @@ export function EditSourceModal({
                     </div>
                   )}
                   <p id="tag-help" className="text-xs text-muted-foreground">
-                    {tags.length}/{MAX_TAGS} tags. Use letters, numbers, hyphens, and underscores. Press Enter or comma to add.
+                    {tags.length}/{MAX_TAGS} tags. Use letters, numbers, hyphens, and underscores.
+                    Press Enter or comma to add.
                   </p>
                 </div>
               </div>
 
               {/* Trust and Metadata */}
-              <div className="border-t pt-4 mt-2">
-                <div className="space-y-1 mb-3">
+              <div className="mt-2 border-t pt-4">
+                <div className="mb-3 space-y-1">
                   <Label className="text-base font-semibold">Trust and Metadata</Label>
                 </div>
 
@@ -411,14 +416,21 @@ export function EditSourceModal({
                       <Label htmlFor="trust-level">Trust Level</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          <p>Trust level indicates the verification status. Untrusted for unknown sources, Basic for community sources, Verified for sources you have reviewed, and Official for first-party sources.</p>
+                          <p>
+                            Trust level indicates the verification status. Untrusted for unknown
+                            sources, Basic for community sources, Verified for sources you have
+                            reviewed, and Official for first-party sources.
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <Select value={trustLevel} onValueChange={(v) => setTrustLevel(v as TrustLevel)}>
+                    <Select
+                      value={trustLevel}
+                      onValueChange={(v) => setTrustLevel(v as TrustLevel)}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -455,9 +467,7 @@ export function EditSourceModal({
                       rows={3}
                       maxLength={2000}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {notes.length}/2000 characters
-                    </p>
+                    <p className="text-xs text-muted-foreground">{notes.length}/2000 characters</p>
                   </div>
                 </div>
               </div>

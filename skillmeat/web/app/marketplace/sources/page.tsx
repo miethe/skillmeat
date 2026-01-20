@@ -297,10 +297,7 @@ function MarketplaceSourcesPageInner() {
   const searchQuery = searchParams.get('q') || '';
 
   // Compute filter state
-  const isFiltered = useMemo(
-    () => hasActiveFilters(filters, searchQuery),
-    [filters, searchQuery]
-  );
+  const isFiltered = useMemo(() => hasActiveFilters(filters, searchQuery), [filters, searchQuery]);
   const activeFilterCount = useMemo(
     () => countActiveFilters(filters, searchQuery),
     [filters, searchQuery]
@@ -452,9 +449,7 @@ function MarketplaceSourcesPageInner() {
 
     // Apply tag filters (source must have ALL selected tags)
     if (filters.tags && filters.tags.length > 0) {
-      result = result.filter((source) =>
-        filters.tags!.every((tag) => source.tags?.includes(tag))
-      );
+      result = result.filter((source) => filters.tags!.every((tag) => source.tags?.includes(tag)));
     }
 
     // Apply artifact type filter (source must have at least one artifact of that type)
@@ -548,11 +543,7 @@ function MarketplaceSourcesPageInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => refetch()}
-            disabled={isLoading || isRefetching}
-          >
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading || isRefetching}>
             <RefreshCw
               className={`mr-2 h-4 w-4 ${isLoading || isRefetching ? 'animate-spin' : ''}`}
             />
@@ -642,10 +633,7 @@ function MarketplaceSourcesPageInner() {
 
       {/* Refetching Indicator - shows when refreshing with existing data */}
       {isRefetching && !isLoading && (
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground"
-          aria-live="polite"
-        >
+        <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
           <Loader2 className="h-4 w-4 animate-spin" />
           Refreshing sources...
         </div>

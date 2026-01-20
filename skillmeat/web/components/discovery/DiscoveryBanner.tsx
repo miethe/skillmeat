@@ -68,16 +68,16 @@ export function DiscoveryBanner({
   }
 
   return (
-    <Alert className="mb-4 relative" role="status" aria-live="polite">
+    <Alert className="relative mb-4" role="status" aria-live="polite">
       <Info className="h-4 w-4" aria-hidden="true" />
       <AlertTitle>
         {importableCount === 1
-          ? "1 Artifact Ready to Import"
+          ? '1 Artifact Ready to Import'
           : `${importableCount} Artifacts Ready to Import`}
       </AlertTitle>
       <AlertDescription>
         {discoveredCount && discoveredCount !== importableCount && (
-          <p className="text-sm text-muted-foreground mb-2">
+          <p className="mb-2 text-sm text-muted-foreground">
             Found {discoveredCount} total - {importableCount} remaining
           </p>
         )}
@@ -102,7 +102,7 @@ export function DiscoveryBanner({
         <Button
           size="icon"
           variant="ghost"
-          className="absolute top-2 right-2 h-6 w-6"
+          className="absolute right-2 top-2 h-6 w-6"
           onClick={() => setDismissed(true)}
           aria-label="Close"
         >
