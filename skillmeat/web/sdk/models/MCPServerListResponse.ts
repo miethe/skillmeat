@@ -7,12 +7,13 @@ import type { MCPServerResponse } from './MCPServerResponse';
  * Response schema for listing MCP servers.
  */
 export type MCPServerListResponse = {
-  /**
-   * List of MCP servers
-   */
-  servers: Array<MCPServerResponse>;
-  /**
-   * Total number of servers
-   */
-  total: number;
+    /**
+     * List of MCP servers
+     */
+    servers: Array<MCPServerResponse>;
+    /**
+     * Total number of servers
+     */
+    total: number;
 };
+

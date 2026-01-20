@@ -9,28 +9,29 @@
  * deployment order and path pattern information.
  */
 export type TemplateEntitySchema = {
-  /**
-   * Context entity artifact identifier
-   */
-  artifact_id: string;
-  /**
-   * Entity name
-   */
-  name: string;
-  /**
-   * Entity type (e.g., rule_file, context_file)
-   */
-  type: string;
-  /**
-   * Deployment order (lower values deploy first)
-   */
-  deploy_order: number;
-  /**
-   * Whether entity is required for template deployment
-   */
-  required?: boolean;
-  /**
-   * Path pattern within .claude/ directory
-   */
-  path_pattern?: string | null;
+    /**
+     * Context entity artifact identifier
+     */
+    artifact_id: string;
+    /**
+     * Entity name
+     */
+    name: string;
+    /**
+     * Entity type (e.g., rule_file, context_file)
+     */
+    type: string;
+    /**
+     * Deployment order (lower values deploy first)
+     */
+    deploy_order: number;
+    /**
+     * Whether entity is required for template deployment
+     */
+    required?: boolean;
+    /**
+     * Path pattern within .claude/ directory
+     */
+    path_pattern?: (string | null);
 };
+

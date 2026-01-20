@@ -13,20 +13,21 @@ import type { MarketplaceEntryResponse } from './MarketplaceEntryResponse';
  * limit: Maximum items per page
  */
 export type MarketplaceListResponse = {
-  /**
-   * List of marketplace entries
-   */
-  items: Array<MarketplaceEntryResponse>;
-  /**
-   * Total number of marketplace entries
-   */
-  total: number;
-  /**
-   * Number of items skipped
-   */
-  skip: number;
-  /**
-   * Maximum items per page
-   */
-  limit: number;
+    /**
+     * List of marketplace entries
+     */
+    items: Array<MarketplaceEntryResponse>;
+    /**
+     * Total number of marketplace entries
+     */
+    total: number;
+    /**
+     * Number of items skipped
+     */
+    skip: number;
+    /**
+     * Maximum items per page
+     */
+    limit: number;
 };
+

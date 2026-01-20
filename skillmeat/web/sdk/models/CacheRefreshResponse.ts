@@ -14,28 +14,29 @@
  * message: Human-readable status message
  */
 export type CacheRefreshResponse = {
-  /**
-   * Overall success status
-   */
-  success: boolean;
-  /**
-   * Number of projects successfully refreshed
-   */
-  projects_refreshed: number;
-  /**
-   * Whether any changes were detected during refresh
-   */
-  changes_detected: boolean;
-  /**
-   * List of error messages encountered
-   */
-  errors?: Array<string>;
-  /**
-   * Total operation duration in seconds
-   */
-  duration_seconds: number;
-  /**
-   * Human-readable status message
-   */
-  message: string;
+    /**
+     * Overall success status
+     */
+    success: boolean;
+    /**
+     * Number of projects successfully refreshed
+     */
+    projects_refreshed: number;
+    /**
+     * Whether any changes were detected during refresh
+     */
+    changes_detected: boolean;
+    /**
+     * List of error messages encountered
+     */
+    errors?: Array<string>;
+    /**
+     * Total operation duration in seconds
+     */
+    duration_seconds: number;
+    /**
+     * Human-readable status message
+     */
+    message: string;
 };
+

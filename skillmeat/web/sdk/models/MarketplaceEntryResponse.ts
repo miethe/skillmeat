@@ -15,32 +15,33 @@
  * data: Additional marketplace data (publisher, license, tags, etc.)
  */
 export type MarketplaceEntryResponse = {
-  /**
-   * Marketplace entry ID
-   */
-  id: string;
-  /**
-   * Artifact name
-   */
-  name: string;
-  /**
-   * Artifact type
-   */
-  type: string;
-  /**
-   * URL to artifact
-   */
-  url: string;
-  /**
-   * Entry description
-   */
-  description?: string | null;
-  /**
-   * When entry was cached
-   */
-  cached_at: string;
-  /**
-   * Additional marketplace data
-   */
-  data?: Record<string, any> | null;
+    /**
+     * Marketplace entry ID
+     */
+    id: string;
+    /**
+     * Artifact name
+     */
+    name: string;
+    /**
+     * Artifact type
+     */
+    type: string;
+    /**
+     * URL to artifact
+     */
+    url: string;
+    /**
+     * Entry description
+     */
+    description?: (string | null);
+    /**
+     * When entry was cached
+     */
+    cached_at: string;
+    /**
+     * Additional marketplace data
+     */
+    data?: (Record<string, any> | null);
 };
+

@@ -11,24 +11,25 @@ import type { VersionGraphNodeResponse } from './VersionGraphNodeResponse';
  * statistics.
  */
 export type VersionGraphResponse = {
-  /**
-   * Artifact name
-   */
-  artifact_name: string;
-  /**
-   * Artifact type
-   */
-  artifact_type: string;
-  /**
-   * Root node (typically the collection version)
-   */
-  root?: VersionGraphNodeResponse | null;
-  /**
-   * Aggregated statistics about version graph
-   */
-  statistics: Record<string, any>;
-  /**
-   * Timestamp when graph was last computed
-   */
-  last_updated: string;
+    /**
+     * Artifact name
+     */
+    artifact_name: string;
+    /**
+     * Artifact type
+     */
+    artifact_type: string;
+    /**
+     * Root node (typically the collection version)
+     */
+    root?: (VersionGraphNodeResponse | null);
+    /**
+     * Aggregated statistics about version graph
+     */
+    statistics: Record<string, any>;
+    /**
+     * Timestamp when graph was last computed
+     */
+    last_updated: string;
 };
+

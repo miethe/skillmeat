@@ -14,24 +14,25 @@ import type { SearchResult } from './SearchResult';
  * limit: Maximum items per page
  */
 export type SearchResultsResponse = {
-  /**
-   * List of search results
-   */
-  items: Array<SearchResult>;
-  /**
-   * Total number of matches
-   */
-  total: number;
-  /**
-   * Search query
-   */
-  query: string;
-  /**
-   * Number of items skipped
-   */
-  skip: number;
-  /**
-   * Maximum items per page
-   */
-  limit: number;
+    /**
+     * List of search results
+     */
+    items: Array<SearchResult>;
+    /**
+     * Total number of matches
+     */
+    total: number;
+    /**
+     * Search query
+     */
+    query: string;
+    /**
+     * Number of items skipped
+     */
+    skip: number;
+    /**
+     * Maximum items per page
+     */
+    limit: number;
 };
+

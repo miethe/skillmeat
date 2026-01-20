@@ -6,12 +6,13 @@
  * Request to add a skip preference.
  */
 export type SkipPreferenceAddRequest = {
-  /**
-   * Artifact identifier in format 'type:name'
-   */
-  artifact_key: string;
-  /**
-   * Human-readable reason for skipping this artifact
-   */
-  skip_reason: string;
+    /**
+     * Artifact identifier in format 'type:name'
+     */
+    artifact_key: string;
+    /**
+     * Human-readable reason for skipping this artifact
+     */
+    skip_reason: string;
 };
+

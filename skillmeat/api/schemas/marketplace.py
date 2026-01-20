@@ -544,6 +544,32 @@ class CreateSourceRequest(BaseModel):
         default=None,
         description="Tags to apply to source (max 20, each 1-50 chars)",
     )
+    single_artifact_mode: bool = Field(
+        default=False,
+        description="Treat the entire repository (or root_hint directory) as a single artifact, bypassing automatic detection",
+    )
+    single_artifact_type: Optional[
+        Literal["skill", "command", "agent", "mcp_server", "hook"]
+    ] = Field(
+        default=None,
+        description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
+    )
+
+    @model_validator(mode="after")
+    def validate_single_artifact_mode(self) -> "CreateSourceRequest":
+        """Validate single artifact mode requires type specification.
+
+        Returns:
+            Validated model instance
+
+        Raises:
+            ValueError: If single_artifact_mode is True but single_artifact_type is not provided
+        """
+        if self.single_artifact_mode and not self.single_artifact_type:
+            raise ValueError(
+                "single_artifact_type is required when single_artifact_mode is True"
+            )
+        return self
 
     @field_validator("tags")
     @classmethod
@@ -664,6 +690,8 @@ class CreateSourceRequest(BaseModel):
                 "import_repo_description": True,
                 "import_repo_readme": True,
                 "tags": ["official", "quickstart", "examples"],
+                "single_artifact_mode": False,
+                "single_artifact_type": None,
             }
         }
 
@@ -1047,6 +1075,16 @@ class SourceResponse(BaseModel):
         default_factory=dict,
         description="Artifact counts by type (e.g., {'skill': 5, 'command': 3})",
     )
+    single_artifact_mode: bool = Field(
+        default=False,
+        description="Whether the source treats the entire repository (or root_hint directory) as a single artifact",
+    )
+    single_artifact_type: Optional[
+        Literal["skill", "command", "agent", "mcp_server", "hook"]
+    ] = Field(
+        default=None,
+        description="Artifact type when single_artifact_mode is enabled",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1075,6 +1113,8 @@ class SourceResponse(BaseModel):
                 "repo_readme": "# Anthropic Quickstarts\n\nWelcome to...",
                 "tags": ["official", "quickstart", "examples"],
                 "counts_by_type": {"skill": 8, "command": 3, "agent": 1},
+                "single_artifact_mode": False,
+                "single_artifact_type": None,
             }
         }
 

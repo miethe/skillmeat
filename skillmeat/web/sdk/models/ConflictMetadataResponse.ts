@@ -9,20 +9,21 @@
  * during rollback analysis.
  */
 export type ConflictMetadataResponse = {
-  /**
-   * Relative path to the conflicting file
-   */
-  file_path: string;
-  /**
-   * Type of conflict: content, deletion, add_add, both_modified
-   */
-  conflict_type: string;
-  /**
-   * Whether the conflict can be automatically merged
-   */
-  auto_mergeable: boolean;
-  /**
-   * Whether the file is binary (cannot be text-merged)
-   */
-  is_binary: boolean;
+    /**
+     * Relative path to the conflicting file
+     */
+    file_path: string;
+    /**
+     * Type of conflict: content, deletion, add_add, both_modified
+     */
+    conflict_type: string;
+    /**
+     * Whether the conflict can be automatically merged
+     */
+    auto_mergeable: boolean;
+    /**
+     * Whether the file is binary (cannot be text-merged)
+     */
+    is_binary: boolean;
 };
+

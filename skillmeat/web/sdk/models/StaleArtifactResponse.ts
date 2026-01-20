@@ -16,36 +16,37 @@
  * version_difference: Human-readable description of version difference
  */
 export type StaleArtifactResponse = {
-  /**
-   * Artifact ID
-   */
-  id: string;
-  /**
-   * Artifact name
-   */
-  name: string;
-  /**
-   * Artifact type
-   */
-  type: string;
-  /**
-   * Project name
-   */
-  project_name: string;
-  /**
-   * Project ID
-   */
-  project_id: string;
-  /**
-   * Currently deployed version
-   */
-  deployed_version?: string | null;
-  /**
-   * Available upstream version
-   */
-  upstream_version?: string | null;
-  /**
-   * Human-readable description of version difference
-   */
-  version_difference?: string | null;
+    /**
+     * Artifact ID
+     */
+    id: string;
+    /**
+     * Artifact name
+     */
+    name: string;
+    /**
+     * Artifact type
+     */
+    type: string;
+    /**
+     * Project name
+     */
+    project_name: string;
+    /**
+     * Project ID
+     */
+    project_id: string;
+    /**
+     * Currently deployed version
+     */
+    deployed_version?: (string | null);
+    /**
+     * Available upstream version
+     */
+    upstream_version?: (string | null);
+    /**
+     * Human-readable description of version difference
+     */
+    version_difference?: (string | null);
 };
+

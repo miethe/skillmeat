@@ -11,12 +11,13 @@ import type { StaleArtifactResponse } from './StaleArtifactResponse';
  * total: Total number of stale artifacts
  */
 export type StaleArtifactsListResponse = {
-  /**
-   * List of stale artifacts
-   */
-  items: Array<StaleArtifactResponse>;
-  /**
-   * Total number of stale artifacts
-   */
-  total: number;
+    /**
+     * List of stale artifacts
+     */
+    items: Array<StaleArtifactResponse>;
+    /**
+     * Total number of stale artifacts
+     */
+    total: number;
 };
+

@@ -10,12 +10,13 @@ import type { skillmeat__api__schemas__collections__ArtifactSummary } from './sk
  * Returns lightweight artifact summaries for efficient collection browsing.
  */
 export type skillmeat__api__schemas__collections__CollectionArtifactsResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<skillmeat__api__schemas__collections__ArtifactSummary>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
+    /**
+     * List of items for this page
+     */
+    items: Array<skillmeat__api__schemas__collections__ArtifactSummary>;
+    /**
+     * Pagination metadata
+     */
+    page_info: PageInfo;
 };
+

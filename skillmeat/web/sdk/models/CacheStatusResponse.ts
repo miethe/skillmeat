@@ -18,40 +18,41 @@ import type { RefreshJobStatus } from './RefreshJobStatus';
  * refresh_job_status: Status of background refresh job
  */
 export type CacheStatusResponse = {
-  /**
-   * Total number of cached projects
-   */
-  total_projects: number;
-  /**
-   * Total number of cached artifacts
-   */
-  total_artifacts: number;
-  /**
-   * Number of stale projects (past TTL)
-   */
-  stale_projects: number;
-  /**
-   * Number of artifacts with updates available
-   */
-  outdated_artifacts: number;
-  /**
-   * Cache database size in bytes
-   */
-  cache_size_bytes: number;
-  /**
-   * Datetime of oldest cached entry
-   */
-  oldest_entry?: string | null;
-  /**
-   * Datetime of newest cached entry
-   */
-  newest_entry?: string | null;
-  /**
-   * When cache was last refreshed
-   */
-  last_refresh?: string | null;
-  /**
-   * Background refresh job status
-   */
-  refresh_job_status: RefreshJobStatus;
+    /**
+     * Total number of cached projects
+     */
+    total_projects: number;
+    /**
+     * Total number of cached artifacts
+     */
+    total_artifacts: number;
+    /**
+     * Number of stale projects (past TTL)
+     */
+    stale_projects: number;
+    /**
+     * Number of artifacts with updates available
+     */
+    outdated_artifacts: number;
+    /**
+     * Cache database size in bytes
+     */
+    cache_size_bytes: number;
+    /**
+     * Datetime of oldest cached entry
+     */
+    oldest_entry?: (string | null);
+    /**
+     * Datetime of newest cached entry
+     */
+    newest_entry?: (string | null);
+    /**
+     * When cache was last refreshed
+     */
+    last_refresh?: (string | null);
+    /**
+     * Background refresh job status
+     */
+    refresh_job_status: RefreshJobStatus;
 };
+

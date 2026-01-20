@@ -19,20 +19,21 @@
  * confidence: Confidence score (0.0-1.0) indicating match quality
  */
 export type CollectionMatch = {
-  /**
-   * Match type: 'exact' (hash match, 1.0 confidence), 'hash' (alias for exact), 'name_type' (0.85 confidence), 'none' (no match, 0.0 confidence)
-   */
-  type: string;
-  /**
-   * ID of matched artifact in collection (format: type:name)
-   */
-  matched_artifact_id?: string | null;
-  /**
-   * Name of the matched artifact
-   */
-  matched_name?: string | null;
-  /**
-   * Confidence score from 0.0 (no match) to 1.0 (exact hash match)
-   */
-  confidence: number;
+    /**
+     * Match type: 'exact' (hash match, 1.0 confidence), 'hash' (alias for exact), 'name_type' (0.85 confidence), 'none' (no match, 0.0 confidence)
+     */
+    type: string;
+    /**
+     * ID of matched artifact in collection (format: type:name)
+     */
+    matched_artifact_id?: (string | null);
+    /**
+     * Name of the matched artifact
+     */
+    matched_name?: (string | null);
+    /**
+     * Confidence score from 0.0 (no match) to 1.0 (exact hash match)
+     */
+    confidence: number;
 };
+

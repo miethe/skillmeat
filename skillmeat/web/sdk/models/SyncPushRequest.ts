@@ -11,16 +11,17 @@
  * overwrite: If True, push even if file modified locally (force)
  */
 export type SyncPushRequest = {
-  /**
-   * Absolute path to project directory
-   */
-  project_path: string;
-  /**
-   * Optional list of entity IDs to push (pushes all if None)
-   */
-  entity_ids?: Array<string> | null;
-  /**
-   * If True, push even if file modified locally (force)
-   */
-  overwrite?: boolean;
+    /**
+     * Absolute path to project directory
+     */
+    project_path: string;
+    /**
+     * Optional list of entity IDs to push (pushes all if None)
+     */
+    entity_ids?: (Array<string> | null);
+    /**
+     * If True, push even if file modified locally (force)
+     */
+    overwrite?: boolean;
 };
+

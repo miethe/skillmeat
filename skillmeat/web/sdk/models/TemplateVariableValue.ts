@@ -16,24 +16,25 @@
  * - ARCHITECTURE_DESCRIPTION: Architecture overview
  */
 export type TemplateVariableValue = {
-  /**
-   * Name of the project
-   */
-  PROJECT_NAME: string;
-  /**
-   * Brief description of the project
-   */
-  PROJECT_DESCRIPTION?: string | null;
-  /**
-   * Project author name
-   */
-  AUTHOR?: string | null;
-  /**
-   * Date string (defaults to current date if not provided)
-   */
-  DATE?: string | null;
-  /**
-   * High-level architecture description
-   */
-  ARCHITECTURE_DESCRIPTION?: string | null;
+    /**
+     * Name of the project
+     */
+    PROJECT_NAME: string;
+    /**
+     * Brief description of the project
+     */
+    PROJECT_DESCRIPTION?: (string | null);
+    /**
+     * Project author name
+     */
+    AUTHOR?: (string | null);
+    /**
+     * Date string (defaults to current date if not provided)
+     */
+    DATE?: (string | null);
+    /**
+     * High-level architecture description
+     */
+    ARCHITECTURE_DESCRIPTION?: (string | null);
 };
+

@@ -7,8 +7,9 @@ import type { ArtifactPositionUpdate } from './ArtifactPositionUpdate';
  * Request schema for bulk reordering artifacts within a group.
  */
 export type ReorderArtifactsRequest = {
-  /**
-   * List of artifacts with their new positions
-   */
-  artifacts: Array<ArtifactPositionUpdate>;
+    /**
+     * List of artifacts with their new positions
+     */
+    artifacts: Array<ArtifactPositionUpdate>;
 };
+

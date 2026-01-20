@@ -8,9 +8,4 @@
  * Defines the role and purpose of the context entity within a project.
  * Each type has specific conventions for path patterns and content structure.
  */
-export type ContextEntityType =
-  | 'project_config'
-  | 'spec_file'
-  | 'rule_file'
-  | 'context_file'
-  | 'progress_template';
+export type ContextEntityType = 'project_config' | 'spec_file' | 'rule_file' | 'context_file' | 'progress_template';
