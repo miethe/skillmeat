@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus } from 'lucide-react';
+import { FolderOpen, Plus, X, MoreHorizontal, FolderPlus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,14 +12,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  useCollectionContext,
-  useRemoveArtifactFromCollection,
-  useToast,
-} from '@/hooks';
+import { useCollectionContext, useRemoveArtifactFromCollection, useToast } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { GroupsDisplay } from './groups-display';
 import type { Entity } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
 
@@ -146,17 +143,13 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
               This artifact is not in any collection.
             </p>
             <div className="mt-4 flex flex-col items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddDialog(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add to Collection
               </Button>
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 or create a new one
               </button>
@@ -194,8 +187,20 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
                   </DropdownMenu>
                 </div>
 
-                {/* Groups within collection - Placeholder for Phase 5 */}
-                {/* Future enhancement: Show groups as badges when group data is available */}
+                {/* Groups within this collection */}
+                <div className="mt-3 border-t pt-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Layers className="h-3 w-3" />
+                    <span className="font-medium">Groups in {collection.name}</span>
+                  </div>
+                  <div className="mt-2">
+                    <GroupsDisplay
+                      collectionId={collection.id}
+                      artifactId={entity.id}
+                      maxBadges={3}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -220,10 +225,7 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
       />
 
       {/* Create Collection dialog */}
-      <CreateCollectionDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-      />
+      <CreateCollectionDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
     </div>
   );
 }
@@ -249,7 +251,16 @@ function CollectionsTabSkeleton() {
               </div>
               <Skeleton className="h-8 w-8" />
             </div>
-            <Skeleton className="h-4 w-full" />
+            {/* Groups section skeleton */}
+            <div className="mt-3 border-t pt-3">
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="h-3 w-3" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <div className="mt-2">
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
           </div>
         ))}
       </div>
