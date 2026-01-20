@@ -103,6 +103,20 @@ Rules in `.claude/rules/web/` auto-load when editing:
 **Stale time**: 5 minutes default
 **Pattern**: Query key factories in each hook file
 
+### Collections & Groups Components
+
+**Shared Components**:
+- `CollectionBadgeStack` - Displays collection membership badges on artifact cards
+- `GroupBadgeRow` - Shows group membership for artifacts with group icons/names
+- `GroupFilterSelect` - Group filter dropdown in sidebar and browsing pages
+
+**Hooks**:
+- `useGroups` - Fetch groups for a collection with TanStack Query
+- `useArtifactGroups` - Fetch groups containing a specific artifact
+
+**Routes**:
+- `/groups` - Groups page with group selector and artifact browsing by group
+
 ### shadcn/ui
 
 **Install**: `pnpm dlx shadcn@latest add [component]`

@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Collections & Groups UX Enhancement (Phases 0-5, 2026-01-20)
+
+**API Contract Alignment (Phase 0)**
+- Added `artifact_id` filter to `GET /groups` endpoint
+- Added `group_id` filter to `GET /user-collections/{id}/artifacts` endpoint
+- Added `include_groups=true` query option for artifact responses to include group memberships
+
+**Data Layer & Hooks (Phase 1)**
+- `useGroups(collectionId)` hook for fetching groups within a collection
+- `useArtifactGroups(artifactId, collectionId)` hook for fetching groups an artifact belongs to
+- Enhanced `useInfiniteCollectionArtifacts` hook with `group_id` and `include_groups` support
+
+**Collection Badges on Artifact Cards (Phase 2)**
+- Collection membership badges on UnifiedCard component in "All Collections" view
+- CollectionBadgeStack component with "+N more" tooltip pattern for overflow handling
+- Multi-collection display showing artifact presence across collections
+
+**Group Badges & Modal Enhancement (Phase 3)**
+- Group membership badges on artifact cards in specific collection context
+- GroupBadgeRow component for displaying group associations
+- Groups display in ModalCollectionsTab showing all collections and their groups
+- Enhanced artifact detail modals with collection and group context
+
+**Groups Sidebar Page (Phase 4)**
+- New `/groups` page with dedicated sidebar navigation item
+- Group selector dropdown for filtering artifacts by group
+- Artifact grid filtered by selected group with full card interactions
+- Groups list view with creation and management capabilities
+
+**Group Filter Integration (Phase 5)**
+- GroupFilterSelect component for filtering artifacts by group
+- Integrated into Filters component (collection page)
+- Integrated into EntityFilters component (manage page)
+- Conditional visibility: hidden in "All Collections" view, visible in collection context
+
+**Technical Improvements**
+- API responses include group membership data when `include_groups=true`
+- Efficient group filtering with indexed queries
+- Consistent badge styling across artifact cards
+- Proper handling of many-to-many artifact-group relationships
+
 #### Marketplace Sources Enhancement v1
 
 **Rich Repository Metadata**
