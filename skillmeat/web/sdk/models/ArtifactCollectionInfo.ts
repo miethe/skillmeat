@@ -6,16 +6,17 @@
  * Embedded collection info for artifact responses.
  */
 export type ArtifactCollectionInfo = {
-  /**
-   * Collection UUID
-   */
-  id: string;
-  /**
-   * Collection name
-   */
-  name: string;
-  /**
-   * Number of artifacts in collection
-   */
-  artifact_count?: number | null;
+    /**
+     * Collection UUID
+     */
+    id: string;
+    /**
+     * Collection name
+     */
+    name: string;
+    /**
+     * Number of artifacts in collection
+     */
+    artifact_count?: (number | null);
 };
+

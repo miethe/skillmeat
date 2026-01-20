@@ -9,8 +9,9 @@
  * changes are detected during a rescan.
  */
 export type BulkSyncRequest = {
-  /**
-   * Catalog entry IDs to sync with upstream
-   */
-  artifact_ids: Array<string>;
+    /**
+     * Catalog entry IDs to sync with upstream
+     */
+    artifact_ids: Array<string>;
 };
+

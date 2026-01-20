@@ -13,21 +13,22 @@ import type { ProjectTemplateResponse } from './ProjectTemplateResponse';
  *
  * Example:
  * >>> response = ProjectTemplateListResponse(
- * ...     items=[template1, template2],
- * ...     page_info=PageInfo(
- * ...         has_next_page=True,
- * ...         has_previous_page=False,
- * ...         end_cursor="cursor123"
- * ...     )
- * ... )
- */
-export type ProjectTemplateListResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<ProjectTemplateResponse>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
-};
+     * ...     items=[template1, template2],
+     * ...     page_info=PageInfo(
+         * ...         has_next_page=True,
+         * ...         has_previous_page=False,
+         * ...         end_cursor="cursor123"
+         * ...     )
+         * ... )
+         */
+        export type ProjectTemplateListResponse = {
+            /**
+             * List of items for this page
+             */
+            items: Array<ProjectTemplateResponse>;
+            /**
+             * Pagination metadata
+             */
+            page_info: PageInfo;
+        };
+

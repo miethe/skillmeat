@@ -11,16 +11,17 @@
  * last_run_time: When last refresh completed
  */
 export type RefreshJobStatus = {
-  /**
-   * Whether refresh scheduler is running
-   */
-  is_running: boolean;
-  /**
-   * Next scheduled refresh time
-   */
-  next_run_time?: string | null;
-  /**
-   * Last refresh completion time
-   */
-  last_run_time?: string | null;
+    /**
+     * Whether refresh scheduler is running
+     */
+    is_running: boolean;
+    /**
+     * Next scheduled refresh time
+     */
+    next_run_time?: (string | null);
+    /**
+     * Last refresh completion time
+     */
+    last_run_time?: (string | null);
 };
+

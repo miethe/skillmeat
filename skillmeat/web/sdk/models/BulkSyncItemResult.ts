@@ -9,28 +9,29 @@
  * including success/failure status, conflicts, and error messages.
  */
 export type BulkSyncItemResult = {
-  /**
-   * Catalog entry ID that was synced
-   */
-  entry_id: string;
-  /**
-   * Name of the artifact
-   */
-  artifact_name: string;
-  /**
-   * Whether the sync succeeded
-   */
-  success: boolean;
-  /**
-   * Human-readable result message
-   */
-  message: string;
-  /**
-   * Whether there were merge conflicts during sync
-   */
-  has_conflicts?: boolean;
-  /**
-   * File paths with merge conflicts (if any)
-   */
-  conflicts?: Array<string> | null;
+    /**
+     * Catalog entry ID that was synced
+     */
+    entry_id: string;
+    /**
+     * Name of the artifact
+     */
+    artifact_name: string;
+    /**
+     * Whether the sync succeeded
+     */
+    success: boolean;
+    /**
+     * Human-readable result message
+     */
+    message: string;
+    /**
+     * Whether there were merge conflicts during sync
+     */
+    has_conflicts?: boolean;
+    /**
+     * File paths with merge conflicts (if any)
+     */
+    conflicts?: (Array<string> | null);
 };
+

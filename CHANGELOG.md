@@ -78,9 +78,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter by artifact type, tags, trust level, and search in marketplace sources list
 - Composable filters with AND logic: combined filters return intersection of results
 - URL state sync for bookmarkable filter combinations
-- Clear individual filters or clear all filters at once
-- Filter badge count shows number of active filters
-- Source detail page filters artifacts by artifact type and import status
+
+**Single Artifact Mode**
+- New toggle in Add Source dialog: "Treat as single artifact"
+- For repositories that ARE an artifact (not containing artifacts), e.g., a skill with SKILL.md at root
+- Manually select artifact type (skill, command, agent, mcp_server, hook) when mode is enabled
+- Bypasses automatic detection and treats entire repo (or root_hint directory) as one artifact
+- Sets 100% confidence score for manually specified artifact type
+- Database migration: adds `single_artifact_mode` and `single_artifact_type` columns to marketplace_sources
 
 **Redesigned Source Cards**
 - Enhanced card layout with repository description, tags, and counts breakdown

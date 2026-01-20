@@ -18,12 +18,13 @@
  * Both operations are idempotent - calling multiple times succeeds.
  */
 export type ExcludeArtifactRequest = {
-  /**
-   * True to mark as excluded, False to restore
-   */
-  excluded: boolean;
-  /**
-   * User-provided reason for exclusion (max 500 chars, optional)
-   */
-  reason?: string | null;
+    /**
+     * True to mark as excluded, False to restore
+     */
+    excluded: boolean;
+    /**
+     * User-provided reason for exclusion (max 500 chars, optional)
+     */
+    reason?: (string | null);
 };
+

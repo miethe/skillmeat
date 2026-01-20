@@ -14,28 +14,29 @@
  * score: Relevance score (100=exact, 80=prefix, 60=contains)
  */
 export type SearchResult = {
-  /**
-   * Artifact ID
-   */
-  id: string;
-  /**
-   * Artifact name
-   */
-  name: string;
-  /**
-   * Artifact type
-   */
-  type: string;
-  /**
-   * Project ID
-   */
-  project_id: string;
-  /**
-   * Project name
-   */
-  project_name: string;
-  /**
-   * Relevance score (100=exact match, 80=prefix, 60=contains)
-   */
-  score: number;
+    /**
+     * Artifact ID
+     */
+    id: string;
+    /**
+     * Artifact name
+     */
+    name: string;
+    /**
+     * Artifact type
+     */
+    type: string;
+    /**
+     * Project ID
+     */
+    project_id: string;
+    /**
+     * Project name
+     */
+    project_name: string;
+    /**
+     * Relevance score (100=exact match, 80=prefix, 60=contains)
+     */
+    score: number;
 };
+

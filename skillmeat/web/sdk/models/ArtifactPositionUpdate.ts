@@ -6,12 +6,13 @@
  * Schema for updating artifact position in bulk reorder operations.
  */
 export type ArtifactPositionUpdate = {
-  /**
-   * Artifact ID
-   */
-  artifact_id: string;
-  /**
-   * New position
-   */
-  position: number;
+    /**
+     * Artifact ID
+     */
+    artifact_id: string;
+    /**
+     * New position
+     */
+    position: number;
 };
+

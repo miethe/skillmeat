@@ -9,20 +9,21 @@
  * value and approval/rejection status for tag creation.
  */
 export type ExtractedSegmentResponse = {
-  /**
-   * Original segment from path
-   */
-  segment: string;
-  /**
-   * Normalized segment value
-   */
-  normalized: string;
-  /**
-   * Approval status
-   */
-  status: 'pending' | 'approved' | 'rejected' | 'excluded';
-  /**
-   * Reason if excluded
-   */
-  reason?: string | null;
+    /**
+     * Original segment from path
+     */
+    segment: string;
+    /**
+     * Normalized segment value
+     */
+    normalized: string;
+    /**
+     * Approval status
+     */
+    status: 'pending' | 'approved' | 'rejected' | 'excluded';
+    /**
+     * Reason if excluded
+     */
+    reason?: (string | null);
 };
+

@@ -11,12 +11,13 @@ import type { SnapshotResponse } from './SnapshotResponse';
  * cursor-based pagination pattern.
  */
 export type SnapshotListResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<SnapshotResponse>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
+    /**
+     * List of items for this page
+     */
+    items: Array<SnapshotResponse>;
+    /**
+     * Pagination metadata
+     */
+    page_info: PageInfo;
 };
+

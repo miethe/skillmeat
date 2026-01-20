@@ -30,7 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react';
 import { useCreateSource, useInferUrl } from '@/hooks';
 import { Loader2, AlertCircle, X, HelpCircle } from 'lucide-react';
-import type { TrustLevel } from '@/types/marketplace';
+import type { TrustLevel, ArtifactType } from '@/types/marketplace';
 
 interface AddSourceModalProps {
   open: boolean;
@@ -74,6 +74,10 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
   const [enableFrontmatterDetection, setEnableFrontmatterDetection] = useState(false);
   const [importRepoDescription, setImportRepoDescription] = useState(false);
   const [importRepoReadme, setImportRepoReadme] = useState(false);
+
+  // Single artifact mode
+  const [singleArtifactMode, setSingleArtifactMode] = useState(false);
+  const [singleArtifactType, setSingleArtifactType] = useState<ArtifactType>('skill');
 
   // Tags state
   const [tags, setTags] = useState<string[]>([]);
@@ -194,6 +198,8 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         enable_frontmatter_detection: enableFrontmatterDetection,
         import_repo_description: importRepoDescription,
         import_repo_readme: importRepoReadme,
+        single_artifact_mode: singleArtifactMode || undefined,
+        single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
       });
 
@@ -217,6 +223,8 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         enable_frontmatter_detection: enableFrontmatterDetection,
         import_repo_description: importRepoDescription,
         import_repo_readme: importRepoReadme,
+        single_artifact_mode: singleArtifactMode || undefined,
+        single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
       });
 
@@ -237,6 +245,8 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
     setEnableFrontmatterDetection(false);
     setImportRepoDescription(false);
     setImportRepoReadme(false);
+    setSingleArtifactMode(false);
+    setSingleArtifactType('skill');
     setTags([]);
     setTagInput('');
     setTagError(null);
@@ -462,6 +472,72 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                         onCheckedChange={setImportRepoReadme}
                       />
                     </div>
+
+                    {/* Single Artifact Mode Toggle */}
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="flex-1 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="single-artifact-mode" className="text-sm">
+                            Treat as single artifact
+                          </Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p>
+                                Enable this if the repository itself is a single Claude Code artifact
+                                (e.g., a skill with SKILL.md at the root). This bypasses automatic
+                                detection and treats the entire repo as one artifact of the selected type.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          For repos that ARE an artifact (not containing artifacts)
+                        </p>
+                      </div>
+                      <Switch
+                        id="single-artifact-mode"
+                        checked={singleArtifactMode}
+                        onCheckedChange={setSingleArtifactMode}
+                      />
+                    </div>
+
+                    {/* Artifact Type Selector (shown when single artifact mode is enabled) */}
+                    {singleArtifactMode && (
+                      <div className="grid gap-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="single-artifact-type">Artifact Type</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p>
+                                Select the type of artifact this repository represents. This will be
+                                used to categorize the artifact in your collection.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Select
+                          value={singleArtifactType}
+                          onValueChange={(v) => setSingleArtifactType(v as ArtifactType)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skill">Skill</SelectItem>
+                            <SelectItem value="command">Command</SelectItem>
+                            <SelectItem value="agent">Agent</SelectItem>
+                            <SelectItem value="mcp_server">MCP Server</SelectItem>
+                            <SelectItem value="hook">Hook</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     {/* Tags Input */}
                     <div className="grid gap-2">

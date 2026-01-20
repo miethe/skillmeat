@@ -137,6 +137,8 @@ export interface GitHubSource {
   manual_map?: Record<string, string>; // Directory path -> artifact type
   tags?: string[]; // User-assigned tags for filtering
   counts_by_type?: Record<string, number>; // Artifact counts by type
+  single_artifact_mode?: boolean; // Treat entire repo as single artifact
+  single_artifact_type?: ArtifactType; // Artifact type when single_artifact_mode is true
 }
 
 export interface GitHubSourceListResponse {
@@ -157,6 +159,8 @@ export interface CreateSourceRequest {
   import_repo_description?: boolean;
   import_repo_readme?: boolean;
   tags?: string[];
+  single_artifact_mode?: boolean;
+  single_artifact_type?: ArtifactType;
 }
 
 export interface UpdateSourceRequest {

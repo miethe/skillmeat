@@ -7,8 +7,9 @@ import type { GroupPositionUpdate } from './GroupPositionUpdate';
  * Request schema for bulk reordering groups within a collection.
  */
 export type GroupReorderRequest = {
-  /**
-   * List of groups with their new positions
-   */
-  groups: Array<GroupPositionUpdate>;
+    /**
+     * List of groups with their new positions
+     */
+    groups: Array<GroupPositionUpdate>;
 };
+

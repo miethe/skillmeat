@@ -9,24 +9,25 @@
  * for efficient pagination of large datasets.
  */
 export type PageInfo = {
-  /**
-   * Whether there are more items after this page
-   */
-  has_next_page: boolean;
-  /**
-   * Whether there are items before this page
-   */
-  has_previous_page: boolean;
-  /**
-   * Cursor pointing to the first item in this page
-   */
-  start_cursor?: string | null;
-  /**
-   * Cursor pointing to the last item in this page
-   */
-  end_cursor?: string | null;
-  /**
-   * Total number of items (may be expensive to compute)
-   */
-  total_count?: number | null;
+    /**
+     * Whether there are more items after this page
+     */
+    has_next_page: boolean;
+    /**
+     * Whether there are items before this page
+     */
+    has_previous_page: boolean;
+    /**
+     * Cursor pointing to the first item in this page
+     */
+    start_cursor?: (string | null);
+    /**
+     * Cursor pointing to the last item in this page
+     */
+    end_cursor?: (string | null);
+    /**
+     * Total number of items (may be expensive to compute)
+     */
+    total_count?: (number | null);
 };
+

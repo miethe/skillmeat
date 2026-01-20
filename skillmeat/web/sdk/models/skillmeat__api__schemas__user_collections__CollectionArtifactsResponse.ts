@@ -11,12 +11,13 @@ import type { skillmeat__api__schemas__user_collections__ArtifactSummary } from 
  * groups field will be populated with group membership information.
  */
 export type skillmeat__api__schemas__user_collections__CollectionArtifactsResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<skillmeat__api__schemas__user_collections__ArtifactSummary>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
+    /**
+     * List of items for this page
+     */
+    items: Array<skillmeat__api__schemas__user_collections__ArtifactSummary>;
+    /**
+     * Pagination metadata
+     */
+    page_info: PageInfo;
 };
+

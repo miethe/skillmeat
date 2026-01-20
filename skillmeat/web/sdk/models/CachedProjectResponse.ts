@@ -14,28 +14,29 @@
  * artifact_count: Number of artifacts in project
  */
 export type CachedProjectResponse = {
-  /**
-   * Project ID
-   */
-  id: string;
-  /**
-   * Project name
-   */
-  name: string;
-  /**
-   * Filesystem path to project
-   */
-  path: string;
-  /**
-   * Project status
-   */
-  status: string;
-  /**
-   * When project was last fetched
-   */
-  last_fetched?: string | null;
-  /**
-   * Number of artifacts in project
-   */
-  artifact_count: number;
+    /**
+     * Project ID
+     */
+    id: string;
+    /**
+     * Project name
+     */
+    name: string;
+    /**
+     * Filesystem path to project
+     */
+    path: string;
+    /**
+     * Project status
+     */
+    status: string;
+    /**
+     * When project was last fetched
+     */
+    last_fetched?: (string | null);
+    /**
+     * Number of artifacts in project
+     */
+    artifact_count: number;
 };
+

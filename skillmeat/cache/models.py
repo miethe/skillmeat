@@ -1285,6 +1285,20 @@ class MarketplaceSource(Base):
         comment="JSON config for path-based tag extraction rules",
     )
 
+    # Single artifact mode settings
+    single_artifact_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Treat entire repository (or root_hint dir) as single artifact",
+    )
+    single_artifact_type: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="Artifact type when single_artifact_mode is True (skill, command, agent, mcp_server, hook)",
+    )
+
     # Sync status
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1373,6 +1387,8 @@ class MarketplaceSource(Base):
             "trust_level": self.trust_level,
             "visibility": self.visibility,
             "enable_frontmatter_detection": self.enable_frontmatter_detection,
+            "single_artifact_mode": self.single_artifact_mode,
+            "single_artifact_type": self.single_artifact_type,
             "last_sync_at": (
                 self.last_sync_at.isoformat() if self.last_sync_at else None
             ),

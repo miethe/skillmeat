@@ -12,20 +12,21 @@
  * message: Human-readable status message
  */
 export type SyncResultResponse = {
-  /**
-   * Entity identifier
-   */
-  entity_id: string;
-  /**
-   * Entity name
-   */
-  entity_name: string;
-  /**
-   * Action performed
-   */
-  action: string;
-  /**
-   * Human-readable status message
-   */
-  message: string;
+    /**
+     * Entity identifier
+     */
+    entity_id: string;
+    /**
+     * Entity name
+     */
+    entity_name: string;
+    /**
+     * Action performed
+     */
+    action: string;
+    /**
+     * Human-readable status message
+     */
+    message: string;
 };
+

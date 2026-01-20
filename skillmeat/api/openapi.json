@@ -3,9 +3,7 @@
   "info": {
     "title": "SkillMeat API",
     "description": "REST API for SkillMeat collection manager",
-    "version": "0.1.0-alpha",
-    "x-api-version": "v1",
-    "x-package-version": "0.1.0-alpha"
+    "version": "0.1.0-alpha"
   },
   "paths": {
     "/health": {
@@ -20112,6 +20110,31 @@
             ],
             "title": "Tags",
             "description": "Tags to apply to source (max 20, each 1-50 chars)"
+          },
+          "single_artifact_mode": {
+            "type": "boolean",
+            "title": "Single Artifact Mode",
+            "description": "Treat the entire repository (or root_hint directory) as a single artifact, bypassing automatic detection",
+            "default": false
+          },
+          "single_artifact_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "skill",
+                  "command",
+                  "agent",
+                  "mcp_server",
+                  "hook"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Single Artifact Type",
+            "description": "Artifact type when single_artifact_mode is enabled (required when mode is True)"
           }
         },
         "type": "object",
@@ -20128,6 +20151,7 @@
           "ref": "main",
           "repo_url": "https://github.com/anthropics/anthropic-quickstarts",
           "root_hint": "skills",
+          "single_artifact_mode": false,
           "tags": [
             "official",
             "quickstart",
@@ -21895,21 +21919,75 @@
         "description": "Reason codes for import failures and skips.\n\nThese codes provide machine-readable reasons for why an artifact\nwas skipped or failed during bulk import, enabling frontend\nerror handling and reporting."
       },
       "ErrorResponse": {
-        "title": "ErrorResponse",
-        "type": "object",
         "properties": {
-          "detail": {
-            "title": "Detail",
-            "type": "string"
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Error type or code",
+            "examples": [
+              "NOT_FOUND"
+            ]
           },
-          "status_code": {
-            "title": "Status Code",
-            "type": "integer"
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable error message",
+            "examples": [
+              "Collection not found"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Additional error details (optional)",
+            "examples": [
+              {
+                "collection_id": "abc123"
+              }
+            ]
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValidationErrorDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors",
+            "description": "Validation errors for invalid requests"
           }
         },
+        "type": "object",
         "required": [
-          "detail"
-        ]
+          "error",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "description": "Standard error response envelope.\n\nAll API errors return this structure for consistent error handling\non the client side.",
+        "example": {
+          "error": "VALIDATION_ERROR",
+          "message": "Invalid request parameters",
+          "validation_errors": [
+            {
+              "field": "name",
+              "message": "Field is required",
+              "type": "value_error.missing"
+            }
+          ]
+        }
       },
       "ExcludeArtifactRequest": {
         "properties": {
@@ -23148,17 +23226,17 @@
         }
       },
       "HTTPValidationError": {
-        "title": "HTTPValidationError",
-        "type": "object",
         "properties": {
           "detail": {
-            "title": "Detail",
-            "type": "array",
             "items": {
               "$ref": "#/components/schemas/ValidationError"
-            }
+            },
+            "type": "array",
+            "title": "Detail"
           }
-        }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "HealthCheckResponse": {
         "properties": {
@@ -28254,7 +28332,7 @@
               }
             ],
             "title": "Manual Map",
-            "description": "Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.",
+            "description": "Manual directory-to-type mappings (directory path \u2192 artifact_type). None if no manual mapping configured.",
             "examples": [
               {
                 "commands/dev": "command",
@@ -28302,6 +28380,31 @@
             "type": "object",
             "title": "Counts By Type",
             "description": "Artifact counts by type (e.g., {'skill': 5, 'command': 3})"
+          },
+          "single_artifact_mode": {
+            "type": "boolean",
+            "title": "Single Artifact Mode",
+            "description": "Whether the source treats the entire repository (or root_hint directory) as a single artifact",
+            "default": false
+          },
+          "single_artifact_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "skill",
+                  "command",
+                  "agent",
+                  "mcp_server",
+                  "hook"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Single Artifact Type",
+            "description": "Artifact type when single_artifact_mode is enabled"
           }
         },
         "type": "object",
@@ -28341,6 +28444,7 @@
           "repo_url": "https://github.com/anthropics/anthropic-quickstarts",
           "root_hint": "skills",
           "scan_status": "success",
+          "single_artifact_mode": false,
           "tags": [
             "official",
             "quickstart",
@@ -29693,7 +29797,7 @@
               }
             ],
             "title": "Manual Map",
-            "description": "Manual directory-to-type mappings (directory path → artifact_type). Example: {\"path/to/dir\": \"skill\", \"other/path\": \"command\"}",
+            "description": "Manual directory-to-type mappings (directory path \u2192 artifact_type). Example: {\"path/to/dir\": \"skill\", \"other/path\": \"command\"}",
             "examples": [
               {
                 "commands/dev": "command",
@@ -30366,17 +30470,8 @@
         }
       },
       "ValidationError": {
-        "title": "ValidationError",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "type": "object",
         "properties": {
           "loc": {
-            "title": "Location",
-            "type": "array",
             "items": {
               "anyOf": [
                 {
@@ -30386,17 +30481,26 @@
                   "type": "integer"
                 }
               ]
-            }
+            },
+            "type": "array",
+            "title": "Location"
           },
           "msg": {
-            "title": "Message",
-            "type": "string"
+            "type": "string",
+            "title": "Message"
           },
           "type": {
-            "title": "Error Type",
-            "type": "string"
+            "type": "string",
+            "title": "Error Type"
           }
-        }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       },
       "ValidationErrorDetail": {
         "properties": {
@@ -31303,15 +31407,5 @@
         "scheme": "bearer"
       }
     }
-  },
-  "servers": [
-    {
-      "url": "http://localhost:8080",
-      "description": "Local development server"
-    },
-    {
-      "url": "http://localhost:8080/api/v1",
-      "description": "Local development API"
-    }
-  ]
+  }
 }

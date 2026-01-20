@@ -8,8 +8,9 @@
  * Allows forcing a rescan even if recently scanned.
  */
 export type ScanRequest = {
-  /**
-   * Force rescan even if recently scanned
-   */
-  force?: boolean;
+    /**
+     * Force rescan even if recently scanned
+     */
+    force?: boolean;
 };
+

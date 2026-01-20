@@ -10,12 +10,13 @@ import type { TopArtifactItem } from './TopArtifactItem';
  * Returns artifacts sorted by usage frequency with pagination support.
  */
 export type TopArtifactsResponse = {
-  /**
-   * List of items for this page
-   */
-  items: Array<TopArtifactItem>;
-  /**
-   * Pagination metadata
-   */
-  page_info: PageInfo;
+    /**
+     * List of items for this page
+     */
+    items: Array<TopArtifactItem>;
+    /**
+     * Pagination metadata
+     */
+    page_info: PageInfo;
 };
+

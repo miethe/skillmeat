@@ -9,16 +9,17 @@
  * along with the associated GitHub username.
  */
 export type GitHubTokenStatusResponse = {
-  /**
-   * Whether a GitHub token is currently configured
-   */
-  is_set: boolean;
-  /**
-   * Masked token showing first 7 characters (e.g., 'ghp_xxx...')
-   */
-  masked_token?: string | null;
-  /**
-   * GitHub username associated with the token
-   */
-  username?: string | null;
+    /**
+     * Whether a GitHub token is currently configured
+     */
+    is_set: boolean;
+    /**
+     * Masked token showing first 7 characters (e.g., 'ghp_xxx...')
+     */
+    masked_token?: (string | null);
+    /**
+     * GitHub username associated with the token
+     */
+    username?: (string | null);
 };
+

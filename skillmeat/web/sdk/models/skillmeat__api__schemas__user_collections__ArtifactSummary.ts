@@ -10,24 +10,25 @@ import type { ArtifactGroupMembership } from './ArtifactGroupMembership';
  * will be populated with group membership information.
  */
 export type skillmeat__api__schemas__user_collections__ArtifactSummary = {
-  /**
-   * Artifact name
-   */
-  name: string;
-  /**
-   * Artifact type (skill, command, agent, etc.)
-   */
-  type: string;
-  /**
-   * Current version
-   */
-  version?: string | null;
-  /**
-   * Source specification
-   */
-  source: string;
-  /**
-   * Groups this artifact belongs to (only populated when include_groups=true)
-   */
-  groups?: Array<ArtifactGroupMembership> | null;
+    /**
+     * Artifact name
+     */
+    name: string;
+    /**
+     * Artifact type (skill, command, agent, etc.)
+     */
+    type: string;
+    /**
+     * Current version
+     */
+    version?: (string | null);
+    /**
+     * Source specification
+     */
+    source: string;
+    /**
+     * Groups this artifact belongs to (only populated when include_groups=true)
+     */
+    groups?: (Array<ArtifactGroupMembership> | null);
 };
+

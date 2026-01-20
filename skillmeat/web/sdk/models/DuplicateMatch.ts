@@ -10,16 +10,17 @@ import type { DuplicateDecisionAction } from './DuplicateDecisionAction';
  * to an existing artifact in their collection.
  */
 export type DuplicateMatch = {
-  /**
-   * Full filesystem path to the discovered artifact
-   */
-  discovered_path: string;
-  /**
-   * ID of the matching collection artifact (format: type:name)
-   */
-  collection_artifact_id: string;
-  /**
-   * Action to take: 'link' to create association, 'skip' to ignore
-   */
-  action?: DuplicateDecisionAction;
+    /**
+     * Full filesystem path to the discovered artifact
+     */
+    discovered_path: string;
+    /**
+     * ID of the matching collection artifact (format: type:name)
+     */
+    collection_artifact_id: string;
+    /**
+     * Action to take: 'link' to create association, 'skip' to ignore
+     */
+    action?: DuplicateDecisionAction;
 };
+

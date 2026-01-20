@@ -7,12 +7,13 @@ import type { GroupResponse } from './GroupResponse';
  * Response schema for listing groups.
  */
 export type GroupListResponse = {
-  /**
-   * List of groups
-   */
-  groups?: Array<GroupResponse>;
-  /**
-   * Total number of groups
-   */
-  total: number;
+    /**
+     * List of groups
+     */
+    groups?: Array<GroupResponse>;
+    /**
+     * Total number of groups
+     */
+    total: number;
 };
+

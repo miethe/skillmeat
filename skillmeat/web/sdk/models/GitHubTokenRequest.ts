@@ -9,8 +9,9 @@
  * or 'github_pat_' (fine-grained).
  */
 export type GitHubTokenRequest = {
-  /**
-   * GitHub Personal Access Token (must start with 'ghp_' or 'github_pat_')
-   */
-  token: string;
+    /**
+     * GitHub Personal Access Token (must start with 'ghp_' or 'github_pat_')
+     */
+    token: string;
 };
+

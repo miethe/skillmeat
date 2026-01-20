@@ -44,6 +44,7 @@ from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
+    DetectedArtifact,
     ExcludeArtifactRequest,
     ExtractedSegmentResponse,
     FileContentResponse,
@@ -479,17 +480,78 @@ async def _perform_scan(
         )
 
     try:
-        # Get database session for cross-source deduplication
-        session = catalog_repo._get_session()
+        # Check for single artifact mode - bypass normal scanning
+        if source.single_artifact_mode and source.single_artifact_type:
+            logger.info(
+                f"Single artifact mode enabled for {source.repo_url}, "
+                f"type={source.single_artifact_type}"
+            )
 
-        scan_result = scanner.scan_repository(
-            owner=source.owner,
-            repo=source.repo_name,
-            ref=source.ref,
-            root_hint=source.root_hint,
-            session=session,
-            manual_mappings=manual_map,
-        )
+            # Create synthetic artifact for the entire repo/root_hint
+            artifact_path = source.root_hint if source.root_hint else ""
+            artifact_name = (
+                source.repo_name
+                if not source.root_hint
+                else source.root_hint.split("/")[-1]
+            )
+            base_url = f"https://github.com/{source.owner}/{source.repo_name}"
+
+            # Get commit SHA for versioning
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            try:
+                commit_sha = client.resolve_version(
+                    f"{source.owner}/{source.repo_name}", source.ref
+                )
+            except Exception:
+                commit_sha = source.ref  # Fallback to ref if resolution fails
+
+            # Build upstream URL
+            upstream_url = f"{base_url}/tree/{source.ref}"
+            if artifact_path:
+                upstream_url = f"{upstream_url}/{artifact_path}"
+
+            # Create synthetic scan result with 100% confidence
+            scan_result = ScanResultDTO(
+                source_id=source_id,
+                status="success",
+                artifacts_found=1,
+                new_count=1,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                scan_duration_ms=0,
+                errors=[],
+                scanned_at=datetime.now(timezone.utc),
+                artifacts=[
+                    DetectedArtifact(
+                        artifact_type=source.single_artifact_type,
+                        name=artifact_name,
+                        path=artifact_path or ".",
+                        upstream_url=upstream_url,
+                        confidence_score=100,
+                        detected_version=None,
+                        detected_sha=commit_sha,
+                        raw_score=100,
+                        score_breakdown=None,
+                        metadata={"single_artifact_mode": True},
+                    )
+                ],
+            )
+        else:
+            # Normal scanning path
+            # Get database session for cross-source deduplication
+            session = catalog_repo._get_session()
+
+            scan_result = scanner.scan_repository(
+                owner=source.owner,
+                repo=source.repo_name,
+                ref=source.ref,
+                root_hint=source.root_hint,
+                session=session,
+                manual_mappings=manual_map,
+            )
 
         # Load path tag config from source (or use defaults)
         config = PathTagConfig.defaults()
@@ -806,6 +868,11 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     # Store manual_map if provided
     if request.manual_map:
         source.set_manual_map_dict(request.manual_map)
+
+    # Store single artifact mode settings
+    if request.single_artifact_mode:
+        source.single_artifact_mode = True
+        source.single_artifact_type = request.single_artifact_type
 
     # Store tags if provided
     if request.tags:

@@ -11,16 +11,17 @@
  * message: Human-readable status message
  */
 export type CacheInvalidateResponse = {
-  /**
-   * Whether invalidation succeeded
-   */
-  success: boolean;
-  /**
-   * Number of projects invalidated
-   */
-  invalidated_count: number;
-  /**
-   * Human-readable status message
-   */
-  message: string;
+    /**
+     * Whether invalidation succeeded
+     */
+    success: boolean;
+    /**
+     * Number of projects invalidated
+     */
+    invalidated_count: number;
+    /**
+     * Human-readable status message
+     */
+    message: string;
 };
+
