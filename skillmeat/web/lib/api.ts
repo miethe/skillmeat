@@ -73,6 +73,13 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   trace('request:start', { url, method: requestInit.method || 'GET' });
 
   const response = await fetch(url, requestInit);
+
+  // Handle 204 No Content - return undefined (cast to T for void returns)
+  if (response.status === 204) {
+    trace('request:success', { url, status: response.status });
+    return undefined as T;
+  }
+
   const contentType = response.headers.get('content-type');
   const isJson = contentType?.includes('application/json');
   const body = isJson ? await response.json() : undefined;
