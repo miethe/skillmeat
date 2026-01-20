@@ -10,13 +10,12 @@ import type { UserCollectionResponse } from './UserCollectionResponse';
  * Extends the generic paginated response with collection-specific items.
  */
 export type UserCollectionListResponse = {
-    /**
-     * List of items for this page
-     */
-    items: Array<UserCollectionResponse>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of items for this page
+   */
+  items: Array<UserCollectionResponse>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-

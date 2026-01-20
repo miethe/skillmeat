@@ -9,25 +9,24 @@
  * for safety.
  */
 export type MergeExecuteRequest = {
-    /**
-     * Snapshot ID of base/ancestor version
-     */
-    base_snapshot_id: string;
-    /**
-     * Name of the local collection
-     */
-    local_collection: string;
-    /**
-     * Snapshot ID of remote version to merge
-     */
-    remote_snapshot_id: string;
-    /**
-     * Name of remote collection (defaults to local_collection)
-     */
-    remote_collection?: (string | null);
-    /**
-     * Whether to automatically create a safety snapshot before merge
-     */
-    auto_snapshot?: boolean;
+  /**
+   * Snapshot ID of base/ancestor version
+   */
+  base_snapshot_id: string;
+  /**
+   * Name of the local collection
+   */
+  local_collection: string;
+  /**
+   * Snapshot ID of remote version to merge
+   */
+  remote_snapshot_id: string;
+  /**
+   * Name of remote collection (defaults to local_collection)
+   */
+  remote_collection?: string | null;
+  /**
+   * Whether to automatically create a safety snapshot before merge
+   */
+  auto_snapshot?: boolean;
 };
-

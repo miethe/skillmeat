@@ -13,21 +13,20 @@ import type { CachedProjectResponse } from './CachedProjectResponse';
  * limit: Maximum items per page
  */
 export type CachedProjectsListResponse = {
-    /**
-     * List of cached projects
-     */
-    items: Array<CachedProjectResponse>;
-    /**
-     * Total number of projects
-     */
-    total: number;
-    /**
-     * Number of items skipped
-     */
-    skip: number;
-    /**
-     * Maximum items per page
-     */
-    limit: number;
+  /**
+   * List of cached projects
+   */
+  items: Array<CachedProjectResponse>;
+  /**
+   * Total number of projects
+   */
+  total: number;
+  /**
+   * Number of items skipped
+   */
+  skip: number;
+  /**
+   * Maximum items per page
+   */
+  limit: number;
 };
-

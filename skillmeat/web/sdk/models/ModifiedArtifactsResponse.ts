@@ -10,21 +10,20 @@ import type { ModifiedArtifactInfo } from './ModifiedArtifactInfo';
  * since deployment.
  */
 export type ModifiedArtifactsResponse = {
-    /**
-     * Base64-encoded project path
-     */
-    project_id: string;
-    /**
-     * List of modified artifacts
-     */
-    modified_artifacts: Array<ModifiedArtifactInfo>;
-    /**
-     * Total number of modified artifacts
-     */
-    total_count: number;
-    /**
-     * Timestamp when modifications were last checked
-     */
-    last_checked: string;
+  /**
+   * Base64-encoded project path
+   */
+  project_id: string;
+  /**
+   * List of modified artifacts
+   */
+  modified_artifacts: Array<ModifiedArtifactInfo>;
+  /**
+   * Total number of modified artifacts
+   */
+  total_count: number;
+  /**
+   * Timestamp when modifications were last checked
+   */
+  last_checked: string;
 };
-

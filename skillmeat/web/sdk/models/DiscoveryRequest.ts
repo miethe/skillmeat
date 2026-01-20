@@ -6,9 +6,8 @@
  * Request to scan for artifacts.
  */
 export type DiscoveryRequest = {
-    /**
-     * Custom path to scan. Defaults to collection artifacts directory.
-     */
-    scan_path?: (string | null);
+  /**
+   * Custom path to scan. Defaults to collection artifacts directory.
+   */
+  scan_path?: string | null;
 };
-

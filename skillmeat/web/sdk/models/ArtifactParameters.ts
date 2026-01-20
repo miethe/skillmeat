@@ -6,25 +6,24 @@
  * Updatable artifact parameters.
  */
 export type ArtifactParameters = {
-    /**
-     * GitHub source or local path
-     */
-    source?: (string | null);
-    /**
-     * Version specification
-     */
-    version?: (string | null);
-    /**
-     * Scope: user or local
-     */
-    scope?: (string | null);
-    /**
-     * Tags to apply (replaces existing tags)
-     */
-    tags?: (Array<string> | null);
-    /**
-     * Aliases to apply (replaces existing aliases)
-     */
-    aliases?: (Array<string> | null);
+  /**
+   * GitHub source or local path
+   */
+  source?: string | null;
+  /**
+   * Version specification
+   */
+  version?: string | null;
+  /**
+   * Scope: user or local
+   */
+  scope?: string | null;
+  /**
+   * Tags to apply (replaces existing tags)
+   */
+  tags?: Array<string> | null;
+  /**
+   * Aliases to apply (replaces existing aliases)
+   */
+  aliases?: Array<string> | null;
 };
-

@@ -6,9 +6,8 @@
  * Request body for updating file content.
  */
 export type FileUpdateRequest = {
-    /**
-     * New file content
-     */
-    content: string;
+  /**
+   * New file content
+   */
+  content: string;
 };
-

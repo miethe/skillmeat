@@ -10,13 +10,12 @@ import type { ProjectSummary } from './ProjectSummary';
  * Extends the generic paginated response with project-specific items.
  */
 export type ProjectListResponse = {
-    /**
-     * List of items for this page
-     */
-    items: Array<ProjectSummary>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of items for this page
+   */
+  items: Array<ProjectSummary>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-

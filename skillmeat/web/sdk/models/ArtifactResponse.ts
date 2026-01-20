@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ArtifactCollectionInfo } from './ArtifactCollectionInfo';
 import type { ArtifactMetadataResponse } from './ArtifactMetadataResponse';
 import type { ArtifactUpstreamInfo } from './ArtifactUpstreamInfo';
 import type { DeploymentStatistics } from './DeploymentStatistics';
@@ -12,53 +13,56 @@ import type { DeploymentStatistics } from './DeploymentStatistics';
  * deployment status, and upstream tracking.
  */
 export type ArtifactResponse = {
-    /**
-     * Artifact composite key (type:name)
-     */
-    id: string;
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Artifact type
-     */
-    type: string;
-    /**
-     * Source specification
-     */
-    source: string;
-    /**
-     * Version specification
-     */
-    version: string;
-    /**
-     * Artifact aliases
-     */
-    aliases?: Array<string>;
-    /**
-     * Artifact tags
-     */
-    tags?: Array<string>;
-    /**
-     * Artifact metadata
-     */
-    metadata?: (ArtifactMetadataResponse | null);
-    /**
-     * Upstream tracking information
-     */
-    upstream?: (ArtifactUpstreamInfo | null);
-    /**
-     * Deployment statistics (included when include_deployments=true)
-     */
-    deployment_stats?: (DeploymentStatistics | null);
-    /**
-     * Timestamp when artifact was added to collection
-     */
-    added: string;
-    /**
-     * Timestamp of last update
-     */
-    updated: string;
+  /**
+   * Artifact composite key (type:name)
+   */
+  id: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Artifact type
+   */
+  type: string;
+  /**
+   * Source specification
+   */
+  source: string;
+  /**
+   * Version specification
+   */
+  version: string;
+  /**
+   * Artifact aliases
+   */
+  aliases?: Array<string>;
+  /**
+   * Artifact tags
+   */
+  tags?: Array<string>;
+  /**
+   * Artifact metadata
+   */
+  metadata?: ArtifactMetadataResponse | null;
+  /**
+   * Upstream tracking information
+   */
+  upstream?: ArtifactUpstreamInfo | null;
+  /**
+   * Deployment statistics (included when include_deployments=true)
+   */
+  deployment_stats?: DeploymentStatistics | null;
+  /**
+   * Collections this artifact belongs to (many-to-many relationship)
+   */
+  collections?: Array<ArtifactCollectionInfo>;
+  /**
+   * Timestamp when artifact was added to collection
+   */
+  added: string;
+  /**
+   * Timestamp of last update
+   */
+  updated: string;
 };
-

@@ -9,13 +9,12 @@ import type { SnapshotResponse } from './SnapshotResponse';
  * Returns the newly created snapshot with confirmation flag.
  */
 export type SnapshotCreateResponse = {
-    /**
-     * Newly created snapshot metadata
-     */
-    snapshot: SnapshotResponse;
-    /**
-     * Confirmation that snapshot was created
-     */
-    created?: boolean;
+  /**
+   * Newly created snapshot metadata
+   */
+  snapshot: SnapshotResponse;
+  /**
+   * Confirmation that snapshot was created
+   */
+  created?: boolean;
 };
-

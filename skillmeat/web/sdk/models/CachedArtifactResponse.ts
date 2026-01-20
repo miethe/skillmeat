@@ -15,33 +15,32 @@
  * is_outdated: Whether deployed version is behind upstream
  */
 export type CachedArtifactResponse = {
-    /**
-     * Artifact ID
-     */
-    id: string;
-    /**
-     * Artifact name
-     */
-    name: string;
-    /**
-     * Artifact type
-     */
-    type: string;
-    /**
-     * Project ID
-     */
-    project_id: string;
-    /**
-     * Version deployed to project
-     */
-    deployed_version?: (string | null);
-    /**
-     * Latest available version
-     */
-    upstream_version?: (string | null);
-    /**
-     * Whether artifact is outdated
-     */
-    is_outdated: boolean;
+  /**
+   * Artifact ID
+   */
+  id: string;
+  /**
+   * Artifact name
+   */
+  name: string;
+  /**
+   * Artifact type
+   */
+  type: string;
+  /**
+   * Project ID
+   */
+  project_id: string;
+  /**
+   * Version deployed to project
+   */
+  deployed_version?: string | null;
+  /**
+   * Latest available version
+   */
+  upstream_version?: string | null;
+  /**
+   * Whether artifact is outdated
+   */
+  is_outdated: boolean;
 };
-

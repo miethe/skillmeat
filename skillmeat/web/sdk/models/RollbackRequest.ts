@@ -9,21 +9,20 @@
  * with selective path restoration.
  */
 export type RollbackRequest = {
-    /**
-     * ID of snapshot to rollback to
-     */
-    snapshot_id: string;
-    /**
-     * Collection name (uses active collection if not specified)
-     */
-    collection_name?: (string | null);
-    /**
-     * Use intelligent merge to preserve local changes (recommended)
-     */
-    preserve_changes?: boolean;
-    /**
-     * Only rollback these specific paths (optional)
-     */
-    selective_paths?: (Array<string> | null);
+  /**
+   * ID of snapshot to rollback to
+   */
+  snapshot_id: string;
+  /**
+   * Collection name (uses active collection if not specified)
+   */
+  collection_name?: string | null;
+  /**
+   * Use intelligent merge to preserve local changes (recommended)
+   */
+  preserve_changes?: boolean;
+  /**
+   * Only rollback these specific paths (optional)
+   */
+  selective_paths?: Array<string> | null;
 };
-
