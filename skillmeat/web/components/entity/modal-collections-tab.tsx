@@ -16,6 +16,7 @@ import { useCollectionContext, useRemoveArtifactFromCollection, useToast } from 
 import { useQueryClient } from '@tanstack/react-query';
 import { MoveCopyDialog } from '@/components/collection/move-copy-dialog';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
+import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
 import { GroupsDisplay } from './groups-display';
 import type { Entity } from '@/types/entity';
 import type { Artifact } from '@/types/artifact';
@@ -46,6 +47,7 @@ interface ModalCollectionsTabProps {
 export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
   const { isLoadingCollections } = useCollectionContext();
   const removeFromCollection = useRemoveArtifactFromCollection();
   const queryClient = useQueryClient();
@@ -126,6 +128,10 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
           <Button variant="ghost" size="sm" onClick={() => setShowCreateDialog(true)}>
             <FolderPlus className="mr-2 h-4 w-4" />
             New
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowGroupDialog(true)}>
+            <Layers className="mr-2 h-4 w-4" />
+            Add to Group
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -226,6 +232,22 @@ export function ModalCollectionsTab({ entity }: ModalCollectionsTabProps) {
 
       {/* Create Collection dialog */}
       <CreateCollectionDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+
+      {/* Add to Group dialog */}
+      <AddToGroupDialog
+        open={showGroupDialog}
+        onOpenChange={setShowGroupDialog}
+        artifact={artifactForDialog}
+        onSuccess={() => {
+          setShowGroupDialog(false);
+          // Invalidate artifacts queries to refresh entity.collections
+          queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+          toast({
+            title: 'Added to Group',
+            description: `${entity.name} has been added to the group.`,
+          });
+        }}
+      />
     </div>
   );
 }

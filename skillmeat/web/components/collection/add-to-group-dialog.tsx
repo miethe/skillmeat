@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Plus, Loader2, ChevronLeft, FolderOpen } from 'lucide-react';
+import { Layers, Plus, Loader2, ChevronLeft, FolderOpen, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,12 +18,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   useGroups,
   useAddArtifactToGroup,
+  useRemoveArtifactFromGroup,
   useCreateGroup,
   useToast,
   useCollections,
+  useArtifactGroups,
 } from '@/hooks';
+import { cn } from '@/lib/utils';
 import type { Artifact } from '@/types/artifact';
 
 type DialogStep = 'collection' | 'group';
@@ -87,6 +96,7 @@ export function AddToGroupDialog({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [removingGroupId, setRemovingGroupId] = useState<string | null>(null);
 
   // Determine effective collection ID (prop takes precedence over selection)
   const effectiveCollectionId = collectionId ?? selectedCollectionId;
@@ -130,7 +140,15 @@ export function AddToGroupDialog({
     isLoading,
     refetch: refetchGroups,
   } = useGroups(effectiveCollectionId ?? '');
+
+  // Fetch groups the artifact already belongs to
+  const { data: existingGroups } = useArtifactGroups(
+    open && effectiveCollectionId ? artifact.id : undefined,
+    effectiveCollectionId ?? undefined
+  );
+
   const addArtifactToGroup = useAddArtifactToGroup();
+  const removeArtifactFromGroup = useRemoveArtifactFromGroup();
   const createGroup = useCreateGroup();
   const { toast } = useToast();
 
@@ -147,6 +165,7 @@ export function AddToGroupDialog({
       setSelectedCollectionId(null);
       setIsCreatingGroup(false);
       setNewGroupName('');
+      setRemovingGroupId(null);
     }
   }, [open]);
 
@@ -198,6 +217,31 @@ export function AddToGroupDialog({
       }
       return next;
     });
+  };
+
+  const handleRemoveFromGroup = async (groupId: string) => {
+    setRemovingGroupId(groupId);
+    try {
+      await removeArtifactFromGroup.mutateAsync({
+        groupId,
+        artifactId: artifact.id,
+      });
+
+      toast({
+        title: 'Removed from group',
+        description: `"${artifact.name}" has been removed from the group.`,
+      });
+      // Dialog stays open - cache invalidation will auto-refetch existingGroups
+    } catch (error) {
+      console.error('Failed to remove artifact from group:', error);
+      toast({
+        title: 'Failed to remove from group',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemovingGroupId(null);
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -268,13 +312,14 @@ export function AddToGroupDialog({
   };
 
   const handleClose = () => {
-    if (!addArtifactToGroup.isPending && !createGroup.isPending) {
+    if (!addArtifactToGroup.isPending && !createGroup.isPending && !removeArtifactFromGroup.isPending) {
       onOpenChange(false);
     }
   };
 
   const isPending = addArtifactToGroup.isPending;
   const isCreatingGroupPending = createGroup.isPending;
+  const isRemovePending = removeArtifactFromGroup.isPending;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -490,40 +535,81 @@ export function AddToGroupDialog({
                   )}
                 </div>
                 <div className="space-y-1 p-2">
-                  {groups.map((group) => (
-                    <div
-                      key={group.id}
-                      className="flex items-start space-x-3 rounded-md px-2 py-2 hover:bg-accent"
-                    >
-                      <Checkbox
-                        id={`group-${group.id}`}
-                        checked={selectedGroupIds.has(group.id)}
-                        onCheckedChange={(checked) =>
-                          handleCheckboxChange(group.id, checked === true)
-                        }
-                        disabled={isPending}
-                        className="mt-0.5"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <Label
-                          htmlFor={`group-${group.id}`}
-                          className="block cursor-pointer text-sm font-medium"
-                        >
-                          {group.name}
-                        </Label>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          {group.description && (
-                            <span className="max-w-[200px] truncate text-xs text-muted-foreground">
-                              {group.description}
+                  {groups.map((group) => {
+                    const isAlreadyInGroup = existingGroups?.some((g) => g.id === group.id) ?? false;
+                    const isRemoving = isRemovePending && removingGroupId === group.id;
+
+                    return (
+                      <div
+                        key={group.id}
+                        className={cn(
+                          'flex items-start space-x-3 rounded-md px-2 py-2',
+                          isAlreadyInGroup ? 'opacity-60' : 'hover:bg-accent'
+                        )}
+                      >
+                        <Checkbox
+                          id={`group-${group.id}`}
+                          checked={selectedGroupIds.has(group.id)}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange(group.id, checked === true)
+                          }
+                          disabled={isPending || isAlreadyInGroup}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <Label
+                            htmlFor={`group-${group.id}`}
+                            className={cn(
+                              'block text-sm font-medium',
+                              isAlreadyInGroup ? 'cursor-default' : 'cursor-pointer'
+                            )}
+                          >
+                            {group.name}
+                          </Label>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            {isAlreadyInGroup ? (
+                              <span className="text-xs text-amber-600">Already in Group</span>
+                            ) : (
+                              group.description && (
+                                <span className="max-w-[200px] truncate text-xs text-muted-foreground">
+                                  {group.description}
+                                </span>
+                              )
+                            )}
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {group.artifact_count} artifact{group.artifact_count !== 1 ? 's' : ''}
                             </span>
-                          )}
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {group.artifact_count} artifact{group.artifact_count !== 1 ? 's' : ''}
-                          </span>
+                          </div>
                         </div>
+                        {isAlreadyInGroup && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveFromGroup(group.id);
+                                  }}
+                                  disabled={isRemoving}
+                                  aria-label="Remove from group"
+                                >
+                                  {isRemoving ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                                  ) : (
+                                    <X className="h-3 w-3" aria-hidden="true" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Remove from Group</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}
@@ -534,7 +620,7 @@ export function AddToGroupDialog({
           <Button
             variant="outline"
             onClick={handleClose}
-            disabled={isPending || isCreatingGroupPending}
+            disabled={isPending || isCreatingGroupPending || isRemovePending}
           >
             Cancel
           </Button>
