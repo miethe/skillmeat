@@ -185,10 +185,7 @@ export async function reorderGroups(collectionId: string, groupIds: string[]): P
  * @param targetCollectionId - Target collection ID
  * @returns The newly created group copy
  */
-export async function copyGroup(
-  groupId: string,
-  targetCollectionId: string
-): Promise<Group> {
+export async function copyGroup(groupId: string, targetCollectionId: string): Promise<Group> {
   const response = await fetch(buildUrl(`/groups/${groupId}/copy`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
