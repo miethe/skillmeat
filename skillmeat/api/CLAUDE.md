@@ -191,36 +191,6 @@ async def delete_artifact(...): ...
 | `bundles` | `/api/v1/bundles` | Artifact bundles |
 | `health` | `/health` | Health checks |
 
-### Enhanced Endpoints (Phase 0)
-
-**Groups Filtering**:
-
-```python
-# GET /api/v1/groups
-@router.get("/", response_model=GroupListResponse)
-async def list_groups(
-    artifact_id: Optional[str] = Query(None),  # Filter groups containing artifact
-) -> GroupListResponse:
-    ...
-```
-
-**Artifact Filtering by Group**:
-
-```python
-# GET /api/v1/user-collections/{collection_id}/artifacts
-@router.get("/{collection_id}/artifacts", response_model=ArtifactListResponse)
-async def list_artifacts(
-    collection_id: str,
-    group_id: Optional[str] = Query(None),         # Filter by group membership
-    include_groups: bool = Query(False),            # Include group data per artifact
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
-) -> ArtifactListResponse:
-    ...
-```
-
----
-
 ## Schemas (Pydantic Models)
 
 **File**: `schemas/artifacts.py`
