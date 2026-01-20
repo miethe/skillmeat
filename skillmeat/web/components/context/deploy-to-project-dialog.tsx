@@ -70,7 +70,7 @@ export function DeployToProjectDialog({
     try {
       await deployEntity.mutateAsync({
         id: entity.id,
-        projectPath: project.path
+        projectPath: project.path,
       });
 
       // Show success and close
@@ -126,9 +126,7 @@ export function DeployToProjectDialog({
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Path Pattern</span>
-              <code className="rounded bg-muted px-2 py-1 text-xs">
-                {entity.path_pattern}
-              </code>
+              <code className="rounded bg-muted px-2 py-1 text-xs">{entity.path_pattern}</code>
             </div>
             {entity.category && (
               <div className="flex items-center justify-between text-sm">
@@ -155,9 +153,17 @@ export function DeployToProjectDialog({
                 Failed to load projects
               </div>
             ) : (
-              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isDeploying || !projects || projects.length === 0}>
+              <Select
+                value={selectedProject}
+                onValueChange={setSelectedProject}
+                disabled={isDeploying || !projects || projects.length === 0}
+              >
                 <SelectTrigger id="project" aria-label="Select target project for deployment">
-                  <SelectValue placeholder={projects && projects.length === 0 ? "No projects found" : "Select a project"} />
+                  <SelectValue
+                    placeholder={
+                      projects && projects.length === 0 ? 'No projects found' : 'Select a project'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {projects?.map((project) => (
@@ -181,7 +187,7 @@ export function DeployToProjectDialog({
                 Target Path
               </label>
               <div className="rounded-lg bg-muted p-3">
-                <code className="text-xs break-all">{targetPath}</code>
+                <code className="break-all text-xs">{targetPath}</code>
               </div>
             </div>
           )}
@@ -202,13 +208,22 @@ export function DeployToProjectDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isDeploying} aria-label="Cancel deployment">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isDeploying}
+            aria-label="Cancel deployment"
+          >
             Cancel
           </Button>
           <Button
             onClick={handleDeploy}
             disabled={!selectedProject || isDeploying}
-            aria-label={isDeploying ? 'Deploying entity to project' : `Deploy ${entity.name} to selected project`}
+            aria-label={
+              isDeploying
+                ? 'Deploying entity to project'
+                : `Deploy ${entity.name} to selected project`
+            }
           >
             {isDeploying ? (
               <>

@@ -62,7 +62,7 @@ function ArtifactCardActions({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-0 touch:opacity-100"
+          className="touch:opacity-100 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 md:opacity-0"
           onClick={(e) => e.stopPropagation()}
           aria-label={`Actions for ${artifact.name}`}
         >
@@ -90,10 +90,7 @@ function ArtifactCardActions({
           Edit
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="text-destructive focus:text-destructive"
-        >
+        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>
@@ -124,14 +121,14 @@ function ArtifactCard({
   onDeploy?: () => void;
 }) {
   return (
-    <div className="relative group">
+    <div className="group relative">
       <UnifiedCard item={artifact} onClick={onClick} />
 
       {/* Collection Badge - Top Right */}
       {showCollectionBadge && artifact.collection && (
         <Badge
           variant="outline"
-          className="absolute top-2 right-2 cursor-pointer bg-background/95 backdrop-blur text-xs hover:bg-accent z-10"
+          className="absolute right-2 top-2 z-10 cursor-pointer bg-background/95 text-xs backdrop-blur hover:bg-accent"
           onClick={(e) => {
             e.stopPropagation();
             artifact.collection?.id && onCollectionClick?.(artifact.collection.id);
@@ -142,7 +139,13 @@ function ArtifactCard({
       )}
 
       {/* Actions Menu - Top Right (below collection badge if present) */}
-      <div className={showCollectionBadge && artifact.collection ? 'absolute top-10 right-2' : 'absolute top-2 right-2'}>
+      <div
+        className={
+          showCollectionBadge && artifact.collection
+            ? 'absolute right-2 top-10'
+            : 'absolute right-2 top-2'
+        }
+      >
         <ArtifactCardActions
           artifact={artifact}
           collectionId={artifact.collection?.id}
@@ -248,12 +251,16 @@ export function ArtifactGrid({
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteArtifact} onOpenChange={(open) => !open && setDeleteArtifact(null)}>
+      <AlertDialog
+        open={!!deleteArtifact}
+        onOpenChange={(open) => !open && setDeleteArtifact(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteArtifact?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{deleteArtifact?.name}"? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

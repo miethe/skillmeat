@@ -54,7 +54,13 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
     queryKey: ['artifacts', 'discover', 'project', projectPath],
     queryFn: async (): Promise<DiscoveryResult> => {
       if (!projectPath) {
-        return { discovered_count: 0, importable_count: 0, artifacts: [], errors: [], scan_duration_ms: 0 };
+        return {
+          discovered_count: 0,
+          importable_count: 0,
+          artifacts: [],
+          errors: [],
+          scan_duration_ms: 0,
+        };
       }
 
       const result = await apiRequest<DiscoveryResult>(
@@ -104,7 +110,9 @@ export function useProjectDiscovery(projectPath: string | undefined, projectId?:
       }
 
       // AWAIT all invalidations to ensure cache is fresh before mutation completes
-      await queryClient.invalidateQueries({ queryKey: ['artifacts', 'discover', 'project', projectPath] });
+      await queryClient.invalidateQueries({
+        queryKey: ['artifacts', 'discover', 'project', projectPath],
+      });
       await queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       if (projectId) {
         // Only invalidate the specific project detail, not the entire projects list

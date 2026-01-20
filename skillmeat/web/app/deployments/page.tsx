@@ -23,11 +23,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { useDeploymentList, useDeploymentSummary, useRefreshDeployments } from '@/hooks';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
@@ -87,7 +83,10 @@ export default function DeploymentsPage() {
       }
 
       // Search filter (case-insensitive name match)
-      if (debouncedSearch && !deployment.artifact_name.toLowerCase().includes(debouncedSearch.toLowerCase())) {
+      if (
+        debouncedSearch &&
+        !deployment.artifact_name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      ) {
         return false;
       }
 
@@ -221,7 +220,7 @@ export default function DeploymentsPage() {
             {summary.byStatus.synced > 0 && (
               <Badge
                 variant="outline"
-                className="border-green-500/20 bg-green-500/10 text-green-600 px-3 py-1"
+                className="border-green-500/20 bg-green-500/10 px-3 py-1 text-green-600"
               >
                 Synced: {summary.byStatus.synced}
               </Badge>
@@ -229,7 +228,7 @@ export default function DeploymentsPage() {
             {summary.byStatus.modified > 0 && (
               <Badge
                 variant="outline"
-                className="border-yellow-500/20 bg-yellow-500/10 text-yellow-600 px-3 py-1"
+                className="border-yellow-500/20 bg-yellow-500/10 px-3 py-1 text-yellow-600"
               >
                 Modified: {summary.byStatus.modified}
               </Badge>
@@ -237,7 +236,7 @@ export default function DeploymentsPage() {
             {summary.byStatus.outdated > 0 && (
               <Badge
                 variant="outline"
-                className="border-orange-500/20 bg-orange-500/10 text-orange-600 px-3 py-1"
+                className="border-orange-500/20 bg-orange-500/10 px-3 py-1 text-orange-600"
               >
                 Outdated: {summary.byStatus.outdated}
               </Badge>
@@ -254,7 +253,7 @@ export default function DeploymentsPage() {
         {/* Filters Bar */}
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border bg-background p-3">
           {/* Search input */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by name..."
@@ -334,14 +333,14 @@ export default function DeploymentsPage() {
         ) : filteredDeployments.length === 0 ? (
           // Empty state
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="rounded-full bg-muted p-6 mb-4">
+            <div className="mb-4 rounded-full bg-muted p-6">
               <LayoutGrid className="h-12 w-12 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No deployments found</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
+            <h3 className="mb-2 text-lg font-semibold">No deployments found</h3>
+            <p className="max-w-md text-sm text-muted-foreground">
               {hasActiveFilters
                 ? 'No deployments match your current filters. Try adjusting your search criteria.'
-                : 'You haven\'t deployed any artifacts yet. Deploy artifacts from your collection to get started.'}
+                : "You haven't deployed any artifacts yet. Deploy artifacts from your collection to get started."}
             </p>
             {hasActiveFilters && (
               <Button variant="outline" onClick={clearFilters} className="mt-4">
@@ -369,7 +368,7 @@ export default function DeploymentsPage() {
             {Object.entries(groupedDeployments).map(([projectPath, deployments]) => (
               <Collapsible key={projectPath} defaultOpen>
                 <div className="rounded-lg border bg-card">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between p-4 hover:bg-accent/50 transition-colors">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between p-4 transition-colors hover:bg-accent/50">
                     <div className="flex items-center gap-2">
                       <ChevronDown className="h-4 w-4 transition-transform [[data-state=closed]>&]:rotate-[-90deg]" />
                       <h3 className="font-semibold">{projectPath}</h3>

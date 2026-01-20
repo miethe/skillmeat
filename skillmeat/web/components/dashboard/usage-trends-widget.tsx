@@ -205,13 +205,13 @@ export function UsageTrendsWidget({ showType = 'area' }: UsageTrendsWidgetProps)
         {/* Summary stats below chart */}
         <div className="mt-6 grid grid-cols-3 gap-4 border-t pt-4">
           <div className="text-center">
-            <p className="text-2xl font-bold text-brand">
+            <p className="text-brand text-2xl font-bold">
               {trends.reduce((sum, t) => sum + t.usage_count, 0)}
             </p>
             <p className="text-xs text-muted-foreground">Total Usage</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-success">
+            <p className="text-success text-2xl font-bold">
               {trends.reduce((sum, t) => sum + t.deployment_count, 0)}
             </p>
             <p className="text-xs text-muted-foreground">Total Deployments</p>

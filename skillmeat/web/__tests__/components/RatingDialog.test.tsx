@@ -329,9 +329,7 @@ describe('RatingDialog', () => {
 
   describe('Loading State', () => {
     it('shows loading indicator during submission', async () => {
-      const onSubmit = jest.fn(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      const onSubmit = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
       render(<RatingDialog {...defaultProps} onSubmit={onSubmit} />);
 
       const thirdStar = screen.getByRole('button', { name: 'Rate 3 stars' });
@@ -345,9 +343,7 @@ describe('RatingDialog', () => {
     });
 
     it('disables submit button during loading', async () => {
-      const onSubmit = jest.fn(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      const onSubmit = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
       render(<RatingDialog {...defaultProps} onSubmit={onSubmit} />);
 
       const thirdStar = screen.getByRole('button', { name: 'Rate 3 stars' });
@@ -361,9 +357,7 @@ describe('RatingDialog', () => {
     });
 
     it('disables cancel button during loading', async () => {
-      const onSubmit = jest.fn(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      const onSubmit = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
       render(<RatingDialog {...defaultProps} onSubmit={onSubmit} />);
 
       const thirdStar = screen.getByRole('button', { name: 'Rate 3 stars' });
@@ -377,9 +371,7 @@ describe('RatingDialog', () => {
     });
 
     it('disables star buttons during loading', async () => {
-      const onSubmit = jest.fn(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      const onSubmit = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
       render(<RatingDialog {...defaultProps} onSubmit={onSubmit} />);
 
       const thirdStar = screen.getByRole('button', { name: 'Rate 3 stars' });
@@ -395,9 +387,7 @@ describe('RatingDialog', () => {
     });
 
     it('disables feedback textarea during loading', async () => {
-      const onSubmit = jest.fn(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
+      const onSubmit = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
       render(<RatingDialog {...defaultProps} onSubmit={onSubmit} />);
 
       const thirdStar = screen.getByRole('button', { name: 'Rate 3 stars' });
@@ -498,9 +488,12 @@ describe('RatingDialog', () => {
       fireEvent.click(submitButton);
 
       // Wait for error to appear
-      await waitFor(() => {
-        expect(screen.getByText('Test error')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('Test error')).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
 
       // Verify error is visible
       expect(screen.getByRole('alert')).toHaveTextContent('Test error');

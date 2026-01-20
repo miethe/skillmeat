@@ -121,9 +121,9 @@ test.describe('Tags Feature E2E', () => {
           await editButton.click();
 
           // Find the tag input
-          const tagInput = page.locator('[data-testid="tag-input"]').or(
-            page.locator('input[aria-label="Tag input"]')
-          );
+          const tagInput = page
+            .locator('[data-testid="tag-input"]')
+            .or(page.locator('input[aria-label="Tag input"]'));
 
           if (await tagInput.isVisible().catch(() => false)) {
             await tagInput.fill('new-tag');
@@ -209,9 +209,15 @@ test.describe('Tags Feature E2E', () => {
         await page.waitForTimeout(500);
 
         // Verify all three tags appear
-        await expect(page.locator('.badge:has-text("tag1")')).toBeVisible({ timeout: 2000 }).catch(() => {});
-        await expect(page.locator('.badge:has-text("tag2")')).toBeVisible({ timeout: 2000 }).catch(() => {});
-        await expect(page.locator('.badge:has-text("tag3")')).toBeVisible({ timeout: 2000 }).catch(() => {});
+        await expect(page.locator('.badge:has-text("tag1")'))
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {});
+        await expect(page.locator('.badge:has-text("tag2")'))
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {});
+        await expect(page.locator('.badge:has-text("tag3")'))
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {});
       }
     });
   });
@@ -242,7 +248,9 @@ test.describe('Tags Feature E2E', () => {
         await page.keyboard.press('Enter');
 
         // Wait for tag to appear
-        await page.waitForSelector('.badge:has-text("temp-tag")', { timeout: 2000 }).catch(() => {});
+        await page
+          .waitForSelector('.badge:has-text("temp-tag")', { timeout: 2000 })
+          .catch(() => {});
 
         // Click input (make sure it's focused and empty)
         await tagInput.click();
@@ -314,9 +322,9 @@ test.describe('Tags Feature E2E', () => {
         await tagFilterButton.click();
 
         // Select a tag checkbox
-        const tagCheckbox = page.locator('[data-testid="tag-checkbox-react"]').or(
-          page.getByRole('checkbox', { name: /react/i })
-        );
+        const tagCheckbox = page
+          .locator('[data-testid="tag-checkbox-react"]')
+          .or(page.getByRole('checkbox', { name: /react/i }));
 
         if (await tagCheckbox.isVisible().catch(() => false)) {
           await tagCheckbox.click();
@@ -328,8 +336,12 @@ test.describe('Tags Feature E2E', () => {
           await expect(page).toHaveURL(/tags=react/);
 
           // Verify only matching artifacts are shown
-          await expect(page.locator('[data-testid="artifact-card"]:has-text("react-skill")')).toBeVisible();
-          await expect(page.locator('[data-testid="artifact-card"]:has-text("python-skill")')).not.toBeVisible();
+          await expect(
+            page.locator('[data-testid="artifact-card"]:has-text("react-skill")')
+          ).toBeVisible();
+          await expect(
+            page.locator('[data-testid="artifact-card"]:has-text("python-skill")')
+          ).not.toBeVisible();
         }
       }
     });
@@ -367,8 +379,12 @@ test.describe('Tags Feature E2E', () => {
         await expect(page).toHaveURL(/tags=.*react.*python|tags=.*python.*react/);
 
         // Verify both tagged artifacts are shown
-        await expect(page.locator('[data-testid="artifact-card"]:has-text("react-skill")')).toBeVisible();
-        await expect(page.locator('[data-testid="artifact-card"]:has-text("python-skill")')).toBeVisible();
+        await expect(
+          page.locator('[data-testid="artifact-card"]:has-text("react-skill")')
+        ).toBeVisible();
+        await expect(
+          page.locator('[data-testid="artifact-card"]:has-text("python-skill")')
+        ).toBeVisible();
       }
     });
 
@@ -413,7 +429,9 @@ test.describe('Tags Feature E2E', () => {
         const reactTag = page.locator('text=react').first();
         if (await reactTag.isVisible().catch(() => false)) {
           // Count should be visible near tag name
-          await expect(page.locator('text=/react.*5|5.*react/i')).toBeVisible({ timeout: 2000 }).catch(() => {});
+          await expect(page.locator('text=/react.*5|5.*react/i'))
+            .toBeVisible({ timeout: 2000 })
+            .catch(() => {});
         }
       }
     });
@@ -479,7 +497,9 @@ test.describe('Tags Feature E2E', () => {
 
         // Verify Python appears in suggestions
         const pythonOption = page.locator('[role="option"]:has-text("Python")');
-        await expect(pythonOption).toBeVisible({ timeout: 2000 }).catch(() => {});
+        await expect(pythonOption)
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {});
 
         // Verify React does NOT appear
         const reactOption = page.locator('[role="option"]:has-text("React")');
@@ -516,7 +536,9 @@ test.describe('Tags Feature E2E', () => {
 
         // Verify first option is highlighted
         const firstOption = page.locator('[role="option"][aria-selected="true"]').first();
-        await expect(firstOption).toBeVisible({ timeout: 2000 }).catch(() => {});
+        await expect(firstOption)
+          .toBeVisible({ timeout: 2000 })
+          .catch(() => {});
 
         // Press Enter to select
         await page.keyboard.press('Enter');
@@ -544,7 +566,9 @@ test.describe('Tags Feature E2E', () => {
         await waitForPageReady(page);
 
         // Verify tag still exists
-        await expect(page.locator('.badge:has-text("persistent-tag")')).toBeVisible({ timeout: 5000 }).catch(() => {});
+        await expect(page.locator('.badge:has-text("persistent-tag")'))
+          .toBeVisible({ timeout: 5000 })
+          .catch(() => {});
       }
     });
 

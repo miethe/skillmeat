@@ -1,17 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  FileText,
-  Calendar,
-  Tag,
-  Eye,
-  EyeOff,
-  Edit,
-  Upload,
-  X,
-  Loader2,
-} from 'lucide-react';
+import { FileText, Calendar, Tag, Eye, EyeOff, Edit, Upload, X, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -135,10 +125,7 @@ export function ContextEntityDetail({
                     <DialogTitle className="text-2xl">{entity.name}</DialogTitle>
                     <DialogDescription>{entity.description || 'No description'}</DialogDescription>
                     <div className="flex items-center gap-2 pt-1">
-                      <Badge
-                        variant="outline"
-                        className={entityTypeColors[entity.entity_type]}
-                      >
+                      <Badge variant="outline" className={entityTypeColors[entity.entity_type]}>
                         {entityTypeLabels[entity.entity_type]}
                       </Badge>
                       {entity.category && (
@@ -219,7 +206,9 @@ export function ContextEntityDetail({
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowRawContent(!showRawContent)}
-                      aria-label={showRawContent ? 'Show formatted content' : 'Show raw markdown content'}
+                      aria-label={
+                        showRawContent ? 'Show formatted content' : 'Show raw markdown content'
+                      }
                       aria-pressed={showRawContent}
                     >
                       {showRawContent ? 'Show Formatted' : 'Show Raw'}
@@ -228,8 +217,15 @@ export function ContextEntityDetail({
 
                   <div className="rounded-lg border bg-muted/50">
                     {isContentLoading ? (
-                      <div className="flex items-center justify-center p-8" role="status" aria-live="polite">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                      <div
+                        className="flex items-center justify-center p-8"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <Loader2
+                          className="h-6 w-6 animate-spin text-muted-foreground"
+                          aria-hidden="true"
+                        />
                         <span className="ml-2 text-sm text-muted-foreground">
                           Loading content...
                         </span>
@@ -247,7 +243,7 @@ export function ContextEntityDetail({
                             <code>{content}</code>
                           </pre>
                         ) : (
-                          <div className="prose prose-sm dark:prose-invert max-w-none p-4">
+                          <div className="prose prose-sm max-w-none p-4 dark:prose-invert">
                             {/* Simple markdown rendering - just show paragraphs for now */}
                             {content.split('\n\n').map((paragraph, idx) => {
                               // Handle headers
@@ -304,7 +300,7 @@ export function ContextEntityDetail({
                 {entity.content_hash && (
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-foreground">Content Hash</h3>
-                    <code className="block rounded border bg-muted px-3 py-2 text-xs break-all">
+                    <code className="block break-all rounded border bg-muted px-3 py-2 text-xs">
                       {entity.content_hash}
                     </code>
                   </div>

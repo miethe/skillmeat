@@ -1,11 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,12 +85,12 @@ export function SkipPreferencesList({
       <Collapsible
         open={shouldBeOpen}
         onOpenChange={setIsOpen}
-        className="border rounded-lg bg-card"
+        className="rounded-lg border bg-card"
       >
         <CollapsibleTrigger asChild>
           <button
             className={cn(
-              'flex w-full items-center justify-between p-4 hover:bg-accent transition-colors',
+              'flex w-full items-center justify-between p-4 transition-colors hover:bg-accent',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
             )}
             aria-expanded={shouldBeOpen}
@@ -132,23 +128,21 @@ export function SkipPreferencesList({
                   return (
                     <div
                       key={pref.artifact_key}
-                      className="flex items-start gap-3 p-3 rounded-md border bg-background"
+                      className="flex items-start gap-3 rounded-md border bg-background p-3"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm truncate">
-                            {displayName}
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{displayName}</span>
                           <Badge variant="outline" className="text-xs">
                             {artifactType}
                           </Badge>
                         </div>
                         {pref.skip_reason && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
                             {pref.skip_reason}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Skipped {new Date(pref.added_date).toLocaleDateString()}
                         </p>
                       </div>
@@ -169,7 +163,7 @@ export function SkipPreferencesList({
               </div>
 
               {count > 1 && (
-                <div className="pt-2 border-t">
+                <div className="border-t pt-2">
                   <Button
                     variant="destructive"
                     size="sm"
@@ -177,7 +171,7 @@ export function SkipPreferencesList({
                     disabled={isLoading}
                     className="w-full"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Clear All Skips
                   </Button>
                 </div>
@@ -193,8 +187,8 @@ export function SkipPreferencesList({
           <AlertDialogHeader>
             <AlertDialogTitle>Clear all skip preferences?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will clear all {count} skipped artifact{count !== 1 ? 's' : ''}. These
-              artifacts will appear in future discovery scans and can be imported.
+              This will clear all {count} skipped artifact{count !== 1 ? 's' : ''}. These artifacts
+              will appear in future discovery scans and can be imported.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

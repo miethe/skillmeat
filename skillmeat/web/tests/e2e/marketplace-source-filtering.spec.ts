@@ -14,10 +14,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import {
-  waitForPageLoad,
-  mockApiRoute,
-} from '../helpers/test-utils';
+import { waitForPageLoad, mockApiRoute } from '../helpers/test-utils';
 
 // ============================================================================
 // Mock Data
@@ -215,7 +212,9 @@ test.describe('Tag Filtering', () => {
     await expect(page.getByText('Tags')).toBeVisible();
 
     // Click on 'production' tag in the filter bar
-    const productionTagBadge = page.locator('[role="button"][aria-label*="Add tag filter: production"]');
+    const productionTagBadge = page.locator(
+      '[role="button"][aria-label*="Add tag filter: production"]'
+    );
     await productionTagBadge.click();
 
     // Verify filter is active (tag should now show as selected)

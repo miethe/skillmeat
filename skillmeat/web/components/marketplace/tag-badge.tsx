@@ -11,12 +11,7 @@
 
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -110,10 +105,7 @@ function SingleTagBadge({ tag, onClick }: SingleTagBadgeProps) {
   return (
     <Badge
       colorStyle={color}
-      className={cn(
-        'text-xs',
-        isClickable && 'cursor-pointer hover:opacity-80 transition-opacity'
-      )}
+      className={cn('text-xs', isClickable && 'cursor-pointer transition-opacity hover:opacity-80')}
       onClick={isClickable ? handleClick : undefined}
       onKeyDown={isClickable ? handleKeyDown : undefined}
       role={isClickable ? 'button' : undefined}
@@ -139,7 +131,7 @@ function OverflowBadge({ hiddenTags, onTagClick }: OverflowBadgeProps) {
         <TooltipTrigger asChild>
           <Badge
             variant="secondary"
-            className="text-xs cursor-default"
+            className="cursor-default text-xs"
             aria-label={`${count} more tags: ${hiddenTags.join(', ')}`}
           >
             +{count} more
@@ -161,12 +153,7 @@ function OverflowBadge({ hiddenTags, onTagClick }: OverflowBadgeProps) {
 // Main Component
 // ============================================================================
 
-export function TagBadge({
-  tags,
-  maxDisplay = 3,
-  onTagClick,
-  className,
-}: TagBadgeProps) {
+export function TagBadge({ tags, maxDisplay = 3, onTagClick, className }: TagBadgeProps) {
   // Handle empty tags array gracefully
   if (!tags || tags.length === 0) {
     return null;

@@ -207,11 +207,15 @@ function CatalogRow({
   const excludeMutation = useExcludeCatalogEntry(sourceId);
 
   const Icon = artifactTypeIcons[entry.artifact_type] || HelpCircle;
-  const iconColor = artifactTypeIconColors[entry.artifact_type] || 'text-gray-500 dark:text-gray-400';
+  const iconColor =
+    artifactTypeIconColors[entry.artifact_type] || 'text-gray-500 dark:text-gray-400';
   const rowTint = artifactTypeRowTints[entry.artifact_type] || 'bg-gray-500/[0.02]';
   const borderAccent = artifactTypeBorderAccents[entry.artifact_type] || 'border-l-gray-400';
   const typeLabel = artifactTypeLabels[entry.artifact_type] || entry.artifact_type || 'Unknown';
-  const entryStatus = statusConfig[entry.status] || { label: 'New', className: 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950' };
+  const entryStatus = statusConfig[entry.status] || {
+    label: 'New',
+    className: 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950',
+  };
 
   const canImport = entry.status === 'new' || entry.status === 'updated';
   const canSelect = entry.status !== 'removed' && entry.status !== 'excluded';
@@ -249,9 +253,7 @@ function CatalogRow({
         <TableCell>
           <div className="space-y-1">
             <div className="font-medium">{entry.name}</div>
-            <div className="text-xs text-muted-foreground truncate max-w-[300px]">
-              {entry.path}
-            </div>
+            <div className="max-w-[300px] truncate text-xs text-muted-foreground">{entry.path}</div>
           </div>
         </TableCell>
 
@@ -285,13 +287,13 @@ function CatalogRow({
             {entry.status === 'excluded' && entry.is_duplicate && (
               <Badge
                 variant="outline"
-                className="border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950"
+                className="border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-950"
                 title={
                   entry.duplicate_reason === 'within_source'
                     ? `Duplicate within this source${entry.duplicate_of ? `: ${entry.duplicate_of}` : ''}`
                     : entry.duplicate_reason === 'cross_source'
-                    ? 'Duplicate from another source or collection'
-                    : 'Marked as duplicate'
+                      ? 'Duplicate from another source or collection'
+                      : 'Marked as duplicate'
                 }
               >
                 Duplicate
@@ -301,7 +303,7 @@ function CatalogRow({
             {entry.in_collection && entry.status !== 'imported' && (
               <Badge
                 variant="outline"
-                className="border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950"
+                className="border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950"
                 title="An artifact with this name and type already exists in your collection"
               >
                 In Collection
@@ -318,7 +320,7 @@ function CatalogRow({
               href={entry.upstream_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
               aria-label={`View ${entry.name} on GitHub`}
             >
               <ExternalLink className="h-3 w-3" />
@@ -339,14 +341,14 @@ function CatalogRow({
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
                   ) : (
                     <>
-                      <Download className="h-3 w-3 mr-1" aria-hidden="true" />
+                      <Download className="mr-1 h-3 w-3" aria-hidden="true" />
                       Import
                     </>
                   )}
                 </Button>
                 <button
                   type="button"
-                  className="text-xs text-muted-foreground hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm px-1"
+                  className="cursor-pointer rounded-sm px-1 text-xs text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => setExcludeDialogOpen(true)}
                   aria-label={`Mark ${entry.name} as not an artifact`}
                 >

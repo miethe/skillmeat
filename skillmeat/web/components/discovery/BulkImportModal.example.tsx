@@ -68,7 +68,7 @@ export function BulkImportModalExample() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Bulk Import Modal Example</h2>
+      <h2 className="mb-4 text-2xl font-bold">Bulk Import Modal Example</h2>
 
       <Button onClick={() => setModalOpen(true)}>
         Review Discovered Artifacts ({mockArtifacts.length})
@@ -81,9 +81,9 @@ export function BulkImportModalExample() {
         onImport={handleImport}
       />
 
-      <div className="mt-6 p-4 bg-muted rounded-lg">
-        <h3 className="font-semibold mb-2">Usage:</h3>
-        <pre className="text-xs overflow-auto">
+      <div className="mt-6 rounded-lg bg-muted p-4">
+        <h3 className="mb-2 font-semibold">Usage:</h3>
+        <pre className="overflow-auto text-xs">
           {`<BulkImportModal
   artifacts={discoveredArtifacts}
   open={isOpen}

@@ -206,10 +206,7 @@ describe('DiscoveryTab Accessibility', () => {
       const onViewDetails = jest.fn();
       render(
         <TestWrapper>
-          <DiscoveryTab
-            artifacts={mockArtifacts}
-            onViewDetails={onViewDetails}
-          />
+          <DiscoveryTab artifacts={mockArtifacts} onViewDetails={onViewDetails} />
         </TestWrapper>
       );
 
@@ -358,9 +355,7 @@ describe('DiscoveryTab Accessibility', () => {
     });
 
     it('should have compliant type badge colors', async () => {
-      const { container } = render(
-        <DiscoveryTab artifacts={mockArtifacts} />
-      );
+      const { container } = render(<DiscoveryTab artifacts={mockArtifacts} />);
 
       const results = await axe(container, {
         rules: {
@@ -375,11 +370,7 @@ describe('DiscoveryTab Accessibility', () => {
     it('should have accessible action buttons', () => {
       render(
         <TestWrapper>
-          <DiscoveryTab
-            artifacts={mockArtifacts}
-            onImport={jest.fn()}
-            onToggleSkip={jest.fn()}
-          />
+          <DiscoveryTab artifacts={mockArtifacts} onImport={jest.fn()} onToggleSkip={jest.fn()} />
         </TestWrapper>
       );
 

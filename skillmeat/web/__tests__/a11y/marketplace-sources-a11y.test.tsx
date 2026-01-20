@@ -358,12 +358,7 @@ describe('SourceFilterBar Accessibility', () => {
     });
 
     it('tag buttons have aria-pressed state', () => {
-      render(
-        <SourceFilterBar
-          {...defaultProps}
-          currentFilters={{ tags: ['python'] }}
-        />
-      );
+      render(<SourceFilterBar {...defaultProps} currentFilters={{ tags: ['python'] }} />);
       // python is selected
       const pythonButtons = screen.getAllByLabelText('Remove tag filter: python');
       expect(pythonButtons[0]).toHaveAttribute('aria-pressed', 'true');
@@ -373,12 +368,7 @@ describe('SourceFilterBar Accessibility', () => {
     });
 
     it('tag button labels update based on selection state', () => {
-      render(
-        <SourceFilterBar
-          {...defaultProps}
-          currentFilters={{ tags: ['python'] }}
-        />
-      );
+      render(<SourceFilterBar {...defaultProps} currentFilters={{ tags: ['python'] }} />);
       // Selected tag has "Remove" prefix
       expect(screen.getAllByLabelText('Remove tag filter: python').length).toBeGreaterThan(0);
       // Unselected tag has "Add" prefix
@@ -403,12 +393,7 @@ describe('SourceFilterBar Accessibility', () => {
     });
 
     it('clear all button has descriptive aria-label', () => {
-      render(
-        <SourceFilterBar
-          {...defaultProps}
-          currentFilters={{ artifact_type: 'skill' }}
-        />
-      );
+      render(<SourceFilterBar {...defaultProps} currentFilters={{ artifact_type: 'skill' }} />);
       expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument();
     });
   });
@@ -451,12 +436,7 @@ describe('SourceFilterBar Accessibility', () => {
     });
 
     it('remove filter buttons have visible focus indicator', () => {
-      render(
-        <SourceFilterBar
-          {...defaultProps}
-          currentFilters={{ artifact_type: 'skill' }}
-        />
-      );
+      render(<SourceFilterBar {...defaultProps} currentFilters={{ artifact_type: 'skill' }} />);
       const removeButton = screen.getByRole('button', {
         name: 'Remove artifact type filter: skill',
       });
@@ -498,9 +478,7 @@ describe('RepoDetailsModal Accessibility', () => {
       const source = createMockSource({
         readme_content: '# README\n\nThis is content with **markdown**.',
       });
-      const { container } = render(
-        <RepoDetailsModal {...defaultProps} source={source} />
-      );
+      const { container } = render(<RepoDetailsModal {...defaultProps} source={source} />);
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
@@ -514,9 +492,7 @@ describe('RepoDetailsModal Accessibility', () => {
         repo_description: undefined,
         readme_content: undefined,
       });
-      const { container } = render(
-        <RepoDetailsModal {...defaultProps} source={source} />
-      );
+      const { container } = render(<RepoDetailsModal {...defaultProps} source={source} />);
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
@@ -728,9 +704,7 @@ describe('SourceCard Accessibility', () => {
   describe('Action Button Accessibility', () => {
     it('rescan button has descriptive aria-label', () => {
       render(<SourceCard source={defaultSource} />);
-      expect(
-        screen.getByRole('button', { name: 'Rescan repository' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Rescan repository' })).toBeInTheDocument();
     });
 
     it('rescan button has screen reader text', () => {
@@ -751,9 +725,7 @@ describe('SourceCard Accessibility', () => {
 
     it('external link button has descriptive aria-label', () => {
       render(<SourceCard source={defaultSource} />);
-      expect(
-        screen.getByRole('button', { name: 'Open GitHub repository' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open GitHub repository' })).toBeInTheDocument();
     });
   });
 
@@ -761,9 +733,7 @@ describe('SourceCard Accessibility', () => {
     it('status badge has descriptive aria-label', () => {
       const source = createMockSource({ scan_status: 'success' });
       render(<SourceCard source={source} />);
-      expect(
-        screen.getByLabelText(/scan status: synced/i)
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/scan status: synced/i)).toBeInTheDocument();
     });
 
     it('error status badge includes error message in aria-label', () => {

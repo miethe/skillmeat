@@ -96,10 +96,18 @@ describe('skip-preferences', () => {
 
     it('handles different project IDs independently', () => {
       const project1Prefs: SkipPreference[] = [
-        { artifact_key: 'skill:test1', skip_reason: 'Project 1', added_date: '2025-01-01T00:00:00Z' },
+        {
+          artifact_key: 'skill:test1',
+          skip_reason: 'Project 1',
+          added_date: '2025-01-01T00:00:00Z',
+        },
       ];
       const project2Prefs: SkipPreference[] = [
-        { artifact_key: 'skill:test2', skip_reason: 'Project 2', added_date: '2025-01-02T00:00:00Z' },
+        {
+          artifact_key: 'skill:test2',
+          skip_reason: 'Project 2',
+          added_date: '2025-01-02T00:00:00Z',
+        },
       ];
 
       localStorage.setItem(`skillmeat_skip_prefs_project1`, JSON.stringify(project1Prefs));

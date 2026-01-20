@@ -1,7 +1,15 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ManageGroupsDialog } from '@/components/collection/manage-groups-dialog';
-import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useToast, useCollections, useCopyGroup } from '@/hooks';
+import {
+  useGroups,
+  useCreateGroup,
+  useUpdateGroup,
+  useDeleteGroup,
+  useToast,
+  useCollections,
+  useCopyGroup,
+} from '@/hooks';
 
 // Mock hooks
 jest.mock('@/hooks', () => ({
@@ -206,9 +214,9 @@ describe('ManageGroupsDialog', () => {
       fireEvent.click(screen.getByRole('button', { name: /Create Group/i }));
 
       // Find the submit button in the form by its text content
-      const formButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
-      );
+      const formButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.textContent === 'Create Group' && !btn.classList.contains('w-full'));
       const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
@@ -224,9 +232,9 @@ describe('ManageGroupsDialog', () => {
       const nameInput = screen.getByLabelText(/Name/i);
       fireEvent.change(nameInput, { target: { value: 'a'.repeat(256) } });
 
-      const formButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
-      );
+      const formButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.textContent === 'Create Group' && !btn.classList.contains('w-full'));
       const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
@@ -245,16 +253,14 @@ describe('ManageGroupsDialog', () => {
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
       fireEvent.change(descInput, { target: { value: 'a'.repeat(1001) } });
 
-      const formButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
-      );
+      const formButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.textContent === 'Create Group' && !btn.classList.contains('w-full'));
       const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/must be less than 1000 characters/i)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/must be less than 1000 characters/i)).toBeInTheDocument();
       });
     });
 
@@ -279,9 +285,9 @@ describe('ManageGroupsDialog', () => {
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
       fireEvent.change(descInput, { target: { value: 'Test description' } });
 
-      const formButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
-      );
+      const formButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.textContent === 'Create Group' && !btn.classList.contains('w-full'));
       const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
@@ -314,9 +320,9 @@ describe('ManageGroupsDialog', () => {
       const nameInput = screen.getByLabelText(/Name/i);
       fireEvent.change(nameInput, { target: { value: 'Test Group' } });
 
-      const formButtons = screen.getAllByRole('button').filter(btn =>
-        btn.textContent === 'Create Group' && !btn.classList.contains('w-full')
-      );
+      const formButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.textContent === 'Create Group' && !btn.classList.contains('w-full'));
       const submitButton = formButtons[formButtons.length - 1];
       fireEvent.click(submitButton);
 
@@ -423,9 +429,7 @@ describe('ManageGroupsDialog', () => {
       expect(
         screen.getByText('This will remove all artifacts from this group.')
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(/The artifacts themselves will not be deleted/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/The artifacts themselves will not be deleted/i)).toBeInTheDocument();
     });
 
     it('deletes group successfully', async () => {

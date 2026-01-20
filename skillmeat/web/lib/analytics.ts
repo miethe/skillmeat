@@ -48,10 +48,7 @@ type AnalyticsEvent = {
   };
 };
 
-export function trackEvent<K extends keyof AnalyticsEvent>(
-  name: K,
-  data: AnalyticsEvent[K]
-) {
+export function trackEvent<K extends keyof AnalyticsEvent>(name: K, data: AnalyticsEvent[K]) {
   // Log in development
   if (process.env.NODE_ENV === 'development') {
     console.log('[Analytics]', name, data);
@@ -69,7 +66,11 @@ export function trackEvent<K extends keyof AnalyticsEvent>(
 // Helper hooks for common tracking patterns
 export function useTrackDiscovery() {
   return {
-    trackScan: (result: { discovered_count: number; scan_duration_ms: number; errors: string[] }) => {
+    trackScan: (result: {
+      discovered_count: number;
+      scan_duration_ms: number;
+      errors: string[];
+    }) => {
       trackEvent('discovery_scan', {
         discovered_count: result.discovered_count,
         duration_ms: result.scan_duration_ms,
@@ -109,7 +110,12 @@ export function useTrackDiscovery() {
         cleared_count: count,
       });
     },
-    trackImport: (result: { total_requested: number; total_imported: number; total_failed: number; duration_ms: number }) => {
+    trackImport: (result: {
+      total_requested: number;
+      total_imported: number;
+      total_failed: number;
+      duration_ms: number;
+    }) => {
       trackEvent('bulk_import', {
         requested_count: result.total_requested,
         imported_count: result.total_imported,

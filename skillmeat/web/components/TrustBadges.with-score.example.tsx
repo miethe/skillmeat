@@ -36,7 +36,7 @@ export function ArtifactCardWithBothBadges({ artifact }: { artifact: ExampleArti
         <div className="flex items-start justify-between gap-2">
           <CardTitle>{artifact.name}</CardTitle>
           {/* Multiple badges: type, trust, and score */}
-          <div className="flex gap-1 flex-shrink-0 flex-wrap">
+          <div className="flex flex-shrink-0 flex-wrap gap-1">
             <Badge variant="secondary">{artifact.type}</Badge>
             <TrustBadges trustLevel={trustLevel} source={artifact.source} />
             {artifact.confidenceScore !== undefined && (
@@ -46,7 +46,7 @@ export function ArtifactCardWithBothBadges({ artifact }: { artifact: ExampleArti
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-2">{artifact.description}</p>
+        <p className="mb-2 text-sm text-muted-foreground">{artifact.description}</p>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           {artifact.version && <span>v{artifact.version}</span>}
           <span>{artifact.source}</span>
@@ -104,7 +104,7 @@ export function ArtifactCardConditional({ artifact }: { artifact: ExampleArtifac
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle>{artifact.name}</CardTitle>
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 gap-1">
             {/* Always show type */}
             <Badge variant="secondary">{artifact.type}</Badge>
 
@@ -127,7 +127,7 @@ export function FullArtifactCard({ artifact }: { artifact: ExampleArtifact }) {
   const trustLevel = getTrustLevelFromSource(artifact.source);
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="transition-shadow hover:shadow-lg">
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
@@ -136,7 +136,7 @@ export function FullArtifactCard({ artifact }: { artifact: ExampleArtifact }) {
               <p className="text-xs text-muted-foreground">Version {artifact.version}</p>
             )}
           </div>
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 gap-1">
             <TrustBadges trustLevel={trustLevel} source={artifact.source} />
           </div>
         </div>
@@ -208,7 +208,7 @@ export function TrustAndScoreBadgesPage() {
   ];
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto space-y-8 p-6">
       <h1 className="text-3xl font-bold">TrustBadges + ScoreBadge Examples</h1>
 
       <div className="space-y-4">
@@ -255,52 +255,52 @@ export function TrustAndScoreBadgesPage() {
  */
 export function BadgeCombinationsGuide() {
   return (
-    <div className="space-y-6 p-6 bg-muted rounded-lg">
+    <div className="space-y-6 rounded-lg bg-muted p-6">
       <h3 className="text-lg font-semibold">Badge Combinations Guide</h3>
 
       <div className="space-y-4">
         <div>
-          <h4 className="text-sm font-medium mb-2">Official Artifact (High Confidence)</h4>
+          <h4 className="mb-2 text-sm font-medium">Official Artifact (High Confidence)</h4>
           <div className="flex gap-1">
             <TrustBadges trustLevel="official" source="anthropics/skills/canvas" />
             <ScoreBadge confidence={95} size="sm" />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Best combination: Official source + high confidence = most trustworthy
           </p>
         </div>
 
         <div>
-          <h4 className="text-sm font-medium mb-2">Verified Artifact (Medium Confidence)</h4>
+          <h4 className="mb-2 text-sm font-medium">Verified Artifact (Medium Confidence)</h4>
           <div className="flex gap-1">
             <TrustBadges trustLevel="verified" source="verified/community/skill" />
             <ScoreBadge confidence={65} size="sm" />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Good combination: Verified source + medium confidence = reliable
           </p>
         </div>
 
         <div>
-          <h4 className="text-sm font-medium mb-2">Community Artifact (Low Confidence)</h4>
+          <h4 className="mb-2 text-sm font-medium">Community Artifact (Low Confidence)</h4>
           <div className="flex gap-1">
             <TrustBadges trustLevel="community" source="user/repo/skill" />
             <ScoreBadge confidence={45} size="sm" />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Caution: Community source + low confidence = use with care
           </p>
         </div>
 
         <div>
-          <h4 className="text-sm font-medium mb-2">Official Artifact (No Score)</h4>
+          <h4 className="mb-2 text-sm font-medium">Official Artifact (No Score)</h4>
           <div className="flex gap-1">
             <TrustBadges trustLevel="official" source="anthropics/skills/new" />
             <Badge variant="outline" className="text-xs">
               Not scored
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Official source but no confidence score available yet
           </p>
         </div>

@@ -153,9 +153,7 @@ export function DuplicateReviewTab({
                   onClick={() => setSelectedPath(artifact.path)}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors',
-                    isSelected
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-muted/50',
+                    isSelected ? 'border border-primary/30 bg-primary/10' : 'hover:bg-muted/50',
                     isArtifactSkipped && 'opacity-50'
                   )}
                 >
@@ -165,23 +163,19 @@ export function DuplicateReviewTab({
                       <span className="truncate text-sm font-medium">{artifact.name}</span>
                     </div>
                     {artifact.collection_match && (
-                      <div className="flex items-center gap-1 mt-0.5">
+                      <div className="mt-0.5 flex items-center gap-1">
                         <Badge
                           variant="outline"
                           className={cn(
-                            'text-[10px] px-1 py-0',
+                            'px-1 py-0 text-[10px]',
                             getConfidenceColor(artifact.collection_match.confidence),
-                            'text-white border-0'
+                            'border-0 text-white'
                           )}
                         >
                           {formatConfidence(artifact.collection_match.confidence)}
                         </Badge>
-                        {decision?.action === 'link' && (
-                          <Link2 className="h-3 w-3 text-blue-500" />
-                        )}
-                        {isArtifactSkipped && (
-                          <XCircle className="h-3 w-3 text-gray-500" />
-                        )}
+                        {decision?.action === 'link' && <Link2 className="h-3 w-3 text-blue-500" />}
+                        {isArtifactSkipped && <XCircle className="h-3 w-3 text-gray-500" />}
                       </div>
                     )}
                   </div>
@@ -206,8 +200,8 @@ export function DuplicateReviewTab({
                     Possible Duplicate Detected
                   </p>
                   <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
-                    This artifact has the same name and type as an existing collection item but different content.
-                    Review the details and choose an action.
+                    This artifact has the same name and type as an existing collection item but
+                    different content. Review the details and choose an action.
                   </p>
                 </div>
               </div>
@@ -241,7 +235,7 @@ export function DuplicateReviewTab({
                     {selectedArtifact.source && (
                       <div>
                         <span className="text-muted-foreground">Source:</span>
-                        <p className="font-mono text-xs truncate" title={selectedArtifact.source}>
+                        <p className="truncate font-mono text-xs" title={selectedArtifact.source}>
                           {selectedArtifact.source}
                         </p>
                       </div>
@@ -255,7 +249,10 @@ export function DuplicateReviewTab({
                   )}
                   <div>
                     <span className="text-sm text-muted-foreground">Path:</span>
-                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={selectedArtifact.path}>
+                    <p
+                      className="mt-1 truncate font-mono text-xs text-muted-foreground"
+                      title={selectedArtifact.path}
+                    >
                       {selectedArtifact.path}
                     </p>
                   </div>
@@ -271,54 +268,57 @@ export function DuplicateReviewTab({
               </Card>
 
               {/* Matched Artifact Card */}
-              {selectedArtifact.collection_match && selectedArtifact.collection_match.matched_artifact_id && (
-                <Card className="border-blue-200 dark:border-blue-900">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between text-base">
-                      <div className="flex items-center gap-2">
-                        <Link2 className="h-4 w-4 text-blue-500" />
-                        Collection Match
+              {selectedArtifact.collection_match &&
+                selectedArtifact.collection_match.matched_artifact_id && (
+                  <Card className="border-blue-200 dark:border-blue-900">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center justify-between text-base">
+                        <div className="flex items-center gap-2">
+                          <Link2 className="h-4 w-4 text-blue-500" />
+                          Collection Match
+                        </div>
+                        <Badge
+                          className={cn(
+                            'text-xs',
+                            getConfidenceColor(selectedArtifact.collection_match.confidence)
+                          )}
+                        >
+                          {formatConfidence(selectedArtifact.collection_match.confidence)}{' '}
+                          confidence
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Artifact ID:</span>
+                          <p className="font-mono text-xs">
+                            {selectedArtifact.collection_match.matched_artifact_id}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Name:</span>
+                          <p className="font-medium">
+                            {selectedArtifact.collection_match.matched_name}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Match Type:</span>
+                          <p>
+                            <Badge variant="outline" className="capitalize">
+                              {selectedArtifact.collection_match.type.replace('_', ' ')}
+                            </Badge>
+                          </p>
+                        </div>
                       </div>
-                      <Badge
-                        className={cn(
-                          'text-xs',
-                          getConfidenceColor(selectedArtifact.collection_match.confidence)
-                        )}
-                      >
-                        {formatConfidence(selectedArtifact.collection_match.confidence)} confidence
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Artifact ID:</span>
-                        <p className="font-mono text-xs">
-                          {selectedArtifact.collection_match.matched_artifact_id}
-                        </p>
+                      <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+                        <strong>Name + Type match</strong>: Same name and artifact type, but the
+                        content differs. This could be a modified version or an unrelated artifact
+                        with the same name.
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Name:</span>
-                        <p className="font-medium">
-                          {selectedArtifact.collection_match.matched_name}
-                        </p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-muted-foreground">Match Type:</span>
-                        <p>
-                          <Badge variant="outline" className="capitalize">
-                            {selectedArtifact.collection_match.type.replace('_', ' ')}
-                          </Badge>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
-                      <strong>Name + Type match</strong>: Same name and artifact type, but the content differs.
-                      This could be a modified version or an unrelated artifact with the same name.
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Action Selector */}
               <Card>

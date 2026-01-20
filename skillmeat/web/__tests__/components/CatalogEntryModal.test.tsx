@@ -61,7 +61,7 @@ function buildFileStructure(files: FileTreeEntry[]): FileNode[] {
       const parentPath = path.substring(0, lastSlashIndex);
       const parentNode = nodeMap.get(parentPath);
       if (parentNode && parentNode.children) {
-        if (!parentNode.children.some(child => child.path === node.path)) {
+        if (!parentNode.children.some((child) => child.path === node.path)) {
           parentNode.children.push(node);
         }
       }

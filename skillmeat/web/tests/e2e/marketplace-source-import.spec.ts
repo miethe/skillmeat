@@ -107,9 +107,9 @@ async function navigateToSourcesPage(page: Page) {
 
 async function openAddSourceModal(page: Page) {
   // Click Add Source button - try both Add Source and Add Your First Source
-  const addButton = page.getByRole('button', { name: /Add Source/i }).or(
-    page.getByRole('button', { name: /Add Your First Source/i })
-  );
+  const addButton = page
+    .getByRole('button', { name: /Add Source/i })
+    .or(page.getByRole('button', { name: /Add Your First Source/i }));
   await addButton.first().click();
   await expectModalOpen(page, '[role="dialog"]');
 }
@@ -138,7 +138,9 @@ test.describe('Marketplace Source Import (TEST-005)', () => {
     await page.waitForTimeout(500);
 
     // Verify the manual entry fields are auto-populated
-    await expect(page.locator('#repo-url')).toHaveValue('https://github.com/anthropics/claude-artifacts');
+    await expect(page.locator('#repo-url')).toHaveValue(
+      'https://github.com/anthropics/claude-artifacts'
+    );
     await expect(page.locator('#ref')).toHaveValue('main');
 
     // Step 3: Enable "Import repo description" toggle
@@ -265,9 +267,7 @@ test.describe('Marketplace Source Import (TEST-005)', () => {
     await tagInput.press('Enter');
 
     // Verify error message
-    await expect(
-      page.getByText(/Tag must start with alphanumeric/i)
-    ).toBeVisible();
+    await expect(page.getByText(/Tag must start with alphanumeric/i)).toBeVisible();
   });
 
   test('shows error for duplicate tag', async ({ page }) => {
@@ -419,7 +419,9 @@ test.describe('URL Inference', () => {
 
     // Paste URL in quick import
     const quickImportInput = page.locator('#quick-import-url');
-    await quickImportInput.fill('https://github.com/anthropics/claude-artifacts/tree/develop/skills');
+    await quickImportInput.fill(
+      'https://github.com/anthropics/claude-artifacts/tree/develop/skills'
+    );
 
     // Mock updated inference result
     await mockApiRoute(page, '/api/v1/marketplace/infer-url', {
@@ -433,7 +435,9 @@ test.describe('URL Inference', () => {
     await page.waitForTimeout(500);
 
     // Verify fields are populated
-    await expect(page.locator('#repo-url')).toHaveValue('https://github.com/anthropics/claude-artifacts');
+    await expect(page.locator('#repo-url')).toHaveValue(
+      'https://github.com/anthropics/claude-artifacts'
+    );
   });
 
   test('shows loading indicator during URL inference', async ({ page }) => {

@@ -65,11 +65,7 @@ export interface AutoPopulationFormProps {
   onCancel?: () => void;
 }
 
-export function AutoPopulationForm({
-  artifactType,
-  onImport,
-  onCancel,
-}: AutoPopulationFormProps) {
+export function AutoPopulationForm({ artifactType, onImport, onCancel }: AutoPopulationFormProps) {
   const [source, setSource] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -130,7 +126,12 @@ export function AutoPopulationForm({
         artifact_type: artifactType,
         name: name || undefined,
         description: description || undefined,
-        tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+        tags: tags
+          ? tags
+              .split(',')
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : undefined,
         collection: scope,
       });
     } catch (err) {
@@ -159,7 +160,10 @@ export function AutoPopulationForm({
           />
           {isLoading && (
             <>
-              <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+              <Loader2
+                className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground"
+                aria-hidden="true"
+              />
               <span className="sr-only" role="status" aria-live="polite">
                 Loading metadata...
               </span>
@@ -170,7 +174,7 @@ export function AutoPopulationForm({
           Enter a GitHub repository path or URL
         </p>
         {metadata && (
-          <p className="text-sm text-green-600 flex items-center gap-1">
+          <p className="flex items-center gap-1 text-sm text-green-600">
             <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
             Metadata fetched successfully
           </p>
@@ -206,9 +210,7 @@ export function AutoPopulationForm({
               placeholder="Artifact name"
               disabled={isSubmitting}
             />
-            <p className="text-sm text-muted-foreground">
-              Override the artifact name (optional)
-            </p>
+            <p className="text-sm text-muted-foreground">Override the artifact name (optional)</p>
           </div>
 
           <div className="space-y-2">
@@ -235,9 +237,7 @@ export function AutoPopulationForm({
               placeholder="Author name"
               disabled={isSubmitting}
             />
-            <p className="text-sm text-muted-foreground">
-              Override the author name (optional)
-            </p>
+            <p className="text-sm text-muted-foreground">Override the author name (optional)</p>
           </div>
 
           <div className="space-y-2">
@@ -269,22 +269,15 @@ export function AutoPopulationForm({
                 <SelectItem value="local">Local (Project)</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose where to store the artifact
-            </p>
+            <p className="text-sm text-muted-foreground">Choose where to store the artifact</p>
           </div>
         </>
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 justify-end pt-4">
+      <div className="flex justify-end gap-2 pt-4">
         {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
         )}

@@ -242,7 +242,10 @@ export function GitHubSettings() {
                   value={token}
                   onChange={handleTokenChange}
                   disabled={isSubmitting}
-                  className={cn('pr-10', validationError && 'border-red-500 focus-visible:ring-red-500')}
+                  className={cn(
+                    'pr-10',
+                    validationError && 'border-red-500 focus-visible:ring-red-500'
+                  )}
                   aria-describedby={validationError ? 'token-error' : 'token-help'}
                 />
                 <Button

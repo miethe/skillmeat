@@ -159,7 +159,9 @@ function ProjectDetailPageContent() {
   const handleArtifactClick = async (deployedArtifact: DeployedArtifact) => {
     // Try to find matching artifact from collection by name and type
     const matchingArtifact = artifactsData?.artifacts.find(
-      (artifact) => artifact.name === deployedArtifact.artifact_name && artifact.type === deployedArtifact.artifact_type
+      (artifact) =>
+        artifact.name === deployedArtifact.artifact_name &&
+        artifact.type === deployedArtifact.artifact_type
     );
 
     if (matchingArtifact) {
@@ -456,7 +458,9 @@ function ProjectDetailPageContent() {
             <Card>
               <CardHeader>
                 <CardTitle>Deployed Artifacts</CardTitle>
-                <CardDescription>Complete list of artifacts deployed to this project</CardDescription>
+                <CardDescription>
+                  Complete list of artifacts deployed to this project
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">

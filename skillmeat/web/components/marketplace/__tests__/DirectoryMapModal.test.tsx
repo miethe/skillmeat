@@ -29,9 +29,7 @@ const createTreeData = (): DirectoryNode[] => [
     createDirectoryNode('skills/canvas', 'canvas'),
     createDirectoryNode('skills/data', 'data'),
   ]),
-  createDirectoryNode('agents', 'agents', [
-    createDirectoryNode('agents/helper', 'helper'),
-  ]),
+  createDirectoryNode('agents', 'agents', [createDirectoryNode('agents/helper', 'helper')]),
   createDirectoryNode('commands', 'commands'),
 ];
 
@@ -72,9 +70,7 @@ describe('DirectoryMapModal', () => {
     it('does not render when closed', () => {
       render(<DirectoryMapModal {...defaultProps} open={false} />);
 
-      expect(
-        screen.queryByText('Map Directories to Artifact Types')
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Map Directories to Artifact Types')).not.toBeInTheDocument();
     });
 
     it('displays repository information', () => {
@@ -276,7 +272,9 @@ describe('DirectoryMapModal', () => {
       await waitFor(() => {
         const allCheckboxes = screen.getAllByRole('checkbox');
         // Parent and children should be checked
-        const checkedCount = allCheckboxes.filter((cb) => cb.getAttribute('data-state') === 'checked').length;
+        const checkedCount = allCheckboxes.filter(
+          (cb) => cb.getAttribute('data-state') === 'checked'
+        ).length;
         expect(checkedCount).toBeGreaterThan(1);
       });
     });
@@ -300,7 +298,9 @@ describe('DirectoryMapModal', () => {
       // All checkboxes should be unchecked
       await waitFor(() => {
         const allCheckboxes = screen.getAllByRole('checkbox');
-        const checkedCount = allCheckboxes.filter((cb) => cb.getAttribute('data-state') === 'checked').length;
+        const checkedCount = allCheckboxes.filter(
+          (cb) => cb.getAttribute('data-state') === 'checked'
+        ).length;
         expect(checkedCount).toBe(0);
       });
     });

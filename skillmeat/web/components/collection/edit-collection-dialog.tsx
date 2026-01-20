@@ -194,7 +194,8 @@ export function EditCollectionDialog({
                 {collection.id}
               </div>
               <p className="text-xs text-muted-foreground">
-                {collection.artifact_count} {collection.artifact_count === 1 ? 'artifact' : 'artifacts'}
+                {collection.artifact_count}{' '}
+                {collection.artifact_count === 1 ? 'artifact' : 'artifacts'}
               </p>
             </div>
 
@@ -239,9 +240,7 @@ export function EditCollectionDialog({
               {errors.description && (
                 <p className="text-sm text-destructive">{errors.description}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Maximum 1000 characters
-              </p>
+              <p className="text-xs text-muted-foreground">Maximum 1000 characters</p>
             </div>
           </div>
 
@@ -294,8 +293,8 @@ export function EditCollectionDialog({
 
           <div className="rounded-lg border border-muted bg-muted/50 p-4">
             <p className="text-sm text-muted-foreground">
-              <strong>Note:</strong> The artifacts themselves will not be deleted. They will
-              remain in your collection and can be added to other collections.
+              <strong>Note:</strong> The artifacts themselves will not be deleted. They will remain
+              in your collection and can be added to other collections.
             </p>
           </div>
 

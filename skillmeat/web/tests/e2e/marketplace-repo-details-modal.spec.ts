@@ -152,7 +152,8 @@ const mockCatalogResponse = {
       path: '.claude/skills/example.md',
       status: 'new',
       confidence_score: 95,
-      upstream_url: 'https://github.com/anthropics/claude-cookbook/blob/main/.claude/skills/example.md',
+      upstream_url:
+        'https://github.com/anthropics/claude-cookbook/blob/main/.claude/skills/example.md',
       detected_at: '2024-12-08T10:00:00Z',
     },
   ],
@@ -170,7 +171,9 @@ const mockLongReadmeSource = {
   id: 'source-long-readme',
   readme_content: `# Very Long README
 
-${Array(50).fill(`## Section
+${Array(50)
+  .fill(
+    `## Section
 
 This is a section with some content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 
@@ -183,7 +186,9 @@ function example() {
 
 Some more text here with **bold** and *italic* formatting.
 
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 ## Final Section
 
@@ -284,12 +289,12 @@ test.describe('Repo Details Modal (TEST-007)', () => {
     await expectModalOpen(page, '[role="dialog"]');
 
     // Click the close button (X in top right of dialog)
-    const closeButton = page.locator('[role="dialog"] button[aria-label="Close"]').or(
-      page.locator('[role="dialog"] button:has(svg.lucide-x)')
-    );
+    const closeButton = page
+      .locator('[role="dialog"] button[aria-label="Close"]')
+      .or(page.locator('[role="dialog"] button:has(svg.lucide-x)'));
 
     // If there's no explicit close button, click outside the dialog
-    if (await closeButton.count() > 0) {
+    if ((await closeButton.count()) > 0) {
       await closeButton.first().click();
     } else {
       // Click outside the modal to close
@@ -310,12 +315,12 @@ test.describe('Repo Details Modal (TEST-007)', () => {
     await expectModalOpen(page, '[role="dialog"]');
 
     // Verify the scroll area is present
-    const scrollArea = page.locator('[role="dialog"] [data-radix-scroll-area-viewport]').or(
-      page.locator('[role="dialog"] .overflow-y-auto')
-    );
+    const scrollArea = page
+      .locator('[role="dialog"] [data-radix-scroll-area-viewport]')
+      .or(page.locator('[role="dialog"] .overflow-y-auto'));
 
     // Check that the scroll area exists and has content
-    if (await scrollArea.count() > 0) {
+    if ((await scrollArea.count()) > 0) {
       const scrollElement = scrollArea.first();
       await expect(scrollElement).toBeVisible();
 
@@ -394,7 +399,7 @@ test.describe('Repo Details Modal (TEST-007)', () => {
 
     // Links (GFM anchor links)
     const gettingStartedLink = page.locator('a[href="#getting-started"]');
-    if (await gettingStartedLink.count() > 0) {
+    if ((await gettingStartedLink.count()) > 0) {
       await expect(gettingStartedLink).toBeVisible();
     }
 
@@ -404,13 +409,13 @@ test.describe('Repo Details Modal (TEST-007)', () => {
 
     // Bold and italic text (GFM)
     const boldText = page.locator('strong').filter({ hasText: 'bold' });
-    if (await boldText.count() > 0) {
+    if ((await boldText.count()) > 0) {
       await expect(boldText).toBeVisible();
     }
 
     // Horizontal rule
     const horizontalRule = page.locator('[role="dialog"] hr');
-    if (await horizontalRule.count() > 0) {
+    if ((await horizontalRule.count()) > 0) {
       await expect(horizontalRule.first()).toBeVisible();
     }
   });
@@ -452,9 +457,9 @@ test.describe('Repo Details Modal (TEST-007)', () => {
     await expect(dialog).toBeVisible();
 
     // Verify title is present
-    const dialogTitle = page.locator('[role="dialog"] h2').or(
-      page.locator('[role="dialog"] [data-dialog-title]')
-    );
+    const dialogTitle = page
+      .locator('[role="dialog"] h2')
+      .or(page.locator('[role="dialog"] [data-dialog-title]'));
     await expect(dialogTitle.first()).toBeVisible();
   });
 });
@@ -500,11 +505,11 @@ test.describe('Modal Responsive Behavior', () => {
     await expect(modal).toBeVisible();
 
     // Verify README is scrollable
-    const scrollArea = page.locator('[role="dialog"] [data-radix-scroll-area-viewport]').or(
-      page.locator('[role="dialog"] .overflow-y-auto')
-    );
+    const scrollArea = page
+      .locator('[role="dialog"] [data-radix-scroll-area-viewport]')
+      .or(page.locator('[role="dialog"] .overflow-y-auto'));
 
-    if (await scrollArea.count() > 0) {
+    if ((await scrollArea.count()) > 0) {
       await expect(scrollArea.first()).toBeVisible();
     }
   });

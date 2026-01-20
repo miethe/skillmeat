@@ -275,7 +275,10 @@ async function setupMockRoutes(page: Page) {
   // Mock copy group endpoint
   await page.route('**/api/v1/groups/*/copy', async (route) => {
     if (route.request().method() === 'POST') {
-      const groupId = route.request().url().match(/groups\/([^/]+)\/copy/)?.[1];
+      const groupId = route
+        .request()
+        .url()
+        .match(/groups\/([^/]+)\/copy/)?.[1];
       const body = JSON.parse(route.request().postData() || '{}');
 
       // Simulate creating a new group in target collection
@@ -399,7 +402,9 @@ test.describe('Groups All Collections Feature', () => {
           await page.waitForTimeout(500);
 
           // Check that we can go back
-          const backButton = page.locator('button:has-text("Primary Collection"), button:has-text("Back")');
+          const backButton = page.locator(
+            'button:has-text("Primary Collection"), button:has-text("Back")'
+          );
           if (await backButton.first().isVisible()) {
             // Successfully navigated to group step
             expect(true).toBe(true);

@@ -33,11 +33,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, GripVertical, Package } from 'lucide-react';
 import { UnifiedCard, UnifiedCardSkeleton } from '@/components/shared/unified-card';
 import { Button } from '@/components/ui/button';
@@ -89,18 +85,8 @@ interface SortableArtifactCardProps {
   onDelete?: (artifact: Artifact) => void;
 }
 
-function SortableArtifactCard({
-  artifact,
-  onArtifactClick,
-}: SortableArtifactCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+function SortableArtifactCard({ artifact, onArtifactClick }: SortableArtifactCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: artifact.id,
     data: {
       type: 'artifact',
@@ -120,17 +106,14 @@ function SortableArtifactCard({
       <div
         {...attributes}
         {...listeners}
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute left-2 top-1/2 z-10 -translate-y-1/2 cursor-grab opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100"
         aria-label="Drag to reorder"
       >
         <GripVertical className="h-5 w-5 text-muted-foreground" />
       </div>
 
-      <div className="pl-8 group">
-        <UnifiedCard
-          item={artifact}
-          onClick={() => onArtifactClick?.(artifact)}
-        />
+      <div className="group pl-8">
+        <UnifiedCard item={artifact} onClick={() => onArtifactClick?.(artifact)} />
       </div>
     </div>
   );
@@ -160,14 +143,7 @@ function SortableGroupSection({
   onEdit,
   onDelete,
 }: SortableGroupSectionProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
     data: {
       type: 'group',
@@ -184,7 +160,7 @@ function SortableGroupSection({
   return (
     <div ref={setNodeRef} style={style} className="space-y-2">
       <Collapsible open={isOpen} onOpenChange={onToggle}>
-        <div className="flex items-center gap-2 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors">
+        <div className="flex items-center gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
           {/* Drag handle for group */}
           <div
             {...attributes}
@@ -198,9 +174,9 @@ function SortableGroupSection({
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="flex-1 justify-start">
               {isOpen ? (
-                <ChevronDown className="h-4 w-4 mr-2" />
+                <ChevronDown className="mr-2 h-4 w-4" />
               ) : (
-                <ChevronRight className="h-4 w-4 mr-2" />
+                <ChevronRight className="mr-2 h-4 w-4" />
               )}
               <span className="font-semibold">{group.name}</span>
               <span className="ml-2 text-xs text-muted-foreground">
@@ -210,10 +186,10 @@ function SortableGroupSection({
           </CollapsibleTrigger>
         </div>
 
-        <CollapsibleContent className="space-y-2 mt-2 pl-4">
+        <CollapsibleContent className="mt-2 space-y-2 pl-4">
           {artifacts.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              <Package className="mx-auto h-8 w-8 mb-2 opacity-50" />
+              <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p>No artifacts in this group</p>
             </div>
           ) : (
@@ -249,7 +225,7 @@ function GroupedViewSkeleton() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="space-y-2">
           <Skeleton className="h-12 w-full rounded-lg" />
-          <div className="pl-4 space-y-2">
+          <div className="space-y-2 pl-4">
             <UnifiedCardSkeleton />
             <UnifiedCardSkeleton />
           </div>
@@ -482,10 +458,7 @@ export function GroupedArtifactView({
     >
       <div className="space-y-4">
         {/* Groups */}
-        <SortableContext
-          items={groups.map((g) => g.id)}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={groups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
           {groups.map((group) => {
             const groupArtifacts = artifactsByGroup.get(group.id) || [];
             return (
@@ -512,7 +485,7 @@ export function GroupedArtifactView({
               <div className="flex items-center gap-2 rounded-lg border bg-muted/30 p-3">
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex-1 justify-start">
-                    <ChevronDown className="h-4 w-4 mr-2" />
+                    <ChevronDown className="mr-2 h-4 w-4" />
                     <span className="font-semibold text-muted-foreground">Ungrouped</span>
                     <span className="ml-2 text-xs text-muted-foreground">
                       ({ungroupedArtifacts.length}{' '}
@@ -522,7 +495,7 @@ export function GroupedArtifactView({
                 </CollapsibleTrigger>
               </div>
 
-              <CollapsibleContent className="space-y-2 mt-2 pl-4">
+              <CollapsibleContent className="mt-2 space-y-2 pl-4">
                 <div className="space-y-2">
                   {ungroupedArtifacts.map((artifact) => (
                     <UnifiedCard
@@ -540,22 +513,26 @@ export function GroupedArtifactView({
 
       {/* Drag overlay */}
       <DragOverlay>
-        {activeId && activeDragType === 'artifact' && (() => {
-          const artifact = artifacts.find((a) => a.id === activeId);
-          return artifact ? (
-            <div className="opacity-80">
-              <UnifiedCard item={artifact} />
-            </div>
-          ) : null;
-        })()}
-        {activeId && activeDragType === 'group' && (() => {
-          const group = groups.find((g) => g.id === activeId);
-          return group ? (
-            <div className="opacity-80 rounded-lg border bg-card p-3">
-              <span className="font-semibold">{group.name}</span>
-            </div>
-          ) : null;
-        })()}
+        {activeId &&
+          activeDragType === 'artifact' &&
+          (() => {
+            const artifact = artifacts.find((a) => a.id === activeId);
+            return artifact ? (
+              <div className="opacity-80">
+                <UnifiedCard item={artifact} />
+              </div>
+            ) : null;
+          })()}
+        {activeId &&
+          activeDragType === 'group' &&
+          (() => {
+            const group = groups.find((g) => g.id === activeId);
+            return group ? (
+              <div className="rounded-lg border bg-card p-3 opacity-80">
+                <span className="font-semibold">{group.name}</span>
+              </div>
+            ) : null;
+          })()}
       </DragOverlay>
     </DndContext>
   );

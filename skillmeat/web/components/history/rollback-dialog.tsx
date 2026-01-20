@@ -88,10 +88,11 @@ export function RollbackDialog({
 
   // Hooks
   const { data: snapshot, isLoading: isLoadingSnapshot } = useSnapshot(snapshotId, collectionName);
-  const { data: analysis, isLoading: isLoadingAnalysis, error: analysisError } = useRollbackAnalysis(
-    snapshotId,
-    collectionName
-  );
+  const {
+    data: analysis,
+    isLoading: isLoadingAnalysis,
+    error: analysisError,
+  } = useRollbackAnalysis(snapshotId, collectionName);
   const rollbackMutation = useRollback();
 
   // Reset state when dialog opens/closes
@@ -142,9 +143,7 @@ export function RollbackDialog({
               <CheckCircle2 className="h-5 w-5 text-green-600" />
               Rollback Complete
             </DialogTitle>
-            <DialogDescription>
-              Successfully rolled back to snapshot.
-            </DialogDescription>
+            <DialogDescription>Successfully rolled back to snapshot.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -172,7 +171,8 @@ export function RollbackDialog({
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Manual Resolution Required</AlertTitle>
                 <AlertDescription>
-                  {rollbackResult.conflicts.length} file(s) have conflicts that require manual resolution.
+                  {rollbackResult.conflicts.length} file(s) have conflicts that require manual
+                  resolution.
                   <ScrollArea className="mt-2 max-h-[100px]">
                     <ul className="space-y-1">
                       {rollbackResult.conflicts.map((conflict, index) => (
@@ -377,7 +377,8 @@ export function RollbackDialog({
                     Preserve local changes (3-way merge)
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Attempt to merge uncommitted changes. Uncheck to discard all local modifications.
+                    Attempt to merge uncommitted changes. Uncheck to discard all local
+                    modifications.
                   </p>
                 </div>
               </div>

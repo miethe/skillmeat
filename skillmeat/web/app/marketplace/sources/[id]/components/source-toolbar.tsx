@@ -54,7 +54,12 @@ import type { ArtifactType } from '@/types/marketplace';
 // ============================================================================
 
 export type ViewMode = 'grid' | 'list';
-export type SortOption = 'confidence-desc' | 'confidence-asc' | 'name-asc' | 'name-desc' | 'date-added';
+export type SortOption =
+  | 'confidence-desc'
+  | 'confidence-asc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'date-added';
 
 export interface SourceToolbarProps {
   // Search
@@ -124,7 +129,11 @@ function useDebounce<T>(value: T, delay: number): T {
 // Constants
 // ============================================================================
 
-const ARTIFACT_TYPES: Array<{ value: ArtifactType; label: string; Icon: React.ComponentType<{ className?: string }> }> = [
+const ARTIFACT_TYPES: Array<{
+  value: ArtifactType;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}> = [
   { value: 'skill', label: 'Skills', Icon: Sparkles },
   { value: 'agent', label: 'Agents', Icon: Bot },
   { value: 'command', label: 'Commands', Icon: Terminal },
@@ -255,7 +264,9 @@ export function SourceToolbar({
           {/* Type Dropdown */}
           <Select
             value={selectedType || 'all'}
-            onValueChange={(value) => onTypeChange(value === 'all' ? null : value as ArtifactType)}
+            onValueChange={(value) =>
+              onTypeChange(value === 'all' ? null : (value as ArtifactType))
+            }
           >
             <SelectTrigger className="h-9 w-[160px]">
               <SelectValue placeholder="All Types" />
@@ -309,7 +320,7 @@ export function SourceToolbar({
 
           {/* Confidence Range */}
           <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5">
-            <Label className="text-sm font-medium whitespace-nowrap">Confidence Range</Label>
+            <Label className="whitespace-nowrap text-sm font-medium">Confidence Range</Label>
             <Input
               type="number"
               min={0}
@@ -342,7 +353,7 @@ export function SourceToolbar({
             />
             <Label
               htmlFor="include-low-confidence"
-              className="text-sm font-medium cursor-pointer whitespace-nowrap"
+              className="cursor-pointer whitespace-nowrap text-sm font-medium"
             >
               Include low-confidence
             </Label>
@@ -358,7 +369,7 @@ export function SourceToolbar({
             />
             <Label
               htmlFor="show-only-duplicates"
-              className="text-sm font-medium cursor-pointer whitespace-nowrap"
+              className="cursor-pointer whitespace-nowrap text-sm font-medium"
             >
               Only duplicates
             </Label>
@@ -386,7 +397,7 @@ export function SourceToolbar({
             />
             <Label
               htmlFor="select-all"
-              className="text-sm font-medium cursor-pointer whitespace-nowrap"
+              className="cursor-pointer whitespace-nowrap text-sm font-medium"
             >
               Select All
               {selectedCount > 0 && (

@@ -162,11 +162,7 @@ describe('SourceFilterBar Integration', () => {
       const manyTags = Array.from({ length: 12 }, (_, i) => `tag-${i}`);
 
       render(
-        <SourceFilterBar
-          currentFilters={{}}
-          onFilterChange={jest.fn()}
-          availableTags={manyTags}
-        />
+        <SourceFilterBar currentFilters={{}} onFilterChange={jest.fn()} availableTags={manyTags} />
       );
 
       expect(screen.getByLabelText('Add tag filter: tag-0')).toBeInTheDocument();
@@ -297,9 +293,7 @@ describe('SourceFilterBar Integration', () => {
     });
 
     it('hides tags section when no available tags', () => {
-      render(
-        <SourceFilterBar currentFilters={{}} onFilterChange={jest.fn()} availableTags={[]} />
-      );
+      render(<SourceFilterBar currentFilters={{}} onFilterChange={jest.fn()} availableTags={[]} />);
 
       expect(screen.queryByText('Tags')).not.toBeInTheDocument();
     });
@@ -332,9 +326,7 @@ describe('SourceFilterBar Integration', () => {
     });
 
     it('filter labels are associated with controls', () => {
-      render(
-        <SourceFilterBar currentFilters={{}} onFilterChange={jest.fn()} availableTags={[]} />
-      );
+      render(<SourceFilterBar currentFilters={{}} onFilterChange={jest.fn()} availableTags={[]} />);
 
       const typeLabel = screen.getByText('Type');
       const trustLabel = screen.getByText('Trust');

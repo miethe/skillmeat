@@ -62,12 +62,7 @@ function NotificationAnnouncer({ notifications }: NotificationAnnouncerProps) {
   }, [notifications]);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      className="sr-only"
-    >
+    <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
       {announcement}
     </div>
   );
@@ -111,49 +106,49 @@ export function NotificationBell({
             aria-haspopup="menu"
             aria-expanded={open}
           >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className={cn(
-                "absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-                "animate-in fade-in zoom-in animate-notification-pulse",
-                "motion-reduce:animate-none"
-              )}
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-          <span className="sr-only">
-            {unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
+                className={cn(
+                  'absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                  'animate-notification-pulse animate-in fade-in zoom-in',
+                  'motion-reduce:animate-none'
+                )}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
+            )}
+            <span className="sr-only">
+              {unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
 
-      <DropdownMenuContent
-        align="end"
-        className={cn(
-          "w-full sm:w-[380px] p-0",
-          "max-h-[80vh] sm:max-h-[500px]",
-          "transform transition-all duration-200 ease-out",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2",
-          "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2",
-          "motion-reduce:transition-none motion-reduce:animate-none"
-        )}
-        sideOffset={8}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        <NotificationDropdown
-          notifications={notifications}
-          onMarkAllRead={onMarkAllRead}
-          onClearAll={onClearAll}
-          onNotificationClick={onNotificationClick}
-          onDismiss={onDismiss}
-          onClose={() => setOpen(false)}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <DropdownMenuContent
+          align="end"
+          className={cn(
+            'w-full p-0 sm:w-[380px]',
+            'max-h-[80vh] sm:max-h-[500px]',
+            'transform transition-all duration-200 ease-out',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2',
+            'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2',
+            'motion-reduce:animate-none motion-reduce:transition-none'
+          )}
+          sideOffset={8}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <NotificationDropdown
+            notifications={notifications}
+            onMarkAllRead={onMarkAllRead}
+            onClearAll={onClearAll}
+            onNotificationClick={onNotificationClick}
+            onDismiss={onDismiss}
+            onClose={() => setOpen(false)}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }
@@ -240,17 +235,10 @@ function NotificationDropdown({
     <div className="flex flex-col" onKeyDown={handleListKeyDown}>
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <DropdownMenuLabel className="p-0 text-base font-semibold">
-          Notifications
-        </DropdownMenuLabel>
+        <DropdownMenuLabel className="p-0 text-base font-semibold">Notifications</DropdownMenuLabel>
         <div className="flex items-center gap-2">
           {hasUnread && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={handleMarkAllRead}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
               Mark all read
             </Button>
           )}
@@ -292,10 +280,10 @@ function NotificationDropdown({
           </div>
         </ScrollArea>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <Bell className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+          <Bell className="mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
-          <p className="text-xs text-muted-foreground/70 mt-1.5 max-w-[280px]">
+          <p className="mt-1.5 max-w-[280px] text-xs text-muted-foreground/70">
             You'll see updates about imports, syncs, and system events here
           </p>
         </div>
@@ -321,7 +309,7 @@ const NotificationItem = React.memo(function NotificationItem({
   onClick,
   onDismiss,
   isActive,
-  onFocus
+  onFocus,
 }: NotificationItemProps) {
   const [expanded, setExpanded] = React.useState(false);
   const isUnread = notification.status === 'unread';
@@ -367,11 +355,11 @@ const NotificationItem = React.memo(function NotificationItem({
     <div
       ref={itemRef}
       className={cn(
-        'group relative px-4 py-3 cursor-pointer',
+        'group relative cursor-pointer px-4 py-3',
         'transition-all duration-150',
         'hover:bg-accent/50 hover:shadow-sm',
         'focus-within:bg-accent/50 focus-within:ring-2 focus-within:ring-ring',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
         'motion-reduce:transition-none',
         isUnread && 'bg-accent/30'
       )}
@@ -385,7 +373,7 @@ const NotificationItem = React.memo(function NotificationItem({
     >
       {/* Unread indicator */}
       {isUnread && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" aria-hidden="true" />
+        <div className="absolute bottom-0 left-0 top-0 w-1 bg-primary" aria-hidden="true" />
       )}
 
       <div className="flex gap-3">
@@ -393,9 +381,9 @@ const NotificationItem = React.memo(function NotificationItem({
         <div className={cn('mt-0.5 flex-shrink-0', iconColor)}>{icon}</div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <p
                 id={`notification-${notification.id}-title`}
                 className="text-sm font-medium leading-tight"
@@ -404,11 +392,11 @@ const NotificationItem = React.memo(function NotificationItem({
               </p>
               <p
                 id={`notification-${notification.id}-message`}
-                className="text-xs text-muted-foreground mt-1 line-clamp-2"
+                className="mt-1 line-clamp-2 text-xs text-muted-foreground"
               >
                 {notification.message}
               </p>
-              <p className="text-xs text-muted-foreground/70 mt-1.5">
+              <p className="mt-1.5 text-xs text-muted-foreground/70">
                 {formatDistanceToNow(notification.timestamp, { addSuffix: true })}
               </p>
             </div>
@@ -418,11 +406,11 @@ const NotificationItem = React.memo(function NotificationItem({
               variant="ghost"
               size="icon"
               className={cn(
-                "h-6 w-6 flex-shrink-0",
-                "opacity-60 hover:opacity-100 focus-visible:opacity-100",
-                "transition-opacity duration-150",
-                "hover:bg-background/80",
-                "motion-reduce:transition-none"
+                'h-6 w-6 flex-shrink-0',
+                'opacity-60 hover:opacity-100 focus-visible:opacity-100',
+                'transition-opacity duration-150',
+                'hover:bg-background/80',
+                'motion-reduce:transition-none'
               )}
               onClick={onDismiss}
               aria-label="Dismiss notification"
@@ -445,12 +433,12 @@ const NotificationItem = React.memo(function NotificationItem({
               >
                 {expanded ? (
                   <>
-                    <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                    <ChevronUp className="mr-1 h-3.5 w-3.5" />
                     Hide details
                   </>
                 ) : (
                   <>
-                    <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                    <ChevronDown className="mr-1 h-3.5 w-3.5" />
                     Show details
                   </>
                 )}
@@ -458,7 +446,13 @@ const NotificationItem = React.memo(function NotificationItem({
 
               {expanded && notification.details && (
                 <div id={`notification-${notification.id}-details`}>
-                  <React.Suspense fallback={<div className="mt-3 p-3 text-xs text-muted-foreground">Loading details...</div>}>
+                  <React.Suspense
+                    fallback={
+                      <div className="mt-3 p-3 text-xs text-muted-foreground">
+                        Loading details...
+                      </div>
+                    }
+                  >
                     <NotificationDetailView details={notification.details} />
                   </React.Suspense>
                 </div>
@@ -602,7 +596,7 @@ interface NotificationDetailViewProps {
 }
 
 const NotificationDetailView = React.memo(function NotificationDetailView({
-  details
+  details,
 }: NotificationDetailViewProps) {
   if (isBulkImportResultDetails(details)) {
     return <BulkImportResultDetailsMemo details={details} />;
@@ -649,18 +643,18 @@ function parseArtifactId(artifactId: string): { type: string; name: string } {
 function getStatusIcon(status: ImportStatus): React.ReactNode {
   switch (status) {
     case 'success':
-      return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />;
+      return <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-500" />;
     case 'skipped':
-      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+      return <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-500" />;
     case 'failed':
-      return <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />;
+      return <XCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-500" />;
     default:
-      return <Info className="h-3.5 w-3.5 text-gray-500 flex-shrink-0 mt-0.5" />;
+      return <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-gray-500" />;
   }
 }
 
 const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsMemo({
-  details
+  details,
 }: BulkImportResultDetailsProps) {
   return (
     <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
@@ -709,14 +703,14 @@ const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsM
         )}
 
         {/* Total */}
-        <div className="pt-1 border-t text-xs text-muted-foreground">
+        <div className="border-t pt-1 text-xs text-muted-foreground">
           Total requested: {details.total_requested}
         </div>
       </div>
 
       {/* Per-artifact details */}
       {details.results && details.results.length > 0 && (
-        <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+        <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
           <div className="text-xs font-medium text-muted-foreground">Artifact Details:</div>
           {details.results.map((result: BulkImportArtifactResult, index: number) => {
             const { type, name } = parseArtifactId(result.artifact_id);
@@ -734,36 +728,31 @@ const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsM
                 {getStatusIcon(result.status)}
 
                 {/* Artifact info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge
-                      variant="outline"
-                      className="h-4 px-1 text-[10px] font-medium"
-                    >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
                       {type}
                     </Badge>
-                    <span className="font-medium truncate">{name}</span>
+                    <span className="truncate font-medium">{name}</span>
                   </div>
 
                   {/* Skip reason */}
                   {result.status === 'skipped' && result.skip_reason && (
-                    <p className="text-muted-foreground mt-0.5 line-clamp-2">
+                    <p className="mt-0.5 line-clamp-2 text-muted-foreground">
                       {result.skip_reason}
                     </p>
                   )}
 
                   {/* Error message */}
                   {result.status === 'failed' && result.error && (
-                    <p className="text-red-600 dark:text-red-400 mt-0.5 line-clamp-2">
+                    <p className="mt-0.5 line-clamp-2 text-red-600 dark:text-red-400">
                       {sanitizeErrorMessage(result.error)}
                     </p>
                   )}
 
                   {/* Success message */}
                   {result.status === 'success' && result.message && (
-                    <p className="text-muted-foreground mt-0.5 text-[10px]">
-                      {result.message}
-                    </p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">{result.message}</p>
                   )}
                 </div>
               </div>
@@ -774,7 +763,7 @@ const BulkImportResultDetailsMemo = React.memo(function BulkImportResultDetailsM
 
       {/* Duration (if available) */}
       {details.duration_ms !== undefined && (
-        <div className="pt-2 border-t text-[10px] text-muted-foreground">
+        <div className="border-t pt-2 text-[10px] text-muted-foreground">
           Completed in {(details.duration_ms / 1000).toFixed(2)}s
         </div>
       )}
@@ -791,7 +780,7 @@ interface ImportResultDetailsProps {
 }
 
 const ImportResultDetailsMemo = React.memo(function ImportResultDetailsMemo({
-  details
+  details,
 }: ImportResultDetailsProps) {
   return (
     <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
@@ -805,13 +794,11 @@ const ImportResultDetailsMemo = React.memo(function ImportResultDetailsMemo({
           <XCircle className="h-3.5 w-3.5 text-red-500" />
           <span className="font-medium">{details.failed} failed</span>
         </div>
-        <div className="text-muted-foreground">
-          Total: {details.total}
-        </div>
+        <div className="text-muted-foreground">Total: {details.total}</div>
       </div>
 
       {/* Artifact list */}
-      <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+      <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
         {details.artifacts.map((artifact, index) => (
           <div
             key={`${artifact.name}-${index}`}
@@ -824,24 +811,21 @@ const ImportResultDetailsMemo = React.memo(function ImportResultDetailsMemo({
           >
             {/* Status icon */}
             {artifact.success ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-500" />
             ) : (
-              <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+              <XCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-500" />
             )}
 
             {/* Artifact info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className="h-4 px-1 text-[10px] font-medium"
-                >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
                   {artifact.type}
                 </Badge>
-                <span className="font-medium truncate">{artifact.name}</span>
+                <span className="truncate font-medium">{artifact.name}</span>
               </div>
               {!artifact.success && artifact.error && (
-                <p className="text-muted-foreground mt-0.5 line-clamp-2">
+                <p className="mt-0.5 line-clamp-2 text-muted-foreground">
                   {sanitizeErrorMessage(artifact.error)}
                 </p>
               )}
@@ -864,17 +848,17 @@ interface ErrorDetailProps {
 
 const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
   details,
-  onRetry
+  onRetry,
 }: ErrorDetailProps) {
   const [showStack, setShowStack] = React.useState(false);
 
   return (
-    <div className="mt-3 space-y-3 rounded-md border border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 p-3">
+    <div className="mt-3 space-y-3 rounded-md border border-red-200 bg-red-50/50 p-3 dark:border-red-900 dark:bg-red-950/20">
       {/* Error code and message */}
       <div className="space-y-2">
         {details.code && (
           <div className="flex items-center gap-2">
-            <Badge variant="destructive" className="h-5 px-2 text-xs font-mono">
+            <Badge variant="destructive" className="h-5 px-2 font-mono text-xs">
               {details.code}
             </Badge>
           </div>
@@ -890,19 +874,19 @@ const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-xs text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
+            className="h-6 px-2 text-xs text-red-700 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100"
             onClick={() => setShowStack(!showStack)}
             aria-expanded={showStack}
             aria-controls="error-stack-trace"
           >
             {showStack ? (
               <>
-                <ChevronUp className="h-3 w-3 mr-1" />
+                <ChevronUp className="mr-1 h-3 w-3" />
                 Hide stack trace
               </>
             ) : (
               <>
-                <ChevronDown className="h-3 w-3 mr-1" />
+                <ChevronDown className="mr-1 h-3 w-3" />
                 Show stack trace
               </>
             )}
@@ -910,7 +894,7 @@ const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
           {showStack && (
             <pre
               id="error-stack-trace"
-              className="mt-2 rounded bg-red-100/50 dark:bg-red-950/50 p-2 text-[10px] font-mono text-red-900 dark:text-red-200 overflow-x-auto max-h-32 overflow-y-auto"
+              className="mt-2 max-h-32 overflow-x-auto overflow-y-auto rounded bg-red-100/50 p-2 font-mono text-[10px] text-red-900 dark:bg-red-950/50 dark:text-red-200"
             >
               {details.stack}
             </pre>
@@ -923,10 +907,10 @@ const ErrorDetailMemo = React.memo(function ErrorDetailMemo({
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/40"
+          className="h-7 border-red-300 text-xs text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
           onClick={onRetry}
         >
-          <RefreshCw className="h-3 w-3 mr-1" />
+          <RefreshCw className="mr-1 h-3 w-3" />
           Retry
         </Button>
       )}
@@ -942,9 +926,7 @@ interface GenericDetailProps {
   details: GenericDetails;
 }
 
-const GenericDetailMemo = React.memo(function GenericDetailMemo({
-  details
-}: GenericDetailProps) {
+const GenericDetailMemo = React.memo(function GenericDetailMemo({ details }: GenericDetailProps) {
   if (!details.metadata || Object.keys(details.metadata).length === 0) {
     return null;
   }
@@ -956,15 +938,13 @@ const GenericDetailMemo = React.memo(function GenericDetailMemo({
           <div
             key={key}
             className={cn(
-              "flex items-start gap-2 text-xs rounded px-2 py-1.5",
-              "transition-colors duration-150",
-              "hover:bg-background/60 dark:hover:bg-background/40",
-              "motion-reduce:transition-none"
+              'flex items-start gap-2 rounded px-2 py-1.5 text-xs',
+              'transition-colors duration-150',
+              'hover:bg-background/60 dark:hover:bg-background/40',
+              'motion-reduce:transition-none'
             )}
           >
-            <span className="font-medium text-muted-foreground min-w-[80px]">
-              {key}:
-            </span>
+            <span className="min-w-[80px] font-medium text-muted-foreground">{key}:</span>
             <span className="flex-1 break-words">
               {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
             </span>
@@ -1012,4 +992,3 @@ function getNotificationIconColor(type: NotificationType): string {
       return 'text-muted-foreground';
   }
 }
-

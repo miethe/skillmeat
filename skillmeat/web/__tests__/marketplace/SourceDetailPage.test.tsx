@@ -5,12 +5,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SourceDetailPage from '@/app/marketplace/sources/[id]/page';
-import {
-  useSource,
-  useSourceCatalog,
-  useRescanSource,
-  useImportArtifacts,
-} from '@/hooks';
+import { useSource, useSourceCatalog, useRescanSource, useImportArtifacts } from '@/hooks';
 import type { GitHubSource, CatalogEntry, CatalogListResponse } from '@/types/marketplace';
 
 // Mock hooks
@@ -63,9 +58,7 @@ const createTestQueryClient = () =>
 
 const renderWithClient = (ui: React.ReactElement) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 };
 
 const mockSource: GitHubSource = {
@@ -102,7 +95,12 @@ const createMockEntry = (overrides?: Partial<CatalogEntry>): CatalogEntry => ({
 const mockCatalogResponse: CatalogListResponse = {
   items: [
     createMockEntry({ id: 'entry-1', name: 'skill-1', status: 'new' }),
-    createMockEntry({ id: 'entry-2', name: 'skill-2', status: 'updated', artifact_type: 'command' }),
+    createMockEntry({
+      id: 'entry-2',
+      name: 'skill-2',
+      status: 'updated',
+      artifact_type: 'command',
+    }),
     createMockEntry({ id: 'entry-3', name: 'skill-3', status: 'imported' }),
   ],
   page_info: {
@@ -366,12 +364,14 @@ describe('SourceDetailPage', () => {
       const user = userEvent.setup();
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [
-              createMockEntry({ id: 'entry-1', name: 'test', path: 'skills/special-path' }),
-            ],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [
+                createMockEntry({ id: 'entry-1', name: 'test', path: 'skills/special-path' }),
+              ],
+            },
+          ],
         },
         isLoading: false,
       });
@@ -406,7 +406,8 @@ describe('SourceDetailPage', () => {
 
       // Check that useSourceCatalog was called with type filter
       await waitFor(() => {
-        const lastCall = mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
+        const lastCall =
+          mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
         expect(lastCall[1]).toEqual({ artifact_type: 'skill' });
       });
     });
@@ -424,7 +425,8 @@ describe('SourceDetailPage', () => {
       await user.click(allTypesOption);
 
       await waitFor(() => {
-        const lastCall = mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
+        const lastCall =
+          mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
         expect(lastCall[1]?.artifact_type).toBeUndefined();
       });
     });
@@ -462,7 +464,8 @@ describe('SourceDetailPage', () => {
       await user.click(clearButton);
 
       await waitFor(() => {
-        const lastCall = mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
+        const lastCall =
+          mockUseSourceCatalog.mock.calls[mockUseSourceCatalog.mock.calls.length - 1];
         expect(lastCall[1]).toEqual({});
       });
     });
@@ -531,10 +534,12 @@ describe('SourceDetailPage', () => {
     it('disables checkbox for removed entries', () => {
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [createMockEntry({ status: 'removed' })],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [createMockEntry({ status: 'removed' })],
+            },
+          ],
         },
         isLoading: false,
       });
@@ -562,7 +567,7 @@ describe('SourceDetailPage', () => {
 
       const checkboxes = screen.getAllByRole('checkbox');
       // Only new and updated entries should be selected (not imported)
-      const checkedBoxes = checkboxes.filter(cb => (cb as HTMLInputElement).checked);
+      const checkedBoxes = checkboxes.filter((cb) => (cb as HTMLInputElement).checked);
       expect(checkedBoxes.length).toBe(2); // new + updated
     });
 
@@ -589,17 +594,19 @@ describe('SourceDetailPage', () => {
       await user.click(deselectAllButton);
 
       const checkboxes = screen.getAllByRole('checkbox');
-      const checkedBoxes = checkboxes.filter(cb => (cb as HTMLInputElement).checked);
+      const checkedBoxes = checkboxes.filter((cb) => (cb as HTMLInputElement).checked);
       expect(checkedBoxes.length).toBe(0);
     });
 
     it('disables select all when no importable entries', () => {
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [createMockEntry({ status: 'imported' })],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [createMockEntry({ status: 'imported' })],
+            },
+          ],
         },
         isLoading: false,
       });
@@ -712,12 +719,12 @@ describe('SourceDetailPage', () => {
     it('does not show import button for imported entries', () => {
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [
-              createMockEntry({ status: 'imported', import_date: '2024-12-01T10:00:00Z' }),
-            ],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [createMockEntry({ status: 'imported', import_date: '2024-12-01T10:00:00Z' })],
+            },
+          ],
         },
         isLoading: false,
       });
@@ -733,10 +740,12 @@ describe('SourceDetailPage', () => {
     it('shows empty state when no artifacts', () => {
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [],
+            },
+          ],
         },
         isLoading: false,
       });
@@ -841,7 +850,7 @@ describe('SourceDetailPage', () => {
       renderWithClient(<SourceDetailPage />);
 
       const githubLinks = screen.getAllByText('View on GitHub');
-      githubLinks.forEach(link => {
+      githubLinks.forEach((link) => {
         expect(link.closest('a')).toHaveAttribute('rel', 'noopener noreferrer');
       });
     });
@@ -852,33 +861,35 @@ describe('SourceDetailPage', () => {
       // Mock catalog with excluded entries including duplicates
       (useSourceCatalog as jest.Mock).mockReturnValue({
         data: {
-          pages: [{
-            ...mockCatalogResponse,
-            items: [
-              createMockEntry({ id: 'entry-1', name: 'skill-1', status: 'new' }),
-              createMockEntry({
-                id: 'entry-excluded-1',
-                name: 'duplicate-skill',
-                status: 'excluded',
-                is_duplicate: true,
-                duplicate_reason: 'within_source',
-                duplicate_of: 'skills/original-skill',
-              }),
-              createMockEntry({
-                id: 'entry-excluded-2',
-                name: 'excluded-not-duplicate',
-                status: 'excluded',
-                is_duplicate: false,
-              }),
-              createMockEntry({
-                id: 'entry-excluded-3',
-                name: 'cross-source-dup',
-                status: 'excluded',
-                is_duplicate: true,
-                duplicate_reason: 'cross_source',
-              }),
-            ],
-          }],
+          pages: [
+            {
+              ...mockCatalogResponse,
+              items: [
+                createMockEntry({ id: 'entry-1', name: 'skill-1', status: 'new' }),
+                createMockEntry({
+                  id: 'entry-excluded-1',
+                  name: 'duplicate-skill',
+                  status: 'excluded',
+                  is_duplicate: true,
+                  duplicate_reason: 'within_source',
+                  duplicate_of: 'skills/original-skill',
+                }),
+                createMockEntry({
+                  id: 'entry-excluded-2',
+                  name: 'excluded-not-duplicate',
+                  status: 'excluded',
+                  is_duplicate: false,
+                }),
+                createMockEntry({
+                  id: 'entry-excluded-3',
+                  name: 'cross-source-dup',
+                  status: 'excluded',
+                  is_duplicate: true,
+                  duplicate_reason: 'cross_source',
+                }),
+              ],
+            },
+          ],
         },
         isLoading: false,
         isFetching: false,
@@ -1041,9 +1052,7 @@ describe('SourceDetailPage', () => {
         });
 
         // Check that dedup stats are included
-        const toastCall = mockToast.mock.calls.find(
-          call => call[0].title === 'Scan complete'
-        );
+        const toastCall = mockToast.mock.calls.find((call) => call[0].title === 'Scan complete');
         expect(toastCall[0].description).toContain('5 within-source duplicates');
         expect(toastCall[0].description).toContain('5 cross-source duplicates');
       });
@@ -1087,9 +1096,7 @@ describe('SourceDetailPage', () => {
         });
 
         // Should NOT contain dedup stats
-        const toastCall = mockToast.mock.calls.find(
-          call => call[0].title === 'Scan complete'
-        );
+        const toastCall = mockToast.mock.calls.find((call) => call[0].title === 'Scan complete');
         expect(toastCall[0].description).not.toContain('duplicates');
       });
     });
@@ -1126,9 +1133,7 @@ describe('SourceDetailPage', () => {
       await user.click(rescanButton);
 
       await waitFor(() => {
-        const toastCall = mockToast.mock.calls.find(
-          call => call[0].title === 'Scan complete'
-        );
+        const toastCall = mockToast.mock.calls.find((call) => call[0].title === 'Scan complete');
         expect(toastCall[0].description).toContain('3 within-source duplicates');
         expect(toastCall[0].description).not.toContain('cross-source');
       });

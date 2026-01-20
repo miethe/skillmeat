@@ -230,10 +230,7 @@ describe('SourceFilterBar', () => {
   describe('Clear Filters', () => {
     it('shows clear all button when filters are active', () => {
       render(
-        <SourceFilterBar
-          currentFilters={{ artifact_type: 'skill' }}
-          onFilterChange={jest.fn()}
-        />
+        <SourceFilterBar currentFilters={{ artifact_type: 'skill' }} onFilterChange={jest.fn()} />
       );
 
       expect(screen.getByRole('button', { name: 'Clear all filters' })).toBeInTheDocument();

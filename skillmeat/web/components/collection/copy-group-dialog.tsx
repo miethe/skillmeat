@@ -86,9 +86,7 @@ export function CopyGroupDialog({
   const handleSubmit = async () => {
     if (!selectedCollectionId) return;
 
-    const targetCollection = availableCollections.find(
-      (c) => c.id === selectedCollectionId
-    );
+    const targetCollection = availableCollections.find((c) => c.id === selectedCollectionId);
 
     try {
       await copyGroupMutation.mutateAsync({
@@ -144,16 +142,14 @@ export function CopyGroupDialog({
           ) : availableCollections.length === 0 ? (
             <div className="mt-2 rounded-lg border border-dashed border-muted-foreground/25 p-6 text-center">
               <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-              <p className="mt-2 text-sm text-muted-foreground">
-                No other collections available.
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-2 text-sm text-muted-foreground">No other collections available.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Create another collection first to copy this group.
               </p>
             </div>
           ) : (
             <>
-              <ScrollArea className="h-[200px] mt-2 rounded-md border">
+              <ScrollArea className="mt-2 h-[200px] rounded-md border">
                 <RadioGroup
                   value={selectedCollectionId ?? ''}
                   onValueChange={handleCollectionSelect}
@@ -163,7 +159,7 @@ export function CopyGroupDialog({
                   {availableCollections.map((collection) => (
                     <div
                       key={collection.id}
-                      className="flex items-center space-x-2 py-2 px-2 rounded-md hover:bg-accent"
+                      className="flex items-center space-x-2 rounded-md px-2 py-2 hover:bg-accent"
                     >
                       <RadioGroupItem
                         value={collection.id}
@@ -173,12 +169,12 @@ export function CopyGroupDialog({
                       />
                       <Label
                         htmlFor={`collection-${collection.id}`}
-                        className="flex items-center gap-2 cursor-pointer flex-1"
+                        className="flex flex-1 cursor-pointer items-center gap-2"
                       >
                         <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         <span>{collection.name}</span>
                         {collection.artifact_count !== undefined && (
-                          <span className="text-xs text-muted-foreground ml-auto">
+                          <span className="ml-auto text-xs text-muted-foreground">
                             {collection.artifact_count} artifact
                             {collection.artifact_count !== 1 ? 's' : ''}
                           </span>
@@ -190,8 +186,8 @@ export function CopyGroupDialog({
               </ScrollArea>
 
               <p className="mt-3 text-xs text-muted-foreground">
-                The group and its artifacts will be copied to the selected collection.
-                Original group remains unchanged.
+                The group and its artifacts will be copied to the selected collection. Original
+                group remains unchanged.
               </p>
             </>
           )}

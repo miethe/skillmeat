@@ -200,8 +200,7 @@ export function NavSection({
         <div className="space-y-1 pl-4 pt-1">
           {items.map((item) => {
             const ItemIcon = item.icon;
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
               <Link
@@ -210,7 +209,7 @@ export function NavSection({
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
                   isActive
-                    ? 'bg-secondary text-secondary-foreground font-medium'
+                    ? 'bg-secondary font-medium text-secondary-foreground'
                     : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
                 )}
