@@ -29,6 +29,9 @@ import { getEntityTypeConfig } from '@/types/entity';
 import { EntityActions } from '@/components/entity/entity-actions';
 import type { ArtifactDiffResponse } from '@/sdk';
 import { ScoreBadge, ScoreBadgeSkeleton } from '@/components/ScoreBadge';
+import { CollectionBadgeStack, type CollectionInfo } from './collection-badge-stack';
+import { GroupBadgeRow, type GroupInfo } from './group-badge-row';
+import { useCollectionContext } from '@/hooks';
 
 /**
  * Type guard to check if item is an Entity
@@ -214,8 +217,49 @@ export const UnifiedCard = React.memo(
     mode, // Deprecated but kept for backward compatibility
   }: UnifiedCardProps) {
     const queryClient = useQueryClient();
+    const { selectedCollectionId } = useCollectionContext();
     const data = normalizeCardData(item);
     const config = getEntityTypeConfig(data.type as EntityType);
+
+    // Determine if we're in "All Collections" view (null or 'all')
+    const isAllCollectionsView = !selectedCollectionId || selectedCollectionId === 'all';
+
+    // Extract collections from the item for badge display
+    // Both Entity and Artifact types can have collections
+    const itemCollections = React.useMemo((): CollectionInfo[] => {
+      if (!isAllCollectionsView) return [];
+
+      // Check if item has collections array
+      const collectionsArray = (item as Entity | Artifact).collections;
+      if (!collectionsArray || !Array.isArray(collectionsArray)) return [];
+
+      return collectionsArray.map((c) => ({
+        id: c.id,
+        name: c.name,
+        // Mark default collection to be filtered by CollectionBadgeStack
+        is_default: c.id === 'default' || c.name === 'Default',
+      }));
+    }, [item, isAllCollectionsView]);
+
+    // Extract groups from the item for badge display
+    // Groups are only shown when viewing a specific collection (opposite of collections)
+    const itemGroups = React.useMemo((): GroupInfo[] => {
+      // Only show groups in specific collection view, not "All Collections"
+      if (isAllCollectionsView) return [];
+
+      // Check if item has groups array (populated when include_groups=true from backend)
+      // Groups may exist on artifact responses when viewing a specific collection
+      const itemWithGroups = item as (Entity | Artifact) & {
+        groups?: { id: string; name: string }[];
+      };
+      const groupsArray = itemWithGroups.groups;
+      if (!groupsArray || !Array.isArray(groupsArray)) return [];
+
+      return groupsArray.map((g) => ({
+        id: g.id,
+        name: g.name,
+      }));
+    }, [item, isAllCollectionsView]);
 
     // Type-safe icon lookup with fallback (config may be undefined for unknown types)
     const iconName = config?.icon ?? 'FileText';
@@ -379,6 +423,20 @@ export const UnifiedCard = React.memo(
               )}
             </div>
           </div>
+
+          {/* Collection badges - Only shown in "All Collections" view */}
+          {isAllCollectionsView && itemCollections.length > 0 && (
+            <div className="mt-2">
+              <CollectionBadgeStack collections={itemCollections} maxBadges={2} />
+            </div>
+          )}
+
+          {/* Group badges - Only shown when viewing a specific collection (not "All Collections") */}
+          {!isAllCollectionsView && itemGroups.length > 0 && (
+            <div className="mt-2">
+              <GroupBadgeRow groups={itemGroups} maxBadges={2} />
+            </div>
+          )}
         </div>
 
         {/* Content - Fixed-height rows for consistent card heights */}
@@ -518,9 +576,7 @@ export function UnifiedCardSkeleton({ selectable = false }: { selectable?: boole
         </div>
 
         {/* Warnings skeleton - fixed height */}
-        <div className="flex h-4 items-center">
-          {/* Empty to match potential warning space */}
-        </div>
+        <div className="flex h-4 items-center">{/* Empty to match potential warning space */}</div>
       </div>
     </Card>
   );
