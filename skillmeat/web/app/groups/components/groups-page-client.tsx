@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Layers, FolderOpen, X, FolderSearch, Library, Settings } from 'lucide-react';
 import { useCollectionContext, useGroup } from '@/hooks';
 import { GroupArtifactGrid } from './group-artifact-grid';
@@ -9,6 +9,7 @@ import { GroupSelector } from './group-selector';
 import { CollectionSwitcher } from '@/components/collection/collection-switcher';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { ManageGroupsDialog } from '@/components/collection/manage-groups-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -97,6 +98,8 @@ export function GroupsPageClient() {
   const effectiveCollectionId = collectionId || selectedCollectionId;
   const hasCollections = collections.length > 0;
 
+  const [manageGroupsOpen, setManageGroupsOpen] = useState(false);
+
   // Sync URL with collection context changes
   // When collection changes via CollectionSwitcher, update URL and clear group
   useEffect(() => {
@@ -146,11 +149,9 @@ export function GroupsPageClient() {
         {/* Manage Groups Link */}
         {effectiveCollectionId && (
           <div className="ml-auto">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`/collection?collection=${effectiveCollectionId}`}>
-                <Settings className="mr-1 h-4 w-4" aria-hidden="true" />
-                Manage Groups
-              </Link>
+            <Button variant="ghost" size="sm" onClick={() => setManageGroupsOpen(true)}>
+              <Settings className="mr-1 h-4 w-4" aria-hidden="true" />
+              Manage Groups
             </Button>
           </div>
         )}
@@ -234,6 +235,14 @@ export function GroupsPageClient() {
               </Link>
             </Button>
           }
+        />
+      )}
+
+      {effectiveCollectionId && (
+        <ManageGroupsDialog
+          open={manageGroupsOpen}
+          onOpenChange={setManageGroupsOpen}
+          collectionId={effectiveCollectionId}
         />
       )}
     </div>
