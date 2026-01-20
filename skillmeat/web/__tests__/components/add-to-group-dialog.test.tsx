@@ -8,6 +8,8 @@ import {
   useCreateGroup,
   useToast,
   useCollections,
+  useArtifactGroups,
+  useRemoveArtifactFromGroup,
 } from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
@@ -18,6 +20,8 @@ jest.mock('@/hooks', () => ({
   useCreateGroup: jest.fn(),
   useToast: jest.fn(),
   useCollections: jest.fn(),
+  useArtifactGroups: jest.fn(),
+  useRemoveArtifactFromGroup: jest.fn(),
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
@@ -27,6 +31,10 @@ const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 const mockUseCollections = useCollections as jest.MockedFunction<typeof useCollections>;
+const mockUseArtifactGroups = useArtifactGroups as jest.MockedFunction<typeof useArtifactGroups>;
+const mockUseRemoveArtifactFromGroup = useRemoveArtifactFromGroup as jest.MockedFunction<
+  typeof useRemoveArtifactFromGroup
+>;
 
 describe('AddToGroupDialog', () => {
   const mockToast = jest.fn();
@@ -149,6 +157,23 @@ describe('AddToGroupDialog', () => {
     mockUseCollections.mockReturnValue({
       data: undefined,
       isLoading: false,
+      error: null,
+    } as any);
+
+    // Mock useArtifactGroups - returns empty array by default (artifact not in any groups)
+    mockUseArtifactGroups.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: jest.fn(),
+    } as any);
+
+    // Mock useRemoveArtifactFromGroup
+    mockUseRemoveArtifactFromGroup.mockReturnValue({
+      mutateAsync: jest.fn().mockResolvedValue(undefined),
+      isPending: false,
+      isError: false,
       error: null,
     } as any);
   });
@@ -610,6 +635,29 @@ describe('AddToGroupDialog', () => {
         (call) => typeof call[0] === 'boolean' && call[0] === false
       );
       expect(closeHandler).toBeUndefined();
+    });
+  });
+
+  describe('Already in Group Feature', () => {
+    it('shows "Already in Group" for groups artifact belongs to', async () => {
+      // Mock that artifact is already in group g1
+      mockUseArtifactGroups.mockReturnValue({
+        data: [mockGroups[0]], // Artifact is in "Development" group
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: jest.fn(),
+      } as any);
+
+      renderDialog({ collectionId: 'c1' });
+
+      // Wait for the groups to be displayed
+      await waitFor(() => {
+        expect(screen.getByText('Development')).toBeInTheDocument();
+      });
+
+      // Should show "Already in Group" text
+      expect(screen.getByText('Already in Group')).toBeInTheDocument();
     });
   });
 });
