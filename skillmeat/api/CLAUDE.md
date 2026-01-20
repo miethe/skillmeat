@@ -181,7 +181,8 @@ async def delete_artifact(...): ...
 | Router | Prefix | Purpose |
 |--------|--------|---------|
 | `artifacts` | `/api/v1/artifacts` | Artifact CRUD, deployment |
-| `collections` | `/api/v1/collections` | Collection management |
+| `collections` | `/api/v1/collections` | Collection management (with group filtering) |
+| `groups` | `/api/v1/groups` | Group management and filtering |
 | `deployments` | `/api/v1/deployments` | Deployment operations |
 | `projects` | `/api/v1/projects` | Project registry |
 | `analytics` | `/api/v1/analytics` | Usage analytics |
@@ -189,6 +190,34 @@ async def delete_artifact(...): ...
 | `mcp` | `/api/v1/mcp` | MCP server management |
 | `bundles` | `/api/v1/bundles` | Artifact bundles |
 | `health` | `/health` | Health checks |
+
+### Enhanced Endpoints (Phase 0)
+
+**Groups Filtering**:
+
+```python
+# GET /api/v1/groups
+@router.get("/", response_model=GroupListResponse)
+async def list_groups(
+    artifact_id: Optional[str] = Query(None),  # Filter groups containing artifact
+) -> GroupListResponse:
+    ...
+```
+
+**Artifact Filtering by Group**:
+
+```python
+# GET /api/v1/user-collections/{collection_id}/artifacts
+@router.get("/{collection_id}/artifacts", response_model=ArtifactListResponse)
+async def list_artifacts(
+    collection_id: str,
+    group_id: Optional[str] = Query(None),         # Filter by group membership
+    include_groups: bool = Query(False),            # Include group data per artifact
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+) -> ArtifactListResponse:
+    ...
+```
 
 ---
 
