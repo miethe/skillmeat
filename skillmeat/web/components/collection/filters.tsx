@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { GroupFilterSelect } from '@/components/shared/group-filter-select';
+import { useCollectionContext } from '@/hooks';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
 interface FiltersProps {
@@ -19,6 +21,8 @@ interface FiltersProps {
 }
 
 export function Filters({ filters, sort, onFiltersChange, onSortChange }: FiltersProps) {
+  const { selectedCollectionId } = useCollectionContext();
+
   const handleFilterChange = (key: keyof ArtifactFilters, value: string) => {
     onFiltersChange({
       ...filters,
@@ -40,6 +44,10 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     });
   };
 
+  // Determine if we're in a specific collection context (not "All Collections")
+  const isSpecificCollectionContext =
+    selectedCollectionId && selectedCollectionId !== 'all';
+
   return (
     <div className="space-y-4">
       {/* Search */}
@@ -54,7 +62,11 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
       </div>
 
       {/* Filter Controls */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
+          isSpecificCollectionContext ? 'md:grid-cols-5' : 'md:grid-cols-4'
+        }`}
+      >
         {/* Type Filter */}
         <div>
           <label htmlFor="type-filter" className="mb-1.5 block text-sm font-medium">
@@ -119,6 +131,20 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
             </SelectContent>
           </Select>
         </div>
+
+        {/* Group Filter - Only show in specific collection context */}
+        {isSpecificCollectionContext && selectedCollectionId && (
+          <div>
+            <label htmlFor="group-filter" className="mb-1.5 block text-sm font-medium">
+              Group
+            </label>
+            <GroupFilterSelect
+              collectionId={selectedCollectionId}
+              value={filters.groupId}
+              onChange={(groupId) => onFiltersChange({ ...filters, groupId })}
+            />
+          </div>
+        )}
 
         {/* Sort Controls */}
         <div>

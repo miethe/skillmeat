@@ -78,6 +78,8 @@ export interface ArtifactFilters {
   status?: ArtifactStatus | 'all';
   scope?: ArtifactScope | 'all';
   search?: string;
+  /** Group ID for filtering artifacts by group (only applicable in specific collection context) */
+  groupId?: string;
 }
 
 export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';

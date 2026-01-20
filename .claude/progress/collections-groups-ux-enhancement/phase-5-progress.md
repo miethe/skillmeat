@@ -1,135 +1,138 @@
 ---
-# === PROGRESS TRACKING: Phase 5 ===
-# Group Filter Integration - Filter by Group on Collection Pages
-
-# Metadata: Identification and Classification
 type: progress
-prd: "collections-groups-ux-enhancement"
+prd: collections-groups-ux-enhancement
 phase: 5
-title: "Group Filter Integration"
-status: "pending"
+title: Group Filter Integration
+status: completed
 started: null
 completed: null
-
-# Overall Progress: Status and Estimates
 overall_progress: 0
-completion_estimate: "on-track"
-
-# Task Counts: Machine-readable task state
+completion_estimate: on-track
 total_tasks: 5
-completed_tasks: 0
+completed_tasks: 5
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-# Ownership: Primary and secondary agents
-owners: ["ui-engineer-enhanced"]
+owners:
+- ui-engineer-enhanced
 contributors: []
-
-# === TASKS (SOURCE OF TRUTH) ===
 tasks:
-  - id: "P5-T1"
-    description: "Create GroupFilterSelect component with shadcn Select"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "P5-T2"
-    description: "Integrate GroupFilterSelect into Filters component (collection page)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P5-T1"]
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "P5-T3"
-    description: "Integrate GroupFilterSelect into EntityFilters component (manage page)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P5-T1"]
-    estimated_effort: "1.5h"
-    priority: "high"
-    model: "sonnet"
-
-  - id: "P5-T4"
-    description: "Add conditional visibility logic (hide in All Collections view)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P5-T2", "P5-T3"]
-    estimated_effort: "1h"
-    priority: "medium"
-    model: "sonnet"
-
-  - id: "P5-T5"
-    description: "Write unit tests for filter component (≥80% coverage)"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: ["P5-T1", "P5-T2", "P5-T3", "P5-T4"]
-    estimated_effort: "2h"
-    priority: "high"
-    model: "sonnet"
-
-# Parallelization Strategy
+- id: P5-T1
+  description: Create GroupFilterSelect component with shadcn Select
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  estimated_effort: 2h
+  priority: high
+  model: sonnet
+- id: P5-T2
+  description: Integrate GroupFilterSelect into Filters component (collection page)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P5-T1
+  estimated_effort: 1.5h
+  priority: high
+  model: sonnet
+- id: P5-T3
+  description: Integrate GroupFilterSelect into EntityFilters component (manage page)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P5-T1
+  estimated_effort: 1.5h
+  priority: high
+  model: sonnet
+- id: P5-T4
+  description: Add conditional visibility logic (hide in All Collections view)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P5-T2
+  - P5-T3
+  estimated_effort: 1h
+  priority: medium
+  model: sonnet
+- id: P5-T5
+  description: Write unit tests for filter component (≥80% coverage)
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies:
+  - P5-T1
+  - P5-T2
+  - P5-T3
+  - P5-T4
+  estimated_effort: 2h
+  priority: high
+  model: sonnet
 parallelization:
-  batch_1: ["P5-T1"]
-  batch_2: ["P5-T2", "P5-T3"]
-  batch_3: ["P5-T4"]
-  batch_4: ["P5-T5"]
-  critical_path: ["P5-T1", "P5-T2", "P5-T4", "P5-T5"]
-  estimated_total_time: "6.5h"
-
-# Critical Blockers
+  batch_1:
+  - P5-T1
+  batch_2:
+  - P5-T2
+  - P5-T3
+  batch_3:
+  - P5-T4
+  batch_4:
+  - P5-T5
+  critical_path:
+  - P5-T1
+  - P5-T2
+  - P5-T4
+  - P5-T5
+  estimated_total_time: 6.5h
 blockers: []
-
-# Success Criteria
 success_criteria:
-  - id: "SC-1"
-    description: "Group filter dropdown appears on /collection page in specific collection context"
-    status: "pending"
-  - id: "SC-2"
-    description: "Group filter dropdown appears on /manage page in specific collection context"
-    status: "pending"
-  - id: "SC-3"
-    description: "Filter hidden when viewing All Collections or outside collection context"
-    status: "pending"
-  - id: "SC-4"
-    description: "Filter options populated from useGroups(collectionId) API"
-    status: "pending"
-  - id: "SC-5"
-    description: "Default value: All Groups (no filter applied)"
-    status: "pending"
-  - id: "SC-6"
-    description: "Selecting group filters artifacts; URL updates with ?group=<id>"
-    status: "pending"
-  - id: "SC-7"
-    description: "Clearing filter removes ?group=<id> from URL"
-    status: "pending"
-  - id: "SC-8"
-    description: "Both Filters and EntityFilters have identical Group filter UX"
-    status: "pending"
-  - id: "SC-9"
-    description: "Filter state persists across page navigation (via URL params)"
-    status: "pending"
-  - id: "SC-10"
-    description: "Tooltip/help text explains filter availability"
-    status: "pending"
-  - id: "SC-11"
-    description: "≥80% test coverage"
-    status: "pending"
-
-# Files Modified
+- id: SC-1
+  description: Group filter dropdown appears on /collection page in specific collection
+    context
+  status: pending
+- id: SC-2
+  description: Group filter dropdown appears on /manage page in specific collection
+    context
+  status: pending
+- id: SC-3
+  description: Filter hidden when viewing All Collections or outside collection context
+  status: pending
+- id: SC-4
+  description: Filter options populated from useGroups(collectionId) API
+  status: pending
+- id: SC-5
+  description: 'Default value: All Groups (no filter applied)'
+  status: pending
+- id: SC-6
+  description: Selecting group filters artifacts; URL updates with ?group=<id>
+  status: pending
+- id: SC-7
+  description: Clearing filter removes ?group=<id> from URL
+  status: pending
+- id: SC-8
+  description: Both Filters and EntityFilters have identical Group filter UX
+  status: pending
+- id: SC-9
+  description: Filter state persists across page navigation (via URL params)
+  status: pending
+- id: SC-10
+  description: Tooltip/help text explains filter availability
+  status: pending
+- id: SC-11
+  description: ≥80% test coverage
+  status: pending
 files_modified:
-  - "skillmeat/web/components/shared/group-filter-select.tsx"
-  - "skillmeat/web/components/collection/filters.tsx"
-  - "skillmeat/web/app/manage/components/entity-filters.tsx"
-  - "skillmeat/web/hooks/use-artifact-filters.ts"
-  - "skillmeat/web/__tests__/components/group-filter-select.test.ts"
-  - "skillmeat/web/__tests__/components/filters.test.ts"
-  - "skillmeat/web/__tests__/integration/collection-page.test.ts"
+- skillmeat/web/components/shared/group-filter-select.tsx
+- skillmeat/web/components/collection/filters.tsx
+- skillmeat/web/app/manage/components/entity-filters.tsx
+- skillmeat/web/hooks/use-artifact-filters.ts
+- skillmeat/web/__tests__/components/group-filter-select.test.ts
+- skillmeat/web/__tests__/components/filters.test.ts
+- skillmeat/web/__tests__/integration/collection-page.test.ts
+progress: 100
+updated: '2026-01-20'
 ---
 
 # Collections & Groups UX Enhancement - Phase 5: Group Filter Integration
