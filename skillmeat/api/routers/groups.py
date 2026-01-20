@@ -171,7 +171,8 @@ async def create_group(request: GroupCreateRequest) -> GroupResponse:
     description="""
     List all groups in a collection, ordered by position.
 
-    Optionally filter by name using the search parameter.
+    Optionally filter by name using the search parameter, or filter to only
+    groups containing a specific artifact using the artifact_id parameter.
     """,
 )
 async def list_groups(
@@ -179,12 +180,16 @@ async def list_groups(
     search: Optional[str] = Query(
         None, description="Filter groups by name (case-insensitive)"
     ),
+    artifact_id: Optional[str] = Query(
+        None, description="Filter to groups containing this artifact"
+    ),
 ) -> GroupListResponse:
     """List all groups in a collection.
 
     Args:
         collection_id: Collection ID (required)
         search: Optional name filter
+        artifact_id: Optional artifact ID filter - returns only groups containing this artifact
 
     Returns:
         List of groups ordered by position
@@ -209,6 +214,12 @@ async def list_groups(
         # Apply search filter if provided
         if search:
             query = query.filter(Group.name.ilike(f"%{search}%"))
+
+        # Apply artifact_id filter if provided
+        if artifact_id:
+            query = query.join(GroupArtifact).filter(
+                GroupArtifact.artifact_id == artifact_id
+            )
 
         # Order by position
         query = query.order_by(Group.position)
@@ -237,6 +248,7 @@ async def list_groups(
         logger.info(
             f"Listed {len(group_responses)} groups from collection {collection_id}"
             + (f" (search: {search})" if search else "")
+            + (f" (artifact_id: {artifact_id})" if artifact_id else "")
         )
 
         return GroupListResponse(

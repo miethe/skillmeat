@@ -6,17 +6,16 @@
  * Request to undeploy (remove) an artifact from a project.
  */
 export type UndeployRequest = {
-    /**
-     * Artifact name
-     */
-    artifact_name: string;
-    /**
-     * Artifact type
-     */
-    artifact_type: string;
-    /**
-     * Path to project directory (uses CWD if not specified)
-     */
-    project_path?: (string | null);
+  /**
+   * Artifact name
+   */
+  artifact_name: string;
+  /**
+   * Artifact type
+   */
+  artifact_type: string;
+  /**
+   * Path to project directory (uses CWD if not specified)
+   */
+  project_path?: string | null;
 };
-

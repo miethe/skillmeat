@@ -7,9 +7,8 @@ import type { ArtifactParameters } from './ArtifactParameters';
  * Request to update artifact parameters.
  */
 export type ParameterUpdateRequest = {
-    /**
-     * Parameters to update
-     */
-    parameters: ArtifactParameters;
+  /**
+   * Parameters to update
+   */
+  parameters: ArtifactParameters;
 };
-

@@ -890,7 +890,7 @@
           "user-collections"
         ],
         "summary": "List artifacts in collection",
-        "description": "Retrieve paginated list of artifacts in a collection with optional type filtering",
+        "description": "Retrieve paginated list of artifacts in a collection with optional type and group filtering",
         "operationId": "list_collection_artifacts_api_v1_user_collections__collection_id__artifacts_get",
         "security": [
           {
@@ -952,6 +952,36 @@
               "title": "Artifact Type"
             },
             "description": "Filter by artifact type"
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by group membership - only return artifacts belonging to this group",
+              "title": "Group Id"
+            },
+            "description": "Filter by group membership - only return artifacts belonging to this group"
+          },
+          {
+            "name": "include_groups",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include group memberships for each artifact in the response",
+              "default": false,
+              "title": "Include Groups"
+            },
+            "description": "Include group memberships for each artifact in the response"
           }
         ],
         "responses": {
@@ -7394,7 +7424,7 @@
           "groups"
         ],
         "summary": "List groups in collection",
-        "description": "List all groups in a collection, ordered by position.\n\n    Optionally filter by name using the search parameter.",
+        "description": "List all groups in a collection, ordered by position.\n\n    Optionally filter by name using the search parameter, or filter to only\n    groups containing a specific artifact using the artifact_id parameter.",
         "operationId": "list_groups_api_v1_groups_get",
         "parameters": [
           {
@@ -7425,6 +7455,24 @@
               "title": "Search"
             },
             "description": "Filter groups by name (case-insensitive)"
+          },
+          {
+            "name": "artifact_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to groups containing this artifact",
+              "title": "Artifact Id"
+            },
+            "description": "Filter to groups containing this artifact"
           }
         ],
         "responses": {
@@ -14749,6 +14797,33 @@
             "unchanged": 3
           }
         }
+      },
+      "ArtifactGroupMembership": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Group unique identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Group name"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position",
+            "description": "Artifact position within the group"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "position"
+        ],
+        "title": "ArtifactGroupMembership",
+        "description": "Group membership info for an artifact."
       },
       "ArtifactListResponse": {
         "properties": {
@@ -31167,6 +31242,21 @@
             "type": "string",
             "title": "Source",
             "description": "Source specification"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ArtifactGroupMembership"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups",
+            "description": "Groups this artifact belongs to (only populated when include_groups=true)"
           }
         },
         "type": "object",
@@ -31176,7 +31266,7 @@
           "source"
         ],
         "title": "ArtifactSummary",
-        "description": "Lightweight artifact summary for collection listings."
+        "description": "Lightweight artifact summary for collection listings.\n\nWhen include_groups=true query parameter is used, the groups field\nwill be populated with group membership information."
       },
       "skillmeat__api__schemas__user_collections__CollectionArtifactsResponse": {
         "properties": {
@@ -31199,7 +31289,7 @@
           "page_info"
         ],
         "title": "CollectionArtifactsResponse",
-        "description": "Paginated response for collection artifacts."
+        "description": "Paginated response for collection artifacts.\n\nWhen include_groups=true query parameter is used, each artifact's\ngroups field will be populated with group membership information."
       }
     },
     "securitySchemes": {

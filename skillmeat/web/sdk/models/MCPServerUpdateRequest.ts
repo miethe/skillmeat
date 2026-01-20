@@ -6,21 +6,20 @@
  * Request schema for updating an MCP server.
  */
 export type MCPServerUpdateRequest = {
-    /**
-     * GitHub repository
-     */
-    repo?: (string | null);
-    /**
-     * Version spec
-     */
-    version?: (string | null);
-    /**
-     * Server description
-     */
-    description?: (string | null);
-    /**
-     * Environment variables (replaces existing)
-     */
-    env_vars?: (Record<string, string> | null);
+  /**
+   * GitHub repository
+   */
+  repo?: string | null;
+  /**
+   * Version spec
+   */
+  version?: string | null;
+  /**
+   * Server description
+   */
+  description?: string | null;
+  /**
+   * Environment variables (replaces existing)
+   */
+  env_vars?: Record<string, string> | null;
 };
-

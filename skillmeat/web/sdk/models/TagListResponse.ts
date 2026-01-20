@@ -8,13 +8,12 @@ import type { TagResponse } from './TagResponse';
  * Paginated response for tag listings.
  */
 export type TagListResponse = {
-    /**
-     * List of tags for this page
-     */
-    items: Array<TagResponse>;
-    /**
-     * Pagination metadata
-     */
-    page_info: PageInfo;
+  /**
+   * List of tags for this page
+   */
+  items: Array<TagResponse>;
+  /**
+   * Pagination metadata
+   */
+  page_info: PageInfo;
 };
-
