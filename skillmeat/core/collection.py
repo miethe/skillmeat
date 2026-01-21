@@ -1,12 +1,18 @@
 """Collection data model and manager for SkillMeat."""
 
+import logging
 import shutil
+import threading
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .artifact import Artifact, ArtifactType
+
+logger = logging.getLogger(__name__)
+
 from .mcp.metadata import MCPServerMetadata
 
 
@@ -230,6 +236,8 @@ class CollectionManager:
         # In-memory cache for collection objects
         self._collection_cache: Dict[str, Collection] = {}
         self._collection_mtime: Dict[str, float] = {}
+        # Thread-safe lock for cache operations (RLock allows nested calls)
+        self._cache_lock = threading.RLock()
 
     def init(self, name: str = "default") -> Collection:
         """Initialize new collection.
@@ -311,7 +319,7 @@ class CollectionManager:
             name: Collection name (uses active if None)
 
         Returns:
-            Collection object
+            Collection object (deep copy to prevent mutation of cached data)
 
         Raises:
             ValueError: Collection not found
@@ -322,25 +330,28 @@ class CollectionManager:
         if not collection_path.exists():
             raise ValueError(f"Collection '{name}' not found at {collection_path}")
 
-        # Check for cached version
+        # Check for cached version (thread-safe)
         try:
             manifest_path = collection_path / self.manifest_mgr.MANIFEST_FILENAME
             if manifest_path.exists():
                 mtime = manifest_path.stat().st_mtime
-                if (
-                    name in self._collection_cache
-                    and self._collection_mtime.get(name) == mtime
-                ):
-                    return self._collection_cache[name]
+                with self._cache_lock:
+                    if (
+                        name in self._collection_cache
+                        and self._collection_mtime.get(name) == mtime
+                    ):
+                        # Return deep copy to prevent callers from mutating cached data
+                        return deepcopy(self._collection_cache[name])
 
-                # Load from disk and cache
-                collection = self.manifest_mgr.read(collection_path)
-                self._collection_cache[name] = collection
-                self._collection_mtime[name] = mtime
-                return collection
-        except Exception:
+                    # Load from disk and cache
+                    collection = self.manifest_mgr.read(collection_path)
+                    self._collection_cache[name] = collection
+                    self._collection_mtime[name] = mtime
+                    # Return deep copy to prevent callers from mutating cached data
+                    return deepcopy(collection)
+        except Exception as e:
             # Fallback to direct read on error (e.g. permission issues)
-            pass
+            logger.debug(f"Cache fallback for collection '{name}': {e}")
 
         return self.manifest_mgr.read(collection_path)
 
@@ -356,10 +367,26 @@ class CollectionManager:
 
         # Invalidate cache to ensure consistency (force reload on next access)
         # This avoids race conditions where we might cache stale data or mtime mismatch
-        if collection.name in self._collection_cache:
-            del self._collection_cache[collection.name]
-        if collection.name in self._collection_mtime:
-            del self._collection_mtime[collection.name]
+        with self._cache_lock:
+            if collection.name in self._collection_cache:
+                del self._collection_cache[collection.name]
+            if collection.name in self._collection_mtime:
+                del self._collection_mtime[collection.name]
+
+    def invalidate_collection_cache(self, name: str) -> None:
+        """Invalidate the cache for a specific collection.
+
+        Call this after directly modifying the collection manifest file
+        (bypassing save_collection) to ensure cache consistency.
+
+        Args:
+            name: Collection name to invalidate
+        """
+        with self._cache_lock:
+            if name in self._collection_cache:
+                del self._collection_cache[name]
+            if name in self._collection_mtime:
+                del self._collection_mtime[name]
 
     def delete_collection(self, name: str, confirm: bool = True) -> None:
         """Delete collection.
@@ -387,11 +414,12 @@ class CollectionManager:
         # Delete collection directory
         shutil.rmtree(collection_path)
 
-        # Remove from cache
-        if name in self._collection_cache:
-            del self._collection_cache[name]
-        if name in self._collection_mtime:
-            del self._collection_mtime[name]
+        # Remove from cache (thread-safe)
+        with self._cache_lock:
+            if name in self._collection_cache:
+                del self._collection_cache[name]
+            if name in self._collection_mtime:
+                del self._collection_mtime[name]
 
     def artifact_in_collection(
         self,
