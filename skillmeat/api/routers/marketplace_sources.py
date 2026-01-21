@@ -2411,6 +2411,11 @@ async def import_artifacts(
                     detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
                 )
 
+            # Extract description and tags from metadata_json if available
+            entry_metadata = entry.get_metadata_dict() or {}
+            description = entry_metadata.get("description")
+            tags = entry_metadata.get("tags", [])
+
             # Convert to dict for ImportCoordinator
             entries_data.append(
                 {
@@ -2419,6 +2424,8 @@ async def import_artifacts(
                     "name": entry.name,
                     "upstream_url": entry.upstream_url,
                     "path": entry.path,
+                    "description": description,
+                    "tags": tags,
                 }
             )
 

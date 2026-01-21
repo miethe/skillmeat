@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { GroupFilterSelect } from '@/components/shared/group-filter-select';
+import { TagFilterPopover, TagFilterBar } from '@/components/ui/tag-filter-popover';
 import { useCollectionContext } from '@/hooks';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
@@ -27,6 +28,13 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     onFiltersChange({
       ...filters,
       [key]: value === 'all' ? undefined : value,
+    });
+  };
+
+  const handleTagsChange = (tags: string[]) => {
+    onFiltersChange({
+      ...filters,
+      tags: tags.length > 0 ? tags : undefined,
     });
   };
 
@@ -64,7 +72,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
       {/* Filter Controls */}
       <div
         className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
-          isSpecificCollectionContext ? 'md:grid-cols-5' : 'md:grid-cols-4'
+          isSpecificCollectionContext ? 'md:grid-cols-6' : 'md:grid-cols-5'
         }`}
       >
         {/* Type Filter */}
@@ -146,6 +154,16 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           </div>
         )}
 
+        {/* Tags Filter */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Tags</label>
+          <TagFilterPopover
+            selectedTags={filters.tags || []}
+            onChange={handleTagsChange}
+            className="w-full justify-start"
+          />
+        </div>
+
         {/* Sort Controls */}
         <div>
           <label htmlFor="sort-field" className="mb-1.5 block text-sm font-medium">
@@ -174,6 +192,9 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           </div>
         </div>
       </div>
+
+      {/* Selected Tags Bar */}
+      <TagFilterBar selectedTags={filters.tags || []} onChange={handleTagsChange} />
     </div>
   );
 }

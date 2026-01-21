@@ -539,6 +539,8 @@ def artifact_to_response(
         name=artifact.name,
         type=artifact.type.value,
         source=artifact.upstream if artifact.upstream else "local",
+        origin=artifact.origin,
+        origin_source=artifact.origin_source,
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
         tags=artifact.tags or [],
