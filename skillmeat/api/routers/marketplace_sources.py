@@ -2461,10 +2461,25 @@ async def import_artifacts(
                     detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
                 )
 
-            # Extract description and tags from metadata_json if available
+            # Extract description from metadata_json if available
             entry_metadata = entry.get_metadata_dict() or {}
             description = entry_metadata.get("description")
-            tags = entry_metadata.get("tags", [])
+
+            # Extract approved tags from path_segments
+            tags = []
+            if entry.path_segments:
+                try:
+                    segments_data = json.loads(entry.path_segments)
+                    extracted = segments_data.get("extracted", [])
+                    # Only include approved tags
+                    tags = [
+                        seg["normalized"]
+                        for seg in extracted
+                        if seg.get("status") == "approved"
+                    ]
+                except (json.JSONDecodeError, KeyError):
+                    logger.warning(f"Failed to parse path_segments for entry {entry.id}")
+                    tags = []
 
             # Convert to dict for ImportCoordinator
             entries_data.append(
