@@ -36,10 +36,7 @@ jest.mock('@/hooks/use-toast', () => ({
 }));
 
 // Helper to create mock catalog entries
-function createMockEntry(
-  path: string,
-  overrides: Partial<CatalogEntry> = {}
-): CatalogEntry {
+function createMockEntry(path: string, overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
     id: `entry-${path.replace(/\//g, '-')}`,
     source_id: 'source-123',
@@ -83,9 +80,7 @@ function createWrapper() {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
 
@@ -184,9 +179,7 @@ describe('Bulk Tag Workflow Integration', () => {
       });
 
       // Find and click a suggested tag (generated from path)
-      const suggestedTagButton = screen.getAllByLabelText(
-        /add suggested tag skills/i
-      )[0];
+      const suggestedTagButton = screen.getAllByLabelText(/add suggested tag skills/i)[0];
       if (suggestedTagButton) await user.click(suggestedTagButton);
 
       // Should auto-select the directory
@@ -396,9 +389,7 @@ describe('Bulk Tag Workflow Integration', () => {
         { wrapper: createWrapper() }
       );
 
-      expect(
-        screen.getByText('No directories found in catalog entries.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('No directories found in catalog entries.')).toBeInTheDocument();
 
       const applyButton = screen.getByRole('button', { name: /apply tags/i });
       expect(applyButton).toBeDisabled();
@@ -423,12 +414,8 @@ describe('Bulk Tag Workflow Integration', () => {
         { wrapper: createWrapper() }
       );
 
-      expect(
-        screen.getByText('No directories found in catalog entries.')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Root-level artifacts cannot be bulk-tagged.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('No directories found in catalog entries.')).toBeInTheDocument();
+      expect(screen.getByText('Root-level artifacts cannot be bulk-tagged.')).toBeInTheDocument();
     });
 
     it('handles deeply nested directories', async () => {
@@ -537,7 +524,9 @@ describe('Bulk Tag Workflow Integration', () => {
       const checkbox = screen.getByRole('checkbox', { name: /select skills/i });
       await user.click(checkbox);
 
-      const tagInput = screen.getAllByPlaceholderText('Add tag and press Enter')[0] as HTMLInputElement | undefined;
+      const tagInput = screen.getAllByPlaceholderText('Add tag and press Enter')[0] as
+        | HTMLInputElement
+        | undefined;
 
       // Try to add empty/whitespace tags
       if (tagInput) {
@@ -562,10 +551,7 @@ describe('Bulk Tag Workflow Integration', () => {
 
     it('canceling dialog resets all state', async () => {
       const user = userEvent.setup();
-      const entries = [
-        createMockEntry('skills/canvas'),
-        createMockEntry('skills/docs'),
-      ];
+      const entries = [createMockEntry('skills/canvas'), createMockEntry('skills/docs')];
 
       const { rerender } = render(
         <BulkTagDialogWithHook
@@ -594,9 +580,13 @@ describe('Bulk Tag Workflow Integration', () => {
 
       // Reopen dialog
       rerender(
-        <QueryClientProvider client={new QueryClient({
-          defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-        })}>
+        <QueryClientProvider
+          client={
+            new QueryClient({
+              defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+            })
+          }
+        >
           <BulkTagDialogWithHook
             open={true}
             onOpenChange={mockOnOpenChange}
@@ -617,10 +607,7 @@ describe('Bulk Tag Workflow Integration', () => {
   describe('Keyboard Navigation', () => {
     it('supports keyboard navigation through checkboxes', async () => {
       const user = userEvent.setup();
-      const entries = [
-        createMockEntry('skills/canvas'),
-        createMockEntry('commands/ai'),
-      ];
+      const entries = [createMockEntry('skills/canvas'), createMockEntry('commands/ai')];
 
       render(
         <BulkTagDialogWithHook

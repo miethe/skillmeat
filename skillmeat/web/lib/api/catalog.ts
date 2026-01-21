@@ -88,9 +88,7 @@ export async function fetchCatalogFileTree(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(
-      errorBody.detail || `Failed to fetch file tree: ${response.statusText}`
-    );
+    throw new Error(errorBody.detail || `Failed to fetch file tree: ${response.statusText}`);
   }
 
   return response.json();
@@ -126,9 +124,7 @@ export async function fetchCatalogFileContent(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(
-      errorBody.detail || `Failed to fetch file content: ${response.statusText}`
-    );
+    throw new Error(errorBody.detail || `Failed to fetch file content: ${response.statusText}`);
   }
 
   return response.json();

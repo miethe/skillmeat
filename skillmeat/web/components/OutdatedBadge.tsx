@@ -67,7 +67,7 @@ export function OutdatedBadge({
       variant={variant}
       className={cn(
         'gap-1',
-        isClickable && 'cursor-pointer hover:opacity-80 transition-opacity',
+        isClickable && 'cursor-pointer transition-opacity hover:opacity-80',
         className
       )}
       onClick={onClick}

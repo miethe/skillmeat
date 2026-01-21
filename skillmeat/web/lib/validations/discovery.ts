@@ -16,16 +16,13 @@ import { z } from 'zod';
 export const githubSourceSchema = z
   .string()
   .min(1, 'Source is required')
-  .refine(
-    (val) => {
-      // Standard format: user/repo/path or user/repo/path@version
-      const standardFormat = /^[\w.-]+\/[\w.-]+\/[\w./-]+(@[\w.-]+)?$/;
-      // HTTPS URL format
-      const httpsFormat = /^https:\/\/github\.com\/.+/;
-      return standardFormat.test(val) || httpsFormat.test(val);
-    },
-    'Invalid GitHub source format. Use: user/repo/path or https://github.com/...'
-  );
+  .refine((val) => {
+    // Standard format: user/repo/path or user/repo/path@version
+    const standardFormat = /^[\w.-]+\/[\w.-]+\/[\w./-]+(@[\w.-]+)?$/;
+    // HTTPS URL format
+    const httpsFormat = /^https:\/\/github\.com\/.+/;
+    return standardFormat.test(val) || httpsFormat.test(val);
+  }, 'Invalid GitHub source format. Use: user/repo/path or https://github.com/...');
 
 /**
  * Version validation
@@ -39,11 +36,7 @@ export const versionSchema = z
   .string()
   .optional()
   .refine(
-    (val) =>
-      !val ||
-      val === 'latest' ||
-      val.startsWith('@') ||
-      /^v?\d+\.\d+/.test(val),
+    (val) => !val || val === 'latest' || val.startsWith('@') || /^v?\d+\.\d+/.test(val),
     'Version must be "latest", "@v1.0.0", or a valid semver'
   );
 
@@ -59,20 +52,15 @@ export const scopeSchema = z.enum(['user', 'local'], {
  * Tags validation
  * Array of non-empty strings
  */
-export const tagsSchema = z
-  .array(z.string().min(1, 'Tags cannot be empty'))
-  .optional();
+export const tagsSchema = z.array(z.string().min(1, 'Tags cannot be empty')).optional();
 
 /**
  * Artifact type validation
  * Supports all current artifact types in SkillMeat
  */
-export const artifactTypeSchema = z.enum(
-  ['skill', 'command', 'agent', 'hook', 'mcp'],
-  {
-    errorMap: () => ({ message: 'Invalid artifact type' }),
-  }
-);
+export const artifactTypeSchema = z.enum(['skill', 'command', 'agent', 'hook', 'mcp'], {
+  errorMap: () => ({ message: 'Invalid artifact type' }),
+});
 
 /**
  * Artifact parameters schema
@@ -104,9 +92,7 @@ export const bulkImportArtifactSchema = z.object({
  * Requires at least one artifact
  */
 export const bulkImportRequestSchema = z.object({
-  artifacts: z
-    .array(bulkImportArtifactSchema)
-    .min(1, 'At least one artifact required'),
+  artifacts: z.array(bulkImportArtifactSchema).min(1, 'At least one artifact required'),
   auto_resolve_conflicts: z.boolean().optional(),
 });
 

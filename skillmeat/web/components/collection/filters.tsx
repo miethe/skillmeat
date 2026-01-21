@@ -2,7 +2,15 @@
 
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { GroupFilterSelect } from '@/components/shared/group-filter-select';
+import { useCollectionContext } from '@/hooks';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
 interface FiltersProps {
@@ -13,6 +21,8 @@ interface FiltersProps {
 }
 
 export function Filters({ filters, sort, onFiltersChange, onSortChange }: FiltersProps) {
+  const { selectedCollectionId } = useCollectionContext();
+
   const handleFilterChange = (key: keyof ArtifactFilters, value: string) => {
     onFiltersChange({
       ...filters,
@@ -34,6 +44,10 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     });
   };
 
+  // Determine if we're in a specific collection context (not "All Collections")
+  const isSpecificCollectionContext =
+    selectedCollectionId && selectedCollectionId !== 'all';
+
   return (
     <div className="space-y-4">
       {/* Search */}
@@ -48,7 +62,11 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
       </div>
 
       {/* Filter Controls */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
+          isSpecificCollectionContext ? 'md:grid-cols-5' : 'md:grid-cols-4'
+        }`}
+      >
         {/* Type Filter */}
         <div>
           <label htmlFor="type-filter" className="mb-1.5 block text-sm font-medium">
@@ -114,16 +132,27 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           </Select>
         </div>
 
+        {/* Group Filter - Only show in specific collection context */}
+        {isSpecificCollectionContext && selectedCollectionId && (
+          <div>
+            <label htmlFor="group-filter" className="mb-1.5 block text-sm font-medium">
+              Group
+            </label>
+            <GroupFilterSelect
+              collectionId={selectedCollectionId}
+              value={filters.groupId}
+              onChange={(groupId) => onFiltersChange({ ...filters, groupId })}
+            />
+          </div>
+        )}
+
         {/* Sort Controls */}
         <div>
           <label htmlFor="sort-field" className="mb-1.5 block text-sm font-medium">
             Sort By
           </label>
           <div className="flex gap-2">
-            <Select
-              value={sort.field}
-              onValueChange={handleSortFieldChange}
-            >
+            <Select value={sort.field} onValueChange={handleSortFieldChange}>
               <SelectTrigger id="sort-field" className="flex-1">
                 <SelectValue placeholder="Name" />
               </SelectTrigger>
@@ -133,10 +162,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
                 <SelectItem value="usageCount">Usage Count</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={sort.order}
-              onValueChange={handleSortOrderChange}
-            >
+            <Select value={sort.order} onValueChange={handleSortOrderChange}>
               <SelectTrigger id="sort-order" aria-label="Sort order">
                 <SelectValue placeholder="A-Z" />
               </SelectTrigger>

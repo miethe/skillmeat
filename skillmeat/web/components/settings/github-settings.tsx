@@ -53,7 +53,8 @@ export function GitHubSettings() {
       }
     }
     fetchStatus();
-  }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount - toast is stable enough for error handling
 
   // Client-side token format validation
   const isValidTokenFormat = (value: string): boolean => {
@@ -241,7 +242,10 @@ export function GitHubSettings() {
                   value={token}
                   onChange={handleTokenChange}
                   disabled={isSubmitting}
-                  className={cn('pr-10', validationError && 'border-red-500 focus-visible:ring-red-500')}
+                  className={cn(
+                    'pr-10',
+                    validationError && 'border-red-500 focus-visible:ring-red-500'
+                  )}
                   aria-describedby={validationError ? 'token-error' : 'token-help'}
                 />
                 <Button

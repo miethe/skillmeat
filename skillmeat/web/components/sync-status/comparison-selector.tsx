@@ -122,10 +122,7 @@ export function ComparisonSelector({
               size="sm"
               onClick={() => onChange(option.value)}
               disabled={isDisabled}
-              className={cn(
-                'flex-1 text-xs',
-                isActive && 'pointer-events-none'
-              )}
+              className={cn('flex-1 text-xs', isActive && 'pointer-events-none')}
               title={isDisabled && disabledReason ? disabledReason : option.label}
             >
               {option.shortLabel}

@@ -77,9 +77,7 @@ export async function analyzeMergeSafety(
 /**
  * Preview merge changes between snapshots
  */
-export async function previewMerge(
-  request: MergeAnalyzeRequest
-): Promise<MergePreviewResponse> {
+export async function previewMerge(request: MergeAnalyzeRequest): Promise<MergePreviewResponse> {
   const response = await fetch(buildUrl('/merge/preview'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -98,9 +96,7 @@ export async function previewMerge(
 /**
  * Execute merge between snapshots
  */
-export async function executeMerge(
-  request: MergeExecuteRequest
-): Promise<MergeExecuteResponse> {
+export async function executeMerge(request: MergeExecuteRequest): Promise<MergeExecuteResponse> {
   const response = await fetch(buildUrl('/merge/execute'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -120,9 +120,7 @@ describe('ScoreBreakdown', () => {
         match: 0.5,
       };
 
-      render(
-        <ScoreBreakdown {...defaultProps} weights={customWeights} defaultExpanded={true} />
-      );
+      render(<ScoreBreakdown {...defaultProps} weights={customWeights} defaultExpanded={true} />);
 
       expect(screen.getByText(/\(30%\)/)).toBeInTheDocument(); // Trust
       expect(screen.getByText(/\(20%\)/)).toBeInTheDocument(); // Quality
@@ -136,9 +134,7 @@ describe('ScoreBreakdown', () => {
         match: 0.5,
       };
 
-      render(
-        <ScoreBreakdown {...defaultProps} weights={customWeights} defaultExpanded={true} />
-      );
+      render(<ScoreBreakdown {...defaultProps} weights={customWeights} defaultExpanded={true} />);
 
       expect(screen.getByText(/Formula:/)).toBeInTheDocument();
       expect(screen.getByText(/\(T×0\.3\) \+ \(Q×0\.2\) \+ \(M×0\.5\)/)).toBeInTheDocument();
@@ -220,13 +216,7 @@ describe('ScoreBreakdown', () => {
   describe('Edge Cases', () => {
     it('handles zero scores', () => {
       render(
-        <ScoreBreakdown
-          confidence={0}
-          trust={0}
-          quality={0}
-          match={0}
-          defaultExpanded={true}
-        />
+        <ScoreBreakdown confidence={0} trust={0} quality={0} match={0} defaultExpanded={true} />
       );
 
       expect(screen.getAllByText(/\b0\b/)).toHaveLength(4); // 3 components + confidence in formula
@@ -253,9 +243,7 @@ describe('ScoreBreakdown', () => {
         match: 0.334,
       };
 
-      render(
-        <ScoreBreakdown {...defaultProps} weights={decimalWeights} defaultExpanded={true} />
-      );
+      render(<ScoreBreakdown {...defaultProps} weights={decimalWeights} defaultExpanded={true} />);
 
       // Math.round(0.333 * 100) = 33
       // Math.round(0.334 * 100) = 33

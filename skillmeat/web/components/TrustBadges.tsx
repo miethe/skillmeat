@@ -17,12 +17,7 @@
 import * as React from 'react';
 import { ShieldCheck, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 /**
@@ -109,9 +104,7 @@ export function TrustBadges({ trustLevel, source, className }: TrustBadgesProps)
         <TooltipContent>
           <div className="space-y-1">
             <p>{config.tooltip}</p>
-            {source && (
-              <p className="text-xs text-muted-foreground">Source: {source}</p>
-            )}
+            {source && <p className="text-xs text-muted-foreground">Source: {source}</p>}
           </div>
         </TooltipContent>
       </Tooltip>

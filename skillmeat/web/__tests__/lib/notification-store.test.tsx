@@ -601,7 +601,9 @@ describe('useNotifications', () => {
       // Oldest remaining should be at index 49
       expect(result.current.notifications[49].title).toBe('Notification 1');
       // Notification 0 should be evicted
-      expect(result.current.notifications.find((n) => n.title === 'Notification 0')).toBeUndefined();
+      expect(
+        result.current.notifications.find((n) => n.title === 'Notification 0')
+      ).toBeUndefined();
     });
 
     it('should evict oldest read notification first', () => {
@@ -765,10 +767,7 @@ describe('useNotifications', () => {
         },
       ];
 
-      localStorageMock.setItem(
-        'skillmeat-notifications',
-        JSON.stringify(storedNotifications)
-      );
+      localStorageMock.setItem('skillmeat-notifications', JSON.stringify(storedNotifications));
 
       const { result } = renderHook(() => useNotifications(), { wrapper });
 
@@ -788,10 +787,7 @@ describe('useNotifications', () => {
         },
       ];
 
-      localStorageMock.setItem(
-        'skillmeat-notifications',
-        JSON.stringify(storedNotifications)
-      );
+      localStorageMock.setItem('skillmeat-notifications', JSON.stringify(storedNotifications));
 
       const { result } = renderHook(() => useNotifications(), { wrapper });
 

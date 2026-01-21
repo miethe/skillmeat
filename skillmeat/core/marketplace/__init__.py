@@ -67,6 +67,15 @@ from .observability import (
     track_operation,
     ValidationError,
 )
+from .source_manager import (
+    MAX_TAG_LENGTH,
+    MAX_TAGS_PER_SOURCE,
+    MIN_TAG_LENGTH,
+    SourceManager,
+    SourceNotFoundError,
+    TAG_PATTERN,
+    TagValidationError,
+)
 
 __all__ = [
     # Content hashing
@@ -120,4 +129,12 @@ __all__ = [
     "track_operation",
     "operation_context",
     "ErrorResponse",
+    # Source management
+    "SourceManager",
+    "SourceNotFoundError",
+    "TagValidationError",
+    "TAG_PATTERN",
+    "MIN_TAG_LENGTH",
+    "MAX_TAG_LENGTH",
+    "MAX_TAGS_PER_SOURCE",
 ]

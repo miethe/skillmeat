@@ -79,12 +79,10 @@ export default function ContextEntitiesPage() {
 
   // Data fetching with cursor-based pagination
   const [paginationCursor, setPaginationCursor] = useState<string | undefined>(undefined);
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useContextEntities({ ...filters, after: paginationCursor });
+  const { data, isLoading, error, refetch } = useContextEntities({
+    ...filters,
+    after: paginationCursor,
+  });
 
   // Mutations
   const createEntity = useCreateContextEntity();
@@ -175,7 +173,7 @@ export default function ContextEntitiesPage() {
       {/* Skip Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:rounded focus:outline focus:outline-2 focus:outline-primary"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-background focus:px-4 focus:py-2 focus:outline focus:outline-2 focus:outline-primary"
       >
         Skip to main content
       </a>
@@ -216,8 +214,7 @@ export default function ContextEntitiesPage() {
                 'Error loading entities'
               ) : (
                 <>
-                  {data?.items.length || 0}{' '}
-                  {data?.items.length === 1 ? 'Entity' : 'Entities'}
+                  {data?.items.length || 0} {data?.items.length === 1 ? 'Entity' : 'Entities'}
                 </>
               )}
             </h2>
@@ -271,7 +268,9 @@ export default function ContextEntitiesPage() {
                     variant="outline"
                     onClick={handleLoadMore}
                     disabled={isLoading}
-                    aria-label={isLoading ? 'Loading more context entities' : 'Load more context entities'}
+                    aria-label={
+                      isLoading ? 'Loading more context entities' : 'Load more context entities'
+                    }
                   >
                     {isLoading ? (
                       <>

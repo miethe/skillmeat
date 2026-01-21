@@ -14,7 +14,12 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useCollectionContext, useAddArtifactToCollection, useRemoveArtifactFromCollection, useToast } from '@/hooks';
+import {
+  useCollectionContext,
+  useAddArtifactToCollection,
+  useRemoveArtifactFromCollection,
+  useToast,
+} from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 import { CreateCollectionDialog } from '@/components/collection/create-collection-dialog';
 
@@ -133,9 +138,7 @@ export function MoveCopyDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>
-            {operation === 'move' ? 'Move' : 'Copy'} to Collection
-          </DialogTitle>
+          <DialogTitle>{operation === 'move' ? 'Move' : 'Copy'} to Collection</DialogTitle>
           <DialogDescription>
             {artifacts.length === 1 && firstArtifact
               ? `${operation === 'move' ? 'Move' : 'Copy'} "${firstArtifact.name}" to another collection.`
@@ -168,7 +171,7 @@ export function MoveCopyDialog({
         {/* Collection selection */}
         <div className="py-4">
           <Label className="text-sm font-medium">Select collection</Label>
-          <ScrollArea className="h-[200px] mt-2 rounded-md border">
+          <ScrollArea className="mt-2 h-[200px] rounded-md border">
             <RadioGroup
               value={selectedCollectionId ?? ''}
               onValueChange={setSelectedCollectionId}
@@ -176,10 +179,8 @@ export function MoveCopyDialog({
               disabled={isPending}
             >
               {availableCollections.length === 0 ? (
-                <div className="p-4 text-center space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    No other collections available.
-                  </p>
+                <div className="space-y-3 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">No other collections available.</p>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -194,17 +195,18 @@ export function MoveCopyDialog({
                 availableCollections.map((collection) => (
                   <div
                     key={collection.id}
-                    className="flex items-center space-x-2 py-2 px-2 rounded-md hover:bg-accent"
+                    className="flex items-center space-x-2 rounded-md px-2 py-2 hover:bg-accent"
                   >
                     <RadioGroupItem value={collection.id} id={collection.id} />
                     <Label
                       htmlFor={collection.id}
-                      className="flex items-center gap-2 cursor-pointer flex-1"
+                      className="flex flex-1 cursor-pointer items-center gap-2"
                     >
                       <FolderOpen className="h-4 w-4 text-muted-foreground" />
                       <span>{collection.name}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {collection.artifact_count} artifact{collection.artifact_count !== 1 ? 's' : ''}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {collection.artifact_count} artifact
+                        {collection.artifact_count !== 1 ? 's' : ''}
                       </span>
                     </Label>
                   </div>
@@ -216,7 +218,7 @@ export function MoveCopyDialog({
 
         {/* Info message */}
         {operation === 'move' && sourceCollectionId && (
-          <div className="bg-muted rounded-md p-3">
+          <div className="rounded-md bg-muted p-3">
             <p className="text-sm text-muted-foreground">
               Moving will remove the artifact{artifacts.length > 1 ? 's' : ''} from the current
               collection.
@@ -246,10 +248,7 @@ export function MoveCopyDialog({
         </DialogFooter>
       </DialogContent>
 
-      <CreateCollectionDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-      />
+      <CreateCollectionDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
     </Dialog>
   );
 }

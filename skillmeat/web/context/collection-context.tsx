@@ -44,7 +44,9 @@ interface CollectionProviderProps {
 }
 
 export function CollectionProvider({ children }: CollectionProviderProps) {
-  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(DEFAULT_COLLECTION_ID);
+  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(
+    DEFAULT_COLLECTION_ID
+  );
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {

@@ -5,12 +5,7 @@
  * GitHub source management, catalog browsing, and artifact import.
  */
 
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  useInfiniteQuery,
-} from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 import { apiRequest } from '@/lib/api';
 import { inferUrl } from '@/lib/api/marketplace';
@@ -55,9 +50,7 @@ export function useSources(limit = 50) {
       const params = new URLSearchParams();
       if (pageParam) params.append('cursor', pageParam);
       params.append('limit', limit.toString());
-      return apiRequest<GitHubSourceListResponse>(
-        `/marketplace/sources?${params}`
-      );
+      return apiRequest<GitHubSourceListResponse>(`/marketplace/sources?${params}`);
     },
     getNextPageParam: (lastPage) =>
       lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor : undefined,
@@ -72,8 +65,7 @@ export function useSources(limit = 50) {
 export function useSource(sourceId: string) {
   return useQuery({
     queryKey: sourceKeys.detail(sourceId),
-    queryFn: () =>
-      apiRequest<GitHubSource>(`/marketplace/sources/${sourceId}`),
+    queryFn: () => apiRequest<GitHubSource>(`/marketplace/sources/${sourceId}`),
     enabled: !!sourceId,
     staleTime: 30000, // 30 seconds
   });
@@ -237,11 +229,7 @@ export function useRescanSource(sourceId: string) {
 /**
  * Fetch source catalog with filters and pagination
  */
-export function useSourceCatalog(
-  sourceId: string,
-  filters?: CatalogFilters,
-  limit = 50
-) {
+export function useSourceCatalog(sourceId: string, filters?: CatalogFilters, limit = 50) {
   return useInfiniteQuery({
     queryKey: sourceKeys.catalog(sourceId, filters, limit),
     queryFn: async ({ pageParam }) => {
@@ -303,7 +291,9 @@ export function useImportArtifacts(sourceId: string) {
         result.imported_count > 0 && `${result.imported_count} imported`,
         result.skipped_count > 0 && `${result.skipped_count} skipped`,
         result.error_count > 0 && `${result.error_count} failed`,
-      ].filter(Boolean).join(', ');
+      ]
+        .filter(Boolean)
+        .join(', ');
 
       toast({
         title: 'Import complete',
@@ -329,8 +319,8 @@ export function useImportAllMatching(sourceId: string) {
   const importMutation = useImportArtifacts(sourceId);
 
   const importAll = (strategy: ImportRequest['conflict_strategy'] = 'skip') => {
-    const allEntries = data?.pages.flatMap(page => page.items) || [];
-    const entryIds = allEntries.map(entry => entry.id);
+    const allEntries = data?.pages.flatMap((page) => page.items) || [];
+    const entryIds = allEntries.map((entry) => entry.id);
 
     if (entryIds.length === 0) {
       return;
@@ -362,13 +352,10 @@ export function useUpdateCatalogEntryName(sourceId: string) {
 
   return useMutation({
     mutationFn: ({ entryId, name }: { entryId: string; name: string }) =>
-      apiRequest<CatalogEntry>(
-        `/marketplace/sources/${sourceId}/artifacts/${entryId}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ name } as UpdateCatalogEntryNameRequest),
-        }
-      ),
+      apiRequest<CatalogEntry>(`/marketplace/sources/${sourceId}/artifacts/${entryId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name } as UpdateCatalogEntryNameRequest),
+      }),
     onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       toast({
@@ -404,13 +391,10 @@ export function useExcludeCatalogEntry(sourceId: string) {
 
   return useMutation({
     mutationFn: ({ entryId, reason }: { entryId: string; reason?: string }) =>
-      apiRequest<CatalogEntry>(
-        `/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ excluded: true, reason } as ExcludeEntryRequest),
-        }
-      ),
+      apiRequest<CatalogEntry>(`/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`, {
+        method: 'PATCH',
+        body: JSON.stringify({ excluded: true, reason } as ExcludeEntryRequest),
+      }),
     onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       toast({
@@ -437,13 +421,10 @@ export function useRestoreCatalogEntry(sourceId: string) {
 
   return useMutation({
     mutationFn: (entryId: string) =>
-      apiRequest<CatalogEntry>(
-        `/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ excluded: false } as ExcludeEntryRequest),
-        }
-      ),
+      apiRequest<CatalogEntry>(`/marketplace/sources/${sourceId}/artifacts/${entryId}/exclude`, {
+        method: 'PATCH',
+        body: JSON.stringify({ excluded: false } as ExcludeEntryRequest),
+      }),
     onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: [...sourceKeys.catalogs(), sourceId] });
       toast({

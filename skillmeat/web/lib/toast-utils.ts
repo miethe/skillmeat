@@ -51,9 +51,8 @@ export function showErrorToast(
   addNotification?: (notification: NotificationCreateInput) => void
 ) {
   const message = error instanceof Error ? error.message : fallbackMessage;
-  const errorCode = error && typeof error === 'object' && 'code' in error
-    ? String(error.code)
-    : undefined;
+  const errorCode =
+    error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined;
   const stack = error instanceof Error ? error.stack : undefined;
 
   toast.error(message, {
@@ -95,10 +94,7 @@ export function showWarningToast(message: string, description?: string) {
  * @returns Formatted breakdown string
  */
 export function formatImportBreakdown(result: BulkImportResult): string {
-  const lines = [
-    'Import Complete',
-    '─────────────────',
-  ];
+  const lines = ['Import Complete', '─────────────────'];
 
   // Imported to collection (new artifacts)
   if (result.imported_to_collection > 0) {
@@ -247,9 +243,7 @@ export function showImportResultToast(
   const total = result.total_imported + result.total_failed;
 
   if (result.total_imported > 0 && result.total_failed === 0) {
-    showSuccessToast(
-      `Successfully imported ${result.total_imported} artifact(s)`
-    );
+    showSuccessToast(`Successfully imported ${result.total_imported} artifact(s)`);
   } else if (result.total_imported > 0 && result.total_failed > 0) {
     showWarningToast(
       `Imported ${result.total_imported} artifact(s)`,
@@ -265,12 +259,14 @@ export function showImportResultToast(
       type: result.total_failed > 0 ? 'error' : 'success',
       title: 'Import Complete',
       message: `Imported ${result.total_imported} of ${total} artifact(s)`,
-      details: result.artifacts ? {
-        total,
-        succeeded: result.total_imported,
-        failed: result.total_failed,
-        artifacts: result.artifacts,
-      } : undefined,
+      details: result.artifacts
+        ? {
+            total,
+            succeeded: result.total_imported,
+            failed: result.total_failed,
+            artifacts: result.artifacts,
+          }
+        : undefined,
     });
   }
 }

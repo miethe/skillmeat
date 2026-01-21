@@ -36,12 +36,7 @@ import { useToastNotification } from '@/hooks';
 import { useTrackDiscovery } from '@/lib/analytics';
 import { TableSkeleton } from './skeletons';
 import { cn } from '@/lib/utils';
-import type {
-  BulkImportResult,
-  ImportResult,
-  ImportStatus,
-  MatchType,
-} from '@/types/discovery';
+import type { BulkImportResult, ImportResult, ImportStatus, MatchType } from '@/types/discovery';
 import { getReasonCodeMessage as getReasonMessage } from '@/types/discovery';
 import type { ArtifactImportResult } from '@/types/notification';
 
@@ -200,7 +195,7 @@ function ImportResultsSummary({
   return (
     <div className="space-y-4">
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-3 gap-4 rounded-lg bg-muted/50 p-4">
         <div className="text-center">
           <div className="text-2xl font-bold text-green-600">{results.total_imported}</div>
           <div className="text-sm text-muted-foreground">Imported</div>
@@ -217,19 +212,19 @@ function ImportResultsSummary({
 
       {/* Summary Message */}
       {results.summary && (
-        <p className="text-sm text-muted-foreground text-center">{results.summary}</p>
+        <p className="text-center text-sm text-muted-foreground">{results.summary}</p>
       )}
 
       {/* Issues Alert */}
       {hasIssues && (
-        <Alert variant="default" className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+        <Alert
+          variant="default"
+          className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20"
+        >
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-sm">
             Some artifacts were skipped or failed.{' '}
-            <button
-              onClick={onViewDetails}
-              className="font-medium underline hover:no-underline"
-            >
+            <button onClick={onViewDetails} className="font-medium underline hover:no-underline">
               View details
             </button>
           </AlertDescription>
@@ -238,7 +233,7 @@ function ImportResultsSummary({
 
       {/* Duration */}
       {results.duration_ms && (
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-center text-xs text-muted-foreground">
           Completed in {(results.duration_ms / 1000).toFixed(2)}s
         </p>
       )}
@@ -309,31 +304,25 @@ function ImportResultsDetails({
           }}
         >
           <span className={colorClass}>{icon}</span>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-medium truncate">{result.artifact_id}</span>
+              <span className="truncate font-medium">{result.artifact_id}</span>
               <Badge variant="outline" className={cn('text-xs', colorClass)}>
                 {label}
               </Badge>
             </div>
             {result.path && (
-              <span className="text-xs text-muted-foreground truncate block">
-                {result.path}
-              </span>
+              <span className="block truncate text-xs text-muted-foreground">{result.path}</span>
             )}
           </div>
           {hasDetails && (
             <span className="text-muted-foreground">
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </span>
           )}
         </div>
         {isExpanded && hasDetails && (
-          <div className="px-3 pb-3 pl-10 space-y-1">
+          <div className="space-y-1 px-3 pb-3 pl-10">
             {result.reason_code && (
               <div className="text-sm">
                 <span className="font-medium text-muted-foreground">Reason: </span>
@@ -374,17 +363,17 @@ function ImportResultsDetails({
     <div className="space-y-4">
       {/* Summary Row */}
       <div className="flex items-center gap-4 text-sm">
-        <span className="text-green-600 font-medium">{successResults.length} imported</span>
-        <span className="text-yellow-600 font-medium">{skippedResults.length} skipped</span>
-        <span className="text-red-600 font-medium">{failedResults.length} failed</span>
+        <span className="font-medium text-green-600">{successResults.length} imported</span>
+        <span className="font-medium text-yellow-600">{skippedResults.length} skipped</span>
+        <span className="font-medium text-red-600">{failedResults.length} failed</span>
       </div>
 
       {/* Results List */}
-      <div className="max-h-[400px] overflow-auto border rounded-md">
+      <div className="max-h-[400px] overflow-auto rounded-md border">
         {/* Failed Items First */}
         {failedResults.length > 0 && (
           <div>
-            <div className="sticky top-0 bg-red-50 dark:bg-red-950/20 px-3 py-2 border-b font-medium text-sm text-red-600">
+            <div className="sticky top-0 border-b bg-red-50 px-3 py-2 text-sm font-medium text-red-600 dark:bg-red-950/20">
               Failed ({failedResults.length})
             </div>
             {failedResults.map(renderResultItem)}
@@ -394,7 +383,7 @@ function ImportResultsDetails({
         {/* Skipped Items */}
         {skippedResults.length > 0 && (
           <div>
-            <div className="sticky top-0 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-2 border-b font-medium text-sm text-yellow-600">
+            <div className="sticky top-0 border-b bg-yellow-50 px-3 py-2 text-sm font-medium text-yellow-600 dark:bg-yellow-950/20">
               Skipped ({skippedResults.length})
             </div>
             {skippedResults.map(renderResultItem)}
@@ -404,7 +393,7 @@ function ImportResultsDetails({
         {/* Success Items */}
         {successResults.length > 0 && (
           <div>
-            <div className="sticky top-0 bg-green-50 dark:bg-green-950/20 px-3 py-2 border-b font-medium text-sm text-green-600">
+            <div className="sticky top-0 border-b bg-green-50 px-3 py-2 text-sm font-medium text-green-600 dark:bg-green-950/20">
               Imported ({successResults.length})
             </div>
             {successResults.map(renderResultItem)}
@@ -563,7 +552,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[900px] max-h-[80vh] flex flex-col">
+      <DialogContent className="flex max-h-[80vh] flex-col sm:max-w-[900px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">
@@ -611,7 +600,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
         {/* Selection View */}
         {showSelectionView && (
           <>
-            <div className="flex-1 overflow-auto border rounded-md" aria-busy={isImporting}>
+            <div className="flex-1 overflow-auto rounded-md border" aria-busy={isImporting}>
               {isImporting ? (
                 <div className="p-4">
                   <TableSkeleton rows={artifacts.length > 5 ? 5 : artifacts.length} />
@@ -640,7 +629,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                   <TableBody>
                     {artifacts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                           No artifacts discovered
                         </TableCell>
                       </TableRow>
@@ -669,13 +658,13 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                             </TableCell>
                             <TableCell className="font-medium">{artifact.name}</TableCell>
                             <TableCell>
-                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                                 {artifact.version || '---'}
                               </code>
                             </TableCell>
                             <TableCell>
                               <span
-                                className="font-mono text-xs truncate block max-w-[200px]"
+                                className="block max-w-[200px] truncate font-mono text-xs"
                                 title={artifact.source}
                               >
                                 {artifact.source || '---'}
@@ -699,7 +688,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                                 />
                                 <Label
                                   htmlFor={`skip-${artifact.path}`}
-                                  className="text-xs text-muted-foreground cursor-pointer"
+                                  className="cursor-pointer text-xs text-muted-foreground"
                                 >
                                   Skip
                                 </Label>
@@ -727,14 +716,14 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
 
             <DialogFooter>
               {/* Path Tags Option */}
-              <div className="flex items-center gap-2 py-2 border-t">
+              <div className="flex items-center gap-2 border-t py-2">
                 <Checkbox
                   id="apply-path-tags"
                   checked={applyPathTags}
                   onCheckedChange={(checked) => setApplyPathTags(checked === true)}
                   disabled={isImporting}
                 />
-                <Label htmlFor="apply-path-tags" className="text-sm cursor-pointer">
+                <Label htmlFor="apply-path-tags" className="cursor-pointer text-sm">
                   Apply approved path tags
                 </Label>
                 <span className="text-xs text-muted-foreground">
@@ -742,7 +731,7 @@ export function BulkImportModal({ artifacts, open, onClose, onImport }: BulkImpo
                 </span>
               </div>
 
-              <div className="flex items-center justify-between w-full">
+              <div className="flex w-full items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                   {selected.size > 0 && `${selected.size} selected`}
                 </div>

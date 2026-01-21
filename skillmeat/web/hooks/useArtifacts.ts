@@ -15,10 +15,7 @@ import type {
   ArtifactType,
 } from '@/types/artifact';
 import { ApiError, apiConfig, apiRequest } from '@/lib/api';
-import {
-  fetchArtifactsPaginated,
-  type ArtifactsPaginatedResponse,
-} from '@/lib/api/artifacts';
+import { fetchArtifactsPaginated, type ArtifactsPaginatedResponse } from '@/lib/api/artifacts';
 
 const USE_MOCKS = apiConfig.useMocks;
 
@@ -625,7 +622,7 @@ export function useInfiniteArtifacts(options?: InfiniteAllArtifactsOptions) {
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
-      lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor ?? undefined : undefined,
+      lastPage.page_info.has_next_page ? (lastPage.page_info.end_cursor ?? undefined) : undefined,
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

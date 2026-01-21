@@ -30,12 +30,7 @@ export function SyncActionsFooter({
     <div className="flex items-center justify-between border-t bg-background p-4">
       {/* Left: Action buttons */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="default"
-          size="sm"
-          onClick={onPullCollectionUpdates}
-          disabled={isApplying}
-        >
+        <Button variant="default" size="sm" onClick={onPullCollectionUpdates} disabled={isApplying}>
           <ArrowDown className="mr-2 h-4 w-4" />
           Pull Collection Updates
         </Button>
@@ -65,12 +60,7 @@ export function SyncActionsFooter({
               Merge Conflicts
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onResolveAll}
-              disabled={isApplying}
-            >
+            <Button variant="outline" size="sm" onClick={onResolveAll} disabled={isApplying}>
               <Check className="mr-2 h-4 w-4" />
               Resolve All
             </Button>
@@ -80,12 +70,7 @@ export function SyncActionsFooter({
 
       {/* Right: Final action buttons */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-          disabled={isApplying}
-        >
+        <Button variant="outline" size="sm" onClick={onCancel} disabled={isApplying}>
           <X className="mr-2 h-4 w-4" />
           Cancel
         </Button>

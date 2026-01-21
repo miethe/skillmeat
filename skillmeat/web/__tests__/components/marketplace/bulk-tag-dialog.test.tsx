@@ -11,10 +11,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
-import {
-  BulkTagDialog,
-  BulkTagDialogWithHook,
-} from '@/components/marketplace/bulk-tag-dialog';
+import { BulkTagDialog, BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
 import type { CatalogEntry } from '@/types/marketplace';
 import type { BulkTagResult } from '@/lib/utils/bulk-tag-apply';
 
@@ -37,10 +34,7 @@ jest.mock('@/hooks/use-toast', () => ({
 }));
 
 // Helper to create mock catalog entries
-function createMockEntry(
-  path: string,
-  overrides: Partial<CatalogEntry> = {}
-): CatalogEntry {
+function createMockEntry(path: string, overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
     id: `entry-${path.replace(/\//g, '-')}`,
     source_id: 'source-123',
@@ -70,9 +64,7 @@ function createWrapper() {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
 
@@ -120,7 +112,9 @@ describe('BulkTagDialog', () => {
       expect(screen.getByRole('checkbox', { name: /select skills$/i })).toBeInTheDocument();
       expect(screen.getByRole('checkbox', { name: /select skills\/dev/i })).toBeInTheDocument();
       expect(screen.getByRole('checkbox', { name: /select commands$/i })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /select commands\/system/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole('checkbox', { name: /select commands\/system/i })
+      ).toBeInTheDocument();
     });
 
     it('shows artifact count for each directory', () => {
@@ -134,12 +128,8 @@ describe('BulkTagDialog', () => {
     it('renders Apply and Cancel buttons', () => {
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByRole('button', { name: /apply tags/i })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /cancel/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /apply tags/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     });
 
     it('disables Apply button when no directories selected', () => {
@@ -168,12 +158,8 @@ describe('BulkTagDialog', () => {
         { wrapper: createWrapper() }
       );
 
-      expect(
-        screen.getByText('No directories found in catalog entries.')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Root-level artifacts cannot be bulk-tagged.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('No directories found in catalog entries.')).toBeInTheDocument();
+      expect(screen.getByText('Root-level artifacts cannot be bulk-tagged.')).toBeInTheDocument();
     });
 
     it('shows empty state with empty entries array', () => {
@@ -181,9 +167,7 @@ describe('BulkTagDialog', () => {
         wrapper: createWrapper(),
       });
 
-      expect(
-        screen.getByText('No directories found in catalog entries.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('No directories found in catalog entries.')).toBeInTheDocument();
     });
   });
 
@@ -264,9 +248,7 @@ describe('BulkTagDialog', () => {
       expect(skillsCheckbox).not.toBeChecked();
 
       // Click a suggested tag button (skills is suggested based on path)
-      const suggestedTagButton = screen.getAllByLabelText(
-        /add suggested tag skills/i
-      )[0];
+      const suggestedTagButton = screen.getAllByLabelText(/add suggested tag skills/i)[0];
       if (suggestedTagButton) await user.click(suggestedTagButton);
 
       // Directory should now be selected
@@ -363,9 +345,10 @@ describe('BulkTagDialog', () => {
       const user = userEvent.setup();
       let resolveApply: (() => void) | undefined;
       mockOnApply.mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveApply = resolve;
-        })
+        () =>
+          new Promise<void>((resolve) => {
+            resolveApply = resolve;
+          })
       );
 
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
@@ -394,9 +377,10 @@ describe('BulkTagDialog', () => {
       const user = userEvent.setup();
       let resolveApply: (() => void) | undefined;
       mockOnApply.mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveApply = resolve;
-        })
+        () =>
+          new Promise<void>((resolve) => {
+            resolveApply = resolve;
+          })
       );
 
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
@@ -474,10 +458,7 @@ describe('BulkTagDialog', () => {
   describe('Progress Indicator', () => {
     it('shows progress indicator when provided', () => {
       render(
-        <BulkTagDialog
-          {...defaultProps}
-          progress={{ current: 5, total: 10, percentage: 50 }}
-        />,
+        <BulkTagDialog {...defaultProps} progress={{ current: 5, total: 10, percentage: 50 }} />,
         { wrapper: createWrapper() }
       );
 
@@ -490,9 +471,7 @@ describe('BulkTagDialog', () => {
     it('has accessible dialog title and description', () => {
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(screen.getByRole('dialog')).toHaveAccessibleName(
-        'Bulk Tag Application'
-      );
+      expect(screen.getByRole('dialog')).toHaveAccessibleName('Bulk Tag Application');
       expect(
         screen.getByText(/apply tags to all artifacts in selected directories/i)
       ).toBeInTheDocument();
@@ -501,21 +480,15 @@ describe('BulkTagDialog', () => {
     it('has accessible checkbox labels', () => {
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByRole('checkbox', { name: /select skills$/i })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('checkbox', { name: /select commands$/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /select skills$/i })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /select commands$/i })).toBeInTheDocument();
     });
 
     it('provides hint for disabled Apply button', () => {
       render(<BulkTagDialog {...defaultProps} />, { wrapper: createWrapper() });
 
       // Screen reader hint should be present
-      expect(
-        screen.getByText('Select at least one directory to apply tags')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Select at least one directory to apply tags')).toBeInTheDocument();
     });
 
     it('has accessible directory list group', () => {
@@ -531,9 +504,7 @@ describe('BulkTagDialog', () => {
         wrapper: createWrapper(),
       });
 
-      expect(
-        screen.getByRole('status', { name: /no directories available/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('status', { name: /no directories available/i })).toBeInTheDocument();
     });
   });
 
@@ -544,10 +515,9 @@ describe('BulkTagDialog', () => {
         createMockEntry('skills_test/docs'),
       ];
 
-      render(
-        <BulkTagDialog {...defaultProps} entries={specialEntries} />,
-        { wrapper: createWrapper() }
-      );
+      render(<BulkTagDialog {...defaultProps} entries={specialEntries} />, {
+        wrapper: createWrapper(),
+      });
 
       // Use getByRole for more specific query since text may appear multiple times
       expect(screen.getByRole('checkbox', { name: /select skills-v2/i })).toBeInTheDocument();
@@ -560,10 +530,9 @@ describe('BulkTagDialog', () => {
         createMockEntry('a/b/c/d/artifact2'),
       ];
 
-      render(
-        <BulkTagDialog {...defaultProps} entries={deepEntries} />,
-        { wrapper: createWrapper() }
-      );
+      render(<BulkTagDialog {...defaultProps} entries={deepEntries} />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByRole('checkbox', { name: /select a\/b\/c\/d/i })).toBeInTheDocument();
     });

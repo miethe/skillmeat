@@ -532,6 +532,72 @@ class CreateSourceRequest(BaseModel):
         default=False,
         description="Enable parsing markdown frontmatter for artifact type hints",
     )
+    import_repo_description: bool = Field(
+        default=False,
+        description="Fetch repository description from GitHub on import",
+    )
+    import_repo_readme: bool = Field(
+        default=False,
+        description="Fetch README content from GitHub on import",
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags to apply to source (max 20, each 1-50 chars)",
+    )
+    single_artifact_mode: bool = Field(
+        default=False,
+        description="Treat the entire repository (or root_hint directory) as a single artifact, bypassing automatic detection",
+    )
+    single_artifact_type: Optional[
+        Literal["skill", "command", "agent", "mcp_server", "hook"]
+    ] = Field(
+        default=None,
+        description="Artifact type when single_artifact_mode is enabled (required when mode is True)",
+    )
+
+    @model_validator(mode="after")
+    def validate_single_artifact_mode(self) -> "CreateSourceRequest":
+        """Validate single artifact mode requires type specification.
+
+        Returns:
+            Validated model instance
+
+        Raises:
+            ValueError: If single_artifact_mode is True but single_artifact_type is not provided
+        """
+        if self.single_artifact_mode and not self.single_artifact_type:
+            raise ValueError(
+                "single_artifact_type is required when single_artifact_mode is True"
+            )
+        return self
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate tags format and constraints.
+
+        Args:
+            v: Tags list to validate
+
+        Returns:
+            Validated and normalized tags (lowercase)
+
+        Raises:
+            ValueError: If tags exceed limits or have invalid format
+        """
+        if v is None:
+            return v
+        if len(v) > 20:
+            raise ValueError("Maximum 20 tags allowed per source")
+        pattern = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+        for tag in v:
+            if not (1 <= len(tag) <= 50):
+                raise ValueError(f"Tag '{tag}' must be 1-50 characters")
+            if not pattern.match(tag):
+                raise ValueError(
+                    f"Tag '{tag}' must be alphanumeric with optional hyphens/underscores"
+                )
+        return [t.lower() for t in v]  # Normalize to lowercase
 
     @field_validator("description")
     @classmethod
@@ -621,6 +687,11 @@ class CreateSourceRequest(BaseModel):
                 "trust_level": "verified",
                 "description": "Anthropic's official quickstart examples",
                 "notes": "Contains high-quality reference implementations",
+                "import_repo_description": True,
+                "import_repo_readme": True,
+                "tags": ["official", "quickstart", "examples"],
+                "single_artifact_mode": False,
+                "single_artifact_type": None,
             }
         }
 
@@ -740,6 +811,46 @@ class UpdateSourceRequest(BaseModel):
         default=None,
         description="Enable parsing markdown frontmatter for artifact type hints",
     )
+    import_repo_description: Optional[bool] = Field(
+        default=None,
+        description="Fetch repository description from GitHub",
+    )
+    import_repo_readme: Optional[bool] = Field(
+        default=None,
+        description="Fetch README content from GitHub",
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags to apply to source (max 20)",
+    )
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate tags format and constraints.
+
+        Args:
+            v: Tags list to validate
+
+        Returns:
+            Validated and normalized tags (lowercase)
+
+        Raises:
+            ValueError: If tags exceed limits or have invalid format
+        """
+        if v is None:
+            return v
+        if len(v) > 20:
+            raise ValueError("Maximum 20 tags allowed per source")
+        pattern = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+        for tag in v:
+            if not (1 <= len(tag) <= 50):
+                raise ValueError(f"Tag '{tag}' must be 1-50 characters")
+            if not pattern.match(tag):
+                raise ValueError(
+                    f"Tag '{tag}' must be alphanumeric with optional hyphens/underscores"
+                )
+        return [t.lower() for t in v]  # Normalize to lowercase
 
     @field_validator("root_hint")
     @classmethod
@@ -854,6 +965,9 @@ class UpdateSourceRequest(BaseModel):
                 "ref": "v2.0.0",
                 "description": "Updated description for repository",
                 "notes": "Updated internal notes about this source",
+                "import_repo_description": True,
+                "import_repo_readme": False,
+                "tags": ["updated", "production"],
             }
         }
 
@@ -944,6 +1058,33 @@ class SourceResponse(BaseModel):
         "None if no manual mapping configured.",
         examples=[{"skills/python": "skill", "commands/dev": "command"}],
     )
+    repo_description: Optional[str] = Field(
+        default=None,
+        description="Repository description from GitHub API",
+        max_length=2000,
+    )
+    repo_readme: Optional[str] = Field(
+        default=None,
+        description="README content from GitHub (up to 50KB)",
+    )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Source tags for categorization",
+    )
+    counts_by_type: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Artifact counts by type (e.g., {'skill': 5, 'command': 3})",
+    )
+    single_artifact_mode: bool = Field(
+        default=False,
+        description="Whether the source treats the entire repository (or root_hint directory) as a single artifact",
+    )
+    single_artifact_type: Optional[
+        Literal["skill", "command", "agent", "mcp_server", "hook"]
+    ] = Field(
+        default=None,
+        description="Artifact type when single_artifact_mode is enabled",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -968,6 +1109,12 @@ class SourceResponse(BaseModel):
                 "description": "Official skills repository",
                 "notes": "Contains verified skills from Anthropic",
                 "manual_map": None,
+                "repo_description": "Official quickstart examples and skills from Anthropic",
+                "repo_readme": "# Anthropic Quickstarts\n\nWelcome to...",
+                "tags": ["official", "quickstart", "examples"],
+                "counts_by_type": {"skill": 8, "command": 3, "agent": 1},
+                "single_artifact_mode": False,
+                "single_artifact_type": None,
             }
         }
 
@@ -1035,9 +1182,11 @@ class CatalogEntryResponse(BaseModel):
         description="ID of the source this artifact was detected in",
         examples=["src_anthropics_quickstarts"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
-        description="Type of artifact detected",
-        examples=["skill"],
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+        Field(
+            description="Type of artifact detected",
+            examples=["skill"],
+        )
     )
     name: str = Field(
         description="Artifact name extracted from manifest or inferred",
@@ -2146,9 +2295,11 @@ class ManualMapEntry(BaseModel):
         description="Unix-style path like 'skills/python' (no leading/trailing slashes)",
         examples=["skills/python", "commands/dev", "agents/research"],
     )
-    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = Field(
-        description="Artifact type for this directory",
-        examples=["skill"],
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+        Field(
+            description="Artifact type for this directory",
+            examples=["skill"],
+        )
     )
 
     @field_validator("directory_path")

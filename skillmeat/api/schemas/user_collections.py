@@ -199,13 +199,29 @@ class UserCollectionListResponse(PaginatedResponse[UserCollectionResponse]):
     pass
 
 
+class ArtifactGroupMembership(BaseModel):
+    """Group membership info for an artifact."""
+
+    id: str = Field(description="Group unique identifier")
+    name: str = Field(description="Group name")
+    position: int = Field(description="Artifact position within the group")
+
+
 class ArtifactSummary(BaseModel):
-    """Lightweight artifact summary for collection listings."""
+    """Lightweight artifact summary for collection listings.
+
+    When include_groups=true query parameter is used, the groups field
+    will be populated with group membership information.
+    """
 
     name: str = Field(description="Artifact name")
     type: str = Field(description="Artifact type (skill, command, agent, etc.)")
     version: Optional[str] = Field(default=None, description="Current version")
     source: str = Field(description="Source specification")
+    groups: Optional[List[ArtifactGroupMembership]] = Field(
+        default=None,
+        description="Groups this artifact belongs to (only populated when include_groups=true)",
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -213,7 +229,24 @@ class ArtifactSummary(BaseModel):
         from_attributes = True
 
 
+class ArtifactSummaryWithGroups(ArtifactSummary):
+    """Artifact summary with guaranteed group memberships.
+
+    Deprecated: Use ArtifactSummary with groups field instead.
+    Kept for backward compatibility.
+    """
+
+    groups: List[ArtifactGroupMembership] = Field(
+        default=[],
+        description="Groups this artifact belongs to within the collection",
+    )
+
+
 class CollectionArtifactsResponse(PaginatedResponse[ArtifactSummary]):
-    """Paginated response for collection artifacts."""
+    """Paginated response for collection artifacts.
+
+    When include_groups=true query parameter is used, each artifact's
+    groups field will be populated with group membership information.
+    """
 
     pass

@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ArtifactCollectionInfo } from './ArtifactCollectionInfo';
 import type { ArtifactMetadataResponse } from './ArtifactMetadataResponse';
 import type { ArtifactUpstreamInfo } from './ArtifactUpstreamInfo';
 import type { DeploymentStatistics } from './DeploymentStatistics';
@@ -52,6 +53,10 @@ export type ArtifactResponse = {
      * Deployment statistics (included when include_deployments=true)
      */
     deployment_stats?: (DeploymentStatistics | null);
+    /**
+     * Collections this artifact belongs to (many-to-many relationship)
+     */
+    collections?: Array<ArtifactCollectionInfo>;
     /**
      * Timestamp when artifact was added to collection
      */

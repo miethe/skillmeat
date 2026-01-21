@@ -55,12 +55,13 @@ import { TrustBadges, getTrustLevelFromSource } from '@/components/TrustBadges';
 const source = 'anthropics/skills/canvas-design';
 const trustLevel = getTrustLevelFromSource(source);
 
-<TrustBadges trustLevel={trustLevel} source={source} />
+<TrustBadges trustLevel={trustLevel} source={source} />;
 ```
 
 ## Badge Types
 
 ### Official (Blue)
+
 - **Icon**: ShieldCheck ✓
 - **Color**: Blue border/background
 - **Tooltip**: "Official artifact from trusted source"
@@ -68,6 +69,7 @@ const trustLevel = getTrustLevelFromSource(source);
 - **Example**: `anthropics/skills/canvas-design`
 
 ### Verified (Green)
+
 - **Icon**: ShieldCheck ✓
 - **Color**: Green border/background
 - **Tooltip**: "Community verified artifact"
@@ -75,6 +77,7 @@ const trustLevel = getTrustLevelFromSource(source);
 - **Example**: `verified/community-skills`
 
 ### Community (Gray)
+
 - **Icon**: Shield
 - **Color**: Gray border/background
 - **Tooltip**: "Community contributed artifact"
@@ -103,6 +106,7 @@ function getTrustLevelFromSource(source: string): TrustLevel;
 ```
 
 Determines trust level from source string using pattern matching:
+
 - **Official**: Contains `anthropic/`, `anthropics/`, or starts with `claude-`
 - **Verified**: Starts with `verified/` or `trusted-`
 - **Community**: All other sources
@@ -128,9 +132,7 @@ function ArtifactCard({ artifact }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        {/* ... */}
-      </CardContent>
+      <CardContent>{/* ... */}</CardContent>
     </Card>
   );
 }
@@ -158,6 +160,7 @@ pnpm test TrustBadges.test.tsx
 ```
 
 Test coverage:
+
 - Badge rendering (3 trust levels)
 - Tooltip display and content
 - Source auto-detection (official/verified/community)
@@ -171,20 +174,24 @@ Test coverage:
 ### Why separate from marketplace TrustBadge?
 
 The marketplace `TrustBadge` (in `source-card.tsx`) uses different trust levels:
+
 - `untrusted`, `basic`, `verified`, `official`
 
 This component uses artifact-specific trust levels:
+
 - `official`, `verified`, `community`
 
 ### Why use icons?
 
 Icons provide quick visual recognition:
+
 - **ShieldCheck** (✓): Official and Verified sources
 - **Shield**: Community sources
 
 ### Why tooltips?
 
 Tooltips provide additional context without cluttering the UI:
+
 - Trust level explanation
 - Source URL/identifier
 - Educational for new users
@@ -208,6 +215,7 @@ Potential improvements for future phases:
 ## Support
 
 For questions or issues:
+
 - See examples: `TrustBadges.example.tsx`
 - See integration guide: `TrustBadges.integration.md`
 - Check tests: `__tests__/components/TrustBadges.test.tsx`

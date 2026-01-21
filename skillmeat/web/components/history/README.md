@@ -31,10 +31,12 @@ function SnapshotView() {
 
   return (
     <>
-      <button onClick={() => {
-        setSelectedSnapshot('snapshot-id-here');
-        setShowRollback(true);
-      }}>
+      <button
+        onClick={() => {
+          setSelectedSnapshot('snapshot-id-here');
+          setShowRollback(true);
+        }}
+      >
         Rollback
       </button>
 
@@ -56,11 +58,11 @@ function SnapshotView() {
 
 ```typescript
 interface RollbackDialogProps {
-  snapshotId: string;          // Snapshot SHA-256 hash identifier
-  collectionName?: string;     // Optional collection name
-  open: boolean;               // Dialog open state
-  onOpenChange: (open: boolean) => void;  // Dialog state change handler
-  onSuccess?: (result: RollbackResponse) => void;  // Success callback
+  snapshotId: string; // Snapshot SHA-256 hash identifier
+  collectionName?: string; // Optional collection name
+  open: boolean; // Dialog open state
+  onOpenChange: (open: boolean) => void; // Dialog state change handler
+  onSuccess?: (result: RollbackResponse) => void; // Success callback
 }
 ```
 

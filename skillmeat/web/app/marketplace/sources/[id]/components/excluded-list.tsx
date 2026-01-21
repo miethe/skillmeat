@@ -10,11 +10,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Table,
   TableBody,
@@ -62,10 +58,7 @@ function formatRelativeDate(dateString: string | null | undefined): string {
  * - Restore button calls useRestoreCatalogEntry hook
  * - Returns null if no excluded entries (hidden section)
  */
-export function ExcludedArtifactsList({
-  entries,
-  sourceId,
-}: ExcludedArtifactsListProps) {
+export function ExcludedArtifactsList({ entries, sourceId }: ExcludedArtifactsListProps) {
   const [isOpen, setIsOpen] = useState(false);
   const restoreMutation = useRestoreCatalogEntry(sourceId);
 
@@ -80,7 +73,11 @@ export function ExcludedArtifactsList({
         <Button
           variant="ghost"
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={isOpen ? `Collapse excluded artifacts list (${entries.length} items)` : `Expand excluded artifacts list (${entries.length} items)`}
+          aria-label={
+            isOpen
+              ? `Collapse excluded artifacts list (${entries.length} items)`
+              : `Expand excluded artifacts list (${entries.length} items)`
+          }
         >
           {isOpen ? (
             <ChevronUp className="h-4 w-4" aria-hidden="true" />

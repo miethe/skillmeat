@@ -62,11 +62,7 @@ describe('GroupedArtifactView', () => {
   const renderComponent = (props: any = {}) => {
     return render(
       <QueryClientProvider client={queryClient}>
-        <GroupedArtifactView
-          collectionId="test-collection"
-          artifacts={mockArtifacts}
-          {...props}
-        />
+        <GroupedArtifactView collectionId="test-collection" artifacts={mockArtifacts} {...props} />
       </QueryClientProvider>
     );
   };

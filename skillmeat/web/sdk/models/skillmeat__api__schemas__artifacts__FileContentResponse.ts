@@ -5,7 +5,7 @@
 /**
  * Response for artifact file content.
  */
-export type FileContentResponse = {
+export type skillmeat__api__schemas__artifacts__FileContentResponse = {
     /**
      * Artifact identifier
      */

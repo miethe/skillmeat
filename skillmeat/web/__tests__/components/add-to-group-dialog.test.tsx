@@ -2,7 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AddToGroupDialog } from '@/components/collection/add-to-group-dialog';
-import { useGroups, useAddArtifactToGroup, useCreateGroup, useToast, useCollections } from '@/hooks';
+import {
+  useGroups,
+  useAddArtifactToGroup,
+  useCreateGroup,
+  useToast,
+  useCollections,
+  useArtifactGroups,
+  useRemoveArtifactFromGroup,
+} from '@/hooks';
 import type { Artifact } from '@/types/artifact';
 
 // Mock hooks
@@ -12,13 +20,21 @@ jest.mock('@/hooks', () => ({
   useCreateGroup: jest.fn(),
   useToast: jest.fn(),
   useCollections: jest.fn(),
+  useArtifactGroups: jest.fn(),
+  useRemoveArtifactFromGroup: jest.fn(),
 }));
 
 const mockUseGroups = useGroups as jest.MockedFunction<typeof useGroups>;
-const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<typeof useAddArtifactToGroup>;
+const mockUseAddArtifactToGroup = useAddArtifactToGroup as jest.MockedFunction<
+  typeof useAddArtifactToGroup
+>;
 const mockUseCreateGroup = useCreateGroup as jest.MockedFunction<typeof useCreateGroup>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 const mockUseCollections = useCollections as jest.MockedFunction<typeof useCollections>;
+const mockUseArtifactGroups = useArtifactGroups as jest.MockedFunction<typeof useArtifactGroups>;
+const mockUseRemoveArtifactFromGroup = useRemoveArtifactFromGroup as jest.MockedFunction<
+  typeof useRemoveArtifactFromGroup
+>;
 
 describe('AddToGroupDialog', () => {
   const mockToast = jest.fn();
@@ -143,6 +159,23 @@ describe('AddToGroupDialog', () => {
       isLoading: false,
       error: null,
     } as any);
+
+    // Mock useArtifactGroups - returns empty array by default (artifact not in any groups)
+    mockUseArtifactGroups.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: jest.fn(),
+    } as any);
+
+    // Mock useRemoveArtifactFromGroup
+    mockUseRemoveArtifactFromGroup.mockReturnValue({
+      mutateAsync: jest.fn().mockResolvedValue(undefined),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as any);
   });
 
   describe('Collection Picker Step', () => {
@@ -214,7 +247,9 @@ describe('AddToGroupDialog', () => {
       // Should show empty state
       expect(screen.getByText('Select a collection')).toBeInTheDocument();
       expect(screen.getByText('No collections available.')).toBeInTheDocument();
-      expect(screen.getByText('Create a collection first to organize artifacts into groups.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Create a collection first to organize artifacts into groups.')
+      ).toBeInTheDocument();
     });
 
     it('shows Next button disabled until collection selected', async () => {
@@ -324,9 +359,7 @@ describe('AddToGroupDialog', () => {
       renderDialog({ collectionId: 'c1' });
 
       expect(screen.getByText('No groups in this collection yet.')).toBeInTheDocument();
-      expect(
-        screen.getByText('Create a group to organize your artifacts.')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Create a group to organize your artifacts.')).toBeInTheDocument();
     });
 
     it('displays group list with checkboxes', () => {
@@ -410,9 +443,9 @@ describe('AddToGroupDialog', () => {
       renderDialog({ collectionId: 'c1' });
 
       // Should not have a back button since we skipped collection picker
-      const backButtons = screen.queryAllByRole('button').filter((btn) =>
-        btn.textContent?.includes('Collection')
-      );
+      const backButtons = screen
+        .queryAllByRole('button')
+        .filter((btn) => btn.textContent?.includes('Collection'));
       expect(backButtons).toHaveLength(0);
     });
   });
@@ -602,6 +635,29 @@ describe('AddToGroupDialog', () => {
         (call) => typeof call[0] === 'boolean' && call[0] === false
       );
       expect(closeHandler).toBeUndefined();
+    });
+  });
+
+  describe('Already in Group Feature', () => {
+    it('shows "Already in Group" for groups artifact belongs to', async () => {
+      // Mock that artifact is already in group g1
+      mockUseArtifactGroups.mockReturnValue({
+        data: [mockGroups[0]], // Artifact is in "Development" group
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: jest.fn(),
+      } as any);
+
+      renderDialog({ collectionId: 'c1' });
+
+      // Wait for the groups to be displayed
+      await waitFor(() => {
+        expect(screen.getByText('Development')).toBeInTheDocument();
+      });
+
+      // Should show "Already in Group" text
+      expect(screen.getByText('Already in Group')).toBeInTheDocument();
     });
   });
 });

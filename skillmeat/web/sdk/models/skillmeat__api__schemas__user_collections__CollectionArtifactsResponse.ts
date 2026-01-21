@@ -6,6 +6,9 @@ import type { PageInfo } from './PageInfo';
 import type { skillmeat__api__schemas__user_collections__ArtifactSummary } from './skillmeat__api__schemas__user_collections__ArtifactSummary';
 /**
  * Paginated response for collection artifacts.
+ *
+ * When include_groups=true query parameter is used, each artifact's
+ * groups field will be populated with group membership information.
  */
 export type skillmeat__api__schemas__user_collections__CollectionArtifactsResponse = {
     /**

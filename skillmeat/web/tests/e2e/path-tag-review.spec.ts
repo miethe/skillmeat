@@ -208,7 +208,9 @@ test.describe('Path Tag Review Workflow', () => {
 
       // Verify content is displayed
       await expect(page.getByText('Path-Based Tag Suggestions')).toBeVisible();
-      await expect(page.getByText('Review and approve tags extracted from the artifact path')).toBeVisible();
+      await expect(
+        page.getByText('Review and approve tags extracted from the artifact path')
+      ).toBeVisible();
     });
 
     test('displays all extracted segments with correct statuses', async ({ page }) => {
@@ -602,13 +604,19 @@ test.describe('Path Tag Review Workflow', () => {
       await navigateToSuggestedTagsTab(page);
 
       // Verify approved status persists
-      const categoriesRowAfterReopen = page.locator('div', { has: page.locator('text="categories"') }).first();
+      const categoriesRowAfterReopen = page
+        .locator('div', { has: page.locator('text="categories"') })
+        .first();
       await expect(categoriesRowAfterReopen.locator('text=Approved')).toBeVisible();
       await expect(categoriesRowAfterReopen.locator('text=Pending')).not.toBeVisible();
 
       // Verify no action buttons on approved segment
-      await expect(categoriesRowAfterReopen.locator('button[aria-label="Approve segment"]')).not.toBeVisible();
-      await expect(categoriesRowAfterReopen.locator('button[aria-label="Reject segment"]')).not.toBeVisible();
+      await expect(
+        categoriesRowAfterReopen.locator('button[aria-label="Approve segment"]')
+      ).not.toBeVisible();
+      await expect(
+        categoriesRowAfterReopen.locator('button[aria-label="Reject segment"]')
+      ).not.toBeVisible();
     });
   });
 
@@ -695,7 +703,9 @@ test.describe('Path Tag Review Workflow', () => {
 
       // Verify loading state is displayed
       // Check for skeleton or loading indicator
-      const loadingIndicator = page.locator('[class*="animate-pulse"], [aria-label*="Loading"]').first();
+      const loadingIndicator = page
+        .locator('[class*="animate-pulse"], [aria-label*="Loading"]')
+        .first();
       await expect(loadingIndicator).toBeVisible();
 
       // Wait for content to load

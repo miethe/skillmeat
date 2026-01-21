@@ -14,6 +14,21 @@ import type { BaseHttpRequest } from '../core/BaseHttpRequest';
 export class UserCollectionsService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
     /**
+     * Migrate all artifacts to default collection
+     * Ensures all existing artifacts from file-system collections are registered in the default database collection. This enables Groups and other collection features for all artifacts. Safe to run multiple times - only adds missing entries.
+     * @returns any Migration completed successfully
+     * @throws ApiError
+     */
+    public migrateToDefaultCollectionApiV1UserCollectionsMigrateToDefaultPost(): CancelablePromise<Record<string, any>> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/user-collections/migrate-to-default',
+            errors: {
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
      * List all user collections
      * Retrieve a paginated list of all user-defined collections
      * @returns UserCollectionListResponse Successfully retrieved collections
@@ -162,7 +177,7 @@ export class UserCollectionsService {
     }
     /**
      * List artifacts in collection
-     * Retrieve paginated list of artifacts in a collection with optional type filtering
+     * Retrieve paginated list of artifacts in a collection with optional type and group filtering
      * @returns skillmeat__api__schemas__user_collections__CollectionArtifactsResponse Successfully retrieved artifacts
      * @throws ApiError
      */
@@ -171,6 +186,8 @@ export class UserCollectionsService {
         limit = 20,
         after,
         artifactType,
+        groupId,
+        includeGroups = false,
     }: {
         collectionId: string,
         limit?: number,
@@ -179,6 +196,14 @@ export class UserCollectionsService {
          * Filter by artifact type
          */
         artifactType?: (string | null),
+        /**
+         * Filter by group membership - only return artifacts belonging to this group
+         */
+        groupId?: (string | null),
+        /**
+         * Include group memberships for each artifact in the response
+         */
+        includeGroups?: boolean,
     }): CancelablePromise<skillmeat__api__schemas__user_collections__CollectionArtifactsResponse> {
         return this.httpRequest.request({
             method: 'GET',
@@ -190,6 +215,8 @@ export class UserCollectionsService {
                 'limit': limit,
                 'after': after,
                 'artifact_type': artifactType,
+                'group_id': groupId,
+                'include_groups': includeGroups,
             },
             errors: {
                 404: `Collection not found`,

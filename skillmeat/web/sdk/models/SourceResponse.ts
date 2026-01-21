@@ -72,5 +72,37 @@ export type SourceResponse = {
      * Internal notes/documentation for this source
      */
     notes?: (string | null);
+    /**
+     * Whether frontmatter detection is enabled for this source
+     */
+    enable_frontmatter_detection: boolean;
+    /**
+     * Manual directory-to-type mappings (directory path → artifact_type). None if no manual mapping configured.
+     */
+    manual_map?: (Record<string, string> | null);
+    /**
+     * Repository description from GitHub API
+     */
+    repo_description?: (string | null);
+    /**
+     * README content from GitHub (up to 50KB)
+     */
+    repo_readme?: (string | null);
+    /**
+     * Source tags for categorization
+     */
+    tags?: Array<string>;
+    /**
+     * Artifact counts by type (e.g., {'skill': 5, 'command': 3})
+     */
+    counts_by_type?: Record<string, number>;
+    /**
+     * Whether the source treats the entire repository (or root_hint directory) as a single artifact
+     */
+    single_artifact_mode?: boolean;
+    /**
+     * Artifact type when single_artifact_mode is enabled
+     */
+    single_artifact_type?: ('skill' | 'command' | 'agent' | 'mcp_server' | 'hook' | null);
 };
 

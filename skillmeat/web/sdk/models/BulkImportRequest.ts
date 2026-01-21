@@ -19,5 +19,9 @@ export type BulkImportRequest = {
      * List of artifact keys to mark as skipped (format: type:name)
      */
     skip_list?: (Array<string> | null);
+    /**
+     * Apply approved path-based tags to imported artifacts. If true, segments with status='approved' in entry.path_segments will be created/found and linked as tags to the imported artifact.
+     */
+    apply_path_tags?: boolean;
 };
 

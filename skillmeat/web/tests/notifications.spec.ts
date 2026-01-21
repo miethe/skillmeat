@@ -33,9 +33,7 @@ async function addNotificationViaStorage(
   }
 ) {
   await page.evaluate((notif) => {
-    const notifications = JSON.parse(
-      localStorage.getItem('skillmeat-notifications') || '[]'
-    );
+    const notifications = JSON.parse(localStorage.getItem('skillmeat-notifications') || '[]');
     notifications.unshift({
       id: notif.id || `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       type: notif.type,
@@ -102,7 +100,10 @@ test.describe('Notification System', () => {
       await page.reload();
 
       // Verify notification appears in the bell dropdown
-      const bellButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+      const bellButton = page
+        .locator('button')
+        .filter({ has: page.locator('svg') })
+        .first();
       await bellButton.click();
 
       await expect(page.getByText('Import Complete')).toBeVisible();
@@ -118,7 +119,10 @@ test.describe('Notification System', () => {
       await page.reload();
 
       // Open bell dropdown
-      const bellButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+      const bellButton = page
+        .locator('button')
+        .filter({ has: page.locator('svg') })
+        .first();
       await bellButton.click();
 
       // Find and click dismiss button
@@ -304,11 +308,19 @@ test.describe('Notification System', () => {
       expect(count).toBe(2);
 
       // First should be newer
-      const firstTitle = await notifications.nth(0).locator('p[class*="font-medium"]').first().textContent();
+      const firstTitle = await notifications
+        .nth(0)
+        .locator('p[class*="font-medium"]')
+        .first()
+        .textContent();
       expect(firstTitle).toBe('New Notification');
 
       // Second should be older
-      const secondTitle = await notifications.nth(1).locator('p[class*="font-medium"]').first().textContent();
+      const secondTitle = await notifications
+        .nth(1)
+        .locator('p[class*="font-medium"]')
+        .first()
+        .textContent();
       expect(secondTitle).toBe('Old Notification');
     });
 

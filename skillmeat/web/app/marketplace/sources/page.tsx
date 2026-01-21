@@ -3,15 +3,30 @@
  *
  * Displays all GitHub repository sources that can be scanned for artifacts.
  * Provides add, rescan, and manage functionality.
+ *
+ * Filter state is synchronized with URL query parameters for shareability
+ * and browser navigation support.
  */
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Plus, RefreshCw, Search as SearchIcon, Loader2, Github } from 'lucide-react';
+import { useMemo, useCallback, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  Plus,
+  RefreshCw,
+  Search as SearchIcon,
+  Loader2,
+  Github,
+  X,
+  AlertCircle,
+  FilterX,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SourceCard, SourceCardSkeleton } from '@/components/marketplace/source-card';
+import { SourceFilterBar, type FilterState } from '@/components/marketplace/source-filter-bar';
 import { AddSourceModal } from '@/components/marketplace/add-source-modal';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
@@ -24,9 +39,271 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import type { ScanResult, CatalogListResponse, GitHubSource } from '@/types/marketplace';
+import { useState } from 'react';
 
-export default function MarketplaceSourcesPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+// ============================================================================
+// URL State Utilities
+// ============================================================================
+
+/**
+ * Parse filter state from URL search params
+ */
+function parseFiltersFromUrl(searchParams: URLSearchParams): FilterState {
+  const filters: FilterState = {};
+
+  const artifactType = searchParams.get('artifact_type');
+  if (artifactType) {
+    filters.artifact_type = artifactType;
+  }
+
+  const trustLevel = searchParams.get('trust_level');
+  if (trustLevel) {
+    filters.trust_level = trustLevel;
+  }
+
+  const tags = searchParams.get('tags');
+  if (tags) {
+    filters.tags = tags.split(',').filter(Boolean);
+  }
+
+  return filters;
+}
+
+/**
+ * Serialize filter state to URL search params string
+ */
+function serializeFiltersToUrl(filters: FilterState, searchQuery: string): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (searchQuery.trim()) {
+    params.set('q', searchQuery.trim());
+  }
+
+  if (filters.artifact_type) {
+    params.set('artifact_type', filters.artifact_type);
+  }
+
+  if (filters.trust_level) {
+    params.set('trust_level', filters.trust_level);
+  }
+
+  if (filters.tags && filters.tags.length > 0) {
+    params.set('tags', filters.tags.join(','));
+  }
+
+  return params;
+}
+
+/**
+ * Check if any filters or search query are active
+ */
+function hasActiveFilters(filters: FilterState, searchQuery: string): boolean {
+  return !!(
+    searchQuery.trim() ||
+    filters.artifact_type ||
+    filters.trust_level ||
+    (filters.tags && filters.tags.length > 0)
+  );
+}
+
+/**
+ * Count the number of active filters (including search)
+ */
+function countActiveFilters(filters: FilterState, searchQuery: string): number {
+  let count = 0;
+  if (searchQuery.trim()) count += 1;
+  if (filters.artifact_type) count += 1;
+  if (filters.trust_level) count += 1;
+  if (filters.tags && filters.tags.length > 0) count += filters.tags.length;
+  return count;
+}
+
+// ============================================================================
+// Error State Component
+// ============================================================================
+
+interface ErrorStateProps {
+  error: Error;
+  onRetry: () => void;
+  isRetrying?: boolean;
+}
+
+function ErrorState({ error, onRetry, isRetrying }: ErrorStateProps) {
+  return (
+    <Alert variant="destructive" className="max-w-2xl" role="alert" aria-live="polite">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Failed to load sources</AlertTitle>
+      <AlertDescription className="mt-2 space-y-3">
+        <p>
+          We encountered an error while loading your GitHub sources. This could be due to a network
+          issue or the server being temporarily unavailable.
+        </p>
+        <p className="font-mono text-xs opacity-80">{error.message || 'Unknown error occurred'}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRetry}
+          disabled={isRetrying}
+          className="mt-2"
+          aria-label="Retry loading sources"
+        >
+          {isRetrying ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Retrying...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </>
+          )}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+// ============================================================================
+// Loading State Component
+// ============================================================================
+
+interface LoadingGridProps {
+  count?: number;
+}
+
+function LoadingGrid({ count = 6 }: LoadingGridProps) {
+  return (
+    <div
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+      aria-busy="true"
+      aria-label="Loading source repositories"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <SourceCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// Empty State Component
+// ============================================================================
+
+interface EmptyStateProps {
+  isFiltered: boolean;
+  onClearFilters: () => void;
+  onAddSource: () => void;
+}
+
+function EmptyState({ isFiltered, onClearFilters, onAddSource }: EmptyStateProps) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <Github className="mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
+      {isFiltered ? (
+        <>
+          <h3 className="mb-2 text-lg font-semibold">No matching sources</h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            No sources match your current search and filter criteria. Try adjusting your filters or
+            clearing them to see all sources.
+          </p>
+          <Button variant="outline" className="mt-4 gap-2" onClick={onClearFilters}>
+            <FilterX className="h-4 w-4" aria-hidden="true" />
+            Clear All Filters
+          </Button>
+        </>
+      ) : (
+        <>
+          <h3 className="mb-2 text-lg font-semibold">No sources added yet</h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Add a GitHub repository to start discovering Claude Code artifacts like skills,
+            commands, agents, and more.
+          </p>
+          <Button className="mt-4" onClick={onAddSource}>
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            Add Your First Source
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Filter Summary Component
+// ============================================================================
+
+interface FilterSummaryProps {
+  totalCount: number;
+  filteredCount: number;
+  artifactCount: number;
+  isFiltered: boolean;
+  filterCount: number;
+  onClearFilters: () => void;
+}
+
+function FilterSummary({
+  totalCount,
+  filteredCount,
+  artifactCount,
+  isFiltered,
+  filterCount,
+  onClearFilters,
+}: FilterSummaryProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <span>
+        {isFiltered ? (
+          <>
+            Showing {filteredCount} of {totalCount} sources
+          </>
+        ) : (
+          <>{filteredCount} sources</>
+        )}
+      </span>
+      <span aria-hidden="true">-</span>
+      <span>{artifactCount} total artifacts</span>
+
+      {/* Clear Filters Button - prominently displayed when filters are active */}
+      {isFiltered && (
+        <>
+          <span aria-hidden="true">|</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className="h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+            aria-label={`Clear ${filterCount} active filter${filterCount !== 1 ? 's' : ''}`}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            Clear {filterCount} filter{filterCount !== 1 ? 's' : ''}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Inner Component (uses useSearchParams)
+// ============================================================================
+
+function MarketplaceSourcesPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Parse filters from URL
+  const filters = useMemo(() => parseFiltersFromUrl(searchParams), [searchParams]);
+  const searchQuery = searchParams.get('q') || '';
+
+  // Compute filter state
+  const isFiltered = useMemo(() => hasActiveFilters(filters, searchQuery), [filters, searchQuery]);
+  const activeFilterCount = useMemo(
+    () => countActiveFilters(filters, searchQuery),
+    [filters, searchQuery]
+  );
+
+  // Modal state (local only - not in URL)
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -48,11 +325,18 @@ export default function MarketplaceSourcesPage() {
     hasNextPage,
     isFetchingNextPage,
     refetch,
+    isRefetching,
   } = useSources();
 
   // Rescan mutation (works for any source ID)
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Flatten pages
+  const allSources = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items) || [];
+  }, [data]);
+
   const rescanMutation = useMutation({
     mutationFn: ({ sourceId }: { sourceId: string }) =>
       apiRequest<ScanResult>(`/marketplace/sources/${sourceId}/rescan`, {
@@ -130,23 +414,108 @@ export default function MarketplaceSourcesPage() {
     },
   });
 
-  // Flatten pages
-  const allSources = useMemo(() => {
-    return data?.pages.flatMap((page) => page.items) || [];
-  }, [data]);
+  // Extract all unique tags and their counts from sources for the filter bar
+  const { availableTags, tagCounts } = useMemo(() => {
+    const countMap: Record<string, number> = {};
+    allSources.forEach((source) => {
+      source.tags?.forEach((tag) => {
+        countMap[tag] = (countMap[tag] || 0) + 1;
+      });
+    });
+    return {
+      availableTags: Object.keys(countMap).sort(),
+      tagCounts: countMap,
+    };
+  }, [allSources]);
 
-  // Filter by search
+  // Filter by search and filters (client-side filtering)
   const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return allSources;
-    const query = searchQuery.toLowerCase();
-    return allSources.filter(
-      (source) =>
-        source.owner.toLowerCase().includes(query) ||
-        source.repo_name.toLowerCase().includes(query)
-    );
-  }, [allSources, searchQuery]);
+    let result = allSources;
 
-  // Handler functions
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (source) =>
+          source.owner.toLowerCase().includes(query) ||
+          source.repo_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply trust level filter
+    if (filters.trust_level) {
+      result = result.filter((source) => source.trust_level === filters.trust_level);
+    }
+
+    // Apply tag filters (source must have ALL selected tags)
+    if (filters.tags && filters.tags.length > 0) {
+      result = result.filter((source) => filters.tags!.every((tag) => source.tags?.includes(tag)));
+    }
+
+    // Apply artifact type filter (source must have at least one artifact of that type)
+    if (filters.artifact_type) {
+      result = result.filter((source) => {
+        const counts = source.counts_by_type ?? { skill: source.artifact_count };
+        return (counts[filters.artifact_type!] ?? 0) > 0;
+      });
+    }
+
+    return result;
+  }, [allSources, searchQuery, filters]);
+
+  // URL update helper
+  const updateUrl = useCallback(
+    (newFilters: FilterState, newSearchQuery: string) => {
+      const params = serializeFiltersToUrl(newFilters, newSearchQuery);
+      const search = params.toString();
+      // Use replace to avoid polluting history for every keystroke
+      router.replace(search ? `?${search}` : '/marketplace/sources', {
+        scroll: false,
+      });
+    },
+    [router]
+  );
+
+  // Handler for filter changes
+  const handleFilterChange = useCallback(
+    (newFilters: FilterState) => {
+      updateUrl(newFilters, searchQuery);
+    },
+    [updateUrl, searchQuery]
+  );
+
+  // Handler for search query changes
+  const handleSearchChange = useCallback(
+    (newQuery: string) => {
+      updateUrl(filters, newQuery);
+    },
+    [updateUrl, filters]
+  );
+
+  // Handler for clicking a tag on a source card
+  const handleTagClick = useCallback(
+    (tag: string) => {
+      const currentTags = filters.tags || [];
+      // Toggle the tag: add if not present, remove if already present
+      const newTags = currentTags.includes(tag)
+        ? currentTags.filter((t) => t !== tag)
+        : [...currentTags, tag];
+
+      const newFilters: FilterState = {
+        ...filters,
+        tags: newTags.length > 0 ? newTags : undefined,
+      };
+      updateUrl(newFilters, searchQuery);
+    },
+    [filters, searchQuery, updateUrl]
+  );
+
+  // Handler for clearing all filters and search
+  const handleClearAll = useCallback(() => {
+    router.replace('/marketplace/sources', { scroll: false });
+  }, [router]);
+
+  // Handler functions for modals
   const handleEdit = (source: GitHubSource) => {
     setSelectedSource(source);
     setEditModalOpen(true);
@@ -174,8 +543,10 @@ export default function MarketplaceSourcesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading || isRefetching}>
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isLoading || isRefetching ? 'animate-spin' : ''}`}
+            />
             Refresh
           </Button>
           <Button onClick={() => setAddModalOpen(true)}>
@@ -185,104 +556,117 @@ export default function MarketplaceSourcesPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search repositories..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search Bar with Clear Button */}
+      <div className="flex items-center gap-2">
+        <div className="relative max-w-md flex-1">
+          <SearchIcon
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            placeholder="Search repositories..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9 pr-9"
+            aria-label="Search repositories by owner or name"
+          />
+          {/* Clear search button inside input */}
+          {searchQuery && (
+            <button
+              onClick={() => handleSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Clear All Filters Button - always visible when filtered */}
+        {isFiltered && (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={handleClearAll}
+            className="gap-2 whitespace-nowrap"
+            aria-label={`Clear all ${activeFilterCount} active filters`}
+          >
+            <FilterX className="h-4 w-4" aria-hidden="true" />
+            Clear Filters
+          </Button>
+        )}
       </div>
 
-      {/* Stats Summary */}
+      {/* Filter Bar */}
+      {availableTags.length > 0 && (
+        <SourceFilterBar
+          currentFilters={filters}
+          onFilterChange={handleFilterChange}
+          availableTags={availableTags}
+          tagCounts={tagCounts}
+        />
+      )}
+
+      {/* Stats Summary with Clear Filters */}
       {!isLoading && !error && allSources.length > 0 && (
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{filteredSources.length} sources</span>
-          <span>•</span>
-          <span>
-            {filteredSources.reduce((sum, s) => sum + s.artifact_count, 0)} total artifacts
-          </span>
-        </div>
+        <FilterSummary
+          totalCount={allSources.length}
+          filteredCount={filteredSources.length}
+          artifactCount={filteredSources.reduce((sum, s) => sum + s.artifact_count, 0)}
+          isFiltered={isFiltered}
+          filterCount={activeFilterCount}
+          onClearFilters={handleClearAll}
+        />
       )}
 
       {/* Error State */}
       {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">
-            Failed to load sources. Please try again later.
-          </p>
-          <p className="mt-1 text-xs text-destructive/80">
-            {error instanceof Error ? error.message : 'Unknown error'}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2"
-            onClick={() => refetch()}
-          >
-            Retry
-          </Button>
-        </div>
+        <ErrorState
+          error={error instanceof Error ? error : new Error('Unknown error')}
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+        />
       )}
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <SourceCardSkeleton key={i} />
-          ))}
+      {isLoading && <LoadingGrid count={6} />}
+
+      {/* Refetching Indicator - shows when refreshing with existing data */}
+      {isRefetching && !isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Refreshing sources...
         </div>
       )}
 
       {/* Empty State */}
       {!isLoading && !error && filteredSources.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Github className="mb-4 h-12 w-12 text-muted-foreground" />
-          {allSources.length === 0 ? (
-            <>
-              <h3 className="mb-2 text-lg font-semibold">No sources added yet</h3>
-              <p className="max-w-md text-sm text-muted-foreground">
-                Add a GitHub repository to start discovering Claude Code artifacts like
-                skills, commands, agents, and more.
-              </p>
-              <Button className="mt-4" onClick={() => setAddModalOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Your First Source
-              </Button>
-            </>
-          ) : (
-            <>
-              <h3 className="mb-2 text-lg font-semibold">No matching sources</h3>
-              <p className="max-w-md text-sm text-muted-foreground">
-                Try adjusting your search term.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => setSearchQuery('')}
-              >
-                Clear Search
-              </Button>
-            </>
-          )}
-        </div>
+        <EmptyState
+          isFiltered={isFiltered}
+          onClearFilters={handleClearAll}
+          onAddSource={() => setAddModalOpen(true)}
+        />
       )}
 
       {/* Sources Grid */}
       {!isLoading && !error && filteredSources.length > 0 && (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            role="list"
+            aria-label="GitHub source repositories"
+          >
             {filteredSources.map((source) => (
-              <SourceCard
-                key={source.id}
-                source={source}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onRescan={handleRescan}
-                isRescanning={rescanningSourceId === source.id}
-              />
+              <div key={source.id} role="listitem">
+                <SourceCard
+                  source={source}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onRescan={handleRescan}
+                  isRescanning={rescanningSourceId === source.id}
+                  onTagClick={handleTagClick}
+                />
+              </div>
             ))}
           </div>
 
@@ -360,5 +744,39 @@ export default function MarketplaceSourcesPage() {
         />
       )}
     </div>
+  );
+}
+
+// ============================================================================
+// Main Export with Suspense Boundary
+// ============================================================================
+
+/**
+ * Marketplace Sources Page
+ *
+ * Wraps the inner component in Suspense because useSearchParams requires it
+ * in Next.js 15 when the page doesn't have a loading.tsx file.
+ */
+export default function MarketplaceSourcesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          {/* Header skeleton */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">GitHub Sources</h1>
+              <p className="text-muted-foreground">
+                Add and manage GitHub repositories to discover Claude Code artifacts
+              </p>
+            </div>
+          </div>
+          {/* Cards skeleton */}
+          <LoadingGrid count={6} />
+        </div>
+      }
+    >
+      <MarketplaceSourcesPageInner />
+    </Suspense>
   );
 }

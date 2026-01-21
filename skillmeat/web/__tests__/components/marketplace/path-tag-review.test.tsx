@@ -381,9 +381,7 @@ describe('PathTagReview', () => {
 
   describe('data rendering', () => {
     it('displays raw path', () => {
-      const testData = createPathTagsResponse([
-        createSegment('05-data-ai', 'data-ai', 'pending'),
-      ]);
+      const testData = createPathTagsResponse([createSegment('05-data-ai', 'data-ai', 'pending')]);
 
       mockUsePathTags.mockReturnValue({
         data: testData,
@@ -485,9 +483,7 @@ describe('PathTagReview', () => {
     });
 
     it('shows normalized values when different from segment', () => {
-      const testData = createPathTagsResponse([
-        createSegment('05-data-ai', 'data-ai', 'pending'),
-      ]);
+      const testData = createPathTagsResponse([createSegment('05-data-ai', 'data-ai', 'pending')]);
 
       mockUsePathTags.mockReturnValue({
         data: testData,
@@ -585,9 +581,7 @@ describe('PathTagReview', () => {
 
   describe('approve action', () => {
     it('calls mutate with correct params when approve button is clicked', () => {
-      const testData = createPathTagsResponse([
-        createSegment('05-data-ai', 'data-ai', 'pending'),
-      ]);
+      const testData = createPathTagsResponse([createSegment('05-data-ai', 'data-ai', 'pending')]);
 
       mockUsePathTags.mockReturnValue({
         data: testData,
@@ -1012,9 +1006,7 @@ describe('PathTagReview', () => {
     });
 
     it('shows 0 counts for missing statuses', () => {
-      const testData = createPathTagsResponse([
-        createSegment('segment-1', 'segment-1', 'pending'),
-      ]);
+      const testData = createPathTagsResponse([createSegment('segment-1', 'segment-1', 'pending')]);
 
       mockUsePathTags.mockReturnValue({
         data: testData,

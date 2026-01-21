@@ -43,11 +43,7 @@ function Badge({ className, variant, colorStyle, style, ...props }: BadgeProps) 
     : style;
 
   return (
-    <div
-      className={cn(badgeVariants({ variant }), className)}
-      style={customStyle}
-      {...props}
-    />
+    <div className={cn(badgeVariants({ variant }), className)} style={customStyle} {...props} />
   );
 }
 

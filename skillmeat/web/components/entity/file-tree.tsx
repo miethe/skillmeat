@@ -89,10 +89,7 @@ function getFileIcon(fileName: string) {
  * Flatten tree nodes into a linear list for keyboard navigation.
  * Only includes visible nodes (respects expanded state).
  */
-function flattenVisibleNodes(
-  nodes: FileNode[],
-  expandedPaths: Set<string>
-): FileNode[] {
+function flattenVisibleNodes(nodes: FileNode[], expandedPaths: Set<string>): FileNode[] {
   const result: FileNode[] = [];
 
   function traverse(nodeList: FileNode[]) {
@@ -260,7 +257,7 @@ function TreeNode({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+            className="h-6 w-6 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
             onClick={handleDelete}
             aria-label={`Delete ${node.name}`}
             tabIndex={-1}

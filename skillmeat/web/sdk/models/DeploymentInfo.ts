@@ -27,6 +27,10 @@ export type DeploymentInfo = {
      */
     artifact_path: string;
     /**
+     * Absolute path to the project directory
+     */
+    project_path: string;
+    /**
      * SHA at deployment time
      */
     collection_sha: string;

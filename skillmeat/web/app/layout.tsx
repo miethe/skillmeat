@@ -26,9 +26,11 @@ export const metadata: Metadata = {
     icon: '/favicon.svg',
   },
   keywords: ['claude', 'skills', 'commands', 'agents', 'mcp', 'collection manager', 'artifacts'],
-  authors: [{
-    name: 'SkillMeat Contributors'
-  }],
+  authors: [
+    {
+      name: 'SkillMeat Contributors',
+    },
+  ],
   openGraph: {
     type: 'website',
     locale: 'en_US',

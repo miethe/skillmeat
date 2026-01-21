@@ -9,6 +9,7 @@ This directory contains components for displaying and managing artifact deployme
 A card component that displays comprehensive deployment information with status indicators and action menus.
 
 **Features:**
+
 - Type-colored left border (follows UnifiedCard pattern)
 - Status badges (up to date, outdated, error)
 - Version comparison (deployed vs. latest)
@@ -18,6 +19,7 @@ A card component that displays comprehensive deployment information with status 
 - Action menu with context-aware options
 
 **Props:**
+
 ```typescript
 interface DeploymentCardProps {
   deployment: Deployment;
@@ -30,6 +32,7 @@ interface DeploymentCardProps {
 ```
 
 **Usage:**
+
 ```tsx
 import { DeploymentCard } from '@/components/deployments';
 
@@ -40,7 +43,7 @@ import { DeploymentCard } from '@/components/deployments';
   onRemove={() => removeDeployment(deployment.id)}
   onViewSource={() => navigateToArtifact(deployment.artifact_name)}
   onViewDiff={() => showDiff(deployment)}
-/>
+/>;
 ```
 
 ### DeploymentActions
@@ -48,6 +51,7 @@ import { DeploymentCard } from '@/components/deployments';
 Dropdown menu component with deployment lifecycle actions.
 
 **Features:**
+
 - Update to latest version (shown only for outdated deployments)
 - View diff (shown only when local modifications exist)
 - View source artifact in collection
@@ -55,6 +59,7 @@ Dropdown menu component with deployment lifecycle actions.
 - Remove deployment (with confirmation dialog)
 
 **Props:**
+
 ```typescript
 interface DeploymentActionsProps {
   deployment: Deployment;
@@ -67,6 +72,7 @@ interface DeploymentActionsProps {
 ```
 
 **Usage:**
+
 ```tsx
 import { DeploymentActions } from '@/components/deployments';
 
@@ -75,7 +81,7 @@ import { DeploymentActions } from '@/components/deployments';
   onUpdate={() => updateDeployment(deployment.id)}
   onRemove={() => removeDeployment(deployment.id)}
   onViewSource={() => navigateToCollection(deployment.artifact_name)}
-/>
+/>;
 ```
 
 ### DeploymentCardSkeleton
@@ -83,14 +89,13 @@ import { DeploymentActions } from '@/components/deployments';
 Loading skeleton for the deployment card.
 
 **Usage:**
+
 ```tsx
 import { DeploymentCardSkeleton } from '@/components/deployments';
 
-{isLoading ? (
-  <DeploymentCardSkeleton />
-) : (
-  <DeploymentCard deployment={deployment} />
-)}
+{
+  isLoading ? <DeploymentCardSkeleton /> : <DeploymentCard deployment={deployment} />;
+}
 ```
 
 ## Type Definitions
@@ -143,27 +148,27 @@ interface ArtifactDeploymentInfo {
 
 Deployments use type-colored borders matching the artifact type:
 
-| Type | Border Color | Background Tint |
-|------|--------------|-----------------|
-| skill | Blue | Blue/2% |
-| command | Purple | Purple/2% |
-| agent | Green | Green/2% |
-| mcp | Orange | Orange/2% |
-| hook | Pink | Pink/2% |
+| Type    | Border Color | Background Tint |
+| ------- | ------------ | --------------- |
+| skill   | Blue         | Blue/2%         |
+| command | Purple       | Purple/2%       |
+| agent   | Green        | Green/2%        |
+| mcp     | Orange       | Orange/2%       |
+| hook    | Pink         | Pink/2%         |
 
 ### Status Colors
 
-| Status | Color | Icon |
-|--------|-------|------|
-| current | Green | CheckCircle2 |
-| outdated | Yellow | AlertCircle |
-| error | Red | XCircle |
+| Status   | Color  | Icon         |
+| -------- | ------ | ------------ |
+| current  | Green  | CheckCircle2 |
+| outdated | Yellow | AlertCircle  |
+| error    | Red    | XCircle      |
 
 ### Sync Status Colors
 
-| Status | Color |
-|--------|-------|
-| synced | Green |
+| Status   | Color  |
+| -------- | ------ |
+| synced   | Green  |
 | modified | Yellow |
 | outdated | Orange |
 
@@ -240,21 +245,17 @@ function ProjectDeployments({ projectId }: { projectId: string }) {
 import { DeploymentCard } from '@/components/deployments';
 
 function OutdatedDeployments({ deployments }: { deployments: Deployment[] }) {
-  const outdated = deployments.filter(d => d.status === 'outdated');
+  const outdated = deployments.filter((d) => d.status === 'outdated');
 
   if (outdated.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        All deployments are up to date
-      </div>
+      <div className="py-8 text-center text-muted-foreground">All deployments are up to date</div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">
-        Updates Available ({outdated.length})
-      </h2>
+      <h2 className="text-lg font-semibold">Updates Available ({outdated.length})</h2>
       <div className="grid gap-4 md:grid-cols-2">
         {outdated.map((deployment) => (
           <DeploymentCard
@@ -277,6 +278,7 @@ Unit tests are located in `__tests__/components/deployments/`:
 - `deployment-actions.test.tsx` - DeploymentActions component tests
 
 Run tests:
+
 ```bash
 pnpm test deployments
 ```

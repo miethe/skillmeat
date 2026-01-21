@@ -101,11 +101,11 @@ export function DiscoveryTabExample() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto space-y-6 py-6">
       <h1 className="text-3xl font-bold">Discovery</h1>
 
       {/* Discovery scan results would go here */}
-      <div className="border rounded-lg p-4">
+      <div className="rounded-lg border p-4">
         <p>Discovery scan results...</p>
       </div>
 
@@ -204,14 +204,12 @@ export function WithDiscoveryResultsExample() {
   return (
     <div className="space-y-4">
       {/* Discovery results with skip actions */}
-      <div className="border rounded-lg p-4">
+      <div className="rounded-lg border p-4">
         {discoveredArtifacts.map((artifact) => (
-          <div key={artifact.name} className="flex justify-between items-center p-2">
+          <div key={artifact.name} className="flex items-center justify-between p-2">
             <span>{artifact.name}</span>
             <button
-              onClick={() =>
-                handleSkipArtifact(artifact, 'User chose to skip during discovery')
-              }
+              onClick={() => handleSkipArtifact(artifact, 'User chose to skip during discovery')}
             >
               Skip
             </button>

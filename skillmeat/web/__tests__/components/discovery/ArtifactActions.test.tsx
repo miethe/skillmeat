@@ -135,12 +135,7 @@ describe('ArtifactActions', () => {
   it('disables Copy Source URL when source is undefined', async () => {
     const user = userEvent.setup();
     const artifactWithoutSource = { ...mockArtifact, source: undefined };
-    render(
-      <ArtifactActions
-        {...mockProps}
-        artifact={artifactWithoutSource}
-      />
-    );
+    render(<ArtifactActions {...mockProps} artifact={artifactWithoutSource} />);
     const button = screen.getByRole('button', { name: /actions for test-skill/i });
 
     await user.click(button);

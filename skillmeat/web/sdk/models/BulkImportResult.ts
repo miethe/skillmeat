@@ -32,6 +32,10 @@ export type BulkImportResult = {
      */
     added_to_project?: number;
     /**
+     * Total number of path-based tags applied across all artifacts. Sum of tags_applied from all ImportResult entries.
+     */
+    total_tags_applied?: number;
+    /**
      * Per-artifact import results
      */
     results?: Array<ImportResult>;

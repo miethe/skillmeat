@@ -145,17 +145,13 @@ describe('ChangeBadge', () => {
 
   describe('className prop', () => {
     it('accepts custom className', () => {
-      const { container } = render(
-        <ChangeBadge origin="upstream" className="custom-class" />
-      );
+      const { container } = render(<ChangeBadge origin="upstream" className="custom-class" />);
       const badge = container.firstChild;
       expect(badge).toHaveClass('custom-class');
     });
 
     it('merges custom className with default classes', () => {
-      const { container } = render(
-        <ChangeBadge origin="upstream" className="custom-class" />
-      );
+      const { container } = render(<ChangeBadge origin="upstream" className="custom-class" />);
       const badge = container.firstChild;
       // Should have both custom and default classes
       expect(badge).toHaveClass('custom-class');
@@ -216,9 +212,7 @@ describe('ChangeBadge', () => {
 
   describe('variant combinations', () => {
     it('combines size and showLabel props', () => {
-      const { container } = render(
-        <ChangeBadge origin="upstream" size="sm" showLabel={false} />
-      );
+      const { container } = render(<ChangeBadge origin="upstream" size="sm" showLabel={false} />);
       const badge = container.firstChild;
       expect(badge).toHaveClass('text-xs'); // Small size
       expect(screen.queryByText('Upstream')).not.toBeInTheDocument(); // No label

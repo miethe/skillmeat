@@ -28,7 +28,7 @@ All colors meet WCAG 2.1 AA contrast requirements (>4.5:1 ratio).
 ```tsx
 import { ScoreBadge } from '@/components/ScoreBadge';
 
-<ScoreBadge confidence={87} />
+<ScoreBadge confidence={87} />;
 ```
 
 ### Size Variants
@@ -56,7 +56,7 @@ const artifact: Artifact = {
   // ... other fields
 };
 
-<UnifiedCard item={artifact} />
+<UnifiedCard item={artifact} />;
 // ScoreBadge automatically shown in header
 ```
 
@@ -65,32 +65,32 @@ const artifact: Artifact = {
 ```tsx
 import { ScoreBadgeSkeleton } from '@/components/ScoreBadge';
 
-<ScoreBadgeSkeleton size="sm" />
+<ScoreBadgeSkeleton size="sm" />;
 ```
 
 ## Props
 
 ### ScoreBadge
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `confidence` | `number` | required | Confidence score (0-100) |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Badge size variant |
-| `className` | `string` | - | Additional CSS classes |
+| Prop         | Type                   | Default  | Description              |
+| ------------ | ---------------------- | -------- | ------------------------ |
+| `confidence` | `number`               | required | Confidence score (0-100) |
+| `size`       | `'sm' \| 'md' \| 'lg'` | `'md'`   | Badge size variant       |
+| `className`  | `string`               | -        | Additional CSS classes   |
 
 ### ScoreBadgeSkeleton
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Badge size variant |
+| Prop   | Type                   | Default | Description        |
+| ------ | ---------------------- | ------- | ------------------ |
+| `size` | `'sm' \| 'md' \| 'lg'` | `'md'`  | Badge size variant |
 
 ## Color Mapping
 
-| Confidence Range | Background | Text Color | Border | Contrast Ratio |
-|-----------------|------------|------------|--------|----------------|
-| > 70 | Green (#22c55e) | White | Green-600 | 4.54:1 ✓ |
-| 50-70 | Yellow (#eab308) | Black | Yellow-600 | 8.38:1 ✓ |
-| < 50 | Red (#ef4444) | White | Red-600 | 4.72:1 ✓ |
+| Confidence Range | Background       | Text Color | Border     | Contrast Ratio |
+| ---------------- | ---------------- | ---------- | ---------- | -------------- |
+| > 70             | Green (#22c55e)  | White      | Green-600  | 4.54:1 ✓       |
+| 50-70            | Yellow (#eab308) | Black      | Yellow-600 | 8.38:1 ✓       |
+| < 50             | Red (#ef4444)    | White      | Red-600    | 4.72:1 ✓       |
 
 All colors meet WCAG 2.1 AA requirements for normal text (>4.5:1).
 
@@ -106,11 +106,11 @@ All colors meet WCAG 2.1 AA requirements for normal text (>4.5:1).
 ```typescript
 // types/artifact.ts
 export interface ArtifactScore {
-  confidence: number;        // Composite confidence (0-100)
-  trustScore?: number;       // Source trust (0-100)
-  qualityScore?: number;     // Community quality (0-100)
-  matchScore?: number;       // Query relevance (0-100, search only)
-  lastUpdated?: string;      // ISO timestamp
+  confidence: number; // Composite confidence (0-100)
+  trustScore?: number; // Source trust (0-100)
+  qualityScore?: number; // Community quality (0-100)
+  matchScore?: number; // Query relevance (0-100, search only)
+  lastUpdated?: string; // ISO timestamp
 }
 
 export interface Artifact {
@@ -127,16 +127,17 @@ The score data comes from the `/api/v1/artifacts/{id}/scores` endpoint:
 // Backend schema (skillmeat/api/schemas/scoring.py)
 interface ArtifactScoreResponse {
   artifact_id: string;
-  trust_score: float;        // 0-100
-  quality_score: float;      // 0-100
-  match_score?: float;       // 0-100 (optional, search context)
-  confidence: float;         // Composite score (0-100)
+  trust_score: float; // 0-100
+  quality_score: float; // 0-100
+  match_score?: float; // 0-100 (optional, search context)
+  confidence: float; // Composite score (0-100)
   schema_version: string;
   last_updated?: datetime;
 }
 ```
 
 The backend calculates the composite `confidence` score by weighting:
+
 - `trust_score`: Source reputation
 - `quality_score`: Community ratings
 - `match_score`: Query relevance (search only)
@@ -144,6 +145,7 @@ The backend calculates the composite `confidence` score by weighting:
 ## Examples
 
 See `components/ScoreBadge.example.tsx` for:
+
 - Basic usage with different confidence levels
 - Size variants
 - Integration with artifact cards
@@ -153,6 +155,7 @@ See `components/ScoreBadge.example.tsx` for:
 ## Testing
 
 **Unit Tests** (20 tests):
+
 - Color coding (high/medium/low)
 - Edge cases (0, 100, negative, >100)
 - Boundary values (49, 50, 70, 71)
@@ -161,6 +164,7 @@ See `components/ScoreBadge.example.tsx` for:
 - Custom styling
 
 **Visual Tests** (11 tests):
+
 - Color mapping verification
 - Size class application
 - Typography (tabular-nums, font-semibold)
@@ -168,6 +172,7 @@ See `components/ScoreBadge.example.tsx` for:
 - Custom className merging
 
 Run tests:
+
 ```bash
 npm test -- ScoreBadge
 ```

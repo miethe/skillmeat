@@ -5,7 +5,12 @@
  */
 
 /** Artifact deployment status enum */
-export type ArtifactDeploymentStatus = 'active' | 'inactive' | 'error' | 'pending' | 'version_mismatch';
+export type ArtifactDeploymentStatus =
+  | 'active'
+  | 'inactive'
+  | 'error'
+  | 'pending'
+  | 'version_mismatch';
 
 /** Artifact sync status enum */
 export type ArtifactSyncStatus = 'synced' | 'modified' | 'outdated';

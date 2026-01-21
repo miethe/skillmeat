@@ -94,9 +94,7 @@ export function EntityActions({ artifact }) {
 
   return (
     <>
-      <button onClick={() => setShowDeletionDialog(true)}>
-        Delete
-      </button>
+      <button onClick={() => setShowDeletionDialog(true)}>Delete</button>
 
       <ArtifactDeletionDialog
         artifact={artifact}
@@ -162,7 +160,7 @@ const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     // Update error state
     setErrorMessage(error.message);
   }}
-/>
+/>;
 ```
 
 ### Behavior Notes
@@ -223,6 +221,7 @@ const result = await deletion.mutateAsync({
 ```
 
 Features:
+
 - Parallel project undeployment using `Promise.allSettled`
 - Comprehensive error tracking per operation
 - Automatic cache invalidation on success

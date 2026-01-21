@@ -11,15 +11,18 @@ This page displays detailed information about a GitHub marketplace source, inclu
 ## Key Features
 
 ### 1. Source Information Display
+
 - Owner/repo name and GitHub link
 - Branch/ref and root hint
 - Description and notes
 - Status badges (new, updated, imported counts)
 
 ### 2. Toolbar (`SourceToolbar` component)
+
 Located in `components/source-toolbar.tsx`
 
 **Features**:
+
 - Search artifacts by name/path
 - Filter by artifact type (skill, agent, command, mcp, hook)
 - Sort by confidence, name, or date
@@ -31,6 +34,7 @@ Located in `components/source-toolbar.tsx`
 - **Map Directories** button (opens DirectoryMapModal)
 
 **Props**:
+
 ```typescript
 interface SourceToolbarProps {
   searchQuery: string;
@@ -59,6 +63,7 @@ interface SourceToolbarProps {
 ```
 
 ### 3. Catalog Display
+
 - **Grid View**: Card-based layout (default)
 - **List View**: Dense table layout
 - Infinite scroll pagination
@@ -67,11 +72,13 @@ interface SourceToolbarProps {
 - Entry details modal
 
 ### 4. Directory Mapping (`DirectoryMapModal`)
+
 **Location**: `components/marketplace/DirectoryMapModal.tsx`
 
 Allows users to manually map repository directories to artifact types, improving detection accuracy.
 
 **Integration**:
+
 ```typescript
 // Open modal and fetch GitHub tree data
 const handleOpenDirectoryMap = async () => {
@@ -100,6 +107,7 @@ const handleConfirmAndRescan = async (mappings: Record<string, string>) => {
 ```
 
 **Usage**:
+
 ```tsx
 <DirectoryMapModal
   open={directoryMapModalOpen}
@@ -116,6 +124,7 @@ const handleConfirmAndRescan = async (mappings: Record<string, string>) => {
 ```
 
 ### 5. Source Actions
+
 - **Rescan**: Re-detect artifacts in repository
 - **Edit**: Update source metadata (ref, root_hint, description, notes)
 - **Delete**: Remove source and all catalog entries
@@ -153,6 +162,7 @@ page.tsx (main component)
 ## State Management
 
 ### URL State (synced with URL params)
+
 - `type`: Selected artifact type filter
 - `status`: Selected status filter
 - `minConfidence`: Minimum confidence threshold
@@ -161,6 +171,7 @@ page.tsx (main component)
 - `sort`: Sort option
 
 ### Local State
+
 - `searchQuery`: Search text (debounced)
 - `selectedEntries`: Set of selected artifact IDs
 - `editModalOpen`: Edit modal visibility
@@ -180,19 +191,17 @@ page.tsx (main component)
 ## Data Fetching
 
 ### Queries (TanStack Query)
+
 ```typescript
 // Source metadata
 const { data: source } = useSource(sourceId);
 
 // Catalog entries (infinite scroll)
-const {
-  data: catalogData,
-  fetchNextPage,
-  hasNextPage,
-} = useSourceCatalog(sourceId, filters);
+const { data: catalogData, fetchNextPage, hasNextPage } = useSourceCatalog(sourceId, filters);
 ```
 
 ### Mutations
+
 ```typescript
 // Rescan source
 const rescanMutation = useRescanSource(sourceId);
@@ -212,10 +221,12 @@ const excludeMutation = useExcludeCatalogEntry(sourceId);
 ## Filtering Logic
 
 ### Client-Side Filters
+
 - **Search**: Filters by artifact name or path (case-insensitive)
 - **Sort**: Sorts entries by confidence, name, or date
 
 ### Server-Side Filters
+
 - **Type**: `artifact_type` filter
 - **Status**: `status` filter (new, updated, imported, removed, excluded)
 - **Confidence Range**: `min_confidence`, `max_confidence`
@@ -226,6 +237,7 @@ const excludeMutation = useExcludeCatalogEntry(sourceId);
 ## Common Tasks
 
 ### Add a New Filter
+
 1. Add state variable in `page.tsx`
 2. Add prop to `SourceToolbarProps` interface
 3. Add UI control in `SourceToolbar` component
@@ -235,6 +247,7 @@ const excludeMutation = useExcludeCatalogEntry(sourceId);
 7. Update `onClearFilters` to reset new filter
 
 ### Add a New Action Button
+
 1. Import icon from `lucide-react`
 2. Add mutation hook (if needed)
 3. Add button to header or toolbar
@@ -243,6 +256,7 @@ const excludeMutation = useExcludeCatalogEntry(sourceId);
 6. Add loading/disabled states
 
 ### Customize Catalog Card
+
 1. Edit `CatalogCard` component in `page.tsx`
 2. Update `CatalogCardProps` interface if needed
 3. Maintain accessibility (ARIA labels, keyboard navigation)
@@ -253,16 +267,19 @@ const excludeMutation = useExcludeCatalogEntry(sourceId);
 ## Testing
 
 ### Unit Tests
+
 ```bash
 pnpm test -- source-toolbar
 ```
 
 ### E2E Tests
+
 ```bash
 pnpm test:e2e -- marketplace/sources
 ```
 
 ### Manual Testing Checklist
+
 - [ ] Toolbar filters work correctly
 - [ ] Search filters artifacts in real-time
 - [ ] Sort changes order of artifacts
@@ -281,21 +298,25 @@ pnpm test:e2e -- marketplace/sources
 ## Troubleshooting
 
 ### Tree Data Not Loading
+
 - **Symptom**: DirectoryMapModal shows error or empty tree
 - **Cause**: GitHub API rate limit or network error
 - **Solution**: Check GitHub API rate limit, verify network connection, ensure source.ref is valid
 
 ### Filters Not Updating Catalog
+
 - **Symptom**: Changing filters doesn't update visible artifacts
 - **Cause**: URL params not syncing or server-side filters not working
 - **Solution**: Check `mergedFilters` object, verify URL params update, check backend API response
 
 ### Selection Not Working
+
 - **Symptom**: Cannot select artifacts or bulk import fails
 - **Cause**: Removed/imported artifacts are not selectable
 - **Solution**: Check artifact status, ensure only new/updated artifacts are selectable
 
 ### Modal Not Closing
+
 - **Symptom**: DirectoryMapModal or other modals won't close
 - **Cause**: State not updating or unsaved changes warning
 - **Solution**: Check modal `open` and `onOpenChange` props, verify dirty state logic

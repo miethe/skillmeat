@@ -21,9 +21,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
 const mockProjects = [
@@ -59,9 +57,9 @@ describe('ProjectsList', () => {
       );
 
       // Should render 6 skeleton cards
-      const skeletons = screen.getAllByRole('generic').filter((el) =>
-        el.className.includes('animate-pulse')
-      );
+      const skeletons = screen
+        .getAllByRole('generic')
+        .filter((el) => el.className.includes('animate-pulse'));
       expect(skeletons.length).toBeGreaterThan(0);
     });
 
@@ -242,11 +240,7 @@ describe('ProjectsList', () => {
 
       render(
         <TestWrapper>
-          <ProjectsList
-            projects={mockProjects}
-            isLoading={false}
-            onProjectClick={onProjectClick}
-          />
+          <ProjectsList projects={mockProjects} isLoading={false} onProjectClick={onProjectClick} />
         </TestWrapper>
       );
 

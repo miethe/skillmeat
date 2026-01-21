@@ -106,9 +106,7 @@ export function ParameterEditorModal({
     setIsSubmitting(true);
 
     try {
-      const tagsById = new Map(
-        (tagsData?.items || []).map((tag) => [tag.id, tag.name])
-      );
+      const tagsById = new Map((tagsData?.items || []).map((tag) => [tag.id, tag.name]));
       const normalizedTags = (data.tags || [])
         .map((tag) => tagsById.get(tag) || tag)
         .map((tag) => tag.trim())
@@ -155,9 +153,7 @@ export function ParameterEditorModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent
-        className="sm:max-w-[500px]"
-      >
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">
@@ -229,11 +225,7 @@ export function ParameterEditorModal({
               name="scope"
               control={control}
               render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  disabled={isSubmitting}
-                >
+                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
                   <SelectTrigger id="scope">
                     <SelectValue />
                   </SelectTrigger>
@@ -280,9 +272,7 @@ export function ParameterEditorModal({
               {...register('aliases')}
               disabled={isSubmitting}
             />
-            <p className="text-xs text-muted-foreground">
-              Separate multiple aliases with commas
-            </p>
+            <p className="text-xs text-muted-foreground">Separate multiple aliases with commas</p>
           </div>
 
           <DialogFooter>

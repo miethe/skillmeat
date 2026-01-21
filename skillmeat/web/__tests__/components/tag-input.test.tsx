@@ -406,7 +406,7 @@ describe('TagInput', () => {
 
       // No option should be selected
       const options = screen.getAllByRole('option');
-      options.forEach(option => {
+      options.forEach((option) => {
         expect(option).not.toHaveAttribute('aria-selected', 'true');
       });
     });
@@ -467,7 +467,7 @@ describe('TagInput', () => {
       });
 
       const options = screen.getAllByRole('option');
-      options.forEach(option => {
+      options.forEach((option) => {
         expect(option).not.toHaveAttribute('aria-selected', 'true');
       });
     });
@@ -576,7 +576,15 @@ describe('TagInput', () => {
     it('respects max tags limit during CSV paste', async () => {
       const user = userEvent.setup();
       const onChange = jest.fn();
-      render(<TagInput {...defaultProps} value={['1']} onChange={onChange} maxTags={2} allowCreate={true} />);
+      render(
+        <TagInput
+          {...defaultProps}
+          value={['1']}
+          onChange={onChange}
+          maxTags={2}
+          allowCreate={true}
+        />
+      );
 
       const input = screen.getByRole('combobox');
       await user.click(input);

@@ -94,9 +94,7 @@ function evictOldest(notifications: NotificationData[]): NotificationData[] {
   if (read.length > 0) {
     // Remove oldest read notifications until under limit
     const toRemove = notifications.length - MAX_NOTIFICATIONS;
-    const sortedRead = [...read].sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-    );
+    const sortedRead = [...read].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
     const idsToRemove = new Set(sortedRead.slice(0, toRemove).map((n) => n.id));
     return notifications.filter((n) => !idsToRemove.has(n.id));
   }
@@ -154,9 +152,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
    * Mark all notifications as read
    */
   const markAllAsRead = React.useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, status: 'read' as const }))
-    );
+    setNotifications((prev) => prev.map((n) => ({ ...n, status: 'read' as const })));
   }, []);
 
   /**
