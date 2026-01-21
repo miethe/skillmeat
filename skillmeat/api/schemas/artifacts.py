@@ -184,6 +184,15 @@ class ArtifactResponse(BaseModel):
         description="Source specification",
         examples=["anthropics/skills/pdf"],
     )
+    origin: str = Field(
+        description="Origin category: 'local', 'github', or 'marketplace'",
+        examples=["github"],
+    )
+    origin_source: Optional[str] = Field(
+        default=None,
+        description="Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')",
+        examples=["github"],
+    )
     version: str = Field(
         description="Version specification",
         examples=["latest"],
@@ -230,6 +239,8 @@ class ArtifactResponse(BaseModel):
                 "name": "pdf",
                 "type": "skill",
                 "source": "anthropics/skills/pdf",
+                "origin": "github",
+                "origin_source": None,
                 "version": "latest",
                 "aliases": ["pdf-processor"],
                 "metadata": {

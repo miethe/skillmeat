@@ -80,6 +80,8 @@ export interface ArtifactFilters {
   search?: string;
   /** Group ID for filtering artifacts by group (only applicable in specific collection context) */
   groupId?: string;
+  /** Tag IDs to filter artifacts by (multi-select) */
+  tags?: string[];
 }
 
 export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';

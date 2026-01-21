@@ -42,7 +42,13 @@ from typing import Literal, Optional
 # Default exclude patterns for common directories and pure numbers
 DEFAULT_EXCLUDE_PATTERNS: list[str] = [
     r"^\d+$",  # Pure numbers (e.g., "01", "123")
-    r"^(src|lib|test|docs|examples|__pycache__|node_modules)$",  # Common directories
+    r"^(src|lib|test|docs|examples|__pycache__|node_modules)$",  # Common code directories
+    # Filesystem paths that are not semantically meaningful
+    r"^(Users|home|var|tmp|opt|usr|etc|mnt|dev|bin|sbin)$",  # Unix system paths
+    r"^(homelab|development|workspace|projects|repos|code)$",  # Common dev directories
+    r"^(\.claude|\.git|\.github|\.vscode|\.idea)$",  # Hidden/config directories
+    # Short generic names (2 chars or less, except abbreviations)
+    r"^[a-z]{1,2}$",  # Single/double letter segments
 ]
 
 
