@@ -389,6 +389,8 @@ function CollectionPageContent() {
     version?: string;
     tags?: string[];
     aliases?: string[];
+    origin?: string;
+    origin_source?: string | null;
     metadata?: {
       title?: string;
       description?: string;
@@ -433,6 +435,8 @@ function CollectionPageContent() {
       status: isOutdated ? 'outdated' : 'active',
       version: apiArtifact.version || metadata.version,
       source: apiArtifact.source,
+      origin: apiArtifact.origin,
+      origin_source: apiArtifact.origin_source || undefined,
       metadata: {
         title: metadata.title || apiArtifact.name,
         description: metadata.description || '',
