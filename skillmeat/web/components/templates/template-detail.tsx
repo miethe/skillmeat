@@ -130,10 +130,7 @@ function PathTreeNode({
         <span className={isFile ? 'font-mono' : 'font-semibold'}>{pathName}</span>
         {entity && (
           <>
-            <Badge
-              variant="outline"
-              className={`text-xs ${entityTypeColors[entity.type] || ''}`}
-            >
+            <Badge variant="outline" className={`text-xs ${entityTypeColors[entity.type] || ''}`}>
               {entityTypeLabels[entity.type] || entity.type}
             </Badge>
             {entity.required ? (
@@ -162,12 +159,7 @@ function PathTreeNode({
   );
 }
 
-export function TemplateDetail({
-  template,
-  open,
-  onOpenChange,
-  onDeploy,
-}: TemplateDetailProps) {
+export function TemplateDetail({ template, open, onOpenChange, onDeploy }: TemplateDetailProps) {
   // Sort entities by deploy_order
   const sortedEntities = [...template.entities].sort((a, b) => a.deploy_order - b.deploy_order);
 
@@ -280,8 +272,8 @@ export function TemplateDetail({
               <div className="rounded-lg border border-muted bg-muted/30 p-4">
                 <p className="text-xs text-muted-foreground">
                   <strong>Note:</strong> This structure will be created in your project's{' '}
-                  <code className="rounded bg-background px-1 py-0.5">.claude/</code> directory
-                  when you deploy this template.
+                  <code className="rounded bg-background px-1 py-0.5">.claude/</code> directory when
+                  you deploy this template.
                 </p>
               </div>
             </div>

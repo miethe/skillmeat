@@ -100,15 +100,22 @@ function isContextEntity(entity: Entity | null): boolean {
 
   // Check if entity has 'context' in its type (for future context entity type support)
   // OR if entity ID follows context entity pattern (entity_type:name)
-  const contextTypes = ['spec_file', 'rule_file', 'context_file', 'project_config', 'progress_template'];
+  const contextTypes = [
+    'spec_file',
+    'rule_file',
+    'context_file',
+    'project_config',
+    'progress_template',
+  ];
 
   // Check if entity ID starts with any context type
-  const hasContextType = contextTypes.some(type => entity.id.startsWith(`${type}:`));
+  const hasContextType = contextTypes.some((type) => entity.id.startsWith(`${type}:`));
 
   // Check if artifact_type property exists and indicates context
-  const hasContextArtifactType = entity.type?.includes('context') ||
-                                  entity.type?.includes('spec') ||
-                                  entity.type?.includes('rule');
+  const hasContextArtifactType =
+    entity.type?.includes('context') ||
+    entity.type?.includes('spec') ||
+    entity.type?.includes('rule');
 
   return hasContextType || hasContextArtifactType;
 }
@@ -559,9 +566,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   // Count unique projects where this artifact is deployed
   const deploymentProjectCount = useMemo(() => {
     const projectPaths = new Set(
-      artifactDeployments
-        .map((d) => d.project_path)
-        .filter((p): p is string => p != null)
+      artifactDeployments.map((d) => d.project_path).filter((p): p is string => p != null)
     );
     return projectPaths.size;
   }, [artifactDeployments]);
@@ -630,14 +635,12 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
       // Invalidate deployment queries to refresh the list
       await queryClient.invalidateQueries({
-        queryKey: deploymentKeys.list(deployment.project_path)
+        queryKey: deploymentKeys.list(deployment.project_path),
       });
 
       // Also invalidate all deployment queries since we're showing deployments from all projects
       await queryClient.invalidateQueries({
-        predicate: (query) =>
-          Array.isArray(query.queryKey) &&
-          query.queryKey[0] === 'deployments'
+        predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === 'deployments',
       });
 
       toast({
@@ -1533,7 +1536,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() => setShowDeletionDialog(true)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -1668,7 +1671,10 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
             </TabsContent>
 
             {/* Contents Tab */}
-            <TabsContent value="contents" className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <TabsContent
+              value="contents"
+              className="mt-0 h-full min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+            >
               <div className="flex min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
                 {/* File Tree - Left Panel - Narrower in edit mode */}
                 <div
@@ -1865,16 +1871,14 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     <div>
                       {artifactDeployments.length > 0 && (
                         <p className="text-sm text-muted-foreground">
-                          {artifactDeployments.length} {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
-                          {deploymentProjectCount} {deploymentProjectCount === 1 ? 'project' : 'projects'}
+                          {artifactDeployments.length}{' '}
+                          {artifactDeployments.length === 1 ? 'deployment' : 'deployments'} across{' '}
+                          {deploymentProjectCount}{' '}
+                          {deploymentProjectCount === 1 ? 'project' : 'projects'}
                         </p>
                       )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDeployDialog(true)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setShowDeployDialog(true)}>
                       <Rocket className="mr-2 h-4 w-4" />
                       Deploy to Project
                     </Button>
@@ -1909,15 +1913,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   )}
 
                   {/* Empty state */}
-                  {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length === 0 && (
-                    <div className="py-12 text-center">
-                      <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
-                      <h3 className="mb-2 text-lg font-semibold">Not deployed to any projects yet</h3>
-                      <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                        Deploy this artifact to a project to see it listed here.
-                      </p>
-                    </div>
-                  )}
+                  {!isDeploymentsLoading &&
+                    !deploymentsError &&
+                    artifactDeployments.length === 0 && (
+                      <div className="py-12 text-center">
+                        <Rocket className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+                        <h3 className="mb-2 text-lg font-semibold">
+                          Not deployed to any projects yet
+                        </h3>
+                        <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                          Deploy this artifact to a project to see it listed here.
+                        </p>
+                      </div>
+                    )}
 
                   {/* Success state - Grid of deployment cards */}
                   {!isDeploymentsLoading && !deploymentsError && artifactDeployments.length > 0 && (
@@ -1934,7 +1942,9 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                               description: 'Deployment update functionality coming soon',
                             });
                           }}
-                          onRemove={(removeFiles) => handleDeploymentRemove(deployment, removeFiles)}
+                          onRemove={(removeFiles) =>
+                            handleDeploymentRemove(deployment, removeFiles)
+                          }
                           onViewSource={() => {
                             // Close modal - user is already viewing the source
                             onClose();

@@ -21,7 +21,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Tooltip component that displays detailed confidence score breakdowns with individual signal contributions.',
+        component:
+          'Tooltip component that displays detailed confidence score breakdowns with individual signal contributions.',
       },
     },
   },
@@ -218,28 +219,28 @@ export const CustomDelay: Story = {
   render: () => (
     <div className="flex flex-col gap-6 p-8">
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground w-32">No delay (0ms):</span>
+        <span className="w-32 text-sm text-muted-foreground">No delay (0ms):</span>
         <ScoreBreakdownTooltip breakdown={highConfidenceBreakdown} delayDuration={0}>
           <ScoreBadge score={100} />
         </ScoreBreakdownTooltip>
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground w-32">Short (200ms):</span>
+        <span className="w-32 text-sm text-muted-foreground">Short (200ms):</span>
         <ScoreBreakdownTooltip breakdown={highConfidenceBreakdown} delayDuration={200}>
           <ScoreBadge score={100} />
         </ScoreBreakdownTooltip>
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground w-32">Default (500ms):</span>
+        <span className="w-32 text-sm text-muted-foreground">Default (500ms):</span>
         <ScoreBreakdownTooltip breakdown={highConfidenceBreakdown}>
           <ScoreBadge score={100} />
         </ScoreBreakdownTooltip>
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground w-32">Long (1000ms):</span>
+        <span className="w-32 text-sm text-muted-foreground">Long (1000ms):</span>
         <ScoreBreakdownTooltip breakdown={highConfidenceBreakdown} delayDuration={1000}>
           <ScoreBadge score={100} />
         </ScoreBreakdownTooltip>
@@ -276,14 +277,14 @@ export const KeyboardAccessible: Story = {
   },
   render: (args) => (
     <div className="flex flex-col gap-4 p-8">
-      <p className="text-sm text-muted-foreground max-w-md">
-        Press Tab to focus the badge, then hover or keep focus to see the tooltip.
-        The tooltip is accessible via keyboard navigation.
+      <p className="max-w-md text-sm text-muted-foreground">
+        Press Tab to focus the badge, then hover or keep focus to see the tooltip. The tooltip is
+        accessible via keyboard navigation.
       </p>
       <div className="flex items-center gap-4">
         <span className="text-sm text-muted-foreground">Try Tab key:</span>
         <ScoreBreakdownTooltip {...args}>
-          <button className="focus:outline-none focus:ring-2 focus:ring-primary rounded">
+          <button className="rounded focus:outline-none focus:ring-2 focus:ring-primary">
             <ScoreBadge score={args.breakdown.normalized_score} />
           </button>
         </ScoreBreakdownTooltip>
@@ -298,7 +299,7 @@ export const KeyboardAccessible: Story = {
 export const MultipleInRow: Story = {
   render: () => (
     <div className="flex flex-col gap-4 p-8">
-      <p className="text-sm text-muted-foreground max-w-md">
+      <p className="max-w-md text-sm text-muted-foreground">
         Example of multiple score badges with tooltips in a row, similar to marketplace results.
       </p>
       <div className="flex items-center gap-3">
@@ -334,65 +335,57 @@ export const AllConfidenceLevels: Story = {
     <div className="flex flex-col gap-6 p-8">
       <h3 className="text-lg font-semibold">Confidence Score Comparison</h3>
 
-      <div className="grid grid-cols-2 gap-6 max-w-2xl">
+      <div className="grid max-w-2xl grid-cols-2 gap-6">
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-medium uppercase text-muted-foreground">
             High Confidence (100)
           </span>
           <div className="flex items-center gap-2">
             <ScoreBreakdownTooltip breakdown={highConfidenceBreakdown}>
               <ScoreBadge score={100} />
             </ScoreBreakdownTooltip>
-            <span className="text-sm text-muted-foreground">
-              All signals present, no penalty
-            </span>
+            <span className="text-sm text-muted-foreground">All signals present, no penalty</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-medium uppercase text-muted-foreground">
             With Penalty (69)
           </span>
           <div className="flex items-center gap-2">
             <ScoreBreakdownTooltip breakdown={withPenaltyBreakdown}>
               <ScoreBadge score={69} />
             </ScoreBreakdownTooltip>
-            <span className="text-sm text-muted-foreground">
-              Good signals, large depth penalty
-            </span>
+            <span className="text-sm text-muted-foreground">Good signals, large depth penalty</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-medium uppercase text-muted-foreground">
             Medium Confidence (38)
           </span>
           <div className="flex items-center gap-2">
             <ScoreBreakdownTooltip breakdown={mediumConfidenceBreakdown}>
               <ScoreBadge score={38} />
             </ScoreBreakdownTooltip>
-            <span className="text-sm text-muted-foreground">
-              Partial signals, small penalty
-            </span>
+            <span className="text-sm text-muted-foreground">Partial signals, small penalty</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-medium uppercase text-muted-foreground">
             Low Confidence (15)
           </span>
           <div className="flex items-center gap-2">
             <ScoreBreakdownTooltip breakdown={lowConfidenceBreakdown}>
               <ScoreBadge score={15} />
             </ScoreBreakdownTooltip>
-            <span className="text-sm text-muted-foreground">
-              Minimal signals, moderate penalty
-            </span>
+            <span className="text-sm text-muted-foreground">Minimal signals, moderate penalty</span>
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-medium uppercase text-muted-foreground">
             No Confidence (0)
           </span>
           <div className="flex items-center gap-2">

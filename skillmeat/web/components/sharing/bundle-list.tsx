@@ -85,7 +85,10 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
     <>
       <div className="space-y-3">
         {bundles.map((bundle, index) => (
-          <Card key={bundle.id || `bundle-${index}`} className="group cursor-pointer transition-shadow hover:shadow-md">
+          <Card
+            key={bundle.id || `bundle-${index}`}
+            className="group cursor-pointer transition-shadow hover:shadow-md"
+          >
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -95,7 +98,9 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center gap-2">
-                        <h3 className="truncate text-base font-semibold">{bundle.metadata?.name || 'Unnamed Bundle'}</h3>
+                        <h3 className="truncate text-base font-semibold">
+                          {bundle.metadata?.name || 'Unnamed Bundle'}
+                        </h3>
                         {bundle.isImported && (
                           <Badge variant="secondary" className="flex-shrink-0 text-xs">
                             Imported
@@ -247,8 +252,8 @@ export function BundleList({ filter = 'all' }: BundleListProps) {
           <DialogHeader>
             <DialogTitle>Delete Bundle?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedBundle?.metadata?.name || 'this bundle'}"? This action cannot
-              be undone.
+              Are you sure you want to delete "{selectedBundle?.metadata?.name || 'this bundle'}"?
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

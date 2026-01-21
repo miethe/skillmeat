@@ -149,10 +149,7 @@ export async function fetchContextEntityContent(id: string): Promise<string> {
 /**
  * Deploy context entity to a project
  */
-export async function deployContextEntity(
-  id: string,
-  projectPath: string
-): Promise<void> {
+export async function deployContextEntity(id: string, projectPath: string): Promise<void> {
   const response = await fetch(buildUrl(`/context-entities/${id}/deploy`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

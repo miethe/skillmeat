@@ -63,11 +63,7 @@ describe('SkipPreferencesList Accessibility', () => {
 
     it('should have no violations with empty state', async () => {
       const { container } = render(
-        <SkipPreferencesList
-          skipPrefs={[]}
-          onRemoveSkip={jest.fn()}
-          onClearAll={jest.fn()}
-        />
+        <SkipPreferencesList skipPrefs={[]} onRemoveSkip={jest.fn()} onClearAll={jest.fn()} />
       );
       const results = await axe(container);
       expect(results).toHaveNoViolations();
@@ -169,11 +165,7 @@ describe('SkipPreferencesList Accessibility', () => {
 
     it('should announce empty state', async () => {
       render(
-        <SkipPreferencesList
-          skipPrefs={[]}
-          onRemoveSkip={jest.fn()}
-          onClearAll={jest.fn()}
-        />
+        <SkipPreferencesList skipPrefs={[]} onRemoveSkip={jest.fn()} onClearAll={jest.fn()} />
       );
 
       const trigger = screen.getByRole('button');
@@ -470,11 +462,7 @@ describe('SkipPreferencesList Accessibility', () => {
 
       // Update to empty
       rerender(
-        <SkipPreferencesList
-          skipPrefs={[]}
-          onRemoveSkip={jest.fn()}
-          onClearAll={jest.fn()}
-        />
+        <SkipPreferencesList skipPrefs={[]} onRemoveSkip={jest.fn()} onClearAll={jest.fn()} />
       );
 
       // Should auto-collapse

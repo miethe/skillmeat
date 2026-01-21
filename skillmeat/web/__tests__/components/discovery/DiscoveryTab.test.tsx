@@ -99,7 +99,9 @@ describe('DiscoveryTab', () => {
 
       expect(screen.getByRole('status')).toBeInTheDocument();
       expect(screen.getByText('No Artifacts Discovered')).toBeInTheDocument();
-      expect(screen.getByText(/No artifacts have been discovered in this project yet/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/No artifacts have been discovered in this project yet/i)
+      ).toBeInTheDocument();
     });
 
     it('shows loading state with skeleton', () => {
@@ -117,7 +119,7 @@ describe('DiscoveryTab', () => {
       render(<DiscoveryTab {...mockProps} />);
 
       // Check names
-      mockArtifacts.forEach(artifact => {
+      mockArtifacts.forEach((artifact) => {
         expect(screen.getByText(artifact.name)).toBeInTheDocument();
       });
 
@@ -166,10 +168,13 @@ describe('DiscoveryTab', () => {
       await user.type(searchInput, 'canvas');
 
       // Wait for debounce (300ms)
-      await waitFor(() => {
-        expect(screen.getByText('canvas-design')).toBeInTheDocument();
-        expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('canvas-design')).toBeInTheDocument();
+          expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
+        },
+        { timeout: 500 }
+      );
     });
 
     // Note: Status dropdown filter interaction is complex with Radix UI portals
@@ -230,9 +235,12 @@ describe('DiscoveryTab', () => {
       await user.type(searchInput, 'canvas');
 
       // Wait for debounce and clear button to appear
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
+        },
+        { timeout: 500 }
+      );
     });
 
     it('clear filters button resets search', async () => {
@@ -244,10 +252,13 @@ describe('DiscoveryTab', () => {
       await user.type(searchInput, 'canvas');
 
       // Wait for debounce (300ms) and filters to apply
-      await waitFor(() => {
-        // Should only show canvas-design, not test-runner
-        expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          // Should only show canvas-design, not test-runner
+          expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
 
       // Clear button should be visible
       const clearButton = screen.getByRole('button', { name: /clear filters/i });
@@ -272,9 +283,12 @@ describe('DiscoveryTab', () => {
       const searchInput = screen.getByPlaceholderText(/search artifacts by name/i);
       await user.type(searchInput, 'nonexistent');
 
-      await waitFor(() => {
-        expect(screen.getByText(/No artifacts match your filters/i)).toBeInTheDocument();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(screen.getByText(/No artifacts match your filters/i)).toBeInTheDocument();
+        },
+        { timeout: 500 }
+      );
     });
   });
 
@@ -519,7 +533,7 @@ describe('DiscoveryTab', () => {
       render(<DiscoveryTab {...mockProps} />);
 
       const rows = screen.getAllByRole('button', { name: /view details for/i });
-      rows.forEach(row => {
+      rows.forEach((row) => {
         expect(row).toHaveAttribute('tabIndex', '0');
       });
     });
@@ -600,10 +614,13 @@ describe('DiscoveryTab', () => {
       expect(screen.getByText('test-runner')).toBeInTheDocument();
 
       // Wait for debounce
-      await waitFor(() => {
-        expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
-        expect(screen.getByText('canvas-design')).toBeInTheDocument();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
+          expect(screen.getByText('canvas-design')).toBeInTheDocument();
+        },
+        { timeout: 500 }
+      );
     });
 
     it('handles rapid search filter changes', async () => {
@@ -618,10 +635,13 @@ describe('DiscoveryTab', () => {
       await user.type(searchInput, 'canvas');
 
       // Final filter should apply after debounce
-      await waitFor(() => {
-        expect(screen.getByText('canvas-design')).toBeInTheDocument();
-        expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('canvas-design')).toBeInTheDocument();
+          expect(screen.queryByText('test-runner')).not.toBeInTheDocument();
+        },
+        { timeout: 500 }
+      );
     });
   });
 });

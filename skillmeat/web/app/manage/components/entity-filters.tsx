@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EntityStatus } from '@/types/entity';
 import { Badge } from '@/components/ui/badge';
+import { GroupFilterSelect } from '@/components/shared/group-filter-select';
+import { useCollectionContext } from '@/hooks';
 
 interface EntityFiltersProps {
   searchQuery: string;
@@ -24,6 +26,10 @@ interface EntityFiltersProps {
   tagFilter: string[];
   onTagFilterChange: (tags: string[]) => void;
   availableTags?: string[];
+  /** Currently selected group ID for filtering (optional) */
+  groupId?: string;
+  /** Callback when group filter changes (optional) */
+  onGroupFilterChange?: (groupId: string | undefined) => void;
 }
 
 const STATUS_OPTIONS: { value: EntityStatus | 'all'; label: string }[] = [
@@ -41,8 +47,15 @@ export function EntityFilters({
   onStatusFilterChange,
   tagFilter,
   onTagFilterChange,
+  groupId,
+  onGroupFilterChange,
 }: EntityFiltersProps) {
   const [tagInputValue, setTagInputValue] = useState('');
+  const { selectedCollectionId } = useCollectionContext();
+
+  // Only show group filter when in specific collection context
+  const isSpecificCollectionContext =
+    selectedCollectionId && selectedCollectionId !== 'all';
 
   const handleStatusChange = (value: string) => {
     if (value === 'all') {
@@ -113,6 +126,18 @@ export function EntityFilters({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Group Filter - Only shown in specific collection context */}
+        {isSpecificCollectionContext &&
+          selectedCollectionId &&
+          onGroupFilterChange && (
+            <GroupFilterSelect
+              collectionId={selectedCollectionId}
+              value={groupId}
+              onChange={onGroupFilterChange}
+              className="w-48"
+            />
+          )}
       </div>
 
       {/* Tag Filter */}
@@ -141,7 +166,7 @@ export function EntityFilters({
         </div>
 
         {/* Clear filters */}
-        {(searchQuery || statusFilter || tagFilter.length > 0) && (
+        {(searchQuery || statusFilter || tagFilter.length > 0 || groupId) && (
           <Button
             variant="ghost"
             size="sm"
@@ -149,6 +174,7 @@ export function EntityFilters({
               onSearchChange('');
               onStatusFilterChange(null);
               onTagFilterChange([]);
+              onGroupFilterChange?.(undefined);
             }}
           >
             Clear All

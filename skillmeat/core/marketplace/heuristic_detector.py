@@ -1253,7 +1253,10 @@ class HeuristicDetector:
         # and the detected type matches the container type, add full bonus
         # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
+            if (
+                artifact_type == container_hint
+                and breakdown["container_hint_score"] == 0
+            ):
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight
                 match_reasons.append(
@@ -2073,7 +2076,10 @@ class HeuristicDetector:
         # container type (e.g., skill inside skills/)
         # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
+            if (
+                artifact_type == container_hint
+                and breakdown["container_hint_score"] == 0
+            ):
                 # Type matches container - full bonus
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight
@@ -2143,6 +2149,7 @@ class HeuristicDetector:
         matches: List[HeuristicMatch],
         base_url: str,
         detected_sha: Optional[str] = None,
+        ref: str = "main",
     ) -> List[DetectedArtifact]:
         """Convert heuristic matches to detected artifact objects.
 
@@ -2152,6 +2159,7 @@ class HeuristicDetector:
             matches: List of heuristic matches
             base_url: Base URL for repository
             detected_sha: Git commit SHA for version tracking
+            ref: Branch/tag/SHA for upstream URL construction
 
         Returns:
             List of detected artifacts
@@ -2189,7 +2197,7 @@ class HeuristicDetector:
                 name = name[:-3]
 
             # Construct upstream URL
-            upstream_url = f"{base_url.rstrip('/')}/tree/main/{match.path}"
+            upstream_url = f"{base_url.rstrip('/')}/tree/{ref}/{match.path}"
 
             artifact = DetectedArtifact(
                 artifact_type=match.artifact_type,
@@ -2218,7 +2226,7 @@ class HeuristicDetector:
 def detect_artifacts_in_tree(
     file_tree: List[str],
     repo_url: str,
-    _ref: str = "main",  # Unused but kept for API compatibility
+    ref: str = "main",
     root_hint: Optional[str] = None,
     detected_sha: Optional[str] = None,
     enable_frontmatter_detection: bool = False,
@@ -2262,7 +2270,7 @@ def detect_artifacts_in_tree(
     )
     matches = detector.analyze_paths(file_tree, base_url=repo_url, root_hint=root_hint)
     return detector.matches_to_artifacts(
-        matches, base_url=repo_url, detected_sha=detected_sha
+        matches, base_url=repo_url, detected_sha=detected_sha, ref=ref
     )
 
 

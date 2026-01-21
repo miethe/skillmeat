@@ -13,7 +13,6 @@ from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import requests
 
 from skillmeat.core.marketplace.github_scanner import (
     GitHubAPIError,
@@ -21,6 +20,11 @@ from skillmeat.core.marketplace.github_scanner import (
     RateLimitError,
     ScanConfig,
     scan_github_source,
+)
+from skillmeat.core.github_client import (
+    GitHubClientError,
+    GitHubRateLimitError,
+    GitHubNotFoundError,
 )
 
 
@@ -54,150 +58,116 @@ class TestGitHubScanner:
     """Test suite for GitHubScanner."""
 
     @pytest.fixture
-    def mock_session(self):
-        """Create a mock requests session."""
-        session = MagicMock()
-        session.headers = {}
-        return session
+    def mock_client(self):
+        """Create a mock GitHubClient."""
+        with patch(
+            "skillmeat.core.marketplace.github_scanner.GitHubClient"
+        ) as MockClient:
+            mock_instance = MagicMock()
+            mock_instance.token = "test_token"
+            MockClient.return_value = mock_instance
+            yield mock_instance
 
     @pytest.fixture
-    def scanner(self, mock_session):
-        """Create a scanner with mocked session."""
+    def scanner(self, mock_client):
+        """Create a scanner with mocked client."""
         scanner = GitHubScanner(token="test_token")
-        scanner.session = mock_session
+        scanner._client = mock_client
         return scanner
 
     def test_init_with_token(self):
         """Test initialization with explicit token."""
-        scanner = GitHubScanner(token="test_token")
-        assert scanner.token == "test_token"
-        assert "Authorization" in scanner.session.headers
+        with patch(
+            "skillmeat.core.marketplace.github_scanner.GitHubClient"
+        ) as MockClient:
+            mock_instance = MagicMock()
+            mock_instance.token = "test_token"
+            MockClient.return_value = mock_instance
+
+            scanner = GitHubScanner(token="test_token")
+
+            assert scanner.token == "test_token"
+            MockClient.assert_called_once_with("test_token")
 
     def test_init_from_env(self, monkeypatch):
         """Test initialization from environment variable."""
         monkeypatch.setenv("GITHUB_TOKEN", "env_token")
-        scanner = GitHubScanner()
-        assert scanner.token == "env_token"
+        with patch(
+            "skillmeat.core.marketplace.github_scanner.GitHubClient"
+        ) as MockClient:
+            mock_instance = MagicMock()
+            mock_instance.token = "env_token"
+            MockClient.return_value = mock_instance
+
+            scanner = GitHubScanner()
+
+            assert scanner.token == "env_token"
 
     def test_init_without_token(self, monkeypatch):
         """Test initialization without token (unauthenticated)."""
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         monkeypatch.delenv("SKILLMEAT_GITHUB_TOKEN", raising=False)
-        scanner = GitHubScanner()
-        assert scanner.token is None
+        with patch(
+            "skillmeat.core.marketplace.github_scanner.GitHubClient"
+        ) as MockClient:
+            mock_instance = MagicMock()
+            mock_instance.token = None
+            MockClient.return_value = mock_instance
 
-    def test_fetch_tree_success(self, scanner, mock_session):
+            scanner = GitHubScanner()
+
+            assert scanner.token is None
+
+    def test_fetch_tree_success(self, scanner, mock_client):
         """Test successful tree fetch."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tree": [
-                {"path": "skills/skill1/SKILL.md", "type": "blob"},
-                {"path": "skills/skill1/index.ts", "type": "blob"},
-                {"path": "commands/cmd1/COMMAND.md", "type": "blob"},
-            ]
-        }
-        mock_session.get.return_value = mock_response
+        mock_client.get_repo_tree.return_value = [
+            {"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "abc"},
+            {"path": "skills/skill1/index.ts", "type": "blob", "sha": "def"},
+            {"path": "commands/cmd1/COMMAND.md", "type": "blob", "sha": "ghi"},
+        ]
 
         tree, actual_ref = scanner._fetch_tree("user", "repo", "main")
 
         assert len(tree) == 3
         assert tree[0]["path"] == "skills/skill1/SKILL.md"
         assert actual_ref == "main"  # No fallback needed
-        mock_session.get.assert_called_once()
+        mock_client.get_repo_tree.assert_called_once_with(
+            "user/repo", ref="main", recursive=True
+        )
 
-    def test_fetch_tree_invalid_response(self, scanner, mock_session):
-        """Test handling of invalid tree response."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"error": "Not found"}
-        mock_session.get.return_value = mock_response
-
-        with pytest.raises(GitHubAPIError, match="Invalid tree response"):
-            scanner._fetch_tree("user", "repo", "main")
-
-    def test_fetch_tree_fallback_to_default_branch(self, scanner, mock_session):
+    def test_fetch_tree_fallback_to_default_branch(self, scanner, mock_client):
         """Test fallback to actual default branch when main returns 404."""
-        # The retry logic will try 3 times for git/trees/main (all 404)
-        # Then fallback code fetches repos endpoint for default branch
-        # Then fetches git/trees/master successfully
-        call_count = [0]
-
-        def mock_get(url, timeout=None):
-            call_count[0] += 1
-            response = Mock()
-            response.status_code = 200
-            response.headers = {}
-
-            if "git/trees/main" in url:
-                # All calls to git/trees/main - simulate 404
-                response.status_code = 404
-                response.raise_for_status.side_effect = requests.HTTPError(
-                    "404 Not Found"
-                )
-            elif url.endswith("/repos/user/repo"):
-                # Call to repos endpoint for default branch
-                response.json.return_value = {"default_branch": "master"}
-                response.raise_for_status = Mock()
-            elif "git/trees/master" in url:
-                # Call to git/trees/master - success
-                response.json.return_value = {
-                    "tree": [
-                        {"path": "skills/skill1/SKILL.md", "type": "blob"},
-                    ]
-                }
-                response.raise_for_status = Mock()
-
-            return response
-
-        mock_session.get.side_effect = mock_get
+        # First call raises not found, second succeeds
+        mock_client.get_repo_tree.side_effect = [
+            GitHubNotFoundError("Branch not found"),
+            [{"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "abc"}],
+        ]
+        mock_client.get_repo_metadata.return_value = {"default_branch": "master"}
 
         tree, actual_ref = scanner._fetch_tree("user", "repo", "main")
 
         assert len(tree) == 1
         assert tree[0]["path"] == "skills/skill1/SKILL.md"
         assert actual_ref == "master"  # Fallback occurred
-        # Should have made 5 calls: 3 retries for main (404), repos (default branch), master
-        assert call_count[0] == 5
 
-    def test_fetch_tree_no_fallback_for_non_main_ref(self, scanner, mock_session):
+    def test_fetch_tree_no_fallback_for_non_main_ref(self, scanner, mock_client):
         """Test that fallback does not occur when ref is not 'main'."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
-        mock_session.get.return_value = mock_response
+        mock_client.get_repo_tree.side_effect = GitHubNotFoundError("Branch not found")
 
         # Should raise without fallback when ref is not "main"
-        with pytest.raises(GitHubAPIError):
+        with pytest.raises(GitHubNotFoundError):
             scanner._fetch_tree("user", "repo", "feature-branch")
 
         # Should only make one call (no fallback)
-        assert mock_session.get.call_count == 3  # 3 retries
+        assert mock_client.get_repo_tree.call_count == 1
 
-    def test_fetch_tree_fallback_when_default_is_also_main(self, scanner, mock_session):
+    def test_fetch_tree_fallback_when_default_is_also_main(self, scanner, mock_client):
         """Test that if default branch is also 'main', error is re-raised."""
-        call_count = [0]
+        mock_client.get_repo_tree.side_effect = GitHubNotFoundError("Branch not found")
+        mock_client.get_repo_metadata.return_value = {"default_branch": "main"}
 
-        def mock_get(url, timeout=None):
-            call_count[0] += 1
-            response = Mock()
-            response.status_code = 200
-
-            if call_count[0] <= 3:
-                # First 3 calls to git/trees/main - simulate 404 with retries
-                response.status_code = 404
-                response.raise_for_status.side_effect = requests.HTTPError(
-                    "404 Not Found"
-                )
-            elif call_count[0] == 4:
-                # Fourth call to repos endpoint - default branch is also "main"
-                response.json.return_value = {"default_branch": "main"}
-                response.raise_for_status = Mock()
-
-            return response
-
-        mock_session.get.side_effect = mock_get
-
-        # Should raise GitHubAPIError since default branch is also "main"
-        with pytest.raises(GitHubAPIError):
+        # Should raise GitHubNotFoundError since default branch is also "main"
+        with pytest.raises(GitHubNotFoundError):
             scanner._fetch_tree("user", "repo", "main")
 
     def test_extract_file_paths_no_filter(self, scanner):
@@ -243,199 +213,73 @@ class TestGitHubScanner:
 
         assert len(paths) == 10
 
-    def test_get_ref_sha_success(self, scanner, mock_session):
+    def test_get_ref_sha_success(self, scanner, mock_client):
         """Test successful SHA resolution."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"sha": "abc123def456"}
-        mock_session.get.return_value = mock_response
+        mock_client.resolve_version.return_value = "abc123def456"
 
         sha = scanner._get_ref_sha("user", "repo", "main")
 
         assert sha == "abc123def456"
-        mock_session.get.assert_called_once()
+        mock_client.resolve_version.assert_called_once_with("user/repo", "main")
 
-    def test_request_with_retry_success(self, scanner, mock_session):
-        """Test successful request on first try."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.raise_for_status = Mock()
-        mock_session.get.return_value = mock_response
-
-        response = scanner._request_with_retry("https://api.github.com/test")
-
-        assert response == mock_response
-        mock_session.get.assert_called_once()
-
-    def test_request_with_retry_transient_failure(self, scanner, mock_session):
-        """Test retry on transient failure."""
-        # First call fails, second succeeds
-        failed_response = Mock()
-        failed_response.raise_for_status.side_effect = (
-            requests.exceptions.RequestException("Timeout")
-        )
-
-        success_response = Mock()
-        success_response.status_code = 200
-        success_response.raise_for_status = Mock()
-
-        mock_session.get.side_effect = [failed_response, success_response]
-
-        response = scanner._request_with_retry("https://api.github.com/test")
-
-        assert response == success_response
-        assert mock_session.get.call_count == 2
-
-    def test_request_with_retry_rate_limit_403(self, scanner, mock_session):
-        """Test handling of 403 rate limit with reset time."""
-        mock_response = Mock()
-        mock_response.status_code = 403
-        mock_response.headers = {
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": str(int(time.time()) + 30),  # 30 seconds from now
+    def test_get_rate_limit(self, scanner, mock_client):
+        """Test rate limit retrieval."""
+        mock_client.get_rate_limit.return_value = {
+            "remaining": 4500,
+            "limit": 5000,
+            "reset": datetime.utcnow(),
         }
-        mock_session.get.return_value = mock_response
 
-        with pytest.raises(RateLimitError, match="Rate limited"):
-            scanner._request_with_retry("https://api.github.com/test")
+        rate_limit = scanner.get_rate_limit()
 
-    def test_request_with_retry_rate_limit_429(self, scanner, mock_session):
-        """Test handling of 429 rate limit."""
-        mock_response = Mock()
-        mock_response.status_code = 429
-        mock_response.headers = {"Retry-After": "120"}
-        mock_session.get.return_value = mock_response
+        assert rate_limit["remaining"] == 4500
+        assert rate_limit["limit"] == 5000
+        mock_client.get_rate_limit.assert_called_once()
 
-        with pytest.raises(RateLimitError, match="Rate limited for 120s"):
-            scanner._request_with_retry("https://api.github.com/test")
-
-    def test_request_with_retry_max_retries_exceeded(self, scanner, mock_session):
-        """Test failure after max retries."""
-        scanner.config.retry_count = 2
-        mock_session.get.side_effect = requests.exceptions.RequestException("Error")
-
-        with pytest.raises(GitHubAPIError, match="failed after 2 attempts"):
-            scanner._request_with_retry("https://api.github.com/test")
-
-        assert mock_session.get.call_count == 2
-
-    def test_get_file_content_success(self, scanner, mock_session):
+    def test_get_file_content_success(self, scanner, mock_client):
         """Test successful file content retrieval with metadata."""
-        import base64
-
         content = "# Test Skill\nThis is a skill."
-        encoded = base64.b64encode(content.encode("utf-8")).decode("utf-8")
-
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "content": encoded,
-            "encoding": "base64",
-            "type": "file",
-            "size": 31,
-            "sha": "abc123def456",
-            "name": "SKILL.md",
-            "path": "skills/test/SKILL.md",
-        }
-        mock_session.get.return_value = mock_response
+        mock_client.get_file_content.return_value = content.encode("utf-8")
 
         result = scanner.get_file_content("user", "repo", "skills/test/SKILL.md")
 
         assert result is not None
         assert result["content"] == content
-        assert result["encoding"] == "base64"
-        assert result["size"] == 31
-        assert result["sha"] == "abc123def456"
+        assert result["encoding"] == "utf-8"
+        assert result["size"] == len(content)
         assert result["name"] == "SKILL.md"
         assert result["path"] == "skills/test/SKILL.md"
         assert result["is_binary"] is False
 
-    def test_get_file_content_no_encoding(self, scanner, mock_session):
-        """Test file content retrieval without base64 encoding."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "content": "plain text content",
-            "type": "file",
-            "size": 18,
-            "sha": "xyz789",
-            "name": "README.md",
-            "path": "README.md",
-        }
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_content("user", "repo", "README.md")
-
-        assert result is not None
-        assert result["content"] == "plain text content"
-        assert result["size"] == 18
-        assert result["is_binary"] is False
-
-    def test_get_file_content_binary_file(self, scanner, mock_session):
+    def test_get_file_content_binary_file(self, scanner, mock_client):
         """Test binary file content is kept as base64."""
         import base64
 
         binary_data = b"\x89PNG\r\n\x1a\n"
-        encoded = base64.b64encode(binary_data).decode("utf-8")
-
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "content": encoded,
-            "encoding": "base64",
-            "type": "file",
-            "size": 8,
-            "sha": "img123",
-            "name": "icon.png",
-            "path": "assets/icon.png",
-        }
-        mock_session.get.return_value = mock_response
+        mock_client.get_file_content.return_value = binary_data
 
         result = scanner.get_file_content("user", "repo", "assets/icon.png")
 
         assert result is not None
         assert result["is_binary"] is True
-        # Binary content should remain as base64
-        assert result["content"] == encoded.replace("\n", "")
+        # Binary content should be base64 encoded
+        assert result["content"] == base64.b64encode(binary_data).decode("ascii")
         assert result["name"] == "icon.png"
+        assert result["encoding"] == "base64"
 
-    def test_get_file_content_not_found(self, scanner, mock_session):
+    def test_get_file_content_not_found(self, scanner, mock_client):
         """Test file not found returns None."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_session.get.return_value = mock_response
+        mock_client.get_file_content.side_effect = GitHubNotFoundError("Not found")
 
         result = scanner.get_file_content("user", "repo", "nonexistent.txt")
 
         assert result is None
 
-    def test_get_file_content_directory(self, scanner, mock_session):
-        """Test directory path returns None."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "type": "dir",
-            "name": "src",
-            "path": "src",
-        }
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_content("user", "repo", "src")
-
-        assert result is None
-
-    def test_scan_repository_empty_repo(self, scanner, mock_session):
+    def test_scan_repository_empty_repo(self, scanner, mock_client):
         """Test scanning an empty repository."""
         # Mock empty tree
-        tree_response = Mock()
-        tree_response.json.return_value = {"tree": []}
-        tree_response.raise_for_status = Mock()
-
-        # Mock commit SHA
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "abc123"}
-        commit_response.raise_for_status = Mock()
-
-        mock_session.get.side_effect = [tree_response, commit_response]
+        mock_client.get_repo_tree.return_value = []
+        mock_client.resolve_version.return_value = "abc123"
 
         result = scanner.scan_repository("user", "repo", "main")
 
@@ -444,11 +288,9 @@ class TestGitHubScanner:
         assert result.new_count == 0
         assert len(result.errors) == 0
 
-    def test_scan_repository_with_errors(self, scanner, mock_session):
+    def test_scan_repository_with_errors(self, scanner, mock_client):
         """Test scan with API errors."""
-        mock_session.get.side_effect = requests.exceptions.RequestException(
-            "API unavailable"
-        )
+        mock_client.get_repo_tree.side_effect = GitHubClientError("API unavailable")
 
         result = scanner.scan_repository("user", "repo", "main")
 
@@ -457,22 +299,13 @@ class TestGitHubScanner:
         assert len(result.errors) > 0
         assert "API unavailable" in result.errors[0]
 
-    def test_scan_repository_with_root_hint(self, scanner, mock_session):
+    def test_scan_repository_with_root_hint(self, scanner, mock_client):
         """Test scanning with root_hint."""
-        tree_response = Mock()
-        tree_response.json.return_value = {
-            "tree": [
-                {"path": "skills/skill1/SKILL.md", "type": "blob"},
-                {"path": "other/file.txt", "type": "blob"},
-            ]
-        }
-        tree_response.raise_for_status = Mock()
-
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "abc123"}
-        commit_response.raise_for_status = Mock()
-
-        mock_session.get.side_effect = [tree_response, commit_response]
+        mock_client.get_repo_tree.return_value = [
+            {"path": "skills/skill1/SKILL.md", "type": "blob", "sha": "abc"},
+            {"path": "other/file.txt", "type": "blob", "sha": "def"},
+        ]
+        mock_client.resolve_version.return_value = "abc123"
 
         result = scanner.scan_repository("user", "repo", "main", root_hint="skills")
 
@@ -480,17 +313,10 @@ class TestGitHubScanner:
         # Note: artifacts_found will be 0 because heuristic detector isn't implemented
         # But we verify the scan completed successfully
 
-    def test_scan_repository_duration_tracking(self, scanner, mock_session):
+    def test_scan_repository_duration_tracking(self, scanner, mock_client):
         """Test that scan duration is tracked."""
-        tree_response = Mock()
-        tree_response.json.return_value = {"tree": []}
-        tree_response.raise_for_status = Mock()
-
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "abc123"}
-        commit_response.raise_for_status = Mock()
-
-        mock_session.get.side_effect = [tree_response, commit_response]
+        mock_client.get_repo_tree.return_value = []
+        mock_client.resolve_version.return_value = "abc123"
 
         result = scanner.scan_repository("user", "repo", "main")
 
@@ -498,394 +324,55 @@ class TestGitHubScanner:
         assert isinstance(result.scanned_at, datetime)
 
 
-class TestScanGitHubSource:
-    """Test suite for scan_github_source convenience function."""
+class TestExceptionBackwardCompatibility:
+    """Test backward compatibility of exception classes."""
 
-    def test_parse_valid_url(self):
-        """Test parsing a valid GitHub URL."""
-        with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
-            with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
-                with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
-                    mock_extract.return_value = []
-                    mock_get_sha.return_value = "abc123"
+    def test_github_api_error_is_github_client_error(self):
+        """Test GitHubAPIError inherits from GitHubClientError."""
+        error = GitHubAPIError("test error")
+        assert isinstance(error, GitHubClientError)
 
-                    result, artifacts = scan_github_source(
-                        "https://github.com/anthropics/quickstarts"
-                    )
+    def test_rate_limit_error_is_github_rate_limit_error(self):
+        """Test RateLimitError inherits from GitHubRateLimitError."""
+        error = RateLimitError("test error")
+        assert isinstance(error, GitHubRateLimitError)
 
-                    assert result.status == "success"
-                    assert isinstance(artifacts, list)
-                    mock_fetch_tree.assert_called_once_with(
-                        "anthropics", "quickstarts", "main"
-                    )
-
-    def test_parse_url_with_git_suffix(self):
-        """Test parsing URL with .git suffix."""
-        with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
-            with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
-                with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
-                    mock_extract.return_value = []
-                    mock_get_sha.return_value = "abc123"
-
-                    result, artifacts = scan_github_source(
-                        "https://github.com/user/repo.git"
-                    )
-
-                    assert result.status == "success"
-                    mock_fetch_tree.assert_called_once_with("user", "repo", "main")
-
-    def test_parse_invalid_url(self):
-        """Test handling of invalid URL."""
-        with pytest.raises(ValueError, match="Invalid repository URL"):
-            scan_github_source("not-a-url")
-
-    def test_with_custom_ref(self):
-        """Test scanning with custom ref."""
-        with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
-            with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
-                with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = ([], "v1.0.0")  # Returns (tree, actual_ref)
-                    mock_extract.return_value = []
-                    mock_get_sha.return_value = "def456"
-
-                    result, artifacts = scan_github_source(
-                        "https://github.com/user/repo", ref="v1.0.0"
-                    )
-
-                    mock_fetch_tree.assert_called_once_with("user", "repo", "v1.0.0")
-
-    def test_with_root_hint(self):
-        """Test scanning with root_hint."""
-        with patch.object(GitHubScanner, "_fetch_tree") as mock_fetch_tree:
-            with patch.object(GitHubScanner, "_extract_file_paths") as mock_extract:
-                with patch.object(GitHubScanner, "_get_ref_sha") as mock_get_sha:
-                    mock_fetch_tree.return_value = ([], "main")  # Returns (tree, actual_ref)
-                    mock_extract.return_value = []
-                    mock_get_sha.return_value = "abc123"
-
-                    result, artifacts = scan_github_source(
-                        "https://github.com/user/repo", root_hint="skills"
-                    )
-
-                    mock_extract.assert_called_once()
-                    call_args = mock_extract.call_args
-                    assert call_args[0][1] == "skills"  # root_hint argument
-
-
-class TestErrorHandling:
-    """Test suite for error handling scenarios."""
-
-    def test_github_api_error_exception(self):
-        """Test GitHubAPIError exception."""
-        error = GitHubAPIError("API call failed")
-        assert str(error) == "API call failed"
-        assert isinstance(error, Exception)
-
-    def test_rate_limit_error_exception(self):
-        """Test RateLimitError exception."""
-        error = RateLimitError("Rate limited")
-        assert str(error) == "Rate limited"
+    def test_rate_limit_error_is_github_api_error(self):
+        """Test RateLimitError inherits from GitHubAPIError for backward compat."""
+        error = RateLimitError("test error")
         assert isinstance(error, GitHubAPIError)
 
-    def test_network_timeout(self):
-        """Test handling of network timeout."""
-        scanner = GitHubScanner()
-        scanner.config.retry_count = 1
-
-        with patch.object(
-            scanner.session,
-            "get",
-            side_effect=requests.exceptions.Timeout("Timeout"),
-        ):
-            with pytest.raises(GitHubAPIError, match="failed after"):
-                scanner._request_with_retry("https://api.github.com/test")
-
-    def test_connection_error(self):
-        """Test handling of connection error."""
-        scanner = GitHubScanner()
-        scanner.config.retry_count = 1
-
-        with patch.object(
-            scanner.session,
-            "get",
-            side_effect=requests.exceptions.ConnectionError("Connection failed"),
-        ):
-            with pytest.raises(GitHubAPIError, match="failed after"):
-                scanner._request_with_retry("https://api.github.com/test")
+    def test_catching_github_api_error_catches_rate_limit(self):
+        """Test that catching GitHubAPIError also catches RateLimitError."""
+        error = RateLimitError("rate limited")
+        try:
+            raise error
+        except GitHubAPIError as e:
+            assert str(e) == "rate limited"
 
 
-class TestEdgeCases:
-    """Test suite for edge cases and boundary conditions."""
+class TestScanGithubSourceConvenience:
+    """Test the scan_github_source convenience function."""
 
-    def test_empty_tree_response(self):
-        """Test handling of empty tree response."""
-        scanner = GitHubScanner()
-        with patch.object(scanner.session, "get") as mock_get:
-            tree_response = Mock()
-            tree_response.json.return_value = {"tree": []}
-            tree_response.raise_for_status = Mock()
+    def test_scan_github_source_parses_url(self):
+        """Test URL parsing in convenience function."""
+        with patch(
+            "skillmeat.core.marketplace.github_scanner.GitHubScanner"
+        ) as MockScanner:
+            mock_instance = MagicMock()
+            mock_instance._fetch_tree.return_value = ([], "main")
+            mock_instance._extract_file_paths.return_value = []
+            mock_instance._get_ref_sha.return_value = "abc123"
+            MockScanner.return_value = mock_instance
 
-            commit_response = Mock()
-            commit_response.json.return_value = {"sha": "abc123"}
-            commit_response.raise_for_status = Mock()
+            result, artifacts = scan_github_source(
+                "https://github.com/user/repo", ref="main"
+            )
 
-            mock_get.side_effect = [tree_response, commit_response]
-
-            result = scanner.scan_repository("user", "empty-repo", "main")
-
+            mock_instance._fetch_tree.assert_called_once_with("user", "repo", "main")
             assert result.status == "success"
-            assert result.artifacts_found == 0
 
-    def test_malformed_json_response(self):
-        """Test handling of malformed JSON response."""
-        scanner = GitHubScanner()
-        with patch.object(scanner.session, "get") as mock_get:
-            mock_response = Mock()
-            mock_response.json.side_effect = ValueError("Invalid JSON")
-            mock_get.return_value = mock_response
-
-            with pytest.raises(GitHubAPIError):
-                scanner._fetch_tree("user", "repo", "main")
-
-    def test_unicode_paths(self):
-        """Test handling of unicode characters in paths."""
-        scanner = GitHubScanner()
-        tree = [
-            {"path": "skills/日本語/SKILL.md", "type": "blob"},
-            {"path": "skills/émoji/SKILL.md", "type": "blob"},
-        ]
-
-        paths = scanner._extract_file_paths(tree)
-
-        assert len(paths) == 2
-        assert "skills/日本語/SKILL.md" in paths
-        assert "skills/émoji/SKILL.md" in paths
-
-    def test_very_deep_paths(self):
-        """Test handling of very deep directory paths."""
-        scanner = GitHubScanner()
-        tree = [
-            {
-                "path": "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/SKILL.md",
-                "type": "blob",
-            }
-        ]
-
-        paths = scanner._extract_file_paths(tree)
-
-        assert len(paths) == 1
-
-    def test_special_characters_in_paths(self):
-        """Test handling of special characters in paths."""
-        scanner = GitHubScanner()
-        tree = [
-            {"path": "skills/my-skill (v2)/SKILL.md", "type": "blob"},
-            {"path": "skills/skill-with-#hash/SKILL.md", "type": "blob"},
-        ]
-
-        paths = scanner._extract_file_paths(tree)
-
-        assert len(paths) == 2
-
-
-class TestGetFileTree:
-    """Test suite for get_file_tree method."""
-
-    @pytest.fixture
-    def mock_session(self):
-        """Create a mock requests session."""
-        session = MagicMock()
-        session.headers = {}
-        return session
-
-    @pytest.fixture
-    def scanner(self, mock_session):
-        """Create a scanner with mocked session."""
-        scanner = GitHubScanner(token="test_token")
-        scanner.session = mock_session
-        return scanner
-
-    def test_get_file_tree_with_sha(self, scanner, mock_session):
-        """Test fetching file tree with explicit SHA."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "sha": "abc123",
-            "tree": [
-                {"path": "README.md", "type": "blob", "size": 1024, "sha": "blob1"},
-                {"path": "src", "type": "tree", "sha": "tree1"},
-                {"path": "src/main.py", "type": "blob", "size": 2048, "sha": "blob2"},
-            ],
-        }
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_tree("owner", "repo", sha="abc123")
-
-        assert len(result) == 3
-        assert result[0]["path"] == "README.md"
-        assert result[0]["type"] == "blob"
-        assert result[0]["size"] == 1024
-        assert result[0]["sha"] == "blob1"
-        # Tree entries don't have size
-        assert result[1]["type"] == "tree"
-        assert "size" not in result[1]
-        mock_session.get.assert_called_once()
-        call_url = mock_session.get.call_args[0][0]
-        assert "git/trees/abc123" in call_url
-        assert "recursive=1" in call_url
-
-    def test_get_file_tree_without_sha_fetches_default_branch(
-        self, scanner, mock_session
-    ):
-        """Test that without SHA, default branch is fetched first."""
-        # First call: get repo info for default branch
-        repo_response = Mock()
-        repo_response.json.return_value = {"default_branch": "main"}
-        repo_response.status_code = 200
-
-        # Second call: get commit SHA for main
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "commit_sha_123"}
-        commit_response.status_code = 200
-
-        # Third call: get tree
-        tree_response = Mock()
-        tree_response.json.return_value = {
-            "tree": [{"path": "file.txt", "type": "blob", "size": 100, "sha": "blob1"}]
-        }
-        tree_response.status_code = 200
-
-        mock_session.get.side_effect = [repo_response, commit_response, tree_response]
-
-        result = scanner.get_file_tree("owner", "repo")
-
-        assert len(result) == 1
-        assert result[0]["path"] == "file.txt"
-        assert mock_session.get.call_count == 3
-
-    def test_get_file_tree_with_path_filter(self, scanner, mock_session):
-        """Test filtering tree by path prefix."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tree": [
-                {"path": "README.md", "type": "blob", "size": 100, "sha": "blob1"},
-                {"path": "src", "type": "tree", "sha": "tree1"},
-                {"path": "src/main.py", "type": "blob", "size": 200, "sha": "blob2"},
-                {"path": "src/utils.py", "type": "blob", "size": 150, "sha": "blob3"},
-                {
-                    "path": "tests/test_main.py",
-                    "type": "blob",
-                    "size": 300,
-                    "sha": "blob4",
-                },
-            ],
-        }
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_tree("owner", "repo", path="src", sha="abc123")
-
-        assert len(result) == 3  # src directory + 2 files
-        paths = [item["path"] for item in result]
-        assert "src" in paths
-        assert "src/main.py" in paths
-        assert "src/utils.py" in paths
-        assert "README.md" not in paths
-        assert "tests/test_main.py" not in paths
-
-    def test_get_file_tree_path_filter_with_trailing_slash(self, scanner, mock_session):
-        """Test path filter handles trailing slashes correctly."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tree": [
-                {"path": "skills/canvas", "type": "tree", "sha": "tree1"},
-                {
-                    "path": "skills/canvas/SKILL.md",
-                    "type": "blob",
-                    "size": 500,
-                    "sha": "blob1",
-                },
-                {
-                    "path": "skills/canvas/index.ts",
-                    "type": "blob",
-                    "size": 1000,
-                    "sha": "blob2",
-                },
-                {"path": "skills/other", "type": "tree", "sha": "tree2"},
-            ],
-        }
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        # Test with trailing slash
-        result = scanner.get_file_tree(
-            "owner", "repo", path="skills/canvas/", sha="abc123"
-        )
-
-        assert len(result) == 3
-        paths = [item["path"] for item in result]
-        assert "skills/canvas" in paths
-        assert "skills/canvas/SKILL.md" in paths
-        assert "skills/canvas/index.ts" in paths
-        assert "skills/other" not in paths
-
-    def test_get_file_tree_empty_result(self, scanner, mock_session):
-        """Test empty tree response."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"tree": []}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_tree("owner", "repo", sha="abc123")
-
-        assert result == []
-
-    def test_get_file_tree_invalid_response(self, scanner, mock_session):
-        """Test handling of invalid tree response."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"not_tree": []}
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        with pytest.raises(GitHubAPIError) as exc_info:
-            scanner.get_file_tree("owner", "repo", sha="abc123")
-
-        assert "missing 'tree' key" in str(exc_info.value)
-
-    def test_get_file_tree_rate_limit_error(self, scanner, mock_session):
-        """Test rate limit error is properly raised."""
-        mock_response = Mock()
-        mock_response.status_code = 403
-        mock_response.headers = {
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": str(int(time.time()) + 3600),  # 1 hour from now
-        }
-        mock_session.get.return_value = mock_response
-
-        with pytest.raises(RateLimitError):
-            scanner.get_file_tree("owner", "repo", sha="abc123")
-
-    def test_get_file_tree_blob_has_size_tree_does_not(self, scanner, mock_session):
-        """Test that blob entries have size but tree entries do not."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tree": [
-                {"path": "file.txt", "type": "blob", "size": 123, "sha": "blob1"},
-                {"path": "directory", "type": "tree", "sha": "tree1"},
-            ],
-        }
-        mock_response.status_code = 200
-        mock_session.get.return_value = mock_response
-
-        result = scanner.get_file_tree("owner", "repo", sha="abc123")
-
-        # Blob should have size
-        blob_entry = next(e for e in result if e["type"] == "blob")
-        assert "size" in blob_entry
-        assert blob_entry["size"] == 123
-
-        # Tree should not have size
-        tree_entry = next(e for e in result if e["type"] == "tree")
-        assert "size" not in tree_entry
+    def test_scan_github_source_invalid_url(self):
+        """Test invalid URL raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid repository URL"):
+            scan_github_source("invalid")

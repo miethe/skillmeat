@@ -2,10 +2,55 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ConfirmDuplicatesRequest } from '../models/ConfirmDuplicatesRequest';
+import type { ConfirmDuplicatesResponse } from '../models/ConfirmDuplicatesResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest';
 export class DiscoveryService {
     constructor(public readonly httpRequest: BaseHttpRequest) {}
+    /**
+     * Process duplicate review decisions
+     * Process user decisions from the duplicate review modal.
+     *
+     * Handles three types of decisions:
+     * 1. **matches**: Link discovered duplicates to existing collection artifacts
+     * 2. **new_artifacts**: Import selected paths as new artifacts
+     * 3. **skipped**: Acknowledge paths the user chose to skip (logged for audit)
+     *
+     * All operations are atomic - if any operation fails, the response will
+     * indicate partial success with error details.
+     *
+     * This endpoint is idempotent for link operations - calling multiple times
+     * with the same matches will not create duplicate links.
+     * @returns ConfirmDuplicatesResponse Duplicate decisions processed successfully
+     * @throws ApiError
+     */
+    public confirmDuplicatesApiV1ArtifactsConfirmDuplicatesPost({
+        requestBody,
+        collection,
+    }: {
+        requestBody: ConfirmDuplicatesRequest,
+        /**
+         * Collection name (uses default if not specified)
+         */
+        collection?: (string | null),
+    }): CancelablePromise<ConfirmDuplicatesResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/artifacts/confirm-duplicates',
+            query: {
+                'collection': collection,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Unauthorized`,
+                422: `Validation Error`,
+                500: `Internal server error`,
+            },
+        });
+    }
     /**
      * Get discovery feature metrics
      * Get metrics and statistics for discovery features including:

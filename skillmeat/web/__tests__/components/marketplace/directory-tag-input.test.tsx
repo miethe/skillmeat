@@ -53,27 +53,19 @@ describe('DirectoryTagInput', () => {
     it('renders input field', () => {
       render(<DirectoryTagInput {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByPlaceholderText('Add tag and press Enter')
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Add tag and press Enter')).toBeInTheDocument();
     });
 
     it('renders add button', () => {
       render(<DirectoryTagInput {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByRole('button', { name: /add tag to/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add tag to/i })).toBeInTheDocument();
     });
 
     it('renders current tags', () => {
-      render(
-        <DirectoryTagInput
-          {...defaultProps}
-          currentTags={['python', 'typescript']}
-        />,
-        { wrapper: createWrapper() }
-      );
+      render(<DirectoryTagInput {...defaultProps} currentTags={['python', 'typescript']} />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByText('python')).toBeInTheDocument();
       expect(screen.getByText('typescript')).toBeInTheDocument();
@@ -202,13 +194,9 @@ describe('DirectoryTagInput', () => {
   describe('Tag Removal', () => {
     it('calls onRemoveTag when clicking tag badge', async () => {
       const user = userEvent.setup();
-      render(
-        <DirectoryTagInput
-          {...defaultProps}
-          currentTags={['python', 'typescript']}
-        />,
-        { wrapper: createWrapper() }
-      );
+      render(<DirectoryTagInput {...defaultProps} currentTags={['python', 'typescript']} />, {
+        wrapper: createWrapper(),
+      });
 
       const pythonBadge = screen.getByLabelText(/remove tag python/i);
       await user.click(pythonBadge);
@@ -238,9 +226,7 @@ describe('DirectoryTagInput', () => {
         { wrapper: createWrapper() }
       );
 
-      expect(
-        screen.queryByRole('list', { name: /suggested tags for/i })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: /suggested tags for/i })).not.toBeInTheDocument();
     });
   });
 
@@ -248,26 +234,16 @@ describe('DirectoryTagInput', () => {
     it('has accessible input label', () => {
       render(<DirectoryTagInput {...defaultProps} />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByLabelText(/add tag for skills\/canvas-design/i)
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/add tag for skills\/canvas-design/i)).toBeInTheDocument();
     });
 
     it('has accessible tag lists', () => {
-      render(
-        <DirectoryTagInput
-          {...defaultProps}
-          currentTags={['python']}
-        />,
-        { wrapper: createWrapper() }
-      );
+      render(<DirectoryTagInput {...defaultProps} currentTags={['python']} />, {
+        wrapper: createWrapper(),
+      });
 
-      expect(
-        screen.getByRole('list', { name: /applied tags for/i })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('list', { name: /suggested tags for/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: /applied tags for/i })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: /suggested tags for/i })).toBeInTheDocument();
     });
 
     it('has ARIA attributes for autocomplete', () => {

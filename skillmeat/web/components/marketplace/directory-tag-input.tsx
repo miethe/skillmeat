@@ -33,11 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -90,25 +86,21 @@ export function DirectoryTagInput({
   const debouncedQuery = useDebounce(inputValue, 150);
 
   // Search for existing tags using the API
-  const {
-    data: searchResults,
-    isLoading: isSearching,
-  } = useSearchTags(debouncedQuery, debouncedQuery.length >= 1);
+  const { data: searchResults, isLoading: isSearching } = useSearchTags(
+    debouncedQuery,
+    debouncedQuery.length >= 1
+  );
 
   // Filter out tags that are already applied
   const filteredResults = useMemo(() => {
     if (!searchResults) return [];
 
-    return searchResults.filter(
-      (tag) => !currentTags.includes(tag.name.toLowerCase())
-    );
+    return searchResults.filter((tag) => !currentTags.includes(tag.name.toLowerCase()));
   }, [searchResults, currentTags]);
 
   // Filter suggested tags that aren't already applied
   const availableSuggestedTags = useMemo(() => {
-    return suggestedTags.filter(
-      (tag) => !currentTags.includes(tag.toLowerCase())
-    );
+    return suggestedTags.filter((tag) => !currentTags.includes(tag.toLowerCase()));
   }, [suggestedTags, currentTags]);
 
   // Reset highlighted index when results change
@@ -125,20 +117,17 @@ export function DirectoryTagInput({
   }, []);
 
   // Handle input changes
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setInputValue(value);
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
 
-      // Open popover when typing
-      if (value.length >= 1) {
-        setIsPopoverOpen(true);
-      } else {
-        setIsPopoverOpen(false);
-      }
-    },
-    []
-  );
+    // Open popover when typing
+    if (value.length >= 1) {
+      setIsPopoverOpen(true);
+    } else {
+      setIsPopoverOpen(false);
+    }
+  }, []);
 
   // Add tag from input or selection
   const addTag = useCallback(
@@ -184,18 +173,14 @@ export function DirectoryTagInput({
             setIsPopoverOpen(true);
           }
           if (hasResults) {
-            setHighlightedIndex((prev) =>
-              prev < filteredResults.length - 1 ? prev + 1 : 0
-            );
+            setHighlightedIndex((prev) => (prev < filteredResults.length - 1 ? prev + 1 : 0));
           }
           break;
 
         case 'ArrowUp':
           e.preventDefault();
           if (hasResults) {
-            setHighlightedIndex((prev) =>
-              prev > 0 ? prev - 1 : filteredResults.length - 1
-            );
+            setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredResults.length - 1));
           }
           break;
 
@@ -222,14 +207,7 @@ export function DirectoryTagInput({
           break;
       }
     },
-    [
-      isPopoverOpen,
-      inputValue,
-      filteredResults,
-      highlightedIndex,
-      addTag,
-      selectFromDropdown,
-    ]
+    [isPopoverOpen, inputValue, filteredResults, highlightedIndex, addTag, selectFromDropdown]
   );
 
   // Handle click on add button
@@ -247,10 +225,7 @@ export function DirectoryTagInput({
     <div className={cn('space-y-2', className)}>
       {/* Tag Input with Autocomplete */}
       <div className="flex items-center gap-2">
-        <Label
-          htmlFor={inputId}
-          className="text-sm text-muted-foreground shrink-0"
-        >
+        <Label htmlFor={inputId} className="shrink-0 text-sm text-muted-foreground">
           Tags:
         </Label>
         <div className="flex flex-1 items-center gap-2">
@@ -271,21 +246,19 @@ export function DirectoryTagInput({
                     }
                   }}
                   onBlur={handleBlur}
-                  className="h-8 text-sm pr-8"
+                  className="h-8 pr-8 text-sm"
                   aria-label={`Add tag for ${directoryPath}`}
                   aria-autocomplete="list"
                   aria-expanded={isPopoverOpen && filteredResults.length > 0}
                   aria-controls={listId}
                   aria-activedescendant={
-                    highlightedIndex >= 0
-                      ? `${listId}-option-${highlightedIndex}`
-                      : undefined
+                    highlightedIndex >= 0 ? `${listId}-option-${highlightedIndex}` : undefined
                   }
                   autoComplete="off"
                 />
                 {isSearching && (
                   <Loader2
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground"
+                    className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
                     aria-hidden="true"
                   />
                 )}
@@ -301,7 +274,7 @@ export function DirectoryTagInput({
               <Command shouldFilter={false}>
                 <CommandList id={listId} role="listbox">
                   {filteredResults.length === 0 ? (
-                    <CommandEmpty className="py-2 px-3 text-sm text-muted-foreground">
+                    <CommandEmpty className="px-3 py-2 text-sm text-muted-foreground">
                       {isSearching ? 'Searching...' : 'No matching tags found'}
                     </CommandEmpty>
                   ) : (
@@ -376,9 +349,7 @@ export function DirectoryTagInput({
       {/* Suggested Tags (from path) */}
       {availableSuggestedTags.length > 0 && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">
-            Suggested:
-          </span>
+          <span className="shrink-0 text-xs text-muted-foreground">Suggested:</span>
           <div
             className="flex flex-wrap gap-1"
             role="list"

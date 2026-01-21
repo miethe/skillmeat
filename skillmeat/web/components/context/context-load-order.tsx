@@ -12,12 +12,7 @@ import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CheckCircle2, Circle } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -49,8 +44,8 @@ function EntityLoadItem({ entity }: EntityLoadItemProps) {
   const Icon = entity.autoLoad ? CheckCircle2 : Circle;
 
   return (
-    <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+    <div className="flex items-center justify-between rounded px-2 py-1.5 transition-colors hover:bg-muted/50">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <Icon
           className={cn(
             'h-3.5 w-3.5 flex-shrink-0',
@@ -58,14 +53,14 @@ function EntityLoadItem({ entity }: EntityLoadItemProps) {
           )}
           aria-hidden="true"
         />
-        <span className="text-sm truncate">
+        <span className="truncate text-sm">
           {entity.name}
           <span className="sr-only">
             {entity.autoLoad ? ' - Auto-load enabled' : ' - Manual load'}
           </span>
         </span>
       </div>
-      <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
+      <Badge variant="secondary" className="ml-2 flex-shrink-0 text-xs">
         ~{entity.tokens}
         <span className="sr-only"> tokens</span>
       </Badge>
@@ -101,7 +96,7 @@ function LoadPhase({ phase, title, description, entities, variant = 'default' }:
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="secondary" className="text-xs flex-shrink-0">
+                <Badge variant="secondary" className="flex-shrink-0 text-xs">
                   {totalTokens} tokens
                 </Badge>
               </TooltipTrigger>
@@ -116,9 +111,9 @@ function LoadPhase({ phase, title, description, entities, variant = 'default' }:
       </div>
 
       {entities.length === 0 ? (
-        <div className="text-xs text-muted-foreground italic pl-8">No entities in this phase</div>
+        <div className="pl-8 text-xs italic text-muted-foreground">No entities in this phase</div>
       ) : (
-        <div className="pl-8 space-y-0.5">
+        <div className="space-y-0.5 pl-8">
           {entities.map((entity) => (
             <EntityLoadItem key={entity.id} entity={entity} />
           ))}
@@ -166,10 +161,7 @@ export function ContextLoadOrder({ entities }: ContextLoadOrderProps) {
   );
 
   // Calculate total auto-load tokens
-  const totalAutoLoadTokens = entities.reduce(
-    (sum, e) => sum + (e.autoLoad ? e.tokens : 0),
-    0
-  );
+  const totalAutoLoadTokens = entities.reduce((sum, e) => sum + (e.autoLoad ? e.tokens : 0), 0);
 
   return (
     <Card className="p-4">
@@ -185,10 +177,7 @@ export function ContextLoadOrder({ entities }: ContextLoadOrderProps) {
           <div className="text-right">
             <div className="text-sm font-medium">Total Auto-load</div>
             <div
-              className={cn(
-                'text-2xl font-bold',
-                totalAutoLoadTokens > 2000 && 'text-destructive'
-              )}
+              className={cn('text-2xl font-bold', totalAutoLoadTokens > 2000 && 'text-destructive')}
             >
               {totalAutoLoadTokens}
             </div>
@@ -224,7 +213,7 @@ export function ContextLoadOrder({ entities }: ContextLoadOrderProps) {
         </div>
 
         {/* Legend */}
-        <div className="pt-2 border-t space-y-1">
+        <div className="space-y-1 border-t pt-2">
           <div className="flex items-center gap-2 text-xs">
             <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
             <span className="text-muted-foreground">Auto-load enabled (loads automatically)</span>

@@ -39,7 +39,7 @@ class TestManualMapValidation:
 
         with patch("skillmeat.api.routers.marketplace_sources.GitHubScanner") as mock_scanner_class:
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Should not raise exception
@@ -66,7 +66,7 @@ class TestManualMapValidation:
 
         with patch("skillmeat.api.routers.marketplace_sources.GitHubScanner") as mock_scanner_class:
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             with pytest.raises(HTTPException) as exc_info:
@@ -152,7 +152,7 @@ class TestManualMapValidation:
 
         with patch("skillmeat.api.routers.marketplace_sources.GitHubScanner") as mock_scanner_class:
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Should not raise exception
@@ -174,7 +174,7 @@ class TestManualMapValidation:
 
         with patch("skillmeat.api.routers.marketplace_sources.GitHubScanner") as mock_scanner_class:
             mock_scanner = Mock()
-            mock_scanner._fetch_tree.return_value = mock_tree_valid_paths
+            mock_scanner._fetch_tree.return_value = (mock_tree_valid_paths, "main")
             mock_scanner_class.return_value = mock_scanner
 
             # Should not raise exception

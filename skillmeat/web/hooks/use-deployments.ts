@@ -40,7 +40,8 @@ export const deploymentKeys = {
   list: (projectPath?: string) => [...deploymentKeys.lists(), { projectPath }] as const,
   summaries: () => [...deploymentKeys.all, 'summary'] as const,
   summary: (projectPath?: string) => [...deploymentKeys.summaries(), { projectPath }] as const,
-  filtered: (params?: DeploymentQueryParams) => [...deploymentKeys.lists(), 'filtered', params] as const,
+  filtered: (params?: DeploymentQueryParams) =>
+    [...deploymentKeys.lists(), 'filtered', params] as const,
 };
 
 /**

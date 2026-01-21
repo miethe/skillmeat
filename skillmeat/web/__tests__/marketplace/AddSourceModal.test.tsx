@@ -32,9 +32,7 @@ const createTestQueryClient = () =>
 
 const renderWithClient = (ui: React.ReactElement) => {
   const queryClient = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 };
 
 describe('AddSourceModal', () => {
@@ -64,11 +62,7 @@ describe('AddSourceModal', () => {
   describe('Rendering', () => {
     it('renders modal when open', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByText('Add GitHub Source')).toBeInTheDocument();
@@ -79,11 +73,7 @@ describe('AddSourceModal', () => {
 
     it('does not render when closed', () => {
       renderWithClient(
-        <AddSourceModal
-          open={false}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={false} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.queryByText('Add GitHub Source')).not.toBeInTheDocument();
@@ -91,11 +81,7 @@ describe('AddSourceModal', () => {
 
     it('renders all form fields', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByLabelText('Repository URL')).toBeInTheDocument();
@@ -107,11 +93,7 @@ describe('AddSourceModal', () => {
 
     it('renders action buttons', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
@@ -123,51 +105,35 @@ describe('AddSourceModal', () => {
     it('shows validation error for invalid URL', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
       await user.type(urlInput, 'not-a-valid-url');
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/Enter a valid GitHub URL/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Enter a valid GitHub URL/)).toBeInTheDocument();
       });
     });
 
     it('accepts valid GitHub URL', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
       await user.type(urlInput, 'https://github.com/owner/repo');
 
       await waitFor(() => {
-        expect(
-          screen.queryByText(/Enter a valid GitHub URL/)
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/Enter a valid GitHub URL/)).not.toBeInTheDocument();
       });
     });
 
     it('disables submit button for invalid URL', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const submitButton = screen.getByRole('button', { name: /add source/i });
@@ -182,11 +148,7 @@ describe('AddSourceModal', () => {
     it('enables submit button for valid URL', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -203,11 +165,7 @@ describe('AddSourceModal', () => {
     it('updates repository URL field', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL') as HTMLInputElement;
@@ -219,11 +177,7 @@ describe('AddSourceModal', () => {
     it('updates branch/tag field', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const refInput = screen.getByLabelText('Branch / Tag') as HTMLInputElement;
@@ -236,11 +190,7 @@ describe('AddSourceModal', () => {
     it('updates root directory field', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const rootInput = screen.getByLabelText('Root Directory (optional)') as HTMLInputElement;
@@ -252,11 +202,7 @@ describe('AddSourceModal', () => {
     it('updates trust level selector', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       // Find the select trigger button
@@ -286,11 +232,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -318,11 +260,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -366,11 +304,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -393,11 +327,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL') as HTMLInputElement;
@@ -414,11 +344,7 @@ describe('AddSourceModal', () => {
     it('does not submit on Enter key press (form not ready)', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -436,11 +362,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByText(/adding.../i)).toBeInTheDocument();
@@ -454,11 +376,7 @@ describe('AddSourceModal', () => {
       });
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const submitButton = screen.getByRole('button', { name: /adding.../i });
@@ -472,11 +390,7 @@ describe('AddSourceModal', () => {
       mockMutateAsync.mockRejectedValue(new Error('Network error'));
 
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL');
@@ -498,11 +412,7 @@ describe('AddSourceModal', () => {
     it('calls onOpenChange when cancel is clicked', async () => {
       const user = userEvent.setup();
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const cancelButton = screen.getByRole('button', { name: /cancel/i });
@@ -515,11 +425,7 @@ describe('AddSourceModal', () => {
   describe('Accessibility', () => {
     it('has accessible labels for all inputs', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByLabelText('Repository URL')).toBeInTheDocument();
@@ -531,11 +437,7 @@ describe('AddSourceModal', () => {
 
     it('has proper button roles', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByRole('button', { name: /cancel/i })).toHaveAttribute('type', 'button');
@@ -544,11 +446,7 @@ describe('AddSourceModal', () => {
 
     it('provides helper text for optional fields', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       expect(screen.getByText(/Subdirectory to start scanning from/)).toBeInTheDocument();
@@ -558,11 +456,7 @@ describe('AddSourceModal', () => {
   describe('Default Values', () => {
     it('has default branch value of "main"', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const refInput = screen.getByLabelText('Branch / Tag') as HTMLInputElement;
@@ -571,11 +465,7 @@ describe('AddSourceModal', () => {
 
     it('has default trust level displayed', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       // Check that "Basic" is the selected option shown in the trigger
@@ -584,11 +474,7 @@ describe('AddSourceModal', () => {
 
     it('has empty repository URL by default', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const urlInput = screen.getByLabelText('Repository URL') as HTMLInputElement;
@@ -597,11 +483,7 @@ describe('AddSourceModal', () => {
 
     it('has empty root hint by default', () => {
       renderWithClient(
-        <AddSourceModal
-          open={true}
-          onOpenChange={mockOnOpenChange}
-          onSuccess={mockOnSuccess}
-        />
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
       );
 
       const rootInput = screen.getByLabelText('Root Directory (optional)') as HTMLInputElement;

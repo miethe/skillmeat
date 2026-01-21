@@ -27,11 +27,9 @@ import {
 export const tagKeys = {
   all: ['tags'] as const,
   lists: () => [...tagKeys.all, 'list'] as const,
-  list: (filters?: { limit?: number; after?: string }) =>
-    [...tagKeys.lists(), filters] as const,
+  list: (filters?: { limit?: number; after?: string }) => [...tagKeys.lists(), filters] as const,
   search: (query: string) => [...tagKeys.all, 'search', query] as const,
-  artifact: (artifactId: string) =>
-    [...tagKeys.all, 'artifact', artifactId] as const,
+  artifact: (artifactId: string) => [...tagKeys.all, 'artifact', artifactId] as const,
 };
 
 /**

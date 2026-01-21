@@ -10,11 +10,11 @@ A banner component that appears when artifacts are discovered, prompting users t
 
 #### Props
 
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `discoveredCount` | `number` | Yes | - | Number of artifacts discovered |
-| `onReview` | `() => void` | Yes | - | Callback when user clicks Review & Import |
-| `dismissible` | `boolean` | No | `true` | Whether the banner can be dismissed |
+| Prop              | Type         | Required | Default | Description                               |
+| ----------------- | ------------ | -------- | ------- | ----------------------------------------- |
+| `discoveredCount` | `number`     | Yes      | -       | Number of artifacts discovered            |
+| `onReview`        | `() => void` | Yes      | -       | Callback when user clicks Review & Import |
+| `dismissible`     | `boolean`    | No       | `true`  | Whether the banner can be dismissed       |
 
 #### Features
 
@@ -54,11 +54,7 @@ export function ManagePage() {
 #### Example: Non-dismissible Banner
 
 ```tsx
-<DiscoveryBanner
-  discoveredCount={3}
-  onReview={handleReview}
-  dismissible={false}
-/>
+<DiscoveryBanner discoveredCount={3} onReview={handleReview} dismissible={false} />
 ```
 
 #### Example: With Custom Review Handler
@@ -81,12 +77,12 @@ A collapsible component that displays and manages artifacts marked to skip durin
 
 #### Props
 
-| Prop | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `skipPrefs` | `SkipPreference[]` | Yes | - | Array of skip preferences to display |
-| `onRemoveSkip` | `(artifactKey: string) => void` | Yes | - | Callback when user un-skips an artifact |
-| `onClearAll` | `() => void` | Yes | - | Callback when user clears all skips |
-| `isLoading` | `boolean` | No | `false` | Whether actions are in progress |
+| Prop           | Type                            | Required | Default | Description                             |
+| -------------- | ------------------------------- | -------- | ------- | --------------------------------------- |
+| `skipPrefs`    | `SkipPreference[]`              | Yes      | -       | Array of skip preferences to display    |
+| `onRemoveSkip` | `(artifactKey: string) => void` | Yes      | -       | Callback when user un-skips an artifact |
+| `onClearAll`   | `() => void`                    | Yes      | -       | Callback when user clears all skips     |
+| `isLoading`    | `boolean`                       | No       | `false` | Whether actions are in progress         |
 
 #### Features
 

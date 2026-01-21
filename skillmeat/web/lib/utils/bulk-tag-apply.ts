@@ -72,9 +72,7 @@ export function findArtifactsInDirectory(
   }
 
   // Normalize the directory path (remove trailing slash)
-  const normalizedDir = directoryPath.endsWith('/')
-    ? directoryPath.slice(0, -1)
-    : directoryPath;
+  const normalizedDir = directoryPath.endsWith('/') ? directoryPath.slice(0, -1) : directoryPath;
 
   return entries.filter((entry) => {
     const parentDir = getParentDirectory(entry.path);
@@ -82,9 +80,7 @@ export function findArtifactsInDirectory(
     // Match if:
     // 1. Parent directory equals the search path exactly
     // 2. Parent directory starts with the search path followed by a slash
-    return (
-      parentDir === normalizedDir || parentDir.startsWith(normalizedDir + '/')
-    );
+    return parentDir === normalizedDir || parentDir.startsWith(normalizedDir + '/');
   });
 }
 
@@ -113,9 +109,7 @@ export function findArtifactsInDirectoryExact(
   }
 
   // Normalize the directory path
-  const normalizedDir = directoryPath.endsWith('/')
-    ? directoryPath.slice(0, -1)
-    : directoryPath;
+  const normalizedDir = directoryPath.endsWith('/') ? directoryPath.slice(0, -1) : directoryPath;
 
   return entries.filter((entry) => {
     const parentDir = getParentDirectory(entry.path);
@@ -318,10 +312,7 @@ export async function applyTagsToDirectories(
       const reason = settledResult.reason;
       result.errors.push({
         path: workItem.entry.path,
-        error:
-          reason instanceof Error
-            ? reason.message
-            : String(reason),
+        error: reason instanceof Error ? reason.message : String(reason),
       });
 
       if (!continueOnError) {

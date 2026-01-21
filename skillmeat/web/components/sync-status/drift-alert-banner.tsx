@@ -1,13 +1,25 @@
 'use client';
 
-import { CheckCircle2, Edit, Clock, AlertTriangle, Eye, GitMerge, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  CheckCircle2,
+  Edit,
+  Clock,
+  AlertTriangle,
+  Eye,
+  GitMerge,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export type DriftStatus = 'none' | 'modified' | 'outdated' | 'conflict';
-export type ComparisonScope = 'collection-vs-project' | 'source-vs-collection' | 'source-vs-project';
+export type ComparisonScope =
+  | 'collection-vs-project'
+  | 'source-vs-collection'
+  | 'source-vs-project';
 
 export interface DriftAlertBannerProps {
   driftStatus: DriftStatus;
@@ -147,16 +159,14 @@ export function DriftAlertBanner({
   // Determine which actions to show based on status
   const showActions = driftStatus !== 'none';
   const showMergeAction = driftStatus === 'conflict';
-  const showTakeUpstreamAction = driftStatus === 'modified' || driftStatus === 'conflict' || driftStatus === 'outdated';
+  const showTakeUpstreamAction =
+    driftStatus === 'modified' || driftStatus === 'conflict' || driftStatus === 'outdated';
   const showKeepLocalAction = driftStatus === 'modified' || driftStatus === 'conflict';
 
   return (
     <Alert
       variant={getAlertVariant(driftStatus)}
-      className={cn(
-        'relative',
-        getBackgroundColor(driftStatus)
-      )}
+      className={cn('relative', getBackgroundColor(driftStatus))}
     >
       <div className="flex items-start gap-3">
         {getStatusIcon(driftStatus)}
@@ -164,9 +174,7 @@ export function DriftAlertBanner({
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <AlertDescription className="m-0">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-foreground">
-                {getStatusTitle(driftStatus)}
-              </span>
+              <span className="font-semibold text-foreground">{getStatusTitle(driftStatus)}</span>
               {hasChanges && (
                 <Badge variant="outline" className="text-xs">
                   {formatSummaryStats(summary)}

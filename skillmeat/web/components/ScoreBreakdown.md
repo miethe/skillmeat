@@ -5,6 +5,7 @@ Expandable card component showing trust/quality/match score breakdown with visua
 ## Overview
 
 The ScoreBreakdown component displays a confidence score breakdown into three weighted components:
+
 - **Trust** (25% weight): Source trustworthiness
 - **Quality** (25% weight): User ratings + maintenance indicators
 - **Match** (50% weight): Semantic relevance to the search query
@@ -21,12 +22,7 @@ function ArtifactCard({ artifact }) {
     <div className="space-y-4">
       <h2>{artifact.name}</h2>
 
-      <ScoreBreakdown
-        confidence={92}
-        trust={95}
-        quality={87}
-        match={92}
-      />
+      <ScoreBreakdown confidence={92} trust={95} quality={87} match={92} />
     </div>
   );
 }
@@ -35,13 +31,7 @@ function ArtifactCard({ artifact }) {
 ### Expanded by Default
 
 ```tsx
-<ScoreBreakdown
-  confidence={92}
-  trust={95}
-  quality={87}
-  match={92}
-  defaultExpanded={true}
-/>
+<ScoreBreakdown confidence={92} trust={95} quality={87} match={92} defaultExpanded={true} />
 ```
 
 ### Custom Weights
@@ -53,33 +43,35 @@ function ArtifactCard({ artifact }) {
   quality={85}
   match={88}
   weights={{
-    trust: 0.3,    // 30%
-    quality: 0.2,  // 20%
-    match: 0.5,    // 50%
+    trust: 0.3, // 30%
+    quality: 0.2, // 20%
+    match: 0.5, // 50%
   }}
 />
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `confidence` | `number` | Required | Final composite confidence score (0-100) |
-| `trust` | `number` | Required | Source trustworthiness score (0-100) |
-| `quality` | `number` | Required | User/community ratings + maintenance score (0-100) |
-| `match` | `number` | Required | Semantic relevance to query score (0-100) |
-| `weights` | `object` | `{ trust: 0.25, quality: 0.25, match: 0.50 }` | Weight configuration for each component |
-| `defaultExpanded` | `boolean` | `false` | Whether breakdown is expanded by default |
-| `className` | `string` | `undefined` | Additional CSS classes |
+| Prop              | Type      | Default                                       | Description                                        |
+| ----------------- | --------- | --------------------------------------------- | -------------------------------------------------- |
+| `confidence`      | `number`  | Required                                      | Final composite confidence score (0-100)           |
+| `trust`           | `number`  | Required                                      | Source trustworthiness score (0-100)               |
+| `quality`         | `number`  | Required                                      | User/community ratings + maintenance score (0-100) |
+| `match`           | `number`  | Required                                      | Semantic relevance to query score (0-100)          |
+| `weights`         | `object`  | `{ trust: 0.25, quality: 0.25, match: 0.50 }` | Weight configuration for each component            |
+| `defaultExpanded` | `boolean` | `false`                                       | Whether breakdown is expanded by default           |
+| `className`       | `string`  | `undefined`                                   | Additional CSS classes                             |
 
 ## Visual Design
 
 When collapsed, shows only the trigger:
+
 ```
 ▼ Score breakdown
 ```
 
 When expanded, shows all three components with progress bars:
+
 ```
 ▲ Score breakdown
 
@@ -146,24 +138,20 @@ import { ScoreBreakdown } from '@/components/ScoreBreakdown';
 
 export function SearchResultCard({ result }) {
   return (
-    <div className="border rounded-lg p-4 space-y-3">
+    <div className="space-y-3 rounded-lg border p-4">
       <div className="flex items-start justify-between">
         <h3>{result.artifact.name}</h3>
-        <Badge variant={result.confidence > 80 ? 'success' : 'default'}>
-          {result.confidence}%
-        </Badge>
+        <Badge variant={result.confidence > 80 ? 'success' : 'default'}>{result.confidence}%</Badge>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {result.artifact.description}
-      </p>
+      <p className="text-sm text-muted-foreground">{result.artifact.description}</p>
 
       <ScoreBreakdown
         confidence={result.confidence}
         trust={result.trustScore}
         quality={result.qualityScore}
         match={result.matchScore}
-        className="pt-2 border-t"
+        className="border-t pt-2"
       />
     </div>
   );
@@ -202,6 +190,7 @@ export function ArtifactCard({ artifact, scores }) {
 ## Testing
 
 The component includes comprehensive tests covering:
+
 - Rendering (collapsed/expanded states)
 - Expansion/collapse behavior
 - Score component display
@@ -211,6 +200,7 @@ The component includes comprehensive tests covering:
 - Edge cases (zero scores, perfect scores, decimal weights)
 
 Run tests:
+
 ```bash
 pnpm test ScoreBreakdown.test.tsx
 ```
@@ -220,11 +210,9 @@ pnpm test ScoreBreakdown.test.tsx
 The component uses Tailwind CSS and supports dark mode automatically through CSS variables.
 
 Custom styling via className:
+
 ```tsx
-<ScoreBreakdown
-  {...scores}
-  className="mt-4 border-t pt-4"
-/>
+<ScoreBreakdown {...scores} className="mt-4 border-t pt-4" />
 ```
 
 ## Related Components
@@ -237,6 +225,7 @@ Custom styling via className:
 ## Future Enhancements
 
 Potential improvements for future phases:
+
 - Color-coded progress bars based on score thresholds
 - Tooltips explaining each component
 - Animation on expand/collapse

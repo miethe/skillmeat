@@ -8,15 +8,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  MoreVertical,
-  RefreshCw,
-  Trash2,
-  Eye,
-  FileText,
-  Copy,
-  CheckCircle2,
-} from 'lucide-react';
+import { MoreVertical, RefreshCw, Trash2, Eye, FileText, Copy, CheckCircle2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -199,7 +191,7 @@ export function DeploymentActions({
             <AlertDialogTitle>Remove Deployment?</AlertDialogTitle>
             <AlertDialogDescription>
               This will remove "{deployment.artifact_name}" from the project at{' '}
-              <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 {deployment.artifact_path}
               </code>
               . This action cannot be undone.

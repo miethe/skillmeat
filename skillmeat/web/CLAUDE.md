@@ -28,15 +28,15 @@ web/
 
 ## Development
 
-| Command | Purpose |
-|---------|---------|
-| `pnpm dev` | Start dev server (port 3000) |
-| `pnpm build` | Build for production |
-| `pnpm lint` | Run ESLint |
-| `pnpm type-check` | TypeScript checks |
-| `pnpm test` | Unit tests |
-| `pnpm test:e2e` | E2E tests |
-| `pnpm generate-sdk` | Regenerate OpenAPI client |
+| Command             | Purpose                      |
+| ------------------- | ---------------------------- |
+| `pnpm dev`          | Start dev server (port 3000) |
+| `pnpm build`        | Build for production         |
+| `pnpm lint`         | Run ESLint                   |
+| `pnpm type-check`   | TypeScript checks            |
+| `pnpm test`         | Unit tests                   |
+| `pnpm test:e2e`     | E2E tests                    |
+| `pnpm generate-sdk` | Regenerate OpenAPI client    |
 
 ### Environment Variables
 
@@ -53,21 +53,21 @@ NEXT_PUBLIC_API_VERSION=v1
 
 ### Import Aliases
 
-| Alias | Target | Usage |
-|-------|--------|-------|
-| `@/hooks` | `hooks/index.ts` | **Always** use barrel import for hooks |
-| `@/components/ui/*` | `components/ui/*` | shadcn primitives |
-| `@/lib/api` | `lib/api/index.ts` | API client functions |
-| `@/types/*` | `types/*` | TypeScript types |
+| Alias               | Target             | Usage                                  |
+| ------------------- | ------------------ | -------------------------------------- |
+| `@/hooks`           | `hooks/index.ts`   | **Always** use barrel import for hooks |
+| `@/components/ui/*` | `components/ui/*`  | shadcn primitives                      |
+| `@/lib/api`         | `lib/api/index.ts` | API client functions                   |
+| `@/types/*`         | `types/*`          | TypeScript types                       |
 
 ### Canonical Patterns
 
-| Pattern | Rule |
-|---------|------|
-| **Hooks** | Import from `@/hooks`, never direct file imports |
-| **API** | Use `/user-collections` for mutations, `/collections` is read-only |
-| **Components** | Server by default, `'use client'` only when needed |
-| **Types** | Prefer SDK types (`@/sdk/models`), custom in `types/` |
+| Pattern        | Rule                                                               |
+| -------------- | ------------------------------------------------------------------ |
+| **Hooks**      | Import from `@/hooks`, never direct file imports                   |
+| **API**        | Use `/user-collections` for mutations, `/collections` is read-only |
+| **Components** | Server by default, `'use client'` only when needed                 |
+| **Types**      | Prefer SDK types (`@/sdk/models`), custom in `types/`              |
 
 ---
 
@@ -75,23 +75,23 @@ NEXT_PUBLIC_API_VERSION=v1
 
 Rules in `.claude/rules/web/` auto-load when editing:
 
-| Rule File | Path Scope | Contains |
-|-----------|------------|----------|
-| `pages.md` | `app/**/*.tsx` | Server/client components, App Router, dynamic routes |
-| `components.md` | `components/**/*.tsx` | shadcn usage, accessibility, styling patterns |
-| `hooks.md` | `hooks/**/*.ts` | TanStack Query, stub detection, cache invalidation |
-| `api-client.md` | `lib/api/**/*.ts` | Endpoint mapping, error handling, URL building |
-| `testing.md` | `__tests__/**`, `tests/**` | Jest, RTL, Playwright patterns |
+| Rule File       | Path Scope                 | Contains                                             |
+| --------------- | -------------------------- | ---------------------------------------------------- |
+| `pages.md`      | `app/**/*.tsx`             | Server/client components, App Router, dynamic routes |
+| `components.md` | `components/**/*.tsx`      | shadcn usage, accessibility, styling patterns        |
+| `hooks.md`      | `hooks/**/*.ts`            | TanStack Query, stub detection, cache invalidation   |
+| `api-client.md` | `lib/api/**/*.ts`          | Endpoint mapping, error handling, URL building       |
+| `testing.md`    | `__tests__/**`, `tests/**` | Jest, RTL, Playwright patterns                       |
 
 ---
 
 ## Context Files (Load When Needed)
 
-| File | Load When |
-|------|-----------|
+| File                                      | Load When                             |
+| ----------------------------------------- | ------------------------------------- |
 | `.claude/context/api-endpoint-mapping.md` | API mismatch bugs, endpoint questions |
-| `.claude/context/stub-patterns.md` | "Not implemented" errors |
-| `.claude/context/symbol-usage-guide.md` | Bug investigation, unfamiliar code |
+| `.claude/context/stub-patterns.md`        | "Not implemented" errors              |
+| `.claude/context/symbol-usage-guide.md`   | Bug investigation, unfamiliar code    |
 
 ---
 
@@ -110,9 +110,9 @@ Rules in `.claude/rules/web/` auto-load when editing:
 
 ### Static Assets
 
-| Asset | Location | Used In |
-|-------|----------|---------|
-| Logo | `public/logo.png` | `components/header.tsx` |
+| Asset | Location          | Used In                 |
+| ----- | ----------------- | ----------------------- |
+| Logo  | `public/logo.png` | `components/header.tsx` |
 
 ---
 

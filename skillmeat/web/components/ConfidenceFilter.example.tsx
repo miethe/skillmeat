@@ -16,8 +16,8 @@ export function ConfidenceFilterExample() {
   const [includeBelowThreshold, setIncludeBelowThreshold] = useState(false);
 
   return (
-    <div className="p-4 border rounded-lg">
-      <h3 className="text-lg font-semibold mb-4">Filter by Confidence</h3>
+    <div className="rounded-lg border p-4">
+      <h3 className="mb-4 text-lg font-semibold">Filter by Confidence</h3>
 
       <ConfidenceFilter
         minConfidence={minConfidence}
@@ -29,7 +29,7 @@ export function ConfidenceFilterExample() {
       />
 
       {/* Example: Show current filter state */}
-      <div className="mt-4 p-3 bg-muted rounded text-sm">
+      <div className="mt-4 rounded bg-muted p-3 text-sm">
         <p className="font-medium">Current Filter State:</p>
         <ul className="mt-2 space-y-1 text-muted-foreground">
           <li>Min Confidence: {minConfidence}%</li>

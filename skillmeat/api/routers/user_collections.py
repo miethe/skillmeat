@@ -13,10 +13,12 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
 from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
+    ArtifactGroupMembership,
     ArtifactSummary,
     CollectionArtifactsResponse,
     GroupSummary,
@@ -28,9 +30,13 @@ from skillmeat.api.schemas.user_collections import (
 )
 from skillmeat.api.services import get_artifact_metadata
 from skillmeat.cache.models import (
+    DEFAULT_COLLECTION_ID,
+    DEFAULT_COLLECTION_NAME,
+    Artifact,
     Collection,
     CollectionArtifact,
     Group,
+    GroupArtifact,
     get_session,
 )
 
@@ -169,6 +175,175 @@ def collection_to_response_with_groups(
         **base_response.model_dump(),
         groups=groups,
     )
+
+
+def ensure_default_collection(session: Session) -> Collection:
+    """Ensure the default collection exists, creating it if necessary.
+
+    This function should be called during server startup to guarantee
+    the default collection exists for artifact assignments.
+
+    Args:
+        session: Database session
+
+    Returns:
+        The default Collection instance (existing or newly created)
+    """
+    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
+    if existing:
+        logger.debug(f"Default collection '{DEFAULT_COLLECTION_ID}' already exists")
+        return existing
+
+    default_collection = Collection(
+        id=DEFAULT_COLLECTION_ID,
+        name=DEFAULT_COLLECTION_NAME,
+        description="Default collection for all artifacts. Artifacts are automatically added here when no specific collection is specified.",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    session.add(default_collection)
+    session.commit()
+    logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
+    return default_collection
+
+
+def migrate_artifacts_to_default_collection(
+    session: Session,
+    artifact_mgr,
+    collection_mgr,
+) -> dict:
+    """Migrate all existing artifacts to the default collection.
+
+    This function ensures all artifacts from file-system collections
+    are also registered in the default database collection, enabling
+    them to use Groups and other collection features.
+
+    Args:
+        session: Database session
+        artifact_mgr: Artifact manager for listing artifacts
+        collection_mgr: Collection manager for listing collections
+
+    Returns:
+        dict with migration stats: migrated_count, already_present_count, total_artifacts
+    """
+    # Ensure default collection exists first
+    ensure_default_collection(session)
+
+    # Get all artifacts from all file-system collections
+    all_artifact_ids = set()
+    for coll_name in collection_mgr.list_collections():
+        try:
+            artifacts = artifact_mgr.list_artifacts(collection_name=coll_name)
+            for artifact in artifacts:
+                artifact_id = f"{artifact.type.value}:{artifact.name}"
+                all_artifact_ids.add(artifact_id)
+        except Exception as e:
+            logger.warning(f"Failed to load artifacts from collection '{coll_name}': {e}")
+            continue
+
+    logger.info(f"Found {len(all_artifact_ids)} unique artifacts across all collections")
+
+    # Get existing associations for the default collection
+    existing_associations = session.query(CollectionArtifact.artifact_id).filter_by(
+        collection_id=DEFAULT_COLLECTION_ID
+    ).all()
+    existing_artifact_ids = {row[0] for row in existing_associations}
+
+    # Find artifacts not yet in default collection
+    missing_artifact_ids = all_artifact_ids - existing_artifact_ids
+
+    # Add missing artifacts to default collection
+    migrated_count = 0
+    for artifact_id in missing_artifact_ids:
+        try:
+            new_association = CollectionArtifact(
+                collection_id=DEFAULT_COLLECTION_ID,
+                artifact_id=artifact_id,
+                added_at=datetime.utcnow(),
+            )
+            session.add(new_association)
+            migrated_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to add artifact '{artifact_id}' to default collection: {e}")
+            continue
+
+    if migrated_count > 0:
+        session.commit()
+        logger.info(f"Migrated {migrated_count} artifacts to default collection")
+
+    return {
+        "migrated_count": migrated_count,
+        "already_present_count": len(existing_artifact_ids),
+        "total_artifacts": len(all_artifact_ids),
+    }
+
+
+# =============================================================================
+# Migration Endpoint
+# =============================================================================
+
+
+@router.post(
+    "/migrate-to-default",
+    summary="Migrate all artifacts to default collection",
+    description=(
+        "Ensures all existing artifacts from file-system collections are registered "
+        "in the default database collection. This enables Groups and other collection "
+        "features for all artifacts. Safe to run multiple times - only adds missing entries."
+    ),
+    responses={
+        200: {"description": "Migration completed successfully"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def migrate_to_default_collection(
+    session: DbSessionDep,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+) -> dict:
+    """Migrate all artifacts to the default collection.
+
+    This endpoint ensures all artifacts from file-system collections are
+    registered in the default database collection, enabling them to use
+    Groups and other collection features.
+
+    Args:
+        session: Database session
+        artifact_mgr: Artifact manager for listing artifacts
+        collection_mgr: Collection manager for listing collections
+        token: Authentication token
+
+    Returns:
+        Migration statistics with counts
+
+    Note:
+        This operation is idempotent - running it multiple times will not
+        create duplicate entries.
+    """
+    try:
+        result = migrate_artifacts_to_default_collection(
+            session=session,
+            artifact_mgr=artifact_mgr,
+            collection_mgr=collection_mgr,
+        )
+
+        logger.info(
+            f"Migration completed: {result['migrated_count']} migrated, "
+            f"{result['already_present_count']} already present"
+        )
+
+        return {
+            "success": True,
+            "message": f"Migrated {result['migrated_count']} artifacts to default collection",
+            **result,
+        }
+    except Exception as e:
+        logger.exception(f"Migration failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Migration failed: {str(e)}",
+        )
 
 
 # =============================================================================
@@ -592,7 +767,7 @@ async def delete_user_collection(
     "/{collection_id}/artifacts",
     response_model=CollectionArtifactsResponse,
     summary="List artifacts in collection",
-    description="Retrieve paginated list of artifacts in a collection with optional type filtering",
+    description="Retrieve paginated list of artifacts in a collection with optional type and group filtering",
     responses={
         200: {"description": "Successfully retrieved artifacts"},
         404: {"model": ErrorResponse, "description": "Collection not found"},
@@ -608,6 +783,14 @@ async def list_collection_artifacts(
     artifact_type: Optional[str] = Query(
         default=None, description="Filter by artifact type"
     ),
+    group_id: Optional[str] = Query(
+        default=None,
+        description="Filter by group membership - only return artifacts belonging to this group",
+    ),
+    include_groups: bool = Query(
+        default=False,
+        description="Include group memberships for each artifact in the response",
+    ),
 ) -> CollectionArtifactsResponse:
     """List artifacts in a collection with pagination.
 
@@ -618,6 +801,9 @@ async def list_collection_artifacts(
         limit: Number of items per page
         after: Cursor for next page
         artifact_type: Optional artifact type filter
+        group_id: Optional group filter - when provided, only returns artifacts
+            that belong to the specified group
+        include_groups: When true, include group membership info for each artifact
 
     Returns:
         Paginated list of artifacts
@@ -628,7 +814,8 @@ async def list_collection_artifacts(
     try:
         logger.info(
             f"Listing artifacts for collection '{collection_id}' "
-            f"(limit={limit}, after={after}, type={artifact_type})"
+            f"(limit={limit}, after={after}, type={artifact_type}, "
+            f"group_id={group_id}, include_groups={include_groups})"
         )
 
         # Verify collection exists
@@ -650,6 +837,22 @@ async def list_collection_artifacts(
         # Get all matching artifact associations
         all_associations = query.all()
 
+        # Filter by group membership if group_id is provided
+        if group_id:
+            # Get artifact IDs that belong to the specified group
+            group_artifact_ids = {
+                ga.artifact_id
+                for ga in session.query(GroupArtifact)
+                .filter_by(group_id=group_id)
+                .all()
+            }
+            # Filter associations to only those in the group
+            all_associations = [
+                assoc
+                for assoc in all_associations
+                if assoc.artifact_id in group_artifact_ids
+            ]
+
         # Decode cursor if provided
         start_idx = 0
         if after:
@@ -667,6 +870,39 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
+        # Batch fetch group memberships if requested (avoids N+1 queries)
+        artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
+        if include_groups and page_associations:
+            page_artifact_ids = [assoc.artifact_id for assoc in page_associations]
+
+            # Get all groups in this collection
+            collection_group_ids = [g.id for g in collection.groups]
+
+            if collection_group_ids:
+                # Batch query: get all group-artifact associations for page artifacts
+                # within collection's groups
+                group_artifacts = (
+                    session.query(GroupArtifact, Group)
+                    .join(Group, GroupArtifact.group_id == Group.id)
+                    .filter(
+                        GroupArtifact.artifact_id.in_(page_artifact_ids),
+                        GroupArtifact.group_id.in_(collection_group_ids),
+                    )
+                    .all()
+                )
+
+                # Build lookup map: artifact_id -> list of group memberships
+                for ga, group in group_artifacts:
+                    if ga.artifact_id not in artifact_groups_map:
+                        artifact_groups_map[ga.artifact_id] = []
+                    artifact_groups_map[ga.artifact_id].append(
+                        ArtifactGroupMembership(
+                            id=group.id,
+                            name=group.name,
+                            position=ga.position,
+                        )
+                    )
+
         # Fetch artifact metadata for each association using fallback service
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
@@ -674,7 +910,20 @@ async def list_collection_artifacts(
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
-                items.append(artifact_summary)
+                if include_groups:
+                    # Add groups field to artifact summary
+                    groups = artifact_groups_map.get(assoc.artifact_id, [])
+                    items.append(
+                        ArtifactSummary(
+                            name=artifact_summary.name,
+                            type=artifact_summary.type,
+                            version=artifact_summary.version,
+                            source=artifact_summary.source,
+                            groups=groups,
+                        )
+                    )
+                else:
+                    items.append(artifact_summary)
 
         # Build pagination info
         has_next = end_idx < len(all_associations)

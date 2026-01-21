@@ -55,10 +55,7 @@ describe('DeploymentActions', () => {
 
     it('opens menu when trigger clicked', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onViewSource={mockCallbacks.onViewSource}
-        />
+        <DeploymentActions deployment={mockDeployment} onViewSource={mockCallbacks.onViewSource} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -78,10 +75,7 @@ describe('DeploymentActions', () => {
       };
 
       render(
-        <DeploymentActions
-          deployment={outdatedDeployment}
-          onUpdate={mockCallbacks.onUpdate}
-        />
+        <DeploymentActions deployment={outdatedDeployment} onUpdate={mockCallbacks.onUpdate} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -93,12 +87,7 @@ describe('DeploymentActions', () => {
     });
 
     it('does not show Update action for current deployments', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onUpdate={mockCallbacks.onUpdate}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onUpdate={mockCallbacks.onUpdate} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -115,10 +104,7 @@ describe('DeploymentActions', () => {
       };
 
       render(
-        <DeploymentActions
-          deployment={modifiedDeployment}
-          onViewDiff={mockCallbacks.onViewDiff}
-        />
+        <DeploymentActions deployment={modifiedDeployment} onViewDiff={mockCallbacks.onViewDiff} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -131,10 +117,7 @@ describe('DeploymentActions', () => {
 
     it('does not show View Diff when no local modifications', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onViewDiff={mockCallbacks.onViewDiff}
-        />
+        <DeploymentActions deployment={mockDeployment} onViewDiff={mockCallbacks.onViewDiff} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -147,10 +130,7 @@ describe('DeploymentActions', () => {
 
     it('shows View in Collection when callback provided', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onViewSource={mockCallbacks.onViewSource}
-        />
+        <DeploymentActions deployment={mockDeployment} onViewSource={mockCallbacks.onViewSource} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -163,10 +143,7 @@ describe('DeploymentActions', () => {
 
     it('shows Copy Path when callback provided', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onCopyPath={mockCallbacks.onCopyPath}
-        />
+        <DeploymentActions deployment={mockDeployment} onCopyPath={mockCallbacks.onCopyPath} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -178,12 +155,7 @@ describe('DeploymentActions', () => {
     });
 
     it('shows Remove when callback provided', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -202,10 +174,7 @@ describe('DeploymentActions', () => {
       };
 
       render(
-        <DeploymentActions
-          deployment={outdatedDeployment}
-          onUpdate={mockCallbacks.onUpdate}
-        />
+        <DeploymentActions deployment={outdatedDeployment} onUpdate={mockCallbacks.onUpdate} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -226,10 +195,7 @@ describe('DeploymentActions', () => {
       };
 
       render(
-        <DeploymentActions
-          deployment={modifiedDeployment}
-          onViewDiff={mockCallbacks.onViewDiff}
-        />
+        <DeploymentActions deployment={modifiedDeployment} onViewDiff={mockCallbacks.onViewDiff} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -245,10 +211,7 @@ describe('DeploymentActions', () => {
 
     it('calls onViewSource when View in Collection clicked', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onViewSource={mockCallbacks.onViewSource}
-        />
+        <DeploymentActions deployment={mockDeployment} onViewSource={mockCallbacks.onViewSource} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -264,10 +227,7 @@ describe('DeploymentActions', () => {
 
     it('calls onCopyPath when Copy Path clicked', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onCopyPath={mockCallbacks.onCopyPath}
-        />
+        <DeploymentActions deployment={mockDeployment} onCopyPath={mockCallbacks.onCopyPath} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -283,10 +243,7 @@ describe('DeploymentActions', () => {
 
     it('shows "Copied!" feedback after copying path', async () => {
       render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onCopyPath={mockCallbacks.onCopyPath}
-        />
+        <DeploymentActions deployment={mockDeployment} onCopyPath={mockCallbacks.onCopyPath} />
       );
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -305,12 +262,7 @@ describe('DeploymentActions', () => {
 
   describe('Remove Confirmation Dialog', () => {
     it('shows confirmation dialog when Remove clicked', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -327,12 +279,7 @@ describe('DeploymentActions', () => {
     });
 
     it('displays deployment path in confirmation dialog', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -348,12 +295,7 @@ describe('DeploymentActions', () => {
     });
 
     it('calls onRemove with filesystem flag when confirmed', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       // Open menu
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -384,12 +326,7 @@ describe('DeploymentActions', () => {
     });
 
     it('does not call onRemove when cancelled', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       // Open menu
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -411,12 +348,7 @@ describe('DeploymentActions', () => {
     });
 
     it('closes dialog after successful removal', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       // Open menu and trigger remove
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -443,12 +375,7 @@ describe('DeploymentActions', () => {
       // Mock onRemove to delay completion
       const delayedRemove = jest.fn(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={delayedRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={delayedRemove} />);
 
       // Open menu and trigger remove
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -473,12 +400,7 @@ describe('DeploymentActions', () => {
     });
 
     it('calls onRemove with false when filesystem checkbox is unchecked', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       // Open menu and click Remove
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -508,12 +430,7 @@ describe('DeploymentActions', () => {
     });
 
     it('shows filesystem removal checkbox with correct label', async () => {
-      render(
-        <DeploymentActions
-          deployment={mockDeployment}
-          onRemove={mockCallbacks.onRemove}
-        />
-      );
+      render(<DeploymentActions deployment={mockDeployment} onRemove={mockCallbacks.onRemove} />);
 
       // Open menu and click Remove
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -527,7 +444,9 @@ describe('DeploymentActions', () => {
       // Check that the checkbox and label are present
       await waitFor(() => {
         expect(screen.getByRole('checkbox')).toBeInTheDocument();
-        expect(screen.getByText('Remove files from local filesystem at project path')).toBeInTheDocument();
+        expect(
+          screen.getByText('Remove files from local filesystem at project path')
+        ).toBeInTheDocument();
       });
     });
   });

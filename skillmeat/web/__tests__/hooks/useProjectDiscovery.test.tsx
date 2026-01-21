@@ -71,10 +71,9 @@ describe('useProjectDiscovery', () => {
 
       mockLoadSkipPrefs.mockReturnValue(mockSkipPrefs);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       expect(mockLoadSkipPrefs).toHaveBeenCalledWith('project-123');
       expect(result.current.skipPrefs).toEqual(mockSkipPrefs);
@@ -137,10 +136,9 @@ describe('useProjectDiscovery', () => {
 
       mockLoadSkipPrefs.mockReturnValue(mockSkipPrefs);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       expect(result.current.isArtifactSkipped('skill', 'canvas-design')).toBe(true);
       expect(result.current.isArtifactSkipped('skill', 'other-skill')).toBe(false);
@@ -159,10 +157,9 @@ describe('useProjectDiscovery', () => {
 
       mockLoadSkipPrefs.mockReturnValue(mockSkipPrefs);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       act(() => {
         result.current.clearSkips();
@@ -213,10 +210,9 @@ describe('useProjectDiscovery', () => {
       mockApiRequest.mockResolvedValueOnce(mockResult);
       mockLoadSkipPrefs.mockReturnValue([]);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       await act(async () => {
         await result.current.bulkImport({
@@ -283,10 +279,9 @@ describe('useProjectDiscovery', () => {
       mockApiRequest.mockResolvedValueOnce(mockResult);
       mockLoadSkipPrefs.mockReturnValue(existingSkipPrefs);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       await act(async () => {
         await result.current.bulkImport({
@@ -354,10 +349,9 @@ describe('useProjectDiscovery', () => {
       mockApiRequest.mockResolvedValueOnce(mockResult);
       mockLoadSkipPrefs.mockReturnValue(existingSkipPrefs);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       // Try to add a duplicate skip
       await act(async () => {
@@ -406,10 +400,9 @@ describe('useProjectDiscovery', () => {
       mockApiRequest.mockResolvedValueOnce(mockResult);
       mockLoadSkipPrefs.mockReturnValue([]);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       await act(async () => {
         await result.current.bulkImport({
@@ -455,10 +448,9 @@ describe('useProjectDiscovery', () => {
       mockApiRequest.mockResolvedValueOnce(mockDiscoveryResult);
       mockLoadSkipPrefs.mockReturnValue([]);
 
-      const { result } = renderHook(
-        () => useProjectDiscovery('/path/to/project', 'project-123'),
-        { wrapper }
-      );
+      const { result } = renderHook(() => useProjectDiscovery('/path/to/project', 'project-123'), {
+        wrapper,
+      });
 
       result.current.refetchDiscovery();
 

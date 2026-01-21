@@ -5,6 +5,9 @@ import { useCollections, useCollection, useGroups } from '@/hooks';
 import type { Collection } from '@/types/collections';
 import type { Group } from '@/types/groups';
 
+/** Default collection ID that all artifacts are assigned to when not explicitly specified */
+export const DEFAULT_COLLECTION_ID = 'default';
+
 interface CollectionContextValue {
   // State
   selectedCollectionId: string | null;
@@ -41,20 +44,20 @@ interface CollectionProviderProps {
 }
 
 export function CollectionProvider({ children }: CollectionProviderProps) {
-  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(null);
-  const [hasMounted, setHasMounted] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionIdState] = useState<string | null>(
+    DEFAULT_COLLECTION_ID
+  );
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
-    setHasMounted(true);
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setSelectedCollectionIdState(stored);
-        }
+        // Use stored value if exists, otherwise default to DEFAULT_COLLECTION_ID
+        setSelectedCollectionIdState(stored || DEFAULT_COLLECTION_ID);
       } catch {
-        // Ignore localStorage errors
+        // Ignore localStorage errors, use default
+        setSelectedCollectionIdState(DEFAULT_COLLECTION_ID);
       }
     }
   }, []);

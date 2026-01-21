@@ -12,35 +12,29 @@ interface DiffViewerProps {
   className?: string;
 }
 
-export function DiffViewer({
-  file,
-  defaultExpanded = true,
-  className,
-}: DiffViewerProps) {
+export function DiffViewer({ file, defaultExpanded = true, className }: DiffViewerProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
-    <div className={cn('border rounded-lg overflow-hidden', className)}>
+    <div className={cn('overflow-hidden rounded-lg border', className)}>
       {/* Header with file path and badge */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted transition-colors text-left"
+        className="flex w-full items-center gap-2 bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted"
       >
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
-        <FileText className="w-4 h-4 text-muted-foreground" />
-        <span className="font-mono text-sm flex-1">{file.path}</span>
-        {file.change_origin && (
-          <ChangeBadge origin={file.change_origin} size="sm" />
-        )}
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        <span className="flex-1 font-mono text-sm">{file.path}</span>
+        {file.change_origin && <ChangeBadge origin={file.change_origin} size="sm" />}
       </button>
 
       {/* Diff content */}
       {expanded && (
-        <pre className="p-3 text-sm overflow-x-auto bg-background">
+        <pre className="overflow-x-auto bg-background p-3 text-sm">
           <code>{formatDiff(file.diff)}</code>
         </pre>
       )}
@@ -53,13 +47,11 @@ function formatDiff(diff: string): React.ReactNode {
   return diff.split('\n').map((line, i) => {
     let className = '';
     if (line.startsWith('+') && !line.startsWith('+++')) {
-      className =
-        'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
+      className = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
     } else if (line.startsWith('-') && !line.startsWith('---')) {
       className = 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
     } else if (line.startsWith('@@')) {
-      className =
-        'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
+      className = 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
     }
 
     return (

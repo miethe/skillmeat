@@ -1447,17 +1447,22 @@ async def create_artifact(
                 f"Must be one of: {', '.join([t.value for t in ArtifactType])}",
             )
 
-        # Determine collection
+        # Determine collection - use default if not specified
         collection_name = request.collection
         if not collection_name:
-            # Use first available collection as default
+            # Use the default collection
+            collection_name = "default"
+            # Verify default collection exists (should always exist after server startup)
             collections = collection_mgr.list_collections()
-            if not collections:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No collections found. Create a collection first.",
-                )
-            collection_name = collections[0]
+            if "default" not in collections:
+                # Fall back to first available if default doesn't exist (shouldn't happen)
+                if collections:
+                    collection_name = collections[0]
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="No collections found. Create a collection first.",
+                    )
         else:
             # Verify collection exists
             if collection_name not in collection_mgr.list_collections():

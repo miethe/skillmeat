@@ -274,7 +274,7 @@ export function TemplateDeployWizard({
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col overflow-hidden p-0">
         {/* Header - Fixed */}
         <div className="border-b px-6 pb-4 pt-6">
           <DialogHeader>
@@ -306,14 +306,19 @@ export function TemplateDeployWizard({
                         className={cn(
                           'flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs',
                           isActive &&
-                            'border-primary bg-primary text-primary-foreground font-medium',
+                            'border-primary bg-primary font-medium text-primary-foreground',
                           isCompleted && 'border-green-500 bg-green-500 text-white',
                           !isActive && !isCompleted && 'border-muted-foreground bg-background'
                         )}
                       >
                         {isCompleted ? <Check className="h-3 w-3" /> : <span>{s.id}</span>}
                       </div>
-                      <p className={cn('mt-1 text-xs text-center hidden sm:block max-w-[70px]', isActive ? 'font-medium' : 'text-muted-foreground')}>
+                      <p
+                        className={cn(
+                          'mt-1 hidden max-w-[70px] text-center text-xs sm:block',
+                          isActive ? 'font-medium' : 'text-muted-foreground'
+                        )}
+                      >
                         {s.title}
                       </p>
                     </div>
@@ -392,8 +397,8 @@ export function TemplateDeployWizard({
                 <Folder className="h-4 w-4" />
                 <AlertTitle>Path Requirements</AlertTitle>
                 <AlertDescription>
-                  Path must be absolute (start with /), cannot contain "..", and should point to
-                  an existing or new project directory.
+                  Path must be absolute (start with /), cannot contain "..", and should point to an
+                  existing or new project directory.
                 </AlertDescription>
               </Alert>
             </div>
@@ -473,8 +478,8 @@ export function TemplateDeployWizard({
 
               {formData.variables.PROJECT_NAME && (
                 <div className="rounded-lg border bg-muted/50 p-3">
-                  <p className="text-xs font-medium mb-2">Variable Preview</p>
-                  <p className="text-xs text-muted-foreground font-mono">
+                  <p className="mb-2 text-xs font-medium">Variable Preview</p>
+                  <p className="font-mono text-xs text-muted-foreground">
                     Project: {formData.variables.PROJECT_NAME || '{{PROJECT_NAME}}'} by{' '}
                     {formData.variables.AUTHOR || '{{AUTHOR}}'} on{' '}
                     {formData.variables.DATE || '{{DATE}}'}
@@ -547,7 +552,7 @@ export function TemplateDeployWizard({
                             )}
                           </div>
                           {entity.path_pattern && (
-                            <p className="text-xs text-muted-foreground font-mono">
+                            <p className="font-mono text-xs text-muted-foreground">
                               {entity.path_pattern}
                             </p>
                           )}
@@ -580,7 +585,7 @@ export function TemplateDeployWizard({
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium">Project Path:</span>
-                  <span className="text-sm font-mono truncate">{formData.projectPath}</span>
+                  <span className="truncate font-mono text-sm">{formData.projectPath}</span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                   <span className="text-sm font-medium">Selected Entities:</span>
@@ -595,9 +600,7 @@ export function TemplateDeployWizard({
                   <Checkbox
                     id="overwrite"
                     checked={formData.overwrite}
-                    onCheckedChange={(checked) =>
-                      updateFormData({ overwrite: checked === true })
-                    }
+                    onCheckedChange={(checked) => updateFormData({ overwrite: checked === true })}
                   />
                   <Label htmlFor="overwrite" className="cursor-pointer">
                     Overwrite existing files
@@ -622,7 +625,9 @@ export function TemplateDeployWizard({
             <div className="space-y-4">
               <div>
                 <h3 className="mb-1 text-lg font-semibold">Deploying Template</h3>
-                <p className="text-sm text-muted-foreground">Please wait while we deploy your template</p>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we deploy your template
+                </p>
               </div>
 
               <div className="flex flex-col items-center justify-center py-12">

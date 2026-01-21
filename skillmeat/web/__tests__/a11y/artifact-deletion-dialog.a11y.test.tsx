@@ -30,9 +30,7 @@ jest.mock('sonner', () => ({
 const mockedUseArtifactDeletion = useArtifactDeletion as jest.MockedFunction<
   typeof useArtifactDeletion
 >;
-const mockedUseDeploymentList = useDeploymentList as jest.MockedFunction<
-  typeof useDeploymentList
->;
+const mockedUseDeploymentList = useDeploymentList as jest.MockedFunction<typeof useDeploymentList>;
 
 // Mock artifact
 const mockArtifact: Artifact = {
@@ -157,10 +155,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
 
   describe('Default State (Collection Context)', () => {
     it('has no axe violations in default open state', async () => {
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       // Wait for dialog to fully render
       await waitFor(() => {
@@ -196,10 +193,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
     });
 
     it('has no violations with all checkboxes', async () => {
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -221,10 +217,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
   describe('Projects Section Expanded', () => {
     it('has no violations with projects section open', async () => {
       const user = userEvent.setup();
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -290,10 +285,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
   describe('Deployments Section Expanded (RED Warning)', () => {
     it('has no violations with deployments section open', async () => {
       const user = userEvent.setup();
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -340,10 +334,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
 
     it('has warning message with proper semantics', async () => {
       const user = userEvent.setup();
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -354,9 +347,7 @@ describe('ArtifactDeletionDialog Accessibility', () => {
       await user.click(deploymentsCheckbox);
 
       await waitFor(() => {
-        const warningText = screen.getByText(
-          /WARNING: This will permanently delete files/i
-        );
+        const warningText = screen.getByText(/WARNING: This will permanently delete files/i);
         expect(warningText).toBeInTheDocument();
       });
 
@@ -462,10 +453,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
         isPending: true,
       });
 
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -494,10 +484,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
         submittedAt: Date.now(),
       });
 
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -514,10 +503,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
   describe('Color Contrast (WCAG AA)', () => {
     it('passes color contrast checks for warning text', async () => {
       const user = userEvent.setup();
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -543,10 +531,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
     });
 
     it('passes contrast for destructive checkbox label', async () => {
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -589,10 +576,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
     });
 
     it('has visible focus indicators', async () => {
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -610,10 +596,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
 
   describe('Screen Reader Experience', () => {
     it('announces dialog opening', async () => {
-      const { rerender } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={false} />,
-        { wrapper: createWrapper() }
-      );
+      const { rerender } = render(<ArtifactDeletionDialog {...defaultProps} open={false} />, {
+        wrapper: createWrapper(),
+      });
 
       // Dialog should not be in document when closed
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -643,10 +628,9 @@ describe('ArtifactDeletionDialog Accessibility', () => {
     });
 
     it('has descriptive labels for all interactive elements', async () => {
-      const { container } = render(
-        <ArtifactDeletionDialog {...defaultProps} open={true} />,
-        { wrapper: createWrapper() }
-      );
+      const { container } = render(<ArtifactDeletionDialog {...defaultProps} open={true} />, {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();

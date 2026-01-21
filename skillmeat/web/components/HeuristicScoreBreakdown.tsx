@@ -135,28 +135,21 @@ export function HeuristicScoreBreakdown({
           return (
             <div
               key={signal.key}
-              className={cn(
-                'flex items-center justify-between',
-                isCompact ? 'gap-2' : 'gap-3',
-              )}
+              className={cn('flex items-center justify-between', isCompact ? 'gap-2' : 'gap-3')}
             >
               <span
-                className={cn(
-                  'font-medium',
-                  isCompact ? 'text-xs' : 'text-sm',
-                  'text-foreground',
-                )}
+                className={cn('font-medium', isCompact ? 'text-xs' : 'text-sm', 'text-foreground')}
                 title={signal.description}
               >
                 {signal.label}
               </span>
               <span
                 className={cn(
-                  'tabular-nums font-mono',
+                  'font-mono tabular-nums',
                   isCompact ? 'text-xs' : 'text-sm',
                   isPositive && 'text-green-600 dark:text-green-400',
                   isNegative && 'text-red-600 dark:text-red-400',
-                  !isPositive && !isNegative && 'text-muted-foreground',
+                  !isPositive && !isNegative && 'text-muted-foreground'
                 )}
                 aria-label={`${signal.label}: ${value > 0 ? '+' : ''}${value}`}
               >
@@ -174,9 +167,7 @@ export function HeuristicScoreBreakdown({
       {/* Raw total */}
       <div className={cn('flex items-center justify-between', isCompact ? 'gap-2' : 'gap-3')}>
         <span className="font-semibold text-foreground">Raw Total</span>
-        <span className="tabular-nums font-mono font-semibold">
-          {breakdown.raw_total}
-        </span>
+        <span className="font-mono font-semibold tabular-nums">{breakdown.raw_total}</span>
       </div>
 
       {/* Normalization arrow */}
@@ -190,15 +181,15 @@ export function HeuristicScoreBreakdown({
       <div
         className={cn(
           'flex items-center justify-between rounded-md bg-muted px-3 py-2',
-          isCompact && 'px-2 py-1.5',
+          isCompact && 'px-2 py-1.5'
         )}
       >
         <span className="font-bold text-foreground">Final Score</span>
         <span
           className={cn(
-            'tabular-nums font-mono font-bold',
+            'font-mono font-bold tabular-nums',
             isCompact ? 'text-base' : 'text-lg',
-            'text-primary',
+            'text-primary'
           )}
           aria-label={`Final normalized score: ${breakdown.normalized_score} out of 100`}
         >

@@ -89,6 +89,33 @@ T = TypeVar("T", bound=Base)
 
 
 # =============================================================================
+# Merge Result
+# =============================================================================
+
+
+@dataclass
+class MergeResult:
+    """Result of a catalog entry merge operation.
+
+    Tracks counts for different merge outcomes and identifies entries
+    that had SHA changes while preserving import status.
+
+    Attributes:
+        inserted_count: Number of new entries inserted
+        updated_count: Number of existing entries updated (non-imported/excluded)
+        preserved_count: Number of imported/excluded entries that were updated
+        removed_count: Number of entries marked as removed (no longer detected)
+        updated_imports: Entry IDs of imported artifacts that have SHA changes
+    """
+
+    inserted_count: int
+    updated_count: int
+    preserved_count: int
+    removed_count: int
+    updated_imports: List[str]
+
+
+# =============================================================================
 # Pagination Result
 # =============================================================================
 
@@ -411,6 +438,185 @@ class ScanUpdateContext:
             )
 
         return len(entries)
+
+    def merge_catalog_entries(
+        self, entries: List[MarketplaceCatalogEntry]
+    ) -> MergeResult:
+        """Merge new catalog entries with existing ones, preserving import metadata.
+
+        Unlike replace_catalog_entries(), this method preserves import-related
+        metadata for entries that have been imported or excluded. It matches
+        entries by upstream_url (primary) or path + source_id (fallback).
+
+        Merge behavior by existing entry status:
+            - "imported": Preserves status, import_date, import_id, excluded_at,
+              excluded_reason. Updates detection metadata (SHA, scores, etc.)
+            - "excluded": Preserves all exclusion data. Updates detection metadata.
+            - "new"/"updated": Full update with new entry data.
+            - Not in new entries: Marked as "removed" (not deleted).
+
+        Args:
+            entries: List of newly detected MarketplaceCatalogEntry instances
+
+        Returns:
+            MergeResult with counts and list of imported entry IDs with SHA changes
+
+        Example:
+            >>> result = ctx.merge_catalog_entries(detected_entries)
+            >>> print(f"Inserted: {result.inserted_count}")
+            >>> print(f"Updated: {result.updated_count}")
+            >>> print(f"Preserved: {result.preserved_count}")
+            >>> print(f"Removed: {result.removed_count}")
+            >>> if result.updated_imports:
+            ...     print(f"Imports with changes: {result.updated_imports}")
+        """
+        # Build lookup dicts of new entries for O(1) matching
+        new_by_url: Dict[str, MarketplaceCatalogEntry] = {}
+        new_by_path: Dict[str, MarketplaceCatalogEntry] = {}
+        new_by_type_name: Dict[str, MarketplaceCatalogEntry] = {}
+        for entry in entries:
+            new_by_url[entry.upstream_url] = entry
+            # Fallback key: path (unique within a source)
+            new_by_path[entry.path] = entry
+            # Secondary fallback: artifact_type:name (stable across URL changes)
+            type_name_key = f"{entry.artifact_type}:{entry.name}"
+            new_by_type_name[type_name_key] = entry
+
+        # Get existing entries for this source
+        existing_entries = (
+            self.session.query(MarketplaceCatalogEntry)
+            .filter_by(source_id=self.source_id)
+            .all()
+        )
+
+        # Track which new entries have been matched
+        matched_urls: set = set()
+        matched_paths: set = set()
+        matched_type_names: set = set()
+
+        # Counters
+        inserted_count = 0
+        updated_count = 0
+        preserved_count = 0
+        removed_count = 0
+        updated_imports: List[str] = []
+
+        now = datetime.utcnow()
+
+        # Process existing entries
+        for existing in existing_entries:
+            # Try to find matching new entry (priority: URL > path > type:name)
+            new_entry = new_by_url.get(existing.upstream_url)
+            if new_entry:
+                matched_urls.add(existing.upstream_url)
+            else:
+                # Fallback 1: match by path
+                new_entry = new_by_path.get(existing.path)
+                if new_entry:
+                    matched_paths.add(existing.path)
+                else:
+                    # Fallback 2: match by artifact_type:name (handles URL changes)
+                    type_name_key = f"{existing.artifact_type}:{existing.name}"
+                    new_entry = new_by_type_name.get(type_name_key)
+                    if new_entry:
+                        matched_type_names.add(type_name_key)
+                        logger.debug(
+                            f"Matched entry by type:name fallback: {existing.id} ({existing.name})"
+                        )
+
+            if new_entry is None:
+                # Entry no longer detected - mark as removed
+                if existing.status != "removed":
+                    existing.status = "removed"
+                    existing.updated_at = now
+                    removed_count += 1
+                    logger.debug(
+                        f"Marked entry as removed: {existing.id} ({existing.name})"
+                    )
+                continue
+
+            # Track SHA changes for imported entries
+            sha_changed = (
+                existing.detected_sha is not None
+                and new_entry.detected_sha is not None
+                and existing.detected_sha != new_entry.detected_sha
+            )
+
+            if existing.status in ("imported", "excluded"):
+                # Preserve import/exclusion metadata, update detection data
+                if sha_changed and existing.status == "imported":
+                    updated_imports.append(existing.id)
+
+                # Update detection metadata and URLs (URLs may change due to ref fixes)
+                existing.detected_sha = new_entry.detected_sha
+                existing.confidence_score = new_entry.confidence_score
+                existing.raw_score = new_entry.raw_score
+                existing.score_breakdown = new_entry.score_breakdown
+                existing.detected_at = new_entry.detected_at
+                existing.detected_version = new_entry.detected_version
+                existing.path_segments = new_entry.path_segments
+                existing.upstream_url = (
+                    new_entry.upstream_url
+                )  # Update URL (may have changed)
+                existing.path = new_entry.path  # Update path for consistency
+                existing.updated_at = now
+
+                # Preserve: status, import_date, import_id, excluded_at, excluded_reason
+                preserved_count += 1
+                logger.debug(
+                    f"Preserved {existing.status} entry: {existing.id} ({existing.name})"
+                    + (f" [SHA changed]" if sha_changed else "")
+                )
+            else:
+                # Full update for non-imported/excluded entries
+                existing.artifact_type = new_entry.artifact_type
+                existing.name = new_entry.name
+                existing.path = new_entry.path
+                existing.upstream_url = new_entry.upstream_url
+                existing.detected_version = new_entry.detected_version
+                existing.detected_sha = new_entry.detected_sha
+                existing.detected_at = new_entry.detected_at
+                existing.confidence_score = new_entry.confidence_score
+                existing.raw_score = new_entry.raw_score
+                existing.score_breakdown = new_entry.score_breakdown
+                existing.path_segments = new_entry.path_segments
+                existing.status = "updated" if existing.status != "new" else "new"
+                existing.updated_at = now
+                updated_count += 1
+                logger.debug(f"Updated entry: {existing.id} ({existing.name})")
+
+        # Insert new entries that weren't matched
+        for entry in entries:
+            url_matched = entry.upstream_url in matched_urls
+            path_matched = entry.path in matched_paths
+            type_name_key = f"{entry.artifact_type}:{entry.name}"
+            type_name_matched = type_name_key in matched_type_names
+
+            if not url_matched and not path_matched and not type_name_matched:
+                # New entry - insert it
+                self.session.add(entry)
+                inserted_count += 1
+                logger.debug(f"Inserted new entry: {entry.id} ({entry.name})")
+
+        logger.info(
+            f"Merged catalog entries for source {self.source_id}: "
+            f"inserted={inserted_count}, updated={updated_count}, "
+            f"preserved={preserved_count}, removed={removed_count}"
+        )
+
+        if updated_imports:
+            logger.info(
+                f"Found {len(updated_imports)} imported entries with SHA changes: "
+                f"{updated_imports[:5]}{'...' if len(updated_imports) > 5 else ''}"
+            )
+
+        return MergeResult(
+            inserted_count=inserted_count,
+            updated_count=updated_count,
+            preserved_count=preserved_count,
+            removed_count=removed_count,
+            updated_imports=updated_imports,
+        )
 
     def update_entry_statuses(self, status_updates: Dict[str, str]) -> int:
         """Bulk update entry statuses.
@@ -788,18 +994,38 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
     Provides CRUD operations for MarketplaceSource entities, which represent
     GitHub repositories that can be scanned for Claude Code artifacts.
 
+    Supported Fields:
+        Core fields (required):
+            - id, repo_url, owner, repo_name, ref
+
+        User-provided metadata:
+            - description: User-provided description (max 500 chars)
+            - notes: Internal notes/documentation (max 2000 chars)
+
+        GitHub-fetched metadata:
+            - repo_description: Description from GitHub API (max 2000 chars)
+            - repo_readme: README content from GitHub (up to 50KB)
+            - tags: List of tags for categorization (JSON-serialized)
+
+        Scan results:
+            - scan_status: Current scan status
+            - artifact_count: Total count of discovered artifacts
+            - counts_by_type: Dict mapping artifact type to count (JSON-serialized)
+            - last_sync_at, last_error
+
     Methods:
         - get_by_id: Retrieve source by ID
         - get_by_repo_url: Retrieve source by repository URL (unique)
         - list_all: List all sources
-        - create: Create new source
-        - update: Update existing source
+        - create: Create new source (with optional tags/counts_by_type kwargs)
+        - update: Update existing source (with optional tags/counts_by_type kwargs)
+        - update_fields: Partial update by source_id (convenience method)
         - delete: Delete source (cascade deletes catalog entries)
 
     Example:
         >>> repo = MarketplaceSourceRepository()
         >>>
-        >>> # Create a new source
+        >>> # Create a new source with GitHub metadata
         >>> source = MarketplaceSource(
         ...     id=str(uuid.uuid4()),
         ...     repo_url="https://github.com/anthropics/anthropic-quickstarts",
@@ -807,16 +1033,25 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         ...     repo_name="anthropic-quickstarts",
         ...     ref="main",
         ...     trust_level="official",
+        ...     repo_description="Official Anthropic quickstart examples",
+        ...     repo_readme="# Anthropic Quickstarts\n\n...",
         ... )
-        >>> created = repo.create(source)
+        >>> created = repo.create(
+        ...     source,
+        ...     tags=["official", "anthropic"],
+        ...     counts_by_type={"skill": 5},
+        ... )
         >>>
         >>> # Find by URL
         >>> found = repo.get_by_repo_url("https://github.com/anthropics/anthropic-quickstarts")
         >>>
-        >>> # Update scan status
-        >>> found.scan_status = "success"
-        >>> found.last_sync_at = datetime.utcnow()
-        >>> updated = repo.update(found)
+        >>> # Partial update with update_fields
+        >>> updated = repo.update_fields(
+        ...     found.id,
+        ...     scan_status="success",
+        ...     artifact_count=10,
+        ...     counts_by_type={"skill": 7, "command": 3},
+        ... )
     """
 
     def __init__(self, db_path: Optional[str | Path] = None):
@@ -879,11 +1114,24 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         finally:
             session.close()
 
-    def create(self, source: MarketplaceSource) -> MarketplaceSource:
+    def create(
+        self,
+        source: MarketplaceSource,
+        *,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+    ) -> MarketplaceSource:
         """Create a new marketplace source.
 
         Args:
-            source: MarketplaceSource instance to create
+            source: MarketplaceSource instance to create. Can include:
+                - repo_description: Description fetched from GitHub API
+                - repo_readme: README content from GitHub
+                - tags: Will be overridden if tags kwarg is provided
+                - counts_by_type: Will be overridden if counts_by_type kwarg is provided
+            tags: Optional list of tags (serialized via set_tags_list())
+            counts_by_type: Optional dict mapping artifact type to count
+                (serialized via set_counts_by_type_dict())
 
         Returns:
             Created MarketplaceSource instance
@@ -897,9 +1145,21 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             ...     repo_url="https://github.com/user/repo",
             ...     owner="user",
             ...     repo_name="repo",
+            ...     repo_description="A great repo for Claude artifacts",
+            ...     repo_readme="# My Repo\n\nThis repo contains...",
             ... )
-            >>> created = repo.create(source)
+            >>> created = repo.create(
+            ...     source,
+            ...     tags=["productivity", "coding"],
+            ...     counts_by_type={"skill": 5, "command": 2},
+            ... )
         """
+        # Apply serialized fields if provided as kwargs
+        if tags is not None:
+            source.set_tags_list(tags)
+        if counts_by_type is not None:
+            source.set_counts_by_type_dict(counts_by_type)
+
         session = self._get_session()
         try:
             session.add(source)
@@ -913,11 +1173,24 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         finally:
             session.close()
 
-    def update(self, source: MarketplaceSource) -> MarketplaceSource:
+    def update(
+        self,
+        source: MarketplaceSource,
+        *,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+    ) -> MarketplaceSource:
         """Update an existing marketplace source.
 
         Args:
-            source: MarketplaceSource instance with updated values
+            source: MarketplaceSource instance with updated values. Can include:
+                - repo_description: Description fetched from GitHub API
+                - repo_readme: README content from GitHub
+                - tags: Will be overridden if tags kwarg is provided
+                - counts_by_type: Will be overridden if counts_by_type kwarg is provided
+            tags: Optional list of tags to set (serialized via set_tags_list())
+            counts_by_type: Optional dict mapping artifact type to count
+                (serialized via set_counts_by_type_dict())
 
         Returns:
             Updated MarketplaceSource instance
@@ -929,8 +1202,19 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             >>> source = repo.get_by_id("source-123")
             >>> source.scan_status = "success"
             >>> source.artifact_count = 5
-            >>> updated = repo.update(source)
+            >>> source.repo_description = "Updated description from GitHub"
+            >>> updated = repo.update(
+            ...     source,
+            ...     tags=["updated", "verified"],
+            ...     counts_by_type={"skill": 10, "command": 3},
+            ... )
         """
+        # Apply serialized fields if provided as kwargs
+        if tags is not None:
+            source.set_tags_list(tags)
+        if counts_by_type is not None:
+            source.set_counts_by_type_dict(counts_by_type)
+
         session = self._get_session()
         try:
             # Ensure entity exists
@@ -972,6 +1256,100 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             session.commit()
             logger.info(f"Deleted marketplace source: {source_id}")
             return True
+        finally:
+            session.close()
+
+    def update_fields(
+        self,
+        source_id: str,
+        *,
+        repo_description: Optional[str] = None,
+        repo_readme: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+        description: Optional[str] = None,
+        notes: Optional[str] = None,
+        scan_status: Optional[str] = None,
+        artifact_count: Optional[int] = None,
+        last_sync_at: Optional[datetime] = None,
+        last_error: Optional[str] = None,
+    ) -> MarketplaceSource:
+        """Update specific fields on a marketplace source without full ORM object.
+
+        This is a convenience method for partial updates. Only provided fields
+        are updated; None values are ignored (not set to NULL).
+
+        Args:
+            source_id: Unique source identifier
+            repo_description: Description fetched from GitHub API (max 2000 chars)
+            repo_readme: README content from GitHub (up to 50KB)
+            tags: List of tags for categorization (serialized to JSON)
+            counts_by_type: Dict mapping artifact type to count (serialized to JSON)
+            description: User-provided description (max 500 chars)
+            notes: Internal notes/documentation (max 2000 chars)
+            scan_status: Scan status ("pending", "scanning", "success", "error")
+            artifact_count: Cached count of discovered artifacts
+            last_sync_at: Timestamp of last successful scan
+            last_error: Last error message if scan failed
+
+        Returns:
+            Updated MarketplaceSource instance
+
+        Raises:
+            NotFoundError: If source does not exist
+
+        Example:
+            >>> # Update GitHub metadata after fetching from API
+            >>> updated = repo.update_fields(
+            ...     "source-123",
+            ...     repo_description="Official Claude Code skills repository",
+            ...     repo_readme="# Anthropic Skills\n\nThis repo contains...",
+            ...     tags=["official", "anthropic", "skills"],
+            ... )
+            >>>
+            >>> # Update after successful scan
+            >>> updated = repo.update_fields(
+            ...     "source-123",
+            ...     scan_status="success",
+            ...     artifact_count=15,
+            ...     counts_by_type={"skill": 10, "command": 3, "agent": 2},
+            ...     last_sync_at=datetime.utcnow(),
+            ... )
+        """
+        session = self._get_session()
+        try:
+            source = session.query(MarketplaceSource).filter_by(id=source_id).first()
+            if not source:
+                raise NotFoundError(f"Source not found: {source_id}")
+
+            # Update simple fields if provided
+            if repo_description is not None:
+                source.repo_description = repo_description
+            if repo_readme is not None:
+                source.repo_readme = repo_readme
+            if description is not None:
+                source.description = description
+            if notes is not None:
+                source.notes = notes
+            if scan_status is not None:
+                source.scan_status = scan_status
+            if artifact_count is not None:
+                source.artifact_count = artifact_count
+            if last_sync_at is not None:
+                source.last_sync_at = last_sync_at
+            if last_error is not None:
+                source.last_error = last_error
+
+            # Update JSON-serialized fields using helper methods
+            if tags is not None:
+                source.set_tags_list(tags)
+            if counts_by_type is not None:
+                source.set_counts_by_type_dict(counts_by_type)
+
+            session.commit()
+            session.refresh(source)
+            logger.info(f"Updated fields on marketplace source: {source_id}")
+            return source
         finally:
             session.close()
 

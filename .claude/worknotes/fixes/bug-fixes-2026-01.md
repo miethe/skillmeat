@@ -511,3 +511,90 @@ This simpler logic:
 **Impact**: Artifacts with valid upstream sources now correctly display their GitHub URL in the source field, enabling the "Source vs Collection" comparison tab in the Sync Status view.
 
 **Status**: RESOLVED
+
+---
+
+## Marketplace Source Pagination Broken - Multi-Page Navigation Fails
+
+**Date Fixed**: 2026-01-15
+**Severity**: high
+**Component**: marketplace-sources-api, marketplace-pagination
+
+**Issue**: When viewing artifacts from a Marketplace Source, users could not navigate beyond the first page. Two related issues:
+1. **API infinite loop**: Changing pages triggered endless API requests until hitting rate limit (429 errors)
+2. **Page jumping fails**: Navigating directly to a later page (e.g., page 1→6) would get stuck "Loading page 6..." indefinitely
+
+**Root Cause (Backend)**: Cursor-based pagination in `list_artifacts` endpoint was broken. UUID comparison using `>` operator doesn't work for UUIDs:
+
+```python
+# BUG: UUID comparison with > doesn't work
+cursor_idx = next(
+    (i for i, e in enumerate(entries) if e.id > cursor),  # Always returns len(entries)
+    len(entries),
+)
+entries = entries[cursor_idx:]  # Returns empty or same data
+```
+
+Every page request returned the same 50 items regardless of cursor value.
+
+**Root Cause (Frontend)**: The fetch effect had two problems:
+1. No guard against duplicate `fetchNextPage()` calls during React state transitions
+2. Ref reset logic only triggered when target was reached, not after each successful fetch
+
+When jumping multiple pages (1→6), the ref guard blocked intermediate page fetches:
+- User clicks page 6 → `fetchTargetRef = 127` (items needed for page 6)
+- Page 4 loads (100 items) → `100 >= 127` is false → ref not reset
+- Pages 5 and 6 never fetch because ref guard blocks them
+
+**Fix (Backend)**:
+1. Changed UUID comparison to exact string match: `str(e.id) == cursor`
+2. Adjusted slice to skip cursor item: `entries[cursor_idx + 1:]` instead of `entries[cursor_idx:]`
+
+```python
+# FIXED: String comparison for cursor matching
+cursor_idx = next(
+    (i for i, e in enumerate(entries) if str(e.id) == cursor),
+    -1,
+)
+if cursor_idx >= 0:
+    entries = entries[cursor_idx + 1:]  # Skip cursor item, start from next
+```
+
+**Fix (Frontend)**:
+1. Added `fetchTargetRef` to prevent duplicate fetch requests during state transitions
+2. Added `prevEntriesLengthRef` to track when new data arrives
+3. Reset ref after ANY successful fetch (length increases), not just when target reached
+4. Added loading state UI when fetching data for requested page
+
+```typescript
+// Track when new data arrives to allow sequential page loading
+useEffect(() => {
+  const loadedCount = allEntries.length;
+  if (loadedCount > prevEntriesLengthRef.current && fetchTargetRef.current !== null) {
+    fetchTargetRef.current = null;  // Reset to allow next fetch
+  }
+  prevEntriesLengthRef.current = loadedCount;
+}, [allEntries.length]);
+```
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py`:
+  - Lines 1454-1462: Fixed cursor comparison and slice logic
+- `skillmeat/web/app/marketplace/sources/[id]/page.tsx`:
+  - Added `useRef` import
+  - Lines 342-346: Added `fetchTargetRef` and `prevEntriesLengthRef`
+  - Lines 459-469: Reset refs on filter/itemsPerPage changes
+  - Lines 571-580: Ref reset when new data arrives
+  - Lines 582-607: Fetch effect with ref-based guard
+  - Lines 1197-1205: Loading state UI for page fetching
+
+**Testing**:
+- Sequential navigation (1→2→3): ✓
+- Page jumping (1→6): ✓ (loads intermediate pages 2-5 automatically)
+- Navigation back (6→3): ✓
+- No infinite loops or rate limiting
+- Build and type-check pass
+
+**Commit**: 2654b98
+
+**Status**: RESOLVED

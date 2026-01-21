@@ -23,9 +23,7 @@ interface CollectionSwitcherWithDialogsProps {
  * This is a convenience component that can be used in the navigation sidebar or anywhere
  * you want a collection switcher with full create functionality.
  */
-export function CollectionSwitcherWithDialogs({
-  className,
-}: CollectionSwitcherWithDialogsProps) {
+export function CollectionSwitcherWithDialogs({ className }: CollectionSwitcherWithDialogsProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   return (

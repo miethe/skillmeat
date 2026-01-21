@@ -29,9 +29,7 @@ jest.mock('sonner', () => ({
 const mockedUseArtifactDeletion = useArtifactDeletion as jest.MockedFunction<
   typeof useArtifactDeletion
 >;
-const mockedUseDeploymentList = useDeploymentList as jest.MockedFunction<
-  typeof useDeploymentList
->;
+const mockedUseDeploymentList = useDeploymentList as jest.MockedFunction<typeof useDeploymentList>;
 const mockedToast = toast as jest.Mocked<typeof toast>;
 
 // Mock artifact
@@ -134,11 +132,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -149,11 +143,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -249,11 +239,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -276,11 +262,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -303,11 +285,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -327,11 +305,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -351,11 +325,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -369,9 +339,7 @@ describe('ArtifactDeletionDialog', () => {
       await user.click(checkbox);
 
       // Warning should now be visible
-      expect(
-        screen.getByText(/WARNING: This will permanently delete files/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/WARNING: This will permanently delete files/)).toBeInTheDocument();
     });
   });
 
@@ -381,11 +349,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -405,11 +369,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -434,11 +394,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -461,11 +417,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -500,11 +452,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -512,9 +460,7 @@ describe('ArtifactDeletionDialog', () => {
       await user.click(screen.getByLabelText(/Delete Deployments/));
 
       // RED warning banner should appear
-      expect(
-        screen.getByText(/WARNING: This will permanently delete files/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/WARNING: This will permanently delete files/)).toBeInTheDocument();
       expect(screen.getByText(/This cannot be undone!/)).toBeInTheDocument();
     });
 
@@ -523,11 +469,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -547,11 +489,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -559,9 +497,7 @@ describe('ArtifactDeletionDialog', () => {
       await user.click(screen.getByLabelText(/Delete Deployments/));
 
       // Find first deployment checkbox
-      const deploymentCheckbox = screen.getByLabelText(
-        '/project1/.claude/skills/test-skill'
-      );
+      const deploymentCheckbox = screen.getByLabelText('/project1/.claude/skills/test-skill');
       expect(deploymentCheckbox).toBeChecked();
 
       // Toggle off
@@ -640,11 +576,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -676,11 +608,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 
@@ -877,9 +805,7 @@ describe('ArtifactDeletionDialog', () => {
         collectionDeleted: true,
         projectsUndeployed: 1,
         deploymentsDeleted: 0,
-        errors: [
-          { operation: 'undeploy:/project2', error: 'Permission denied' },
-        ],
+        errors: [{ operation: 'undeploy:/project2', error: 'Permission denied' }],
       };
       mockMutateAsync.mockResolvedValue(mockResult);
 
@@ -953,11 +879,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={onOpenChange}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={onOpenChange} />
         </Wrapper>
       );
 
@@ -1000,11 +922,7 @@ describe('ArtifactDeletionDialog', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <ArtifactDeletionDialog
-            artifact={mockArtifact}
-            open={true}
-            onOpenChange={jest.fn()}
-          />
+          <ArtifactDeletionDialog artifact={mockArtifact} open={true} onOpenChange={jest.fn()} />
         </Wrapper>
       );
 

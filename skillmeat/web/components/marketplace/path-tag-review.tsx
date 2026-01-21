@@ -20,12 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { usePathTags, useUpdatePathTagStatus } from '@/hooks';
 import type { ExtractedSegment } from '@/types/path-tags';
@@ -54,10 +49,7 @@ interface StatusBadgeProps {
   reason?: string;
 }
 
-const statusConfig: Record<
-  SegmentStatus,
-  { label: string; className: string }
-> = {
+const statusConfig: Record<SegmentStatus, { label: string; className: string }> = {
   pending: {
     label: 'Pending',
     className:
@@ -70,13 +62,11 @@ const statusConfig: Record<
   },
   rejected: {
     label: 'Rejected',
-    className:
-      'border-red-500 text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-950/50',
+    className: 'border-red-500 text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-950/50',
   },
   excluded: {
     label: 'Excluded',
-    className:
-      'border-gray-400 text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-800/50',
+    className: 'border-gray-400 text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-800/50',
   },
 };
 
@@ -134,27 +124,26 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
       )}
     >
       {/* Segment values */}
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <code className="rounded bg-muted px-2 py-0.5 text-sm font-mono">
-            {segment.segment}
-          </code>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="rounded bg-muted px-2 py-0.5 font-mono text-sm">{segment.segment}</code>
           {segment.segment !== segment.normalized && (
             <>
-              <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden="true" />
-              <span className="text-sm text-muted-foreground">
-                {segment.normalized}
-              </span>
+              <ArrowRight
+                className="h-3 w-3 flex-shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span className="text-sm text-muted-foreground">{segment.normalized}</span>
             </>
           )}
         </div>
         {segment.status === 'excluded' && segment.reason && (
-          <p className="text-xs text-muted-foreground italic">{segment.reason}</p>
+          <p className="text-xs italic text-muted-foreground">{segment.reason}</p>
         )}
       </div>
 
       {/* Status badge and actions */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex flex-shrink-0 items-center gap-2">
         <StatusBadge status={segment.status} reason={segment.reason} />
 
         {showActions && (
@@ -165,7 +154,7 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-500 dark:hover:text-green-400 dark:hover:bg-green-950/50"
+                    className="h-8 w-8 p-0 text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-500 dark:hover:bg-green-950/50 dark:hover:text-green-400"
                     onClick={onApprove}
                     disabled={isPending}
                     aria-label="Approve segment"
@@ -187,7 +176,7 @@ function SegmentRow({ segment, isPending, onApprove, onReject }: SegmentRowProps
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-500 dark:hover:text-red-400 dark:hover:bg-red-950/50"
+                    className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                     onClick={onReject}
                     disabled={isPending}
                     aria-label="Reject segment"
@@ -227,14 +216,30 @@ function PathTagSummary({ segments }: PathTagSummaryProps) {
   );
 
   const items = [
-    { status: 'approved' as const, count: counts.approved || 0, className: 'text-green-600 dark:text-green-400' },
-    { status: 'rejected' as const, count: counts.rejected || 0, className: 'text-red-600 dark:text-red-400' },
-    { status: 'pending' as const, count: counts.pending || 0, className: 'text-yellow-600 dark:text-yellow-400' },
-    { status: 'excluded' as const, count: counts.excluded || 0, className: 'text-gray-500 dark:text-gray-400' },
+    {
+      status: 'approved' as const,
+      count: counts.approved || 0,
+      className: 'text-green-600 dark:text-green-400',
+    },
+    {
+      status: 'rejected' as const,
+      count: counts.rejected || 0,
+      className: 'text-red-600 dark:text-red-400',
+    },
+    {
+      status: 'pending' as const,
+      count: counts.pending || 0,
+      className: 'text-yellow-600 dark:text-yellow-400',
+    },
+    {
+      status: 'excluded' as const,
+      count: counts.excluded || 0,
+      className: 'text-gray-500 dark:text-gray-400',
+    },
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm border-t pt-3 mt-3">
+    <div className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3 text-sm">
       {items.map(({ status, count, className }) => (
         <span key={status} className={cn('font-medium', className)}>
           {count} {status}
@@ -281,13 +286,8 @@ function ErrorState({ error, onRetry }: ErrorStateProps) {
       <AlertTitle>Failed to load path segments</AlertTitle>
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{error.message || 'An unexpected error occurred'}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRetry}
-          className="flex-shrink-0"
-        >
-          <RefreshCw className="h-4 w-4 mr-1" aria-hidden="true" />
+        <Button variant="outline" size="sm" onClick={onRetry} className="flex-shrink-0">
+          <RefreshCw className="mr-1 h-4 w-4" aria-hidden="true" />
           Retry
         </Button>
       </AlertDescription>
@@ -298,11 +298,11 @@ function ErrorState({ error, onRetry }: ErrorStateProps) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
-      <div className="rounded-full bg-muted p-3 mb-3">
+      <div className="mb-3 rounded-full bg-muted p-3">
         <Info className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
       </div>
       <h3 className="text-sm font-medium text-foreground">No segments extracted</h3>
-      <p className="text-sm text-muted-foreground mt-1">
+      <p className="mt-1 text-sm text-muted-foreground">
         This entry does not have any path segments to review.
       </p>
     </div>
@@ -363,14 +363,14 @@ export function PathTagReview({ sourceId, entryId, className }: PathTagReviewPro
     <div className={cn('space-y-2', className)}>
       {/* Raw path display */}
       {data.raw_path && (
-        <div className="text-xs text-muted-foreground mb-3">
+        <div className="mb-3 text-xs text-muted-foreground">
           <span className="font-medium">Path:</span>{' '}
           <code className="rounded bg-muted px-1.5 py-0.5">{data.raw_path}</code>
         </div>
       )}
 
       {/* Segment list */}
-      <ul className="space-y-2 list-none">
+      <ul className="list-none space-y-2">
         {data.extracted.map((segment) => (
           <li key={segment.segment}>
             <SegmentRow

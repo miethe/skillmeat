@@ -76,10 +76,23 @@ describe('CollectionSwitcher', () => {
   });
 
   it('displays selected collection name when collection is selected', () => {
+    const workCollection = mockCollections.find((c) => c.id === 'work') ?? null;
     mockUseCollectionContext.mockReturnValue({
-      ...mockUseCollectionContext(),
+      collections: mockCollections,
       selectedCollectionId: 'work',
-      currentCollection: mockCollections[1],
+      selectedGroupId: null,
+      currentCollection: workCollection,
+      currentGroups: [],
+      isLoadingCollections: false,
+      isLoadingCollection: false,
+      isLoadingGroups: false,
+      collectionsError: null,
+      collectionError: null,
+      groupsError: null,
+      setSelectedCollectionId: mockSetSelectedCollectionId,
+      setSelectedGroupId: jest.fn(),
+      refreshCollections: jest.fn(),
+      refreshGroups: jest.fn(),
     });
 
     render(<CollectionSwitcher />);
@@ -124,10 +137,23 @@ describe('CollectionSwitcher', () => {
   });
 
   it('calls setSelectedCollectionId when "All Collections" is selected', async () => {
+    const workCollection = mockCollections.find((c) => c.id === 'work') ?? null;
     mockUseCollectionContext.mockReturnValue({
-      ...mockUseCollectionContext(),
+      collections: mockCollections,
       selectedCollectionId: 'work',
-      currentCollection: mockCollections[1],
+      selectedGroupId: null,
+      currentCollection: workCollection,
+      currentGroups: [],
+      isLoadingCollections: false,
+      isLoadingCollection: false,
+      isLoadingGroups: false,
+      collectionsError: null,
+      collectionError: null,
+      groupsError: null,
+      setSelectedCollectionId: mockSetSelectedCollectionId,
+      setSelectedGroupId: jest.fn(),
+      refreshCollections: jest.fn(),
+      refreshGroups: jest.fn(),
     });
 
     render(<CollectionSwitcher />);

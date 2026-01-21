@@ -21,9 +21,7 @@ jest.mock('@/lib/api/deployments', () => ({
 const mockedDeleteArtifact = deleteArtifactFromCollection as jest.MockedFunction<
   typeof deleteArtifactFromCollection
 >;
-const mockedUndeployArtifact = undeployArtifact as jest.MockedFunction<
-  typeof undeployArtifact
->;
+const mockedUndeployArtifact = undeployArtifact as jest.MockedFunction<typeof undeployArtifact>;
 
 // Test wrapper with QueryClientProvider
 function createWrapper() {

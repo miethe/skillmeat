@@ -43,12 +43,8 @@ const exampleDiffs: FileDiff[] = [
  */
 export function BasicDiffViewerExample() {
   return (
-    <div className="h-96 border rounded">
-      <DiffViewer
-        files={exampleDiffs}
-        leftLabel="Collection"
-        rightLabel="Project"
-      />
+    <div className="h-96 rounded border">
+      <DiffViewer files={exampleDiffs} leftLabel="Collection" rightLabel="Project" />
     </div>
   );
 }
@@ -78,7 +74,7 @@ export function SyncResolutionExample() {
 
   return (
     <div className="space-y-4">
-      <div className="h-96 border rounded">
+      <div className="h-96 rounded border">
         <DiffViewer
           files={exampleDiffs}
           leftLabel="Collection"
@@ -93,8 +89,10 @@ export function SyncResolutionExample() {
       </div>
 
       {resolvedWith && (
-        <div className="p-4 bg-green-100 dark:bg-green-900 rounded">
-          <p>✅ Conflict resolved using: <strong>{resolvedWith}</strong></p>
+        <div className="rounded bg-green-100 p-4 dark:bg-green-900">
+          <p>
+            ✅ Conflict resolved using: <strong>{resolvedWith}</strong>
+          </p>
         </div>
       )}
     </div>
@@ -115,7 +113,7 @@ export function CustomLabelsExample() {
   };
 
   return (
-    <div className="h-96 border rounded">
+    <div className="h-96 rounded border">
       <DiffViewer
         files={exampleDiffs}
         leftLabel="Upstream (GitHub)"
@@ -140,14 +138,14 @@ export function NoPreviewExample() {
   };
 
   return (
-    <div className="h-96 border rounded">
+    <div className="h-96 rounded border">
       <DiffViewer
         files={exampleDiffs}
         leftLabel="Collection"
         rightLabel="Project"
         showResolutionActions={true}
         onResolve={handleResolve}
-        previewMode={false}  // No preview message
+        previewMode={false} // No preview message
       />
     </div>
   );
@@ -158,9 +156,9 @@ export function NoPreviewExample() {
  */
 export default function DiffViewerExamplesPage() {
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto space-y-8 py-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">DiffViewer Examples</h1>
+        <h1 className="mb-2 text-3xl font-bold">DiffViewer Examples</h1>
         <p className="text-muted-foreground">
           Demonstrating sync conflict resolution features added in Phase 5
         </p>
@@ -168,8 +166,8 @@ export default function DiffViewerExamplesPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">Basic Diff Viewer</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="mb-2 text-2xl font-semibold">Basic Diff Viewer</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
             Traditional diff view without resolution actions
           </p>
         </div>
@@ -178,8 +176,8 @@ export default function DiffViewerExamplesPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">Sync Resolution Actions</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="mb-2 text-2xl font-semibold">Sync Resolution Actions</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
             With resolution buttons, preview mode, and loading states
           </p>
         </div>
@@ -188,8 +186,8 @@ export default function DiffViewerExamplesPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">Custom Labels</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="mb-2 text-2xl font-semibold">Custom Labels</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
             Using custom labels for different sync scenarios
           </p>
         </div>
@@ -198,8 +196,8 @@ export default function DiffViewerExamplesPage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">No Preview Mode</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="mb-2 text-2xl font-semibold">No Preview Mode</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
             Resolution actions without preview message
           </p>
         </div>

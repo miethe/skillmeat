@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { AddGroupArtifactsRequest } from '../models/AddGroupArtifactsRequest';
 import type { ArtifactPositionUpdate } from '../models/ArtifactPositionUpdate';
+import type { CopyGroupRequest } from '../models/CopyGroupRequest';
 import type { GroupArtifactResponse } from '../models/GroupArtifactResponse';
 import type { GroupCreateRequest } from '../models/GroupCreateRequest';
 import type { GroupListResponse } from '../models/GroupListResponse';
@@ -44,13 +45,15 @@ export class GroupsService {
      * List groups in collection
      * List all groups in a collection, ordered by position.
      *
-     * Optionally filter by name using the search parameter.
+     * Optionally filter by name using the search parameter, or filter to only
+     * groups containing a specific artifact using the artifact_id parameter.
      * @returns GroupListResponse Successful Response
      * @throws ApiError
      */
     public listGroupsApiV1GroupsGet({
         collectionId,
         search,
+        artifactId,
     }: {
         /**
          * Collection ID to list groups from
@@ -60,6 +63,10 @@ export class GroupsService {
          * Filter groups by name (case-insensitive)
          */
         search?: (string | null),
+        /**
+         * Filter to groups containing this artifact
+         */
+        artifactId?: (string | null),
     }): CancelablePromise<GroupListResponse> {
         return this.httpRequest.request({
             method: 'GET',
@@ -67,6 +74,7 @@ export class GroupsService {
             query: {
                 'collection_id': collectionId,
                 'search': search,
+                'artifact_id': artifactId,
             },
             errors: {
                 422: `Validation Error`,
@@ -145,6 +153,36 @@ export class GroupsService {
             path: {
                 'group_id': groupId,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Copy group to another collection
+     * Copy a group with all its artifacts to another collection.
+     *
+     * The new group will have the same name with " (Copy)" suffix.
+     * If an artifact is not already in the target collection, it will be added.
+     * Duplicate artifacts (already in target collection) are silently skipped.
+     * @returns GroupResponse Successful Response
+     * @throws ApiError
+     */
+    public copyGroupApiV1GroupsGroupIdCopyPost({
+        groupId,
+        requestBody,
+    }: {
+        groupId: string,
+        requestBody: CopyGroupRequest,
+    }): CancelablePromise<GroupResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/groups/{group_id}/copy',
+            path: {
+                'group_id': groupId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },

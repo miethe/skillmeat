@@ -87,7 +87,9 @@ export function ArtifactFlowBanner({
               sourceInfo ? 'border-muted-foreground' : 'border-dashed border-muted'
             )}
           >
-            <Github className={cn('h-6 w-6', sourceInfo ? 'text-foreground' : 'text-muted-foreground')} />
+            <Github
+              className={cn('h-6 w-6', sourceInfo ? 'text-foreground' : 'text-muted-foreground')}
+            />
             <span className="mt-1 text-xs font-medium text-muted-foreground">Source</span>
           </div>
           {sourceInfo ? (
@@ -230,7 +232,10 @@ export function ArtifactFlowBanner({
                 {truncateSha(projectInfo.sha)}
               </code>
               {projectInfo.isModified && (
-                <Badge variant="secondary" className="mt-1 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-xs">
+                <Badge
+                  variant="secondary"
+                  className="mt-1 bg-yellow-500/20 text-xs text-yellow-700 dark:text-yellow-400"
+                >
                   Modified
                 </Badge>
               )}

@@ -123,7 +123,8 @@ export function useCollections(filters?: CollectionFilters) {
       if (filters?.search) {
         const searchLower = filters.search.toLowerCase();
         filteredCollections = collections.filter(
-          (c) => c.name.toLowerCase().includes(searchLower) || c.id.toLowerCase().includes(searchLower)
+          (c) =>
+            c.name.toLowerCase().includes(searchLower) || c.id.toLowerCase().includes(searchLower)
         );
       }
 
@@ -276,7 +277,7 @@ export function useInfiniteCollectionArtifacts(
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
-      lastPage.page_info.has_next_page ? lastPage.page_info.end_cursor ?? undefined : undefined,
+      lastPage.page_info.has_next_page ? (lastPage.page_info.end_cursor ?? undefined) : undefined,
     enabled: !!id && enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -325,7 +326,10 @@ export function useUpdateCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
       id: string;
       data: UpdateCollectionRequest;
     }): Promise<Collection> => {
@@ -382,10 +386,18 @@ export function useAddArtifactToCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ collectionId, artifactId }: {
+    mutationFn: async ({
+      collectionId,
+      artifactId,
+    }: {
       collectionId: string;
       artifactId: string;
-    }): Promise<{ collection_id: string; added_count: number; already_present_count: number; total_artifacts: number }> => {
+    }): Promise<{
+      collection_id: string;
+      added_count: number;
+      already_present_count: number;
+      total_artifacts: number;
+    }> => {
       return addArtifactToCollection(collectionId, artifactId);
     },
     onSuccess: (_, { collectionId }) => {
@@ -416,7 +428,10 @@ export function useRemoveArtifactFromCollection() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ collectionId, artifactId }: {
+    mutationFn: async ({
+      collectionId,
+      artifactId,
+    }: {
       collectionId: string;
       artifactId: string;
     }): Promise<void> => {

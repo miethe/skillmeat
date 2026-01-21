@@ -24,9 +24,7 @@ function buildUrl(path: string): string {
 /**
  * Fetch all templates with optional filtering and pagination
  */
-export async function fetchTemplates(
-  filters?: TemplateFilters
-): Promise<TemplateListResponse> {
+export async function fetchTemplates(filters?: TemplateFilters): Promise<TemplateListResponse> {
   const params = new URLSearchParams();
 
   if (filters?.search) params.set('search', filters.search);
@@ -62,9 +60,7 @@ export async function fetchTemplateById(id: string): Promise<ProjectTemplate> {
 /**
  * Create new template
  */
-export async function createTemplate(
-  data: CreateTemplateRequest
-): Promise<ProjectTemplate> {
+export async function createTemplate(data: CreateTemplateRequest): Promise<ProjectTemplate> {
   const response = await fetch(buildUrl('/project-templates'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
