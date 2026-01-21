@@ -112,6 +112,8 @@ function artifactToEntity(artifact: Artifact): Entity {
     description: artifact.metadata?.description,
     version: artifact.version || artifact.metadata?.version,
     source: artifact.source || 'unknown',
+    origin: artifact.origin,
+    origin_source: artifact.origin_source,
     deployedAt: artifact.createdAt,
     modifiedAt: artifact.updatedAt,
     aliases: artifact.aliases || [],

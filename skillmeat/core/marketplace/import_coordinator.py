@@ -404,7 +404,7 @@ class ImportCoordinator:
             origin="marketplace",  # Track provenance via origin field, not tags
             metadata=metadata,
             added=datetime.utcnow(),
-            upstream=entry.upstream_url,
+            upstream=entry.upstream_url,  # Keep full GitHub URL
             version_spec="latest",  # Default to latest
             resolved_sha=None,  # Will be set after actual download
             resolved_version=None,

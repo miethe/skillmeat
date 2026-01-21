@@ -1574,6 +1574,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   )}
 
+                  {/* Origin */}
+                  {entity.origin && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Origin</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">
+                          {entity.origin}
+                        </Badge>
+                        {entity.origin === 'marketplace' && entity.origin_source && (
+                          <Badge variant="secondary">{entity.origin_source}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Source */}
                   <div>
                     <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
@@ -1590,6 +1605,25 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     <div>
                       <h3 className="mb-2 text-sm font-medium">Version</h3>
                       <p className="text-sm text-muted-foreground">{entity.version}</p>
+                    </div>
+                  )}
+
+                  {/* Author */}
+                  {entity.author && (
+                    <div>
+                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <User className="h-4 w-4" />
+                        Author
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{entity.author}</p>
+                    </div>
+                  )}
+
+                  {/* License */}
+                  {entity.license && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">License</h3>
+                      <Badge variant="outline">{entity.license}</Badge>
                     </div>
                   )}
 
@@ -1618,6 +1652,20 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                         {entity.aliases.map((alias) => (
                           <Badge key={alias} variant="secondary">
                             {alias}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dependencies */}
+                  {entity.dependencies && entity.dependencies.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Dependencies</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {entity.dependencies.map((dep) => (
+                          <Badge key={dep} variant="secondary">
+                            {dep}
                           </Badge>
                         ))}
                       </div>

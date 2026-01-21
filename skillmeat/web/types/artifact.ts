@@ -51,6 +51,10 @@ export interface Artifact {
   status: ArtifactStatus;
   version?: string;
   source?: string;
+  /** Origin category: 'local', 'github', or 'marketplace' */
+  origin?: string;
+  /** Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket') */
+  origin_source?: string;
   metadata: ArtifactMetadata;
   upstreamStatus: UpstreamStatus;
   usageStats: UsageStats;

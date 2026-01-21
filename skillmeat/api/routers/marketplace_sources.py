@@ -28,12 +28,18 @@ import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Dict, List, Literal, Optional, Set
+from typing import Annotated, Dict, List, Literal, Optional, Set
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
+from skillmeat.cache.models import (
+    DEFAULT_COLLECTION_ID,
+    CollectionArtifact,
+    get_session,
+)
 from skillmeat.api.schemas.common import PageInfo
 from skillmeat.api.schemas.discovery import (
     BulkSyncItemResult,
@@ -97,6 +103,48 @@ logger = logging.getLogger(__name__)
 
 # Confidence threshold for hiding low-quality entries
 CONFIDENCE_THRESHOLD = 30
+
+
+# =============================================================================
+# Database Session Dependency
+# =============================================================================
+
+
+def get_db_session():
+    """Dependency that provides a database session.
+
+    Yields a SQLAlchemy session and ensures cleanup on exit.
+    """
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+DbSessionDep = Annotated[Session, Depends(get_db_session)]
+
+
+def ensure_default_collection(session: Session) -> None:
+    """Ensure the default collection exists in the database.
+
+    Creates the default collection if it doesn't exist. This is a simplified
+    version that doesn't return the collection object (not needed here).
+    """
+    from skillmeat.cache.models import Collection, DEFAULT_COLLECTION_NAME
+
+    existing = session.query(Collection).filter_by(id=DEFAULT_COLLECTION_ID).first()
+    if not existing:
+        default_collection = Collection(
+            id=DEFAULT_COLLECTION_ID,
+            name=DEFAULT_COLLECTION_NAME,
+            description="Default collection for all artifacts.",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        session.add(default_collection)
+        session.commit()
+        logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
 
 router = APIRouter(
     prefix="/marketplace/sources",
@@ -2355,12 +2403,14 @@ async def import_artifacts(
     source_id: str,
     request: ImportRequest,
     collection_mgr: CollectionManagerDep,
+    session: DbSessionDep,
 ) -> ImportResultDTO:
     """Import catalog entries to local collection.
 
     Args:
         source_id: Unique source identifier
         request: Import request with entry IDs and conflict strategy
+        session: Database session for adding artifacts to default collection
 
     Returns:
         Import result with statistics
@@ -2439,6 +2489,30 @@ async def import_artifacts(
             strategy=strategy,
             source_ref=source.ref,
         )
+
+        # Add imported artifacts to default database collection
+        try:
+            ensure_default_collection(session)
+            db_added_count = 0
+            for entry in import_result.entries:
+                if entry.status.value == "success":
+                    artifact_id = f"{entry.artifact_type}:{entry.name}"
+                    # Use merge to handle duplicates gracefully (idempotent)
+                    association = CollectionArtifact(
+                        collection_id=DEFAULT_COLLECTION_ID,
+                        artifact_id=artifact_id,
+                        added_at=datetime.utcnow(),
+                    )
+                    session.merge(association)
+                    db_added_count += 1
+            session.commit()
+            logger.info(
+                f"Added {db_added_count} artifacts to default database collection"
+            )
+        except Exception as e:
+            logger.error(f"Failed to add artifacts to database collection: {e}")
+            session.rollback()
+            # Don't fail the entire import - file-system import already succeeded
 
         # Update catalog entry statuses atomically
         with transaction_handler.import_transaction(source_id) as ctx:
@@ -3009,6 +3083,7 @@ async def update_path_tag_status(
     source_id: str,
     entry_id: str,
     request: UpdateSegmentStatusRequest,
+    collection_mgr: CollectionManagerDep,
 ) -> UpdateSegmentStatusResponse:
     """Update approval status of a single path segment.
 
@@ -3130,6 +3205,46 @@ async def update_path_tag_status(
             # Save back to DB
             entry.path_segments = json.dumps(segments_data)
             session.commit()
+
+            # Sync approved tag to collection artifact if already imported
+            if request.status == "approved":
+                try:
+                    # Check if artifact is in collection
+                    in_collection, artifact_id, _ = (
+                        collection_mgr.artifact_in_collection(
+                            name=entry.name,
+                            artifact_type=entry.artifact_type,
+                        )
+                    )
+
+                    if in_collection:
+                        # Get the normalized tag value to add
+                        normalized_tag = None
+                        for seg in segments_data["extracted"]:
+                            if (
+                                seg["segment"].lower() == request_lower
+                                or seg.get("normalized", "").lower() == request_lower
+                            ):
+                                normalized_tag = seg.get("normalized") or seg["segment"]
+                                break
+
+                        if normalized_tag:
+                            # Load collection, find artifact, add tag
+                            collection = collection_mgr.load_collection()
+                            for artifact in collection.artifacts:
+                                if f"{artifact.type.value}:{artifact.name}" == artifact_id:
+                                    # Add tag if not already present
+                                    if normalized_tag not in artifact.tags:
+                                        artifact.tags.append(normalized_tag)
+                                        collection_mgr.save_collection(collection)
+                                        logger.info(
+                                            f"Synced tag '{normalized_tag}' to collection "
+                                            f"artifact '{artifact_id}'"
+                                        )
+                                    break
+                except Exception as e:
+                    # Log but don't fail - source tag update already succeeded
+                    logger.warning(f"Failed to sync tag to collection artifact: {e}")
 
             # Build response
             extracted_segments = [

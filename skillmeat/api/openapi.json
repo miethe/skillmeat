@@ -15170,6 +15170,29 @@
               "anthropics/skills/pdf"
             ]
           },
+          "origin": {
+            "type": "string",
+            "title": "Origin",
+            "description": "Origin category: 'local', 'github', or 'marketplace'",
+            "examples": [
+              "github"
+            ]
+          },
+          "origin_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Source",
+            "description": "Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')",
+            "examples": [
+              "github"
+            ]
+          },
           "version": {
             "type": "string",
             "title": "Version",
@@ -15266,6 +15289,7 @@
           "name",
           "type",
           "source",
+          "origin",
           "version",
           "added",
           "updated"
@@ -15289,6 +15313,7 @@
             "title": "PDF Processing Skill"
           },
           "name": "pdf",
+          "origin": "github",
           "source": "anthropics/skills/pdf",
           "type": "skill",
           "updated": "2024-11-16T15:30:00Z",

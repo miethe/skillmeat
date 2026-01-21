@@ -246,6 +246,11 @@ function mapApiArtifactToEntity(
     deployedAt: artifact.added,
     modifiedAt: artifact.updated,
     aliases: artifact.aliases || [],
+    origin: artifact.origin,
+    origin_source: artifact.origin_source || undefined,
+    author: metadata.author || undefined,
+    license: metadata.license || undefined,
+    dependencies: metadata.dependencies || [],
   };
 }
 
