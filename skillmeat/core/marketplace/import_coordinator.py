@@ -416,6 +416,13 @@ class ImportCoordinator:
         # Write updated manifest
         manifest_mgr.write(collection_path, collection)
 
+        # Invalidate collection cache since we bypassed CollectionManager.save_collection()
+        if self.collection_mgr is not None and self.collection_name is not None:
+            self.collection_mgr.invalidate_collection_cache(self.collection_name)
+        elif self.collection_mgr is not None:
+            # Fallback: use collection name from the loaded collection
+            self.collection_mgr.invalidate_collection_cache(collection.name)
+
     def _download_artifact(
         self,
         entry: ImportEntry,
