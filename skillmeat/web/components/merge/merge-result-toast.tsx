@@ -12,10 +12,7 @@ interface MergeResultToastProps {
   onDismiss?: () => void;
 }
 
-export function MergeResultToast({
-  result,
-  onDismiss,
-}: MergeResultToastProps) {
+export function MergeResultToast({ result, onDismiss }: MergeResultToastProps) {
   const { toast } = useToast();
 
   useEffect(() => {

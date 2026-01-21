@@ -77,17 +77,10 @@ export function MergeAnalysisDialog({
 
         <div className="space-y-4">
           {/* Safety Indicator */}
-          <div
-            className={cn(
-              'flex items-center gap-3 rounded-lg p-4',
-              indicator.bgColor
-            )}
-          >
+          <div className={cn('flex items-center gap-3 rounded-lg p-4', indicator.bgColor)}>
             <Icon className={cn('h-6 w-6', indicator.color)} />
             <div className="flex-1">
-              <p className={cn('font-semibold', indicator.color)}>
-                {indicator.label}
-              </p>
+              <p className={cn('font-semibold', indicator.color)}>{indicator.label}</p>
               <p className="text-sm text-muted-foreground">
                 {analysis.canAutoMerge
                   ? 'All changes can be automatically merged'
@@ -103,29 +96,25 @@ export function MergeAnalysisDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border p-4">
               <p className="text-sm text-muted-foreground">Auto-mergeable</p>
-              <p className="text-2xl font-bold text-green-600">
-                {analysis.autoMergeableCount}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{analysis.autoMergeableCount}</p>
             </div>
             <div className="rounded-lg border p-4">
               <p className="text-sm text-muted-foreground">Conflicts</p>
-              <p className="text-2xl font-bold text-red-600">
-                {analysis.conflictCount}
-              </p>
+              <p className="text-2xl font-bold text-red-600">{analysis.conflictCount}</p>
             </div>
           </div>
 
           {/* Warnings */}
           {analysis.warnings.length > 0 && (
             <div className="space-y-2">
-              <p className="font-semibold text-sm">Warnings</p>
+              <p className="text-sm font-semibold">Warnings</p>
               <div className="space-y-1">
                 {analysis.warnings.map((warning, index) => (
                   <div
                     key={index}
                     className="flex items-start gap-2 rounded-md bg-yellow-50 p-2 text-sm"
                   >
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
                     <span className="text-yellow-900">{warning}</span>
                   </div>
                 ))}
@@ -136,16 +125,14 @@ export function MergeAnalysisDialog({
           {/* Conflict Summary */}
           {analysis.conflicts.length > 0 && (
             <div className="space-y-2">
-              <p className="font-semibold text-sm">Conflicts Detected</p>
-              <div className="max-h-[200px] overflow-y-auto space-y-1">
+              <p className="text-sm font-semibold">Conflicts Detected</p>
+              <div className="max-h-[200px] space-y-1 overflow-y-auto">
                 {analysis.conflicts.map((conflict, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between rounded-md bg-red-50 p-2 text-sm"
                   >
-                    <span className="font-mono text-xs truncate flex-1">
-                      {conflict.filePath}
-                    </span>
+                    <span className="flex-1 truncate font-mono text-xs">{conflict.filePath}</span>
                     <Badge variant="outline" className="ml-2 text-xs">
                       {conflict.conflictType}
                     </Badge>
@@ -157,11 +144,7 @@ export function MergeAnalysisDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
           <Button onClick={onProceed} disabled={isLoading}>

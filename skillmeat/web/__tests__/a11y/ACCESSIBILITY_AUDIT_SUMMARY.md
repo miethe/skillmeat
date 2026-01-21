@@ -20,6 +20,7 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 **Total Tests**: 23 passed
 **Test Framework**: Jest + @testing-library/react + jest-axe
 **Coverage Areas**:
+
 - Default state accessibility
 - Projects section (expandable)
 - Deployments section (RED warning)
@@ -39,24 +40,27 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 **Status**: All elements properly labeled
 
 #### Dialog Structure
+
 - **Dialog role**: Properly defined via Radix UI Dialog primitive
 - **aria-labelledby**: Dialog title correctly referenced
 - **aria-describedby**: Dialog description correctly referenced
 - **Accessible name**: "Delete {artifact-name}?"
 
 #### Form Controls
-| Element | Label Method | Verification |
-|---------|--------------|--------------|
-| Delete from Collection checkbox | `<Label htmlFor="delete-collection">` | ✅ Accessible name present |
-| Delete from Projects checkbox | `<Label htmlFor="delete-projects">` | ✅ Accessible name present |
-| Delete Deployments checkbox | `<Label htmlFor="delete-deployments">` | ✅ Accessible name present |
-| Project checkboxes | `aria-label="Undeploy from {path}"` | ✅ Dynamic labels |
-| Deployment checkboxes | `aria-label="Delete deployment at {path}"` | ✅ Dynamic labels |
-| Cancel button | Text content | ✅ "Cancel" |
-| Delete button | Text content | ✅ "Delete Artifact" |
-| Select All buttons | `aria-label` with context | ✅ "Select all projects" / "Deselect all projects" |
+
+| Element                         | Label Method                               | Verification                                       |
+| ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| Delete from Collection checkbox | `<Label htmlFor="delete-collection">`      | ✅ Accessible name present                         |
+| Delete from Projects checkbox   | `<Label htmlFor="delete-projects">`        | ✅ Accessible name present                         |
+| Delete Deployments checkbox     | `<Label htmlFor="delete-deployments">`     | ✅ Accessible name present                         |
+| Project checkboxes              | `aria-label="Undeploy from {path}"`        | ✅ Dynamic labels                                  |
+| Deployment checkboxes           | `aria-label="Delete deployment at {path}"` | ✅ Dynamic labels                                  |
+| Cancel button                   | Text content                               | ✅ "Cancel"                                        |
+| Delete button                   | Text content                               | ✅ "Delete Artifact"                               |
+| Select All buttons              | `aria-label` with context                  | ✅ "Select all projects" / "Deselect all projects" |
 
 **Implementation Notes**:
+
 - All checkboxes use proper `<Label>` association via `htmlFor` attribute
 - Dynamic aria-labels for list items provide context-specific descriptions
 - Button labels include loading states ("Deleting...")
@@ -68,20 +72,23 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 **Status**: Full keyboard accessibility
 
 #### Focus Order
+
 - **Tab navigation**: All interactive elements reachable in logical order
 - **Shift+Tab**: Reverse navigation works correctly
 - **No keyboard traps**: User can always exit dialog with Escape
 
 #### Keyboard Interactions
-| Key | Action | Verification |
-|-----|--------|--------------|
-| Tab | Move forward through interactive elements | ✅ Tested |
-| Shift+Tab | Move backward through interactive elements | ✅ Tested |
-| Space | Toggle checkboxes when focused | ✅ Tested |
-| Enter | Activate focused button | ✅ Tested (implicit via Radix) |
-| Escape | Close dialog | ✅ Tested (implicit via Radix) |
+
+| Key       | Action                                     | Verification                   |
+| --------- | ------------------------------------------ | ------------------------------ |
+| Tab       | Move forward through interactive elements  | ✅ Tested                      |
+| Shift+Tab | Move backward through interactive elements | ✅ Tested                      |
+| Space     | Toggle checkboxes when focused             | ✅ Tested                      |
+| Enter     | Activate focused button                    | ✅ Tested (implicit via Radix) |
+| Escape    | Close dialog                               | ✅ Tested (implicit via Radix) |
 
 **Implementation Notes**:
+
 - Focus trap provided by Radix UI Dialog primitive
 - All interactive elements use standard HTML semantics (no custom focus handling needed)
 - Touch targets meet 44px minimum on mobile (WCAG 2.5.5)
@@ -95,6 +102,7 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 #### Contrast Testing Results
 
 **Warning Text (RED)** - Deployments Section:
+
 - **Text**: "WARNING: This will permanently delete files from your filesystem"
 - **Foreground (light mode)**: `text-red-700` (rgb(185, 28, 28))
 - **Background**: `bg-red-100` (rgb(254, 226, 226))
@@ -104,11 +112,13 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 - **Contrast Ratio**: 5.2:1 ✅ (Exceeds 4.5:1 requirement)
 
 **Destructive Checkbox Label**:
+
 - **Text**: "Delete Deployments"
 - **Foreground**: `text-destructive` (inherits from theme)
 - **Contrast Ratio**: Passed axe-core checks ✅
 
 **Count Badges**:
+
 - **Text**: "(2 projects)", "(2 deployments)"
 - **Foreground**: `text-muted-foreground`
 - **Contrast Ratio**: Passed axe-core checks ✅
@@ -123,6 +133,7 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 | Select All | Default | Theme-compliant | ✅ |
 
 **Implementation Notes**:
+
 - Uses Tailwind CSS theme colors that are pre-validated for WCAG AA
 - RED styling uses accessible red variants (not pure #FF0000)
 - Dark mode support with proper contrast maintained
@@ -134,20 +145,24 @@ The Artifact Deletion Dialog component has undergone comprehensive accessibility
 **Status**: All content properly announced
 
 #### Live Regions
-| Element | Attribute | Purpose | Status |
-|---------|-----------|---------|--------|
-| Warning banner | `role="alert" aria-live="assertive"` | Immediate announcement of destructive action | ✅ |
-| Selection counters | `aria-live="polite"` | Announce count changes | ✅ |
-| Loading states | `role="status" aria-live="polite"` | Announce loading progress | ✅ |
+
+| Element            | Attribute                            | Purpose                                      | Status |
+| ------------------ | ------------------------------------ | -------------------------------------------- | ------ |
+| Warning banner     | `role="alert" aria-live="assertive"` | Immediate announcement of destructive action | ✅     |
+| Selection counters | `aria-live="polite"`                 | Announce count changes                       | ✅     |
+| Loading states     | `role="status" aria-live="polite"`   | Announce loading progress                    | ✅     |
 
 #### Semantic Structure
+
 - **Heading hierarchy**: Dialog title uses proper heading level (h2)
 - **Regions**: Projects/deployments sections use `role="region"` with `aria-label`
 - **Lists**: Project/deployment lists use `role="list"` and `role="listitem"`
 - **Alerts**: Error/warning messages use `role="alert"`
 
 #### Screen Reader Testing Notes
+
 Based on automated testing, the following should be announced:
+
 1. **Dialog open**: "Dialog, Delete test-skill?"
 2. **Description**: "This action cannot be undone. This will remove the artifact from your collection."
 3. **Checkbox states**: "Delete from Collection, checkbox, checked" (or "unchecked")
@@ -166,18 +181,21 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 **Status**: Proper focus trap and visual indicators
 
 #### Focus Trap
+
 - **Implementation**: Radix UI Dialog primitive handles focus trapping
 - **Entry point**: Focus automatically moves into dialog when opened
 - **Exit**: Focus returns to trigger element when dialog closes
 - **Containment**: Tab navigation cycles within dialog only
 
 #### Visual Focus Indicators
+
 - **Checkboxes**: Ring on focus via Radix primitive
 - **Buttons**: Ring on focus via shadcn defaults
 - **Close button**: Ring on focus via Radix primitive
 - **Contrast**: All focus rings meet WCAG 2.4.7 (visible focus)
 
 **Implementation Notes**:
+
 - Uses Tailwind's `focus:ring-2 focus:ring-ring focus:ring-offset-2` pattern
 - Disabled elements still show disabled state visually (not invisible)
 
@@ -188,13 +206,15 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 **Status**: Mobile-optimized with proper touch targets
 
 #### Touch Target Sizes (WCAG 2.5.5)
-| Element | Minimum Size | Actual Size | Status |
-|---------|--------------|-------------|--------|
-| Checkboxes | 44x44px | `min-h-[44px]` wrapper + 20x20px visual | ✅ |
-| Buttons | 44x44px | `min-h-[44px]` | ✅ |
-| Close button | 44x44px | Default Radix size | ✅ |
+
+| Element      | Minimum Size | Actual Size                             | Status |
+| ------------ | ------------ | --------------------------------------- | ------ |
+| Checkboxes   | 44x44px      | `min-h-[44px]` wrapper + 20x20px visual | ✅     |
+| Buttons      | 44x44px      | `min-h-[44px]`                          | ✅     |
+| Close button | 44x44px      | Default Radix size                      | ✅     |
 
 #### Mobile Optimizations
+
 - **Scrollable sections**: Projects/deployments lists scroll when >5 items
 - **Stacked buttons**: Footer buttons stack vertically on mobile
 - **Text wrapping**: Long paths wrap instead of overflow
@@ -205,22 +225,26 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 ## Accessibility Features Implemented
 
 ### 1. Progressive Disclosure
+
 - ✅ Sections expand only when checkbox is toggled
 - ✅ Expansion is keyboard-accessible
 - ✅ Screen readers announce section expansion
 
 ### 2. Contextual Help
+
 - ✅ Descriptive text explains each option
 - ✅ Count badges show affected resources
 - ✅ Warning messages highlight destructive actions
 
 ### 3. Error Prevention
+
 - ✅ Primary warning: "This action cannot be undone"
 - ✅ RED warning banner for file deletion
 - ✅ Confirmation required (no accidental deletion)
 - ✅ Disabled states prevent invalid actions
 
 ### 4. Loading States
+
 - ✅ Loading indicators announced via aria-live
 - ✅ Buttons disabled during mutation
 - ✅ Visual feedback (spinner icon)
@@ -281,6 +305,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 ## WCAG 2.1 AA Compliance Checklist
 
 ### Perceivable
+
 - [x] **1.1.1** Non-text Content: All icons have `aria-hidden="true"`, text alternatives provided
 - [x] **1.3.1** Info and Relationships: Proper use of labels, headings, regions, lists
 - [x] **1.3.2** Meaningful Sequence: Logical tab order maintained
@@ -292,6 +317,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 - [x] **1.4.13** Content on Hover/Focus: Tooltips dismissible, hoverable (not applicable here)
 
 ### Operable
+
 - [x] **2.1.1** Keyboard: All functionality available via keyboard
 - [x] **2.1.2** No Keyboard Trap: User can exit dialog with Escape
 - [x] **2.1.4** Character Key Shortcuts: No single-key shortcuts (not applicable)
@@ -305,6 +331,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 - [x] **2.5.5** Target Size: All touch targets ≥44x44px
 
 ### Understandable
+
 - [x] **3.1.1** Language of Page: Set via parent layout (not component-specific)
 - [x] **3.2.1** On Focus: No unexpected context changes on focus
 - [x] **3.2.2** On Input: No unexpected context changes on input
@@ -316,6 +343,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 - [x] **3.3.4** Error Prevention: Confirmation dialog prevents accidental deletion
 
 ### Robust
+
 - [x] **4.1.1** Parsing: Valid HTML structure via React/Radix
 - [x] **4.1.2** Name, Role, Value: All form controls properly exposed to AT
 - [x] **4.1.3** Status Messages: Loading/error states announced via aria-live
@@ -325,6 +353,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 ## Recommendations
 
 ### Implemented ✅
+
 1. All WCAG 2.1 AA requirements met
 2. Comprehensive automated testing with jest-axe
 3. Proper ARIA labels and semantic HTML
@@ -334,6 +363,7 @@ While automated tests pass, manual verification with NVDA/JAWS (Windows) or Voic
 7. Screen reader compatibility (automated checks)
 
 ### Optional Enhancements 💡
+
 1. **Manual Screen Reader Testing**: Verify announcement flow with NVDA/JAWS/VoiceOver
 2. **User Testing**: Test with users who rely on assistive technology
 3. **Playwright Accessibility Tests**: Add E2E accessibility tests (using @axe-core/playwright)

@@ -1,7 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Terminal, Bot, Server, Webhook, AlertCircle, MoreHorizontal, FolderPlus, Layers, Edit, Trash2, HelpCircle, Rocket } from 'lucide-react';
+import {
+  Package,
+  Terminal,
+  Bot,
+  Server,
+  Webhook,
+  AlertCircle,
+  MoreHorizontal,
+  FolderPlus,
+  Layers,
+  Edit,
+  Trash2,
+  HelpCircle,
+  Rocket,
+} from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -140,7 +154,7 @@ function ArtifactRowActions({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onManageGroups}>
           <Layers className="mr-2 h-4 w-4" />
-          Manage Groups
+          Add to Group
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onEdit}>
@@ -148,10 +162,7 @@ function ArtifactRowActions({
           Edit
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="text-destructive focus:text-destructive"
-        >
+        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete
         </DropdownMenuItem>
@@ -298,8 +309,10 @@ export function ArtifactList({
           <TableBody>
             {artifacts.map((artifact) => {
               const Icon = artifactTypeIcons[artifact.type] || HelpCircle;
-              const iconColor = artifactTypeIconColors[artifact.type] || 'text-gray-500 dark:text-gray-400';
-              const rowTint = artifactTypeRowTints[artifact.type] || 'bg-gray-500/[0.02] dark:bg-gray-500/[0.03]';
+              const iconColor =
+                artifactTypeIconColors[artifact.type] || 'text-gray-500 dark:text-gray-400';
+              const rowTint =
+                artifactTypeRowTints[artifact.type] || 'bg-gray-500/[0.02] dark:bg-gray-500/[0.03]';
               const borderAccent = artifactTypeBorderAccents[artifact.type] || 'border-l-gray-400';
               const typeLabel = artifactTypeLabels[artifact.type] || artifact.type || 'Unknown';
               return (
@@ -354,10 +367,7 @@ export function ArtifactList({
                   )}
                   <TableCell>
                     <div className="flex items-center gap-2" data-testid="type-badge">
-                      <Icon
-                        className={`h-4 w-4 ${iconColor}`}
-                        aria-hidden="true"
-                      />
+                      <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
                       <span className="text-sm">{typeLabel}</span>
                     </div>
                   </TableCell>
@@ -393,7 +403,9 @@ export function ArtifactList({
                       artifact={artifact}
                       collectionId={artifact.collection?.id}
                       onDeploy={() => handleDeploy(artifact)}
-                      onMoveToCollection={onMoveToCollection ? () => onMoveToCollection(artifact) : undefined}
+                      onMoveToCollection={
+                        onMoveToCollection ? () => onMoveToCollection(artifact) : undefined
+                      }
                       onManageGroups={onManageGroups ? () => onManageGroups(artifact) : undefined}
                       onEdit={onEdit ? () => onEdit(artifact) : undefined}
                       onDelete={handleDelete ? () => handleDelete(artifact) : undefined}
@@ -415,12 +427,16 @@ export function ArtifactList({
       />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteArtifact} onOpenChange={(open) => !open && setDeleteArtifact(null)}>
+      <AlertDialog
+        open={!!deleteArtifact}
+        onOpenChange={(open) => !open && setDeleteArtifact(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteArtifact?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{deleteArtifact?.name}"? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

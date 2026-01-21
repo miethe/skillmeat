@@ -130,9 +130,15 @@ export interface GitHubSource {
   created_at: string;
   updated_at: string;
   description?: string;
+  repo_description?: string; // GitHub repository description (fallback)
+  repo_readme?: string; // GitHub repository README content
   notes?: string;
   enable_frontmatter_detection?: boolean;
   manual_map?: Record<string, string>; // Directory path -> artifact type
+  tags?: string[]; // User-assigned tags for filtering
+  counts_by_type?: Record<string, number>; // Artifact counts by type
+  single_artifact_mode?: boolean; // Treat entire repo as single artifact
+  single_artifact_type?: ArtifactType; // Artifact type when single_artifact_mode is true
 }
 
 export interface GitHubSourceListResponse {
@@ -150,6 +156,11 @@ export interface CreateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
+  single_artifact_mode?: boolean;
+  single_artifact_type?: ArtifactType;
 }
 
 export interface UpdateSourceRequest {
@@ -160,6 +171,9 @@ export interface UpdateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
 }
 
 export interface CatalogEntry {
@@ -196,6 +210,8 @@ export interface CatalogEntry {
   is_duplicate?: boolean;
   duplicate_reason?: 'within_source' | 'cross_source';
   duplicate_of?: string; // Path of original artifact
+  // Collection match field
+  in_collection?: boolean;
 }
 
 export interface UpdateCatalogEntryNameRequest {
@@ -241,6 +257,9 @@ export interface ScanResult {
   duplicates_cross_source?: number;
   total_detected?: number;
   total_unique?: number;
+  // Updated imports tracking
+  updated_imports?: string[];
+  preserved_count?: number;
 }
 
 export interface ImportRequest {

@@ -3,7 +3,11 @@
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { DeploymentCard, DeploymentCardSkeleton, type Deployment } from '@/components/deployments/deployment-card';
+import {
+  DeploymentCard,
+  DeploymentCardSkeleton,
+  type Deployment,
+} from '@/components/deployments/deployment-card';
 
 // Mock the clipboard API
 Object.assign(navigator, {
@@ -156,12 +160,7 @@ describe('DeploymentCard', () => {
 
   describe('Actions Menu', () => {
     it('opens actions menu on click', async () => {
-      render(
-        <DeploymentCard
-          deployment={mockDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={mockDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -179,12 +178,7 @@ describe('DeploymentCard', () => {
         status: 'outdated',
       };
 
-      render(
-        <DeploymentCard
-          deployment={outdatedDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={outdatedDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -200,12 +194,7 @@ describe('DeploymentCard', () => {
         local_modifications: true,
       };
 
-      render(
-        <DeploymentCard
-          deployment={modifiedDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={modifiedDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -216,12 +205,7 @@ describe('DeploymentCard', () => {
     });
 
     it('calls onViewSource when View in Collection clicked', async () => {
-      render(
-        <DeploymentCard
-          deployment={mockDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={mockDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -235,12 +219,7 @@ describe('DeploymentCard', () => {
     });
 
     it('copies path to clipboard when Copy Path clicked', async () => {
-      render(
-        <DeploymentCard
-          deployment={mockDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={mockDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -256,12 +235,7 @@ describe('DeploymentCard', () => {
     });
 
     it('shows confirmation dialog before removing deployment', async () => {
-      render(
-        <DeploymentCard
-          deployment={mockDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={mockDeployment} {...mockCallbacks} />);
 
       const menuButton = screen.getByRole('button', { name: /open menu/i });
       fireEvent.click(menuButton);
@@ -278,12 +252,7 @@ describe('DeploymentCard', () => {
     });
 
     it('calls onRemove when removal confirmed', async () => {
-      render(
-        <DeploymentCard
-          deployment={mockDeployment}
-          {...mockCallbacks}
-        />
-      );
+      render(<DeploymentCard deployment={mockDeployment} {...mockCallbacks} />);
 
       // Open menu
       const menuButton = screen.getByRole('button', { name: /open menu/i });
@@ -297,9 +266,7 @@ describe('DeploymentCard', () => {
 
       // Confirm removal
       await waitFor(() => {
-        const confirmButton = screen.getAllByText('Remove').find(
-          (el) => el.tagName === 'BUTTON'
-        );
+        const confirmButton = screen.getAllByText('Remove').find((el) => el.tagName === 'BUTTON');
         if (confirmButton) fireEvent.click(confirmButton);
       });
 

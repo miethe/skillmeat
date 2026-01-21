@@ -128,15 +128,14 @@ export function ScoreBadge({ confidence, size = 'md', className, breakdown }: Sc
   // Create the badge element
   const badge = (
     <Badge
-      className={cn(
-        'font-semibold tabular-nums',
-        colorClass,
-        sizeClasses,
-        className
-      )}
+      className={cn('font-semibold tabular-nums', colorClass, sizeClasses, className)}
       colorStyle={hexColor}
       aria-label={`Confidence score: ${displayScore} percent, ${confidenceLevel} confidence`}
-      title={breakdown ? undefined : `${confidenceLevel.charAt(0).toUpperCase() + confidenceLevel.slice(1)} confidence: ${displayScore}%`}
+      title={
+        breakdown
+          ? undefined
+          : `${confidenceLevel.charAt(0).toUpperCase() + confidenceLevel.slice(1)} confidence: ${displayScore}%`
+      }
     >
       {displayScore}%
     </Badge>
@@ -144,11 +143,7 @@ export function ScoreBadge({ confidence, size = 'md', className, breakdown }: Sc
 
   // Wrap in tooltip if breakdown is provided
   if (breakdown) {
-    return (
-      <ScoreBreakdownTooltip breakdown={breakdown}>
-        {badge}
-      </ScoreBreakdownTooltip>
-    );
+    return <ScoreBreakdownTooltip breakdown={breakdown}>{badge}</ScoreBreakdownTooltip>;
   }
 
   return badge;
@@ -167,7 +162,7 @@ export function ScoreBadgeSkeleton({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' 
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-md border bg-muted animate-pulse',
+        'inline-flex animate-pulse items-center rounded-md border bg-muted',
         sizeClasses
       )}
       aria-label="Loading confidence score"

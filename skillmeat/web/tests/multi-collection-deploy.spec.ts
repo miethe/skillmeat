@@ -416,9 +416,11 @@ test.describe('Multi-Collection Deployment', () => {
       await navigateToPage(page, '/collection?collection_id=collection-a');
 
       // Deploy test-artifact skill (first occurrence)
-      const skillCard = page.locator('[data-testid="artifact-card"]', {
-        hasText: 'test-artifact',
-      }).filter({ has: page.locator('text=skill') });
+      const skillCard = page
+        .locator('[data-testid="artifact-card"]', {
+          hasText: 'test-artifact',
+        })
+        .filter({ has: page.locator('text=skill') });
 
       await skillCard.click();
       await waitForElement(page, '[role="dialog"]');
@@ -440,9 +442,11 @@ test.describe('Multi-Collection Deployment', () => {
       await page.waitForTimeout(300);
 
       // Deploy test-artifact command (second occurrence)
-      const commandCard = page.locator('[data-testid="artifact-card"]', {
-        hasText: 'test-artifact',
-      }).filter({ has: page.locator('text=command') });
+      const commandCard = page
+        .locator('[data-testid="artifact-card"]', {
+          hasText: 'test-artifact',
+        })
+        .filter({ has: page.locator('text=command') });
 
       await commandCard.click();
       await waitForElement(page, '[role="dialog"]');
@@ -528,21 +532,27 @@ test.describe('Multi-Collection Deployment', () => {
       expect(count).toBe(3);
 
       // Verify skill deployment shows correct collection
-      const skillRow = page.locator('[data-testid="deployment-row"]', {
-        hasText: 'skill',
-      }).filter({ hasText: 'test-artifact' });
+      const skillRow = page
+        .locator('[data-testid="deployment-row"]', {
+          hasText: 'skill',
+        })
+        .filter({ hasText: 'test-artifact' });
       await expect(skillRow).toContainText('collection-a');
 
       // Verify command deployment shows correct collection
-      const commandRow = page.locator('[data-testid="deployment-row"]', {
-        hasText: 'command',
-      }).filter({ hasText: 'test-artifact' });
+      const commandRow = page
+        .locator('[data-testid="deployment-row"]', {
+          hasText: 'command',
+        })
+        .filter({ hasText: 'test-artifact' });
       await expect(commandRow).toContainText('collection-a');
 
       // Verify agent deployment shows correct collection
-      const agentRow = page.locator('[data-testid="deployment-row"]', {
-        hasText: 'agent',
-      }).filter({ hasText: 'test-artifact' });
+      const agentRow = page
+        .locator('[data-testid="deployment-row"]', {
+          hasText: 'agent',
+        })
+        .filter({ hasText: 'test-artifact' });
       await expect(agentRow).toContainText('collection-b');
     });
 
@@ -576,18 +586,22 @@ test.describe('Multi-Collection Deployment', () => {
       await navigateToPage(page, '/collection?collection_id=collection-a');
 
       // Check status of test-artifact skill (should show as deployed)
-      const skillCard = page.locator('[data-testid="artifact-card"]', {
-        hasText: 'test-artifact',
-      }).filter({ has: page.locator('text=skill') });
+      const skillCard = page
+        .locator('[data-testid="artifact-card"]', {
+          hasText: 'test-artifact',
+        })
+        .filter({ has: page.locator('text=skill') });
 
       await expect(skillCard.locator('[data-testid="deployment-status"]')).toHaveText(
         /deployed|active/i
       );
 
       // Check status of test-artifact command (should NOT show as deployed)
-      const commandCard = page.locator('[data-testid="artifact-card"]', {
-        hasText: 'test-artifact',
-      }).filter({ has: page.locator('text=command') });
+      const commandCard = page
+        .locator('[data-testid="artifact-card"]', {
+          hasText: 'test-artifact',
+        })
+        .filter({ has: page.locator('text=command') });
 
       // Command should not have deployed status (or should show as "not deployed")
       const commandStatus = commandCard.locator('[data-testid="deployment-status"]');

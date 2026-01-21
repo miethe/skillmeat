@@ -4,7 +4,7 @@ description: "Step-by-step guide to discovering, managing, and importing Claude 
 audience: "users"
 tags: ["marketplace", "github", "sources", "artifacts", "ingestion"]
 created: 2025-12-08
-updated: 2025-12-08
+updated: 2026-01-20
 category: "guides"
 status: "published"
 related_documents:
@@ -23,6 +23,7 @@ Discover and import Claude artifacts directly from GitHub repositories. This gui
 - [Adding a GitHub Source](#adding-a-github-source)
 - [Understanding Scan Results](#understanding-scan-results)
 - [Manual Catalog Override](#manual-catalog-override)
+- [Single Artifact Mode](#single-artifact-mode)
 - [Importing Artifacts](#importing-artifacts)
 - [Rescanning Sources](#rescanning-sources)
 - [Status Chips Explained](#status-chips-explained)
@@ -345,6 +346,75 @@ You can edit paths by:
 2. Clicking the "Edit Catalog" button
 3. Adding, removing, or modifying paths
 4. Triggering a rescan to refresh results
+
+## Single Artifact Mode
+
+### What is Single Artifact Mode?
+
+Some GitHub repositories ARE themselves an artifact rather than containing multiple artifacts. For example, a repository with a `SKILL.md` file at the root, where the entire repository represents a single skill. SkillMeat's automatic detection may not recognize these edge cases because it expects artifacts to be in subdirectories.
+
+**Single Artifact Mode** lets you explicitly tell SkillMeat to treat the entire repository (or root directory hint) as one artifact of a specific type.
+
+### When to Use Single Artifact Mode
+
+Use this mode when:
+
+1. **Repository IS the artifact**: The entire repo is a single skill, command, agent, etc.
+2. **Artifact files at root level**: `SKILL.md`, `COMMAND.md`, or similar files are at the repository root
+3. **Non-standard structure**: Detection heuristics don't recognize your artifact layout
+4. **Quick manual import**: You know exactly what type of artifact it is and want to skip detection
+
+### How to Enable Single Artifact Mode
+
+When adding a new GitHub source:
+
+1. Click "Add Source" to open the wizard
+2. Enter your repository URL and other settings as normal
+3. In the **Settings** section, toggle **"Treat as single artifact"**
+4. When enabled, an **Artifact Type** dropdown appears
+5. Select the appropriate type: **Skill**, **Command**, **Agent**, **MCP Server**, or **Hook**
+6. Complete the wizard and create the source
+
+**What happens:**
+- SkillMeat skips automatic artifact detection
+- Creates a single artifact entry for the entire repository (or `root_hint` directory if specified)
+- Sets the artifact confidence score to 100% (manual specification)
+- The artifact name is derived from the repository name (or the last path component of `root_hint`)
+
+### Example Use Cases
+
+**Example 1: Single skill repository**
+```
+Repository: https://github.com/user/my-awesome-skill
+Structure:
+├── SKILL.md
+├── templates/
+│   └── template.md
+└── examples/
+    └── example.md
+```
+Enable Single Artifact Mode and select "Skill" - the entire repo becomes one skill artifact.
+
+**Example 2: Root directory hint with single artifact**
+```
+Repository: https://github.com/user/monorepo
+Root Hint: /tools/my-command
+Structure:
+└── tools/
+    └── my-command/
+        ├── COMMAND.md
+        └── scripts/
+```
+Enable Single Artifact Mode with Root Hint `/tools/my-command` and select "Command" - only that subdirectory becomes the artifact.
+
+### Viewing Single Artifact Mode Status
+
+Sources created with Single Artifact Mode show:
+- A single artifact in the catalog with 100% confidence
+- The artifact type you specified during creation
+- The source settings indicate single artifact mode is enabled
+
+You can view and modify this setting by editing the source.
 
 ## Importing Artifacts
 

@@ -18,12 +18,15 @@ import { GroupsService } from './services/GroupsService';
 import { HealthService } from './services/HealthService';
 import { MarketplaceService } from './services/MarketplaceService';
 import { MarketplaceSourcesService } from './services/MarketplaceSourcesService';
+import { MatchService } from './services/MatchService';
 import { McpService } from './services/McpService';
 import { MergeService } from './services/MergeService';
 import { MetricsService } from './services/MetricsService';
 import { ProjectsService } from './services/ProjectsService';
 import { ProjectTemplatesService } from './services/ProjectTemplatesService';
+import { RatingsService } from './services/RatingsService';
 import { RootService } from './services/RootService';
+import { SettingsService } from './services/SettingsService';
 import { TagsService } from './services/TagsService';
 import { UserCollectionsService } from './services/UserCollectionsService';
 import { VersionsService } from './services/VersionsService';
@@ -42,19 +45,22 @@ export class SkillMeatClient {
     public readonly health: HealthService;
     public readonly marketplace: MarketplaceService;
     public readonly marketplaceSources: MarketplaceSourcesService;
+    public readonly match: MatchService;
     public readonly mcp: McpService;
     public readonly merge: MergeService;
     public readonly metrics: MetricsService;
     public readonly projects: ProjectsService;
     public readonly projectTemplates: ProjectTemplatesService;
+    public readonly ratings: RatingsService;
     public readonly root: RootService;
+    public readonly settings: SettingsService;
     public readonly tags: TagsService;
     public readonly userCollections: UserCollectionsService;
     public readonly versions: VersionsService;
     public readonly request: BaseHttpRequest;
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = FetchHttpRequest) {
         this.request = new HttpRequest({
-            BASE: config?.BASE ?? 'http://localhost:8080',
+            BASE: config?.BASE ?? '',
             VERSION: config?.VERSION ?? '0.1.0-alpha',
             WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
             CREDENTIALS: config?.CREDENTIALS ?? 'include',
@@ -77,12 +83,15 @@ export class SkillMeatClient {
         this.health = new HealthService(this.request);
         this.marketplace = new MarketplaceService(this.request);
         this.marketplaceSources = new MarketplaceSourcesService(this.request);
+        this.match = new MatchService(this.request);
         this.mcp = new McpService(this.request);
         this.merge = new MergeService(this.request);
         this.metrics = new MetricsService(this.request);
         this.projects = new ProjectsService(this.request);
         this.projectTemplates = new ProjectTemplatesService(this.request);
+        this.ratings = new RatingsService(this.request);
         this.root = new RootService(this.request);
+        this.settings = new SettingsService(this.request);
         this.tags = new TagsService(this.request);
         this.userCollections = new UserCollectionsService(this.request);
         this.versions = new VersionsService(this.request);

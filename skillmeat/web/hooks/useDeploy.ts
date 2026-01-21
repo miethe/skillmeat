@@ -80,10 +80,10 @@ export function useDeploy(options: UseDeployOptions = {}) {
           queryKey: ['projects', 'detail'],
           predicate: (query) => {
             // Only invalidate if this query is for the deployed project
-            return query.queryKey.some(k =>
-              typeof k === 'string' && k.includes(variables.projectPath || '')
+            return query.queryKey.some(
+              (k) => typeof k === 'string' && k.includes(variables.projectPath || '')
             );
-          }
+          },
         });
       }
 
@@ -163,10 +163,10 @@ export function useUndeploy(options: UseDeployOptions = {}) {
           queryKey: ['projects', 'detail'],
           predicate: (query) => {
             // Only invalidate if this query is for the undeployed project
-            return query.queryKey.some(k =>
-              typeof k === 'string' && k.includes(variables.projectPath || '')
+            return query.queryKey.some(
+              (k) => typeof k === 'string' && k.includes(variables.projectPath || '')
             );
-          }
+          },
         });
       }
 

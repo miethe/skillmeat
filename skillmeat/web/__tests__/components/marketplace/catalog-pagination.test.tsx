@@ -203,13 +203,7 @@ function PaginationControls({
 describe('Pagination Controls', () => {
   it('disables Previous button on first page', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={1}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={1} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const prevButton = screen.getByRole('button', { name: /previous/i });
     expect(prevButton).toBeDisabled();
@@ -217,13 +211,7 @@ describe('Pagination Controls', () => {
 
   it('disables Next button on last page', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={10}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={10} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const nextButton = screen.getByRole('button', { name: /next/i });
     expect(nextButton).toBeDisabled();
@@ -231,13 +219,7 @@ describe('Pagination Controls', () => {
 
   it('enables both buttons on middle page', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const prevButton = screen.getByRole('button', { name: /previous/i });
     const nextButton = screen.getByRole('button', { name: /next/i });
@@ -248,13 +230,7 @@ describe('Pagination Controls', () => {
 
   it('highlights current page button with aria-current', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={3}
-        totalPages={5}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={3} totalPages={5} onPageChange={mockOnPageChange} />);
 
     const currentPageButton = screen.getByRole('button', { name: 'Page 3' });
     expect(currentPageButton).toHaveAttribute('aria-current', 'page');
@@ -262,13 +238,7 @@ describe('Pagination Controls', () => {
 
   it('other page buttons do not have aria-current', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={3}
-        totalPages={5}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={3} totalPages={5} onPageChange={mockOnPageChange} />);
 
     const page1Button = screen.getByRole('button', { name: 'Page 1' });
     const page2Button = screen.getByRole('button', { name: 'Page 2' });
@@ -280,13 +250,7 @@ describe('Pagination Controls', () => {
   it('calls onPageChange when page button clicked', async () => {
     const user = userEvent.setup();
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={1}
-        totalPages={5}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={1} totalPages={5} onPageChange={mockOnPageChange} />);
 
     const page3Button = screen.getByRole('button', { name: 'Page 3' });
     await user.click(page3Button);
@@ -297,13 +261,7 @@ describe('Pagination Controls', () => {
   it('calls onPageChange with correct value when Previous clicked', async () => {
     const user = userEvent.setup();
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const prevButton = screen.getByRole('button', { name: /previous/i });
     await user.click(prevButton);
@@ -314,13 +272,7 @@ describe('Pagination Controls', () => {
   it('calls onPageChange with correct value when Next clicked', async () => {
     const user = userEvent.setup();
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const nextButton = screen.getByRole('button', { name: /next/i });
     await user.click(nextButton);
@@ -330,13 +282,7 @@ describe('Pagination Controls', () => {
 
   it('renders ellipsis for large page counts', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const ellipsisElements = screen.getAllByText('...');
     expect(ellipsisElements.length).toBeGreaterThan(0);
@@ -344,13 +290,7 @@ describe('Pagination Controls', () => {
 
   it('ellipsis elements have aria-hidden', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const ellipsisElements = screen.getAllByText('...');
     ellipsisElements.forEach((el) => {
@@ -443,12 +383,7 @@ interface CountIndicatorProps {
   totalCount?: number;
 }
 
-function CountIndicator({
-  startIndex,
-  endIndex,
-  totalFiltered,
-  totalCount,
-}: CountIndicatorProps) {
+function CountIndicator({ startIndex, endIndex, totalFiltered, totalCount }: CountIndicatorProps) {
   return (
     <div className="text-sm text-muted-foreground" data-testid="count-indicator">
       <span>
@@ -463,89 +398,45 @@ function CountIndicator({
 
 describe('Count Indicator', () => {
   it('displays correct count format', () => {
-    render(
-      <CountIndicator
-        startIndex={1}
-        endIndex={25}
-        totalFiltered={100}
-      />
-    );
+    render(<CountIndicator startIndex={1} endIndex={25} totalFiltered={100} />);
 
     expect(screen.getByText(/Showing 1-25 of 100 artifacts/)).toBeInTheDocument();
   });
 
   it('displays correct range for middle pages', () => {
-    render(
-      <CountIndicator
-        startIndex={26}
-        endIndex={50}
-        totalFiltered={100}
-      />
-    );
+    render(<CountIndicator startIndex={26} endIndex={50} totalFiltered={100} />);
 
     expect(screen.getByText(/Showing 26-50 of 100 artifacts/)).toBeInTheDocument();
   });
 
   it('displays correct range for last page with partial results', () => {
-    render(
-      <CountIndicator
-        startIndex={76}
-        endIndex={82}
-        totalFiltered={82}
-      />
-    );
+    render(<CountIndicator startIndex={76} endIndex={82} totalFiltered={82} />);
 
     expect(screen.getByText(/Showing 76-82 of 82 artifacts/)).toBeInTheDocument();
   });
 
   it('formats large numbers with commas', () => {
-    render(
-      <CountIndicator
-        startIndex={1}
-        endIndex={25}
-        totalFiltered={1500}
-      />
-    );
+    render(<CountIndicator startIndex={1} endIndex={25} totalFiltered={1500} />);
 
     expect(screen.getByText(/Showing 1-25 of 1,500 artifacts/)).toBeInTheDocument();
   });
 
   it('shows filtered count when different from total', () => {
-    render(
-      <CountIndicator
-        startIndex={1}
-        endIndex={25}
-        totalFiltered={100}
-        totalCount={500}
-      />
-    );
+    render(<CountIndicator startIndex={1} endIndex={25} totalFiltered={100} totalCount={500} />);
 
     expect(screen.getByText(/Showing 1-25 of 100 artifacts/)).toBeInTheDocument();
     expect(screen.getByText(/filtered from 500 total/)).toBeInTheDocument();
   });
 
   it('does not show filtered message when counts are equal', () => {
-    render(
-      <CountIndicator
-        startIndex={1}
-        endIndex={25}
-        totalFiltered={100}
-        totalCount={100}
-      />
-    );
+    render(<CountIndicator startIndex={1} endIndex={25} totalFiltered={100} totalCount={100} />);
 
     expect(screen.getByText(/Showing 1-25 of 100 artifacts/)).toBeInTheDocument();
     expect(screen.queryByText(/filtered from/)).not.toBeInTheDocument();
   });
 
   it('handles single item', () => {
-    render(
-      <CountIndicator
-        startIndex={1}
-        endIndex={1}
-        totalFiltered={1}
-      />
-    );
+    render(<CountIndicator startIndex={1} endIndex={1} totalFiltered={1} />);
 
     expect(screen.getByText(/Showing 1-1 of 1 artifacts/)).toBeInTheDocument();
   });
@@ -611,13 +502,7 @@ describe('Pagination State Management', () => {
 describe('Edge Cases', () => {
   it('handles zero items gracefully', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={1}
-        totalPages={0}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={1} totalPages={0} onPageChange={mockOnPageChange} />);
 
     // Should not render any page buttons for empty results
     const pageButtons = screen.queryAllByRole('button', { name: /Page \d+/ });
@@ -626,13 +511,7 @@ describe('Edge Cases', () => {
 
   it('handles single page correctly', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={1}
-        totalPages={1}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={1} totalPages={1} onPageChange={mockOnPageChange} />);
 
     const prevButton = screen.getByRole('button', { name: /previous/i });
     const nextButton = screen.getByRole('button', { name: /next/i });
@@ -651,11 +530,7 @@ describe('Edge Cases', () => {
     const mockOnPageChange = jest.fn();
 
     const { rerender } = render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
+      <PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />
     );
 
     // Rapid clicks
@@ -676,13 +551,7 @@ describe('Edge Cases', () => {
 describe('Accessibility', () => {
   it('pagination controls have proper ARIA labels', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     expect(screen.getByRole('button', { name: /previous page/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument();
@@ -691,13 +560,7 @@ describe('Accessibility', () => {
 
   it('current page is marked with aria-current', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const currentPageButton = screen.getByRole('button', { name: 'Page 5' });
     expect(currentPageButton).toHaveAttribute('aria-current', 'page');
@@ -714,13 +577,7 @@ describe('Accessibility', () => {
 
   it('ellipsis is hidden from screen readers', () => {
     const mockOnPageChange = jest.fn();
-    render(
-      <PaginationControls
-        currentPage={5}
-        totalPages={10}
-        onPageChange={mockOnPageChange}
-      />
-    );
+    render(<PaginationControls currentPage={5} totalPages={10} onPageChange={mockOnPageChange} />);
 
     const ellipsisElements = screen.getAllByText('...');
     ellipsisElements.forEach((el) => {

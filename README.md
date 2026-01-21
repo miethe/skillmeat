@@ -246,7 +246,17 @@ Collection (Personal Library)
 
 ## Configuration
 
-Configure SkillMeat globally:
+### GitHub Authentication (Optional)
+
+Configure a GitHub Personal Access Token to increase API rate limits from 60 to 5,000 requests/hour:
+
+1. Via Web UI: Go to Settings → GitHub Authentication
+2. Via environment variable: `export GITHUB_TOKEN=ghp_...`
+3. Via CLI: `skillmeat config set github-token ghp_...`
+
+Create a PAT at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` scope.
+
+### General Settings
 
 ```bash
 # Set GitHub token (for private repos and higher rate limits)

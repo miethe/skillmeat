@@ -118,7 +118,11 @@ export interface BulkImportResultDetails {
 /**
  * Union type for all notification detail types
  */
-export type NotificationDetails = ImportResultDetails | ErrorDetails | GenericDetails | BulkImportResultDetails;
+export type NotificationDetails =
+  | ImportResultDetails
+  | ErrorDetails
+  | GenericDetails
+  | BulkImportResultDetails;
 
 /**
  * Complete notification data structure

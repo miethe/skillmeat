@@ -339,18 +339,14 @@ describe('SourceCard', () => {
       const source = createMockSource();
       render(<SourceCard source={source} />);
 
-      expect(
-        screen.getByRole('button', { name: 'Rescan repository' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Rescan repository' })).toBeInTheDocument();
     });
 
     it('has accessible label for open button', () => {
       const source = createMockSource();
       render(<SourceCard source={source} />);
 
-      expect(
-        screen.getByRole('button', { name: 'View source details' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'View source details' })).toBeInTheDocument();
     });
 
     it('has screen reader text for rescan button', () => {

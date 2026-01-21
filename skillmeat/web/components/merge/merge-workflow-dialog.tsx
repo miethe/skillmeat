@@ -16,25 +16,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  GitMerge,
-  Loader2,
-} from 'lucide-react';
+import { CheckCircle, ChevronLeft, ChevronRight, GitMerge, Loader2 } from 'lucide-react';
 import { MergePreviewView } from './merge-preview-view';
 import { ConflictList } from './conflict-list';
 import { ConflictResolver } from './conflict-resolver';
 import { MergeStrategySelector } from './merge-strategy-selector';
 import { MergeProgressIndicator } from './merge-progress-indicator';
 import { useMergeResultToast } from './merge-result-toast';
-import {
-  useAnalyzeMerge,
-  usePreviewMerge,
-  useExecuteMerge,
-  useResolveConflict,
-} from '@/hooks';
+import { useAnalyzeMerge, usePreviewMerge, useExecuteMerge, useResolveConflict } from '@/hooks';
 import type {
   MergeAnalyzeRequest,
   MergeWorkflowState,
@@ -77,8 +66,7 @@ export function MergeWorkflowDialog({
     strategy: 'auto',
   });
 
-  const [selectedConflict, setSelectedConflict] =
-    useState<ConflictMetadata | null>(null);
+  const [selectedConflict, setSelectedConflict] = useState<ConflictMetadata | null>(null);
 
   const analyzeMerge = useAnalyzeMerge();
   const previewMerge = usePreviewMerge();
@@ -121,10 +109,7 @@ export function MergeWorkflowDialog({
         ...prev,
         preview,
         step:
-          preview.potentialConflicts.length > 0 &&
-          prev.strategy !== 'auto'
-            ? 'resolve'
-            : 'confirm',
+          preview.potentialConflicts.length > 0 && prev.strategy !== 'auto' ? 'resolve' : 'confirm',
       }));
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Preview failed');
@@ -162,9 +147,7 @@ export function MergeWorkflowDialog({
         setSelectedConflict(null);
       }
     } catch (error) {
-      showError(
-        error instanceof Error ? error.message : 'Failed to resolve conflict'
-      );
+      showError(error instanceof Error ? error.message : 'Failed to resolve conflict');
     }
   };
 
@@ -190,9 +173,7 @@ export function MergeWorkflowDialog({
   };
 
   const handleNext = () => {
-    const currentIndex = WORKFLOW_STEPS.findIndex(
-      (s) => s.id === workflowState.step
-    );
+    const currentIndex = WORKFLOW_STEPS.findIndex((s) => s.id === workflowState.step);
     if (currentIndex < WORKFLOW_STEPS.length - 1) {
       const nextStep = WORKFLOW_STEPS[currentIndex + 1]?.id;
 
@@ -207,9 +188,7 @@ export function MergeWorkflowDialog({
   };
 
   const handleBack = () => {
-    const currentIndex = WORKFLOW_STEPS.findIndex(
-      (s) => s.id === workflowState.step
-    );
+    const currentIndex = WORKFLOW_STEPS.findIndex((s) => s.id === workflowState.step);
     if (currentIndex > 0) {
       const prevStep = WORKFLOW_STEPS[currentIndex - 1]?.id;
       if (prevStep) {
@@ -235,15 +214,13 @@ export function MergeWorkflowDialog({
     }
   };
 
-  const getCurrentStepIndex = () =>
-    WORKFLOW_STEPS.findIndex((s) => s.id === workflowState.step);
+  const getCurrentStepIndex = () => WORKFLOW_STEPS.findIndex((s) => s.id === workflowState.step);
 
-  const progressPercentage =
-    ((getCurrentStepIndex() + 1) / WORKFLOW_STEPS.length) * 100;
+  const progressPercentage = ((getCurrentStepIndex() + 1) / WORKFLOW_STEPS.length) * 100;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="flex max-h-[90vh] max-w-[900px] flex-col overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <GitMerge className="h-5 w-5" />
@@ -258,21 +235,21 @@ export function MergeWorkflowDialog({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             {WORKFLOW_STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-1">
+              <div key={step.id} className="flex flex-1 items-center">
                 <div
                   className={cn(
-                    'flex items-center gap-2 flex-1',
+                    'flex flex-1 items-center gap-2',
                     index < getCurrentStepIndex() && 'opacity-50'
                   )}
                 >
                   <div
                     className={cn(
-                      'h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold',
+                      'flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold',
                       workflowState.step === step.id
                         ? 'bg-primary text-primary-foreground'
                         : index < getCurrentStepIndex()
-                        ? 'bg-green-600 text-white'
-                        : 'bg-muted text-muted-foreground'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-muted text-muted-foreground'
                     )}
                   >
                     {index < getCurrentStepIndex() ? (
@@ -290,9 +267,7 @@ export function MergeWorkflowDialog({
                     {step.label}
                   </span>
                 </div>
-                {index < WORKFLOW_STEPS.length - 1 && (
-                  <div className="h-0.5 w-8 bg-muted mx-2" />
-                )}
+                {index < WORKFLOW_STEPS.length - 1 && <div className="mx-2 h-0.5 w-8 bg-muted" />}
               </div>
             ))}
           </div>
@@ -305,15 +280,13 @@ export function MergeWorkflowDialog({
             <div className="py-12 text-center">
               {analyzeMerge.isPending ? (
                 <>
-                  <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-primary" />
+                  <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-primary" />
                   <p className="text-muted-foreground">Analyzing merge safety...</p>
                 </>
               ) : (
                 <>
-                  <GitMerge className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">
-                    Ready to analyze merge compatibility
-                  </p>
+                  <GitMerge className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                  <p className="text-muted-foreground">Ready to analyze merge compatibility</p>
                 </>
               )}
             </div>
@@ -337,9 +310,7 @@ export function MergeWorkflowDialog({
                 ]}
                 selectedConflict={selectedConflict ?? undefined}
                 onSelectConflict={setSelectedConflict}
-                resolvedConflicts={
-                  new Set(workflowState.resolvedConflicts.keys())
-                }
+                resolvedConflicts={new Set(workflowState.resolvedConflicts.keys())}
               />
               <ConflictResolver
                 conflict={selectedConflict ?? null}
@@ -353,12 +324,10 @@ export function MergeWorkflowDialog({
             <div className="space-y-4">
               <MergeStrategySelector
                 value={workflowState.strategy}
-                onChange={(strategy) =>
-                  setWorkflowState((prev) => ({ ...prev, strategy }))
-                }
+                onChange={(strategy) => setWorkflowState((prev) => ({ ...prev, strategy }))}
               />
               {workflowState.preview && (
-                <div className="rounded-lg border p-4 space-y-2">
+                <div className="space-y-2 rounded-lg border p-4">
                   <p className="font-semibold">Summary</p>
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
@@ -369,9 +338,7 @@ export function MergeWorkflowDialog({
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">
-                        Conflicts resolved:
-                      </span>
+                      <span className="text-muted-foreground">Conflicts resolved:</span>
                       <span className="ml-2 font-semibold">
                         {workflowState.resolvedConflicts.size}
                       </span>
@@ -402,7 +369,7 @@ export function MergeWorkflowDialog({
 
         {/* Footer */}
         <DialogFooter>
-          <div className="flex items-center justify-between w-full">
+          <div className="flex w-full items-center justify-between">
             <Button
               variant="outline"
               onClick={handleBack}
@@ -413,7 +380,7 @@ export function MergeWorkflowDialog({
                 executeMerge.isPending
               }
             >
-              <ChevronLeft className="h-4 w-4 mr-2" />
+              <ChevronLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
             <Button
@@ -426,14 +393,10 @@ export function MergeWorkflowDialog({
             {workflowState.step !== 'execute' && (
               <Button
                 onClick={handleNext}
-                disabled={
-                  !canProceed() ||
-                  analyzeMerge.isPending ||
-                  previewMerge.isPending
-                }
+                disabled={!canProceed() || analyzeMerge.isPending || previewMerge.isPending}
               >
                 {workflowState.step === 'confirm' ? 'Execute Merge' : 'Next'}
-                <ChevronRight className="h-4 w-4 ml-2" />
+                <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             )}
           </div>

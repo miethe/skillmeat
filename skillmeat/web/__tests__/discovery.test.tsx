@@ -339,12 +339,7 @@ describe('BulkImportModal', () => {
 
     render(
       <TestWrapper>
-        <BulkImportModal
-          artifacts={[]}
-          open={true}
-          onClose={onClose}
-          onImport={onImport}
-        />
+        <BulkImportModal artifacts={[]} open={true} onClose={onClose} onImport={onImport} />
       </TestWrapper>
     );
 
@@ -573,7 +568,6 @@ describe('BulkImportModal', () => {
       expect(skipCheckbox1).toBeChecked();
       expect(skipCheckbox2).not.toBeChecked();
     });
-
 
     it('passes skip list to onImport', async () => {
       const onClose = jest.fn();

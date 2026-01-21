@@ -176,12 +176,7 @@ export function VersionComparisonView({
   const { data: snapshot2 } = useSnapshot(snapshotId2, collectionName);
 
   // Fetch diff between snapshots
-  const {
-    mutate: fetchDiff,
-    data: diff,
-    isLoading,
-    error,
-  } = useDiffSnapshots();
+  const { mutate: fetchDiff, data: diff, isLoading, error } = useDiffSnapshots();
 
   // Load diff on mount or when IDs change
   useEffect(() => {
@@ -216,7 +211,8 @@ export function VersionComparisonView({
   }
 
   // Calculate total files changed
-  const totalFilesChanged = diff.filesAdded.length + diff.filesRemoved.length + diff.filesModified.length;
+  const totalFilesChanged =
+    diff.filesAdded.length + diff.filesRemoved.length + diff.filesModified.length;
 
   return (
     <Card className={cn('overflow-hidden', className)}>
@@ -352,9 +348,7 @@ export function VersionComparisonView({
             <div className="text-center">
               <GitCompare className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-4 text-sm font-medium">No Changes Detected</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                These snapshots are identical
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">These snapshots are identical</p>
             </div>
           </div>
         )}

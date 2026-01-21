@@ -53,14 +53,13 @@ export async function fetchSnapshots(filters?: {
  * @param id - Snapshot SHA-256 hash identifier
  * @param collectionName - Optional collection name
  */
-export async function fetchSnapshot(
-  id: string,
-  collectionName?: string
-): Promise<Snapshot> {
+export async function fetchSnapshot(id: string, collectionName?: string): Promise<Snapshot> {
   const params = new URLSearchParams();
   if (collectionName) params.set('collection_name', collectionName);
 
-  const url = buildUrl(`/versions/snapshots/${id}${params.toString() ? `?${params.toString()}` : ''}`);
+  const url = buildUrl(
+    `/versions/snapshots/${id}${params.toString() ? `?${params.toString()}` : ''}`
+  );
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -75,9 +74,7 @@ export async function fetchSnapshot(
  * Create new version snapshot
  * @param data - Snapshot creation request data
  */
-export async function createSnapshot(
-  data: CreateSnapshotRequest
-): Promise<CreateSnapshotResponse> {
+export async function createSnapshot(data: CreateSnapshotRequest): Promise<CreateSnapshotResponse> {
   const response = await fetch(buildUrl('/versions/snapshots'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -100,14 +97,13 @@ export async function createSnapshot(
  * @param id - Snapshot SHA-256 hash identifier
  * @param collectionName - Optional collection name
  */
-export async function deleteSnapshot(
-  id: string,
-  collectionName?: string
-): Promise<void> {
+export async function deleteSnapshot(id: string, collectionName?: string): Promise<void> {
   const params = new URLSearchParams();
   if (collectionName) params.set('collection_name', collectionName);
 
-  const url = buildUrl(`/versions/snapshots/${id}${params.toString() ? `?${params.toString()}` : ''}`);
+  const url = buildUrl(
+    `/versions/snapshots/${id}${params.toString() ? `?${params.toString()}` : ''}`
+  );
   const response = await fetch(url, {
     method: 'DELETE',
   });
@@ -131,12 +127,16 @@ export async function analyzeRollbackSafety(
   const params = new URLSearchParams();
   if (collectionName) params.set('collection_name', collectionName);
 
-  const url = buildUrl(`/versions/snapshots/${snapshotId}/rollback-analysis${params.toString() ? `?${params.toString()}` : ''}`);
+  const url = buildUrl(
+    `/versions/snapshots/${snapshotId}/rollback-analysis${params.toString() ? `?${params.toString()}` : ''}`
+  );
   const response = await fetch(url);
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.detail || `Failed to analyze rollback safety: ${response.statusText}`);
+    throw new Error(
+      errorBody.detail || `Failed to analyze rollback safety: ${response.statusText}`
+    );
   }
 
   return response.json();
@@ -174,9 +174,7 @@ export async function executeRollback(
  * Compare two snapshots and get diff
  * @param data - Snapshot IDs to compare
  */
-export async function diffSnapshots(
-  data: DiffSnapshotsRequest
-): Promise<SnapshotDiff> {
+export async function diffSnapshots(data: DiffSnapshotsRequest): Promise<SnapshotDiff> {
   const response = await fetch(buildUrl('/versions/snapshots/diff'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

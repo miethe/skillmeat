@@ -7,10 +7,7 @@ describe('ScoreBadge', () => {
       render(<ScoreBadge confidence={85} />);
       const badge = screen.getByText('85%');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        'Confidence score: 85 percent, high confidence'
-      );
+      expect(badge).toHaveAttribute('aria-label', 'Confidence score: 85 percent, high confidence');
     });
 
     it('renders medium confidence (50-70) with yellow color', () => {
@@ -27,10 +24,7 @@ describe('ScoreBadge', () => {
       render(<ScoreBadge confidence={30} />);
       const badge = screen.getByText('30%');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        'Confidence score: 30 percent, low confidence'
-      );
+      expect(badge).toHaveAttribute('aria-label', 'Confidence score: 30 percent, low confidence');
     });
   });
 
@@ -65,37 +59,25 @@ describe('ScoreBadge', () => {
     it('renders 70 as high confidence (boundary)', () => {
       render(<ScoreBadge confidence={70} />);
       const badge = screen.getByText('70%');
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        expect.stringContaining('medium confidence')
-      );
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining('medium confidence'));
     });
 
     it('renders 71 as high confidence', () => {
       render(<ScoreBadge confidence={71} />);
       const badge = screen.getByText('71%');
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        expect.stringContaining('high confidence')
-      );
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining('high confidence'));
     });
 
     it('renders 50 as medium confidence (boundary)', () => {
       render(<ScoreBadge confidence={50} />);
       const badge = screen.getByText('50%');
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        expect.stringContaining('medium confidence')
-      );
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining('medium confidence'));
     });
 
     it('renders 49 as low confidence', () => {
       render(<ScoreBadge confidence={49} />);
       const badge = screen.getByText('49%');
-      expect(badge).toHaveAttribute(
-        'aria-label',
-        expect.stringContaining('low confidence')
-      );
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining('low confidence'));
     });
   });
 

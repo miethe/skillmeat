@@ -166,9 +166,7 @@ describe('SkipPreferencesList', () => {
   });
 
   it('disables buttons when isLoading is true', async () => {
-    render(
-      <SkipPreferencesList skipPrefs={mockSkipPrefs} {...mockHandlers} isLoading={true} />
-    );
+    render(<SkipPreferencesList skipPrefs={mockSkipPrefs} {...mockHandlers} isLoading={true} />);
 
     // Expand
     fireEvent.click(screen.getByRole('button', { name: /skipped artifacts/i }));

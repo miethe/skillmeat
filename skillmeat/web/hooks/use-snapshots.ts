@@ -47,8 +47,10 @@ export const snapshotKeys = {
   lists: () => [...snapshotKeys.all, 'list'] as const,
   list: (filters?: SnapshotFilters) => [...snapshotKeys.lists(), filters] as const,
   details: () => [...snapshotKeys.all, 'detail'] as const,
-  detail: (id: string, collectionName?: string) => [...snapshotKeys.details(), id, collectionName] as const,
-  rollbackAnalysis: (id: string, collectionName?: string) => [...snapshotKeys.detail(id, collectionName), 'rollback-analysis'] as const,
+  detail: (id: string, collectionName?: string) =>
+    [...snapshotKeys.details(), id, collectionName] as const,
+  rollbackAnalysis: (id: string, collectionName?: string) =>
+    [...snapshotKeys.detail(id, collectionName), 'rollback-analysis'] as const,
 };
 
 /**
@@ -179,7 +181,10 @@ export function useDeleteSnapshot() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, collectionName }: {
+    mutationFn: async ({
+      id,
+      collectionName,
+    }: {
       id: string;
       collectionName?: string;
     }): Promise<void> => {

@@ -72,7 +72,17 @@ SkillMeat: Personal collection manager for Claude Code artifacts with web UI
 | `/dev:complete-user-story` | dev-execution, artifact-tracking | `Skill("dev-execution")` then `Skill("artifact-tracking")` |
 | `/dev:create-feature`      | dev-execution                    | `Skill("dev-execution")`                                   |
 | `/plan:*`                  | planning                         | `Skill("planning")`                                        |
+| `/analyze:symbols:*`       | symbols                          | CLI scripts (automatic via commands)                       |
 | `/mc`                      | (self-contained)                 | No additional skills needed                                |
+
+### Symbol-First Exploration
+
+**Pattern discovery uses symbols automatically** via `codebase-explorer` agent delegation.
+
+When exploring code patterns before implementation:
+1. Delegate to `Task("codebase-explorer", "Find [pattern]")` - uses symbols internally
+2. Direct queries: `jq '.symbols[] | select(.layer == "service")' ai/symbols-api.json`
+3. Token savings: ~150 tokens (symbols) vs 5-15K tokens (file reads)
 
 ### Enforcement Protocol
 
@@ -266,6 +276,7 @@ Track bugs/enhancements via MeatyCapture request-logs.
 skillmeat/
 ├── cli.py              # Click-based CLI (collection, web commands)
 ├── core/               # Business logic (artifact, deployment, sync, analytics)
+│   └── github_client.py # Centralized GitHub API client wrapper
 ├── api/                # FastAPI backend → See skillmeat/api/CLAUDE.md
 ├── web/                # Next.js 15 frontend → See skillmeat/web/CLAUDE.md
 ├── sources/            # GitHub, local artifact sources
@@ -409,6 +420,56 @@ locked_at = "2024-11-29T10:00:00Z"
 # API: Raise HTTPException with status code
 # Core: Raise domain-specific exceptions
 ```
+
+### GitHub Client
+
+**File**: `core/github_client.py`
+
+All GitHub API operations must use the centralized `GitHubClient` wrapper:
+
+```python
+from skillmeat.core.github_client import get_github_client, GitHubClient
+
+# Get singleton client (automatic token resolution)
+client = get_github_client()
+
+# Common operations
+metadata = client.get_repo_metadata("owner/repo")
+content = client.get_file_content("owner/repo", "path/to/file")
+tree = client.get_repo_tree("owner/repo", ref="main")
+sha = client.resolve_version("owner/repo", "latest")
+rate_limit = client.get_rate_limit()
+
+# Token priority (automatic resolution)
+# 1. ConfigManager (settings.github-token)
+# 2. SKILLMEAT_GITHUB_TOKEN env var
+# 3. GITHUB_TOKEN env var
+# 4. Unauthenticated (60 req/hr fallback)
+```
+
+**Exception Handling**:
+
+```python
+from skillmeat.core.github_client import (
+    GitHubClientError,
+    GitHubRateLimitError,
+    GitHubAuthError,
+    GitHubNotFoundError,
+)
+
+try:
+    content = client.get_file_content("owner/repo", "path")
+except GitHubAuthError:
+    # Handle invalid/missing token
+except GitHubRateLimitError as e:
+    # Check e.reset_at for rate limit reset time
+except GitHubNotFoundError:
+    # Handle missing repo/file
+except GitHubClientError:
+    # Catch-all for other GitHub errors
+```
+
+Never use PyGithub directly; always go through the wrapper.
 
 ---
 

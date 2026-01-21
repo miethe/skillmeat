@@ -1,1 +1,0 @@
-"""Code map extraction helpers."""

@@ -29,8 +29,7 @@ export function MergeProgressIndicator({
   currentFile,
   fileStatuses,
 }: MergeProgressIndicatorProps) {
-  const progressPercentage =
-    filesTotal > 0 ? (filesProcessed / filesTotal) * 100 : 0;
+  const progressPercentage = filesTotal > 0 ? (filesProcessed / filesTotal) * 100 : 0;
 
   const successCount = fileStatuses.filter((f) => f.status === 'success').length;
   const failedCount = fileStatuses.filter((f) => f.status === 'failed').length;
@@ -97,27 +96,23 @@ export function MergeProgressIndicator({
 
         {/* Current File */}
         {currentFile && (
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-            <p className="text-sm font-semibold text-blue-900 mb-1">
-              Currently Processing:
-            </p>
-            <p className="font-mono text-sm text-blue-700 truncate">
-              {currentFile}
-            </p>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <p className="mb-1 text-sm font-semibold text-blue-900">Currently Processing:</p>
+            <p className="truncate font-mono text-sm text-blue-700">{currentFile}</p>
           </div>
         )}
 
         {/* Status Summary */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="text-center rounded-lg border p-2">
+          <div className="rounded-lg border p-2 text-center">
             <p className="text-lg font-bold text-green-600">{successCount}</p>
             <p className="text-xs text-muted-foreground">Success</p>
           </div>
-          <div className="text-center rounded-lg border p-2">
+          <div className="rounded-lg border p-2 text-center">
             <p className="text-lg font-bold text-red-600">{failedCount}</p>
             <p className="text-xs text-muted-foreground">Failed</p>
           </div>
-          <div className="text-center rounded-lg border p-2">
+          <div className="rounded-lg border p-2 text-center">
             <p className="text-lg font-bold text-gray-600">{pendingCount}</p>
             <p className="text-xs text-muted-foreground">Pending</p>
           </div>
@@ -137,14 +132,14 @@ export function MergeProgressIndicator({
                     <div
                       key={index}
                       className={cn(
-                        'flex items-center gap-2 rounded-md p-2 border',
+                        'flex items-center gap-2 rounded-md border p-2',
                         fileStatus.status === 'success' && 'bg-green-50',
                         fileStatus.status === 'failed' && 'bg-red-50',
                         fileStatus.status === 'processing' && 'bg-blue-50'
                       )}
                     >
                       <Icon className={cn('h-4 w-4 flex-shrink-0', color)} />
-                      <span className="font-mono text-xs truncate flex-1">
+                      <span className="flex-1 truncate font-mono text-xs">
                         {fileStatus.filePath}
                       </span>
                       <Badge
@@ -152,8 +147,8 @@ export function MergeProgressIndicator({
                           fileStatus.status === 'success'
                             ? 'default'
                             : fileStatus.status === 'failed'
-                            ? 'destructive'
-                            : 'secondary'
+                              ? 'destructive'
+                              : 'secondary'
                         }
                         className="text-xs"
                       >
@@ -170,9 +165,7 @@ export function MergeProgressIndicator({
         {/* Failed Files Details */}
         {failedCount > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-red-600">
-              Failed Files ({failedCount})
-            </p>
+            <p className="text-sm font-semibold text-red-600">Failed Files ({failedCount})</p>
             <ScrollArea className="h-[100px]">
               <div className="space-y-1 pr-4">
                 {fileStatuses
@@ -180,11 +173,9 @@ export function MergeProgressIndicator({
                   .map((fileStatus, index) => (
                     <div
                       key={index}
-                      className="rounded-md bg-red-50 border border-red-200 p-2 space-y-1"
+                      className="space-y-1 rounded-md border border-red-200 bg-red-50 p-2"
                     >
-                      <p className="font-mono text-xs text-red-900">
-                        {fileStatus.filePath}
-                      </p>
+                      <p className="font-mono text-xs text-red-900">{fileStatus.filePath}</p>
                       {fileStatus.error && (
                         <p className="text-xs text-red-700">{fileStatus.error}</p>
                       )}

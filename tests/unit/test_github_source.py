@@ -6,41 +6,43 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import requests
 
 from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
+from skillmeat.core.github_client import GitHubNotFoundError
 from skillmeat.sources.github import ArtifactSpec, GitHubClient, GitHubSource
 
 
 class TestGitHubClient:
     """Test GitHubClient functionality."""
 
-    def test_init_with_token(self):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_init_with_token(self, mock_wrapper_class):
         """Test initializing client with token."""
+        mock_wrapper = Mock()
+        mock_wrapper.token = "test_token"
+        mock_wrapper_class.return_value = mock_wrapper
+
         client = GitHubClient(github_token="test_token")
         assert client.token == "test_token"
-        assert "Authorization" in client.session.headers
-        assert client.session.headers["Authorization"] == "token test_token"
+        mock_wrapper_class.assert_called_once_with(token="test_token")
 
-    def test_init_without_token(self):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_init_without_token(self, mock_wrapper_class):
         """Test initializing client without token."""
-        with patch.dict("os.environ", {}, clear=True):
-            client = GitHubClient()
-            assert client.token is None
+        mock_wrapper = Mock()
+        mock_wrapper.token = None
+        mock_wrapper_class.return_value = mock_wrapper
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_latest(self, mock_get):
+        client = GitHubClient()
+        assert client.token is None
+        mock_wrapper_class.assert_called_once_with(token=None)
+
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_latest(self, mock_wrapper_class):
         """Test resolving 'latest' version."""
-        # Mock API responses
-        repo_response = Mock()
-        repo_response.json.return_value = {"default_branch": "main"}
-        repo_response.raise_for_status = Mock()
-
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "abc123"}
-        commit_response.raise_for_status = Mock()
-
-        mock_get.side_effect = [repo_response, commit_response]
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.return_value = "abc123"
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@latest")
@@ -48,16 +50,16 @@ class TestGitHubClient:
 
         assert sha == "abc123"
         assert version is None
-        assert mock_get.call_count == 2
+        mock_wrapper.resolve_version.assert_called_once_with(
+            "anthropics/skills", "latest"
+        )
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_tag(self, mock_get):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_tag(self, mock_wrapper_class):
         """Test resolving version tag."""
-        tag_response = Mock()
-        tag_response.json.return_value = {"object": {"sha": "def456"}}
-        tag_response.raise_for_status = Mock()
-
-        mock_get.return_value = tag_response
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.return_value = "def456"
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@v1.0.0")
@@ -65,15 +67,16 @@ class TestGitHubClient:
 
         assert sha == "def456"
         assert version == "v1.0.0"
+        mock_wrapper.resolve_version.assert_called_once_with(
+            "anthropics/skills", "v1.0.0"
+        )
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_sha(self, mock_get):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_sha(self, mock_wrapper_class):
         """Test resolving commit SHA."""
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "abc123def456"}
-        commit_response.raise_for_status = Mock()
-
-        mock_get.return_value = commit_response
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.return_value = "abc123def456"
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@abc123def456")
@@ -82,14 +85,12 @@ class TestGitHubClient:
         assert sha == "abc123def456"
         assert version is None
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_branch(self, mock_get):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_branch(self, mock_wrapper_class):
         """Test resolving branch name."""
-        commit_response = Mock()
-        commit_response.json.return_value = {"sha": "ghi789"}
-        commit_response.raise_for_status = Mock()
-
-        mock_get.return_value = commit_response
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.return_value = "ghi789"
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@develop")
@@ -98,15 +99,14 @@ class TestGitHubClient:
         assert sha == "ghi789"
         assert version is None
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_tag_not_found(self, mock_get):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_tag_not_found(self, mock_wrapper_class):
         """Test resolving non-existent tag."""
-        mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=Mock(status_code=404)
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.side_effect = GitHubNotFoundError(
+            "Version 'v99.99.99' not found"
         )
-
-        mock_get.return_value = mock_response
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@v99.99.99")
@@ -114,46 +114,38 @@ class TestGitHubClient:
         with pytest.raises(RuntimeError, match="not found"):
             client.resolve_version(spec)
 
-    @patch("skillmeat.sources.github.requests.Session.get")
-    def test_resolve_version_retry_on_error(self, mock_get):
-        """Test retry logic on network errors."""
-        # First call fails, second succeeds
-        error_response = Mock()
-        error_response.raise_for_status.side_effect = (
-            requests.exceptions.RequestException("Network error")
-        )
-
-        success_response = Mock()
-        success_response.json.return_value = {"sha": "abc123"}
-        success_response.raise_for_status = Mock()
-
-        # Need to mock both the repo and commit calls
-        mock_get.side_effect = [
-            Mock(
-                json=lambda: {"default_branch": "main"}, raise_for_status=lambda: None
-            ),
-            error_response,
-            success_response,
-        ]
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_resolve_version_wrapper_handles_retry(self, mock_wrapper_class):
+        """Test that wrapper handles retry logic internally."""
+        # The wrapper now handles retries, so we just test success
+        mock_wrapper = Mock()
+        mock_wrapper.resolve_version.return_value = "abc123"
+        mock_wrapper_class.return_value = mock_wrapper
 
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills@latest")
-
-        with patch("time.sleep"):  # Mock sleep to speed up test
-            sha, version = client.resolve_version(spec)
+        sha, version = client.resolve_version(spec)
 
         assert sha == "abc123"
 
-    def test_get_upstream_url_with_path(self):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_get_upstream_url_with_path(self, mock_wrapper_class):
         """Test constructing upstream URL with path."""
+        mock_wrapper = Mock()
+        mock_wrapper_class.return_value = mock_wrapper
+
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills/python")
         url = client.get_upstream_url(spec, "abc123")
 
         assert url == "https://github.com/anthropics/skills/tree/abc123/python"
 
-    def test_get_upstream_url_without_path(self):
+    @patch("skillmeat.sources.github.GitHubClientWrapper")
+    def test_get_upstream_url_without_path(self, mock_wrapper_class):
         """Test constructing upstream URL without path."""
+        mock_wrapper = Mock()
+        mock_wrapper_class.return_value = mock_wrapper
+
         client = GitHubClient()
         spec = ArtifactSpec.parse("anthropics/skills")
         url = client.get_upstream_url(spec, "abc123")

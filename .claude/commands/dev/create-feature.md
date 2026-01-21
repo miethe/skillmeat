@@ -32,7 +32,18 @@ Follow this systematic approach to create a new feature: $ARGUMENTS
    - Identify affected components and potential impact areas
    - Plan the API/interface design before implementation
 
-2. **Research and Analysis**
+2. **Research and Analysis (Symbol-First)**
+   - **Query symbols first** for existing patterns (96% token savings):
+     ```bash
+     # Find similar implementations via symbols
+     jq '.symbols[] | select(.name | contains("Feature"))' /Users/miethe/dev/homelab/development/skillmeat/ai/symbols-*.json
+
+     # Backend patterns
+     jq '.symbols[] | select(.layer == "service" or .layer == "repository")' /Users/miethe/dev/homelab/development/skillmeat/ai/symbols-api.json
+
+     # Frontend patterns
+     jq '.symbols[] | select(.type == "component")' /Users/miethe/dev/homelab/development/skillmeat/ai/symbols-web.json
+     ```
    - Study existing codebase patterns and conventions
    - Identify similar features for consistency
    - Research external dependencies or libraries needed

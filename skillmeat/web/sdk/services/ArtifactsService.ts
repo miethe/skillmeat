@@ -17,14 +17,16 @@ import type { ArtifactUpstreamResponse } from '../models/ArtifactUpstreamRespons
 import type { Body_undeploy_artifact_api_v1_artifacts__artifact_id__undeploy_post } from '../models/Body_undeploy_artifact_api_v1_artifacts__artifact_id__undeploy_post';
 import type { BulkImportRequest } from '../models/BulkImportRequest';
 import type { BulkImportResult } from '../models/BulkImportResult';
+import type { ConfirmDuplicatesRequest } from '../models/ConfirmDuplicatesRequest';
+import type { ConfirmDuplicatesResponse } from '../models/ConfirmDuplicatesResponse';
 import type { DiscoveryRequest } from '../models/DiscoveryRequest';
 import type { DiscoveryResult } from '../models/DiscoveryResult';
-import type { FileContentResponse } from '../models/FileContentResponse';
 import type { FileListResponse } from '../models/FileListResponse';
 import type { FileUpdateRequest } from '../models/FileUpdateRequest';
 import type { MetadataFetchResponse } from '../models/MetadataFetchResponse';
 import type { ParameterUpdateRequest } from '../models/ParameterUpdateRequest';
 import type { ParameterUpdateResponse } from '../models/ParameterUpdateResponse';
+import type { skillmeat__api__schemas__artifacts__FileContentResponse } from '../models/skillmeat__api__schemas__artifacts__FileContentResponse';
 import type { SkipClearResponse } from '../models/SkipClearResponse';
 import type { SkipPreferenceAddRequest } from '../models/SkipPreferenceAddRequest';
 import type { SkipPreferenceListResponse } from '../models/SkipPreferenceListResponse';
@@ -131,6 +133,49 @@ export class ArtifactsService {
             query: {
                 'collection': collection,
                 'project_id': projectId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request`,
+                401: `Unauthorized`,
+                422: `Validation Error`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Process duplicate review decisions
+     * Process user decisions from the duplicate review modal.
+     *
+     * Handles three types of decisions:
+     * 1. **matches**: Link discovered duplicates to existing collection artifacts
+     * 2. **new_artifacts**: Import selected paths as new artifacts
+     * 3. **skipped**: Acknowledge paths the user chose to skip (logged for audit)
+     *
+     * All operations are atomic - if any operation fails, the response will
+     * indicate partial success with error details.
+     *
+     * This endpoint is idempotent for link operations - calling multiple times
+     * with the same matches will not create duplicate links.
+     * @returns ConfirmDuplicatesResponse Duplicate decisions processed successfully
+     * @throws ApiError
+     */
+    public confirmDuplicatesApiV1ArtifactsConfirmDuplicatesPost({
+        requestBody,
+        collection,
+    }: {
+        requestBody: ConfirmDuplicatesRequest,
+        /**
+         * Collection name (uses default if not specified)
+         */
+        collection?: (string | null),
+    }): CancelablePromise<ConfirmDuplicatesResponse> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/artifacts/confirm-duplicates',
+            query: {
+                'collection': collection,
             },
             body: requestBody,
             mediaType: 'application/json',
@@ -667,7 +712,7 @@ export class ArtifactsService {
     /**
      * Get artifact file content
      * Get the content of a specific file within an artifact
-     * @returns FileContentResponse Successfully retrieved file content
+     * @returns skillmeat__api__schemas__artifacts__FileContentResponse Successfully retrieved file content
      * @throws ApiError
      */
     public getArtifactFileContentApiV1ArtifactsArtifactIdFilesFilePathGet({
@@ -681,7 +726,7 @@ export class ArtifactsService {
          * Collection name (searches all if not specified)
          */
         collection?: (string | null),
-    }): CancelablePromise<FileContentResponse> {
+    }): CancelablePromise<skillmeat__api__schemas__artifacts__FileContentResponse> {
         return this.httpRequest.request({
             method: 'GET',
             url: '/api/v1/artifacts/{artifact_id}/files/{file_path}',
@@ -704,7 +749,7 @@ export class ArtifactsService {
     /**
      * Update artifact file content
      * Update the content of a specific file within an artifact
-     * @returns FileContentResponse Successfully updated file content
+     * @returns skillmeat__api__schemas__artifacts__FileContentResponse Successfully updated file content
      * @throws ApiError
      */
     public updateArtifactFileContentApiV1ArtifactsArtifactIdFilesFilePathPut({
@@ -720,7 +765,7 @@ export class ArtifactsService {
          * Collection name (searches all if not specified)
          */
         collection?: (string | null),
-    }): CancelablePromise<FileContentResponse> {
+    }): CancelablePromise<skillmeat__api__schemas__artifacts__FileContentResponse> {
         return this.httpRequest.request({
             method: 'PUT',
             url: '/api/v1/artifacts/{artifact_id}/files/{file_path}',
@@ -745,7 +790,7 @@ export class ArtifactsService {
     /**
      * Create new artifact file
      * Create a new file within an artifact
-     * @returns FileContentResponse Successfully created file
+     * @returns skillmeat__api__schemas__artifacts__FileContentResponse Successfully created file
      * @throws ApiError
      */
     public createArtifactFileApiV1ArtifactsArtifactIdFilesFilePathPost({
@@ -761,7 +806,7 @@ export class ArtifactsService {
          * Collection name (searches all if not specified)
          */
         collection?: (string | null),
-    }): CancelablePromise<FileContentResponse> {
+    }): CancelablePromise<skillmeat__api__schemas__artifacts__FileContentResponse> {
         return this.httpRequest.request({
             method: 'POST',
             url: '/api/v1/artifacts/{artifact_id}/files/{file_path}',

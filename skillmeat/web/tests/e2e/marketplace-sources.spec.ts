@@ -63,7 +63,8 @@ const mockCatalogEntry = {
   path: '.claude/skills/canvas-design.md',
   status: 'new',
   confidence_score: 95,
-  upstream_url: 'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/canvas-design.md',
+  upstream_url:
+    'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/canvas-design.md',
   detected_at: '2024-12-08T10:00:00Z',
 };
 
@@ -78,7 +79,8 @@ const mockCatalogResponse = {
       path: '.claude/skills/data-analysis.md',
       status: 'updated',
       confidence_score: 85,
-      upstream_url: 'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/data-analysis.md',
+      upstream_url:
+        'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/data-analysis.md',
       detected_at: '2024-12-08T10:00:00Z',
     },
     {
@@ -89,7 +91,8 @@ const mockCatalogResponse = {
       path: '.claude/commands/code-review.md',
       status: 'imported',
       confidence_score: 90,
-      upstream_url: 'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/commands/code-review.md',
+      upstream_url:
+        'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/commands/code-review.md',
       import_date: '2024-12-07T10:00:00Z',
       detected_at: '2024-12-08T10:00:00Z',
     },
@@ -143,18 +146,16 @@ async function setupMockApiRoutes(page: Page) {
   await mockApiRoute(page, '/api/v1/marketplace/sources', mockSource, 201);
 
   // Mock rescan
-  await mockApiRoute(
-    page,
-    `/api/v1/marketplace/sources/${mockSource.id}/rescan`,
-    { success: true, message: 'Rescan initiated' }
-  );
+  await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/rescan`, {
+    success: true,
+    message: 'Rescan initiated',
+  });
 
   // Mock import
-  await mockApiRoute(
-    page,
-    `/api/v1/marketplace/sources/${mockSource.id}/import`,
-    { success: true, imported_count: 1 }
-  );
+  await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/import`, {
+    success: true,
+    imported_count: 1,
+  });
 }
 
 async function navigateToSourcesPage(page: Page) {
@@ -523,28 +524,25 @@ test.describe('Rescan Source', () => {
 
   test('updates catalog after successful rescan', async ({ page }) => {
     // Mock updated catalog response
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
-      {
-        ...mockCatalogResponse,
-        items: [
-          ...mockCatalogResponse.items,
-          {
-            id: 'entry-4',
-            source_id: 'source-123',
-            name: 'new-skill',
-            artifact_type: 'skill',
-            path: '.claude/skills/new-skill.md',
-            status: 'new',
-            confidence_score: 88,
-            upstream_url: 'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/new-skill.md',
-            detected_at: '2024-12-08T11:00:00Z',
-          },
-        ],
-        total: 4,
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/catalog*`, {
+      ...mockCatalogResponse,
+      items: [
+        ...mockCatalogResponse.items,
+        {
+          id: 'entry-4',
+          source_id: 'source-123',
+          name: 'new-skill',
+          artifact_type: 'skill',
+          path: '.claude/skills/new-skill.md',
+          status: 'new',
+          confidence_score: 88,
+          upstream_url:
+            'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/new-skill.md',
+          detected_at: '2024-12-08T11:00:00Z',
+        },
+      ],
+      total: 4,
+    });
 
     // Click rescan
     await page.getByRole('button', { name: /Rescan/i }).click();
@@ -641,28 +639,25 @@ test.describe('Import Artifacts', () => {
 
   test('disables selection for removed artifacts', async ({ page }) => {
     // Mock catalog with removed artifact
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
-      {
-        ...mockCatalogResponse,
-        items: [
-          {
-            id: 'entry-removed',
-            source_id: 'source-123',
-            name: 'removed-skill',
-            artifact_type: 'skill',
-            path: '.claude/skills/removed-skill.md',
-            status: 'removed',
-            confidence_score: 75,
-            upstream_url: 'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/removed-skill.md',
-            detected_at: '2024-12-08T10:00:00Z',
-          },
-        ],
-        total: 1,
-        counts_by_status: { removed: 1 },
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/catalog*`, {
+      ...mockCatalogResponse,
+      items: [
+        {
+          id: 'entry-removed',
+          source_id: 'source-123',
+          name: 'removed-skill',
+          artifact_type: 'skill',
+          path: '.claude/skills/removed-skill.md',
+          status: 'removed',
+          confidence_score: 75,
+          upstream_url:
+            'https://github.com/anthropics/anthropic-cookbook/blob/main/.claude/skills/removed-skill.md',
+          detected_at: '2024-12-08T10:00:00Z',
+        },
+      ],
+      total: 1,
+      counts_by_status: { removed: 1 },
+    });
 
     await page.reload();
     await waitForPageLoad(page);
@@ -722,7 +717,10 @@ test.describe('Error Handling', () => {
     await mockApiRoute(
       page,
       '/api/v1/marketplace/sources',
-      { error: 'Repository not found or access denied. Private repositories require authentication.' },
+      {
+        error:
+          'Repository not found or access denied. Private repositories require authentication.',
+      },
       403
     );
 
@@ -995,15 +993,11 @@ test.describe('Pagination and Load More', () => {
 
   test('loads more catalog entries in source detail', async ({ page }) => {
     // Mock paginated catalog
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
-      {
-        ...mockCatalogResponse,
-        total: 30,
-        has_next: true,
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/catalog*`, {
+      ...mockCatalogResponse,
+      total: 30,
+      has_next: true,
+    });
 
     await navigateToSourceDetailPage(page);
 

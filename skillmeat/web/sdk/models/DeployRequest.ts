@@ -30,5 +30,9 @@ export type DeployRequest = {
      * Overwrite existing deployment without prompting
      */
     overwrite?: boolean;
+    /**
+     * Custom destination path relative to project root (e.g., '.claude/skills/dev/'). If provided, artifact will be deployed to {dest_path}/{artifact_name}/. Must not contain '..' or be absolute.
+     */
+    dest_path?: (string | null);
 };
 

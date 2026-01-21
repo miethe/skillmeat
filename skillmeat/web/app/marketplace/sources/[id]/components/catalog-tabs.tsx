@@ -55,11 +55,7 @@ export interface CatalogTabsProps {
  * - Horizontal scroll on mobile with overflow-x-auto
  * - Uses Radix Tabs primitive via shadcn
  */
-export function CatalogTabs({
-  countsByType,
-  selectedType,
-  onTypeChange,
-}: CatalogTabsProps) {
+export function CatalogTabs({ countsByType, selectedType, onTypeChange }: CatalogTabsProps) {
   // Calculate total count across all types
   const totalCount = Object.values(countsByType).reduce((sum, count) => sum + count, 0);
 
@@ -75,7 +71,7 @@ export function CatalogTabs({
 
   return (
     <Tabs value={tabValue} onValueChange={handleValueChange} className="w-full">
-      <TabsList className="inline-flex h-10 w-full items-center justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1 scrollbar-hide">
+      <TabsList className="scrollbar-hide inline-flex h-10 w-full items-center justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1">
         {/* All Types tab */}
         <TabsTrigger
           value="all"
@@ -114,12 +110,7 @@ export function CatalogTabs({
             >
               {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
               <span className="hidden sm:inline">{typeConfig.label}</span>
-              <span
-                className={cn(
-                  'text-xs',
-                  isZeroCount ? 'opacity-50' : 'opacity-70'
-                )}
-              >
+              <span className={cn('text-xs', isZeroCount ? 'opacity-50' : 'opacity-70')}>
                 ({count})
               </span>
             </TabsTrigger>

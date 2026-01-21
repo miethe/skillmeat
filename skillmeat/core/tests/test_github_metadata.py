@@ -10,10 +10,14 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
-import requests
 import yaml
 
 from skillmeat.core.cache import MetadataCache
+from skillmeat.core.github_client import (
+    GitHubClientError,
+    GitHubNotFoundError,
+    GitHubRateLimitError,
+)
 from skillmeat.core.github_metadata import (
     GitHubMetadata,
     GitHubMetadataExtractor,
@@ -151,7 +155,7 @@ class TestGitHubURLParsing:
 
 
 class TestMetadataFetching:
-    """Test metadata fetching functionality with mocked HTTP."""
+    """Test metadata fetching functionality with mocked GitHubClient."""
 
     @pytest.fixture
     def mock_cache(self):
@@ -164,8 +168,8 @@ class TestMetadataFetching:
         return GitHubMetadataExtractor(cache=mock_cache)
 
     def test_fetch_metadata_success(self, extractor, mock_cache):
-        """Test successful metadata fetch with mocked GitHub API."""
-        # Mock file content endpoint (SKILL.md)
+        """Test successful metadata fetch with mocked GitHub client."""
+        # Mock file content (SKILL.md)
         skill_content = """---
 title: Canvas Design
 description: Create beautiful visual art
@@ -179,27 +183,27 @@ tags:
 
 Content here...
 """
-        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode(
-            "utf-8"
-        )
 
-        file_response = Mock()
-        file_response.status_code = 200
-        file_response.json.return_value = {"content": encoded_content}
-        file_response.raise_for_status = Mock()
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if "SKILL.md" in path:
+                return skill_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
 
-        # Mock repo metadata endpoint
-        repo_response = Mock()
-        repo_response.status_code = 200
-        repo_response.json.return_value = {
+        mock_repo_metadata = {
             "topics": ["design", "art", "canvas"],
-            "license": {"spdx_id": "MIT"},
+            "license": "MIT",
+            "stars": 100,
+            "description": "A great repo",
         }
-        repo_response.raise_for_status = Mock()
 
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.side_effect = [file_response, repo_response]
-
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
             metadata = extractor.fetch_metadata("anthropics/skills/canvas")
 
         assert metadata.title == "Canvas Design"
@@ -221,34 +225,22 @@ description: A great project
 
 # My Project
 """
-        encoded_content = base64.b64encode(readme_content.encode("utf-8")).decode(
-            "utf-8"
-        )
 
-        # Mock 404 for SKILL.md, COMMAND.md, AGENT.md, then success for README.md
-        not_found_response = Mock()
-        not_found_response.status_code = 404
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if "README.md" in path:
+                return readme_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
 
-        readme_response = Mock()
-        readme_response.status_code = 200
-        readme_response.json.return_value = {"content": encoded_content}
-        readme_response.raise_for_status = Mock()
+        mock_repo_metadata = {"topics": [], "license": None}
 
-        repo_response = Mock()
-        repo_response.status_code = 200
-        repo_response.json.return_value = {"topics": [], "license": None}
-        repo_response.raise_for_status = Mock()
-
-        with patch.object(extractor.session, "get") as mock_get:
-            # SKILL.md, COMMAND.md, AGENT.md return 404, README.md succeeds, then repo
-            mock_get.side_effect = [
-                not_found_response,  # SKILL.md
-                not_found_response,  # COMMAND.md
-                not_found_response,  # AGENT.md
-                readme_response,  # README.md
-                repo_response,  # repo metadata
-            ]
-
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
             metadata = extractor.fetch_metadata("user/repo/project")
 
         assert metadata.title == "My Project"
@@ -256,28 +248,23 @@ description: A great project
 
     def test_fetch_metadata_no_frontmatter(self, extractor):
         """Test metadata fetch when no files have frontmatter."""
-        # Mock all files return 404
-        not_found_response = Mock()
-        not_found_response.status_code = 404
 
-        repo_response = Mock()
-        repo_response.status_code = 200
-        repo_response.json.return_value = {
+        def mock_get_file_content(owner_repo, path, ref=None):
+            raise GitHubNotFoundError(f"File not found: {path}")
+
+        mock_repo_metadata = {
             "topics": ["python"],
-            "license": {"spdx_id": "Apache-2.0"},
+            "license": "Apache-2.0",
         }
-        repo_response.raise_for_status = Mock()
 
-        with patch.object(extractor.session, "get") as mock_get:
-            # All metadata files 404, then repo metadata
-            mock_get.side_effect = [
-                not_found_response,
-                not_found_response,
-                not_found_response,
-                not_found_response,
-                repo_response,
-            ]
-
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
             metadata = extractor.fetch_metadata("user/repo/project")
 
         # Frontmatter fields should be None
@@ -290,29 +277,24 @@ description: A great project
 
     def test_fetch_metadata_github_error_404(self, extractor):
         """Test handling of 404 Not Found for repository."""
-        not_found_response = Mock()
-        not_found_response.status_code = 404
 
-        error_response = Mock()
-        error_response.status_code = 404
-        error_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=Mock(status_code=404)
-        )
+        def mock_get_file_content(owner_repo, path, ref=None):
+            raise GitHubNotFoundError(f"File not found: {path}")
 
-        with patch.object(extractor.session, "get") as mock_get:
-            # All file requests 404, repo metadata also fails (with retries)
-            mock_get.side_effect = [
-                not_found_response,  # SKILL.md
-                not_found_response,  # COMMAND.md
-                not_found_response,  # AGENT.md
-                not_found_response,  # README.md
-                error_response,  # repo metadata attempt 1
-                error_response,  # repo metadata attempt 2
-                error_response,  # repo metadata attempt 3
-            ]
+        def mock_get_repo_metadata(owner_repo):
+            raise GitHubClientError(f"Repository not found: {owner_repo}")
 
-            with patch("time.sleep"):  # Mock sleep to speed up test
-                metadata = extractor.fetch_metadata("user/nonexistent/project")
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client,
+                "get_repo_metadata",
+                side_effect=mock_get_repo_metadata,
+            ),
+        ):
+            metadata = extractor.fetch_metadata("user/nonexistent/project")
 
         # Should still return metadata with minimal info
         assert metadata.title is None
@@ -320,68 +302,54 @@ description: A great project
 
     def test_fetch_metadata_github_error_500(self, extractor):
         """Test handling of 500 Internal Server Error."""
-        error_response = Mock()
-        error_response.status_code = 500
-        error_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=Mock(status_code=500)
-        )
 
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.return_value = error_response
+        def mock_get_file_content(owner_repo, path, ref=None):
+            raise GitHubClientError("Internal server error")
 
+        def mock_get_repo_metadata(owner_repo):
+            raise GitHubClientError("Internal server error")
+
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client,
+                "get_repo_metadata",
+                side_effect=mock_get_repo_metadata,
+            ),
+        ):
             metadata = extractor.fetch_metadata("user/repo/project")
 
         # Should handle gracefully and return basic metadata
         assert metadata is not None
         assert metadata.title is None
 
-    def test_fetch_metadata_rate_limited_429(self, extractor):
-        """Test handling of 429 rate limit response."""
-        rate_limit_response = Mock()
-        rate_limit_response.status_code = 429
+    def test_fetch_metadata_rate_limited(self, extractor):
+        """Test handling of rate limit error."""
 
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.return_value = rate_limit_response
+        def mock_get_file_content(owner_repo, path, ref=None):
+            raise GitHubRateLimitError("Rate limit exceeded")
 
-            with pytest.raises(RuntimeError, match="rate limit exceeded"):
-                extractor.fetch_metadata("user/repo/project")
+        def mock_get_repo_metadata(owner_repo):
+            raise GitHubRateLimitError("Rate limit exceeded")
 
-    def test_fetch_metadata_rate_limited_403(self, extractor):
-        """Test handling of 403 with rate limit message."""
-        forbidden_response = Mock()
-        forbidden_response.status_code = 403
-        forbidden_response.text = "API rate limit exceeded for your IP"
-        forbidden_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            response=Mock(status_code=403)
-        )
-
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.return_value = forbidden_response
-
-            with pytest.raises(RuntimeError, match="rate limit exceeded"):
-                extractor.fetch_metadata("user/repo/project")
-
-    def test_fetch_metadata_timeout(self, extractor):
-        """Test handling of request timeout."""
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
-
-            # Should handle gracefully after retries
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client,
+                "get_repo_metadata",
+                side_effect=mock_get_repo_metadata,
+            ),
+        ):
+            # Now returns metadata with empty fields instead of raising
             metadata = extractor.fetch_metadata("user/repo/project")
 
         assert metadata is not None
         assert metadata.title is None
-
-    def test_fetch_metadata_network_error(self, extractor):
-        """Test handling of network connection errors."""
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
-
-            # Should handle gracefully after retries
-            metadata = extractor.fetch_metadata("user/repo/project")
-
-        assert metadata is not None
-        assert metadata.title is None
+        assert metadata.topics == []
 
     def test_fetch_metadata_with_cache_hit(self, mock_cache):
         """Test that cached data is returned without API call."""
@@ -400,11 +368,15 @@ description: A great project
 
         extractor = GitHubMetadataExtractor(cache=mock_cache)
 
-        with patch.object(extractor.session, "get") as mock_get:
+        with (
+            patch.object(extractor._client, "get_file_content") as mock_get_file,
+            patch.object(extractor._client, "get_repo_metadata") as mock_get_repo,
+        ):
             metadata = extractor.fetch_metadata("user/repo/artifact")
 
-            # Verify no HTTP requests made
-            mock_get.assert_not_called()
+            # Verify no API calls made
+            mock_get_file.assert_not_called()
+            mock_get_repo.assert_not_called()
 
         assert metadata.title == "Cached Artifact"
         assert metadata.description == "From cache"
@@ -420,23 +392,22 @@ description: Newly fetched
 ---
 Content
 """
-        encoded_content = base64.b64encode(skill_content.encode("utf-8")).decode(
-            "utf-8"
-        )
 
-        file_response = Mock()
-        file_response.status_code = 200
-        file_response.json.return_value = {"content": encoded_content}
-        file_response.raise_for_status = Mock()
+        def mock_get_file_content(owner_repo, path, ref=None):
+            if "SKILL.md" in path:
+                return skill_content.encode("utf-8")
+            raise GitHubNotFoundError(f"File not found: {path}")
 
-        repo_response = Mock()
-        repo_response.status_code = 200
-        repo_response.json.return_value = {"topics": [], "license": None}
-        repo_response.raise_for_status = Mock()
+        mock_repo_metadata = {"topics": [], "license": None}
 
-        with patch.object(extractor.session, "get") as mock_get:
-            mock_get.side_effect = [file_response, repo_response]
-
+        with (
+            patch.object(
+                extractor._client, "get_file_content", side_effect=mock_get_file_content
+            ),
+            patch.object(
+                extractor._client, "get_repo_metadata", return_value=mock_repo_metadata
+            ),
+        ):
             metadata = extractor.fetch_metadata("user/repo/fresh")
 
         assert metadata.title == "Fresh Data"
@@ -452,23 +423,33 @@ Content
             extractor.fetch_metadata("invalid")
 
     def test_token_authentication(self):
-        """Test that GitHub token is properly configured."""
+        """Test that GitHub token is properly passed to client."""
         cache = MetadataCache()
         extractor = GitHubMetadataExtractor(cache=cache, token="test_token_123")
 
-        assert extractor.token == "test_token_123"
-        assert "Authorization" in extractor.session.headers
-        assert extractor.session.headers["Authorization"] == "token test_token_123"
+        # Token is now managed by GitHubClient
+        assert extractor._client.token == "test_token_123"
 
     def test_token_from_environment(self):
         """Test that token is read from environment variable."""
         cache = MetadataCache()
 
-        with patch.dict("os.environ", {"GITHUB_TOKEN": "env_token_456"}):
-            extractor = GitHubMetadataExtractor(cache=cache)
+        with patch.dict(
+            "os.environ",
+            {"GITHUB_TOKEN": "env_token_456"},
+            clear=False,
+        ):
+            # Clear any cached config token
+            with patch(
+                "skillmeat.core.github_client.ConfigManager"
+            ) as mock_config_class:
+                mock_config = Mock()
+                mock_config.get.return_value = None
+                mock_config_class.return_value = mock_config
+                extractor = GitHubMetadataExtractor(cache=cache)
 
-        assert extractor.token == "env_token_456"
-        assert extractor.session.headers["Authorization"] == "token env_token_456"
+        # Token is managed by GitHubClient and read from env
+        assert extractor._client.token == "env_token_456"
 
 
 class TestFrontmatterExtraction:
@@ -671,80 +652,8 @@ Content
         assert result["count"] == 42
 
 
-class TestRetryWithBackoff:
-    """Test retry mechanism with exponential backoff."""
-
-    @pytest.fixture
-    def extractor(self):
-        """Provide a GitHubMetadataExtractor."""
-        return GitHubMetadataExtractor(cache=MetadataCache())
-
-    def test_retry_success_first_attempt(self, extractor):
-        """Test successful function call on first attempt."""
-        mock_func = Mock(return_value="success")
-
-        result = extractor._retry_with_backoff(mock_func, max_retries=3)
-
-        assert result == "success"
-        assert mock_func.call_count == 1
-
-    def test_retry_success_after_failure(self, extractor):
-        """Test successful function call after initial failures."""
-        mock_func = Mock()
-        mock_func.side_effect = [
-            requests.exceptions.RequestException("First failure"),
-            requests.exceptions.RequestException("Second failure"),
-            "success",
-        ]
-
-        with patch("time.sleep"):  # Mock sleep to speed up test
-            result = extractor._retry_with_backoff(mock_func, max_retries=3)
-
-        assert result == "success"
-        assert mock_func.call_count == 3
-
-    def test_retry_max_retries_exceeded(self, extractor):
-        """Test that exception is raised after max retries."""
-        mock_func = Mock()
-        mock_func.side_effect = requests.exceptions.RequestException("Persistent error")
-
-        with patch("time.sleep"):
-            with pytest.raises(
-                requests.exceptions.RequestException, match="Persistent error"
-            ):
-                extractor._retry_with_backoff(mock_func, max_retries=3)
-
-        assert mock_func.call_count == 3
-
-    def test_retry_exponential_backoff(self, extractor):
-        """Test that backoff timing increases exponentially."""
-        mock_func = Mock()
-        mock_func.side_effect = [
-            requests.exceptions.RequestException("Error 1"),
-            requests.exceptions.RequestException("Error 2"),
-            "success",
-        ]
-
-        with patch("time.sleep") as mock_sleep:
-            result = extractor._retry_with_backoff(mock_func, max_retries=3)
-
-        # Should have called sleep with 2^0=1 and 2^1=2 seconds
-        assert mock_sleep.call_count == 2
-        sleep_times = [call[0][0] for call in mock_sleep.call_args_list]
-        assert sleep_times == [1, 2]  # 2^0, 2^1
-
-    def test_retry_non_request_exception_not_retried(self, extractor):
-        """Test that non-RequestException errors are not retried."""
-        mock_func = Mock(side_effect=ValueError("Not a request error"))
-
-        with pytest.raises(ValueError, match="Not a request error"):
-            extractor._retry_with_backoff(mock_func, max_retries=3)
-
-        assert mock_func.call_count == 1
-
-
 class TestFetchFileContent:
-    """Test file content fetching from GitHub."""
+    """Test file content fetching from GitHub using GitHubClient."""
 
     @pytest.fixture
     def extractor(self):
@@ -754,36 +663,34 @@ class TestFetchFileContent:
     def test_fetch_file_content_success(self, extractor):
         """Test successful file content fetch."""
         content = "# Test Content\n\nThis is a test file."
-        encoded = base64.b64encode(content.encode("utf-8")).decode("utf-8")
 
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {"content": encoded}
-        response.raise_for_status = Mock()
-
-        with patch.object(extractor.session, "get", return_value=response):
+        with patch.object(
+            extractor._client,
+            "get_file_content",
+            return_value=content.encode("utf-8"),
+        ):
             result = extractor._fetch_file_content("owner", "repo", "path/to/file.md")
 
         assert result == content
 
     def test_fetch_file_content_404_not_found(self, extractor):
         """Test handling of 404 Not Found."""
-        response = Mock()
-        response.status_code = 404
-
-        with patch.object(extractor.session, "get", return_value=response):
+        with patch.object(
+            extractor._client,
+            "get_file_content",
+            side_effect=GitHubNotFoundError("File not found"),
+        ):
             result = extractor._fetch_file_content("owner", "repo", "missing.md")
 
         assert result is None
 
-    def test_fetch_file_content_no_content_field(self, extractor):
-        """Test handling of response without content field."""
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {}  # No content field
-        response.raise_for_status = Mock()
-
-        with patch.object(extractor.session, "get", return_value=response):
+    def test_fetch_file_content_rate_limit(self, extractor):
+        """Test handling of rate limit error."""
+        with patch.object(
+            extractor._client,
+            "get_file_content",
+            side_effect=GitHubRateLimitError("Rate limit exceeded"),
+        ):
             result = extractor._fetch_file_content("owner", "repo", "file.md")
 
         assert result is None
@@ -791,23 +698,34 @@ class TestFetchFileContent:
     def test_fetch_file_content_with_ref(self, extractor):
         """Test fetching file content with specific ref."""
         content = "Content"
-        encoded = base64.b64encode(content.encode("utf-8")).decode("utf-8")
 
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {"content": encoded}
-        response.raise_for_status = Mock()
-
-        with patch.object(extractor.session, "get", return_value=response) as mock_get:
+        with patch.object(
+            extractor._client,
+            "get_file_content",
+            return_value=content.encode("utf-8"),
+        ) as mock_get:
             extractor._fetch_file_content("owner", "repo", "file.md", ref="v1.0.0")
 
-            # Verify ref was passed in params
-            call_args = mock_get.call_args
-            assert call_args[1]["params"] == {"ref": "v1.0.0"}
+            # Verify ref was passed
+            mock_get.assert_called_once_with("owner/repo", "file.md", ref="v1.0.0")
+
+    def test_fetch_file_content_head_ref(self, extractor):
+        """Test that HEAD ref is converted to None (default branch)."""
+        content = "Content"
+
+        with patch.object(
+            extractor._client,
+            "get_file_content",
+            return_value=content.encode("utf-8"),
+        ) as mock_get:
+            extractor._fetch_file_content("owner", "repo", "file.md", ref="HEAD")
+
+            # HEAD should be converted to None
+            mock_get.assert_called_once_with("owner/repo", "file.md", ref=None)
 
 
 class TestFetchRepoMetadata:
-    """Test repository metadata fetching."""
+    """Test repository metadata fetching using GitHubClient."""
 
     @pytest.fixture
     def extractor(self):
@@ -816,29 +734,57 @@ class TestFetchRepoMetadata:
 
     def test_fetch_repo_metadata_success(self, extractor):
         """Test successful repo metadata fetch."""
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {
+        mock_metadata = {
             "topics": ["python", "testing"],
-            "license": {"spdx_id": "MIT"},
+            "license": "MIT",
             "description": "A great repo",
-            "stargazers_count": 100,
+            "stars": 100,
         }
-        response.raise_for_status = Mock()
 
-        with patch.object(extractor.session, "get", return_value=response):
+        with patch.object(
+            extractor._client, "get_repo_metadata", return_value=mock_metadata
+        ):
             result = extractor._fetch_repo_metadata("owner", "repo")
 
         assert result["topics"] == ["python", "testing"]
+        # License is converted to dict format for backward compatibility
         assert result["license"]["spdx_id"] == "MIT"
         assert result["description"] == "A great repo"
 
+    def test_fetch_repo_metadata_no_license(self, extractor):
+        """Test repo metadata fetch with no license."""
+        mock_metadata = {
+            "topics": ["python"],
+            "license": None,
+            "description": "No license",
+        }
+
+        with patch.object(
+            extractor._client, "get_repo_metadata", return_value=mock_metadata
+        ):
+            result = extractor._fetch_repo_metadata("owner", "repo")
+
+        assert result["topics"] == ["python"]
+        assert result["license"] is None
+
     def test_fetch_repo_metadata_error(self, extractor):
         """Test handling of repo metadata fetch error."""
-        response = Mock()
-        response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+        with patch.object(
+            extractor._client,
+            "get_repo_metadata",
+            side_effect=GitHubClientError("API error"),
+        ):
+            result = extractor._fetch_repo_metadata("owner", "repo")
 
-        with patch.object(extractor.session, "get", return_value=response):
+        assert result == {}
+
+    def test_fetch_repo_metadata_rate_limit(self, extractor):
+        """Test handling of rate limit error."""
+        with patch.object(
+            extractor._client,
+            "get_repo_metadata",
+            side_effect=GitHubRateLimitError("Rate limit exceeded"),
+        ):
             result = extractor._fetch_repo_metadata("owner", "repo")
 
         assert result == {}

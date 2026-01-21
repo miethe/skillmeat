@@ -2,11 +2,7 @@
 
 import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +81,7 @@ export function ScoreBreakdown({
   trust,
   quality,
   match,
-  weights = { trust: 0.25, quality: 0.25, match: 0.50 },
+  weights = { trust: 0.25, quality: 0.25, match: 0.5 },
   defaultExpanded = false,
   className,
 }: ScoreBreakdownProps) {
@@ -121,7 +117,7 @@ export function ScoreBreakdown({
         className={cn(
           'flex items-center gap-2 text-sm font-medium transition-colors',
           'hover:text-primary focus-visible:outline-none focus-visible:ring-2',
-          'focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm',
+          'rounded-sm focus-visible:ring-ring focus-visible:ring-offset-2'
         )}
         aria-label={isOpen ? 'Hide score breakdown' : 'Show score breakdown'}
       >
@@ -156,8 +152,9 @@ export function ScoreBreakdown({
           </div>
         ))}
 
-        <div className="border-t pt-3 text-xs text-muted-foreground font-mono">
-          <span className="font-medium">Formula:</span> (T×{weights.trust}) + (Q×{weights.quality}) + (M×
+        <div className="border-t pt-3 font-mono text-xs text-muted-foreground">
+          <span className="font-medium">Formula:</span> (T×{weights.trust}) + (Q×{weights.quality})
+          + (M×
           {weights.match}) = {confidence}%
         </div>
       </CollapsibleContent>

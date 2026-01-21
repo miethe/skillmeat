@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Grid3x3,
+  Layers,
   Settings2,
   FolderKanban,
   Server,
@@ -52,9 +53,7 @@ interface NavigationConfig {
 // ============================================================================
 
 const navigationConfig: NavigationConfig = {
-  topItems: [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  ],
+  topItems: [{ name: 'Dashboard', href: '/', icon: LayoutDashboard }],
   sections: [
     {
       title: 'Collections',
@@ -63,6 +62,7 @@ const navigationConfig: NavigationConfig = {
       defaultExpanded: true,
       items: [
         { name: 'Browse', href: '/collection', icon: Grid3x3 },
+        { name: 'Groups', href: '/groups', icon: Layers },
         { name: 'Manage', href: '/manage', icon: Settings2 },
         { name: 'Projects', href: '/projects', icon: FolderKanban },
         { name: 'MCP Servers', href: '/mcp', icon: Server },
@@ -72,9 +72,7 @@ const navigationConfig: NavigationConfig = {
       title: 'Marketplace',
       icon: Store,
       storageKey: 'marketplace',
-      items: [
-        { name: 'Sources', href: '/marketplace/sources', icon: GitBranch },
-      ],
+      items: [{ name: 'Sources', href: '/marketplace/sources', icon: GitBranch }],
     },
     {
       title: 'Agent Context',
@@ -131,7 +129,8 @@ export function Navigation() {
         {/* Top Items */}
         {navigationConfig.topItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`));
+          const isActive =
+            pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`));
 
           return (
             <Link

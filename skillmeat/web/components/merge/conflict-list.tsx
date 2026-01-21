@@ -68,16 +68,14 @@ export function ConflictList({
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
-          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
           <p>No conflicts to resolve</p>
         </CardContent>
       </Card>
     );
   }
 
-  const unresolvedConflicts = conflicts.filter(
-    (c) => !resolvedConflicts.has(c.filePath)
-  );
+  const unresolvedConflicts = conflicts.filter((c) => !resolvedConflicts.has(c.filePath));
   const resolvedCount = conflicts.length - unresolvedConflicts.length;
 
   return (
@@ -103,16 +101,15 @@ export function ConflictList({
             {conflicts.map((conflict, index) => {
               const Icon = getConflictIcon(conflict.conflictType);
               const isResolved = resolvedConflicts.has(conflict.filePath);
-              const isSelected =
-                selectedConflict?.filePath === conflict.filePath;
+              const isSelected = selectedConflict?.filePath === conflict.filePath;
 
               return (
                 <button
                   key={index}
                   onClick={() => onSelectConflict(conflict)}
                   className={cn(
-                    'w-full text-left rounded-lg border p-3 transition-colors',
-                    'hover:bg-accent hover:border-accent-foreground/20',
+                    'w-full rounded-lg border p-3 text-left transition-colors',
+                    'hover:border-accent-foreground/20 hover:bg-accent',
                     isSelected && 'border-primary bg-primary/5',
                     isResolved && 'opacity-50'
                   )}
@@ -120,18 +117,15 @@ export function ConflictList({
                   <div className="flex items-start gap-3">
                     <Icon
                       className={cn(
-                        'h-5 w-5 flex-shrink-0 mt-0.5',
+                        'mt-0.5 h-5 w-5 flex-shrink-0',
                         getConflictColor(conflict.conflictType),
                         isResolved && 'opacity-50'
                       )}
                     />
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <span
-                          className={cn(
-                            'font-mono text-sm truncate',
-                            isResolved && 'line-through'
-                          )}
+                          className={cn('truncate font-mono text-sm', isResolved && 'line-through')}
                         >
                           {conflict.filePath}
                         </span>
@@ -141,7 +135,7 @@ export function ConflictList({
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="text-xs">
                           {getConflictTypeLabel(conflict.conflictType)}
                         </Badge>

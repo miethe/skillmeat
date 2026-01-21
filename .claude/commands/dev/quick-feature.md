@@ -38,9 +38,21 @@ Load quick execution guidance: [.claude/skills/dev-execution/modes/quick-executi
 | Starts with `./`, `/`, `~` | File path | Read directly |
 | Other | Direct text | Use as description |
 
-### 2. Pattern Discovery
+### 2. Pattern Discovery (Symbol-First)
 
-Delegate to **codebase-explorer**: Find existing patterns related to the feature.
+Before implementation, query existing patterns via symbols for token efficiency:
+
+**Use symbol-based exploration first** (~150 tokens vs 5-15K for file reads):
+- Backend patterns: `jq '.symbols[] | select(.name | contains("[FeatureName]"))' /Users/miethe/dev/homelab/development/skillmeat/ai/symbols-api.json`
+- Frontend patterns: `jq '.symbols[] | select(.name | contains("[FeatureName]"))' /Users/miethe/dev/homelab/development/skillmeat/ai/symbols-web.json`
+
+**Delegate for comprehensive discovery**:
+- `Task("codebase-explorer", "Find existing patterns for [feature domain] using symbol-first approach")`
+
+**Symbol targets by domain**:
+- `ai/symbols-api.json` - Services, repositories, routers, schemas
+- `ai/symbols-web.json` - Components, hooks, pages
+- `ai/symbols-core.json` - Core business logic, managers, storage
 
 ### 3. Create Quick Plan
 

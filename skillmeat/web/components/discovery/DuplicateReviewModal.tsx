@@ -132,7 +132,10 @@ export function DuplicateReviewModal({
   // Initialize state when modal opens
   useMemo(() => {
     if (isOpen && artifacts.length > 0) {
-      const initialMatches = new Map<string, { collection_id: string; action: DuplicateDecisionAction }>();
+      const initialMatches = new Map<
+        string,
+        { collection_id: string; action: DuplicateDecisionAction }
+      >();
       const initialNew = new Set<string>();
       const initialSkipped = new Set<string>();
 
@@ -202,53 +205,55 @@ export function DuplicateReviewModal({
   }, []);
 
   // Toggle all new artifacts
-  const toggleAllNewArtifacts = useCallback((selected: boolean) => {
-    setState((prev) => {
-      if (selected) {
-        // Select all new artifacts
-        const allPaths = newArtifacts.map((a) => a.path);
-        return {
-          ...prev,
-          newArtifacts: new Set(allPaths),
-          skipped: new Set([...prev.skipped].filter((p) => !allPaths.includes(p))),
-        };
-      } else {
-        // Deselect all new artifacts
-        const allPaths = newArtifacts.map((a) => a.path);
-        return {
-          ...prev,
-          newArtifacts: new Set(),
-          skipped: new Set([...prev.skipped, ...allPaths]),
-        };
-      }
-    });
-  }, [newArtifacts]);
+  const toggleAllNewArtifacts = useCallback(
+    (selected: boolean) => {
+      setState((prev) => {
+        if (selected) {
+          // Select all new artifacts
+          const allPaths = newArtifacts.map((a) => a.path);
+          return {
+            ...prev,
+            newArtifacts: new Set(allPaths),
+            skipped: new Set([...prev.skipped].filter((p) => !allPaths.includes(p))),
+          };
+        } else {
+          // Deselect all new artifacts
+          const allPaths = newArtifacts.map((a) => a.path);
+          return {
+            ...prev,
+            newArtifacts: new Set(),
+            skipped: new Set([...prev.skipped, ...allPaths]),
+          };
+        }
+      });
+    },
+    [newArtifacts]
+  );
 
   // Update match decision for a duplicate
-  const updateMatchDecision = useCallback((
-    path: string,
-    collectionId: string | null,
-    action: DuplicateDecisionAction
-  ) => {
-    setState((prev) => {
-      const newMatches = new Map(prev.matches);
-      const newSkipped = new Set(prev.skipped);
+  const updateMatchDecision = useCallback(
+    (path: string, collectionId: string | null, action: DuplicateDecisionAction) => {
+      setState((prev) => {
+        const newMatches = new Map(prev.matches);
+        const newSkipped = new Set(prev.skipped);
 
-      if (collectionId && action === 'link') {
-        newMatches.set(path, { collection_id: collectionId, action: 'link' });
-        newSkipped.delete(path);
-      } else if (action === 'skip') {
-        newMatches.delete(path);
-        newSkipped.add(path);
-      } else {
-        // "Not a duplicate" - treat as new artifact
-        newMatches.delete(path);
-        newSkipped.delete(path);
-      }
+        if (collectionId && action === 'link') {
+          newMatches.set(path, { collection_id: collectionId, action: 'link' });
+          newSkipped.delete(path);
+        } else if (action === 'skip') {
+          newMatches.delete(path);
+          newSkipped.add(path);
+        } else {
+          // "Not a duplicate" - treat as new artifact
+          newMatches.delete(path);
+          newSkipped.delete(path);
+        }
 
-      return { ...prev, matches: newMatches, skipped: newSkipped };
-    });
-  }, []);
+        return { ...prev, matches: newMatches, skipped: newSkipped };
+      });
+    },
+    []
+  );
 
   // Handle confirm button click
   const handleConfirm = async () => {
@@ -273,7 +278,9 @@ export function DuplicateReviewModal({
       setProcessingResult(result);
 
       if (result.status === 'success') {
-        showSuccess(`Processed ${result.linked_count + result.imported_count} artifacts successfully`);
+        showSuccess(
+          `Processed ${result.linked_count + result.imported_count} artifacts successfully`
+        );
       } else if (result.status === 'partial') {
         showSuccess(`Processed artifacts with some issues: ${result.message}`);
       }
@@ -287,7 +294,9 @@ export function DuplicateReviewModal({
 
   // Calculate summary stats
   const stats = useMemo(() => {
-    const linkedCount = Array.from(state.matches.values()).filter((m) => m.action === 'link').length;
+    const linkedCount = Array.from(state.matches.values()).filter(
+      (m) => m.action === 'link'
+    ).length;
     const importCount = state.newArtifacts.size;
     const skipCount = state.skipped.size;
 
@@ -330,15 +339,21 @@ export function DuplicateReviewModal({
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-4 rounded-lg bg-muted/50 p-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{processingResult.imported_count}</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {processingResult.imported_count}
+                  </div>
                   <div className="text-sm text-muted-foreground">Imported</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{processingResult.linked_count}</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {processingResult.linked_count}
+                  </div>
                   <div className="text-sm text-muted-foreground">Linked</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-600">{processingResult.skipped_count}</div>
+                  <div className="text-2xl font-bold text-gray-600">
+                    {processingResult.skipped_count}
+                  </div>
                   <div className="text-sm text-muted-foreground">Skipped</div>
                 </div>
               </div>
@@ -352,7 +367,10 @@ export function DuplicateReviewModal({
               )}
 
               {processingResult.status === 'partial' && (
-                <Alert variant="default" className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+                <Alert
+                  variant="default"
+                  className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20"
+                >
                   <AlertTriangle className="h-4 w-4 text-yellow-600" />
                   <AlertDescription>
                     Some operations completed with issues. Check the details below.
@@ -455,7 +473,7 @@ export function DuplicateReviewModal({
                           />
                           <label
                             htmlFor="select-all-new"
-                            className="text-sm font-medium cursor-pointer"
+                            className="cursor-pointer text-sm font-medium"
                           >
                             Select all for import
                           </label>
@@ -545,7 +563,9 @@ export function DuplicateReviewModal({
                             key={artifact.path}
                             className={cn(
                               'rounded-lg border p-3',
-                              isSkipped ? 'border-muted bg-muted/20 opacity-60' : 'border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20'
+                              isSkipped
+                                ? 'border-muted bg-muted/20 opacity-60'
+                                : 'border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20'
                             )}
                           >
                             <div className="flex items-start justify-between gap-4">
@@ -555,13 +575,16 @@ export function DuplicateReviewModal({
                                   <Badge variant="outline" className="text-xs">
                                     {artifact.type}
                                   </Badge>
-                                  <Badge variant="default" className="gap-1 text-xs bg-green-600">
+                                  <Badge variant="default" className="gap-1 bg-green-600 text-xs">
                                     <CheckCircle2 className="h-3 w-3" />
                                     100% match
                                   </Badge>
                                 </div>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                  Matches: <span className="font-mono">{artifact.collection_match?.matched_artifact_id}</span>
+                                  Matches:{' '}
+                                  <span className="font-mono">
+                                    {artifact.collection_match?.matched_artifact_id}
+                                  </span>
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -579,7 +602,7 @@ export function DuplicateReviewModal({
                                 />
                                 <label
                                   htmlFor={`skip-exact-${artifact.path}`}
-                                  className="text-sm text-muted-foreground cursor-pointer"
+                                  className="cursor-pointer text-sm text-muted-foreground"
                                 >
                                   Skip
                                 </label>

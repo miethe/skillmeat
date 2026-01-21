@@ -97,9 +97,7 @@ describe('ConfidenceFilter', () => {
   });
 
   it('applies custom className', () => {
-    const { container } = render(
-      <ConfidenceFilter {...mockProps} className="custom-class" />
-    );
+    const { container } = render(<ConfidenceFilter {...mockProps} className="custom-class" />);
 
     const filterDiv = container.firstChild;
     expect(filterDiv).toHaveClass('custom-class');

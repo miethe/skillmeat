@@ -47,10 +47,7 @@ interface PendingAction {
 /**
  * Convert Entity + upstream diff data to Artifact for SyncDialog compatibility
  */
-function entityToArtifact(
-  entity: Entity,
-  upstreamDiff?: ArtifactUpstreamDiffResponse
-): Artifact {
+function entityToArtifact(entity: Entity, upstreamDiff?: ArtifactUpstreamDiffResponse): Artifact {
   return {
     id: entity.id,
     name: entity.name,
@@ -92,14 +89,11 @@ function computeDriftStatus(
   if (!diffData.has_changes) return 'none';
 
   // Check if any file has conflicts (basic heuristic: look for conflict markers)
-  const hasConflicts = diffData.files.some(
-    (f: FileDiff) => f.unified_diff?.includes('<<<<<<< ')
-  );
+  const hasConflicts = diffData.files.some((f: FileDiff) => f.unified_diff?.includes('<<<<<<< '));
 
   if (hasConflicts) return 'conflict';
   return 'modified';
 }
-
 
 /**
  * Get left label for DiffViewer based on comparison scope
@@ -145,7 +139,6 @@ function hasValidUpstreamSource(source: string | undefined | null): boolean {
   return source.includes('/') && !source.startsWith('local');
 }
 
-
 // ============================================================================
 // Loading Skeleton
 // ============================================================================
@@ -177,11 +170,7 @@ function SyncStatusTabSkeleton() {
         {/* Diff Content Skeleton */}
         <div className="flex-1 space-y-2 p-6">
           {[...Array(12)].map((_, i) => (
-            <Skeleton
-              key={i}
-              className="h-5"
-              style={{ width: `${60 + Math.random() * 30}%` }}
-            />
+            <Skeleton key={i} className="h-5" style={{ width: `${60 + Math.random() * 30}%` }} />
           ))}
         </div>
       </div>
@@ -240,12 +229,7 @@ function SyncStatusTabSkeleton() {
  * />
  * ```
  */
-export function SyncStatusTab({
-  entity,
-  mode,
-  projectPath,
-  onClose,
-}: SyncStatusTabProps) {
+export function SyncStatusTab({ entity, mode, projectPath, onClose }: SyncStatusTabProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -287,9 +271,8 @@ export function SyncStatusTab({
         `/artifacts/${encodeURIComponent(entity.id)}/upstream-diff${queryString ? `?${queryString}` : ''}`
       );
     },
-    enabled: !!entity.id
-      && entity.collection !== 'discovered'
-      && hasValidUpstreamSource(entity.source),
+    enabled:
+      !!entity.id && entity.collection !== 'discovered' && hasValidUpstreamSource(entity.source),
   });
 
   // Project diff (collection vs project)
@@ -315,16 +298,13 @@ export function SyncStatusTab({
   // Sync mutation (pull from source)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(
-        `/artifacts/${encodeURIComponent(entity.id)}/sync`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            // Empty body syncs from upstream source (not project)
-            // project_path is omitted to trigger upstream sync
-          }),
-        }
-      );
+      return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/sync`, {
+        method: 'POST',
+        body: JSON.stringify({
+          // Empty body syncs from upstream source (not project)
+          // project_path is omitted to trigger upstream sync
+        }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
@@ -347,16 +327,13 @@ export function SyncStatusTab({
   // Deploy mutation (deploy to project)
   const deployMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(
-        `/artifacts/${encodeURIComponent(entity.id)}/deploy`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            project_path: projectPath,
-            overwrite: false,
-          }),
-        }
-      );
+      return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
+        method: 'POST',
+        body: JSON.stringify({
+          project_path: projectPath,
+          overwrite: false,
+        }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
@@ -386,16 +363,13 @@ export function SyncStatusTab({
         return syncMutation.mutateAsync();
       } else {
         // Deploy from collection to project (overwrite)
-        return await apiRequest(
-          `/artifacts/${encodeURIComponent(entity.id)}/deploy`,
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              project_path: projectPath,
-              overwrite: true,
-            }),
-          }
-        );
+        return await apiRequest(`/artifacts/${encodeURIComponent(entity.id)}/deploy`, {
+          method: 'POST',
+          body: JSON.stringify({
+            project_path: projectPath,
+            overwrite: true,
+          }),
+        });
       }
     },
     onSuccess: () => {
@@ -492,10 +466,7 @@ export function SyncStatusTab({
   }, [comparisonScope, upstreamDiff, projectDiff]);
 
   // Drift status
-  const driftStatus = useMemo(
-    () => computeDriftStatus(currentDiff),
-    [currentDiff]
-  );
+  const driftStatus = useMemo(() => computeDriftStatus(currentDiff), [currentDiff]);
 
   // ============================================================================
   // Early Return: Discovered Artifacts
@@ -509,7 +480,8 @@ export function SyncStatusTab({
         <Alert className="max-w-md">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Sync status is not available for discovered artifacts. Import this artifact to your collection to enable sync tracking.
+            Sync status is not available for discovered artifacts. Import this artifact to your
+            collection to enable sync tracking.
           </AlertDescription>
         </Alert>
       </div>
@@ -610,7 +582,7 @@ export function SyncStatusTab({
   // For local-only artifacts: upstreamError is expected, so don't block if projectData is available
   const shouldBlockWithError =
     (projectError && !hasUpstreamData) || // Project failed and no upstream
-    (upstreamError && projectError) ||     // Both failed
+    (upstreamError && projectError) || // Both failed
     (!hasValidUpstreamSource(entity.source) && projectError); // Local artifact and project failed
 
   if (shouldBlockWithError) {
@@ -646,8 +618,8 @@ export function SyncStatusTab({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               No comparison data available for this scope.
-              {!hasRealSource && " This artifact has no remote source."}
-              {!projectPath && " No project deployment found."}
+              {!hasRealSource && ' This artifact has no remote source.'}
+              {!projectPath && ' No project deployment found.'}
             </AlertDescription>
           </Alert>
         </div>
@@ -671,13 +643,13 @@ export function SyncStatusTab({
         </div>
 
         {/* Middle: Full Width Content */}
-        <div className="flex flex-1 min-w-0 flex-col overflow-hidden min-h-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex-shrink-0 space-y-2 border-b p-4">
             <ComparisonSelector {...comparisonProps} />
             <DriftAlertBanner {...alertProps} />
           </div>
-          <div className="flex-1 overflow-hidden min-h-0 min-w-0">
-            <div className="h-full min-h-[320px] max-h-[55vh] overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div className="h-full max-h-[55vh] min-h-[320px] overflow-hidden">
               <DiffViewer {...diffProps} />
             </div>
           </div>
@@ -695,7 +667,9 @@ export function SyncStatusTab({
         isOpen={showSyncDialog}
         onClose={() => setShowSyncDialog(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['upstream-diff', entity.id, entity.collection] });
+          queryClient.invalidateQueries({
+            queryKey: ['upstream-diff', entity.id, entity.collection],
+          });
           queryClient.invalidateQueries({ queryKey: ['project-diff', entity.id] });
           queryClient.invalidateQueries({ queryKey: ['artifacts'] });
           toast({

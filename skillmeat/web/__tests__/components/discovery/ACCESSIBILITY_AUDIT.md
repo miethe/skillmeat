@@ -27,6 +27,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 ### 1. Label Association ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ Each skip checkbox has proper `id`/`htmlFor` association
   - Checkbox: `id="skip-${artifact.path}"` (line 301)
   - Label: `htmlFor="skip-${artifact.path}"` (line 308)
@@ -37,6 +38,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 - ✅ Selection checkboxes: `aria-label="Select {artifact.name}"` (line 276)
 
 **SkipPreferencesList:**
+
 - ✅ Un-skip buttons have descriptive `aria-label`
   - Format: "Un-skip {artifact.name}" (line 153)
 - ✅ Collapsible trigger has semantic button element with proper ARIA
@@ -44,6 +46,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 ### 2. Keyboard Accessibility ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ All checkboxes are focusable via Tab key
 - ✅ Space key toggles checkbox state (Radix UI built-in)
 - ✅ Focus indicator visible via `focus-visible:ring-1` (checkbox.tsx line 16)
@@ -51,6 +54,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 - ✅ Edit buttons keyboard accessible with aria-labels (line 321)
 
 **SkipPreferencesList:**
+
 - ✅ Collapsible trigger is keyboard accessible
 - ✅ Focus ring visible: `focus-visible:ring-2 focus-visible:ring-ring` (line 91)
 - ✅ Un-skip buttons keyboard accessible
@@ -60,6 +64,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 ### 3. Screen Reader Support ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ Checkbox state announced via Radix primitives
   - `role="checkbox"` (Radix)
   - `aria-checked="true|false"` (Radix)
@@ -74,6 +79,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 - ✅ Dialog has proper ARIA role and labeling (Radix Dialog)
 
 **SkipPreferencesList:**
+
 - ✅ Artifact count announced via badge (line 99)
 - ✅ Semantic structure for artifact cards (lines 126-161)
 - ✅ Confirmation dialog has proper ARIA (Radix AlertDialog)
@@ -83,6 +89,7 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 ### 4. Disabled State Handling ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ Visual distinction via `disabled:opacity-50` (checkbox.tsx line 16)
 - ✅ Properly disabled when:
   - Artifact status is 'skipped' (line 262)
@@ -92,23 +99,27 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
 - ✅ Status badge explains why checkbox is disabled (lines 293-296)
 
 **SkipPreferencesList:**
+
 - ✅ Buttons disabled when `isLoading` prop is true
 - ✅ Visual feedback for disabled state
 
 ### 5. Focus Management ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ Focus moves to first focusable element on modal open (Radix Dialog)
 - ✅ Focus trapped within modal during interaction (Radix Dialog)
 - ✅ Focus restored to trigger element on modal close (Radix Dialog)
 
 **SkipPreferencesList:**
+
 - ✅ Focus maintained on trigger after collapse/expand
 - ✅ Focus returned after dialog dismissal (Radix AlertDialog)
 
 ### 6. ARIA Attributes and Roles ✅ PASS
 
 **BulkImportModal:**
+
 - ✅ `role="dialog"` on modal (Radix)
 - ✅ Dialog title and description properly associated (Radix)
 - ✅ `aria-busy` attribute on table container (line 226)
@@ -116,12 +127,14 @@ All skip checkbox implementations in the BulkImportModal and SkipPreferencesList
   - `data-indeterminate={isPartiallySelected}`
 
 **SkipPreferencesList:**
+
 - ✅ `aria-expanded` on collapsible trigger (lines 93-94)
 - ✅ `aria-controls` links trigger to content (line 94)
 
 ## Automated Testing (jest-axe) ✅ PASS
 
 All components pass automated accessibility testing with zero violations:
+
 - ✅ Default state: No violations
 - ✅ Mixed artifact states: No violations
 - ✅ Empty state: No violations
@@ -162,12 +175,14 @@ While all components pass accessibility requirements, the following improvements
   disabled={isSkipped}
   aria-label={`Don't show ${artifact.name} in future discoveries`}
   aria-describedby={isSkipped ? `skip-reason-${artifact.path}` : undefined}
-/>
-{isSkipped && (
-  <span id={`skip-reason-${artifact.path}`} className="sr-only">
-    Already marked to skip
-  </span>
-)}
+/>;
+{
+  isSkipped && (
+    <span id={`skip-reason-${artifact.path}`} className="sr-only">
+      Already marked to skip
+    </span>
+  );
+}
 ```
 
 **Impact**: Low - Current implementation is accessible; this would provide redundant context
@@ -223,6 +238,7 @@ The skip checkbox implementations in both BulkImportModal and SkipPreferencesLis
 **Recommendation**: APPROVE for production deployment
 
 **Acceptance Criteria Met**:
+
 - ✅ `<label for>` associations correct
 - ✅ Keyboard navigation works
 - ✅ Screen reader announces checkbox state
@@ -233,10 +249,12 @@ The skip checkbox implementations in both BulkImportModal and SkipPreferencesLis
 ---
 
 **Files Modified**:
+
 - Created: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/__tests__/components/discovery/BulkImportModal.a11y.test.tsx`
 - Enhanced: `/Users/miethe/dev/homelab/development/skillmeat/skillmeat/web/__tests__/components/discovery/SkipPreferencesList.test.tsx`
 
 **Test Results**:
+
 - BulkImportModal.a11y.test.tsx: 30/30 passing ✅
 - SkipPreferencesList.test.tsx: 20/20 passing ✅
 

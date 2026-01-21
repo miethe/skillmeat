@@ -239,6 +239,19 @@ class GroupWithArtifactsResponse(GroupResponse):
         }
 
 
+class CopyGroupRequest(BaseModel):
+    """Request schema for copying a group to another collection.
+
+    Creates a copy of the group (with name + " (Copy)") in the target collection,
+    including all artifacts from the source group.
+    """
+
+    target_collection_id: str = Field(
+        description="ID of the collection to copy the group to",
+        examples=["target-collection-123"],
+    )
+
+
 class GroupListResponse(BaseModel):
     """Response schema for listing groups."""
 

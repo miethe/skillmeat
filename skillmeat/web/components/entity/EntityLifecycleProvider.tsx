@@ -7,10 +7,7 @@
  * in component hierarchies.
  */
 
-import {
-  EntityLifecycleProvider as BaseProvider,
-  EntityLifecycleProviderProps,
-} from '@/hooks';
+import { EntityLifecycleProvider as BaseProvider, EntityLifecycleProviderProps } from '@/hooks';
 
 export type { EntityLifecycleProviderProps };
 

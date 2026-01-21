@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings } from 'lucide-react';
+import { GitHubSettings } from '@/components/settings/github-settings';
 
 export default function SettingsPage() {
   return (
@@ -47,6 +48,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <GitHubSettings />
       </div>
     </div>
   );

@@ -316,9 +316,7 @@ describe('CatalogTabs', () => {
       );
 
       const tabs = screen.getAllByRole('tab');
-      const activeTabs = tabs.filter(
-        (tab) => tab.getAttribute('data-state') === 'active'
-      );
+      const activeTabs = tabs.filter((tab) => tab.getAttribute('data-state') === 'active');
 
       expect(activeTabs).toHaveLength(1);
     });
@@ -537,13 +535,7 @@ describe('CatalogTabs', () => {
   describe('Edge Cases', () => {
     it('handles empty countsByType object', () => {
       const mockOnTypeChange = jest.fn();
-      render(
-        <CatalogTabs
-          countsByType={{}}
-          selectedType={null}
-          onTypeChange={mockOnTypeChange}
-        />
-      );
+      render(<CatalogTabs countsByType={{}} selectedType={null} onTypeChange={mockOnTypeChange} />);
 
       // All tabs should show 0 count
       const allTypesTab = screen.getByRole('tab', { name: /all types/i });

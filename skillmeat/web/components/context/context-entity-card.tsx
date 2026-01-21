@@ -26,12 +26,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ContextEntity, ContextEntityType } from '@/types/context-entity';
 
@@ -109,10 +104,7 @@ function TypeBadge({ config }: TypeBadgeProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="outline"
-            className={cn('gap-1 text-xs', config.badgeClassName)}
-          >
+          <Badge variant="outline" className={cn('gap-1 text-xs', config.badgeClassName)}>
             <Icon className="h-3 w-3" />
             {config.label}
           </Badge>
@@ -139,23 +131,17 @@ function AutoLoadIndicator({ autoLoad }: AutoLoadIndicatorProps) {
             className={cn(
               'gap-1 text-xs',
               autoLoad
-                ? 'border-green-500 text-green-700 bg-green-50 dark:bg-green-950'
-                : 'border-gray-300 text-gray-600 bg-gray-50 dark:bg-gray-900'
+                ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-950'
+                : 'border-gray-300 bg-gray-50 text-gray-600 dark:bg-gray-900'
             )}
           >
-            {autoLoad ? (
-              <CheckCircle2 className="h-3 w-3" />
-            ) : (
-              <Circle className="h-3 w-3" />
-            )}
+            {autoLoad ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
             {autoLoad ? 'Auto-load' : 'Manual'}
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
           <p>
-            {autoLoad
-              ? 'Automatically loads when path pattern matches'
-              : 'Requires manual loading'}
+            {autoLoad ? 'Automatically loads when path pattern matches' : 'Requires manual loading'}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -256,9 +242,7 @@ export function ContextEntityCard({
 
   // Truncate path pattern if too long
   const truncatedPath =
-    entity.path_pattern.length > 40
-      ? `...${entity.path_pattern.slice(-37)}`
-      : entity.path_pattern;
+    entity.path_pattern.length > 40 ? `...${entity.path_pattern.slice(-37)}` : entity.path_pattern;
 
   return (
     <Card
@@ -271,21 +255,19 @@ export function ContextEntityCard({
       role="article"
       aria-label={`Context entity: ${entity.name}`}
     >
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 p-4">
         {/* Header: Name + Type Badge + Auto-load */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <Icon className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
             <div className="min-w-0">
-              <h3 className="font-semibold truncate">{entity.name}</h3>
+              <h3 className="truncate font-semibold">{entity.name}</h3>
               {entity.category && (
-                <p className="text-xs text-muted-foreground">
-                  Category: {entity.category}
-                </p>
+                <p className="text-xs text-muted-foreground">Category: {entity.category}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-1">
             <TypeBadge config={config} />
             <AutoLoadIndicator autoLoad={entity.auto_load} />
           </div>
@@ -293,7 +275,7 @@ export function ContextEntityCard({
 
         {/* Hover Actions */}
         {(onEdit || onDelete) && (
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
             {onEdit && (
               <Button
                 variant="ghost"
@@ -321,15 +303,13 @@ export function ContextEntityCard({
 
         {/* Description */}
         {entity.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {entity.description}
-          </p>
+          <p className="line-clamp-2 text-sm text-muted-foreground">{entity.description}</p>
         )}
 
         {/* Path Pattern and Token Count */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <span
-            className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded"
+            className="rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground"
             title={entity.path_pattern}
             aria-label={`Path pattern: ${entity.path_pattern}`}
           >
@@ -344,7 +324,7 @@ export function ContextEntityCard({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="text-xs gap-1">
+                  <Badge variant="secondary" className="gap-1 text-xs">
                     ~{tokenCount} tokens
                   </Badge>
                 </TooltipTrigger>
@@ -358,15 +338,20 @@ export function ContextEntityCard({
 
         {/* Auto-load Toggle */}
         {onAutoLoadToggle && (
-          <div className="flex items-center justify-between pt-2 border-t">
+          <div className="flex items-center justify-between border-t pt-2">
             <div className="flex items-center gap-2">
-              <label htmlFor={`auto-load-${entity.id}`} className="text-sm font-medium cursor-pointer">
+              <label
+                htmlFor={`auto-load-${entity.id}`}
+                className="cursor-pointer text-sm font-medium"
+              >
                 Auto-load
               </label>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-xs text-muted-foreground" aria-label="Help">ⓘ</span>
+                    <span className="text-xs text-muted-foreground" aria-label="Help">
+                      ⓘ
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Automatically load this entity when path pattern matches</p>
@@ -388,7 +373,7 @@ export function ContextEntityCard({
         )}
 
         {/* Footer: Action Buttons */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+        <div className="flex items-center justify-end gap-2 border-t pt-2">
           {onPreview && (
             <Button
               variant="ghost"
@@ -396,7 +381,7 @@ export function ContextEntityCard({
               onClick={handlePreview}
               aria-label={`Preview ${entity.name}`}
             >
-              <Eye className="h-4 w-4 mr-1" aria-hidden="true" />
+              <Eye className="mr-1 h-4 w-4" aria-hidden="true" />
               Preview
             </Button>
           )}
@@ -407,7 +392,7 @@ export function ContextEntityCard({
               onClick={handleDeploy}
               aria-label={`Deploy ${entity.name} to project`}
             >
-              <Rocket className="h-4 w-4 mr-1" aria-hidden="true" />
+              <Rocket className="mr-1 h-4 w-4" aria-hidden="true" />
               Deploy
             </Button>
           )}

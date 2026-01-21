@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { ChangeOrigin } from '@/types/drift';
@@ -68,7 +63,7 @@ export function ChangeBadge({
     <Badge
       variant="outline"
       className={cn(
-        'font-medium border cursor-default',
+        'cursor-default border font-medium',
         config.color,
         config.darkColor,
         SIZE_CLASSES[size],

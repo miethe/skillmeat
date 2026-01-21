@@ -37,6 +37,7 @@ from .routers import (
     project_templates,
     projects,
     ratings,
+    settings as settings_router,
     tags,
     user_collections,
     versions,
@@ -87,6 +88,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from .routers.health import set_service_start_time
 
     set_service_start_time()
+
+    # Ensure default collection exists and migrate existing artifacts
+    try:
+        from skillmeat.api.routers.user_collections import (
+            ensure_default_collection,
+            migrate_artifacts_to_default_collection,
+        )
+        from skillmeat.cache.models import get_session
+
+        session = get_session()
+        try:
+            ensure_default_collection(session)
+            logger.info("Default collection verified/created")
+
+            # Migrate existing artifacts to default collection
+            if app_state.artifact_manager and app_state.collection_manager:
+                result = migrate_artifacts_to_default_collection(
+                    session=session,
+                    artifact_mgr=app_state.artifact_manager,
+                    collection_mgr=app_state.collection_manager,
+                )
+                logger.info(
+                    f"Artifact migration: {result['migrated_count']} migrated, "
+                    f"{result['already_present_count']} already present, "
+                    f"{result['total_artifacts']} total"
+                )
+        finally:
+            session.close()
+    except Exception as e:
+        logger.warning(f"Could not ensure default collection or migrate artifacts: {e}")
 
     logger.info(f"SkillMeat API v{skillmeat_version} started successfully")
 
@@ -278,6 +309,9 @@ def create_app(settings: APISettings = None) -> FastAPI:
     )
     app.include_router(projects.router, prefix=settings.api_prefix, tags=["projects"])
     app.include_router(ratings.router, prefix=settings.api_prefix, tags=["ratings"])
+    app.include_router(
+        settings_router.router, prefix=settings.api_prefix, tags=["settings"]
+    )
     app.include_router(tags.router, prefix=settings.api_prefix, tags=["tags"])
     app.include_router(versions.router, prefix=settings.api_prefix, tags=["versions"])
 
