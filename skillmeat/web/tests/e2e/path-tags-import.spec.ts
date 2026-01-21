@@ -200,14 +200,18 @@ test.describe('Path Tags Import Checkbox', () => {
     await expect(checkbox).not.toBeChecked();
 
     // Select first artifact
-    const firstArtifactCheckbox = page.locator('input[type="checkbox"][aria-label="Select test-skill"]');
+    const firstArtifactCheckbox = page.locator(
+      'input[type="checkbox"][aria-label="Select test-skill"]'
+    );
     await firstArtifactCheckbox.click();
 
     // Verify path tags checkbox is still unchecked
     await expect(checkbox).not.toBeChecked();
 
     // Select second artifact
-    const secondArtifactCheckbox = page.locator('input[type="checkbox"][aria-label="Select test-skill-2"]');
+    const secondArtifactCheckbox = page.locator(
+      'input[type="checkbox"][aria-label="Select test-skill-2"]'
+    );
     await secondArtifactCheckbox.click();
 
     // Verify path tags checkbox is still unchecked
@@ -408,7 +412,9 @@ test.describe('Path Tags Import Checkbox', () => {
     const checkbox = page.locator('#apply-path-tags');
 
     // Select all artifacts
-    const selectAllCheckbox = page.locator('input[type="checkbox"][aria-label="Select all artifacts"]');
+    const selectAllCheckbox = page.locator(
+      'input[type="checkbox"][aria-label="Select all artifacts"]'
+    );
     await selectAllCheckbox.click();
 
     // Verify both artifacts are selected
@@ -495,7 +501,9 @@ test.describe('Path Tags Import Checkbox', () => {
     await expect(checkbox).toBeChecked();
 
     // Select all artifacts
-    const selectAllCheckbox = page.locator('input[type="checkbox"][aria-label="Select all artifacts"]');
+    const selectAllCheckbox = page.locator(
+      'input[type="checkbox"][aria-label="Select all artifacts"]'
+    );
     await selectAllCheckbox.click();
 
     // Click Import

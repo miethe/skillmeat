@@ -9,6 +9,144 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Collections & Groups UX Enhancement (Phases 0-5, 2026-01-20)
+
+**API Contract Alignment (Phase 0)**
+- Added `artifact_id` filter to `GET /groups` endpoint
+- Added `group_id` filter to `GET /user-collections/{id}/artifacts` endpoint
+- Added `include_groups=true` query option for artifact responses to include group memberships
+
+**Data Layer & Hooks (Phase 1)**
+- `useGroups(collectionId)` hook for fetching groups within a collection
+- `useArtifactGroups(artifactId, collectionId)` hook for fetching groups an artifact belongs to
+- Enhanced `useInfiniteCollectionArtifacts` hook with `group_id` and `include_groups` support
+
+**Collection Badges on Artifact Cards (Phase 2)**
+- Collection membership badges on UnifiedCard component in "All Collections" view
+- CollectionBadgeStack component with "+N more" tooltip pattern for overflow handling
+- Multi-collection display showing artifact presence across collections
+
+**Group Badges & Modal Enhancement (Phase 3)**
+- Group membership badges on artifact cards in specific collection context
+- GroupBadgeRow component for displaying group associations
+- Groups display in ModalCollectionsTab showing all collections and their groups
+- Enhanced artifact detail modals with collection and group context
+
+**Groups Sidebar Page (Phase 4)**
+- New `/groups` page with dedicated sidebar navigation item
+- Group selector dropdown for filtering artifacts by group
+- Artifact grid filtered by selected group with full card interactions
+- Groups list view with creation and management capabilities
+
+**Group Filter Integration (Phase 5)**
+- GroupFilterSelect component for filtering artifacts by group
+- Integrated into Filters component (collection page)
+- Integrated into EntityFilters component (manage page)
+- Conditional visibility: hidden in "All Collections" view, visible in collection context
+
+**Technical Improvements**
+- API responses include group membership data when `include_groups=true`
+- Efficient group filtering with indexed queries
+- Consistent badge styling across artifact cards
+- Proper handling of many-to-many artifact-group relationships
+
+#### Marketplace Sources Enhancement v1
+
+**Rich Repository Metadata**
+- Import repository description and README from GitHub during source creation
+- Toggle repository metadata import in add source dialog and edit source dialog
+- View repository details in a modal on source detail page
+- Markdown rendering for README content with syntax highlighting and proper link handling
+- Repository description displayed on source cards (truncated to 2 lines with ellipsis)
+
+**Source-Level Tagging**
+- Add up to 20 searchable tags per source
+- Tag format: alphanumeric characters, hyphens, and underscores (1-50 chars each)
+- Tags managed at import time and updatable via edit source dialog
+- Click-to-filter tags on source cards and detail pages
+- Tag normalization: lowercase conversion and whitespace stripping
+- Tag autocomplete suggestions from existing source tags
+
+**Artifact Count Breakdown**
+- `counts_by_type` field returns artifact count by type (skill, command, agent, mcp, hook)
+- Example: `{ "skill": 12, "command": 3, "agent": 2 }`
+- Tooltip displays type breakdown on source card hover (shows total and per-type counts)
+- Backward compatible: `artifact_count` field still available with total count
+- Enables accurate source composition assessment
+
+**Advanced Filtering**
+- Filter by artifact type, tags, trust level, and search in marketplace sources list
+- Composable filters with AND logic: combined filters return intersection of results
+- URL state sync for bookmarkable filter combinations
+
+**Single Artifact Mode**
+- New toggle in Add Source dialog: "Treat as single artifact"
+- For repositories that ARE an artifact (not containing artifacts), e.g., a skill with SKILL.md at root
+- Manually select artifact type (skill, command, agent, mcp_server, hook) when mode is enabled
+- Bypasses automatic detection and treats entire repo (or root_hint directory) as one artifact
+- Sets 100% confidence score for manually specified artifact type
+- Database migration: adds `single_artifact_mode` and `single_artifact_type` columns to marketplace_sources
+
+**Redesigned Source Cards**
+- Enhanced card layout with repository description, tags, and counts breakdown
+- Status badges: New, Updated, Imported, Removed (consistent with artifact cards)
+- Trust level indicators: Basic (gray), Verified (blue), Official (purple)
+- Artifact count badge with tooltip for type breakdown
+- Tags display with overflow handling and color consistency
+- Rescan button and last sync time visibility improved
+
+### Changed
+
+- `SourceResponse` schema extended with: `repo_description`, `repo_readme`, `tags`, `counts_by_type`
+- `CreateSourceRequest` accepts: `import_repo_description`, `import_repo_readme`, `tags`
+- `UpdateSourceRequest` supports: `repo_description`, `repo_readme`, `tags`
+- Marketplace sources list endpoint now supports query parameters: `artifact_type`, `tags`, `trust_level`, `search`
+- Source card component redesigned with enhanced metadata display
+- GitHub scanner now captures repository description and README content during scans
+- Tag validation enforced: alphanumeric + hyphens/underscores, 1-50 chars, max 20 per source
+
+### Technical Details
+
+**Database Schema**
+- Added `repo_description` (TEXT nullable) and `repo_readme` (TEXT nullable) fields to `marketplace_sources` table
+- Added `tags` (JSON array) field to `marketplace_sources` table
+- Updated `counts_by_type` (JSON) field to be computed from `marketplace_catalog_entries` during source detail queries
+
+**API Endpoints**
+- `GET /api/v1/marketplace/sources` - Enhanced with filter parameters and returns enriched SourceResponse
+- `POST /api/v1/marketplace/sources` - Accepts repo_description, repo_readme, tags options
+- `PATCH /api/v1/marketplace/sources/{source_id}` - Supports tag and metadata updates
+- All endpoints include `counts_by_type` field in responses
+
+**Frontend Components**
+- `SourceFilterBar` component: Filter by artifact type, tags, trust level, and search
+- `RepositoryDetailsModal` component: Display repository description and README
+- Enhanced `SourceCard` component: Render tags, counts breakdown, description
+- Enhanced `SourceDetailPage`: Display filters and repo details modal button
+- `TagBadge` component: Reusable tag display with click-to-filter capability
+
+**Error Handling**
+- Invalid tag format returns 400 Bad Request with detailed error message
+- Exceeding 20 tag limit returns 400 Bad Request
+- Invalid artifact type filter returns 400 Bad Request with available types list
+
+### Migration
+
+No breaking changes. New fields are optional and have sensible defaults:
+- `repo_description`, `repo_readme` default to NULL
+- `tags` defaults to empty array
+- `counts_by_type` computed dynamically (no migration needed)
+- Existing sources can be rescanned to fetch repository details by toggling options in edit dialog
+- Filter parameters are all optional; omitting them returns all sources
+
+### Performance Notes
+
+- Filter operations use indexed queries on artifact_type and tags fields
+- Counts computation cached during source detail page load
+- Repository metadata fetched only when `import_repo_description` or `import_repo_readme` flags set
+- Typical filter operation: <100ms for 100+ sources
+- No performance regression on existing endpoints
+
 #### Settings API & GitHub Authentication
 - **GitHub PAT Settings**: Settings page now allows users to configure a GitHub Personal Access Token
   - Improves API rate limits from 60 req/hr (unauthenticated) to 5,000 req/hr (authenticated)

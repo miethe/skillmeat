@@ -99,7 +99,12 @@ export async function addArtifactToCollection(
   collectionId: string,
   artifactId: string,
   _data?: Record<string, unknown>
-): Promise<{ collection_id: string; added_count: number; already_present_count: number; total_artifacts: number }> {
+): Promise<{
+  collection_id: string;
+  added_count: number;
+  already_present_count: number;
+  total_artifacts: number;
+}> {
   const response = await fetch(buildUrl(`/user-collections/${collectionId}/artifacts`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -107,7 +112,9 @@ export async function addArtifactToCollection(
   });
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.detail || `Failed to add artifact to collection: ${response.statusText}`);
+    throw new Error(
+      errorBody.detail || `Failed to add artifact to collection: ${response.statusText}`
+    );
   }
   return response.json();
 }
@@ -119,12 +126,17 @@ export async function removeArtifactFromCollection(
   collectionId: string,
   artifactId: string
 ): Promise<void> {
-  const response = await fetch(buildUrl(`/user-collections/${collectionId}/artifacts/${artifactId}`), {
-    method: 'DELETE',
-  });
+  const response = await fetch(
+    buildUrl(`/user-collections/${collectionId}/artifacts/${artifactId}`),
+    {
+      method: 'DELETE',
+    }
+  );
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.detail || `Failed to remove artifact from collection: ${response.statusText}`);
+    throw new Error(
+      errorBody.detail || `Failed to remove artifact from collection: ${response.statusText}`
+    );
   }
 }
 
@@ -142,7 +154,9 @@ export async function copyArtifactToCollection(
 ): Promise<{ artifact_id: string; collection_id: string; added_at: string }> {
   // TODO: Backend endpoint not implemented. As workaround, use addArtifactToCollection
   // on the target collection directly
-  throw new Error('Copy artifact not implemented. Use addArtifactToCollection on target collection.');
+  throw new Error(
+    'Copy artifact not implemented. Use addArtifactToCollection on target collection.'
+  );
 }
 
 /**

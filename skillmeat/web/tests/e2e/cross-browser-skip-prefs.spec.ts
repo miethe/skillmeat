@@ -112,7 +112,10 @@ test.describe('Cross-Browser Skip Preferences Persistence', () => {
   });
 
   test.describe('LocalStorage Write/Read Operations', () => {
-    test('writes skip preference to localStorage when artifact is skipped', async ({ page, browserName }) => {
+    test('writes skip preference to localStorage when artifact is skipped', async ({
+      page,
+      browserName,
+    }) => {
       test.info().annotations.push({
         type: 'browser',
         description: browserName,
@@ -354,7 +357,9 @@ test.describe('Cross-Browser Skip Preferences Persistence', () => {
       });
 
       // Find artifact rows
-      const artifactRows = await page.locator('[data-testid*="artifact-row"], .artifact-row, div:has-text("test-skill-1")').all();
+      const artifactRows = await page
+        .locator('[data-testid*="artifact-row"], .artifact-row, div:has-text("test-skill-1")')
+        .all();
 
       // Each artifact should be visible and have proper structure
       for (const row of artifactRows.slice(0, 3)) {
@@ -528,19 +533,31 @@ test.describe('Cross-Browser Skip Preferences Persistence', () => {
       });
 
       // Start on Discovery
-      await expect(page.getByRole('tab', { name: /Discovery/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Discovery/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
 
       // Switch to Deployed
       await page.getByRole('tab', { name: /Deployed/i }).click();
-      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
 
       // Go back
       await page.goBack();
-      await expect(page.getByRole('tab', { name: /Discovery/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Discovery/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
 
       // Go forward
       await page.goForward();
-      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute('data-state', 'active');
+      await expect(page.getByRole('tab', { name: /Deployed/i })).toHaveAttribute(
+        'data-state',
+        'active'
+      );
     });
   });
 

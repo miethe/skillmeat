@@ -75,10 +75,22 @@ function shortenSha(sha: string): string {
 // Type badge color configuration
 const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
   skill: { label: 'Skill', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  command: { label: 'Command', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-  agent: { label: 'Agent', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-  mcp: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-  mcp_server: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+  command: {
+    label: 'Command',
+    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  },
+  agent: {
+    label: 'Agent',
+    color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  },
+  mcp: {
+    label: 'MCP',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  },
+  mcp_server: {
+    label: 'MCP',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  },
   hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
 };
 
@@ -156,7 +168,7 @@ function buildFileStructure(files: FileTreeEntry[]): FileNode[] {
       const parentNode = nodeMap.get(parentPath);
       if (parentNode && parentNode.children) {
         // Only add if not already present (avoid duplicates)
-        if (!parentNode.children.some(child => child.path === node.path)) {
+        if (!parentNode.children.some((child) => child.path === node.path)) {
           parentNode.children.push(node);
         }
       }
@@ -239,7 +251,10 @@ function isRateLimitError(error: Error | null): boolean {
 /**
  * Get user-friendly error message based on error type
  */
-function getErrorMessage(error: Error | null, isTree: boolean): { title: string; description: string } {
+function getErrorMessage(
+  error: Error | null,
+  isTree: boolean
+): { title: string; description: string } {
   if (!error) {
     return {
       title: isTree ? 'Failed to load file tree' : 'Failed to load file',
@@ -255,7 +270,10 @@ function getErrorMessage(error: Error | null, isTree: boolean): { title: string;
   }
 
   // Check for network errors
-  if (error.message?.toLowerCase().includes('network') || error.message?.toLowerCase().includes('fetch')) {
+  if (
+    error.message?.toLowerCase().includes('network') ||
+    error.message?.toLowerCase().includes('fetch')
+  ) {
     return {
       title: isTree ? 'Failed to load file tree' : 'Failed to load file',
       description: 'Network error. Please check your connection and try again.',
@@ -318,9 +336,7 @@ export function CatalogEntryModal({
   } = useCatalogFileContent(sourceId, artifactPath, selectedFilePath);
 
   // Transform flat file list to hierarchical structure for FileTree component
-  const fileStructure = fileTreeData?.entries
-    ? buildFileStructure(fileTreeData.entries)
-    : [];
+  const fileStructure = fileTreeData?.entries ? buildFileStructure(fileTreeData.entries) : [];
 
   // Auto-select default file when file tree loads
   // Priority: first .md file (case-insensitive), then first file alphabetically
@@ -418,8 +434,7 @@ export function CatalogEntryModal({
   // Determine if import button should be disabled
   const isImportDisabled = entry.status === 'imported' || entry.status === 'removed' || isImporting;
   const isSavingName = updateNameMutation.isPending;
-  const isSaveDisabled =
-    isSavingName || !draftName.trim() || draftName.trim() === entry.name;
+  const isSaveDisabled = isSavingName || !draftName.trim() || draftName.trim() === entry.name;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -429,7 +444,8 @@ export function CatalogEntryModal({
           <DialogHeader>
             <DialogTitle>Catalog Entry Details</DialogTitle>
             <DialogDescription className="sr-only">
-              Detailed view of the {entry.name} artifact including confidence scores, metadata, and import options
+              Detailed view of the {entry.name} artifact including confidence scores, metadata, and
+              import options
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -465,10 +481,13 @@ export function CatalogEntryModal({
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="mt-0 flex-1 overflow-y-auto overflow-x-hidden min-h-0 py-4">
+          <TabsContent
+            value="overview"
+            className="mt-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-4"
+          >
             <div className="grid gap-6">
               {/* Header Section */}
-              <div className="border-b pb-4 space-y-2">
+              <div className="space-y-2 border-b pb-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     {isEditingName ? (
@@ -495,11 +514,7 @@ export function CatalogEntryModal({
                           className="min-w-[220px] flex-1"
                           aria-label="Artifact name"
                         />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={isSaveDisabled}
-                        >
+                        <Button type="submit" size="sm" disabled={isSaveDisabled}>
                           {isSavingName ? (
                             <>
                               <Loader2 className="mr-2 h-3 w-3 animate-spin" />
@@ -521,7 +536,7 @@ export function CatalogEntryModal({
                       </form>
                     ) : (
                       <>
-                        <h2 className="text-xl font-semibold truncate">{entry.name}</h2>
+                        <h2 className="truncate text-xl font-semibold">{entry.name}</h2>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -547,14 +562,14 @@ export function CatalogEntryModal({
                     {nameError}
                   </p>
                 )}
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
                   <ScoreBadge
                     confidence={entry.confidence_score}
                     size="md"
                     breakdown={entry.score_breakdown}
                   />
-                  <div className="overflow-x-auto flex-1 min-w-0">
-                    <code className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded break-all">
+                  <div className="min-w-0 flex-1 overflow-x-auto">
+                    <code className="break-all rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
                       {entry.path}
                     </code>
                   </div>
@@ -562,17 +577,11 @@ export function CatalogEntryModal({
               </div>
 
               {/* Confidence Section */}
-              <section
-                aria-label="Confidence score breakdown"
-                className="space-y-3 border-t pt-4"
-              >
+              <section aria-label="Confidence score breakdown" className="space-y-3 border-t pt-4">
                 <h3 className="text-sm font-medium">Confidence Score Breakdown</h3>
                 <div className="max-h-[200px] overflow-y-auto">
                   {entry.score_breakdown ? (
-                    <HeuristicScoreBreakdown
-                      breakdown={entry.score_breakdown}
-                      variant="full"
-                    />
+                    <HeuristicScoreBreakdown breakdown={entry.score_breakdown} variant="full" />
                   ) : (
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">
@@ -587,31 +596,28 @@ export function CatalogEntryModal({
               </section>
 
               {/* Metadata Section */}
-              <section
-                aria-label="Artifact details"
-                className="space-y-4"
-              >
-                <h3 className="font-semibold text-sm">Metadata</h3>
+              <section aria-label="Artifact details" className="space-y-4">
+                <h3 className="text-sm font-semibold">Metadata</h3>
 
                 {/* Path Details */}
                 <div className="space-y-2">
                   <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="text-muted-foreground font-medium">Path:</span>
+                    <span className="font-medium text-muted-foreground">Path:</span>
                     <div className="overflow-x-auto">
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
+                      <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
                         {entry.path}
                       </code>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="text-muted-foreground font-medium">Upstream URL:</span>
+                    <span className="font-medium text-muted-foreground">Upstream URL:</span>
                     <div className="overflow-x-auto">
                       <a
                         href={entry.upstream_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center gap-1 break-all"
+                        className="inline-flex items-center gap-1 break-all text-primary hover:underline"
                         aria-label={`View source repository for ${entry.name} on GitHub`}
                       >
                         <span>{entry.upstream_url}</span>
@@ -622,12 +628,12 @@ export function CatalogEntryModal({
 
                   {entry.detected_version && (
                     <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                      <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
                         <GitBranch className="h-3 w-3" aria-hidden="true" />
                         Version:
                       </span>
                       <div className="overflow-x-auto">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
+                        <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
                           {entry.detected_version}
                         </code>
                       </div>
@@ -636,12 +642,12 @@ export function CatalogEntryModal({
 
                   {entry.detected_sha && (
                     <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                      <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
                         <GitCommit className="h-3 w-3" aria-hidden="true" />
                         SHA:
                       </span>
                       <div className="overflow-x-auto">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all">
+                        <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs">
                           {shortenSha(entry.detected_sha)}
                         </code>
                       </div>
@@ -649,7 +655,7 @@ export function CatalogEntryModal({
                   )}
 
                   <div className="grid grid-cols-[140px_1fr] gap-2 text-sm">
-                    <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
                       <Calendar className="h-3 w-3" aria-hidden="true" />
                       Detected at:
                     </span>
@@ -661,22 +667,25 @@ export function CatalogEntryModal({
           </TabsContent>
 
           {/* Contents Tab - FileTree + ContentPane split layout */}
-          <TabsContent value="contents" className="mt-0 flex-1 overflow-hidden min-h-0">
-            <div className="flex min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
+          <TabsContent
+            value="contents"
+            className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+          >
+            <div className="flex h-full min-h-0 min-w-0 flex-1 gap-0 overflow-hidden">
               {/* Left Panel - File Tree */}
-              <div className="w-[280px] flex-shrink-0 border-r overflow-hidden flex flex-col">
+              <div className="flex w-[280px] flex-shrink-0 flex-col overflow-hidden border-r">
                 {treeError ? (
-                  <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
+                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
                     <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
                     <div>
-                      <p className="font-medium text-sm">
+                      <p className="text-sm font-medium">
                         {getErrorMessage(treeError, true).title}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {getErrorMessage(treeError, true).description}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-2 w-full max-w-[200px]">
+                    <div className="flex w-full max-w-[200px] flex-col gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -686,17 +695,8 @@ export function CatalogEntryModal({
                         <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                         Try again
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                        className="w-full"
-                      >
-                        <a
-                          href={entry.upstream_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                      <Button variant="ghost" size="sm" asChild className="w-full">
+                        <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
                           View on GitHub
                         </a>
@@ -717,37 +717,25 @@ export function CatalogEntryModal({
               </div>
 
               {/* Right Panel - Content Pane with enhanced error handling */}
-              <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {contentError ? (
-                  <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
+                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
                     <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
                     <div>
-                      <p className="font-medium text-sm">
+                      <p className="text-sm font-medium">
                         {getErrorMessage(contentError, false).title}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {getErrorMessage(contentError, false).description}
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetchContent()}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => refetchContent()}>
                         <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                         Try again
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                      >
-                        <a
-                          href={entry.upstream_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={entry.upstream_url} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
                           View on GitHub
                         </a>
@@ -783,12 +771,13 @@ export function CatalogEntryModal({
           </TabsContent>
 
           {/* Suggested Tags Tab */}
-          <TabsContent value="tags" className="mt-0 flex-1 overflow-y-auto min-h-0 py-4">
+          <TabsContent value="tags" className="mt-0 min-h-0 flex-1 overflow-y-auto py-4">
             <div className="space-y-4">
               <div className="space-y-1">
                 <h3 className="text-sm font-medium">Path-Based Tag Suggestions</h3>
                 <p className="text-xs text-muted-foreground">
-                  Review and approve tags extracted from the artifact path. Approved tags will be applied when importing.
+                  Review and approve tags extracted from the artifact path. Approved tags will be
+                  applied when importing.
                 </p>
               </div>
               <PathTagReview sourceId={entry.source_id} entryId={entry.id} />
@@ -797,7 +786,7 @@ export function CatalogEntryModal({
         </Tabs>
 
         {/* Action Buttons */}
-        <DialogFooter className="flex-shrink-0 border-t px-6 py-4 mt-auto">
+        <DialogFooter className="mt-auto flex-shrink-0 border-t px-6 py-4">
           <Button
             variant="outline"
             onClick={() => window.open(entry.upstream_url, '_blank', 'noopener,noreferrer')}
@@ -816,8 +805,8 @@ export function CatalogEntryModal({
                 isImporting
                   ? `Importing ${entry.name}...`
                   : isImportDisabled
-                  ? `Cannot import ${entry.name} - ${entry.status === 'imported' ? 'already imported' : 'artifact removed'}`
-                  : `Import ${entry.name} artifact`
+                    ? `Cannot import ${entry.name} - ${entry.status === 'imported' ? 'already imported' : 'artifact removed'}`
+                    : `Import ${entry.name} artifact`
               }
             >
               {isImporting ? (

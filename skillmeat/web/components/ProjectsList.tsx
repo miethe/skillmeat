@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { GitBranch, Clock, Package } from "lucide-react";
-import { ProjectActions } from "@/app/projects/components/project-actions";
-import { useOutdatedArtifacts } from "@/hooks/useOutdatedArtifacts";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { GitBranch, Clock, Package } from 'lucide-react';
+import { ProjectActions } from '@/app/projects/components/project-actions';
+import { useOutdatedArtifacts } from '@/hooks/useOutdatedArtifacts';
 
 interface Project {
   id: string;
@@ -23,14 +23,14 @@ interface ProjectsListProps {
 }
 
 function formatDate(dateString?: string): string {
-  if (!dateString) return "Never";
+  if (!dateString) return 'Never';
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
@@ -127,8 +127,8 @@ export function ProjectsList({
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Package className="h-4 w-4" />
                   <span>
-                    {project.deployment_count}{" "}
-                    {project.deployment_count === 1 ? "artifact" : "artifacts"}
+                    {project.deployment_count}{' '}
+                    {project.deployment_count === 1 ? 'artifact' : 'artifacts'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">

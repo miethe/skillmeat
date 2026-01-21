@@ -9,6 +9,7 @@ import type { ModifiedArtifactsResponse } from '../models/ModifiedArtifactsRespo
 import type { ProjectCreateRequest } from '../models/ProjectCreateRequest';
 import type { ProjectCreateResponse } from '../models/ProjectCreateResponse';
 import type { ProjectDeleteResponse } from '../models/ProjectDeleteResponse';
+import type { ProjectDeploymentRemovalResponse } from '../models/ProjectDeploymentRemovalResponse';
 import type { ProjectDetail } from '../models/ProjectDetail';
 import type { ProjectListResponse } from '../models/ProjectListResponse';
 import type { ProjectUpdateRequest } from '../models/ProjectUpdateRequest';
@@ -168,6 +169,49 @@ export class ProjectsService {
         });
     }
     /**
+     * Remove deployment from project
+     * Remove a specific artifact deployment from a project
+     * @returns ProjectDeploymentRemovalResponse Deployment removed successfully
+     * @throws ApiError
+     */
+    public removeProjectDeploymentApiV1ProjectsProjectIdDeploymentsArtifactNameDelete({
+        projectId,
+        artifactName,
+        artifactType,
+        removeFiles = true,
+    }: {
+        projectId: string,
+        artifactName: string,
+        /**
+         * Type of the artifact to remove
+         */
+        artifactType: string,
+        /**
+         * Whether to remove files from filesystem (default: True)
+         */
+        removeFiles?: boolean,
+    }): CancelablePromise<ProjectDeploymentRemovalResponse> {
+        return this.httpRequest.request({
+            method: 'DELETE',
+            url: '/api/v1/projects/{project_id}/deployments/{artifact_name}',
+            path: {
+                'project_id': projectId,
+                'artifact_name': artifactName,
+            },
+            query: {
+                'artifact_type': artifactType,
+                'remove_files': removeFiles,
+            },
+            errors: {
+                400: `Invalid request`,
+                401: `Unauthorized`,
+                404: `Project or deployment not found`,
+                422: `Validation Error`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
      * Check for artifact modifications
      * Scan all deployments in a project and detect local modifications by comparing content hashes
      * @returns ModificationCheckResponse Successfully checked for modifications
@@ -272,6 +316,21 @@ export class ProjectsService {
                 404: `Project not found`,
                 422: `Validation Error`,
                 500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Clear project cache
+     * Clear the persistent SQLite cache and force full project rediscovery
+     * @returns any Cache cleared successfully
+     * @throws ApiError
+     */
+    public clearProjectCacheApiV1ProjectsCacheClearPost(): CancelablePromise<Record<string, any>> {
+        return this.httpRequest.request({
+            method: 'POST',
+            url: '/api/v1/projects/cache/clear',
+            errors: {
+                500: `Cache manager not available`,
             },
         });
     }

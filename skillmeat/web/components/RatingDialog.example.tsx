@@ -25,9 +25,7 @@ export function BasicRatingDialogExample() {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Basic Rating Dialog</h3>
-      <p className="text-sm text-muted-foreground">
-        Simple rating dialog without initial rating
-      </p>
+      <p className="text-sm text-muted-foreground">Simple rating dialog without initial rating</p>
       <Button onClick={() => setIsOpen(true)}>Rate Artifact</Button>
       <RatingDialog
         artifactId="skill-canvas-design"
@@ -124,12 +122,13 @@ export function MultipleArtifactsExample() {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Multiple Artifacts</h3>
-      <p className="text-sm text-muted-foreground">
-        Rate multiple artifacts from a list
-      </p>
+      <p className="text-sm text-muted-foreground">Rate multiple artifacts from a list</p>
       <div className="space-y-2">
         {artifacts.map((artifact) => (
-          <div key={artifact.id} className="flex items-center justify-between p-3 border rounded-lg">
+          <div
+            key={artifact.id}
+            className="flex items-center justify-between rounded-lg border p-3"
+          >
             <div>
               <p className="font-medium">{artifact.name}</p>
               {artifact.rating && (
@@ -138,11 +137,7 @@ export function MultipleArtifactsExample() {
                 </p>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOpenArtifact(artifact.id)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setOpenArtifact(artifact.id)}>
               {artifact.rating ? 'Edit Rating' : 'Rate'}
             </Button>
             {openArtifact === artifact.id && (
@@ -167,9 +162,9 @@ export function MultipleArtifactsExample() {
  */
 export default function RatingDialogExamples() {
   return (
-    <div className="container mx-auto py-8 space-y-8 max-w-3xl">
+    <div className="container mx-auto max-w-3xl space-y-8 py-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">RatingDialog Examples</h1>
+        <h1 className="mb-2 text-3xl font-bold">RatingDialog Examples</h1>
         <p className="text-muted-foreground">
           Explore different use cases for the RatingDialog component
         </p>
@@ -185,9 +180,9 @@ export default function RatingDialogExamples() {
         <MultipleArtifactsExample />
       </div>
 
-      <div className="mt-8 p-4 bg-muted rounded-lg">
-        <h3 className="font-semibold mb-2">Features Demonstrated</h3>
-        <ul className="list-disc list-inside space-y-1 text-sm">
+      <div className="mt-8 rounded-lg bg-muted p-4">
+        <h3 className="mb-2 font-semibold">Features Demonstrated</h3>
+        <ul className="list-inside list-disc space-y-1 text-sm">
           <li>Star-based rating (1-5 stars)</li>
           <li>Optional feedback textarea</li>
           <li>Keyboard navigation (Arrow keys, Tab, Enter, Escape)</li>

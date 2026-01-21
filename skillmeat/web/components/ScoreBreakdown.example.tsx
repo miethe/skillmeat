@@ -108,12 +108,12 @@ export function SearchResultCardWithScores({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="pt-6 space-y-3">
+    <Card className="transition-shadow hover:shadow-md">
+      <CardContent className="space-y-3 pt-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h3 className="font-semibold">{artifact.name}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{artifact.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{artifact.description}</p>
           </div>
           <Badge variant={scores.confidence > 85 ? 'default' : 'secondary'}>
             {scores.confidence}%
@@ -171,7 +171,7 @@ export function ArtifactGridItemWithScore({
       </CardHeader>
 
       <CardContent className="pt-0">
-        <div className="text-xs text-muted-foreground mb-3">{artifact.type}</div>
+        <div className="mb-3 text-xs text-muted-foreground">{artifact.type}</div>
 
         {/* Minimal score breakdown for space-constrained layouts */}
         <ScoreBreakdown
@@ -272,7 +272,7 @@ export function ArtifactCardWithConditionalBreakdown({
       </CardHeader>
 
       <CardContent>
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-medium">Confidence</span>
           <Badge
             variant={
@@ -303,9 +303,7 @@ export function ArtifactCardWithConditionalBreakdown({
         )}
 
         {scores.confidence >= 85 && (
-          <p className="text-xs text-muted-foreground">
-            ✓ High confidence - recommended for use
-          </p>
+          <p className="text-xs text-muted-foreground">✓ High confidence - recommended for use</p>
         )}
 
         {scores.confidence < 50 && (

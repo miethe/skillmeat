@@ -27,13 +27,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  useGroups,
-  useCreateGroup,
-  useUpdateGroup,
-  useDeleteGroup,
-  useToast,
-} from '@/hooks';
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useToast } from '@/hooks';
 import { CopyGroupDialog } from '@/components/collection/copy-group-dialog';
 import type { Group } from '@/types/groups';
 
@@ -43,11 +37,7 @@ export interface ManageGroupsDialogProps {
   collectionId: string;
 }
 
-export function ManageGroupsDialog({
-  open,
-  onOpenChange,
-  collectionId,
-}: ManageGroupsDialogProps) {
+export function ManageGroupsDialog({ open, onOpenChange, collectionId }: ManageGroupsDialogProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
@@ -63,9 +53,9 @@ export function ManageGroupsDialog({
   }>({});
 
   // Form state for edit
-  const [editForms, setEditForms] = useState<
-    Record<string, { name: string; description: string }>
-  >({});
+  const [editForms, setEditForms] = useState<Record<string, { name: string; description: string }>>(
+    {}
+  );
   const [editErrors, setEditErrors] = useState<
     Record<string, { name?: string; description?: string }>
   >({});

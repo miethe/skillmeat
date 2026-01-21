@@ -181,7 +181,8 @@ async def delete_artifact(...): ...
 | Router | Prefix | Purpose |
 |--------|--------|---------|
 | `artifacts` | `/api/v1/artifacts` | Artifact CRUD, deployment |
-| `collections` | `/api/v1/collections` | Collection management |
+| `collections` | `/api/v1/collections` | Collection management (with group filtering) |
+| `groups` | `/api/v1/groups` | Group management and filtering |
 | `deployments` | `/api/v1/deployments` | Deployment operations |
 | `projects` | `/api/v1/projects` | Project registry |
 | `analytics` | `/api/v1/analytics` | Usage analytics |
@@ -189,8 +190,6 @@ async def delete_artifact(...): ...
 | `mcp` | `/api/v1/mcp` | MCP server management |
 | `bundles` | `/api/v1/bundles` | Artifact bundles |
 | `health` | `/health` | Health checks |
-
----
 
 ## Schemas (Pydantic Models)
 
@@ -437,6 +436,29 @@ app.openapi = custom_openapi
 ```bash
 python -c "from skillmeat.api.server import app; import json; print(json.dumps(app.openapi()))" > openapi.json
 ```
+
+---
+
+## External Services
+
+### GitHub API
+
+Use the centralized GitHub client for all GitHub API operations:
+
+```python
+from skillmeat.core.github_client import get_github_client
+
+@router.get("/artifacts/from-github/{owner}/{repo}")
+async def fetch_from_github(
+    owner: str,
+    repo: str,
+) -> ArtifactMetadataResponse:
+    client = get_github_client()
+    metadata = client.get_repo_metadata(f"{owner}/{repo}")
+    return ArtifactMetadataResponse(**metadata)
+```
+
+See `CLAUDE.md` → "GitHub Client" section for full API and error handling patterns.
 
 ---
 

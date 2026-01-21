@@ -251,6 +251,58 @@ If you're using SkillMeat in CI/CD workflows with GitHub Actions:
 
 Store your token as a repository secret (`Settings → Secrets and variables → Actions`).
 
+## Developer Notes
+
+For developers integrating GitHub API calls into SkillMeat:
+
+### Using GitHubClient Wrapper
+
+All GitHub operations must use the centralized `GitHubClient` wrapper at `skillmeat/core/github_client.py`:
+
+```python
+from skillmeat.core.github_client import get_github_client
+
+# Get singleton client - token is resolved automatically
+client = get_github_client()
+
+# Common operations
+metadata = client.get_repo_metadata("owner/repo")
+content = client.get_file_content("owner/repo", "path/to/file")
+sha = client.resolve_version("owner/repo", "latest")
+```
+
+### Token Resolution Priority
+
+The wrapper automatically resolves tokens in this order:
+
+1. **ConfigManager**: Stored in `~/.skillmeat/config.toml` (settings.github-token)
+2. **SKILLMEAT_GITHUB_TOKEN** env var
+3. **GITHUB_TOKEN** env var
+4. **Unauthenticated**: 60 req/hr fallback
+
+### Exception Handling
+
+```python
+from skillmeat.core.github_client import (
+    GitHubAuthError,
+    GitHubRateLimitError,
+    GitHubNotFoundError,
+)
+
+try:
+    content = client.get_file_content("owner/repo", "path")
+except GitHubAuthError:
+    # Invalid/missing token
+except GitHubRateLimitError as e:
+    # Check e.reset_at to retry after limit resets
+except GitHubNotFoundError:
+    # Repository or file not found
+```
+
+Never use PyGithub directly - always go through the `GitHubClient` wrapper for consistent error handling, logging, and token management.
+
+---
+
 ## See Also
 
 - [Web UI Guide](web-ui-guide.md) - Settings page documentation

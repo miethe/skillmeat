@@ -42,6 +42,16 @@ export interface UpdateCollectionRequest {
   name?: string;
 }
 
+/** Group membership info for an artifact */
+export interface ArtifactGroupMembership {
+  /** Group unique identifier */
+  id: string;
+  /** Group name */
+  name: string;
+  /** Artifact position within the group */
+  position: number;
+}
+
 /** Lightweight artifact summary in collection listings */
 export interface ArtifactSummary {
   /** Artifact name */
@@ -52,6 +62,8 @@ export interface ArtifactSummary {
   version?: string;
   /** Source specification (e.g., "anthropics/skills/pdf") */
   source: string;
+  /** Groups this artifact belongs to (only populated when include_groups=true) */
+  groups?: ArtifactGroupMembership[] | null;
 }
 
 /** Paginated collection list response */

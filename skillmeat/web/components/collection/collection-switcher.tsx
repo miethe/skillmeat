@@ -13,11 +13,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCollectionContext } from '@/hooks';
 
 interface CollectionSwitcherProps {
@@ -46,18 +42,11 @@ interface CollectionSwitcherProps {
  * />
  * ```
  */
-export function CollectionSwitcher({
-  onCreateCollection,
-  className,
-}: CollectionSwitcherProps) {
+export function CollectionSwitcher({ onCreateCollection, className }: CollectionSwitcherProps) {
   const [open, setOpen] = useState(false);
 
-  const {
-    collections,
-    selectedCollectionId,
-    setSelectedCollectionId,
-    isLoadingCollections,
-  } = useCollectionContext();
+  const { collections, selectedCollectionId, setSelectedCollectionId, isLoadingCollections } =
+    useCollectionContext();
 
   // Find current collection name for display
   const currentCollection = selectedCollectionId
@@ -65,9 +54,10 @@ export function CollectionSwitcher({
     : null;
 
   // Show "All Collections" only when explicitly viewing all, otherwise show collection name
-  const displayName = selectedCollectionId === null || selectedCollectionId === 'all'
-    ? 'All Collections'
-    : currentCollection?.name ?? 'Default Collection';
+  const displayName =
+    selectedCollectionId === null || selectedCollectionId === 'all'
+      ? 'All Collections'
+      : (currentCollection?.name ?? 'Default Collection');
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -101,9 +91,7 @@ export function CollectionSwitcher({
                 <Layers className="mr-2 h-4 w-4" />
                 <span>All Collections</span>
                 {/* Show check when explicitly viewing "all" (null means user selected all collections) */}
-                {selectedCollectionId === null && (
-                  <Check className="ml-auto h-4 w-4" />
-                )}
+                {selectedCollectionId === null && <Check className="ml-auto h-4 w-4" />}
               </CommandItem>
 
               {/* Collection list */}
@@ -122,9 +110,7 @@ export function CollectionSwitcher({
                       {collection.artifact_count}
                     </span>
                   )}
-                  {selectedCollectionId === collection.id && (
-                    <Check className="ml-2 h-4 w-4" />
-                  )}
+                  {selectedCollectionId === collection.id && <Check className="ml-2 h-4 w-4" />}
                 </CommandItem>
               ))}
             </CommandGroup>

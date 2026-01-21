@@ -30,7 +30,9 @@ const trustLevel = data.source ? getTrustLevelFromSource(data.source) : 'communi
 Add the TrustBadges component alongside existing status badges in the header section:
 
 ```tsx
-{/* Status badge and actions - Around line 356 in unified-card.tsx */}
+{
+  /* Status badge and actions - Around line 356 in unified-card.tsx */
+}
 <div className="flex flex-shrink-0 items-center gap-2">
   {/* Existing status badge */}
   {data.status && (
@@ -41,11 +43,7 @@ Add the TrustBadges component alongside existing status badges in the header sec
 
   {/* NEW: Add trust badge */}
   {data.source && (
-    <TrustBadges
-      trustLevel={trustLevel}
-      source={data.source}
-      className="flex-shrink-0"
-    />
+    <TrustBadges trustLevel={trustLevel} source={data.source} className="flex-shrink-0" />
   )}
 
   {/* Existing entity actions */}
@@ -56,7 +54,7 @@ Add the TrustBadges component alongside existing status badges in the header sec
       // ...
     />
   )}
-</div>
+</div>;
 ```
 
 ### Complete Integration Example
@@ -129,14 +127,13 @@ export const UnifiedCard = React.memo(
 If you prefer to show trust badges in the metadata row instead of the header:
 
 ```tsx
-{/* Metadata row - Around line 385 */}
+{
+  /* Metadata row - Around line 385 */
+}
 <div className="flex items-center gap-4 text-xs text-muted-foreground">
   {/* Trust badge */}
   {data.source && (
-    <TrustBadges
-      trustLevel={getTrustLevelFromSource(data.source)}
-      source={data.source}
-    />
+    <TrustBadges trustLevel={getTrustLevelFromSource(data.source)} source={data.source} />
   )}
 
   {/* Existing metadata items */}
@@ -147,7 +144,7 @@ If you prefer to show trust badges in the metadata row instead of the header:
     </div>
   )}
   {/* ... */}
-</div>
+</div>;
 ```
 
 ## Integration with Marketplace Components
@@ -170,6 +167,7 @@ import { TrustBadges as ArtifactTrustBadges } from '@/components/TrustBadges';
 The `getTrustLevelFromSource()` helper uses these rules:
 
 ### Official Sources
+
 - Contains `anthropic/` or `anthropics/` (case insensitive)
 - Starts with `claude-` (case insensitive)
 - Examples:
@@ -178,6 +176,7 @@ The `getTrustLevelFromSource()` helper uses these rules:
   - `claude-marketplace/skill` → official
 
 ### Verified Sources
+
 - Starts with `verified/` (case insensitive)
 - Starts with `trusted-` (case insensitive)
 - Examples:
@@ -185,6 +184,7 @@ The `getTrustLevelFromSource()` helper uses these rules:
   - `trusted-user/repo` → verified
 
 ### Community Sources
+
 - All other sources default to community
 - Examples:
   - `user/repo/skill` → community
@@ -214,6 +214,7 @@ function getTrustLevelFromSource(source: string): TrustLevel;
 ## Accessibility
 
 The component includes:
+
 - `aria-label` on badges for screen readers
 - Keyboard-focusable tooltips
 - High contrast colors for readability
@@ -228,6 +229,7 @@ pnpm test TrustBadges.test.tsx
 ```
 
 All 21 tests should pass, covering:
+
 - Badge rendering for all trust levels
 - Tooltip display and content
 - Source detection logic

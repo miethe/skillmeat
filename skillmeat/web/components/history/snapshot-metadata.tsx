@@ -44,7 +44,7 @@ export function SnapshotMetadata({
     }
   };
 
-  const formattedTimestamp = format(new Date(snapshot.timestamp), 'MMMM d, yyyy \'at\' h:mm:ss a');
+  const formattedTimestamp = format(new Date(snapshot.timestamp), "MMMM d, yyyy 'at' h:mm:ss a");
   const relativeTime = formatDistanceToNow(new Date(snapshot.timestamp), { addSuffix: true });
 
   return (
@@ -57,23 +57,18 @@ export function SnapshotMetadata({
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground">Snapshot ID</label>
           <div className="flex items-center gap-2">
-            <code className="flex-1 rounded bg-muted px-3 py-2 text-sm font-mono">
+            <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
               {snapshot.id}
             </code>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyId}
-              className="shrink-0"
-            >
+            <Button variant="outline" size="sm" onClick={handleCopyId} className="shrink-0">
               {copied ? (
                 <>
-                  <Check className="h-4 w-4 mr-1" />
+                  <Check className="mr-1 h-4 w-4" />
                   Copied!
                 </>
               ) : (
                 <>
-                  <Copy className="h-4 w-4 mr-1" />
+                  <Copy className="mr-1 h-4 w-4" />
                   Copy
                 </>
               )}
@@ -85,7 +80,7 @@ export function SnapshotMetadata({
 
         {/* Timestamp */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Clock className="h-4 w-4" />
             Timestamp
           </label>
@@ -100,7 +95,7 @@ export function SnapshotMetadata({
         {/* Message */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground">Message</label>
-          <p className="text-sm whitespace-pre-wrap">{snapshot.message}</p>
+          <p className="whitespace-pre-wrap text-sm">{snapshot.message}</p>
         </div>
 
         <Separator />
@@ -108,7 +103,7 @@ export function SnapshotMetadata({
         {/* Collection Info */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <FolderOpen className="h-4 w-4" />
               Collection
             </label>
@@ -116,7 +111,7 @@ export function SnapshotMetadata({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <FileStack className="h-4 w-4" />
               Artifacts
             </label>
@@ -155,12 +150,12 @@ export function SnapshotMetadata({
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    <p className="font-medium mb-2">
+                    <p className="mb-2 font-medium">
                       {safetyAnalysis.filesWithConflicts.length}{' '}
                       {safetyAnalysis.filesWithConflicts.length === 1 ? 'file has' : 'files have'}{' '}
                       conflicts:
                     </p>
-                    <ul className="list-disc list-inside space-y-1 text-xs">
+                    <ul className="list-inside list-disc space-y-1 text-xs">
                       {safetyAnalysis.filesWithConflicts.map((file) => (
                         <li key={file} className="font-mono">
                           {file}
@@ -175,14 +170,14 @@ export function SnapshotMetadata({
               {safetyAnalysis.filesSafeToRestore.length > 0 && (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950">
                   <div className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
+                      <p className="mb-2 text-sm font-medium text-green-900 dark:text-green-100">
                         {safetyAnalysis.filesSafeToRestore.length}{' '}
                         {safetyAnalysis.filesSafeToRestore.length === 1 ? 'file is' : 'files are'}{' '}
                         safe to restore:
                       </p>
-                      <ul className="list-disc list-inside space-y-1 text-xs text-green-800 dark:text-green-200">
+                      <ul className="list-inside list-disc space-y-1 text-xs text-green-800 dark:text-green-200">
                         {safetyAnalysis.filesSafeToRestore.map((file) => (
                           <li key={file} className="font-mono">
                             {file}
@@ -199,8 +194,8 @@ export function SnapshotMetadata({
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    <p className="font-medium mb-2">Warnings:</p>
-                    <ul className="list-disc list-inside space-y-1 text-xs">
+                    <p className="mb-2 font-medium">Warnings:</p>
+                    <ul className="list-inside list-disc space-y-1 text-xs">
                       {safetyAnalysis.warnings.map((warning, index) => (
                         <li key={index}>{warning}</li>
                       ))}

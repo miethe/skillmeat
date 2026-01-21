@@ -106,11 +106,7 @@ function PreviewSkeleton() {
       </div>
       <div className="flex-1 space-y-3 p-6">
         {[...Array(15)].map((_, i) => (
-          <Skeleton
-            key={i}
-            className="h-4"
-            style={{ width: `${50 + Math.random() * 50}%` }}
-          />
+          <Skeleton key={i} className="h-4" style={{ width: `${50 + Math.random() * 50}%` }} />
         ))}
       </div>
     </div>
@@ -162,7 +158,7 @@ function MarkdownContent({ content }: MarkdownContentProps) {
 
   return (
     <div
-      className="prose prose-sm dark:prose-invert max-w-none"
+      className="prose prose-sm max-w-none dark:prose-invert"
       dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />
   );
@@ -187,7 +183,7 @@ function CodeContent({ content, filePath }: CodeContentProps) {
         </Badge>
       </div>
       <pre className="overflow-x-auto rounded-md bg-muted p-4">
-        <code className="text-sm font-mono leading-relaxed">{content}</code>
+        <code className="font-mono text-sm leading-relaxed">{content}</code>
       </pre>
     </div>
   );

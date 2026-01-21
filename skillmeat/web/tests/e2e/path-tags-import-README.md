@@ -35,6 +35,7 @@ End-to-end tests for the "Apply approved path tags" checkbox in the BulkImportMo
 **File**: `skillmeat/web/components/discovery/BulkImportModal.tsx`
 
 **Checkbox Element**:
+
 ```tsx
 <Checkbox
   id="apply-path-tags"
@@ -57,6 +58,7 @@ End-to-end tests for the "Apply approved path tags" checkbox in the BulkImportMo
 ### API Contract
 
 **Import Request Body**:
+
 ```json
 {
   "artifacts": [...],
@@ -66,6 +68,7 @@ End-to-end tests for the "Apply approved path tags" checkbox in the BulkImportMo
 ```
 
 **Import Response** (when `apply_path_tags=true`):
+
 ```json
 {
   "total_tags_applied": 6,
@@ -131,6 +134,7 @@ pnpm test:e2e:debug path-tags-import.spec.ts
 ### Expected Tags (when `apply_path_tags=true`)
 
 Based on path structure:
+
 - **Path**: `.claude/skills/category/test-skill`
 - **Tags**: `['skills', 'category']`
 
@@ -139,12 +143,14 @@ Based on path structure:
 ### Integration Tests
 
 Backend path tags logic is tested in:
+
 - **File**: `tests/integration/test_path_tags_workflow.py`
 - **Tests**: Path tag extraction, approval, application during import
 
 ### Unit Tests
 
 Frontend unit tests for BulkImportModal:
+
 - **File**: `__tests__/components/discovery/BulkImportModal.test.tsx`
 - **Tests**: Component rendering, state management (Phase 4)
 
@@ -180,6 +186,7 @@ Frontend unit tests for BulkImportModal:
 ## Future Enhancements
 
 Potential test additions:
+
 1. **Path Tag Preview** - Display tags that will be applied before import
 2. **Tag Conflicts** - Handle artifacts with conflicting path-based tags
 3. **Custom Tag Rules** - Test custom path-to-tag mapping rules

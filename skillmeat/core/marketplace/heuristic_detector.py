@@ -1253,7 +1253,10 @@ class HeuristicDetector:
         # and the detected type matches the container type, add full bonus
         # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
+            if (
+                artifact_type == container_hint
+                and breakdown["container_hint_score"] == 0
+            ):
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight
                 match_reasons.append(
@@ -2073,7 +2076,10 @@ class HeuristicDetector:
         # container type (e.g., skill inside skills/)
         # NOTE: Only give full bonus if type was NOT inferred from container (already got 12 pts)
         if container_hint is not None and artifact_type is not None:
-            if artifact_type == container_hint and breakdown["container_hint_score"] == 0:
+            if (
+                artifact_type == container_hint
+                and breakdown["container_hint_score"] == 0
+            ):
                 # Type matches container - full bonus
                 total_score += self.config.container_hint_weight
                 breakdown["container_hint_score"] = self.config.container_hint_weight

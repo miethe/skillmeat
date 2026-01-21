@@ -21,8 +21,9 @@ export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedOutdatedArtifact, setSelectedOutdatedArtifact] =
-    useState<OutdatedArtifact | null>(null);
+  const [selectedOutdatedArtifact, setSelectedOutdatedArtifact] = useState<OutdatedArtifact | null>(
+    null
+  );
 
   const handleProjectClick = (project: ProjectSummary) => {
     setSelectedProject(project);

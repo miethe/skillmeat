@@ -555,7 +555,9 @@ class ScanUpdateContext:
                 existing.detected_at = new_entry.detected_at
                 existing.detected_version = new_entry.detected_version
                 existing.path_segments = new_entry.path_segments
-                existing.upstream_url = new_entry.upstream_url  # Update URL (may have changed)
+                existing.upstream_url = (
+                    new_entry.upstream_url
+                )  # Update URL (may have changed)
                 existing.path = new_entry.path  # Update path for consistency
                 existing.updated_at = now
 
@@ -992,18 +994,38 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
     Provides CRUD operations for MarketplaceSource entities, which represent
     GitHub repositories that can be scanned for Claude Code artifacts.
 
+    Supported Fields:
+        Core fields (required):
+            - id, repo_url, owner, repo_name, ref
+
+        User-provided metadata:
+            - description: User-provided description (max 500 chars)
+            - notes: Internal notes/documentation (max 2000 chars)
+
+        GitHub-fetched metadata:
+            - repo_description: Description from GitHub API (max 2000 chars)
+            - repo_readme: README content from GitHub (up to 50KB)
+            - tags: List of tags for categorization (JSON-serialized)
+
+        Scan results:
+            - scan_status: Current scan status
+            - artifact_count: Total count of discovered artifacts
+            - counts_by_type: Dict mapping artifact type to count (JSON-serialized)
+            - last_sync_at, last_error
+
     Methods:
         - get_by_id: Retrieve source by ID
         - get_by_repo_url: Retrieve source by repository URL (unique)
         - list_all: List all sources
-        - create: Create new source
-        - update: Update existing source
+        - create: Create new source (with optional tags/counts_by_type kwargs)
+        - update: Update existing source (with optional tags/counts_by_type kwargs)
+        - update_fields: Partial update by source_id (convenience method)
         - delete: Delete source (cascade deletes catalog entries)
 
     Example:
         >>> repo = MarketplaceSourceRepository()
         >>>
-        >>> # Create a new source
+        >>> # Create a new source with GitHub metadata
         >>> source = MarketplaceSource(
         ...     id=str(uuid.uuid4()),
         ...     repo_url="https://github.com/anthropics/anthropic-quickstarts",
@@ -1011,16 +1033,25 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         ...     repo_name="anthropic-quickstarts",
         ...     ref="main",
         ...     trust_level="official",
+        ...     repo_description="Official Anthropic quickstart examples",
+        ...     repo_readme="# Anthropic Quickstarts\n\n...",
         ... )
-        >>> created = repo.create(source)
+        >>> created = repo.create(
+        ...     source,
+        ...     tags=["official", "anthropic"],
+        ...     counts_by_type={"skill": 5},
+        ... )
         >>>
         >>> # Find by URL
         >>> found = repo.get_by_repo_url("https://github.com/anthropics/anthropic-quickstarts")
         >>>
-        >>> # Update scan status
-        >>> found.scan_status = "success"
-        >>> found.last_sync_at = datetime.utcnow()
-        >>> updated = repo.update(found)
+        >>> # Partial update with update_fields
+        >>> updated = repo.update_fields(
+        ...     found.id,
+        ...     scan_status="success",
+        ...     artifact_count=10,
+        ...     counts_by_type={"skill": 7, "command": 3},
+        ... )
     """
 
     def __init__(self, db_path: Optional[str | Path] = None):
@@ -1083,11 +1114,24 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         finally:
             session.close()
 
-    def create(self, source: MarketplaceSource) -> MarketplaceSource:
+    def create(
+        self,
+        source: MarketplaceSource,
+        *,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+    ) -> MarketplaceSource:
         """Create a new marketplace source.
 
         Args:
-            source: MarketplaceSource instance to create
+            source: MarketplaceSource instance to create. Can include:
+                - repo_description: Description fetched from GitHub API
+                - repo_readme: README content from GitHub
+                - tags: Will be overridden if tags kwarg is provided
+                - counts_by_type: Will be overridden if counts_by_type kwarg is provided
+            tags: Optional list of tags (serialized via set_tags_list())
+            counts_by_type: Optional dict mapping artifact type to count
+                (serialized via set_counts_by_type_dict())
 
         Returns:
             Created MarketplaceSource instance
@@ -1101,9 +1145,21 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             ...     repo_url="https://github.com/user/repo",
             ...     owner="user",
             ...     repo_name="repo",
+            ...     repo_description="A great repo for Claude artifacts",
+            ...     repo_readme="# My Repo\n\nThis repo contains...",
             ... )
-            >>> created = repo.create(source)
+            >>> created = repo.create(
+            ...     source,
+            ...     tags=["productivity", "coding"],
+            ...     counts_by_type={"skill": 5, "command": 2},
+            ... )
         """
+        # Apply serialized fields if provided as kwargs
+        if tags is not None:
+            source.set_tags_list(tags)
+        if counts_by_type is not None:
+            source.set_counts_by_type_dict(counts_by_type)
+
         session = self._get_session()
         try:
             session.add(source)
@@ -1117,11 +1173,24 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
         finally:
             session.close()
 
-    def update(self, source: MarketplaceSource) -> MarketplaceSource:
+    def update(
+        self,
+        source: MarketplaceSource,
+        *,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+    ) -> MarketplaceSource:
         """Update an existing marketplace source.
 
         Args:
-            source: MarketplaceSource instance with updated values
+            source: MarketplaceSource instance with updated values. Can include:
+                - repo_description: Description fetched from GitHub API
+                - repo_readme: README content from GitHub
+                - tags: Will be overridden if tags kwarg is provided
+                - counts_by_type: Will be overridden if counts_by_type kwarg is provided
+            tags: Optional list of tags to set (serialized via set_tags_list())
+            counts_by_type: Optional dict mapping artifact type to count
+                (serialized via set_counts_by_type_dict())
 
         Returns:
             Updated MarketplaceSource instance
@@ -1133,8 +1202,19 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             >>> source = repo.get_by_id("source-123")
             >>> source.scan_status = "success"
             >>> source.artifact_count = 5
-            >>> updated = repo.update(source)
+            >>> source.repo_description = "Updated description from GitHub"
+            >>> updated = repo.update(
+            ...     source,
+            ...     tags=["updated", "verified"],
+            ...     counts_by_type={"skill": 10, "command": 3},
+            ... )
         """
+        # Apply serialized fields if provided as kwargs
+        if tags is not None:
+            source.set_tags_list(tags)
+        if counts_by_type is not None:
+            source.set_counts_by_type_dict(counts_by_type)
+
         session = self._get_session()
         try:
             # Ensure entity exists
@@ -1176,6 +1256,100 @@ class MarketplaceSourceRepository(BaseRepository[MarketplaceSource]):
             session.commit()
             logger.info(f"Deleted marketplace source: {source_id}")
             return True
+        finally:
+            session.close()
+
+    def update_fields(
+        self,
+        source_id: str,
+        *,
+        repo_description: Optional[str] = None,
+        repo_readme: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        counts_by_type: Optional[Dict[str, int]] = None,
+        description: Optional[str] = None,
+        notes: Optional[str] = None,
+        scan_status: Optional[str] = None,
+        artifact_count: Optional[int] = None,
+        last_sync_at: Optional[datetime] = None,
+        last_error: Optional[str] = None,
+    ) -> MarketplaceSource:
+        """Update specific fields on a marketplace source without full ORM object.
+
+        This is a convenience method for partial updates. Only provided fields
+        are updated; None values are ignored (not set to NULL).
+
+        Args:
+            source_id: Unique source identifier
+            repo_description: Description fetched from GitHub API (max 2000 chars)
+            repo_readme: README content from GitHub (up to 50KB)
+            tags: List of tags for categorization (serialized to JSON)
+            counts_by_type: Dict mapping artifact type to count (serialized to JSON)
+            description: User-provided description (max 500 chars)
+            notes: Internal notes/documentation (max 2000 chars)
+            scan_status: Scan status ("pending", "scanning", "success", "error")
+            artifact_count: Cached count of discovered artifacts
+            last_sync_at: Timestamp of last successful scan
+            last_error: Last error message if scan failed
+
+        Returns:
+            Updated MarketplaceSource instance
+
+        Raises:
+            NotFoundError: If source does not exist
+
+        Example:
+            >>> # Update GitHub metadata after fetching from API
+            >>> updated = repo.update_fields(
+            ...     "source-123",
+            ...     repo_description="Official Claude Code skills repository",
+            ...     repo_readme="# Anthropic Skills\n\nThis repo contains...",
+            ...     tags=["official", "anthropic", "skills"],
+            ... )
+            >>>
+            >>> # Update after successful scan
+            >>> updated = repo.update_fields(
+            ...     "source-123",
+            ...     scan_status="success",
+            ...     artifact_count=15,
+            ...     counts_by_type={"skill": 10, "command": 3, "agent": 2},
+            ...     last_sync_at=datetime.utcnow(),
+            ... )
+        """
+        session = self._get_session()
+        try:
+            source = session.query(MarketplaceSource).filter_by(id=source_id).first()
+            if not source:
+                raise NotFoundError(f"Source not found: {source_id}")
+
+            # Update simple fields if provided
+            if repo_description is not None:
+                source.repo_description = repo_description
+            if repo_readme is not None:
+                source.repo_readme = repo_readme
+            if description is not None:
+                source.description = description
+            if notes is not None:
+                source.notes = notes
+            if scan_status is not None:
+                source.scan_status = scan_status
+            if artifact_count is not None:
+                source.artifact_count = artifact_count
+            if last_sync_at is not None:
+                source.last_sync_at = last_sync_at
+            if last_error is not None:
+                source.last_error = last_error
+
+            # Update JSON-serialized fields using helper methods
+            if tags is not None:
+                source.set_tags_list(tags)
+            if counts_by_type is not None:
+                source.set_counts_by_type_dict(counts_by_type)
+
+            session.commit()
+            session.refresh(source)
+            logger.info(f"Updated fields on marketplace source: {source_id}")
+            return source
         finally:
             session.close()
 

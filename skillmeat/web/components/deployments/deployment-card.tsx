@@ -12,12 +12,7 @@ import { useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ArtifactDeploymentInfo, ArtifactSyncStatus } from '@/types/deployments';
 import type { ArtifactType } from '@/types/artifact';
@@ -201,7 +196,7 @@ export function DeploymentCard({
               <h3 className="truncate font-semibold" title={deployment.artifact_name}>
                 {deployment.artifact_name}
               </h3>
-              <p className="truncate text-xs text-muted-foreground capitalize">
+              <p className="truncate text-xs capitalize text-muted-foreground">
                 {deployment.artifact_type}
               </p>
             </div>
@@ -232,18 +227,16 @@ export function DeploymentCard({
       <div className="space-y-3 px-4 pb-4">
         {/* Project / Deployment path */}
         <div className="flex items-start gap-2 text-sm">
-          <LucideIcons.FolderTree className="h-4 w-4 flex-shrink-0 text-muted-foreground mt-0.5" />
+          <LucideIcons.FolderTree className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground">Project</p>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <p className="truncate font-medium cursor-help">
-                    {projectDisplayName}
-                  </p>
+                  <p className="cursor-help truncate font-medium">{projectDisplayName}</p>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-[400px]">
-                  <p className="font-mono text-xs break-all">{deployment.artifact_path}</p>
+                  <p className="break-all font-mono text-xs">{deployment.artifact_path}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -262,13 +255,14 @@ export function DeploymentCard({
           )}
 
           {/* Latest version (if different) */}
-          {deployment.latest_version && deployment.latest_version !== deployment.deployed_version && (
-            <div className="flex items-center gap-1 text-xs">
-              <LucideIcons.ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Available:</span>
-              <span className="font-mono">{deployment.latest_version}</span>
-            </div>
-          )}
+          {deployment.latest_version &&
+            deployment.latest_version !== deployment.deployed_version && (
+              <div className="flex items-center gap-1 text-xs">
+                <LucideIcons.ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Available:</span>
+                <span className="font-mono">{deployment.latest_version}</span>
+              </div>
+            )}
         </div>
 
         {/* Metadata row */}
@@ -280,7 +274,10 @@ export function DeploymentCard({
           </div>
 
           {/* Deployment time */}
-          <div className="flex items-center gap-1" title={new Date(deployment.deployed_at).toLocaleString()}>
+          <div
+            className="flex items-center gap-1"
+            title={new Date(deployment.deployed_at).toLocaleString()}
+          >
             <LucideIcons.Clock className="h-3 w-3" />
             <span>{formatRelativeTime(deployment.deployed_at)}</span>
           </div>
@@ -306,7 +303,12 @@ export function DeploymentCard({
 
           {/* Sync status indicator */}
           {deployment.sync_status && deployment.sync_status !== 'synced' && (
-            <div className={cn('flex items-center gap-1 text-xs', syncStatusColors[deployment.sync_status])}>
+            <div
+              className={cn(
+                'flex items-center gap-1 text-xs',
+                syncStatusColors[deployment.sync_status]
+              )}
+            >
               <LucideIcons.RefreshCw className="h-3 w-3" />
               <span>{syncStatusLabels[deployment.sync_status]}</span>
             </div>
@@ -337,43 +339,43 @@ export function DeploymentCardSkeleton() {
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-1 items-center gap-2">
             {/* Icon skeleton */}
-            <div className="h-8 w-8 flex-shrink-0 rounded-md bg-muted animate-pulse" />
+            <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-md bg-muted" />
 
             {/* Name skeleton */}
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
             </div>
           </div>
 
           {/* Status badge and actions skeleton */}
           <div className="flex flex-shrink-0 items-center gap-2">
-            <div className="h-5 w-24 bg-muted animate-pulse rounded-full" />
-            <div className="h-8 w-8 bg-muted animate-pulse rounded" />
+            <div className="h-5 w-24 animate-pulse rounded-full bg-muted" />
+            <div className="h-8 w-8 animate-pulse rounded bg-muted" />
           </div>
         </div>
       </div>
       <div className="space-y-3 px-4 pb-4">
         {/* Path skeleton */}
         <div className="flex items-start gap-2">
-          <div className="h-4 w-4 bg-muted animate-pulse rounded" />
+          <div className="h-4 w-4 animate-pulse rounded bg-muted" />
           <div className="flex-1 space-y-1">
-            <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-            <div className="h-3 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-48 animate-pulse rounded bg-muted" />
           </div>
         </div>
 
         {/* Version skeleton */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-          <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-24 animate-pulse rounded bg-muted" />
         </div>
 
         {/* Metadata skeleton */}
         <div className="flex gap-4">
-          <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-          <div className="h-3 w-16 bg-muted animate-pulse rounded" />
-          <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+          <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-16 animate-pulse rounded bg-muted" />
         </div>
       </div>
     </Card>

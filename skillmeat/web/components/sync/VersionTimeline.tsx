@@ -54,29 +54,23 @@ export function VersionTimeline({ entries, className }: VersionTimelineProps) {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  'w-3 h-3 rounded-full ring-2 ring-background',
+                  'h-3 w-3 rounded-full ring-2 ring-background',
                   colors.dot,
                   entry.isCurrent && 'ring-4 ring-primary/20'
                 )}
               />
-              {!isLast && (
-                <div className={cn('w-0.5 h-8', colors.line)} />
-              )}
+              {!isLast && <div className={cn('h-8 w-0.5', colors.line)} />}
             </div>
 
             {/* Entry content */}
-            <div className="pb-6 -mt-1">
+            <div className="-mt-1 pb-6">
               <div className="flex items-center gap-2">
                 {entry.version && (
-                  <span className="font-mono text-sm font-medium">
-                    {entry.version}
-                  </span>
+                  <span className="font-mono text-sm font-medium">{entry.version}</span>
                 )}
-                <span className={cn('text-sm', colors.text)}>
-                  ({entry.label})
-                </span>
+                <span className={cn('text-sm', colors.text)}>({entry.label})</span>
                 {entry.isCurrent && (
-                  <span className="text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
+                  <span className="rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">
                     Current
                   </span>
                 )}

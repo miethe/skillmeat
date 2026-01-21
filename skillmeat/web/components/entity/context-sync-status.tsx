@@ -7,12 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks';
 import { DiffViewer, type ResolutionType } from '@/components/entity/diff-viewer';
 import type { FileDiff } from '@/sdk/models/FileDiff';
@@ -53,11 +48,7 @@ interface ContextSyncStatusProps {
  * />
  * ```
  */
-export function ContextSyncStatus({
-  entityId,
-  entityName,
-  projectPath,
-}: ContextSyncStatusProps) {
+export function ContextSyncStatus({ entityId, entityName, projectPath }: ContextSyncStatusProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedConflict, setSelectedConflict] = useState<SyncConflict | null>(null);
@@ -230,12 +221,14 @@ export function ContextSyncStatus({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="text-xs cursor-help">
+                    <Badge variant="outline" className="cursor-help text-xs">
                       Preview
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Context sync detection works, but pull/push/resolve are not yet implemented.</p>
+                    <p>
+                      Context sync detection works, but pull/push/resolve are not yet implemented.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

@@ -95,7 +95,13 @@ export interface DeployDialogProps {
   onSuccess?: () => void;
 }
 
-export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClose, onSuccess }: DeployDialogProps) {
+export function DeployDialog({
+  artifact,
+  existingDeploymentPaths,
+  isOpen,
+  onClose,
+  onSuccess,
+}: DeployDialogProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [customPath, setCustomPath] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -121,12 +127,11 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
   const useCustomPath = selectedProjectId === CUSTOM_PATH_VALUE;
 
   // Get selected project object
-  const selectedProject = selectedProjectId && !useCustomPath
-    ? projects?.find((p) => p.id === selectedProjectId)
-    : null;
+  const selectedProject =
+    selectedProjectId && !useCustomPath ? projects?.find((p) => p.id === selectedProjectId) : null;
 
   // Get the effective path for deployment
-  const effectivePath = useCustomPath ? customPath : (selectedProject?.path || '');
+  const effectivePath = useCustomPath ? customPath : selectedProject?.path || '';
 
   // Default deploy path based on artifact type
   const defaultDeployPath = useMemo(() => {
@@ -157,8 +162,8 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
     if (!Array.isArray(existingDeploymentPaths)) return false;
     // Check if any deployment path starts with this project path
     return existingDeploymentPaths.some(
-      deployPath => deployPath.startsWith(projectPath + '/.claude/') ||
-                    deployPath.startsWith(projectPath + '/')
+      (deployPath) =>
+        deployPath.startsWith(projectPath + '/.claude/') || deployPath.startsWith(projectPath + '/')
     );
   };
 
@@ -166,7 +171,7 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
   const currentSelectionDeployed = useMemo(() => {
     if (useCustomPath || !selectedProject) return false;
     return checkIsAlreadyDeployed(selectedProject.path);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProject, existingDeploymentPaths, useCustomPath]);
 
   // Check if current selection is valid for deployment
@@ -188,8 +193,17 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
     }
 
     return false;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId, useCustomPath, customPath, selectedProject, existingDeploymentPaths, overwriteEnabled, customPathEnabled, customPathError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedProjectId,
+    useCustomPath,
+    customPath,
+    selectedProject,
+    existingDeploymentPaths,
+    overwriteEnabled,
+    customPathEnabled,
+    customPathError,
+  ]);
 
   // Reset selection when dialog opens for a new artifact
   useEffect(() => {
@@ -312,327 +326,333 @@ export function DeployDialog({ artifact, existingDeploymentPaths, isOpen, onClos
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary/10 p-2">
-              <Upload className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <DialogTitle>Deploy Artifact</DialogTitle>
-              <DialogDescription>Deploy {artifact.name} to a project</DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {!isDeploying ? (
-            <>
-              {/* Artifact Info */}
-              <div className="space-y-2 rounded-lg border p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Artifact</span>
-                  <span className="font-medium">{artifact.name}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Type</span>
-                  <span className="font-medium capitalize">{artifact.type}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Version</span>
-                  <code className="rounded bg-muted px-2 py-1 text-xs">
-                    {artifact.version || 'N/A'}
-                  </code>
-                </div>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Upload className="h-5 w-5 text-primary" />
               </div>
+              <div>
+                <DialogTitle>Deploy Artifact</DialogTitle>
+                <DialogDescription>Deploy {artifact.name} to a project</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
 
-              {/* Project Selector */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <Folder className="h-4 w-4" />
-                  Target Project
-                </label>
-                <div className="flex gap-2">
-                  <Select
-                    value={selectedProjectId || ''}
-                    onValueChange={(value) => setSelectedProjectId(value || null)}
-                    disabled={isDeploying || projectsLoading}
-                  >
-                    <SelectTrigger className="flex-1" aria-label="Select target project">
-                      <SelectValue placeholder={projectsLoading ? 'Loading projects...' : 'Select a project...'} />
-                    </SelectTrigger>
-                    <SelectContent className="z-[60]">
-                      {projects && projects.length > 0 ? (
-                        <>
-                          {projects.map((project) => {
-                            const deployed = checkIsAlreadyDeployed(project.path);
-                            return (
-                              <SelectItem key={project.id} value={project.id}>
-                                <div className="flex items-center gap-2">
-                                  {deployed && (
-                                    <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
-                                  )}
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center gap-2">
-                                      <span className={deployed ? 'text-muted-foreground' : ''}>
-                                        {project.name}
-                                      </span>
-                                      {deployed && (
-                                        <span className="text-xs text-yellow-600 dark:text-yellow-500">
-                                          (Already Deployed)
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span className="text-xs text-muted-foreground truncate max-w-[280px]">
-                                      {project.path}
-                                    </span>
-                                  </div>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                          <SelectSeparator />
-                        </>
-                      ) : !projectsLoading ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No projects found
-                        </div>
-                      ) : null}
-                      <SelectItem value={CUSTOM_PATH_VALUE}>
-                        <span className="text-muted-foreground">Custom path...</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowCreateProject(true)}
-                    disabled={isDeploying}
-                    aria-label="Add new project"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {selectedProject && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Deploy to: {selectedProject.path}
-                    </p>
-                    {currentSelectionDeployed && !overwriteEnabled && (
-                      <p className="text-xs text-yellow-600">
-                        Artifact is already deployed to this project. Enable overwrite to replace.
-                      </p>
-                    )}
+          <div className="space-y-4 py-4">
+            {!isDeploying ? (
+              <>
+                {/* Artifact Info */}
+                <div className="space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Artifact</span>
+                    <span className="font-medium">{artifact.name}</span>
                   </div>
-                )}
-              </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Type</span>
+                    <span className="font-medium capitalize">{artifact.type}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Version</span>
+                    <code className="rounded bg-muted px-2 py-1 text-xs">
+                      {artifact.version || 'N/A'}
+                    </code>
+                  </div>
+                </div>
 
-              {/* Custom Path Input (shown when "Custom path..." is selected) */}
-              {useCustomPath && (
+                {/* Project Selector */}
                 <div className="space-y-2">
-                  <label
-                    htmlFor="customPath"
-                    className="text-sm font-medium"
-                  >
-                    Custom Path
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Folder className="h-4 w-4" />
+                    Target Project
                   </label>
-                  <Input
-                    id="customPath"
-                    placeholder="/path/to/project"
-                    value={customPath}
-                    onChange={(e) => setCustomPath(e.target.value)}
-                    disabled={isDeploying}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The artifact will be deployed to the .claude directory in this path
-                  </p>
-                </div>
-              )}
-
-              {/* Overwrite Toggle - Only shown when selecting an already-deployed project */}
-              {currentSelectionDeployed && (
-                <div
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg border p-3 transition-all",
-                    showOverwriteWarning
-                      ? "border-red-500 ring-2 ring-red-500/20 bg-red-50 dark:bg-red-950/20"
-                      : "border-border"
-                  )}
-                >
-                  <Switch
-                    id="overwrite-toggle"
-                    checked={overwriteEnabled}
-                    onCheckedChange={setOverwriteEnabled}
-                    disabled={isDeploying}
-                  />
-                  <div className="flex-1 space-y-1">
-                    <Label
-                      htmlFor="overwrite-toggle"
-                      className={cn(
-                        "text-sm font-medium cursor-pointer",
-                        showOverwriteWarning && "text-red-700 dark:text-red-400"
-                      )}
+                  <div className="flex gap-2">
+                    <Select
+                      value={selectedProjectId || ''}
+                      onValueChange={(value) => setSelectedProjectId(value || null)}
+                      disabled={isDeploying || projectsLoading}
                     >
-                      Overwrite Deployment
-                    </Label>
-                    {showOverwriteWarning ? (
-                      <p className="text-xs text-red-600 dark:text-red-400">
-                        Enable overwrite to replace existing deployment
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Replace the existing deployment with this version
-                      </p>
-                    )}
+                      <SelectTrigger className="flex-1" aria-label="Select target project">
+                        <SelectValue
+                          placeholder={
+                            projectsLoading ? 'Loading projects...' : 'Select a project...'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent className="z-[60]">
+                        {projects && projects.length > 0 ? (
+                          <>
+                            {projects.map((project) => {
+                              const deployed = checkIsAlreadyDeployed(project.path);
+                              return (
+                                <SelectItem key={project.id} value={project.id}>
+                                  <div className="flex items-center gap-2">
+                                    {deployed && (
+                                      <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
+                                    )}
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-2">
+                                        <span className={deployed ? 'text-muted-foreground' : ''}>
+                                          {project.name}
+                                        </span>
+                                        {deployed && (
+                                          <span className="text-xs text-yellow-600 dark:text-yellow-500">
+                                            (Already Deployed)
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="max-w-[280px] truncate text-xs text-muted-foreground">
+                                        {project.path}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                            <SelectSeparator />
+                          </>
+                        ) : !projectsLoading ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No projects found
+                          </div>
+                        ) : null}
+                        <SelectItem value={CUSTOM_PATH_VALUE}>
+                          <span className="text-muted-foreground">Custom path...</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setShowCreateProject(true)}
+                      disabled={isDeploying}
+                      aria-label="Add new project"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-              )}
-
-              {/* Custom Deployment Path Toggle */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="custom-path-toggle"
-                    checked={customPathEnabled}
-                    onCheckedChange={(checked) => {
-                      setCustomPathEnabled(checked);
-                      if (!checked) {
-                        setCustomSubPath('');
-                        setCustomPathError(null);
-                      }
-                    }}
-                    disabled={isDeploying}
-                  />
-                  <Label
-                    htmlFor="custom-path-toggle"
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    Custom Deployment Path
-                  </Label>
-                </div>
-
-                {/* Custom path input - shown when toggle is ON */}
-                {customPathEnabled && (
-                  <div className="space-y-2 pl-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
-                        <FolderOpen className="h-4 w-4" />
-                        <span className="font-mono">{defaultDeployPath}</span>
-                      </div>
-                      <Input
-                        id="customSubPath"
-                        placeholder="subdirectory/"
-                        value={customSubPath}
-                        onChange={(e) => handleCustomSubPathChange(e.target.value)}
-                        disabled={isDeploying}
-                        className={cn(
-                          "flex-1 font-mono text-sm",
-                          customPathError && "border-red-500 focus-visible:ring-red-500"
-                        )}
-                        aria-invalid={!!customPathError}
-                        aria-describedby={customPathError ? "custom-path-error" : undefined}
-                      />
-                    </div>
-                    {customPathError ? (
-                      <p
-                        id="custom-path-error"
-                        className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
-                      >
-                        <AlertTriangle className="h-3 w-3" />
-                        Invalid path: {customPathError}
-                      </p>
-                    ) : (
+                  {selectedProject && (
+                    <div>
                       <p className="text-xs text-muted-foreground">
-                        {customSubPath.trim()
-                          ? `Deploys to: ${defaultDeployPath}${validateAndSanitizeSubPath(customSubPath).value}`
-                          : 'Enter a sub-directory to append to the default path (optional)'}
+                        Deploy to: {selectedProject.path}
                       </p>
-                    )}
+                      {currentSelectionDeployed && !overwriteEnabled && (
+                        <p className="text-xs text-yellow-600">
+                          Artifact is already deployed to this project. Enable overwrite to replace.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Path Input (shown when "Custom path..." is selected) */}
+                {useCustomPath && (
+                  <div className="space-y-2">
+                    <label htmlFor="customPath" className="text-sm font-medium">
+                      Custom Path
+                    </label>
+                    <Input
+                      id="customPath"
+                      placeholder="/path/to/project"
+                      value={customPath}
+                      onChange={(e) => setCustomPath(e.target.value)}
+                      disabled={isDeploying}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The artifact will be deployed to the .claude directory in this path
+                    </p>
                   </div>
                 )}
-              </div>
 
-              {/* Existing Deployments Info */}
-              {artifact.usageStats.totalDeployments > 0 && (
-                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                        Existing Deployments
-                      </p>
-                      <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
-                        This artifact is already deployed to {artifact.usageStats.totalDeployments}{' '}
-                        project(s). If the target project already has this artifact, it will be
-                        overwritten.
-                      </p>
+                {/* Overwrite Toggle - Only shown when selecting an already-deployed project */}
+                {currentSelectionDeployed && (
+                  <div
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg border p-3 transition-all',
+                      showOverwriteWarning
+                        ? 'border-red-500 bg-red-50 ring-2 ring-red-500/20 dark:bg-red-950/20'
+                        : 'border-border'
+                    )}
+                  >
+                    <Switch
+                      id="overwrite-toggle"
+                      checked={overwriteEnabled}
+                      onCheckedChange={setOverwriteEnabled}
+                      disabled={isDeploying}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="overwrite-toggle"
+                        className={cn(
+                          'cursor-pointer text-sm font-medium',
+                          showOverwriteWarning && 'text-red-700 dark:text-red-400'
+                        )}
+                      >
+                        Overwrite Deployment
+                      </Label>
+                      {showOverwriteWarning ? (
+                        <p className="text-xs text-red-600 dark:text-red-400">
+                          Enable overwrite to replace existing deployment
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Replace the existing deployment with this version
+                        </p>
+                      )}
                     </div>
                   </div>
+                )}
+
+                {/* Custom Deployment Path Toggle */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="custom-path-toggle"
+                      checked={customPathEnabled}
+                      onCheckedChange={(checked) => {
+                        setCustomPathEnabled(checked);
+                        if (!checked) {
+                          setCustomSubPath('');
+                          setCustomPathError(null);
+                        }
+                      }}
+                      disabled={isDeploying}
+                    />
+                    <Label
+                      htmlFor="custom-path-toggle"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Custom Deployment Path
+                    </Label>
+                  </div>
+
+                  {/* Custom path input - shown when toggle is ON */}
+                  {customPathEnabled && (
+                    <div className="space-y-2 pl-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+                          <FolderOpen className="h-4 w-4" />
+                          <span className="font-mono">{defaultDeployPath}</span>
+                        </div>
+                        <Input
+                          id="customSubPath"
+                          placeholder="subdirectory/"
+                          value={customSubPath}
+                          onChange={(e) => handleCustomSubPathChange(e.target.value)}
+                          disabled={isDeploying}
+                          className={cn(
+                            'flex-1 font-mono text-sm',
+                            customPathError && 'border-red-500 focus-visible:ring-red-500'
+                          )}
+                          aria-invalid={!!customPathError}
+                          aria-describedby={customPathError ? 'custom-path-error' : undefined}
+                        />
+                      </div>
+                      {customPathError ? (
+                        <p
+                          id="custom-path-error"
+                          className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          Invalid path: {customPathError}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {customSubPath.trim()
+                            ? `Deploys to: ${defaultDeployPath}${validateAndSanitizeSubPath(customSubPath).value}`
+                            : 'Enter a sub-directory to append to the default path (optional)'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Progress Indicator */}
-              <ProgressIndicator
-                streamUrl={streamUrl}
-                enabled={isDeploying}
-                initialSteps={initialSteps}
-                onComplete={handleComplete}
-                onError={(error) => {
-                  console.error('Deploy error:', error);
-                  setIsDeploying(false);
-                }}
-              />
-            </>
-          )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeployClick}
-            disabled={isDeploying || deployMutation.isPending || (!canDeploy && !currentSelectionDeployed)}
-          >
-            {isDeploying ? 'Deploying...' : currentSelectionDeployed && overwriteEnabled ? 'Overwrite' : 'Deploy'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                {/* Existing Deployments Info */}
+                {artifact.usageStats.totalDeployments > 0 && (
+                  <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                          Existing Deployments
+                        </p>
+                        <p className="mt-1 text-xs text-yellow-800 dark:text-yellow-200">
+                          This artifact is already deployed to{' '}
+                          {artifact.usageStats.totalDeployments} project(s). If the target project
+                          already has this artifact, it will be overwritten.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Progress Indicator */}
+                <ProgressIndicator
+                  streamUrl={streamUrl}
+                  enabled={isDeploying}
+                  initialSteps={initialSteps}
+                  onComplete={handleComplete}
+                  onError={(error) => {
+                    console.error('Deploy error:', error);
+                    setIsDeploying(false);
+                  }}
+                />
+              </>
+            )}
+          </div>
 
-    {/* Create Project Dialog */}
-    <CreateProjectDialog
-      open={showCreateProject}
-      onOpenChange={setShowCreateProject}
-      onSuccess={handleProjectCreated}
-    />
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose} disabled={isDeploying}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeployClick}
+              disabled={
+                isDeploying || deployMutation.isPending || (!canDeploy && !currentSelectionDeployed)
+              }
+            >
+              {isDeploying
+                ? 'Deploying...'
+                : currentSelectionDeployed && overwriteEnabled
+                  ? 'Overwrite'
+                  : 'Deploy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    {/* Overwrite Confirmation Dialog */}
-    <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Overwrite Existing Deployment?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to overwrite the existing deployment of{' '}
-            <span className="font-semibold">{artifact?.name}</span> in{' '}
-            <span className="font-semibold">{selectedProject?.name}</span>?
-            <br />
-            <br />
-            This will replace the currently deployed version with the version from your collection.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={executeDeploy}>
-            Overwrite Deployment
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      {/* Create Project Dialog */}
+      <CreateProjectDialog
+        open={showCreateProject}
+        onOpenChange={setShowCreateProject}
+        onSuccess={handleProjectCreated}
+      />
+
+      {/* Overwrite Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite Existing Deployment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to overwrite the existing deployment of{' '}
+              <span className="font-semibold">{artifact?.name}</span> in{' '}
+              <span className="font-semibold">{selectedProject?.name}</span>?
+              <br />
+              <br />
+              This will replace the currently deployed version with the version from your
+              collection.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeploy}>Overwrite Deployment</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

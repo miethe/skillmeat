@@ -122,9 +122,7 @@ export function extractDirectories(entries: Array<{ path: string }>): string[] {
  * ])
  * // Returns: ["commands/ai", "skills"]
  */
-export function extractParentDirectories(
-  entries: Array<{ path: string }>
-): string[] {
+export function extractParentDirectories(entries: Array<{ path: string }>): string[] {
   if (!entries || entries.length === 0) {
     return [];
   }
@@ -160,9 +158,7 @@ export function extractParentDirectories(
  * // "commands" -> [{ path: "commands/ai", name: "AI" }]
  * // "" -> [] (root-level entries)
  */
-export function groupByDirectory<T extends { path: string }>(
-  entries: T[]
-): Map<string, T[]> {
+export function groupByDirectory<T extends { path: string }>(entries: T[]): Map<string, T[]> {
   const groups = new Map<string, T[]>();
 
   for (const entry of entries) {

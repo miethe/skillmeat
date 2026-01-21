@@ -28,7 +28,7 @@ import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import List, Literal, Optional, Set
+from typing import Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -44,6 +44,7 @@ from skillmeat.api.schemas.marketplace import (
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
+    DetectedArtifact,
     ExcludeArtifactRequest,
     ExtractedSegmentResponse,
     FileContentResponse,
@@ -88,6 +89,7 @@ from skillmeat.core.marketplace.import_coordinator import (
     ConflictStrategy,
     ImportCoordinator,
 )
+from skillmeat.core.marketplace.source_manager import SourceManager
 from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 from skillmeat.core.validation import validate_artifact_name
 
@@ -322,6 +324,10 @@ def source_to_response(source: MarketplaceSource) -> SourceResponse:
         notes=source.notes,
         enable_frontmatter_detection=source.enable_frontmatter_detection,
         manual_map=source.get_manual_map_dict(),
+        repo_description=source.repo_description,
+        repo_readme=source.repo_readme,
+        tags=source.get_tags_list() or [],
+        counts_by_type=source.get_counts_by_type_dict(),
     )
 
 
@@ -474,17 +480,78 @@ async def _perform_scan(
         )
 
     try:
-        # Get database session for cross-source deduplication
-        session = catalog_repo._get_session()
+        # Check for single artifact mode - bypass normal scanning
+        if source.single_artifact_mode and source.single_artifact_type:
+            logger.info(
+                f"Single artifact mode enabled for {source.repo_url}, "
+                f"type={source.single_artifact_type}"
+            )
 
-        scan_result = scanner.scan_repository(
-            owner=source.owner,
-            repo=source.repo_name,
-            ref=source.ref,
-            root_hint=source.root_hint,
-            session=session,
-            manual_mappings=manual_map,
-        )
+            # Create synthetic artifact for the entire repo/root_hint
+            artifact_path = source.root_hint if source.root_hint else ""
+            artifact_name = (
+                source.repo_name
+                if not source.root_hint
+                else source.root_hint.split("/")[-1]
+            )
+            base_url = f"https://github.com/{source.owner}/{source.repo_name}"
+
+            # Get commit SHA for versioning
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            try:
+                commit_sha = client.resolve_version(
+                    f"{source.owner}/{source.repo_name}", source.ref
+                )
+            except Exception:
+                commit_sha = source.ref  # Fallback to ref if resolution fails
+
+            # Build upstream URL
+            upstream_url = f"{base_url}/tree/{source.ref}"
+            if artifact_path:
+                upstream_url = f"{upstream_url}/{artifact_path}"
+
+            # Create synthetic scan result with 100% confidence
+            scan_result = ScanResultDTO(
+                source_id=source_id,
+                status="success",
+                artifacts_found=1,
+                new_count=1,
+                updated_count=0,
+                removed_count=0,
+                unchanged_count=0,
+                scan_duration_ms=0,
+                errors=[],
+                scanned_at=datetime.now(timezone.utc),
+                artifacts=[
+                    DetectedArtifact(
+                        artifact_type=source.single_artifact_type,
+                        name=artifact_name,
+                        path=artifact_path or ".",
+                        upstream_url=upstream_url,
+                        confidence_score=100,
+                        detected_version=None,
+                        detected_sha=commit_sha,
+                        raw_score=100,
+                        score_breakdown=None,
+                        metadata={"single_artifact_mode": True},
+                    )
+                ],
+            )
+        else:
+            # Normal scanning path
+            # Get database session for cross-source deduplication
+            session = catalog_repo._get_session()
+
+            scan_result = scanner.scan_repository(
+                owner=source.owner,
+                repo=source.repo_name,
+                ref=source.ref,
+                root_hint=source.root_hint,
+                session=session,
+                manual_mappings=manual_map,
+            )
 
         # Load path tag config from source (or use defaults)
         config = PathTagConfig.defaults()
@@ -501,6 +568,12 @@ async def _perform_scan(
         # Create extractor if enabled
         extractor = PathSegmentExtractor(config) if config.enabled else None
 
+        # Compute counts_by_type from scan results
+        counts_by_type: Dict[str, int] = {}
+        for artifact in scan_result.artifacts:
+            artifact_type = artifact.artifact_type
+            counts_by_type[artifact_type] = counts_by_type.get(artifact_type, 0) + 1
+
         # Update source and catalog atomically
         with transaction_handler.scan_update_transaction(source_id) as ctx:
             # Update source status
@@ -509,6 +582,13 @@ async def _perform_scan(
                 artifact_count=scan_result.artifacts_found,
                 error_message=None,
             )
+
+            # Update counts_by_type on source
+            source_in_session = ctx.session.query(MarketplaceSource).filter_by(
+                id=source_id
+            ).first()
+            if source_in_session:
+                source_in_session.set_counts_by_type_dict(counts_by_type)
 
             # Convert detected artifacts to catalog entries
             new_entries = []
@@ -545,9 +625,11 @@ async def _perform_scan(
                     detected_at=datetime.utcnow(),
                     # Copy exclusion status from deduplication engine
                     status=artifact.status if artifact.status else "new",
-                    excluded_at=datetime.fromisoformat(artifact.excluded_at)
-                    if artifact.excluded_at
-                    else None,
+                    excluded_at=(
+                        datetime.fromisoformat(artifact.excluded_at)
+                        if artifact.excluded_at
+                        else None
+                    ),
                     excluded_reason=artifact.excluded_reason,
                     path_segments=path_segments_json,
                 )
@@ -780,15 +862,86 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
         artifact_count=0,
         description=request.description,
         notes=request.notes,
+        enable_frontmatter_detection=request.enable_frontmatter_detection,
     )
 
     # Store manual_map if provided
     if request.manual_map:
         source.set_manual_map_dict(request.manual_map)
 
+    # Store single artifact mode settings
+    if request.single_artifact_mode:
+        source.single_artifact_mode = True
+        source.single_artifact_type = request.single_artifact_type
+
+    # Store tags if provided
+    if request.tags:
+        source.set_tags_list(request.tags)
+
+    # Handle import_repo_description: fetch from GitHub if True
+    if request.import_repo_description:
+        try:
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            metadata = client.get_repo_metadata(f"{owner}/{repo_name}")
+            source.repo_description = metadata.get("description")
+            logger.info(f"Fetched repo description for {owner}/{repo_name}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch repo description for {owner}/{repo_name}: {e}")
+            # Don't fail creation - continue without repo_description
+
+    # Handle import_repo_readme: fetch from GitHub if True
+    if request.import_repo_readme:
+        try:
+            from skillmeat.core.github_client import get_github_client
+
+            client = get_github_client()
+            # Try common README filenames
+            readme_content = None
+            for readme_name in ["README.md", "README.rst", "README.txt", "README"]:
+                try:
+                    content_bytes = client.get_file_content(
+                        f"{owner}/{repo_name}",
+                        readme_name,
+                        ref=request.ref,
+                    )
+                    readme_content = content_bytes.decode("utf-8")
+                    # Truncate to 50KB if needed
+                    if len(readme_content) > 50000:
+                        readme_content = readme_content[:50000] + "\n... [truncated]"
+                    break
+                except Exception:
+                    continue
+
+            source.repo_readme = readme_content
+            if readme_content:
+                logger.info(f"Fetched README for {owner}/{repo_name}")
+            else:
+                logger.info(f"No README found for {owner}/{repo_name}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch README for {owner}/{repo_name}: {e}")
+            # Don't fail creation - continue without repo_readme
+
     try:
         created = source_repo.create(source)
-        logger.info(f"Created marketplace source: {created.id} ({created.repo_url})")
+
+        # Structured logging for source creation
+        logger.info(
+            "create_source_request",
+            extra={
+                "source_id": created.id,
+                "repo_url": created.repo_url,
+                "ref": created.ref,
+                "root_hint": created.root_hint,
+                "trust_level": created.trust_level,
+                "has_manual_map": bool(request.manual_map),
+                "manual_map_count": (
+                    len(request.manual_map) if request.manual_map else 0
+                ),
+                "has_description": bool(request.description),
+            },
+        )
 
         # Trigger initial scan
         logger.info(f"Triggering initial scan for source: {created.id}")
@@ -824,10 +977,16 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
     response_model=SourceListResponse,
     summary="List all GitHub sources",
     description="""
-    List all GitHub repository sources with cursor-based pagination.
+    List all GitHub repository sources with cursor-based pagination and optional filtering.
 
     Returns sources ordered by ID for stable pagination. Use the `cursor`
     parameter from the previous response to fetch the next page.
+
+    **Filters** (all use AND logic - source must match all provided filters):
+    - `artifact_type`: Filter sources containing artifacts of this type
+    - `tags`: Filter by tags (repeated param, e.g., `?tags=ui&tags=ux`)
+    - `trust_level`: Filter by trust level
+    - `search`: Search in repo name, description, and tags
 
     Authentication: TODO - Add authentication when multi-user support is implemented.
     """,
@@ -835,39 +994,131 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
 async def list_sources(
     limit: int = Query(50, ge=1, le=100, description="Maximum items per page"),
     cursor: Optional[str] = Query(None, description="Cursor for next page"),
+    artifact_type: Optional[str] = Query(
+        None,
+        description="Filter by artifact type (skill, command, agent, hook, mcp-server)",
+    ),
+    tags: Optional[List[str]] = Query(
+        None, description="Filter by tags (AND logic - must match all)"
+    ),
+    trust_level: Optional[str] = Query(
+        None, description="Filter by trust level (untrusted, basic, verified, official)"
+    ),
+    search: Optional[str] = Query(
+        None, description="Search in repo name, description, tags"
+    ),
 ) -> SourceListResponse:
-    """List all marketplace sources with pagination.
+    """List all marketplace sources with pagination and filtering.
 
     Args:
         limit: Maximum number of items per page (1-100)
         cursor: Cursor for pagination (from previous response)
+        artifact_type: Filter by artifact type (skill, command, agent, hook, mcp-server)
+        tags: Filter by tags (AND logic - must match all provided tags)
+        trust_level: Filter by trust level (untrusted, basic, verified, official)
+        search: Search in repo name, description, tags
 
     Returns:
-        Paginated list of sources with page info
+        Paginated list of sources with page info including total_count
 
     Raises:
         HTTPException 500: If database operation fails
     """
     source_repo = MarketplaceSourceRepository()
+    source_manager = SourceManager()
 
     try:
-        result = source_repo.list_paginated(limit=limit, cursor=cursor)
+        # Check if any filters are provided
+        has_filters = any([artifact_type, tags, trust_level, search])
 
-        # Convert ORM models to API responses
-        items = [source_to_response(source) for source in result.items]
+        if has_filters:
+            # With filters: fetch all sources, filter in-memory, then paginate
+            all_sources = source_repo.list_all()
 
-        # Build page info
-        page_info = PageInfo(
-            has_next_page=result.has_more,
-            has_previous_page=cursor is not None,
-            start_cursor=items[0].id if items else None,
-            end_cursor=items[-1].id if items else None,
-            total_count=None,  # Not computed for efficiency
-        )
+            # Apply filters using SourceManager
+            filtered_sources = source_manager.apply_filters(
+                sources=all_sources,
+                artifact_type=artifact_type,
+                tags=tags,
+                trust_level=trust_level,
+                search=search,
+            )
 
-        logger.debug(
-            f"Listed {len(items)} sources (cursor={cursor}, has_more={result.has_more})"
-        )
+            # Sort by ID for stable pagination
+            filtered_sources.sort(key=lambda s: s.id)
+
+            total_count = len(filtered_sources)
+
+            # Apply cursor-based pagination manually
+            start_idx = 0
+            if cursor:
+                # Find the index after the cursor
+                for idx, source in enumerate(filtered_sources):
+                    if source.id == cursor:
+                        start_idx = idx + 1
+                        break
+
+            # Slice for current page
+            end_idx = start_idx + limit
+            page_sources = filtered_sources[start_idx:end_idx]
+            has_more = end_idx < len(filtered_sources)
+
+            # Convert ORM models to API responses
+            items = [source_to_response(source) for source in page_sources]
+
+            # Build page info
+            page_info = PageInfo(
+                has_next_page=has_more,
+                has_previous_page=cursor is not None,
+                start_cursor=items[0].id if items else None,
+                end_cursor=items[-1].id if items else None,
+                total_count=total_count,
+            )
+
+            # Structured logging for filtered list request
+            logger.info(
+                "list_sources_request",
+                extra={
+                    "filters": {
+                        "artifact_type": artifact_type,
+                        "tags": tags,
+                        "trust_level": trust_level,
+                        "search": search,
+                    },
+                    "result_count": len(items),
+                    "total_count": total_count,
+                    "has_more": has_more,
+                    "cursor": cursor,
+                },
+            )
+        else:
+            # Without filters: use repository's paginated query for efficiency
+            result = source_repo.list_paginated(limit=limit, cursor=cursor)
+
+            # Convert ORM models to API responses
+            items = [source_to_response(source) for source in result.items]
+
+            # Build page info
+            page_info = PageInfo(
+                has_next_page=result.has_more,
+                has_previous_page=cursor is not None,
+                start_cursor=items[0].id if items else None,
+                end_cursor=items[-1].id if items else None,
+                total_count=None,  # Not computed for efficiency without filters
+            )
+
+            # Structured logging for unfiltered list request
+            logger.info(
+                "list_sources_request",
+                extra={
+                    "filters": None,
+                    "result_count": len(items),
+                    "total_count": None,
+                    "has_more": result.has_more,
+                    "cursor": cursor,
+                },
+            )
+
         return SourceListResponse(items=items, page_info=page_info)
     except Exception as e:
         logger.error(f"Failed to list sources: {e}", exc_info=True)
@@ -1063,6 +1314,9 @@ async def update_source(
             request.description,
             request.notes,
             request.enable_frontmatter_detection,
+            request.import_repo_description,
+            request.import_repo_readme,
+            request.tags,
         ]
     ):
         raise HTTPException(
@@ -1111,10 +1365,99 @@ async def update_source(
             source.notes = request.notes
         if request.enable_frontmatter_detection is not None:
             source.enable_frontmatter_detection = request.enable_frontmatter_detection
+        if request.tags is not None:
+            source.set_tags_list(request.tags)
+
+        # Handle import_repo_description: fetch from GitHub if True
+        if request.import_repo_description is True:
+            try:
+                from skillmeat.core.github_client import get_github_client
+
+                client = get_github_client()
+                metadata = client.get_repo_metadata(f"{source.owner}/{source.repo_name}")
+                source.repo_description = metadata.get("description")
+                logger.info(
+                    f"Fetched repo description for {source.owner}/{source.repo_name}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch repo description for {source.owner}/{source.repo_name}: {e}"
+                )
+                # Don't fail the update - continue with other fields
+
+        # Handle import_repo_readme: fetch from GitHub if True
+        if request.import_repo_readme is True:
+            try:
+                from skillmeat.core.github_client import get_github_client
+
+                client = get_github_client()
+                # Try common README filenames
+                readme_content = None
+                for readme_name in ["README.md", "README.rst", "README.txt", "README"]:
+                    try:
+                        content_bytes = client.get_file_content(
+                            f"{source.owner}/{source.repo_name}",
+                            readme_name,
+                            ref=source.ref,
+                        )
+                        readme_content = content_bytes.decode("utf-8")
+                        # Truncate to 50KB if needed
+                        if len(readme_content) > 50000:
+                            readme_content = readme_content[:50000] + "\n... [truncated]"
+                        break
+                    except Exception:
+                        continue
+
+                source.repo_readme = readme_content
+                if readme_content:
+                    logger.info(
+                        f"Fetched README for {source.owner}/{source.repo_name}"
+                    )
+                else:
+                    logger.info(
+                        f"No README found for {source.owner}/{source.repo_name}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch README for {source.owner}/{source.repo_name}: {e}"
+                )
+                # Don't fail the update - continue with other fields
 
         # Save updates
         updated = source_repo.update(source)
-        logger.info(f"Updated marketplace source: {source_id}")
+
+        # Structured logging for source update
+        logger.info(
+            "update_source_request",
+            extra={
+                "source_id": source_id,
+                "repo_url": updated.repo_url,
+                "updated_fields": [
+                    field
+                    for field, value in [
+                        ("ref", request.ref),
+                        ("root_hint", request.root_hint),
+                        ("manual_map", request.manual_map),
+                        ("trust_level", request.trust_level),
+                        ("description", request.description),
+                        ("notes", request.notes),
+                        (
+                            "enable_frontmatter_detection",
+                            request.enable_frontmatter_detection,
+                        ),
+                        ("import_repo_description", request.import_repo_description),
+                        ("import_repo_readme", request.import_repo_readme),
+                        ("tags", request.tags),
+                    ]
+                    if value is not None
+                ],
+                "has_manual_map": bool(request.manual_map),
+                "manual_map_count": (
+                    len(request.manual_map) if request.manual_map else 0
+                ),
+            },
+        )
+
         return source_to_response(updated)
     except HTTPException:
         raise
@@ -1451,7 +1794,9 @@ async def sync_imported_artifacts(
             try:
                 artifact_type = ArtifactType(entry.artifact_type)
             except ValueError:
-                logger.error(f"Invalid artifact type for entry {entry_id}: {entry.artifact_type}")
+                logger.error(
+                    f"Invalid artifact type for entry {entry_id}: {entry.artifact_type}"
+                )
                 results.append(
                     BulkSyncItemResult(
                         entry_id=entry_id,
@@ -1803,7 +2148,9 @@ async def list_artifacts(
                     -1,
                 )
                 if cursor_idx >= 0:
-                    entries = entries[cursor_idx + 1:]  # Skip cursor item, start from next
+                    entries = entries[
+                        cursor_idx + 1 :
+                    ]  # Skip cursor item, start from next
 
             # Apply limit
             has_more = len(entries) > limit
@@ -1832,15 +2179,11 @@ async def list_artifacts(
 
         # Get collection artifact keys for in_collection check
         collection_keys = (
-            get_collection_artifact_keys(collection_mgr)
-            if collection_mgr
-            else set()
+            get_collection_artifact_keys(collection_mgr) if collection_mgr else set()
         )
 
         # Convert to response DTOs
-        response_items = [
-            entry_to_response(entry, collection_keys) for entry in items
-        ]
+        response_items = [entry_to_response(entry, collection_keys) for entry in items]
 
         # Get aggregated counts (needed for total_count in page_info)
         counts_by_status = catalog_repo.count_by_status(source_id=source_id)
@@ -2743,7 +3086,10 @@ async def update_path_tag_status(
             segment_found = False
             request_lower = request.segment.lower()
             for seg in segments_data["extracted"]:
-                if seg["segment"].lower() == request_lower or seg.get("normalized", "").lower() == request_lower:
+                if (
+                    seg["segment"].lower() == request_lower
+                    or seg.get("normalized", "").lower() == request_lower
+                ):
                     segment_found = True
 
                     # Cannot change "excluded" segments

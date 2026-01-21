@@ -27,9 +27,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
 describe('DiscoveryBanner', () => {
@@ -46,11 +44,7 @@ describe('DiscoveryBanner', () => {
     it('displays importable count, not total discovered', () => {
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={7}
-            discoveredCount={13}
-            onReview={jest.fn()}
-          />
+          <DiscoveryBanner importableCount={7} discoveredCount={13} onReview={jest.fn()} />
         </TestWrapper>
       );
 
@@ -101,11 +95,7 @@ describe('DiscoveryBanner', () => {
     it('does not show total count info when discoveredCount equals importableCount', () => {
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            discoveredCount={5}
-            onReview={jest.fn()}
-          />
+          <DiscoveryBanner importableCount={5} discoveredCount={5} onReview={jest.fn()} />
         </TestWrapper>
       );
 
@@ -141,11 +131,7 @@ describe('DiscoveryBanner', () => {
     it('can be dismissed via Dismiss button', async () => {
       const { container } = render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            onReview={jest.fn()}
-            dismissible={true}
-          />
+          <DiscoveryBanner importableCount={5} onReview={jest.fn()} dismissible={true} />
         </TestWrapper>
       );
 
@@ -160,11 +146,7 @@ describe('DiscoveryBanner', () => {
     it('can be dismissed via close icon', async () => {
       const { container } = render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            onReview={jest.fn()}
-            dismissible={true}
-          />
+          <DiscoveryBanner importableCount={5} onReview={jest.fn()} dismissible={true} />
         </TestWrapper>
       );
 
@@ -177,15 +159,13 @@ describe('DiscoveryBanner', () => {
     it('does not show dismiss buttons when dismissible is false', () => {
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            onReview={jest.fn()}
-            dismissible={false}
-          />
+          <DiscoveryBanner importableCount={5} onReview={jest.fn()} dismissible={false} />
         </TestWrapper>
       );
 
-      expect(screen.queryByRole('button', { name: /Dismiss notification/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /Dismiss notification/i })
+      ).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Close/i })).not.toBeInTheDocument();
     });
   });
@@ -205,11 +185,7 @@ describe('DiscoveryBanner', () => {
     it('has accessible labels for buttons', () => {
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            onReview={jest.fn()}
-            dismissible={true}
-          />
+          <DiscoveryBanner importableCount={5} onReview={jest.fn()} dismissible={true} />
         </TestWrapper>
       );
 
@@ -275,11 +251,7 @@ describe('DiscoveryBanner', () => {
 
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={3}
-            discoveredCount={10}
-            onReview={jest.fn()}
-          />
+          <DiscoveryBanner importableCount={3} discoveredCount={10} onReview={jest.fn()} />
         </TestWrapper>
       );
 
@@ -302,11 +274,7 @@ describe('DiscoveryBanner', () => {
     it('handles dismissal and remounting', async () => {
       const { rerender } = render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            onReview={jest.fn()}
-            dismissible={true}
-          />
+          <DiscoveryBanner importableCount={5} onReview={jest.fn()} dismissible={true} />
         </TestWrapper>
       );
 
@@ -318,11 +286,7 @@ describe('DiscoveryBanner', () => {
       // Remount with different count (simulates new discovery)
       rerender(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={3}
-            onReview={jest.fn()}
-            dismissible={true}
-          />
+          <DiscoveryBanner importableCount={3} onReview={jest.fn()} dismissible={true} />
         </TestWrapper>
       );
 
@@ -351,11 +315,7 @@ describe('DiscoveryBanner', () => {
     it('displays correctly with very long source strings', () => {
       render(
         <TestWrapper>
-          <DiscoveryBanner
-            importableCount={5}
-            discoveredCount={100}
-            onReview={jest.fn()}
-          />
+          <DiscoveryBanner importableCount={5} discoveredCount={100} onReview={jest.fn()} />
         </TestWrapper>
       );
 

@@ -18,6 +18,7 @@ from skillmeat.api.middleware.auth import TokenDep
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
+    ArtifactGroupMembership,
     ArtifactSummary,
     CollectionArtifactsResponse,
     GroupSummary,
@@ -35,6 +36,7 @@ from skillmeat.cache.models import (
     Collection,
     CollectionArtifact,
     Group,
+    GroupArtifact,
     get_session,
 )
 
@@ -765,7 +767,7 @@ async def delete_user_collection(
     "/{collection_id}/artifacts",
     response_model=CollectionArtifactsResponse,
     summary="List artifacts in collection",
-    description="Retrieve paginated list of artifacts in a collection with optional type filtering",
+    description="Retrieve paginated list of artifacts in a collection with optional type and group filtering",
     responses={
         200: {"description": "Successfully retrieved artifacts"},
         404: {"model": ErrorResponse, "description": "Collection not found"},
@@ -781,6 +783,14 @@ async def list_collection_artifacts(
     artifact_type: Optional[str] = Query(
         default=None, description="Filter by artifact type"
     ),
+    group_id: Optional[str] = Query(
+        default=None,
+        description="Filter by group membership - only return artifacts belonging to this group",
+    ),
+    include_groups: bool = Query(
+        default=False,
+        description="Include group memberships for each artifact in the response",
+    ),
 ) -> CollectionArtifactsResponse:
     """List artifacts in a collection with pagination.
 
@@ -791,6 +801,9 @@ async def list_collection_artifacts(
         limit: Number of items per page
         after: Cursor for next page
         artifact_type: Optional artifact type filter
+        group_id: Optional group filter - when provided, only returns artifacts
+            that belong to the specified group
+        include_groups: When true, include group membership info for each artifact
 
     Returns:
         Paginated list of artifacts
@@ -801,7 +814,8 @@ async def list_collection_artifacts(
     try:
         logger.info(
             f"Listing artifacts for collection '{collection_id}' "
-            f"(limit={limit}, after={after}, type={artifact_type})"
+            f"(limit={limit}, after={after}, type={artifact_type}, "
+            f"group_id={group_id}, include_groups={include_groups})"
         )
 
         # Verify collection exists
@@ -823,6 +837,22 @@ async def list_collection_artifacts(
         # Get all matching artifact associations
         all_associations = query.all()
 
+        # Filter by group membership if group_id is provided
+        if group_id:
+            # Get artifact IDs that belong to the specified group
+            group_artifact_ids = {
+                ga.artifact_id
+                for ga in session.query(GroupArtifact)
+                .filter_by(group_id=group_id)
+                .all()
+            }
+            # Filter associations to only those in the group
+            all_associations = [
+                assoc
+                for assoc in all_associations
+                if assoc.artifact_id in group_artifact_ids
+            ]
+
         # Decode cursor if provided
         start_idx = 0
         if after:
@@ -840,6 +870,39 @@ async def list_collection_artifacts(
         end_idx = start_idx + limit
         page_associations = all_associations[start_idx:end_idx]
 
+        # Batch fetch group memberships if requested (avoids N+1 queries)
+        artifact_groups_map: dict[str, list[ArtifactGroupMembership]] = {}
+        if include_groups and page_associations:
+            page_artifact_ids = [assoc.artifact_id for assoc in page_associations]
+
+            # Get all groups in this collection
+            collection_group_ids = [g.id for g in collection.groups]
+
+            if collection_group_ids:
+                # Batch query: get all group-artifact associations for page artifacts
+                # within collection's groups
+                group_artifacts = (
+                    session.query(GroupArtifact, Group)
+                    .join(Group, GroupArtifact.group_id == Group.id)
+                    .filter(
+                        GroupArtifact.artifact_id.in_(page_artifact_ids),
+                        GroupArtifact.group_id.in_(collection_group_ids),
+                    )
+                    .all()
+                )
+
+                # Build lookup map: artifact_id -> list of group memberships
+                for ga, group in group_artifacts:
+                    if ga.artifact_id not in artifact_groups_map:
+                        artifact_groups_map[ga.artifact_id] = []
+                    artifact_groups_map[ga.artifact_id].append(
+                        ArtifactGroupMembership(
+                            id=group.id,
+                            name=group.name,
+                            position=ga.position,
+                        )
+                    )
+
         # Fetch artifact metadata for each association using fallback service
         items: List[ArtifactSummary] = []
         for assoc in page_associations:
@@ -847,7 +910,20 @@ async def list_collection_artifacts(
 
             # Apply type filter if specified
             if artifact_type is None or artifact_summary.type == artifact_type:
-                items.append(artifact_summary)
+                if include_groups:
+                    # Add groups field to artifact summary
+                    groups = artifact_groups_map.get(assoc.artifact_id, [])
+                    items.append(
+                        ArtifactSummary(
+                            name=artifact_summary.name,
+                            type=artifact_summary.type,
+                            version=artifact_summary.version,
+                            source=artifact_summary.source,
+                            groups=groups,
+                        )
+                    )
+                else:
+                    items.append(artifact_summary)
 
         # Build pagination info
         has_next = end_idx < len(all_associations)

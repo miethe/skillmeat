@@ -4,12 +4,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  analyzeMergeSafety,
-  previewMerge,
-  executeMerge,
-  resolveConflict,
-} from '@/lib/api/merge';
+import { analyzeMergeSafety, previewMerge, executeMerge, resolveConflict } from '@/lib/api/merge';
 import type {
   MergeAnalyzeRequest,
   MergeSafetyResponse,

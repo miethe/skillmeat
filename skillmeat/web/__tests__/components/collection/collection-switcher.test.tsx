@@ -76,7 +76,7 @@ describe('CollectionSwitcher', () => {
   });
 
   it('displays selected collection name when collection is selected', () => {
-    const workCollection = mockCollections.find(c => c.id === 'work') ?? null;
+    const workCollection = mockCollections.find((c) => c.id === 'work') ?? null;
     mockUseCollectionContext.mockReturnValue({
       collections: mockCollections,
       selectedCollectionId: 'work',
@@ -137,7 +137,7 @@ describe('CollectionSwitcher', () => {
   });
 
   it('calls setSelectedCollectionId when "All Collections" is selected', async () => {
-    const workCollection = mockCollections.find(c => c.id === 'work') ?? null;
+    const workCollection = mockCollections.find((c) => c.id === 'work') ?? null;
     mockUseCollectionContext.mockReturnValue({
       collections: mockCollections,
       selectedCollectionId: 'work',

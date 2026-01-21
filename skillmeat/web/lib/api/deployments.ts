@@ -112,9 +112,7 @@ export async function listDeployments(
  * @param projectPath - Optional project path
  * @returns Deployment summary with counts by type and status
  */
-export async function getDeploymentSummary(
-  projectPath?: string
-): Promise<DeploymentSummary> {
+export async function getDeploymentSummary(projectPath?: string): Promise<DeploymentSummary> {
   const listResponse = await listDeployments(projectPath);
   const { deployments } = listResponse;
 
@@ -143,13 +141,12 @@ export async function getDeploymentSummary(
   });
 
   // Find most recent deployment
-  const lastUpdated = deployments.length > 0
-    ? deployments.reduce((latest, current) => {
-        return new Date(current.deployed_at) > new Date(latest.deployed_at)
-          ? current
-          : latest;
-      }).deployed_at
-    : new Date().toISOString();
+  const lastUpdated =
+    deployments.length > 0
+      ? deployments.reduce((latest, current) => {
+          return new Date(current.deployed_at) > new Date(latest.deployed_at) ? current : latest;
+        }).deployed_at
+      : new Date().toISOString();
 
   return {
     total: listResponse.total,
@@ -204,15 +201,11 @@ export async function getDeployments(
 
   // Apply client-side filtering if needed
   if (params?.artifactType) {
-    deployments = deployments.filter(
-      (d) => d.artifact_type === params.artifactType
-    );
+    deployments = deployments.filter((d) => d.artifact_type === params.artifactType);
   }
 
   if (params?.syncStatus) {
-    deployments = deployments.filter(
-      (d) => d.sync_status === params.syncStatus
-    );
+    deployments = deployments.filter((d) => d.sync_status === params.syncStatus);
   }
 
   return deployments;

@@ -52,20 +52,20 @@ export function TagMetricsWidget({ limit = 5, className }: TagMetricsWidgetProps
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-2 gap-4">
             <div>
-              <Skeleton className="h-8 w-16 mb-1" />
+              <Skeleton className="mb-1 h-8 w-16" />
               <Skeleton className="h-4 w-24" />
             </div>
             <div>
-              <Skeleton className="h-8 w-16 mb-1" />
+              <Skeleton className="mb-1 h-8 w-16" />
               <Skeleton className="h-4 w-32" />
             </div>
           </div>
           <div className="space-y-2">
-            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="mb-2 h-4 w-20" />
             {[...Array(limit)].map((_, i) => (
-              <div key={i} className="flex justify-between items-center">
+              <div key={i} className="flex items-center justify-between">
                 <Skeleton className="h-6 w-24" />
                 <Skeleton className="h-4 w-12" />
               </div>
@@ -86,7 +86,7 @@ export function TagMetricsWidget({ limit = 5, className }: TagMetricsWidgetProps
       </CardHeader>
       <CardContent>
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="mb-4 grid grid-cols-2 gap-4">
           <div>
             <div className="text-2xl font-bold">{totalTags}</div>
             <div className="text-sm text-muted-foreground">Total Tags</div>
@@ -102,7 +102,7 @@ export function TagMetricsWidget({ limit = 5, className }: TagMetricsWidgetProps
           <div className="space-y-2">
             <div className="text-sm font-medium">Top Tags</div>
             {topTags.map((tag) => (
-              <div key={tag.id} className="flex justify-between items-center">
+              <div key={tag.id} className="flex items-center justify-between">
                 <Badge variant="secondary" colorStyle={tag.color}>
                   {tag.name}
                 </Badge>
@@ -116,9 +116,7 @@ export function TagMetricsWidget({ limit = 5, className }: TagMetricsWidgetProps
 
         {/* Empty State */}
         {topTags.length === 0 && (
-          <div className="text-center py-4 text-sm text-muted-foreground">
-            No tags created yet
-          </div>
+          <div className="py-4 text-center text-sm text-muted-foreground">No tags created yet</div>
         )}
       </CardContent>
     </Card>

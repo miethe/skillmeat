@@ -19,7 +19,7 @@ export type CatalogEntryResponse = {
     /**
      * Type of artifact detected
      */
-    artifact_type: 'skill' | 'command' | 'agent' | 'mcp_server' | 'hook';
+    artifact_type: 'skill' | 'command' | 'agent' | 'mcp' | 'mcp_server' | 'hook';
     /**
      * Artifact name extracted from manifest or inferred
      */
@@ -49,9 +49,17 @@ export type CatalogEntryResponse = {
      */
     confidence_score: number;
     /**
+     * Raw score before normalization (0-120 typical)
+     */
+    raw_score?: (number | null);
+    /**
+     * Detailed signal breakdown: dir_name_score (0-10), manifest_score (0-20), extensions_score (0-5), parent_hint_score (0-15), frontmatter_score (0-15), depth_penalty (negative), raw_total, normalized_score (0-100)
+     */
+    score_breakdown?: (Record<string, number> | null);
+    /**
      * Lifecycle status of the catalog entry
      */
-    status: 'new' | 'updated' | 'removed' | 'imported';
+    status: 'new' | 'updated' | 'removed' | 'imported' | 'excluded';
     /**
      * Timestamp when artifact was imported to collection
      */
@@ -60,5 +68,21 @@ export type CatalogEntryResponse = {
      * ID of import operation if imported
      */
     import_id?: (string | null);
+    /**
+     * ISO 8601 timestamp when artifact was marked as excluded from catalog. Null if not excluded.
+     */
+    excluded_at?: (string | null);
+    /**
+     * User-provided reason for exclusion (max 500 chars). Null if not excluded or no reason provided.
+     */
+    excluded_reason?: (string | null);
+    /**
+     * Whether this artifact was excluded as a duplicate (within-source or cross-source)
+     */
+    is_duplicate?: boolean;
+    /**
+     * Whether an artifact with matching name and type exists in the active collection
+     */
+    in_collection?: boolean;
 };
 

@@ -595,7 +595,14 @@ describe('Skip Reasons in Notifications', () => {
 
       // Component to sync NotificationBell props with store
       function NotificationBellWrapper() {
-        const { notifications, unreadCount, markAsRead, clearAll, dismissNotification, markAllAsRead } = useNotifications();
+        const {
+          notifications,
+          unreadCount,
+          markAsRead,
+          clearAll,
+          dismissNotification,
+          markAllAsRead,
+        } = useNotifications();
         return (
           <NotificationBell
             unreadCount={unreadCount}
@@ -873,7 +880,14 @@ describe('Toast to Notification Center Click-Through', () => {
 
     // Component to sync NotificationBell props with store
     function NotificationBellWrapper() {
-      const { notifications, unreadCount, markAsRead, clearAll, dismissNotification, markAllAsRead } = useNotifications();
+      const {
+        notifications,
+        unreadCount,
+        markAsRead,
+        clearAll,
+        dismissNotification,
+        markAllAsRead,
+      } = useNotifications();
       return (
         <NotificationBell
           unreadCount={unreadCount}

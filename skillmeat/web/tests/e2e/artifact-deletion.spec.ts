@@ -117,7 +117,10 @@ test.describe('Artifact Deletion E2E', () => {
       });
 
       // Get initial artifact count
-      const initialCount = await page.locator('[data-testid="artifact-grid"]').locator('article').count();
+      const initialCount = await page
+        .locator('[data-testid="artifact-grid"]')
+        .locator('article')
+        .count();
 
       // Open deletion dialog
       const firstCard = page.locator('[data-testid="artifact-grid"]').locator('article').first();
@@ -192,7 +195,10 @@ test.describe('Artifact Deletion E2E', () => {
 
       // Find and click Delete button in modal
       // Note: This assumes the modal has a Delete button - may need adjustment based on actual implementation
-      const deleteButton = page.getByRole('dialog').getByRole('button', { name: /delete/i }).first();
+      const deleteButton = page
+        .getByRole('dialog')
+        .getByRole('button', { name: /delete/i })
+        .first();
 
       if (await deleteButton.isVisible()) {
         await deleteButton.click();
@@ -228,7 +234,10 @@ test.describe('Artifact Deletion E2E', () => {
       await waitForElement(page, '[role="dialog"]');
 
       // Find delete button
-      const deleteButton = page.getByRole('dialog').getByRole('button', { name: /delete/i }).first();
+      const deleteButton = page
+        .getByRole('dialog')
+        .getByRole('button', { name: /delete/i })
+        .first();
 
       if (await deleteButton.isVisible()) {
         await deleteButton.click();
@@ -463,9 +472,7 @@ test.describe('Artifact Deletion E2E', () => {
         collectionDeleted: true,
         projectsUndeployed: 1,
         deploymentsDeleted: 0,
-        errors: [
-          { operation: 'undeploy:/project/b', error: 'File not found' },
-        ],
+        errors: [{ operation: 'undeploy:/project/b', error: 'File not found' }],
       });
 
       // Open deletion dialog
@@ -492,12 +499,7 @@ test.describe('Artifact Deletion E2E', () => {
 
     test('keeps dialog open on API error', async ({ page }) => {
       // Mock API error
-      await mockApiRoute(
-        page,
-        '/api/v1/artifacts/*/delete*',
-        { error: 'Network error' },
-        500
-      );
+      await mockApiRoute(page, '/api/v1/artifacts/*/delete*', { error: 'Network error' }, 500);
 
       // Open deletion dialog
       const firstCard = page.locator('[data-testid="artifact-grid"]').locator('article').first();

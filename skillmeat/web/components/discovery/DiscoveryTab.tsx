@@ -12,9 +12,30 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Folder, FileText, Bot, Plug, Code, Package, Search, ArrowUpDown, X, AlertCircle, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import {
+  Folder,
+  FileText,
+  Bot,
+  Plug,
+  Code,
+  Package,
+  Search,
+  ArrowUpDown,
+  X,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildArtifactKey } from '@/lib/skip-preferences';
 import { useTrackDiscovery } from '@/lib/analytics';
@@ -202,7 +223,7 @@ function determineArtifactStatus(
   const artifactKey = buildArtifactKey(artifact.type, artifact.name);
 
   // Check skip preferences first (user's explicit decision)
-  if (skipPrefs?.some(pref => pref.artifact_key === artifactKey)) {
+  if (skipPrefs?.some((pref) => pref.artifact_key === artifactKey)) {
     return 'skipped';
   }
 
@@ -293,7 +314,8 @@ function getMatchInfo(artifact: DiscoveredArtifact): { name: string | null; conf
   if (artifact.collection_status?.matched_artifact_id) {
     // Extract name from artifact ID (format: type:name)
     const parts = artifact.collection_status.matched_artifact_id.split(':');
-    const matchedName = parts.length > 1 ? parts[1] : artifact.collection_status.matched_artifact_id;
+    const matchedName =
+      parts.length > 1 ? parts[1] : artifact.collection_status.matched_artifact_id;
     return {
       name: matchedName ?? null,
       confidence: artifact.collection_status.match_type === 'exact' ? 1.0 : 0.85,
@@ -365,9 +387,7 @@ export function DiscoveryTab({
     // Apply search filter (debounced)
     if (debouncedSearch) {
       const searchLower = debouncedSearch.toLowerCase();
-      result = result.filter((artifact) =>
-        artifact.name.toLowerCase().includes(searchLower)
-      );
+      result = result.filter((artifact) => artifact.name.toLowerCase().includes(searchLower));
     }
 
     // Apply status filter
@@ -463,7 +483,12 @@ export function DiscoveryTab({
   };
 
   // Check if any filters are active
-  const hasActiveFilters = filters.search !== '' || filters.status !== 'all' || filters.type !== 'all' || sort.field !== 'name' || sort.order !== 'asc';
+  const hasActiveFilters =
+    filters.search !== '' ||
+    filters.status !== 'all' ||
+    filters.type !== 'all' ||
+    sort.field !== 'name' ||
+    sort.order !== 'asc';
 
   // Calculate total token usage (for context entities with auto-load)
   const totalAutoLoadTokens = useMemo(() => {
@@ -643,12 +668,7 @@ export function DiscoveryTab({
             )}
           </div>
           {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearFilters}
-              className="gap-2"
-            >
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-2">
               <X className="h-4 w-4" />
               Clear Filters
             </Button>
@@ -660,10 +680,7 @@ export function DiscoveryTab({
       <div className="flex flex-wrap items-center gap-3">
         {/* Import New Only Button */}
         {groupedArtifacts.new.length > 0 && onImportNewOnly && (
-          <Button
-            onClick={() => onImportNewOnly(groupedArtifacts.new)}
-            className="gap-2"
-          >
+          <Button onClick={() => onImportNewOnly(groupedArtifacts.new)} className="gap-2">
             <Package className="h-4 w-4" />
             Import New Only ({groupedArtifacts.new.length})
           </Button>
@@ -696,10 +713,11 @@ export function DiscoveryTab({
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-500" />
-            <h3 className="text-lg font-semibold">
-              New Artifacts ({groupedArtifacts.new.length})
-            </h3>
-            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400">
+            <h3 className="text-lg font-semibold">New Artifacts ({groupedArtifacts.new.length})</h3>
+            <Badge
+              variant="outline"
+              className="border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400"
+            >
               Ready to Import
             </Badge>
           </div>
@@ -717,12 +735,15 @@ export function DiscoveryTab({
               </TableHeader>
               <TableBody>
                 {groupedArtifacts.new.map((artifact) => {
-                  const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
-                  const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                  const Icon =
+                    artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                  const typeColorClass =
+                    artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] ||
+                    'bg-gray-500/10 text-gray-500 border-gray-500/20';
                   const status = determineArtifactStatus(artifact, skipPrefs);
                   const statusColorClass = getStatusColorClass(status);
                   const artifactKey = buildArtifactKey(artifact.type, artifact.name);
-                  const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+                  const isSkipped = skipPrefs?.some((pref) => pref.artifact_key === artifactKey);
                   const isImported = status === 'in_collection' || status === 'in_project';
 
                   return (
@@ -762,7 +783,7 @@ export function DiscoveryTab({
                       </TableCell>
                       <TableCell>
                         <span
-                          className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                          className="block max-w-[200px] truncate font-mono text-xs text-muted-foreground"
                           title={artifact.source || 'No source'}
                         >
                           {truncateSource(artifact.source)}
@@ -774,7 +795,10 @@ export function DiscoveryTab({
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <ArtifactActions
                             artifact={artifact}
                             isSkipped={isSkipped}
@@ -802,7 +826,10 @@ export function DiscoveryTab({
             <h3 className="text-lg font-semibold">
               Possible Duplicates ({groupedArtifacts.possible_duplicates.length})
             </h3>
-            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400">
+            <Badge
+              variant="outline"
+              className="border-yellow-500/20 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+            >
               Review Recommended
             </Badge>
           </div>
@@ -820,11 +847,14 @@ export function DiscoveryTab({
               </TableHeader>
               <TableBody>
                 {groupedArtifacts.possible_duplicates.map((artifact) => {
-                  const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
-                  const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                  const Icon =
+                    artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                  const typeColorClass =
+                    artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] ||
+                    'bg-gray-500/10 text-gray-500 border-gray-500/20';
                   const matchInfo = getMatchInfo(artifact);
                   const artifactKey = buildArtifactKey(artifact.type, artifact.name);
-                  const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+                  const isSkipped = skipPrefs?.some((pref) => pref.artifact_key === artifactKey);
 
                   return (
                     <TableRow
@@ -864,7 +894,7 @@ export function DiscoveryTab({
                       </TableCell>
                       <TableCell>
                         <span
-                          className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                          className="block max-w-[200px] truncate font-mono text-xs text-muted-foreground"
                           title={artifact.source || 'No source'}
                         >
                           {truncateSource(artifact.source)}
@@ -876,7 +906,10 @@ export function DiscoveryTab({
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <ArtifactActions
                             artifact={artifact}
                             isSkipped={isSkipped}
@@ -914,13 +947,19 @@ export function DiscoveryTab({
             <h3 className="text-lg font-semibold">
               Exact Matches ({groupedArtifacts.exact_matches.length})
             </h3>
-            <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400">
+            <Badge
+              variant="outline"
+              className="border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+            >
               Already in Collection
             </Badge>
           </button>
 
           {showExactMatches && (
-            <div id="exact-matches-section" className="rounded-md border border-blue-500/30 bg-blue-500/5">
+            <div
+              id="exact-matches-section"
+              className="rounded-md border border-blue-500/30 bg-blue-500/5"
+            >
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -934,11 +973,14 @@ export function DiscoveryTab({
                 </TableHeader>
                 <TableBody>
                   {groupedArtifacts.exact_matches.map((artifact) => {
-                    const Icon = artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
-                    const typeColorClass = artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] || 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                    const Icon =
+                      artifactTypeIcons[artifact.type as keyof typeof artifactTypeIcons] || Package;
+                    const typeColorClass =
+                      artifactTypeColors[artifact.type as keyof typeof artifactTypeColors] ||
+                      'bg-gray-500/10 text-gray-500 border-gray-500/20';
                     const matchInfo = getMatchInfo(artifact);
                     const artifactKey = buildArtifactKey(artifact.type, artifact.name);
-                    const isSkipped = skipPrefs?.some(pref => pref.artifact_key === artifactKey);
+                    const isSkipped = skipPrefs?.some((pref) => pref.artifact_key === artifactKey);
 
                     return (
                       <TableRow
@@ -971,14 +1013,12 @@ export function DiscoveryTab({
                             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                               {matchInfo.name || artifact.name}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              Identical content
-                            </span>
+                            <span className="text-xs text-muted-foreground">Identical content</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <span
-                            className="block truncate font-mono text-xs text-muted-foreground max-w-[200px]"
+                            className="block max-w-[200px] truncate font-mono text-xs text-muted-foreground"
                             title={artifact.source || 'No source'}
                           >
                             {truncateSource(artifact.source)}
@@ -990,7 +1030,10 @@ export function DiscoveryTab({
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <ArtifactActions
                               artifact={artifact}
                               isSkipped={isSkipped}

@@ -11,6 +11,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact-dialog';
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
+import { RepoDetailsModal } from '@/components/marketplace/repo-details-modal';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -32,6 +33,7 @@ import {
   Tags,
   MoreVertical,
   FolderTree,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,11 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
@@ -58,12 +56,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ExcludedArtifactsList } from './components/excluded-list';
 import { SourceToolbar, useViewMode } from './components/source-toolbar';
 import { CatalogList } from './components/catalog-list';
@@ -82,7 +75,13 @@ import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
 import { CatalogEntryModal } from '@/components/CatalogEntryModal';
 import { ScoreBadge } from '@/components/ScoreBadge';
-import type { CatalogEntry, CatalogFilters, ArtifactType, CatalogStatus } from '@/types/marketplace';
+import { TagBadge } from '@/components/marketplace/tag-badge';
+import type {
+  CatalogEntry,
+  CatalogFilters,
+  ArtifactType,
+  CatalogStatus,
+} from '@/types/marketplace';
 
 // ============================================================================
 // Sub-components
@@ -133,11 +132,26 @@ function CatalogCard({
   }[entry.status];
 
   const typeConfig: Record<ArtifactType, { label: string; color: string }> = {
-    skill: { label: 'Skill', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-    command: { label: 'Command', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-    agent: { label: 'Agent', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-    mcp: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-    mcp_server: { label: 'MCP', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+    skill: {
+      label: 'Skill',
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    },
+    command: {
+      label: 'Command',
+      color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+    },
+    agent: {
+      label: 'Agent',
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    },
+    mcp: {
+      label: 'MCP',
+      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    },
+    mcp_server: {
+      label: 'MCP',
+      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    },
     hook: { label: 'Hook', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
   };
 
@@ -151,7 +165,7 @@ function CatalogCard({
   return (
     <Card
       className={cn(
-        'relative transition-shadow hover:shadow-md cursor-pointer',
+        'relative cursor-pointer transition-shadow hover:shadow-md',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         selected && 'ring-2 ring-primary'
       )}
@@ -161,9 +175,9 @@ function CatalogCard({
       role="button"
       aria-label={`View details for ${entry.name} ${entry.artifact_type}`}
     >
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 p-4">
         {/* Selection checkbox */}
-        <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute right-3 top-3" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={selected}
             onCheckedChange={onSelect}
@@ -174,7 +188,7 @@ function CatalogCard({
 
         {/* Header */}
         <div className="pr-8">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <Badge variant="outline" className={typeConfig[entry.artifact_type].color}>
               {typeConfig[entry.artifact_type].label}
             </Badge>
@@ -185,13 +199,13 @@ function CatalogCard({
             {entry.status === 'excluded' && entry.is_duplicate && (
               <Badge
                 variant="outline"
-                className="border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950"
+                className="border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-950"
                 title={
                   entry.duplicate_reason === 'within_source'
                     ? `Duplicate within this source${entry.duplicate_of ? `: ${entry.duplicate_of}` : ''}`
                     : entry.duplicate_reason === 'cross_source'
-                    ? 'Duplicate from another source or collection'
-                    : 'Marked as duplicate'
+                      ? 'Duplicate from another source or collection'
+                      : 'Marked as duplicate'
                 }
               >
                 Duplicate
@@ -201,15 +215,15 @@ function CatalogCard({
             {entry.in_collection && entry.status !== 'imported' && (
               <Badge
                 variant="outline"
-                className="border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950"
+                className="border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950"
                 title="An artifact with this name and type already exists in your collection"
               >
                 In Collection
               </Badge>
             )}
           </div>
-          <h3 className="font-semibold truncate">{entry.name}</h3>
-          <p className="text-xs text-muted-foreground truncate">{entry.path}</p>
+          <h3 className="truncate font-semibold">{entry.name}</h3>
+          <p className="truncate text-xs text-muted-foreground">{entry.path}</p>
         </div>
 
         {/* Metadata */}
@@ -233,46 +247,48 @@ function CatalogCard({
         </div>
 
         {/* Actions */}
-        {entry.status !== 'imported' && entry.status !== 'removed' && entry.status !== 'excluded' && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                onImport();
-              }}
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" aria-hidden="true" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-3 w-3" aria-hidden="true" />
-                  Import
-                </>
-              )}
-            </Button>
-            <button
-              type="button"
-              className="w-full text-sm text-muted-foreground hover:underline cursor-pointer mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExcludeDialogOpen(true);
-              }}
-              aria-label={`Mark ${entry.name} as not an artifact`}
-            >
-              Not an artifact
-            </button>
-          </>
-        )}
+        {entry.status !== 'imported' &&
+          entry.status !== 'removed' &&
+          entry.status !== 'excluded' && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImport();
+                }}
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" aria-hidden="true" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-3 w-3" aria-hidden="true" />
+                    Import
+                  </>
+                )}
+              </Button>
+              <button
+                type="button"
+                className="mt-2 w-full cursor-pointer rounded-sm text-sm text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExcludeDialogOpen(true);
+                }}
+                aria-label={`Mark ${entry.name} as not an artifact`}
+              >
+                Not an artifact
+              </button>
+            </>
+          )}
 
         {entry.status === 'imported' && entry.import_date && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-center text-xs text-muted-foreground">
             Imported {new Date(entry.import_date).toLocaleDateString()}
           </p>
         )}
@@ -295,7 +311,7 @@ function CatalogCard({
 function CatalogCardSkeleton() {
   return (
     <Card>
-      <div className="p-4 space-y-3">
+      <div className="space-y-3 p-4">
         <div className="flex gap-2">
           <Skeleton className="h-5 w-16 rounded-full" />
           <Skeleton className="h-5 w-14 rounded-full" />
@@ -337,6 +353,7 @@ export default function SourceDetailPage() {
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [directoryMapModalOpen, setDirectoryMapModalOpen] = useState(false);
+  const [repoDetailsModalOpen, setRepoDetailsModalOpen] = useState(false);
   const [treeData, setTreeData] = useState<any[]>([]);
   const [isLoadingTree, setIsLoadingTree] = useState(false);
   const [treeError, setTreeError] = useState<string>();
@@ -345,8 +362,8 @@ export default function SourceDetailPage() {
     maxConfidence: Number(searchParams.get('maxConfidence')) || 100,
     includeBelowThreshold: searchParams.get('includeBelowThreshold') === 'true',
   }));
-  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(() =>
-    searchParams.get('showOnlyDuplicates') === 'true'
+  const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(
+    () => searchParams.get('showOnlyDuplicates') === 'true'
   );
 
   // Ref to prevent duplicate fetch requests during state transitions
@@ -356,7 +373,9 @@ export default function SourceDetailPage() {
   const prevEntriesLengthRef = useRef<number>(0);
 
   // Helper function to convert between SortOption and filters
-  const parseSortOption = (option: SortOption): { sort_by: 'confidence' | 'name' | 'date'; sort_order: 'asc' | 'desc' } => {
+  const parseSortOption = (
+    option: SortOption
+  ): { sort_by: 'confidence' | 'name' | 'date'; sort_order: 'asc' | 'desc' } => {
     switch (option) {
       case 'confidence-asc':
         return { sort_by: 'confidence', sort_order: 'asc' };
@@ -375,8 +394,13 @@ export default function SourceDetailPage() {
 
   const [sortOption, setSortOption] = useState<SortOption>(() => {
     const param = searchParams.get('sort');
-    if (param === 'confidence-asc' || param === 'confidence-desc' ||
-        param === 'name-asc' || param === 'name-desc' || param === 'date-added') {
+    if (
+      param === 'confidence-asc' ||
+      param === 'confidence-desc' ||
+      param === 'name-asc' ||
+      param === 'name-desc' ||
+      param === 'date-added'
+    ) {
       return param;
     }
     return 'confidence-desc'; // default to high confidence first
@@ -405,69 +429,87 @@ export default function SourceDetailPage() {
   const [viewMode, setViewMode] = useViewMode();
 
   // Helper function to update URL parameters
-  const updateURLParams = useCallback((
-    newConfidenceFilters: typeof confidenceFilters,
-    newFilters: typeof filters,
-    newSortOption: SortOption,
-    newShowOnlyDuplicates: boolean,
-    newPage: number,
-    newLimit: number
-  ) => {
-    const params = new URLSearchParams();
+  const updateURLParams = useCallback(
+    (
+      newConfidenceFilters: typeof confidenceFilters,
+      newFilters: typeof filters,
+      newSortOption: SortOption,
+      newShowOnlyDuplicates: boolean,
+      newPage: number,
+      newLimit: number
+    ) => {
+      const params = new URLSearchParams();
 
-    // Add pagination params only if different from defaults
-    if (newPage !== 1) {
-      params.set('page', newPage.toString());
-    }
-    if (newLimit !== 25) {
-      params.set('limit', newLimit.toString());
-    }
+      // Add pagination params only if different from defaults
+      if (newPage !== 1) {
+        params.set('page', newPage.toString());
+      }
+      if (newLimit !== 25) {
+        params.set('limit', newLimit.toString());
+      }
 
-    // Add confidence filters only if different from defaults
-    if (newConfidenceFilters.minConfidence !== 50) {
-      params.set('minConfidence', newConfidenceFilters.minConfidence.toString());
-    }
-    if (newConfidenceFilters.maxConfidence !== 100) {
-      params.set('maxConfidence', newConfidenceFilters.maxConfidence.toString());
-    }
-    if (newConfidenceFilters.includeBelowThreshold) {
-      params.set('includeBelowThreshold', 'true');
-    }
+      // Add confidence filters only if different from defaults
+      if (newConfidenceFilters.minConfidence !== 50) {
+        params.set('minConfidence', newConfidenceFilters.minConfidence.toString());
+      }
+      if (newConfidenceFilters.maxConfidence !== 100) {
+        params.set('maxConfidence', newConfidenceFilters.maxConfidence.toString());
+      }
+      if (newConfidenceFilters.includeBelowThreshold) {
+        params.set('includeBelowThreshold', 'true');
+      }
 
-    // Add duplicate filter (P4.4b)
-    if (newShowOnlyDuplicates) {
-      params.set('showOnlyDuplicates', 'true');
-    }
+      // Add duplicate filter (P4.4b)
+      if (newShowOnlyDuplicates) {
+        params.set('showOnlyDuplicates', 'true');
+      }
 
-    // Add type and status filters
-    if (newFilters.artifact_type) {
-      params.set('type', newFilters.artifact_type);
-    }
-    if (newFilters.status) {
-      params.set('status', newFilters.status);
-    }
+      // Add type and status filters
+      if (newFilters.artifact_type) {
+        params.set('type', newFilters.artifact_type);
+      }
+      if (newFilters.status) {
+        params.set('status', newFilters.status);
+      }
 
-    // Add sort option only if different from default
-    if (newSortOption !== 'confidence-desc') {
-      params.set('sort', newSortOption);
-    }
+      // Add sort option only if different from default
+      if (newSortOption !== 'confidence-desc') {
+        params.set('sort', newSortOption);
+      }
 
-    const query = params.toString();
-    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-  }, [router, pathname]);
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+    },
+    [router, pathname]
+  );
 
   // Sync sortOption changes to filters
   useEffect(() => {
     const { sort_by, sort_order } = parseSortOption(sortOption);
     if (filters.sort_by !== sort_by || filters.sort_order !== sort_order) {
-      setFilters(prev => ({ ...prev, sort_by, sort_order }));
+      setFilters((prev) => ({ ...prev, sort_by, sort_order }));
     }
   }, [sortOption, filters.sort_by, filters.sort_order]);
 
   // Sync URL when filters or pagination change
   useEffect(() => {
-    updateURLParams(confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage);
-  }, [updateURLParams, confidenceFilters, filters, sortOption, showOnlyDuplicates, currentPage, itemsPerPage]);
+    updateURLParams(
+      confidenceFilters,
+      filters,
+      sortOption,
+      showOnlyDuplicates,
+      currentPage,
+      itemsPerPage
+    );
+  }, [
+    updateURLParams,
+    confidenceFilters,
+    filters,
+    sortOption,
+    showOnlyDuplicates,
+    currentPage,
+    itemsPerPage,
+  ]);
 
   // Reset to page 1 and clear fetch target when filters change (but not when page/limit change)
   useEffect(() => {
@@ -526,8 +568,7 @@ export default function SourceDetailPage() {
       const query = searchQuery.toLowerCase();
       entries = entries.filter(
         (entry) =>
-          entry.name.toLowerCase().includes(query) ||
-          entry.path.toLowerCase().includes(query)
+          entry.name.toLowerCase().includes(query) || entry.path.toLowerCase().includes(query)
       );
     }
 
@@ -552,8 +593,11 @@ export default function SourceDetailPage() {
 
   // Get total count from first page (stays consistent across pagination)
   // Fallback to summing counts_by_status if total_count is null
-  const totalCount = catalogData?.pages[0]?.page_info?.total_count
-    ?? (countsByStatus ? Object.values(countsByStatus).reduce((sum: number, count) => sum + (count as number), 0) : undefined);
+  const totalCount =
+    catalogData?.pages[0]?.page_info?.total_count ??
+    (countsByStatus
+      ? Object.values(countsByStatus).reduce((sum: number, count) => sum + (count as number), 0)
+      : undefined);
 
   // Pagination calculations
   // Use server totalCount for total pages, fallback to loaded data count
@@ -569,7 +613,8 @@ export default function SourceDetailPage() {
   }, [filteredEntries, startIndex, endIndex]);
 
   // Determine if we need more data for the current page view
-  const needsMoreDataForPage = filteredEntries.length < endIndex && filteredEntries.length < (totalCount ?? Infinity);
+  const needsMoreDataForPage =
+    filteredEntries.length < endIndex && filteredEntries.length < (totalCount ?? Infinity);
 
   // Ensure current page is valid when data changes
   useEffect(() => {
@@ -605,7 +650,8 @@ export default function SourceDetailPage() {
     const needsMoreData = neededCount > loadedCount;
     const notFullyLoaded = loadedCount < serverTotal;
     const canFetchMore = hasNextPage && !isFetchingNextPage && !catalogFetching;
-    const notAlreadyFetching = fetchTargetRef.current === null || fetchTargetRef.current < neededCount;
+    const notAlreadyFetching =
+      fetchTargetRef.current === null || fetchTargetRef.current < neededCount;
 
     if (needsMoreData && notFullyLoaded && canFetchMore && notAlreadyFetching) {
       // Set the target we're fetching for to prevent duplicate requests
@@ -614,7 +660,14 @@ export default function SourceDetailPage() {
     }
     // Note: fetchNextPage is intentionally omitted - it's stable from React Query
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endIndex, allEntries.length, effectiveTotalCount, hasNextPage, isFetchingNextPage, catalogFetching]);
+  }, [
+    endIndex,
+    allEntries.length,
+    effectiveTotalCount,
+    hasNextPage,
+    isFetchingNextPage,
+    catalogFetching,
+  ]);
 
   // Selection handlers
   const handleSelectEntry = (entryId: string, selected: boolean) => {
@@ -748,6 +801,10 @@ export default function SourceDetailPage() {
     return pages;
   };
 
+  // Check if source has repo details content to show
+  const hasRepoDetails =
+    source && (source.description || source.repo_description || source.repo_readme);
+
   // Loading state
   if (sourceLoading) {
     return (
@@ -788,9 +845,7 @@ export default function SourceDetailPage() {
     (e) => e.status === 'new' || e.status === 'updated'
   ).length;
 
-  const excludedCount = filteredEntries.filter(
-    (e) => e.status === 'excluded'
-  ).length;
+  const excludedCount = filteredEntries.filter((e) => e.status === 'excluded').length;
 
   return (
     <div className="space-y-6">
@@ -800,7 +855,7 @@ export default function SourceDetailPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="mb-2 -ml-2"
+            className="-ml-2 mb-2"
             onClick={() => router.push('/marketplace/sources')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -818,15 +873,34 @@ export default function SourceDetailPage() {
               </p>
               {/* Description */}
               {source.description && (
-                <p className="mt-2 text-muted-foreground">
-                  {source.description}
-                </p>
+                <p className="mt-2 text-muted-foreground">{source.description}</p>
               )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Repo Details Button - only show if content is available */}
+          {hasRepoDetails && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setRepoDetailsModalOpen(true)}
+                    aria-label="View repository details"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Repo Details</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           {/* Icon-only buttons with tooltips */}
           <TooltipProvider>
             <Tooltip>
@@ -838,7 +912,9 @@ export default function SourceDetailPage() {
                   disabled={rescanMutation.isPending}
                   aria-label={rescanMutation.isPending ? 'Scanning...' : 'Rescan source'}
                 >
-                  <RefreshCw className={cn('h-4 w-4', rescanMutation.isPending && 'animate-spin')} />
+                  <RefreshCw
+                    className={cn('h-4 w-4', rescanMutation.isPending && 'animate-spin')}
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -850,11 +926,7 @@ export default function SourceDetailPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <a
-                  href={source.repo_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={source.repo_url} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="icon" aria-label="View repository">
                     <Github className="h-4 w-4" />
                   </Button>
@@ -908,10 +980,7 @@ export default function SourceDetailPage() {
           <Badge
             key={status}
             variant="outline"
-            className={cn(
-              'cursor-pointer',
-              filters.status === status && 'ring-2 ring-primary'
-            )}
+            className={cn('cursor-pointer', filters.status === status && 'ring-2 ring-primary')}
             onClick={() =>
               setFilters((prev) => ({
                 ...prev,
@@ -924,6 +993,21 @@ export default function SourceDetailPage() {
         ))}
       </div>
 
+      {/* Source Tags */}
+      {source.tags && source.tags.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Tags:</span>
+          <TagBadge
+            tags={source.tags}
+            maxDisplay={5}
+            onTagClick={(tag) => {
+              // Navigate to sources list with tag filter
+              router.push(`/marketplace/sources?tag=${encodeURIComponent(tag)}`);
+            }}
+          />
+        </div>
+      )}
+
       {/* Manual Mappings Display (P4.3a) - Collapsible */}
       {source.manual_map && Object.keys(source.manual_map).length > 0 && (
         <Collapsible open={isMappingsOpen} onOpenChange={setIsMappingsOpen}>
@@ -931,7 +1015,9 @@ export default function SourceDetailPage() {
             <Button
               variant="ghost"
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-              aria-label={isMappingsOpen ? 'Collapse directory mappings' : 'Expand directory mappings'}
+              aria-label={
+                isMappingsOpen ? 'Collapse directory mappings' : 'Expand directory mappings'
+              }
             >
               {isMappingsOpen ? (
                 <ChevronUp className="h-4 w-4" aria-hidden="true" />
@@ -943,19 +1029,15 @@ export default function SourceDetailPage() {
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <Card className="p-4">
-              <div className="flex items-start justify-between mb-3">
+              <div className="mb-3 flex items-start justify-between">
                 <div>
-                  <h3 className="font-medium mb-1">Directory Mappings</h3>
+                  <h3 className="mb-1 font-medium">Directory Mappings</h3>
                   <p className="text-sm text-muted-foreground">
                     Manual artifact type mappings for specific directories
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenDirectoryMap}
-                  >
+                  <Button variant="outline" size="sm" onClick={handleOpenDirectoryMap}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit Mappings
                   </Button>
@@ -965,9 +1047,9 @@ export default function SourceDetailPage() {
                 {Object.entries(source.manual_map).map(([directory, artifactType]) => (
                   <div
                     key={directory}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                    className="flex items-center justify-between rounded-md bg-muted/50 p-2"
                   >
-                    <code className="text-sm font-mono">{directory}</code>
+                    <code className="font-mono text-sm">{directory}</code>
                     <Badge variant="secondary">{artifactType}</Badge>
                   </div>
                 ))}
@@ -979,44 +1061,40 @@ export default function SourceDetailPage() {
 
       {/* Scan Result with Dedup Stats (P4.3b) */}
       {lastScanResult && (
-        <Card className="p-4 border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+        <Card className="border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950">
           <div className="space-y-3">
             <div className="flex items-start gap-2">
               <div className="flex-1">
-                <h3 className="font-medium mb-1">Scan Completed Successfully</h3>
+                <h3 className="mb-1 font-medium">Scan Completed Successfully</h3>
                 <p className="text-sm text-muted-foreground">
                   {new Date(lastScanResult.scanned_at).toLocaleString()}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setLastScanResult(null)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setLastScanResult(null)}>
                 Dismiss
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded bg-white p-2 text-center dark:bg-gray-900">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {lastScanResult.artifacts_found}
                 </div>
                 <div className="text-xs text-muted-foreground">Total Found</div>
               </div>
-              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+              <div className="rounded bg-white p-2 text-center dark:bg-gray-900">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {lastScanResult.new_count}
                 </div>
                 <div className="text-xs text-muted-foreground">New</div>
               </div>
-              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+              <div className="rounded bg-white p-2 text-center dark:bg-gray-900">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                   {lastScanResult.updated_count}
                 </div>
                 <div className="text-xs text-muted-foreground">Updated</div>
               </div>
-              <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
+              <div className="rounded bg-white p-2 text-center dark:bg-gray-900">
                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                   {lastScanResult.unchanged_count}
                 </div>
@@ -1025,12 +1103,13 @@ export default function SourceDetailPage() {
             </div>
 
             {/* Deduplication Stats */}
-            {(lastScanResult.duplicates_within_source > 0 || lastScanResult.duplicates_cross_source > 0) && (
+            {(lastScanResult.duplicates_within_source > 0 ||
+              lastScanResult.duplicates_cross_source > 0) && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-medium mb-2">Deduplication</h4>
+                <h4 className="mb-2 text-sm font-medium">Deduplication</h4>
                 <div className="grid grid-cols-2 gap-3">
                   {lastScanResult.duplicates_within_source > 0 && (
-                    <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+                    <div className="rounded border border-yellow-200 bg-yellow-50 p-2 text-center dark:border-yellow-800 dark:bg-yellow-950">
                       <div className="text-xl font-bold text-yellow-700 dark:text-yellow-400">
                         {lastScanResult.duplicates_within_source}
                       </div>
@@ -1038,7 +1117,7 @@ export default function SourceDetailPage() {
                     </div>
                   )}
                   {lastScanResult.duplicates_cross_source > 0 && (
-                    <div className="text-center p-2 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded">
+                    <div className="rounded border border-purple-200 bg-purple-50 p-2 text-center dark:border-purple-800 dark:bg-purple-950">
                       <div className="text-xl font-bold text-purple-700 dark:text-purple-400">
                         {lastScanResult.duplicates_cross_source}
                       </div>
@@ -1046,8 +1125,9 @@ export default function SourceDetailPage() {
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {lastScanResult.total_detected} total detected, {lastScanResult.total_unique} unique artifacts added to catalog
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {lastScanResult.total_detected} total detected, {lastScanResult.total_unique}{' '}
+                  unique artifacts added to catalog
                 </p>
               </div>
             )}
@@ -1060,20 +1140,26 @@ export default function SourceDetailPage() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedType={filters.artifact_type ?? null}
-        onTypeChange={(type) => setFilters(prev => ({ ...prev, artifact_type: type as ArtifactType | undefined }))}
+        onTypeChange={(type) =>
+          setFilters((prev) => ({ ...prev, artifact_type: type as ArtifactType | undefined }))
+        }
         countsByType={catalogData?.pages?.[0]?.counts_by_type ?? {}}
         sortOption={sortOption}
         onSortChange={setSortOption}
         minConfidence={confidenceFilters.minConfidence}
         maxConfidence={confidenceFilters.maxConfidence}
-        onMinConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, minConfidence: v }))}
-        onMaxConfidenceChange={(v) => setConfidenceFilters(prev => ({ ...prev, maxConfidence: v }))}
+        onMinConfidenceChange={(v) =>
+          setConfidenceFilters((prev) => ({ ...prev, minConfidence: v }))
+        }
+        onMaxConfidenceChange={(v) =>
+          setConfidenceFilters((prev) => ({ ...prev, maxConfidence: v }))
+        }
         includeBelowThreshold={confidenceFilters.includeBelowThreshold}
         onIncludeBelowThresholdChange={(v) =>
-          setConfidenceFilters(prev => ({
+          setConfidenceFilters((prev) => ({
             ...prev,
             includeBelowThreshold: v,
-            minConfidence: v ? 1 : 50  // Set to 1% when on, 50% when off
+            minConfidence: v ? 1 : 50, // Set to 1% when on, 50% when off
           }))
         }
         showOnlyDuplicates={showOnlyDuplicates}
@@ -1109,7 +1195,7 @@ export default function SourceDetailPage() {
 
       {/* Refetching indicator */}
       {catalogFetching && !catalogLoading && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground px-4">
+        <div className="flex items-center gap-2 px-4 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>Updating results...</span>
         </div>
@@ -1118,11 +1204,7 @@ export default function SourceDetailPage() {
       {/* Bulk import action (shown when items selected) */}
       {selectedEntries.size > 0 && (
         <div className="flex items-center gap-2 px-4">
-          <Button
-            size="sm"
-            onClick={handleImportSelected}
-            disabled={importMutation.isPending}
-          >
+          <Button size="sm" onClick={handleImportSelected} disabled={importMutation.isPending}>
             {importMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1136,9 +1218,7 @@ export default function SourceDetailPage() {
             )}
           </Button>
           {excludedCount > 0 && (
-            <span className="text-sm text-muted-foreground">
-              {excludedCount} excluded
-            </span>
+            <span className="text-sm text-muted-foreground">{excludedCount} excluded</span>
           )}
         </div>
       )}
@@ -1147,12 +1227,10 @@ export default function SourceDetailPage() {
       {source.notes && (
         <Card className="p-4">
           <div className="flex items-start gap-2">
-            <StickyNote className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <StickyNote className="mt-0.5 h-5 w-5 flex-shrink-0 text-muted-foreground" />
             <div>
-              <h3 className="font-medium mb-1">Notes</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {source.notes}
-              </p>
+              <h3 className="mb-1 font-medium">Notes</h3>
+              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{source.notes}</p>
             </div>
           </div>
         </Card>
@@ -1252,16 +1330,13 @@ export default function SourceDetailPage() {
 
           {/* Pagination Controls */}
           {totalPages > 0 && (
-            <div className="sticky bottom-0 mt-6 -mx-6 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border/40 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="sticky bottom-0 -mx-6 mt-6 border-t border-border/40 bg-background/95 px-6 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
+              <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
                 {/* Items per page selector */}
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Show</span>
-                  <Select
-                    value={itemsPerPage.toString()}
-                    onValueChange={handleItemsPerPageChange}
-                  >
-                    <SelectTrigger className="w-[80px] h-8">
+                  <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                    <SelectTrigger className="h-8 w-[80px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1338,17 +1413,10 @@ export default function SourceDetailPage() {
       )}
 
       {/* Excluded Artifacts List */}
-      <ExcludedArtifactsList
-        entries={excludedEntries}
-        sourceId={sourceId}
-      />
+      <ExcludedArtifactsList entries={excludedEntries} sourceId={sourceId} />
 
       {/* Edit Modal */}
-      <EditSourceModal
-        source={source}
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
-      />
+      <EditSourceModal source={source} open={editModalOpen} onOpenChange={setEditModalOpen} />
 
       {/* Delete Dialog */}
       <DeleteSourceDialog
@@ -1373,11 +1441,15 @@ export default function SourceDetailPage() {
         open={directoryMapModalOpen}
         onOpenChange={setDirectoryMapModalOpen}
         sourceId={sourceId}
-        repoInfo={source ? {
-          owner: source.owner,
-          repo: source.repo_name,
-          ref: source.ref,
-        } : undefined}
+        repoInfo={
+          source
+            ? {
+                owner: source.owner,
+                repo: source.repo_name,
+                ref: source.ref,
+              }
+            : undefined
+        }
         treeData={treeData}
         isLoadingTree={isLoadingTree}
         treeError={treeError}
@@ -1385,6 +1457,15 @@ export default function SourceDetailPage() {
         onConfirm={handleConfirmMappings}
         onConfirmAndRescan={handleConfirmAndRescan}
       />
+
+      {/* Repo Details Modal */}
+      {source && (
+        <RepoDetailsModal
+          isOpen={repoDetailsModalOpen}
+          onClose={() => setRepoDetailsModalOpen(false)}
+          source={source}
+        />
+      )}
 
       {/* Bulk Tag Dialog */}
       <BulkTagDialogWithHook

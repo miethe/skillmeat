@@ -278,9 +278,9 @@ export function DiffViewer({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 min-w-0 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-64 min-h-0 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
+        <div className="min-h-0 w-64 flex-shrink-0 overflow-y-auto border-r bg-muted/20">
           <div className="space-y-1 p-2">
             {files.map((file, index) => {
               const isExpanded = expandedFiles.has(index);
@@ -343,7 +343,7 @@ export function DiffViewer({
         </div>
 
         {/* Diff viewer */}
-        <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* File header */}
           <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2">
             <div className="flex items-center justify-between">
@@ -354,7 +354,7 @@ export function DiffViewer({
 
           {/* Side-by-side diff */}
           {selectedFile?.status === 'modified' && selectedFile.unified_diff ? (
-            <div className="flex min-h-0 flex-1 min-w-0 overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               {/* Left panel */}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r">
                 <div className="flex-shrink-0 border-b bg-muted/50 px-4 py-2 text-sm font-medium">
@@ -435,7 +435,7 @@ export function DiffViewer({
 
       {/* Resolution Action Bar (for sync conflict resolution) */}
       {showResolutionActions && (
-        <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t p-4 bg-muted/20">
+        <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t bg-muted/20 p-4">
           {previewMode && (
             <span className="mr-auto text-sm text-muted-foreground">
               Preview mode - select which version to keep
@@ -468,9 +468,7 @@ export function DiffViewer({
           >
             Merge
           </Button>
-          {isResolving && (
-            <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />
-          )}
+          {isResolving && <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
       )}
     </div>

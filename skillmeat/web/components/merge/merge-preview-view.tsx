@@ -29,7 +29,7 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
-          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
           <p>No preview available</p>
         </CardContent>
       </Card>
@@ -37,9 +37,7 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
   }
 
   const totalChanges =
-    preview.filesAdded.length +
-    preview.filesRemoved.length +
-    preview.filesChanged.length;
+    preview.filesAdded.length + preview.filesRemoved.length + preview.filesChanged.length;
 
   return (
     <div className="space-y-4">
@@ -55,28 +53,22 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
               <p className="text-sm text-muted-foreground">Total Changes</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {preview.filesAdded.length}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{preview.filesAdded.length}</p>
               <p className="text-sm text-muted-foreground">Added</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {preview.filesRemoved.length}
-              </p>
+              <p className="text-2xl font-bold text-red-600">{preview.filesRemoved.length}</p>
               <p className="text-sm text-muted-foreground">Removed</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-amber-600">
-                {preview.filesChanged.length}
-              </p>
+              <p className="text-2xl font-bold text-amber-600">{preview.filesChanged.length}</p>
               <p className="text-sm text-muted-foreground">Changed</p>
             </div>
           </div>
 
           {preview.potentialConflicts.length > 0 && (
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-yellow-50 p-3">
-              <FileWarning className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+              <FileWarning className="h-5 w-5 flex-shrink-0 text-yellow-600" />
               <p className="text-sm text-yellow-900">
                 {preview.potentialConflicts.length} potential conflict(s) detected
               </p>
@@ -85,10 +77,8 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
 
           {preview.canAutoMerge && (
             <div className="mt-2 flex items-center gap-2 rounded-lg bg-green-50 p-3">
-              <FileText className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm text-green-900">
-                All changes can be automatically merged
-              </p>
+              <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+              <p className="text-sm text-green-900">All changes can be automatically merged</p>
             </div>
           )}
         </CardContent>
@@ -100,23 +90,18 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
           <CardHeader>
             <div className="flex items-center gap-2">
               <FilePlus className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-lg">
-                Files Added ({preview.filesAdded.length})
-              </CardTitle>
+              <CardTitle className="text-lg">Files Added ({preview.filesAdded.length})</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[150px]">
               <div className="space-y-1">
                 {preview.filesAdded.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 rounded-md bg-green-50 p-2"
-                  >
+                  <div key={index} className="flex items-center gap-2 rounded-md bg-green-50 p-2">
                     <Badge variant="default" className="bg-green-600 text-xs">
                       +
                     </Badge>
-                    <span className="font-mono text-sm truncate">{file}</span>
+                    <span className="truncate font-mono text-sm">{file}</span>
                   </div>
                 ))}
               </div>
@@ -140,16 +125,11 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
             <ScrollArea className="h-[150px]">
               <div className="space-y-1">
                 {preview.filesRemoved.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 rounded-md bg-red-50 p-2"
-                  >
+                  <div key={index} className="flex items-center gap-2 rounded-md bg-red-50 p-2">
                     <Badge variant="destructive" className="text-xs">
                       -
                     </Badge>
-                    <span className="font-mono text-sm truncate line-through">
-                      {file}
-                    </span>
+                    <span className="truncate font-mono text-sm line-through">{file}</span>
                   </div>
                 ))}
               </div>
@@ -173,14 +153,11 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
             <ScrollArea className="h-[150px]">
               <div className="space-y-1">
                 {preview.filesChanged.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 rounded-md bg-amber-50 p-2"
-                  >
+                  <div key={index} className="flex items-center gap-2 rounded-md bg-amber-50 p-2">
                     <Badge variant="secondary" className="text-xs">
                       M
                     </Badge>
-                    <span className="font-mono text-sm truncate">{file}</span>
+                    <span className="truncate font-mono text-sm">{file}</span>
                   </div>
                 ))}
               </div>
@@ -206,12 +183,10 @@ export function MergePreviewView({ preview, isLoading }: MergePreviewViewProps) 
                 {preview.potentialConflicts.map((conflict, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between gap-2 rounded-md bg-yellow-50 p-2 border border-yellow-200"
+                    className="flex items-center justify-between gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-2"
                   >
-                    <span className="font-mono text-sm truncate flex-1">
-                      {conflict.filePath}
-                    </span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="flex-1 truncate font-mono text-sm">{conflict.filePath}</span>
+                    <div className="flex flex-shrink-0 items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {conflict.conflictType}
                       </Badge>

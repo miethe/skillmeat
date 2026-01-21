@@ -4,16 +4,13 @@ Provides GitHub repository metadata extraction with caching support for SkillMea
 artifact auto-population.
 """
 
-import base64
 import logging
-import os
 import re
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import requests
 import yaml
 from pydantic import BaseModel, Field
 
@@ -23,6 +20,12 @@ from skillmeat.core.discovery_metrics import (
     github_metadata_fetch_duration,
     github_metadata_requests_total,
     log_performance,
+)
+from skillmeat.core.github_client import (
+    GitHubClient,
+    GitHubClientError,
+    GitHubNotFoundError,
+    GitHubRateLimitError,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,9 +86,7 @@ class GitHubMetadataExtractor:
 
     Attributes:
         cache: MetadataCache instance for caching responses
-        token: Optional GitHub personal access token for higher rate limits
-        session: Requests session with authentication if token provided
-        base_url: GitHub API base URL
+        _client: GitHubClient instance for GitHub API operations
     """
 
     def __init__(self, cache: MetadataCache, token: Optional[str] = None):
@@ -94,24 +95,12 @@ class GitHubMetadataExtractor:
         Args:
             cache: MetadataCache instance for caching API responses
             token: Optional GitHub personal access token. If not provided,
-                will check SKILLMEAT_GITHUB_TOKEN then GITHUB_TOKEN environment
-                variables. Used for higher rate limits (5000/hr vs 60/hr
-                unauthenticated).
+                GitHubClient will resolve from ConfigManager, then
+                SKILLMEAT_GITHUB_TOKEN, then GITHUB_TOKEN environment variables.
+                Used for higher rate limits (5000/hr vs 60/hr unauthenticated).
         """
         self.cache = cache
-        # Priority: explicit token > SKILLMEAT_GITHUB_TOKEN env > GITHUB_TOKEN env
-        self.token = (
-            token
-            or os.environ.get("SKILLMEAT_GITHUB_TOKEN")
-            or os.environ.get("GITHUB_TOKEN")
-        )
-        self.session = requests.Session()
-
-        if self.token:
-            self.session.headers["Authorization"] = f"token {self.token}"
-            logger.debug("GitHub token configured for authentication")
-
-        self.base_url = "https://api.github.com"
+        self._client = GitHubClient(token=token)
 
     def parse_github_url(self, url: str) -> GitHubSourceSpec:
         """Parse GitHub URL or spec string into components.
@@ -316,44 +305,13 @@ class GitHubMetadataExtractor:
 
         return metadata
 
-    def _retry_with_backoff(self, func, max_retries: int = 3):
-        """Retry function with exponential backoff on network errors.
-
-        Retries the given function up to max_retries times with exponential
-        backoff (2^attempt seconds) between attempts on network failures.
-
-        Args:
-            func: Function to retry (should return a value or raise exception)
-            max_retries: Maximum number of retry attempts
-
-        Returns:
-            Result from successful function call
-
-        Raises:
-            Last exception if all retries fail
-        """
-        for attempt in range(max_retries):
-            try:
-                return func()
-            except requests.exceptions.RequestException as e:
-                if attempt == max_retries - 1:
-                    # Last attempt, re-raise
-                    raise
-
-                wait_time = 2**attempt
-                logger.warning(
-                    f"Request failed (attempt {attempt + 1}/{max_retries}), "
-                    f"retrying in {wait_time}s: {e}"
-                )
-                time.sleep(wait_time)
-
     def _fetch_file_content(
         self, owner: str, repo: str, path: str, ref: str = "HEAD"
     ) -> Optional[str]:
-        """Fetch file content from GitHub Contents API.
+        """Fetch file content from GitHub using GitHubClient.
 
-        Retrieves file content from GitHub repository using the Contents API.
-        Content is base64 encoded in the API response and decoded here.
+        Retrieves file content from GitHub repository using the centralized
+        GitHubClient wrapper which handles authentication and error handling.
 
         Args:
             owner: Repository owner (username or organization)
@@ -365,59 +323,27 @@ class GitHubMetadataExtractor:
             Decoded file content as string, or None if file not found
 
         Note:
-            Handles 404 errors gracefully by returning None.
-            Logs warnings for missing files, errors for API failures.
+            Handles GitHubNotFoundError gracefully by returning None.
+            Logs warnings for rate limits, errors for other API failures.
         """
-
-        def fetch():
-            url = f"{self.base_url}/repos/{owner}/{repo}/contents/{path}"
-            params = {"ref": ref} if ref != "HEAD" else {}
-
-            response = self.session.get(url, params=params, timeout=10)
-
-            # Handle 404 - file not found (expected for many files)
-            if response.status_code == 404:
-                logger.debug(f"File not found: {path} in {owner}/{repo}")
-                return None
-
-            # Handle rate limiting
-            if response.status_code == 429:
-                logger.error(
-                    f"GitHub API rate limit exceeded. "
-                    f"Consider setting GITHUB_TOKEN environment variable for higher limits."
-                )
-                raise RuntimeError(
-                    "GitHub API rate limit exceeded. Use a GitHub token for higher limits."
-                )
-
-            # Handle forbidden (might be rate limit without 429)
-            if response.status_code == 403:
-                # Check if it's rate limiting
-                if "rate limit" in response.text.lower():
-                    logger.error("GitHub API rate limit exceeded (403 forbidden)")
-                    raise RuntimeError(
-                        "GitHub API rate limit exceeded. Use a GitHub token for higher limits."
-                    )
-
-            # Raise for other HTTP errors
-            response.raise_for_status()
-
-            # Decode base64 content
-            data = response.json()
-            if "content" not in data:
-                logger.warning(f"No content field in response for {path}")
-                return None
-
-            content_b64 = data["content"]
-            content_bytes = base64.b64decode(content_b64)
-            content_str = content_bytes.decode("utf-8")
-
-            return content_str
-
         try:
-            return self._retry_with_backoff(fetch)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch {path} from {owner}/{repo}: {e}")
+            # Use None for ref if it's HEAD (let wrapper use default branch)
+            ref_param = ref if ref != "HEAD" and ref != "latest" else None
+            content_bytes = self._client.get_file_content(
+                f"{owner}/{repo}", path, ref=ref_param
+            )
+            return content_bytes.decode("utf-8")
+        except GitHubNotFoundError:
+            # File not found is expected for many files - log at debug level
+            logger.debug(f"File not found: {path} in {owner}/{repo}")
+            return None
+        except GitHubRateLimitError as e:
+            logger.warning(
+                f"GitHub API rate limit exceeded while fetching {path}: {e.message}"
+            )
+            return None
+        except GitHubClientError as e:
+            logger.error(f"Failed to fetch {path} from {owner}/{repo}: {e.message}")
             return None
 
     def _extract_frontmatter(self, content: str) -> Dict[str, Any]:
@@ -467,10 +393,11 @@ class GitHubMetadataExtractor:
             return {}
 
     def _fetch_repo_metadata(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Fetch repository metadata from GitHub Repositories API.
+        """Fetch repository metadata from GitHub using GitHubClient.
 
         Retrieves repository-level metadata including topics, license,
-        description, and other repository information.
+        description, and other repository information using the centralized
+        GitHubClient wrapper.
 
         Args:
             owner: Repository owner (username or organization)
@@ -484,35 +411,22 @@ class GitHubMetadataExtractor:
             Handles errors gracefully by returning empty dict.
             Topics and license information are the primary fields used.
         """
-
-        def fetch():
-            url = f"{self.base_url}/repos/{owner}/{repo}"
-            response = self.session.get(url, timeout=10)
-
-            # Handle rate limiting
-            if response.status_code == 429:
-                logger.error("GitHub API rate limit exceeded")
-                raise RuntimeError(
-                    "GitHub API rate limit exceeded. Use a GitHub token for higher limits."
-                )
-
-            # Handle forbidden
-            if response.status_code == 403:
-                if "rate limit" in response.text.lower():
-                    logger.error("GitHub API rate limit exceeded (403 forbidden)")
-                    raise RuntimeError(
-                        "GitHub API rate limit exceeded. Use a GitHub token for higher limits."
-                    )
-
-            # Raise for other HTTP errors
-            response.raise_for_status()
-
-            return response.json()
-
         try:
-            data = self._retry_with_backoff(fetch)
+            metadata = self._client.get_repo_metadata(f"{owner}/{repo}")
             logger.debug(f"Fetched repository metadata for {owner}/{repo}")
-            return data
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch repository metadata for {owner}/{repo}: {e}")
+            # Convert license from SPDX id string to dict format for backward compatibility
+            # The existing code expects {"spdx_id": "MIT"} format
+            license_spdx = metadata.get("license")
+            if license_spdx:
+                metadata["license"] = {"spdx_id": license_spdx}
+            return metadata
+        except GitHubRateLimitError as e:
+            logger.warning(
+                f"GitHub API rate limit exceeded while fetching repo metadata: {e.message}"
+            )
+            return {}
+        except GitHubClientError as e:
+            logger.error(
+                f"Failed to fetch repository metadata for {owner}/{repo}: {e.message}"
+            )
             return {}

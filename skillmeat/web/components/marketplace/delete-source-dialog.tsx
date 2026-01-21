@@ -91,15 +91,13 @@ export function DeleteSourceDialog({
             </p>
             <p className="text-destructive">
               This will also remove {source.artifact_count} artifact
-              {source.artifact_count !== 1 ? 's' : ''} from the catalog. This
-              action cannot be undone.
+              {source.artifact_count !== 1 ? 's' : ''} from the catalog. This action cannot be
+              undone.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteSource.isPending}>
-            Cancel
-          </AlertDialogCancel>
+          <AlertDialogCancel disabled={deleteSource.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             disabled={deleteSource.isPending}

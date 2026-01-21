@@ -49,7 +49,8 @@ const mockCatalogEntry = {
   path: '.claude/skills/canvas-design',
   status: 'new',
   confidence_score: 95,
-  upstream_url: 'https://github.com/anthropics/anthropic-cookbook/tree/main/.claude/skills/canvas-design',
+  upstream_url:
+    'https://github.com/anthropics/anthropic-cookbook/tree/main/.claude/skills/canvas-design',
   detected_at: '2024-12-08T10:00:00Z',
   detected_sha: 'abc1234567890',
   detected_version: 'v1.0.0',
@@ -84,7 +85,8 @@ const mockFileTree = {
 };
 
 const mockFileContent = {
-  content: '# Canvas Design Skill\n\nThis skill helps you create beautiful canvas designs.\n\n## Usage\n\nSimply describe what you want to create.',
+  content:
+    '# Canvas Design Skill\n\nThis skill helps you create beautiful canvas designs.\n\n## Usage\n\nSimply describe what you want to create.',
   truncated: false,
   original_size: 150,
 };
@@ -120,18 +122,10 @@ async function setupMockApiRoutes(page: Page) {
   );
 
   // Mock file tree endpoint
-  await mockApiRoute(
-    page,
-    `/api/v1/marketplace/sources/*/artifacts/*/files`,
-    mockFileTree
-  );
+  await mockApiRoute(page, `/api/v1/marketplace/sources/*/artifacts/*/files`, mockFileTree);
 
   // Mock file content endpoint
-  await mockApiRoute(
-    page,
-    `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
-    mockFileContent
-  );
+  await mockApiRoute(page, `/api/v1/marketplace/sources/*/artifacts/*/files/*`, mockFileContent);
 }
 
 async function navigateToSourceDetailPage(page: Page, sourceId: string = mockSource.id) {
@@ -387,11 +381,7 @@ test.describe('Catalog File Preview - Large File Handling', () => {
       `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
       mockCatalogResponse
     );
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/*/artifacts/*/files`,
-      mockFileTree
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/*/artifacts/*/files`, mockFileTree);
     await mockApiRoute(
       page,
       `/api/v1/marketplace/sources/*/artifacts/*/files/*`,
@@ -494,15 +484,11 @@ test.describe('Catalog File Preview - Import', () => {
   test('disables import button for already imported entries', async ({ page }) => {
     // Update mock to show imported status
     const importedEntry = { ...mockCatalogEntry, status: 'imported' };
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
-      {
-        ...mockCatalogResponse,
-        items: [importedEntry],
-        counts_by_status: { imported: 1 },
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/${mockSource.id}/catalog*`, {
+      ...mockCatalogResponse,
+      items: [importedEntry],
+      counts_by_status: { imported: 1 },
+    });
 
     await page.reload();
     await waitForPageLoad(page);
@@ -596,11 +582,10 @@ test.describe('Catalog File Preview - Empty States', () => {
       `/api/v1/marketplace/sources/${mockSource.id}/catalog*`,
       mockCatalogResponse
     );
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/*/artifacts/*/files`,
-      { entries: [], cached: false }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/*/artifacts/*/files`, {
+      entries: [],
+      cached: false,
+    });
 
     await navigateToSourceDetailPage(page);
     await openCatalogEntryModal(page);
@@ -627,17 +612,13 @@ test.describe('Catalog File Preview - Empty States', () => {
       mockCatalogResponse
     );
     // Only directories, no files
-    await mockApiRoute(
-      page,
-      `/api/v1/marketplace/sources/*/artifacts/*/files`,
-      {
-        entries: [
-          { path: 'folder1', type: 'tree', size: 0 },
-          { path: 'folder2', type: 'tree', size: 0 },
-        ],
-        cached: false,
-      }
-    );
+    await mockApiRoute(page, `/api/v1/marketplace/sources/*/artifacts/*/files`, {
+      entries: [
+        { path: 'folder1', type: 'tree', size: 0 },
+        { path: 'folder2', type: 'tree', size: 0 },
+      ],
+      cached: false,
+    });
 
     await navigateToSourceDetailPage(page);
     await openCatalogEntryModal(page);

@@ -5,6 +5,7 @@ Shared state management for collections and groups navigation.
 ## Overview
 
 The `CollectionContext` provides centralized state management for:
+
 - Selected collection and group
 - Collections list and current collection details
 - Groups list for the current collection
@@ -19,9 +20,7 @@ The `CollectionProvider` is already configured in `components/providers.tsx`:
 
 ```tsx
 <QueryClientProvider client={queryClient}>
-  <CollectionProvider>
-    {/* Your app */}
-  </CollectionProvider>
+  <CollectionProvider>{/* Your app */}</CollectionProvider>
 </QueryClientProvider>
 ```
 
@@ -57,11 +56,7 @@ export function MyComponent() {
     refreshGroups,
   } = useCollectionContext();
 
-  return (
-    <div>
-      {/* Your UI */}
-    </div>
-  );
+  return <div>{/* Your UI */}</div>;
 }
 ```
 
@@ -101,12 +96,8 @@ export function CollectionSelector() {
 import { useCollectionContext } from '@/hooks/use-collection-context';
 
 export function GroupList() {
-  const {
-    currentGroups,
-    selectedGroupId,
-    setSelectedGroupId,
-    isLoadingGroups,
-  } = useCollectionContext();
+  const { currentGroups, selectedGroupId, setSelectedGroupId, isLoadingGroups } =
+    useCollectionContext();
 
   if (isLoadingGroups) {
     return <div>Loading groups...</div>;
@@ -136,11 +127,7 @@ export function GroupList() {
 import { useCollectionContext } from '@/hooks/use-collection-context';
 
 export function CollectionHeader() {
-  const {
-    currentCollection,
-    isLoadingCollection,
-    refreshCollections,
-  } = useCollectionContext();
+  const { currentCollection, isLoadingCollection, refreshCollections } = useCollectionContext();
 
   if (isLoadingCollection) {
     return <div>Loading...</div>;
@@ -168,11 +155,7 @@ export function CollectionHeader() {
 import { useCollectionContext } from '@/hooks/use-collection-context';
 
 export function CollectionWithErrors() {
-  const {
-    collections,
-    collectionsError,
-    isLoadingCollections,
-  } = useCollectionContext();
+  const { collections, collectionsError, isLoadingCollections } = useCollectionContext();
 
   if (isLoadingCollections) {
     return <div>Loading...</div>;
@@ -245,7 +228,9 @@ const value = useMemo<CollectionContextValue>(
   () => ({
     // All values and callbacks
   }),
-  [/* dependencies */]
+  [
+    /* dependencies */
+  ]
 );
 ```
 

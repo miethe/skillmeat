@@ -366,10 +366,13 @@ class TestRescanEndToEndFlow:
 
         # Mock scanner for validation
         mock_scanner = Mock()
-        mock_scanner._fetch_tree.return_value = [
-            {"path": "skills/python", "type": "tree"},
-            {"path": "commands/cli", "type": "tree"},
-        ]
+        mock_scanner._fetch_tree.return_value = (
+            [
+                {"path": "skills/python", "type": "tree"},
+                {"path": "commands/cli", "type": "tree"},
+            ],
+            "main",
+        )
 
         with (
             patch(

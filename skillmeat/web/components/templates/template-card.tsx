@@ -81,11 +81,7 @@ export interface TemplateCardProps {
  * @param props - TemplateCardProps configuration
  * @returns Card component with template information and actions
  */
-export function TemplateCard({
-  template,
-  onPreview,
-  onDeploy,
-}: TemplateCardProps) {
+export function TemplateCard({ template, onPreview, onDeploy }: TemplateCardProps) {
   const handlePreview = (e: React.MouseEvent) => {
     e.stopPropagation();
     onPreview?.(template);
@@ -101,17 +97,15 @@ export function TemplateCard({
       className={cn(
         'group relative',
         'transition-all duration-200',
-        'hover:shadow-md hover:scale-[1.02]',
-        'flex flex-col h-full'
+        'hover:scale-[1.02] hover:shadow-md',
+        'flex h-full flex-col'
       )}
       role="article"
       aria-label={`Template: ${template.name}`}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-lg font-semibold leading-tight">
-            {template.name}
-          </h3>
+          <h3 className="text-lg font-semibold leading-tight">{template.name}</h3>
           <Package className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
         </div>
       </CardHeader>
@@ -119,13 +113,11 @@ export function TemplateCard({
       <CardContent className="flex-1 pb-3">
         {/* Description (truncated to 2 lines) */}
         {template.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {template.description}
-          </p>
+          <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{template.description}</p>
         )}
 
         {/* Badges: Entity count and optional collection */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="gap-1 text-xs">
             <span className="font-semibold">{template.entity_count}</span>
             {template.entity_count === 1 ? 'entity' : 'entities'}
@@ -139,27 +131,17 @@ export function TemplateCard({
         </div>
       </CardContent>
 
-      <CardFooter className="pt-3 border-t">
-        <div className="flex items-center justify-end gap-2 w-full">
+      <CardFooter className="border-t pt-3">
+        <div className="flex w-full items-center justify-end gap-2">
           {onPreview && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePreview}
-              aria-label="Preview template"
-            >
-              <Eye className="h-4 w-4 mr-1" />
+            <Button variant="ghost" size="sm" onClick={handlePreview} aria-label="Preview template">
+              <Eye className="mr-1 h-4 w-4" />
               Preview
             </Button>
           )}
           {onDeploy && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleDeploy}
-              aria-label="Deploy template"
-            >
-              <Rocket className="h-4 w-4 mr-1" />
+            <Button variant="default" size="sm" onClick={handleDeploy} aria-label="Deploy template">
+              <Rocket className="mr-1 h-4 w-4" />
               Deploy
             </Button>
           )}

@@ -172,14 +172,14 @@ export function RatingDialog({
                   onMouseLeave={handleStarLeave}
                   aria-label={`Rate ${starNumber} star${starNumber > 1 ? 's' : ''}`}
                   className={cn(
-                    'transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded',
+                    'rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     'p-1'
                   )}
                   disabled={isLoading}
                 >
                   <Star
                     className={cn(
-                      'w-8 h-8 sm:w-10 sm:h-10 transition-colors',
+                      'h-8 w-8 transition-colors sm:h-10 sm:w-10',
                       starNumber <= displayRating
                         ? 'fill-yellow-500 text-yellow-500'
                         : 'fill-gray-200 text-gray-400'
@@ -210,7 +210,7 @@ export function RatingDialog({
               className="min-h-[100px] resize-none"
               maxLength={1000}
             />
-            <p className="text-xs text-muted-foreground text-right">
+            <p className="text-right text-xs text-muted-foreground">
               {feedback.length}/1000 characters
             </p>
           </div>

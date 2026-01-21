@@ -152,6 +152,8 @@ export async function removeTagFromArtifact(artifactId: string, tagId: string): 
   });
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.detail || `Failed to remove tag from artifact: ${response.statusText}`);
+    throw new Error(
+      errorBody.detail || `Failed to remove tag from artifact: ${response.statusText}`
+    );
   }
 }

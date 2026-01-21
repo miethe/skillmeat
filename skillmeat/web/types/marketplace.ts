@@ -130,9 +130,15 @@ export interface GitHubSource {
   created_at: string;
   updated_at: string;
   description?: string;
+  repo_description?: string; // GitHub repository description (fallback)
+  repo_readme?: string; // GitHub repository README content
   notes?: string;
   enable_frontmatter_detection?: boolean;
   manual_map?: Record<string, string>; // Directory path -> artifact type
+  tags?: string[]; // User-assigned tags for filtering
+  counts_by_type?: Record<string, number>; // Artifact counts by type
+  single_artifact_mode?: boolean; // Treat entire repo as single artifact
+  single_artifact_type?: ArtifactType; // Artifact type when single_artifact_mode is true
 }
 
 export interface GitHubSourceListResponse {
@@ -150,6 +156,11 @@ export interface CreateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
+  single_artifact_mode?: boolean;
+  single_artifact_type?: ArtifactType;
 }
 
 export interface UpdateSourceRequest {
@@ -160,6 +171,9 @@ export interface UpdateSourceRequest {
   description?: string;
   notes?: string;
   enable_frontmatter_detection?: boolean;
+  import_repo_description?: boolean;
+  import_repo_readme?: boolean;
+  tags?: string[];
 }
 
 export interface CatalogEntry {

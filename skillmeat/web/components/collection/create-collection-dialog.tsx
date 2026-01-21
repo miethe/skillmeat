@@ -165,12 +165,8 @@ export function CreateCollectionDialog({
               className={errors.description ? 'border-destructive' : ''}
               rows={3}
             />
-            {errors.description && (
-              <p className="text-sm text-destructive">{errors.description}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Maximum 1000 characters
-            </p>
+            {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+            <p className="text-xs text-muted-foreground">Maximum 1000 characters</p>
           </div>
         </div>
 

@@ -127,7 +127,13 @@ function formatRelativeTime(dateString: string): string {
   return formatDate(dateString);
 }
 
-export function ArtifactDetail({ artifact, isOpen, onClose, isLoading, onTagClick }: ArtifactDetailProps) {
+export function ArtifactDetail({
+  artifact,
+  isOpen,
+  onClose,
+  isLoading,
+  onTagClick,
+}: ArtifactDetailProps) {
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
@@ -261,21 +267,23 @@ export function ArtifactDetail({ artifact, isOpen, onClose, isLoading, onTagClic
                       )}
 
                       {/* Legacy tags from metadata (fallback) */}
-                      {(!tags || tags.length === 0) && artifact.metadata.tags && artifact.metadata.tags.length > 0 && (
-                        <div className="space-y-3">
-                          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <Tag className="h-4 w-4" />
-                            Tags
-                          </h3>
-                          <div className="flex flex-wrap gap-2">
-                            {artifact.metadata.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary">
-                                {tag}
-                              </Badge>
-                            ))}
+                      {(!tags || tags.length === 0) &&
+                        artifact.metadata.tags &&
+                        artifact.metadata.tags.length > 0 && (
+                          <div className="space-y-3">
+                            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <Tag className="h-4 w-4" />
+                              Tags
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {artifact.metadata.tags.map((tag) => (
+                                <Badge key={tag} variant="secondary">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       {/* Upstream Status */}
                       <div className="space-y-4">

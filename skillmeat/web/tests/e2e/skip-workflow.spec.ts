@@ -42,7 +42,10 @@ test.describe('BulkImportModal Skip Workflow', () => {
   test.beforeEach(async ({ page }) => {
     // Mock project data
     await page.route('**/api/v1/projects/*', async (route) => {
-      if (!route.request().url().includes('/discover') && !route.request().url().includes('/import')) {
+      if (
+        !route.request().url().includes('/discover') &&
+        !route.request().url().includes('/import')
+      ) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -203,7 +206,9 @@ test.describe('BulkImportModal Skip Workflow', () => {
     expect(capturedRequestBody.skip_list).toContain('skill:importable-skill-2');
   });
 
-  test('skip preferences saved to LocalStorage after import with skip checkbox', async ({ page }) => {
+  test('skip preferences saved to LocalStorage after import with skip checkbox', async ({
+    page,
+  }) => {
     // Mock import endpoint
     await page.route('**/api/v1/projects/*/discover/import', async (route) => {
       await route.fulfill({
@@ -237,7 +242,9 @@ test.describe('BulkImportModal Skip Workflow', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Select agent artifact
-    const agentSelectCheckbox = page.locator('input[type="checkbox"][aria-label*="importable-agent"]');
+    const agentSelectCheckbox = page.locator(
+      'input[type="checkbox"][aria-label*="importable-agent"]'
+    );
     await agentSelectCheckbox.check();
 
     // Check skip checkbox for agent
@@ -254,7 +261,9 @@ test.describe('BulkImportModal Skip Workflow', () => {
     const skipPrefs = await getSkipPrefsFromStorage(page, 'skip-test-project');
     expect(skipPrefs.length).toBeGreaterThan(0);
 
-    const agentSkipPref = skipPrefs.find((pref: any) => pref.artifact_key === 'agent:importable-agent');
+    const agentSkipPref = skipPrefs.find(
+      (pref: any) => pref.artifact_key === 'agent:importable-agent'
+    );
     expect(agentSkipPref).toBeTruthy();
     expect(agentSkipPref.skip_reason).toBeDefined();
     expect(agentSkipPref.added_date).toBeDefined();
@@ -368,7 +377,9 @@ test.describe('BulkImportModal Skip Workflow', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // Select all artifacts
-    const selectAllCheckbox = page.locator('input[type="checkbox"][aria-label="Select all artifacts"]');
+    const selectAllCheckbox = page.locator(
+      'input[type="checkbox"][aria-label="Select all artifacts"]'
+    );
     await selectAllCheckbox.check();
 
     // Mark 2nd and 3rd artifacts to skip

@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { CollectionMatch } from './CollectionMatch';
 /**
  * An artifact discovered during scanning.
  */
@@ -42,5 +43,13 @@ export type DiscoveredArtifact = {
      * When artifact was discovered
      */
     discovered_at: string;
+    /**
+     * SHA256 content hash of the artifact for deduplication
+     */
+    content_hash?: (string | null);
+    /**
+     * Hash-based collection matching result. Populated when collection context is provided during discovery. Shows if artifact content matches an existing collection artifact.
+     */
+    collection_match?: (CollectionMatch | null);
 };
 

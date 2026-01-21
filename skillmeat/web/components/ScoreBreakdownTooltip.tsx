@@ -1,12 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { type ScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 
 /**
@@ -40,17 +35,18 @@ export interface ScoreBreakdownTooltipProps {
 /**
  * Short label mapping for inline format
  */
-const SIGNAL_LABELS: Record<keyof Omit<ScoreBreakdown, 'raw_total' | 'normalized_score'>, string> = {
-  dir_name_score: 'Dir Name',
-  manifest_score: 'Manifest',
-  extensions_score: 'Extensions',
-  parent_hint_score: 'Parent',
-  frontmatter_score: 'Frontmatter',
-  skill_manifest_bonus: 'Manifest Bonus',
-  container_hint_score: 'Container',
-  frontmatter_type_score: 'Type Hint',
-  depth_penalty: 'Depth',
-};
+const SIGNAL_LABELS: Record<keyof Omit<ScoreBreakdown, 'raw_total' | 'normalized_score'>, string> =
+  {
+    dir_name_score: 'Dir Name',
+    manifest_score: 'Manifest',
+    extensions_score: 'Extensions',
+    parent_hint_score: 'Parent',
+    frontmatter_score: 'Frontmatter',
+    skill_manifest_bonus: 'Manifest Bonus',
+    container_hint_score: 'Container',
+    frontmatter_type_score: 'Type Hint',
+    depth_penalty: 'Depth',
+  };
 
 /**
  * Format score breakdown as inline string

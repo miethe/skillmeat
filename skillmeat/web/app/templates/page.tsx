@@ -168,8 +168,7 @@ export default function TemplatesPage() {
               'Error loading templates'
             ) : (
               <>
-                {data?.items.length || 0}{' '}
-                {data?.items.length === 1 ? 'Template' : 'Templates'}
+                {data?.items.length || 0} {data?.items.length === 1 ? 'Template' : 'Templates'}
               </>
             )}
           </h2>
@@ -212,11 +211,7 @@ export default function TemplatesPage() {
             {/* Load More Button */}
             {data.page_info.has_next_page && (
               <div className="flex justify-center pt-6">
-                <Button
-                  variant="outline"
-                  onClick={handleLoadMore}
-                  disabled={isLoading}
-                >
+                <Button variant="outline" onClick={handleLoadMore} disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

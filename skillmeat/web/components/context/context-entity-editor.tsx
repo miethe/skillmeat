@@ -22,16 +22,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MarkdownEditor } from '@/components/editor/markdown-editor';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  useCreateContextEntity,
-  useUpdateContextEntity,
-} from '@/hooks';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCreateContextEntity, useUpdateContextEntity } from '@/hooks';
 
 /**
  * Props for ContextEntityEditor component
@@ -220,7 +212,7 @@ export function ContextEntityEditor({
       if (isEditMode && entity) {
         await updateEntity.mutateAsync({
           id: entity.id,
-          data: requestData as UpdateContextEntityRequest
+          data: requestData as UpdateContextEntityRequest,
         });
       } else {
         await createEntity.mutateAsync(requestData as CreateContextEntityRequest);
@@ -235,7 +227,7 @@ export function ContextEntityEditor({
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
+      <DialogContent className="flex h-[90vh] max-w-6xl flex-col">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Edit Context Entity' : 'Create Context Entity'}</DialogTitle>
         </DialogHeader>
@@ -252,180 +244,186 @@ export function ContextEntityEditor({
             </div>
           )}
 
-      {/* Two-column layout (desktop) / stacked (mobile) */}
-      <div className="flex flex-1 flex-col gap-6 overflow-hidden lg:flex-row">
-        {/* Left column: Metadata fields */}
-        <div className="space-y-4 overflow-auto lg:w-1/3 lg:pr-6">
-          {/* Name field */}
-          <div className="space-y-2">
-            <Label htmlFor="name">
-              Name
-              <span className="ml-1 text-destructive">*</span>
-            </Label>
-            <Input
-              id="name"
-              {...register('name', {
-                required: 'Name is required',
-                minLength: { value: 1, message: 'Name must be at least 1 character' },
-                maxLength: { value: 255, message: 'Name must be at most 255 characters' },
-              })}
-              placeholder="e.g., web-hooks-rules"
-              disabled={isLoading}
-            />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-          </div>
-
-          {/* Entity type field */}
-          <div className="space-y-2">
-            <Label htmlFor="entity_type">
-              Entity Type
-              <span className="ml-1 text-destructive">*</span>
-            </Label>
-            <Controller
-              name="entity_type"
-              control={control}
-              rules={{ required: 'Entity type is required' }}
-              render={({ field: { onChange, value } }) => (
-                <Select value={value} onValueChange={onChange} disabled={isLoading}>
-                  <SelectTrigger id="entity_type">
-                    <SelectValue placeholder="Select entity type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENTITY_TYPE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div>
-                          <div className="font-medium">{option.label}</div>
-                          <div className="text-xs text-muted-foreground">{option.description}</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.entity_type && (
-              <p className="text-sm text-destructive">{errors.entity_type.message}</p>
-            )}
-          </div>
-
-          {/* Path pattern field */}
-          <div className="space-y-2">
-            <Label htmlFor="path_pattern">
-              Path Pattern
-              <span className="ml-1 text-destructive">*</span>
-            </Label>
-            <Input
-              id="path_pattern"
-              {...register('path_pattern', {
-                required: 'Path pattern is required',
-                pattern: {
-                  value: /^\.claude\//,
-                  message: "Path pattern must start with '.claude/'",
-                },
-                validate: (value) => {
-                  if (value.includes('..')) {
-                    return "Path pattern cannot contain '..' for security reasons";
-                  }
-                  return true;
-                },
-              })}
-              placeholder="e.g., .claude/rules/web/hooks.md"
-              disabled={isLoading}
-              aria-describedby="path_pattern-help"
-            />
-            <p id="path_pattern-help" className="text-xs text-muted-foreground">
-              Must start with <code className="rounded bg-muted px-1 py-0.5">.claude/</code>
-            </p>
-            {errors.path_pattern && (
-              <p className="text-sm text-destructive" role="alert">{errors.path_pattern.message}</p>
-            )}
-          </div>
-
-          {/* Description field */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              {...register('description')}
-              placeholder="Detailed description of this context entity..."
-              rows={3}
-              disabled={isLoading}
-            />
-          </div>
-
-          {/* Category field */}
-          <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Input
-              id="category"
-              {...register('category')}
-              placeholder="e.g., api, frontend, debugging"
-              disabled={isLoading}
-              aria-describedby="category-help"
-            />
-            <p id="category-help" className="text-xs text-muted-foreground">
-              For progressive disclosure grouping
-            </p>
-          </div>
-
-          {/* Auto-load checkbox */}
-          <div className="flex items-start space-x-3 space-y-0">
-            <Controller
-              name="auto_load"
-              control={control}
-              render={({ field: { onChange, value } }) => (
-                <Checkbox
-                  id="auto_load"
-                  checked={value}
-                  onCheckedChange={onChange}
+          {/* Two-column layout (desktop) / stacked (mobile) */}
+          <div className="flex flex-1 flex-col gap-6 overflow-hidden lg:flex-row">
+            {/* Left column: Metadata fields */}
+            <div className="space-y-4 overflow-auto lg:w-1/3 lg:pr-6">
+              {/* Name field */}
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  Name
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  {...register('name', {
+                    required: 'Name is required',
+                    minLength: { value: 1, message: 'Name must be at least 1 character' },
+                    maxLength: { value: 255, message: 'Name must be at most 255 characters' },
+                  })}
+                  placeholder="e.g., web-hooks-rules"
                   disabled={isLoading}
-                  aria-describedby="auto_load-help"
                 />
-              )}
-            />
-            <div className="space-y-1">
-              <Label htmlFor="auto_load" className="text-sm font-normal">
-                Auto-load when path pattern matches edited files
+                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+              </div>
+
+              {/* Entity type field */}
+              <div className="space-y-2">
+                <Label htmlFor="entity_type">
+                  Entity Type
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
+                <Controller
+                  name="entity_type"
+                  control={control}
+                  rules={{ required: 'Entity type is required' }}
+                  render={({ field: { onChange, value } }) => (
+                    <Select value={value} onValueChange={onChange} disabled={isLoading}>
+                      <SelectTrigger id="entity_type">
+                        <SelectValue placeholder="Select entity type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ENTITY_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div>
+                              <div className="font-medium">{option.label}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {option.description}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.entity_type && (
+                  <p className="text-sm text-destructive">{errors.entity_type.message}</p>
+                )}
+              </div>
+
+              {/* Path pattern field */}
+              <div className="space-y-2">
+                <Label htmlFor="path_pattern">
+                  Path Pattern
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
+                <Input
+                  id="path_pattern"
+                  {...register('path_pattern', {
+                    required: 'Path pattern is required',
+                    pattern: {
+                      value: /^\.claude\//,
+                      message: "Path pattern must start with '.claude/'",
+                    },
+                    validate: (value) => {
+                      if (value.includes('..')) {
+                        return "Path pattern cannot contain '..' for security reasons";
+                      }
+                      return true;
+                    },
+                  })}
+                  placeholder="e.g., .claude/rules/web/hooks.md"
+                  disabled={isLoading}
+                  aria-describedby="path_pattern-help"
+                />
+                <p id="path_pattern-help" className="text-xs text-muted-foreground">
+                  Must start with <code className="rounded bg-muted px-1 py-0.5">.claude/</code>
+                </p>
+                {errors.path_pattern && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {errors.path_pattern.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Description field */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  {...register('description')}
+                  placeholder="Detailed description of this context entity..."
+                  rows={3}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* Category field */}
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Input
+                  id="category"
+                  {...register('category')}
+                  placeholder="e.g., api, frontend, debugging"
+                  disabled={isLoading}
+                  aria-describedby="category-help"
+                />
+                <p id="category-help" className="text-xs text-muted-foreground">
+                  For progressive disclosure grouping
+                </p>
+              </div>
+
+              {/* Auto-load checkbox */}
+              <div className="flex items-start space-x-3 space-y-0">
+                <Controller
+                  name="auto_load"
+                  control={control}
+                  render={({ field: { onChange, value } }) => (
+                    <Checkbox
+                      id="auto_load"
+                      checked={value}
+                      onCheckedChange={onChange}
+                      disabled={isLoading}
+                      aria-describedby="auto_load-help"
+                    />
+                  )}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="auto_load" className="text-sm font-normal">
+                    Auto-load when path pattern matches edited files
+                  </Label>
+                  <p id="auto_load-help" className="text-xs text-muted-foreground">
+                    Enable for path-scoped rules and context files
+                  </p>
+                </div>
+              </div>
+
+              {/* Version field */}
+              <div className="space-y-2">
+                <Label htmlFor="version">Version</Label>
+                <Input
+                  id="version"
+                  {...register('version')}
+                  placeholder="e.g., 1.0.0"
+                  disabled={isLoading}
+                  aria-describedby="version-help"
+                />
+                <p id="version-help" className="text-xs text-muted-foreground">
+                  Semantic versioning recommended
+                </p>
+              </div>
+            </div>
+
+            {/* Right column: Markdown editor */}
+            <div className="flex flex-1 flex-col space-y-2 overflow-hidden lg:w-2/3">
+              <Label htmlFor="content">
+                Content
+                <span className="ml-1 text-destructive">*</span>
               </Label>
-              <p id="auto_load-help" className="text-xs text-muted-foreground">
-                Enable for path-scoped rules and context files
+              <div className="flex-1 overflow-hidden">
+                <MarkdownEditor
+                  initialContent={markdownContent}
+                  onChange={setMarkdownContent}
+                  readOnly={isLoading}
+                  className="h-full"
+                />
+              </div>
+              <p id="content-help" className="text-xs text-muted-foreground">
+                Markdown content for this context entity
               </p>
             </div>
           </div>
-
-          {/* Version field */}
-          <div className="space-y-2">
-            <Label htmlFor="version">Version</Label>
-            <Input
-              id="version"
-              {...register('version')}
-              placeholder="e.g., 1.0.0"
-              disabled={isLoading}
-              aria-describedby="version-help"
-            />
-            <p id="version-help" className="text-xs text-muted-foreground">Semantic versioning recommended</p>
-          </div>
-        </div>
-
-        {/* Right column: Markdown editor */}
-        <div className="flex flex-1 flex-col space-y-2 overflow-hidden lg:w-2/3">
-          <Label htmlFor="content">
-            Content
-            <span className="ml-1 text-destructive">*</span>
-          </Label>
-          <div className="flex-1 overflow-hidden">
-            <MarkdownEditor
-              initialContent={markdownContent}
-              onChange={setMarkdownContent}
-              readOnly={isLoading}
-              className="h-full"
-            />
-          </div>
-          <p id="content-help" className="text-xs text-muted-foreground">
-            Markdown content for this context entity
-          </p>
-        </div>
-      </div>
 
           {/* Action buttons */}
           <div className="mt-6 flex justify-end gap-3 border-t pt-4">

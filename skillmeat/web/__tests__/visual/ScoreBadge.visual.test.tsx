@@ -110,7 +110,7 @@ describe('ScoreBadge Visual', () => {
   describe('Custom Styling', () => {
     it('merges custom className with base styles', () => {
       const { getByLabelText } = render(
-        <ScoreBadge confidence={75} className="ml-2 custom-class" />
+        <ScoreBadge confidence={75} className="custom-class ml-2" />
       );
       const badge = getByLabelText(/confidence score: 75 percent/i);
 

@@ -100,6 +100,7 @@ Integration tests for multi-collection deployment scenarios:
 - Multiple deployments of same-name different-type artifacts
 
 **Key Scenarios:**
+
 - Verify `collection_name` parameter sent correctly to backend
 - Ensure artifact type included in deployment matching logic
 - Confirm same-name artifacts don't collide when types differ

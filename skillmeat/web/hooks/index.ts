@@ -68,7 +68,7 @@ export {
 } from './use-collections';
 
 // ============================================================================
-// GROUPS (12 hooks)
+// GROUPS (13 hooks)
 // ============================================================================
 // Group CRUD operations with artifact ordering and management
 export {
@@ -86,6 +86,9 @@ export {
   useMoveArtifactToGroup,
   useCopyGroup,
 } from './use-groups';
+
+// Artifact-to-group membership lookup
+export { artifactGroupKeys, useArtifactGroups } from './use-artifact-groups';
 
 // ============================================================================
 // DEPLOYMENTS (6 hooks)
@@ -148,28 +151,17 @@ export {
   useRevokeShareLink,
 } from './useBundles';
 
-export {
-  useExportBundle,
-  useValidateExport,
-} from './useExportBundle';
+export { useExportBundle, useValidateExport } from './useExportBundle';
 
-export {
-  usePreviewBundle,
-  useImportBundle,
-  useValidateImport,
-} from './useImportBundle';
+export { usePreviewBundle, useImportBundle, useValidateImport } from './useImportBundle';
 
 // ============================================================================
 // CACHE (2 hooks)
 // ============================================================================
 // Cache refresh and status operations
-export {
-  useCacheRefresh,
-} from './useCacheRefresh';
+export { useCacheRefresh } from './useCacheRefresh';
 
-export {
-  useCacheStatus,
-} from './useCacheStatus';
+export { useCacheStatus } from './useCacheStatus';
 
 // ============================================================================
 // MARKETPLACE (5 hooks + 13 source hooks)
@@ -307,43 +299,27 @@ export {
 // CATALOG (2 hooks)
 // ============================================================================
 // Catalog file tree and content retrieval
-export {
-  catalogKeys,
-  useCatalogFileTree,
-  useCatalogFileContent,
-} from './use-catalog-files';
+export { catalogKeys, useCatalogFileTree, useCatalogFileContent } from './use-catalog-files';
 
 // ============================================================================
 // DISCOVERY (3 hooks)
 // ============================================================================
 // GitHub metadata, artifact discovery, and parameter editing
-export {
-  useDiscovery,
-  useGitHubMetadata,
-  useEditArtifactParameters,
-} from './useDiscovery';
+export { useDiscovery, useGitHubMetadata, useEditArtifactParameters } from './useDiscovery';
 
 // ============================================================================
 // ANALYTICS (5 hooks)
 // ============================================================================
 // Usage analytics, trends, and streaming analytics
-export {
-  useAnalyticsSummary,
-  useTopArtifacts,
-  useUsageTrends,
-} from './useAnalytics';
+export { useAnalyticsSummary, useTopArtifacts, useUsageTrends } from './useAnalytics';
 
-export {
-  useAnalyticsStream,
-} from './useAnalyticsStream';
+export { useAnalyticsStream } from './useAnalyticsStream';
 
 // ============================================================================
 // SSE (1 hook)
 // ============================================================================
 // Server-sent events for real-time data streaming
-export {
-  useSSE,
-} from './useSSE';
+export { useSSE } from './useSSE';
 
 // ============================================================================
 // UTILITY HOOKS
@@ -354,9 +330,7 @@ export {
  * @example
  * const debouncedSearchTerm = useDebounce(searchTerm, 500);
  */
-export {
-  useDebounce,
-} from './use-debounce';
+export { useDebounce } from './use-debounce';
 
 /**
  * Intersection observer for detecting element visibility
@@ -376,48 +350,32 @@ export {
  * const { toast } = useToast();
  * toast({ title: "Success", description: "Saved!" });
  */
-export {
-  useToast,
-} from './use-toast';
+export { useToast } from './use-toast';
 
 /**
  * Alternative toast notification API
  */
-export {
-  useToastNotification,
-} from './use-toast-notification';
+export { useToastNotification } from './use-toast-notification';
 
 /**
  * Focus trap for modal dialogs and accessibility
  */
-export {
-  useFocusTrap,
-} from './useFocusTrap';
+export { useFocusTrap } from './useFocusTrap';
 
 /**
  * Artifact deletion with confirmation
  */
-export {
-  useArtifactDeletion,
-  type DeletionResult,
-} from './use-artifact-deletion';
+export { useArtifactDeletion, type DeletionResult } from './use-artifact-deletion';
 
 /**
  * Bulk tag application to multiple artifacts
  */
-export {
-  bulkTagKeys,
-  useBulkTagApply,
-} from './use-bulk-tag-apply';
+export { bulkTagKeys, useBulkTagApply } from './use-bulk-tag-apply';
 
 /**
  * Path-based tag operations
  */
-export {
-  pathTagKeys,
-  usePathTags,
-  useUpdatePathTagStatus,
-} from './use-path-tags';
+export { pathTagKeys, usePathTags, useUpdatePathTagStatus } from './use-path-tags';
 
 /**
  * Merge operations for collections and contexts
@@ -433,17 +391,12 @@ export {
 /**
  * Outdated artifact detection and updates
  */
-export {
-  useOutdatedArtifacts,
-} from './useOutdatedArtifacts';
+export { useOutdatedArtifacts } from './useOutdatedArtifacts';
 
 /**
  * Version graph visualization for artifact history
  */
-export {
-  versionKeys,
-  useVersionGraph,
-} from './useVersionGraph';
+export { versionKeys, useVersionGraph } from './useVersionGraph';
 
 // ============================================================================
 // CONTEXT HOOKS
@@ -453,15 +406,10 @@ export {
  * Collection-scoped context provider and hook
  * Use within CollectionProvider component
  */
-export {
-  useCollectionContext,
-} from './use-collection-context';
+export { useCollectionContext } from './use-collection-context';
 
 /**
  * Entity lifecycle provider and hook
  * Manages entity creation, updates, and deletion in React context
  */
-export {
-  EntityLifecycleProvider,
-  useEntityLifecycle,
-} from './useEntityLifecycle';
+export { EntityLifecycleProvider, useEntityLifecycle } from './useEntityLifecycle';

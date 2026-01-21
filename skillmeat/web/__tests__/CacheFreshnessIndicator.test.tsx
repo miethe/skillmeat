@@ -10,24 +10,14 @@ expect.extend(toHaveNoViolations);
 describe('CacheFreshnessIndicator', () => {
   describe('Loading State', () => {
     it('shows "Loading..." when lastFetched is null', () => {
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />);
 
       expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
 
     it('renders secondary badge variant when loading', () => {
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       // Badge should be in the document
@@ -37,11 +27,7 @@ describe('CacheFreshnessIndicator', () => {
 
     it('displays Clock icon when loading', () => {
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       // Should have an icon
@@ -54,13 +40,7 @@ describe('CacheFreshnessIndicator', () => {
     it('shows "Stale data" badge when isStale=true', () => {
       const lastFetched = new Date('2025-01-01T10:00:00Z');
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={true} />);
 
       expect(screen.getByText('Stale data')).toBeInTheDocument();
     });
@@ -68,11 +48,7 @@ describe('CacheFreshnessIndicator', () => {
     it('renders destructive badge variant when stale', () => {
       const lastFetched = new Date('2025-01-01T10:00:00Z');
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={true} />
       );
 
       const badge = container.querySelector('[class*="inline-flex"]');
@@ -82,11 +58,7 @@ describe('CacheFreshnessIndicator', () => {
     it('displays AlertCircle icon when stale', () => {
       const lastFetched = new Date('2025-01-01T10:00:00Z');
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={true} />
       );
 
       const icon = container.querySelector('svg');
@@ -96,13 +68,7 @@ describe('CacheFreshnessIndicator', () => {
     it('shows stale even when cacheHit=false', () => {
       const lastFetched = new Date('2025-01-01T10:00:00Z');
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={false}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={false} />);
 
       expect(screen.getByText('Stale data')).toBeInTheDocument();
     });
@@ -113,11 +79,7 @@ describe('CacheFreshnessIndicator', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated.*ago \(cached\)/i)).toBeInTheDocument();
@@ -127,11 +89,7 @@ describe('CacheFreshnessIndicator', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={false} />
       );
 
       expect(screen.getByText(/Updated.*ago$/i)).toBeInTheDocument();
@@ -141,11 +99,7 @@ describe('CacheFreshnessIndicator', () => {
     it('renders secondary badge variant when fresh', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       const badge = container.querySelector('[class*="inline-flex"]');
@@ -155,11 +109,7 @@ describe('CacheFreshnessIndicator', () => {
     it('displays Clock icon when fresh', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       const icon = container.querySelector('svg');
@@ -172,11 +122,7 @@ describe('CacheFreshnessIndicator', () => {
       const thirtySecondsAgo = new Date(Date.now() - 30 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={thirtySecondsAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={thirtySecondsAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated just now \(cached\)/i)).toBeInTheDocument();
@@ -202,11 +148,7 @@ describe('CacheFreshnessIndicator', () => {
       const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={oneMinuteAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={oneMinuteAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 1m ago \(cached\)/i)).toBeInTheDocument();
@@ -216,11 +158,7 @@ describe('CacheFreshnessIndicator', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 5m ago \(cached\)/i)).toBeInTheDocument();
@@ -245,13 +183,7 @@ describe('CacheFreshnessIndicator', () => {
     it('shows "1h ago" for 1 hour', () => {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={oneHourAgo}
-          isStale={false}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={oneHourAgo} isStale={false} cacheHit={true} />);
 
       expect(screen.getByText(/Updated 1h ago \(cached\)/i)).toBeInTheDocument();
     });
@@ -260,11 +192,7 @@ describe('CacheFreshnessIndicator', () => {
       const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveHoursAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveHoursAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 5h ago \(cached\)/i)).toBeInTheDocument();
@@ -289,13 +217,7 @@ describe('CacheFreshnessIndicator', () => {
     it('shows "1d ago" for 1 day', () => {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={oneDayAgo}
-          isStale={false}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={oneDayAgo} isStale={false} cacheHit={true} />);
 
       expect(screen.getByText(/Updated 1d ago \(cached\)/i)).toBeInTheDocument();
     });
@@ -304,11 +226,7 @@ describe('CacheFreshnessIndicator', () => {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={sevenDaysAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={sevenDaysAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 7d ago \(cached\)/i)).toBeInTheDocument();
@@ -318,11 +236,7 @@ describe('CacheFreshnessIndicator', () => {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={thirtyDaysAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={thirtyDaysAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 30d ago \(cached\)/i)).toBeInTheDocument();
@@ -333,13 +247,7 @@ describe('CacheFreshnessIndicator', () => {
     it('handles future dates (clock skew)', () => {
       const futureDate = new Date(Date.now() + 1000);
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={futureDate}
-          isStale={false}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={futureDate} isStale={false} cacheHit={true} />);
 
       // Should show "just now" for negative time differences
       expect(screen.getByText(/Updated just now \(cached\)/i)).toBeInTheDocument();
@@ -348,13 +256,7 @@ describe('CacheFreshnessIndicator', () => {
     it('handles very old dates', () => {
       const veryOldDate = new Date('2000-01-01T00:00:00Z');
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={veryOldDate}
-          isStale={false}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={veryOldDate} isStale={false} cacheHit={true} />);
 
       // Should show days for old dates
       expect(screen.getByText(/Updated \d+d ago \(cached\)/i)).toBeInTheDocument();
@@ -363,13 +265,7 @@ describe('CacheFreshnessIndicator', () => {
     it('handles invalid dates gracefully', () => {
       const invalidDate = new Date('invalid');
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={invalidDate}
-          isStale={false}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={invalidDate} isStale={false} cacheHit={true} />);
 
       // Should still render something (NaN becomes "just now" due to < 60 check)
       const badge = screen.getByText(/Updated/i);
@@ -382,11 +278,7 @@ describe('CacheFreshnessIndicator', () => {
       const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={sixtySecondsAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={sixtySecondsAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 1m ago \(cached\)/i)).toBeInTheDocument();
@@ -396,11 +288,7 @@ describe('CacheFreshnessIndicator', () => {
       const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={sixtyMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={sixtyMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 1h ago \(cached\)/i)).toBeInTheDocument();
@@ -410,11 +298,7 @@ describe('CacheFreshnessIndicator', () => {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
       render(
-        <CacheFreshnessIndicator
-          lastFetched={twentyFourHoursAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={twentyFourHoursAgo} isStale={false} cacheHit={true} />
       );
 
       expect(screen.getByText(/Updated 1d ago \(cached\)/i)).toBeInTheDocument();
@@ -425,13 +309,7 @@ describe('CacheFreshnessIndicator', () => {
     it('prioritizes stale state over cache hit', () => {
       const lastFetched = new Date(Date.now() - 5 * 60 * 1000);
 
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={true} />);
 
       // Should show stale, not the time
       expect(screen.getByText('Stale data')).toBeInTheDocument();
@@ -439,13 +317,7 @@ describe('CacheFreshnessIndicator', () => {
     });
 
     it('prioritizes loading state over stale state', () => {
-      render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={true}
-          cacheHit={true}
-        />
-      );
+      render(<CacheFreshnessIndicator lastFetched={null} isStale={true} cacheHit={true} />);
 
       // Should show loading, not stale
       expect(screen.getByText('Loading...')).toBeInTheDocument();
@@ -456,11 +328,7 @@ describe('CacheFreshnessIndicator', () => {
   describe('Accessibility', () => {
     it('has no accessibility violations in loading state', async () => {
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       const results = await axe(container);
@@ -470,11 +338,7 @@ describe('CacheFreshnessIndicator', () => {
     it('has no accessibility violations in stale state', async () => {
       const lastFetched = new Date('2025-01-01T10:00:00Z');
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={lastFetched}
-          isStale={true}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={lastFetched} isStale={true} cacheHit={true} />
       );
 
       const results = await axe(container);
@@ -484,11 +348,7 @@ describe('CacheFreshnessIndicator', () => {
     it('has no accessibility violations in fresh state', async () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={fiveMinutesAgo}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={fiveMinutesAgo} isStale={false} cacheHit={true} />
       );
 
       const results = await axe(container);
@@ -497,11 +357,7 @@ describe('CacheFreshnessIndicator', () => {
 
     it('has proper icon sizing for accessibility', () => {
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       const icon = container.querySelector('svg');
@@ -513,11 +369,7 @@ describe('CacheFreshnessIndicator', () => {
   describe('Badge Styling', () => {
     it('applies gap class for icon spacing', () => {
       const { container } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       const badge = container.querySelector('[class*="gap-1"]');
@@ -526,27 +378,15 @@ describe('CacheFreshnessIndicator', () => {
 
     it('uses consistent badge structure across states', () => {
       const { container: loadingContainer } = render(
-        <CacheFreshnessIndicator
-          lastFetched={null}
-          isStale={false}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={null} isStale={false} cacheHit={false} />
       );
 
       const { container: staleContainer } = render(
-        <CacheFreshnessIndicator
-          lastFetched={new Date()}
-          isStale={true}
-          cacheHit={false}
-        />
+        <CacheFreshnessIndicator lastFetched={new Date()} isStale={true} cacheHit={false} />
       );
 
       const { container: freshContainer } = render(
-        <CacheFreshnessIndicator
-          lastFetched={new Date()}
-          isStale={false}
-          cacheHit={true}
-        />
+        <CacheFreshnessIndicator lastFetched={new Date()} isStale={false} cacheHit={true} />
       );
 
       // All should have a badge with icon and text
