@@ -10,11 +10,16 @@ import uuid
 from datetime import datetime
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
 from skillmeat.api.dependencies import ArtifactManagerDep, CollectionManagerDep
 from skillmeat.api.middleware.auth import TokenDep
+from skillmeat.api.schemas.collections import (
+    RefreshModeEnum,
+    RefreshRequest,
+    RefreshResponse,
+)
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
     AddArtifactsRequest,
@@ -29,6 +34,7 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionWithGroupsResponse,
 )
 from skillmeat.api.services import get_artifact_metadata
+from skillmeat.core.refresher import CollectionRefresher, RefreshMode
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
     DEFAULT_COLLECTION_NAME,
@@ -238,15 +244,21 @@ def migrate_artifacts_to_default_collection(
                 artifact_id = f"{artifact.type.value}:{artifact.name}"
                 all_artifact_ids.add(artifact_id)
         except Exception as e:
-            logger.warning(f"Failed to load artifacts from collection '{coll_name}': {e}")
+            logger.warning(
+                f"Failed to load artifacts from collection '{coll_name}': {e}"
+            )
             continue
 
-    logger.info(f"Found {len(all_artifact_ids)} unique artifacts across all collections")
+    logger.info(
+        f"Found {len(all_artifact_ids)} unique artifacts across all collections"
+    )
 
     # Get existing associations for the default collection
-    existing_associations = session.query(CollectionArtifact.artifact_id).filter_by(
-        collection_id=DEFAULT_COLLECTION_ID
-    ).all()
+    existing_associations = (
+        session.query(CollectionArtifact.artifact_id)
+        .filter_by(collection_id=DEFAULT_COLLECTION_ID)
+        .all()
+    )
     existing_artifact_ids = {row[0] for row in existing_associations}
 
     # Find artifacts not yet in default collection
@@ -264,7 +276,9 @@ def migrate_artifacts_to_default_collection(
             session.add(new_association)
             migrated_count += 1
         except Exception as e:
-            logger.warning(f"Failed to add artifact '{artifact_id}' to default collection: {e}")
+            logger.warning(
+                f"Failed to add artifact '{artifact_id}' to default collection: {e}"
+            )
             continue
 
     if migrated_count > 0:
@@ -1475,4 +1489,106 @@ async def list_collection_entities(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list collection entities: {str(e)}",
+        )
+
+
+# =============================================================================
+# Refresh Endpoint
+# =============================================================================
+
+
+@router.post(
+    "/{collection_id}/refresh",
+    response_model=RefreshResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh collection artifact metadata",
+    description="Refresh metadata for artifacts in a collection from their upstream GitHub sources.",
+    responses={
+        200: {"description": "Refresh completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        404: {"model": ErrorResponse, "description": "Collection not found"},
+        500: {
+            "model": ErrorResponse,
+            "description": "Internal server error during refresh",
+        },
+    },
+)
+async def refresh_collection(
+    collection_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    request: RefreshRequest = Body(...),
+    mode: Optional[RefreshModeEnum] = Query(
+        None, description="Override request body mode"
+    ),
+) -> RefreshResponse:
+    """Refresh artifact metadata for a collection from upstream GitHub sources.
+
+    Args:
+        collection_id: Collection identifier
+        request: Refresh request with mode, filters, and dry_run options
+        mode: Optional query param to override request body mode
+        collection_mgr: Collection manager dependency
+        token: Authentication token
+
+    Returns:
+        RefreshResponse with summary statistics and per-artifact details
+
+    Raises:
+        HTTPException: If collection not found or on error
+    """
+    try:
+        logger.info(f"Starting refresh for collection {collection_id}")
+
+        # Check if collection exists in collection manager
+        if collection_id not in collection_mgr.list_collections():
+            logger.warning(f"Collection not found for refresh: {collection_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_id}' not found",
+            )
+
+        # Determine refresh mode - query param overrides request body
+        effective_mode = mode if mode is not None else request.mode
+
+        # Map RefreshModeEnum to core RefreshMode
+        mode_mapping = {
+            RefreshModeEnum.METADATA_ONLY: RefreshMode.METADATA_ONLY,
+            RefreshModeEnum.CHECK_ONLY: RefreshMode.CHECK_ONLY,
+            RefreshModeEnum.SYNC: RefreshMode.SYNC,
+        }
+        core_mode = mode_mapping[effective_mode]
+
+        # Create CollectionRefresher and execute refresh
+        refresher = CollectionRefresher(collection_mgr)
+        result = refresher.refresh_collection(
+            collection_name=collection_id,
+            mode=core_mode,
+            dry_run=request.dry_run,
+            artifact_filter=request.artifact_filter,
+        )
+
+        logger.info(
+            f"Refresh completed: {result.refreshed_count} refreshed, "
+            f"{result.unchanged_count} unchanged"
+        )
+
+        # Convert result to response using the schema's factory method
+        return RefreshResponse.from_refresh_result(
+            collection_id=collection_id,
+            result=result,
+            mode=effective_mode,
+            dry_run=request.dry_run,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error refreshing collection '{collection_id}': {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to refresh collection: {str(e)}",
         )
