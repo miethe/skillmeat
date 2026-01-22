@@ -24,6 +24,11 @@ import { TagFilterPopover } from '@/components/ui/tag-filter-popover';
 import { cn } from '@/lib/utils';
 import type { ArtifactFilters } from '@/types/artifact';
 
+interface AvailableTag {
+  name: string;
+  artifact_count: number;
+}
+
 interface CollectionToolbarProps {
   viewMode: 'grid' | 'list' | 'grouped';
   onViewModeChange: (mode: 'grid' | 'list' | 'grouped') => void;
@@ -39,6 +44,8 @@ interface CollectionToolbarProps {
   lastUpdated?: Date | null;
   selectedTags?: string[];
   onTagsChange?: (tags: string[]) => void;
+  /** Optional: If provided, use these tags instead of fetching from API */
+  availableTags?: AvailableTag[];
 }
 
 /**
@@ -89,6 +96,7 @@ export function CollectionToolbar({
   lastUpdated = null,
   selectedTags = [],
   onTagsChange,
+  availableTags,
 }: CollectionToolbarProps) {
   // Local search state for immediate UI feedback
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -156,7 +164,13 @@ export function CollectionToolbar({
           </div>
 
           {/* Tag Filter Popover */}
-          {onTagsChange && <TagFilterPopover selectedTags={selectedTags} onChange={onTagsChange} />}
+          {onTagsChange && (
+            <TagFilterPopover
+              selectedTags={selectedTags}
+              onChange={onTagsChange}
+              availableTags={availableTags}
+            />
+          )}
 
           {/* Filter Dropdown */}
           <DropdownMenu>

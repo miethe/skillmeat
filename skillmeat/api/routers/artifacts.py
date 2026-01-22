@@ -6188,8 +6188,7 @@ async def update_artifact_tags(
     """Update all tags for an artifact.
 
     This endpoint replaces the artifact's current tags with the provided list.
-    Tags are normalized (lowercase, spaces to underscores) and created if they
-    don't already exist.
+    Tags are normalized (lowercase, spaces to underscores) by the schema validator.
 
     Args:
         artifact_id: Unique identifier of the artifact (format: type:name)
@@ -6206,12 +6205,10 @@ async def update_artifact_tags(
         HTTPException 404: If artifact not found
         HTTPException 500: If operation fails
     """
-    tag_service = TagService()
-
     try:
         logger.info(f"Updating tags for artifact {artifact_id}: {request.tags}")
 
-        # Parse artifact ID
+        # Parse artifact ID (format: type:name)
         try:
             artifact_type_str, artifact_name = artifact_id.split(":", 1)
             artifact_type = ArtifactType(artifact_type_str)
@@ -6224,32 +6221,41 @@ async def update_artifact_tags(
         # Resolve collection
         collection_name = collection or collection_mgr.get_active_collection_name()
 
-        # Get artifact to verify it exists
-        if collection_name not in collection_mgr.list_collections():
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Collection '{collection_name}' not found",
             )
 
+        # Find artifact
         try:
-            coll = collection_mgr.load_collection(collection_name)
             artifact = coll.find_artifact(artifact_name, artifact_type)
-        except ValueError:
+        except ValueError as e:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Artifact '{artifact_id}' not found",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),  # Ambiguous artifact name
             )
 
-        # Sync tags (creates new tags if needed, updates associations)
-        synced_tags = tag_service.sync_artifact_tags(artifact_id, request.tags)
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection",
+            )
+
+        # Update tags (request.tags is already normalized by the validator)
+        artifact.tags = request.tags
+
+        # Save collection back to disk
+        collection_mgr.save_collection(coll)
 
         logger.info(
-            f"Successfully updated tags for artifact {artifact_id}: {synced_tags}"
+            f"Successfully updated tags for artifact {artifact_id}: {artifact.tags}"
         )
 
-        # Refresh artifact data and return response
-        coll = collection_mgr.load_collection(collection_name)
-        artifact = coll.find_artifact(artifact_name, artifact_type)
+        # Return updated artifact response
         return artifact_to_response(artifact)
 
     except HTTPException:

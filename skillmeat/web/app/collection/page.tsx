@@ -600,6 +600,49 @@ function CollectionPageContent() {
     sortOrder,
   ]);
 
+  // Compute unique tags with counts from ALL loaded artifacts (before tag filtering)
+  // This is used by TagFilterPopover instead of fetching from the database Tag table
+  const availableTags = useMemo(() => {
+    // Get all artifacts before tag filtering is applied
+    let allArtifacts: Artifact[] = [];
+
+    if (isSpecificCollection && infiniteCollectionData?.pages) {
+      const allSummaries = infiniteCollectionData.pages.flatMap((page) => page.items);
+      const fullArtifacts: Artifact[] = infiniteAllArtifactsData?.pages
+        ? infiniteAllArtifactsData.pages.flatMap((page) => page.items.map(mapApiArtifactToArtifact))
+        : [];
+      const collectionInfo = currentCollection
+        ? { id: currentCollection.id, name: currentCollection.name }
+        : undefined;
+      allArtifacts = allSummaries.map((summary) =>
+        enrichArtifactSummary(summary, fullArtifacts, collectionInfo)
+      );
+    } else if (!isSpecificCollection && infiniteAllArtifactsData?.pages) {
+      allArtifacts = infiniteAllArtifactsData.pages.flatMap((page) =>
+        page.items.map(mapApiArtifactToArtifact)
+      );
+    }
+
+    // Count tags across all artifacts
+    const tagCounts = new Map<string, number>();
+    allArtifacts.forEach((artifact) => {
+      const tags = artifact.metadata?.tags || [];
+      tags.forEach((tag: string) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+
+    // Convert to array format expected by TagFilterPopover
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, artifact_count: count }))
+      .sort((a, b) => b.artifact_count - a.artifact_count); // Sort by count descending
+  }, [
+    infiniteCollectionData?.pages,
+    infiniteAllArtifactsData?.pages,
+    isSpecificCollection,
+    currentCollection,
+  ]);
+
   const handleArtifactClick = (artifact: Artifact) => {
     // Artifact is now always a full Artifact object due to enrichment in filteredArtifacts
     setSelectedEntity(artifactToEntity(artifact));
@@ -674,12 +717,17 @@ function CollectionPageContent() {
         lastUpdated={lastUpdated}
         selectedTags={selectedTags}
         onTagsChange={handleTagsChange}
+        availableTags={availableTags}
       />
 
       {/* Tag Filter Bar - Shows active tag filters */}
       {selectedTags.length > 0 && (
         <div className="border-b bg-muted/10 px-6 py-2">
-          <TagFilterBar selectedTags={selectedTags} onChange={handleTagsChange} />
+          <TagFilterBar
+            selectedTags={selectedTags}
+            onChange={handleTagsChange}
+            availableTags={availableTags}
+          />
         </div>
       )}
 
