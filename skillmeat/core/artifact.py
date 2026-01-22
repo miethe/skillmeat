@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import requests
 from rich.prompt import Confirm
 
+from skillmeat.core.enums import Tool
 from skillmeat.utils.logging import redact_path
 
 # Handle tomli/tomllib import for different Python versions
@@ -53,6 +54,7 @@ class ArtifactMetadata:
     version: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     dependencies: List[str] = field(default_factory=list)
+    tools: List[Tool] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,6 +74,8 @@ class ArtifactMetadata:
             result["tags"] = self.tags
         if self.dependencies:
             result["dependencies"] = self.dependencies
+        if self.tools:
+            result["tools"] = [tool.value for tool in self.tools]
         if self.extra:
             result["extra"] = self.extra
         return result
@@ -79,6 +83,16 @@ class ArtifactMetadata:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ArtifactMetadata":
         """Create from dictionary (TOML deserialization)."""
+        # Parse tools from string values
+        tools_data = data.get("tools", [])
+        tools = []
+        for tool_str in tools_data:
+            try:
+                tools.append(Tool(tool_str))
+            except ValueError:
+                # Unknown tool - skip (graceful handling)
+                pass
+
         return cls(
             title=data.get("title"),
             description=data.get("description"),
@@ -87,6 +101,7 @@ class ArtifactMetadata:
             version=data.get("version"),
             tags=data.get("tags", []),
             dependencies=data.get("dependencies", []),
+            tools=tools,
             extra=data.get("extra", {}),
         )
 

@@ -1,50 +1,58 @@
 ---
 type: progress
-prd: "enhanced-frontmatter-utilization-v1"
+prd: enhanced-frontmatter-utilization-v1
 phase: 0
 status: in_progress
-progress: 0
-
+progress: 66
 tasks:
-  - id: "ENUM-001"
-    title: "Define Platform & Tool enums (Backend)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: []
-    model: "opus"
-    effort: "3 pts"
-
-  - id: "ENUM-002"
-    title: "Create Frontend Type Definitions"
-    status: "pending"
-    assigned_to: ["ui-engineer-enhanced"]
-    dependencies: []
-    model: "opus"
-    effort: "2 pts"
-
-  - id: "ENUM-003"
-    title: "Update Artifact Models (Python + TypeScript)"
-    status: "pending"
-    assigned_to: ["python-backend-engineer", "ui-engineer-enhanced"]
-    dependencies: ["ENUM-001", "ENUM-002"]
-    model: "opus"
-    effort: "3 pts"
-
+- id: ENUM-001
+  title: Define Platform & Tool enums (Backend)
+  status: completed
+  assigned_to:
+  - python-backend-engineer
+  dependencies: []
+  model: opus
+  effort: 3 pts
+- id: ENUM-002
+  title: Create Frontend Type Definitions
+  status: completed
+  assigned_to:
+  - ui-engineer-enhanced
+  dependencies: []
+  model: opus
+  effort: 2 pts
+- id: ENUM-003
+  title: Update Artifact Models (Python + TypeScript)
+  status: in_progress
+  assigned_to:
+  - python-backend-engineer
+  - ui-engineer-enhanced
+  dependencies:
+  - ENUM-001
+  - ENUM-002
+  model: opus
+  effort: 3 pts
 parallelization:
-  batch_1: ["ENUM-001", "ENUM-002"]
-  batch_2: ["ENUM-003"]
-
+  batch_1:
+  - ENUM-001
+  - ENUM-002
+  batch_2:
+  - ENUM-003
 quality_gates:
-  - "All 17 Claude Code tools enumerated"
-  - "Platform enum covers CLAUDE_CODE, CURSOR, OTHER"
-  - "Frontend and backend enums in sync"
-  - "No circular dependencies"
-  - "Type checking passes (mypy, tsc)"
-
+- All 17 Claude Code tools enumerated
+- Platform enum covers CLAUDE_CODE, CURSOR, OTHER
+- Frontend and backend enums in sync
+- No circular dependencies
+- Type checking passes (mypy, tsc)
 milestone_criteria:
-  - "Enums defined and importable"
-  - "Artifact models updated with tools field"
-  - "Serialization/deserialization works"
+- Enums defined and importable
+- Artifact models updated with tools field
+- Serialization/deserialization works
+total_tasks: 3
+completed_tasks: 2
+in_progress_tasks: 1
+blocked_tasks: 0
+updated: '2026-01-22'
 ---
 
 # Phase 0: Enums & Foundations

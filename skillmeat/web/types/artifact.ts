@@ -4,6 +4,8 @@
  * These types represent artifacts in the collection (Skills, Commands, Agents, MCP servers, Hooks)
  */
 
+import { Tool } from './enums';
+
 export type ArtifactType = 'skill' | 'command' | 'agent' | 'mcp' | 'hook';
 
 export type ArtifactScope = 'user' | 'local';
@@ -17,6 +19,7 @@ export interface ArtifactMetadata {
   author?: string;
   version?: string;
   tags?: string[];
+  tools?: Tool[];  // Claude Code tools used by this artifact
 }
 
 export interface UpstreamStatus {
