@@ -354,8 +354,22 @@ function CollectionPageContent() {
   useEffect(() => {
     if (isIntersecting && hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
+      // When viewing a specific collection, also fetch more full artifacts for enrichment
+      // This ensures metadata is available for artifacts beyond the initial page
+      if (isSpecificCollection && hasNextAllPage && !isFetchingNextAllPage) {
+        fetchNextAllPage();
+      }
     }
-  }, [isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [
+    isIntersecting,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    isSpecificCollection,
+    hasNextAllPage,
+    isFetchingNextAllPage,
+    fetchNextAllPage,
+  ]);
 
   // Select the appropriate loading state and error based on selection
   const isLoadingArtifacts = isSpecificCollection
