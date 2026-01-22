@@ -69,7 +69,9 @@ REFRESH_FIELD_MAPPING: Dict[str, str] = {
     "tags": "topics",  # artifact.tags -> github.topics
     "author": "author",  # artifact.author -> github.owner (mapped to author)
     "license": "license",  # artifact.license -> github.license.spdx_id
-    "origin_source": "url",  # artifact.origin_source -> github.html_url
+    # NOTE: origin_source is NOT refreshed - it's a platform type (github/gitlab/bitbucket)
+    # set during import, not a field that comes from GitHub metadata. The upstream field
+    # already stores the full GitHub URL.
 }
 
 # Set of all valid refreshable field names for validation
@@ -100,7 +102,7 @@ def validate_fields(
         (["description", "tags"], [])
 
         >>> validate_fields(["description", "invalid"])
-        ValueError: Invalid field names: invalid. Valid fields: description, tags, author, license, origin_source
+        ValueError: Invalid field names: invalid. Valid fields: author, description, license, tags
 
         >>> validate_fields(["DESCRIPTION", "Tags"])  # Case-insensitive
         (["description", "tags"], [])
