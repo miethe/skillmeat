@@ -141,7 +141,9 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    last_fetched: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_fetched: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
 
     # Status tracking
     status: Mapped[str] = mapped_column(
