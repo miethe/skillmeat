@@ -567,6 +567,61 @@ export function useDeleteArtifact() {
 }
 
 /**
+ * Hook to update artifact tags
+ *
+ * Updates all tags for an artifact in a single operation.
+ * Tags are normalized on the server (lowercase, spaces to underscores)
+ * and created if they don't already exist.
+ *
+ * @example
+ * ```tsx
+ * const updateTags = useUpdateArtifactTags();
+ * await updateTags.mutateAsync({
+ *   artifactId: 'skill:canvas-design',
+ *   tags: ['design', 'visual', 'canvas'],
+ *   collection: 'default',
+ * });
+ * ```
+ */
+export function useUpdateArtifactTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      artifactId,
+      tags,
+      collection,
+    }: {
+      artifactId: string;
+      tags: string[];
+      collection?: string;
+    }) => {
+      const params = new URLSearchParams();
+      if (collection) {
+        params.set('collection', collection);
+      }
+
+      const queryString = params.toString();
+      const url = `/artifacts/${encodeURIComponent(artifactId)}/tags${queryString ? `?${queryString}` : ''}`;
+
+      const response = await apiRequest<ApiArtifact>(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags }),
+      });
+
+      return mapApiArtifact(response);
+    },
+    onSuccess: (_, { artifactId }) => {
+      // Invalidate all artifact queries to refresh data
+      queryClient.invalidateQueries({ queryKey: artifactKeys.all });
+      // Also invalidate tag-specific queries for this artifact
+      queryClient.invalidateQueries({ queryKey: ['tags', 'artifact', artifactId] });
+    },
+  });
+}
+
+/**
  * Options for infinite artifacts query (used for "All Collections" view)
  */
 export interface InfiniteAllArtifactsOptions {

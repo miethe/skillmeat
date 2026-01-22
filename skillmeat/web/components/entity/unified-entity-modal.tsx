@@ -56,9 +56,12 @@ import {
   deploymentKeys,
   useProjects,
   usePendingContextChanges,
+  useTags,
+  useUpdateArtifactTags,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import { TagEditor } from '@/components/shared/tag-editor';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
@@ -321,6 +324,16 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch available tags for autocomplete
+  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
+  const availableTags = useMemo(() => {
+    if (!tagsData?.items) return [];
+    return tagsData.items.map((tag) => tag.name);
+  }, [tagsData]);
+
+  // Tag update mutation
+  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
 
   // Generate mock history entries
   const historyEntries = useMemo(() => {
@@ -610,7 +623,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Get pending context changes count if this is a context entity
   const pendingContextCount = usePendingContextChanges(
-    isContextEntity(entity) ? entity.id : undefined,
+    entity && isContextEntity(entity) ? entity.id : undefined,
     entity?.projectPath
   );
 
@@ -668,7 +681,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     // 2. selectedProjectForDiff is not already set
     // 3. We have at least one deployment with a project_path
     if (!entity?.projectPath && !selectedProjectForDiff && artifactDeployments.length > 0) {
-      const firstProjectPath = artifactDeployments[0].project_path;
+      const firstProjectPath = artifactDeployments[0]?.project_path;
       if (firstProjectPath) {
         setSelectedProjectForDiff(firstProjectPath);
       }
@@ -1104,6 +1117,37 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       });
       throw error;
     }
+  };
+
+  // Handle tag changes from TagEditor
+  const handleTagsChange = (newTags: string[]) => {
+    if (!entity) return;
+
+    updateTags(
+      {
+        artifactId: entity.id,
+        tags: newTags,
+        collection: entity.collection || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Tags Updated',
+            description: `Updated tags for ${entity.name}`,
+          });
+          // Refresh entity data
+          refetch();
+        },
+        onError: (error) => {
+          console.error('Tag update failed:', error);
+          toast({
+            title: 'Update Failed',
+            description: error instanceof Error ? error.message : 'Failed to update tags',
+            variant: 'destructive',
+          });
+        },
+      }
+    );
   };
 
   // ============================================================================
@@ -1628,21 +1672,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   )}
 
                   {/* Tags */}
-                  {entity.tags && entity.tags.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                        <Tag className="h-4 w-4" />
-                        Tags
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {entity.tags.map((tag) => (
-                          <Badge key={tag} variant="outline">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Tag className="h-4 w-4" />
+                      Tags
+                    </h3>
+                    <TagEditor
+                      tags={entity.tags || []}
+                      onTagsChange={handleTagsChange}
+                      availableTags={availableTags}
+                      isLoading={isTagsLoading || isUpdatingTags}
+                      disabled={isUpdatingTags}
+                    />
+                  </div>
 
                   {/* Aliases */}
                   {entity.aliases && entity.aliases.length > 0 && (
