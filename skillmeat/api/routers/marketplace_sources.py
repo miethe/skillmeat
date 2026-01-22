@@ -20,6 +20,8 @@ API Endpoints:
     PATCH /marketplace/sources/{id}/catalog/{entry_id}/path-tags - Update path segment approval status
     GET /marketplace/sources/{id}/artifacts/{path}/files - Get file tree
     GET /marketplace/sources/{id}/artifacts/{path}/files/{file_path} - Get file content
+    GET /marketplace/sources/{id}/auto-tags - Get auto-tags from GitHub topics
+    PATCH /marketplace/sources/{id}/auto-tags - Approve/reject auto-tags
 """
 
 import json
@@ -47,6 +49,8 @@ from skillmeat.api.schemas.discovery import (
     BulkSyncResponse,
 )
 from skillmeat.api.schemas.marketplace import (
+    AutoTagSegment,
+    AutoTagsResponse,
     CatalogEntryResponse,
     CatalogListResponse,
     CreateSourceRequest,
@@ -65,6 +69,8 @@ from skillmeat.api.schemas.marketplace import (
     ScanResultDTO,
     SourceListResponse,
     SourceResponse,
+    UpdateAutoTagRequest,
+    UpdateAutoTagResponse,
     UpdateCatalogEntryNameRequest,
     UpdateSegmentStatusRequest,
     UpdateSegmentStatusResponse,
@@ -145,6 +151,7 @@ def ensure_default_collection(session: Session) -> None:
         session.add(default_collection)
         session.commit()
         logger.info(f"Created default collection '{DEFAULT_COLLECTION_ID}'")
+
 
 router = APIRouter(
     prefix="/marketplace/sources",
@@ -632,9 +639,9 @@ async def _perform_scan(
             )
 
             # Update counts_by_type on source
-            source_in_session = ctx.session.query(MarketplaceSource).filter_by(
-                id=source_id
-            ).first()
+            source_in_session = (
+                ctx.session.query(MarketplaceSource).filter_by(id=source_id).first()
+            )
             if source_in_session:
                 source_in_session.set_counts_by_type_dict(counts_by_type)
 
@@ -927,6 +934,7 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
         source.set_tags_list(request.tags)
 
     # Handle import_repo_description: fetch from GitHub if True
+    # Also extract GitHub topics as auto-tags
     if request.import_repo_description:
         try:
             from skillmeat.core.github_client import get_github_client
@@ -935,8 +943,29 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
             metadata = client.get_repo_metadata(f"{owner}/{repo_name}")
             source.repo_description = metadata.get("description")
             logger.info(f"Fetched repo description for {owner}/{repo_name}")
+
+            # Extract GitHub topics as auto-tags
+            topics = metadata.get("topics", [])
+            if topics:
+                auto_tags_data = {
+                    "extracted": [
+                        {
+                            "value": topic,
+                            "normalized": topic.lower().replace("_", "-"),
+                            "status": "pending",
+                            "source": "github_topic",
+                        }
+                        for topic in topics
+                    ]
+                }
+                source.set_auto_tags_dict(auto_tags_data)
+                logger.info(
+                    f"Extracted {len(topics)} GitHub topics as auto-tags for {owner}/{repo_name}"
+                )
         except Exception as e:
-            logger.warning(f"Failed to fetch repo description for {owner}/{repo_name}: {e}")
+            logger.warning(
+                f"Failed to fetch repo description for {owner}/{repo_name}: {e}"
+            )
             # Don't fail creation - continue without repo_description
 
     # Handle import_repo_readme: fetch from GitHub if True
@@ -1417,16 +1446,47 @@ async def update_source(
             source.set_tags_list(request.tags)
 
         # Handle import_repo_description: fetch from GitHub if True
+        # Also refresh GitHub topics as auto-tags
         if request.import_repo_description is True:
             try:
                 from skillmeat.core.github_client import get_github_client
 
                 client = get_github_client()
-                metadata = client.get_repo_metadata(f"{source.owner}/{source.repo_name}")
+                metadata = client.get_repo_metadata(
+                    f"{source.owner}/{source.repo_name}"
+                )
                 source.repo_description = metadata.get("description")
                 logger.info(
                     f"Fetched repo description for {source.owner}/{source.repo_name}"
                 )
+
+                # Extract/refresh GitHub topics as auto-tags
+                # Preserve existing approval status for known tags
+                topics = metadata.get("topics", [])
+                if topics:
+                    existing_auto_tags = source.get_auto_tags_dict() or {
+                        "extracted": []
+                    }
+                    existing_status = {
+                        seg["value"]: seg["status"]
+                        for seg in existing_auto_tags.get("extracted", [])
+                    }
+
+                    auto_tags_data = {
+                        "extracted": [
+                            {
+                                "value": topic,
+                                "normalized": topic.lower().replace("_", "-"),
+                                "status": existing_status.get(topic, "pending"),
+                                "source": "github_topic",
+                            }
+                            for topic in topics
+                        ]
+                    }
+                    source.set_auto_tags_dict(auto_tags_data)
+                    logger.info(
+                        f"Refreshed {len(topics)} GitHub topics as auto-tags for {source.owner}/{source.repo_name}"
+                    )
             except Exception as e:
                 logger.warning(
                     f"Failed to fetch repo description for {source.owner}/{source.repo_name}: {e}"
@@ -1451,16 +1511,16 @@ async def update_source(
                         readme_content = content_bytes.decode("utf-8")
                         # Truncate to 50KB if needed
                         if len(readme_content) > 50000:
-                            readme_content = readme_content[:50000] + "\n... [truncated]"
+                            readme_content = (
+                                readme_content[:50000] + "\n... [truncated]"
+                            )
                         break
                     except Exception:
                         continue
 
                 source.repo_readme = readme_content
                 if readme_content:
-                    logger.info(
-                        f"Fetched README for {source.owner}/{source.repo_name}"
-                    )
+                    logger.info(f"Fetched README for {source.owner}/{source.repo_name}")
                 else:
                     logger.info(
                         f"No README found for {source.owner}/{source.repo_name}"
@@ -2478,7 +2538,9 @@ async def import_artifacts(
                         if seg.get("status") == "approved"
                     ]
                 except (json.JSONDecodeError, KeyError):
-                    logger.warning(f"Failed to parse path_segments for entry {entry.id}")
+                    logger.warning(
+                        f"Failed to parse path_segments for entry {entry.id}"
+                    )
                     tags = []
 
             # Convert to dict for ImportCoordinator
@@ -3247,7 +3309,10 @@ async def update_path_tag_status(
                             # Load collection, find artifact, add tag
                             collection = collection_mgr.load_collection()
                             for artifact in collection.artifacts:
-                                if f"{artifact.type.value}:{artifact.name}" == artifact_id:
+                                if (
+                                    f"{artifact.type.value}:{artifact.name}"
+                                    == artifact_id
+                                ):
                                     # Add tag if not already present
                                     if normalized_tag not in artifact.tags:
                                         artifact.tags.append(normalized_tag)
@@ -3669,4 +3734,218 @@ async def get_artifact_file_content(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve file content: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# Auto-Tags Endpoints (GitHub Topics)
+# =============================================================================
+
+
+@router.get(
+    "/{source_id}/auto-tags",
+    response_model=AutoTagsResponse,
+    summary="Get auto-tag suggestions from GitHub topics",
+    description="""
+    Retrieve extracted GitHub repository topics and their approval status.
+
+    Topics are extracted from the repository metadata and stored as auto-tags
+    that can be approved or rejected. Approved auto-tags are added to the
+    source's tags list.
+
+    This endpoint returns all auto-tags with their current status (pending,
+    approved, or rejected) and indicates whether any tags are still pending.
+    """,
+)
+async def get_source_auto_tags(
+    source_id: str,
+) -> AutoTagsResponse:
+    """Get auto-tag suggestions for a marketplace source.
+
+    Args:
+        source_id: Unique source identifier
+
+    Returns:
+        AutoTagsResponse with all auto-tags and their status
+
+    Raises:
+        HTTPException 404: If source not found
+    """
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found for auto-tags: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        segments: List[AutoTagSegment] = []
+        has_pending = False
+
+        if source.auto_tags:
+            try:
+                auto_tags_data = json.loads(source.auto_tags)
+                extracted = auto_tags_data.get("extracted", [])
+                for seg in extracted:
+                    segments.append(
+                        AutoTagSegment(
+                            value=seg["value"],
+                            normalized=seg["normalized"],
+                            status=seg["status"],
+                            source=seg.get("source", "github_topic"),
+                        )
+                    )
+                    if seg.get("status") == "pending":
+                        has_pending = True
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse auto_tags for source {source_id}")
+
+        return AutoTagsResponse(
+            source_id=source_id,
+            segments=segments,
+            has_pending=has_pending,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get auto-tags for source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve auto-tags: {str(e)}",
+        ) from e
+
+
+@router.patch(
+    "/{source_id}/auto-tags",
+    response_model=UpdateAutoTagResponse,
+    summary="Update approval status of an auto-tag",
+    description="""
+    Approve or reject a suggested auto-tag from GitHub topics.
+
+    When a tag is approved, it is automatically added to the source's
+    regular tags list. When rejected, it is marked as rejected and
+    will not be suggested again.
+
+    Note: Auto-tags are source-level only. They do NOT propagate to
+    imported artifacts. Use path_tags for artifact-level tagging.
+    """,
+)
+async def update_source_auto_tag(
+    source_id: str,
+    request: UpdateAutoTagRequest,
+) -> UpdateAutoTagResponse:
+    """Update approval status of an auto-tag.
+
+    Args:
+        source_id: Unique source identifier
+        request: Request body with tag value and new status
+
+    Returns:
+        UpdateAutoTagResponse with updated tag and any tags added
+
+    Raises:
+        HTTPException 404: If source or auto-tag not found
+        HTTPException 500: If update fails
+    """
+    source_repo = MarketplaceSourceRepository()
+
+    try:
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found for auto-tag update: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        if not source.auto_tags:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No auto-tags available for this source",
+            )
+
+        try:
+            auto_tags_data = json.loads(source.auto_tags)
+            extracted = auto_tags_data.get("extracted", [])
+        except json.JSONDecodeError:
+            logger.error(f"Malformed auto_tags JSON for source {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to parse auto-tags data",
+            )
+
+        # Find and update the tag
+        updated_tag = None
+        request_lower = request.value.lower()
+        for seg in extracted:
+            if (
+                seg["value"].lower() == request_lower
+                or seg["normalized"].lower() == request_lower
+            ):
+                seg["status"] = request.status
+                updated_tag = AutoTagSegment(
+                    value=seg["value"],
+                    normalized=seg["normalized"],
+                    status=seg["status"],
+                    source=seg.get("source", "github_topic"),
+                )
+                break
+
+        if not updated_tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Auto-tag '{request.value}' not found",
+            )
+
+        # Save updated auto_tags
+        source.auto_tags = json.dumps(auto_tags_data)
+
+        # If approved, add to source tags
+        tags_added: List[str] = []
+        if request.status == "approved":
+            try:
+                normalized = updated_tag.normalized.lower()
+                current_tags = source.get_tags_list() or []
+                if normalized not in [t.lower() for t in current_tags]:
+                    current_tags.append(normalized)
+                    source.set_tags_list(current_tags)
+                    tags_added.append(normalized)
+                    logger.info(
+                        f"Added approved auto-tag '{normalized}' to source {source_id}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to add approved tag to source {source_id}: {e}")
+
+        # Commit changes
+        session = source_repo._get_session()
+        session.commit()
+
+        logger.info(
+            f"Updated auto-tag '{request.value}' to status '{request.status}' "
+            f"for source {source_id}"
+        )
+
+        return UpdateAutoTagResponse(
+            source_id=source_id,
+            updated_tag=updated_tag,
+            tags_added=tags_added,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update auto-tag for source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update auto-tag: {str(e)}",
         ) from e

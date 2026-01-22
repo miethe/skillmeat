@@ -6,7 +6,7 @@ tags: [implementation, planning, phases, tasks, backend, api, cli, metadata-refr
 created: 2025-01-21
 updated: 2025-01-21
 category: "product-planning"
-status: draft
+status: completed
 related:
   - /docs/project_plans/PRDs/features/collection-artifact-refresh-v1.md
   - /skillmeat/core/sync.py

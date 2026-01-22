@@ -378,6 +378,11 @@ export { bulkTagKeys, useBulkTagApply } from './use-bulk-tag-apply';
 export { pathTagKeys, usePathTags, useUpdatePathTagStatus } from './use-path-tags';
 
 /**
+ * Source auto-tag operations (GitHub topics)
+ */
+export { autoTagsKeys, useSourceAutoTags, useUpdateAutoTag } from './use-auto-tags';
+
+/**
  * Merge operations for collections and contexts
  */
 export {

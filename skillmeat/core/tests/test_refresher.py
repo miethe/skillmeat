@@ -315,8 +315,12 @@ class TestDetectChanges:
         assert old_values["description"] == "Original description"
         assert new_values["description"] == "New description from upstream"
 
-    def test_detect_tags_change(self, refresher, sample_artifact):
-        """Test detecting tags/topics change."""
+    def test_tags_not_detected_as_change(self, refresher, sample_artifact):
+        """Test that tags/topics changes are NOT detected.
+
+        GitHub repository topics are SOURCE-level metadata, not artifact-level.
+        Artifact tags should come from path-based segments or manual tagging.
+        """
         upstream = GitHubMetadata(
             topics=["new-tag", "another-tag"],
             url="https://github.com/test",
@@ -324,12 +328,12 @@ class TestDetectChanges:
         )
 
         old_values, new_values = refresher._detect_changes(
-            sample_artifact, upstream, fields=["tags"]
+            sample_artifact, upstream, fields=["description"]  # tags not valid
         )
 
-        assert "tags" in new_values
-        assert old_values["tags"] == ["old-tag"]
-        assert set(new_values["tags"]) == {"new-tag", "another-tag"}
+        # Tags should NOT be in the changes since it's not in REFRESH_FIELD_MAPPING
+        assert "tags" not in new_values
+        assert "tags" not in old_values
 
     def test_detect_license_change(self, refresher, sample_artifact):
         """Test detecting license field change."""
@@ -354,56 +358,54 @@ class TestDetectChanges:
     def test_detect_no_changes(self, refresher, sample_artifact):
         """Test that identical metadata returns no changes.
 
-        Note: _detect_changes() now always checks ALL fields regardless of the
-        fields parameter. The fields parameter is used later by _apply_updates()
-        to filter which changes get applied.
+        Note: _detect_changes() now always checks ALL fields in REFRESH_FIELD_MAPPING
+        regardless of the fields parameter. The fields parameter is used later by
+        _apply_updates() to filter which changes get applied.
         """
-        # Set origin_source to match the upstream URL so origin_source doesn't change
-        sample_artifact.origin_source = "https://github.com/test"
-
         upstream = GitHubMetadata(
             description="Original description",  # Same as artifact
-            topics=["old-tag"],  # Same as artifact
-            url="https://github.com/test",  # Same as artifact.origin_source
+            topics=["old-tag"],  # topics are NOT in REFRESH_FIELD_MAPPING
+            url="https://github.com/test",
             fetched_at=datetime.now(),
         )
 
         old_values, new_values = refresher._detect_changes(
-            sample_artifact, upstream, fields=["description", "tags"]
+            sample_artifact, upstream, fields=["description"]
         )
 
-        # When all fields match, no changes should be detected
+        # When all refreshable fields match, no changes should be detected
+        # Note: tags/topics are NOT checked since they're not in REFRESH_FIELD_MAPPING
         assert old_values == {}
         assert new_values == {}
 
     def test_detect_multiple_changes(self, refresher, sample_artifact):
         """Test detecting multiple field changes at once.
 
-        Note: _detect_changes() always checks ALL fields, so origin_source will
-        also be detected as a change even though we only requested specific fields.
+        Note: _detect_changes() checks ALL fields in REFRESH_FIELD_MAPPING.
         The fields parameter is used later by _apply_updates() to filter which
-        changes get applied.
+        changes get applied. Tags/topics are NOT checked since they're not in
+        REFRESH_FIELD_MAPPING (GitHub topics are source-level, not artifact-level).
         """
         sample_artifact.metadata.license = "Apache-2.0"
 
         upstream = GitHubMetadata(
             description="New description",
             license="MIT",
-            topics=["new-tag"],
+            topics=["new-tag"],  # topics NOT in REFRESH_FIELD_MAPPING
             url="https://github.com/test",
             fetched_at=datetime.now(),
         )
 
         old_values, new_values = refresher._detect_changes(
-            sample_artifact, upstream, fields=["description", "license", "tags"]
+            sample_artifact, upstream, fields=["description", "license"]
         )
 
-        # ALL changed fields are detected, not just the ones in fields parameter
-        assert len(new_values) == 4  # description, license, tags, origin_source
+        # Only fields in REFRESH_FIELD_MAPPING are detected
+        # (description, author, license - NOT tags)
+        assert len(new_values) == 2  # description, license
         assert "description" in new_values
         assert "license" in new_values
-        assert "tags" in new_values
-        assert "origin_source" in new_values  # Always detected even if not requested
+        assert "tags" not in new_values  # tags NOT in REFRESH_FIELD_MAPPING
 
     def test_handle_none_values(self, refresher, sample_artifact):
         """Test handling None values in either current or upstream."""
@@ -443,55 +445,54 @@ class TestDetectChanges:
         # No change since both are None
         assert "license" not in new_values
 
-    def test_handle_empty_lists(self, refresher, sample_artifact):
-        """Test handling empty list vs populated list."""
+    def test_handle_empty_lists_not_for_tags(self, refresher, sample_artifact):
+        """Test that tags/topics are NOT detected even with empty vs populated list.
+
+        GitHub repository topics are SOURCE-level metadata, not artifact-level.
+        Tags should come from path-based segments or manual tagging.
+        """
         sample_artifact.tags = []
 
         upstream = GitHubMetadata(
-            topics=["new-tag"],
+            topics=["new-tag"],  # topics NOT in REFRESH_FIELD_MAPPING
             url="https://github.com/test",
             fetched_at=datetime.now(),
         )
 
-        old_values, new_values = refresher._detect_changes(
-            sample_artifact, upstream, fields=["tags"]
-        )
-
-        assert "tags" in new_values
-        assert old_values["tags"] == []
-        assert new_values["tags"] == ["new-tag"]
-
-    def test_field_filtering_only_specified_fields(self, refresher, sample_artifact):
-        """Test that ALL changed fields are detected regardless of fields parameter.
-
-        The new behavior is:
-        1. _detect_changes() always detects ALL changed fields
-        2. The fields parameter is used by _apply_updates() to filter which changes get applied
-
-        This test verifies that all changes are detected even when only one field
-        is specified in the fields parameter.
-        """
-        upstream = GitHubMetadata(
-            description="New description",
-            license="MIT",
-            topics=["new-tag"],
-            url="https://github.com/test",
-            fetched_at=datetime.now(),
-        )
-
-        # Specify only description, but ALL changes are detected
         old_values, new_values = refresher._detect_changes(
             sample_artifact, upstream, fields=["description"]
         )
 
-        # ALL changed fields are detected (description, tags, origin_source)
-        # Note: license is not detected because artifact.metadata.license is None
-        # and upstream.license is "MIT", but the artifact doesn't have a license set initially
-        assert len(new_values) == 4  # description, tags, license (None->MIT), origin_source
+        # Tags should NOT be detected since they're not in REFRESH_FIELD_MAPPING
+        assert "tags" not in new_values
+        assert "tags" not in old_values
+
+    def test_field_filtering_only_specified_fields(self, refresher, sample_artifact):
+        """Test that changed fields in REFRESH_FIELD_MAPPING are detected.
+
+        Note: Only fields in REFRESH_FIELD_MAPPING are checked for changes.
+        Tags/topics are NOT in the mapping since GitHub repo topics are
+        source-level metadata, not artifact-level.
+        """
+        upstream = GitHubMetadata(
+            description="New description",
+            license="MIT",
+            topics=["new-tag"],  # topics NOT in REFRESH_FIELD_MAPPING
+            url="https://github.com/test",
+            fetched_at=datetime.now(),
+        )
+
+        # Specify only description, but all REFRESH_FIELD_MAPPING fields are checked
+        old_values, new_values = refresher._detect_changes(
+            sample_artifact, upstream, fields=["description"]
+        )
+
+        # Only fields in REFRESH_FIELD_MAPPING are detected (NOT tags)
+        # description + license (None->MIT) = 2 fields
+        assert len(new_values) == 2  # description, license
         assert "description" in new_values
         assert "license" in new_values  # License changes from None to MIT
-        assert "tags" in new_values
-        assert "origin_source" in new_values
+        assert "tags" not in new_values  # tags NOT in REFRESH_FIELD_MAPPING
 
     def test_field_filtering_all_fields_default(self, refresher, sample_artifact):
         """Test that all REFRESH_FIELD_MAPPING fields are checked when fields=None."""
@@ -697,19 +698,16 @@ class TestRefreshMetadata:
     def test_refresh_no_changes(self, refresher, sample_artifact):
         """Test refresh when upstream metadata matches current.
 
-        Note: _detect_changes() now always checks ALL fields, so we need to ensure
-        origin_source also matches to avoid detecting a change.
+        Note: _detect_changes() checks ALL fields in REFRESH_FIELD_MAPPING.
+        Tags/topics are NOT in the mapping (they're source-level metadata).
         """
-        # Set origin_source to match the upstream URL
-        sample_artifact.origin_source = "https://github.com/user/repo/tree/main/path/to/skill"
-
         # Create matching metadata - matching the artifact's current values
         matching_metadata = GitHubMetadata(
             description="Original description",  # Same as sample_artifact
-            topics=["old-tag"],  # Same as sample_artifact.tags
+            topics=["old-tag"],  # topics NOT in REFRESH_FIELD_MAPPING
             author=None,  # Same as sample_artifact.metadata.author
             license=None,  # Same as sample_artifact.metadata.license
-            url="https://github.com/user/repo/tree/main/path/to/skill",  # Same as origin_source
+            url="https://github.com/user/repo/tree/main/path/to/skill",
             fetched_at=datetime.now(),
         )
 
@@ -719,11 +717,12 @@ class TestRefreshMetadata:
         )
         refresher._metadata_extractor.fetch_metadata.return_value = matching_metadata
 
-        # All fields will be checked, but since they all match, no changes detected
+        # All REFRESH_FIELD_MAPPING fields checked, but since they match, no changes
+        # Note: "tags" is NOT in REFRESH_FIELD_MAPPING
         result = refresher.refresh_metadata(
             sample_artifact,
             mode=RefreshMode.METADATA_ONLY,
-            fields=["description", "tags", "author", "license"],  # Fields to apply (if any changes)
+            fields=["description", "author", "license"],  # Valid fields only
         )
 
         assert result.status == "unchanged"
@@ -1314,15 +1313,17 @@ class TestRefreshFieldMapping:
     def test_required_fields_present(self):
         """Test that required field mappings are present."""
         assert "description" in REFRESH_FIELD_MAPPING
-        assert "tags" in REFRESH_FIELD_MAPPING
         assert "author" in REFRESH_FIELD_MAPPING
         assert "license" in REFRESH_FIELD_MAPPING
-        assert "origin_source" in REFRESH_FIELD_MAPPING
+        # NOTE: "tags" is intentionally EXCLUDED from REFRESH_FIELD_MAPPING
+        # GitHub repository topics are SOURCE-level metadata, not artifact-level.
+        # Artifact tags should come from path-based segments or manual tagging.
+        assert "tags" not in REFRESH_FIELD_MAPPING
 
     def test_field_mapping_values(self):
         """Test field mapping values are correct."""
         assert REFRESH_FIELD_MAPPING["description"] == "description"
-        assert REFRESH_FIELD_MAPPING["tags"] == "topics"
+        assert REFRESH_FIELD_MAPPING["author"] == "author"
         assert REFRESH_FIELD_MAPPING["license"] == "license"
 
 

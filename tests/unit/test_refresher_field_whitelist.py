@@ -27,9 +27,10 @@ class TestFieldWhitelistValidation:
         refresher = CollectionRefresher(mock_collection_manager)
         artifact = _create_test_artifact()
 
-        # Should not raise
+        # Should not raise - note: "tags" is no longer a refreshable field
+        # since GitHub repo topics are source-level metadata, not artifact-level
         result = refresher.refresh_metadata(
-            artifact, fields=["description", "tags"], dry_run=True
+            artifact, fields=["description", "license"], dry_run=True
         )
         assert result.status in ("refreshed", "unchanged", "skipped")
 
@@ -54,9 +55,10 @@ class TestFieldWhitelistValidation:
         refresher = CollectionRefresher(mock_collection_manager)
         artifact = _create_test_artifact()
 
+        # Note: "tags" is no longer a valid field since GitHub topics are source-level
         with pytest.raises(ValueError) as exc_info:
             refresher.refresh_metadata(
-                artifact, fields=["description", "invalid_field", "tags"]
+                artifact, fields=["description", "invalid_field", "license"]
             )
 
         error_msg = str(exc_info.value)
@@ -81,10 +83,12 @@ class TestFieldWhitelistValidation:
         assert len(REFRESHABLE_FIELDS) > 0
         # Should include common fields
         assert "description" in REFRESHABLE_FIELDS
-        assert "tags" in REFRESHABLE_FIELDS
         assert "author" in REFRESHABLE_FIELDS
         assert "license" in REFRESHABLE_FIELDS
-        assert "origin_source" in REFRESHABLE_FIELDS
+        # Note: "tags" is intentionally NOT a refreshable field
+        # GitHub repo topics are source-level metadata, not artifact-level
+        # Artifact tags come from path-based segments or manual tagging
+        assert "tags" not in REFRESHABLE_FIELDS
 
 
 class TestFieldWhitelistFiltering:
@@ -94,18 +98,18 @@ class TestFieldWhitelistFiltering:
         self, mock_collection_manager, mock_metadata_extractor, monkeypatch
     ):
         """Should detect ALL changes but only apply whitelisted fields."""
-        # Setup: artifact with outdated description and tags
+        # Setup: artifact with outdated description and license
         artifact = _create_test_artifact(
-            description="Old description", tags=["old-tag"]
+            description="Old description", license="Apache-2.0"
         )
 
         # Mock upstream with different values for both fields
         upstream_metadata = GitHubMetadata(
             title="Test Skill",
             description="New description",  # Changed
-            topics=["new-tag"],  # Changed
+            topics=["new-tag"],  # Changed but NOT refreshable (source-level)
             author="test-owner",
-            license="MIT",
+            license="MIT",  # Changed
             url="https://github.com/test/repo",
         )
 
@@ -122,14 +126,17 @@ class TestFieldWhitelistFiltering:
             artifact, fields=["description"], dry_run=False
         )
 
-        # Should detect BOTH changes
+        # Should detect changes in refreshable fields (description, license)
+        # but NOT tags since tags are excluded from REFRESH_FIELD_MAPPING
         assert result.status == "refreshed"
         assert "description" in result.changes
-        assert "tags" in result.changes  # Detected but not applied
+        assert "license" in result.changes  # Detected but not applied
+        # Tags are NOT detected since they're not in REFRESH_FIELD_MAPPING
+        assert "tags" not in result.changes
 
         # But only description should be applied
         assert artifact.metadata.description == "New description"
-        assert artifact.tags == ["old-tag"]  # Unchanged (not in whitelist)
+        assert artifact.metadata.license == "Apache-2.0"  # Unchanged (not in whitelist)
 
     def test_reports_all_changes_in_dry_run(
         self, mock_collection_manager, mock_metadata_extractor
@@ -142,8 +149,8 @@ class TestFieldWhitelistFiltering:
         upstream_metadata = GitHubMetadata(
             title="Test",
             description="New desc",
-            topics=["new"],
-            author="test",
+            topics=["new"],  # Topics won't be detected (not in REFRESH_FIELD_MAPPING)
+            author="new-author",  # Changed
             license="MIT",
             url="https://github.com/test/repo",
         )
@@ -159,17 +166,17 @@ class TestFieldWhitelistFiltering:
             artifact, fields=["description"], dry_run=True
         )
 
-        # Should report ALL three changes
+        # Should report changes for refreshable fields only (not tags)
         assert result.status == "refreshed"
         assert "description" in result.changes
-        assert "tags" in result.changes
         assert "license" in result.changes
+        assert "author" in result.changes
+        # Tags are NOT in REFRESH_FIELD_MAPPING so not detected/reported
+        assert "tags" not in result.changes
 
-        # All old/new values should be in result
+        # Old/new values should be in result for refreshable fields
         assert result.old_values["description"] == "Old desc"
         assert result.new_values["description"] == "New desc"
-        assert result.old_values["tags"] == ["old"]
-        assert result.new_values["tags"] == ["new"]
         assert result.old_values["license"] == "Apache-2.0"
         assert result.new_values["license"] == "MIT"
 
@@ -179,13 +186,13 @@ class TestFieldWhitelistFiltering:
     def test_none_fields_applies_all_changes(
         self, mock_collection_manager, mock_metadata_extractor
     ):
-        """When fields=None, should apply ALL detected changes."""
+        """When fields=None, should apply ALL detected changes (excluding tags)."""
         artifact = _create_test_artifact(description="Old", tags=["old"])
 
         upstream_metadata = GitHubMetadata(
             title="Test",
             description="New",
-            topics=["new"],
+            topics=["new"],  # Topics are NOT applied (source-level, not artifact-level)
             author="test",
             license="MIT",
             url="https://github.com/test/repo",
@@ -199,10 +206,12 @@ class TestFieldWhitelistFiltering:
 
         result = refresher.refresh_metadata(artifact, fields=None, dry_run=False)
 
-        # All changes should be applied
+        # All refreshable changes should be applied (but not tags)
         assert result.status == "refreshed"
         assert artifact.metadata.description == "New"
-        assert artifact.tags == ["new"]
+        # Tags remain unchanged because topics are NOT in REFRESH_FIELD_MAPPING
+        # (GitHub repo topics are source-level metadata, not artifact-level)
+        assert artifact.tags == ["old"]
 
 
 class TestRefreshCollectionFieldWhitelist:
@@ -233,7 +242,7 @@ class TestRefreshCollectionFieldWhitelist:
         self, mock_collection_manager, mock_metadata_extractor, tmp_path
     ):
         """Collection refresh should pass field whitelist to each artifact."""
-        artifact = _create_test_artifact(description="Old", tags=["old"])
+        artifact = _create_test_artifact(description="Old", tags=["old"], license="Apache-2.0")
 
         collection = Collection(
             name="test",
@@ -246,7 +255,7 @@ class TestRefreshCollectionFieldWhitelist:
         upstream_metadata = GitHubMetadata(
             title="Test",
             description="New",
-            topics=["new"],
+            topics=["new"],  # Not applied (not in REFRESH_FIELD_MAPPING)
             author="test",
             license="MIT",
             url="https://github.com/test/repo",
@@ -263,7 +272,8 @@ class TestRefreshCollectionFieldWhitelist:
         # Check that only description was applied
         assert result.refreshed_count == 1
         assert artifact.metadata.description == "New"
-        assert artifact.tags == ["old"]  # Not in whitelist
+        assert artifact.metadata.license == "Apache-2.0"  # Not in whitelist
+        assert artifact.tags == ["old"]  # Tags are never refreshed (source-level metadata)
 
 
 # Helper functions

@@ -64,9 +64,16 @@ class RefreshMode(str, Enum):
 #
 # Keys are artifact field names (as stored in collection metadata).
 # Values are GitHub API field names (from repository metadata).
+#
+# NOTE: "tags" is intentionally EXCLUDED from this mapping.
+# GitHub repository topics are SOURCE-level metadata, not artifact-level.
+# Artifact tags should come from:
+#   1. Path-based segments (approved by user during import)
+#   2. Manual tagging by user
+# NOT from the parent repository's topics.
+# Use source auto-tags feature for source-level topic management.
 REFRESH_FIELD_MAPPING: Dict[str, str] = {
     "description": "description",  # artifact.metadata.description -> github.description
-    "tags": "topics",  # artifact.tags -> github.topics
     "author": "author",  # artifact.author -> github.owner (mapped to author)
     "license": "license",  # artifact.license -> github.license.spdx_id
     # NOTE: origin_source is NOT refreshed - it's a platform type (github/gitlab/bitbucket)

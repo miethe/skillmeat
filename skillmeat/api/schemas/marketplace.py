@@ -2280,6 +2280,154 @@ class UpdateSegmentStatusResponse(BaseModel):
 
 
 # ============================================================================
+# Auto-Tags (GitHub Topics) DTOs
+# ============================================================================
+
+
+class AutoTagSegment(BaseModel):
+    """Single auto-tag extracted from GitHub repository topics.
+
+    Represents a tag suggested from GitHub repository topics that can be
+    approved or rejected by the user for inclusion in source tags.
+    """
+
+    value: str = Field(
+        description="Original topic value from GitHub",
+        examples=["claude-code", "ai-assistant", "python"],
+    )
+    normalized: str = Field(
+        description="Normalized value for consistent tagging",
+        examples=["claude-code", "ai-assistant", "python"],
+    )
+    status: Literal["pending", "approved", "rejected"] = Field(
+        description="Approval status",
+        examples=["pending"],
+    )
+    source: str = Field(
+        default="github_topic",
+        description="Source of the auto-tag",
+        examples=["github_topic"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "value": "claude-code",
+                "normalized": "claude-code",
+                "status": "pending",
+                "source": "github_topic",
+            }
+        }
+
+
+class AutoTagsResponse(BaseModel):
+    """Response containing all auto-tags for a marketplace source.
+
+    Returns extracted GitHub topics with their approval status and metadata.
+    """
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    segments: list[AutoTagSegment] = Field(
+        description="List of extracted auto-tags with status",
+    )
+    has_pending: bool = Field(
+        description="Whether any tags are still pending approval",
+        examples=[True],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "segments": [
+                    {
+                        "value": "claude-code",
+                        "normalized": "claude-code",
+                        "status": "approved",
+                        "source": "github_topic",
+                    },
+                    {
+                        "value": "ai-assistant",
+                        "normalized": "ai-assistant",
+                        "status": "pending",
+                        "source": "github_topic",
+                    },
+                ],
+                "has_pending": True,
+            }
+        }
+
+
+class UpdateAutoTagRequest(BaseModel):
+    """Request to update the approval status of an auto-tag.
+
+    Used to approve or reject a GitHub topic for inclusion in source tags.
+    """
+
+    value: str = Field(
+        description="The tag value to update (matches value or normalized)",
+        min_length=1,
+        examples=["claude-code", "ai-assistant"],
+    )
+    status: Literal["approved", "rejected"] = Field(
+        description="New status for the tag",
+        examples=["approved"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "value": "claude-code",
+                "status": "approved",
+            }
+        }
+
+
+class UpdateAutoTagResponse(BaseModel):
+    """Response after updating an auto-tag's approval status.
+
+    Returns the updated tag and any tags that were added to the source.
+    """
+
+    source_id: str = Field(
+        description="Marketplace source ID",
+        examples=["src_anthropics_skills"],
+    )
+    updated_tag: AutoTagSegment = Field(
+        description="The updated auto-tag segment",
+    )
+    tags_added: list[str] = Field(
+        description="Tags added to source.tags if approved",
+        examples=[["claude-code"]],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "source_id": "src_anthropics_skills",
+                "updated_tag": {
+                    "value": "claude-code",
+                    "normalized": "claude-code",
+                    "status": "approved",
+                    "source": "github_topic",
+                },
+                "tags_added": ["claude-code"],
+            }
+        }
+
+
+# ============================================================================
 # Manual Mapping and Deduplication DTOs (Phase 1-3)
 # ============================================================================
 

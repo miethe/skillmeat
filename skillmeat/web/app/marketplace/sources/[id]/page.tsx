@@ -12,6 +12,7 @@ import { ExcludeArtifactDialog } from '@/components/marketplace/exclude-artifact
 import { DirectoryMapModal } from '@/components/marketplace/DirectoryMapModal';
 import { BulkTagDialogWithHook } from '@/components/marketplace/bulk-tag-dialog';
 import { RepoDetailsModal } from '@/components/marketplace/repo-details-modal';
+import { AutoTagsDialog } from '@/components/marketplace/auto-tags-dialog';
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -34,6 +35,7 @@ import {
   MoreVertical,
   FolderTree,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +72,7 @@ import {
   useUpdateSource,
   sourceKeys,
   useToast,
+  useSourceAutoTags,
 } from '@/hooks';
 import { EditSourceModal } from '@/components/marketplace/edit-source-modal';
 import { DeleteSourceDialog } from '@/components/marketplace/delete-source-dialog';
@@ -408,10 +411,14 @@ export default function SourceDetailPage() {
   const [lastScanResult, setLastScanResult] = useState<any>(null);
   const [isMappingsOpen, setIsMappingsOpen] = useState(false);
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false);
+  const [autoTagsDialogOpen, setAutoTagsDialogOpen] = useState(false);
 
   // Toast and query client for bulk tag operations
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Auto-tags query - fetch GitHub topics for the source
+  const { data: autoTagsData } = useSourceAutoTags(sourceId);
 
   // Pagination state from URL
   const [currentPage, setCurrentPage] = useState(() => {
@@ -994,19 +1001,34 @@ export default function SourceDetailPage() {
       </div>
 
       {/* Source Tags */}
-      {source.tags && source.tags.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Tags:</span>
-          <TagBadge
-            tags={source.tags}
-            maxDisplay={5}
-            onTagClick={(tag) => {
-              // Navigate to sources list with tag filter
-              router.push(`/marketplace/sources?tag=${encodeURIComponent(tag)}`);
-            }}
-          />
+      {(source.tags && source.tags.length > 0) || autoTagsData?.has_pending ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {source.tags && source.tags.length > 0 && (
+            <>
+              <span className="text-sm text-muted-foreground">Tags:</span>
+              <TagBadge
+                tags={source.tags}
+                maxDisplay={5}
+                onTagClick={(tag) => {
+                  // Navigate to sources list with tag filter
+                  router.push(`/marketplace/sources?tag=${encodeURIComponent(tag)}`);
+                }}
+              />
+            </>
+          )}
+          {autoTagsData?.has_pending && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAutoTagsDialogOpen(true)}
+              className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950"
+            >
+              <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+              Auto-Tags Available
+            </Button>
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* Manual Mappings Display (P4.3a) - Collapsible */}
       {source.manual_map && Object.keys(source.manual_map).length > 0 && (
@@ -1488,6 +1510,13 @@ export default function SourceDetailPage() {
             variant: 'destructive',
           });
         }}
+      />
+
+      {/* Auto-Tags Dialog (GitHub Topics) */}
+      <AutoTagsDialog
+        open={autoTagsDialogOpen}
+        onOpenChange={setAutoTagsDialogOpen}
+        sourceId={sourceId}
       />
     </div>
   );
