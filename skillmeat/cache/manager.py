@@ -211,17 +211,10 @@ class CacheManager:
                     projects = self.repository.list_projects()
                     logger.debug(f"Retrieved {len(projects)} projects (all)")
                 else:
-                    # Get all projects and filter out stale ones
-                    all_projects = self.repository.list_projects()
-                    stale_ids = {
-                        p.id
-                        for p in self.repository.get_stale_projects(self.ttl_minutes)
-                    }
-                    projects = [p for p in all_projects if p.id not in stale_ids]
-                    logger.debug(
-                        f"Retrieved {len(projects)} projects (fresh only, "
-                        f"excluded {len(stale_ids)} stale)"
+                    projects = self.repository.list_projects(
+                        exclude_stale_ttl=self.ttl_minutes
                     )
+                    logger.debug(f"Retrieved {len(projects)} projects (fresh only)")
                 return projects
         except Exception as e:
             logger.error(f"Failed to get projects: {e}", exc_info=True)

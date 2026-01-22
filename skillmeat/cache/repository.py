@@ -333,12 +333,18 @@ class CacheRepository:
         finally:
             session.close()
 
-    def list_projects(self, skip: int = 0, limit: int = 100) -> List[Project]:
+    def list_projects(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        exclude_stale_ttl: Optional[int] = None,
+    ) -> List[Project]:
         """List projects with pagination.
 
         Args:
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to return
+            exclude_stale_ttl: If provided, exclude projects not fetched within TTL minutes
 
         Returns:
             List of Project objects
@@ -349,18 +355,27 @@ class CacheRepository:
             >>>
             >>> # Get next 50 projects
             >>> more = repo.list_projects(skip=50, limit=50)
+            >>>
+            >>> # Get fresh projects only (fetched within last 6 hours)
+            >>> fresh = repo.list_projects(exclude_stale_ttl=360)
         """
         session = self._get_session()
         try:
-            projects = (
-                session.query(Project)
-                .options(joinedload(Project.artifacts))
-                .offset(skip)
-                .limit(limit)
-                .all()
-            )
+            q = session.query(Project).options(joinedload(Project.artifacts))
+
+            if exclude_stale_ttl is not None:
+                threshold = datetime.utcnow() - timedelta(minutes=exclude_stale_ttl)
+                q = q.filter(
+                    and_(
+                        Project.last_fetched.is_not(None),
+                        Project.last_fetched >= threshold,
+                    )
+                )
+
+            projects = q.offset(skip).limit(limit).all()
             logger.debug(
-                f"Listed {len(projects)} projects (skip={skip}, limit={limit})"
+                f"Listed {len(projects)} projects (skip={skip}, limit={limit}, "
+                f"exclude_stale_ttl={exclude_stale_ttl})"
             )
             return projects
         finally:
