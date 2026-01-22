@@ -2466,6 +2466,11 @@ def collection_use(name: str):
     help="Only detect available updates, don't apply",
 )
 @click.option(
+    "--check-only",
+    is_flag=True,
+    help="Check for version updates without examining metadata (faster)",
+)
+@click.option(
     "--type",
     "-t",
     "artifact_type",
@@ -2483,16 +2488,30 @@ def collection_use(name: str):
 @click.option(
     "--fields",
     default=None,
-    help="Comma-separated list of fields to refresh (e.g., description,tags,author)",
+    help="Comma-separated list of fields to refresh (e.g., 'description,tags,author'). Valid fields: description, tags, author, license, origin_source",
+)
+@click.option(
+    "--rollback",
+    is_flag=True,
+    help="Restore collection to most recent pre-refresh snapshot (exclusive with other flags)",
+)
+@click.option(
+    "-y",
+    "--yes",
+    is_flag=True,
+    help="Skip confirmation prompt for rollback",
 )
 def collection_refresh(
     collection_name: Optional[str],
     dry_run: bool,
     metadata_only: bool,
     check: bool,
+    check_only: bool,
     artifact_type: Optional[str],
     name_pattern: Optional[str],
     fields: Optional[str],
+    rollback: bool,
+    yes: bool,
 ):
     """Refresh artifact metadata from upstream GitHub sources.
 
@@ -2500,24 +2519,128 @@ def collection_refresh(
     GitHub repositories and updates the collection.
 
     Examples:
-      skillmeat collection refresh                    # Refresh all artifacts
-      skillmeat collection refresh --dry-run          # Preview changes
-      skillmeat collection refresh --check            # Check for updates only
-      skillmeat collection refresh -t skill           # Refresh only skills
-      skillmeat collection refresh -n "canvas-*"      # Refresh by name pattern
-      skillmeat collection refresh --fields tags      # Refresh only tags
+      skillmeat collection refresh                           # Refresh all artifacts
+      skillmeat collection refresh --dry-run                 # Preview changes
+      skillmeat collection refresh --check                   # Check for updates only
+      skillmeat collection refresh --check-only              # Check version updates (faster)
+      skillmeat collection refresh -t skill                  # Refresh only skills
+      skillmeat collection refresh -n "canvas-*"             # Refresh by name pattern
+      skillmeat collection refresh --fields tags             # Refresh only tags
+      skillmeat collection refresh --fields description,tags # Refresh multiple fields
+      skillmeat collection refresh --rollback                # Restore pre-refresh snapshot
+      skillmeat collection refresh --rollback -y             # Skip confirmation
     """
     try:
-        collection_mgr = CollectionManager()
-        refresher = CollectionRefresher(collection_mgr)
+        from pathlib import Path as P
+        from skillmeat.storage.snapshot import SnapshotManager
 
-        # Determine refresh mode
-        if check:
-            mode = RefreshMode.CHECK_ONLY
-        elif metadata_only:
-            mode = RefreshMode.METADATA_ONLY
-        else:
-            mode = RefreshMode.METADATA_ONLY  # Default to metadata only
+        collection_mgr = CollectionManager()
+        display_name = collection_name or collection_mgr.get_active_collection_name()
+
+        # Handle --rollback flag (exclusive with other operations)
+        if rollback:
+            # Verify rollback is not combined with other flags
+            if any([dry_run, check, check_only, artifact_type, name_pattern, fields]):
+                console.print(
+                    "[red]Error: --rollback cannot be combined with other flags[/red]"
+                )
+                sys.exit(1)
+
+            # Initialize snapshot manager
+            snapshots_dir = P.home() / ".skillmeat" / "snapshots"
+            snapshot_mgr = SnapshotManager(snapshots_dir)
+
+            # Find most recent pre-refresh snapshot
+            console.print(
+                f"[cyan]Looking for pre-refresh snapshot for collection '{display_name}'...[/cyan]"
+            )
+
+            try:
+                # Get all snapshots for the collection
+                snapshots, _ = snapshot_mgr.list_snapshots(
+                    collection_name=display_name,
+                    limit=100,
+                )
+
+                # Filter for pre-refresh snapshots (by message pattern)
+                pre_refresh_snapshots = [
+                    s
+                    for s in snapshots
+                    if "pre-refresh" in s.message.lower()
+                    or s.message.startswith("Before refresh")
+                ]
+
+                if not pre_refresh_snapshots:
+                    console.print(
+                        "[red]Error: No pre-refresh snapshot found for collection "
+                        f"'{display_name}'[/red]"
+                    )
+                    console.print(
+                        "\n[yellow]Hint:[/yellow] Pre-refresh snapshots are created automatically "
+                        "when running refresh operations."
+                    )
+                    console.print(
+                        "If you've manually created snapshots, ensure the message contains "
+                        "'pre-refresh'."
+                    )
+                    sys.exit(1)
+
+                # Get the most recent pre-refresh snapshot (already sorted by newest first)
+                snapshot = pre_refresh_snapshots[0]
+
+                # Display snapshot info
+                console.print(f"\n[bold cyan]Found pre-refresh snapshot:[/bold cyan]")
+                console.print(f"  ID: {snapshot.id}")
+                console.print(
+                    f"  Created: {snapshot.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                console.print(f"  Message: {snapshot.message}")
+                console.print(f"  Artifacts: {snapshot.artifact_count}")
+
+                # Confirm restoration
+                if not yes:
+                    console.print(
+                        f"\n[yellow]Warning: This will replace collection '{display_name}' "
+                        f"with the snapshot from {snapshot.timestamp.strftime('%Y-%m-%d %H:%M:%S')}[/yellow]"
+                    )
+                    console.print(
+                        "[yellow]All changes made since the snapshot will be lost.[/yellow]"
+                    )
+
+                    from rich.prompt import Confirm
+
+                    if not Confirm.ask("\nContinue with rollback?"):
+                        console.print("[yellow]Rollback cancelled[/yellow]")
+                        return
+
+                # Perform restoration
+                console.print(
+                    f"\n[cyan]Restoring collection '{display_name}' from snapshot...[/cyan]"
+                )
+
+                collection_path = collection_mgr.config.get_collection_path(
+                    display_name
+                )
+                snapshot_mgr.restore_snapshot(snapshot, collection_path)
+
+                console.print(
+                    f"[green]✓ Successfully restored collection '{display_name}' "
+                    f"from pre-refresh snapshot[/green]"
+                )
+                console.print(
+                    f"  Restored {snapshot.artifact_count} artifacts from "
+                    f"{snapshot.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+
+                return
+
+            except Exception as e:
+                logger.exception("Error during rollback operation")
+                console.print(f"[red]Error during rollback: {e}[/red]")
+                sys.exit(1)
+
+        # Continue with normal refresh operations
+        refresher = CollectionRefresher(collection_mgr)
 
         # Build artifact filter
         artifact_filter: Optional[Dict[str, Any]] = None
@@ -2528,14 +2651,107 @@ def collection_refresh(
             if name_pattern:
                 artifact_filter["name"] = name_pattern
 
-        # Parse fields
+        # Handle --check-only flag (version update detection only)
+        if check_only:
+            # Execute check_updates with progress indicator
+            with console.status(
+                f"[cyan]Checking for updates in collection '{display_name}'...[/cyan]"
+            ):
+                update_results = refresher.check_updates(
+                    collection_name=collection_name,
+                    artifact_filter=artifact_filter,
+                )
+
+            # Display update summary table
+            table = Table(title="Update Check Summary")
+            table.add_column("Artifact", style="cyan")
+            table.add_column("Current SHA", style="dim", no_wrap=True)
+            table.add_column("Upstream SHA", style="dim", no_wrap=True)
+            table.add_column("Update Available", justify="center")
+            table.add_column("Strategy", style="yellow")
+
+            updates_available = 0
+            up_to_date = 0
+            skipped = 0
+
+            for result in update_results:
+                # Format SHA display (show first 7 chars)
+                current_sha_display = (
+                    result.current_sha[:7] + "..." if result.current_sha else "N/A"
+                )
+                upstream_sha_display = (
+                    result.upstream_sha[:7] + "..." if result.upstream_sha else "N/A"
+                )
+
+                # Format update status
+                if result.update_available:
+                    update_status = "[green]Yes[/green]"
+                    updates_available += 1
+                elif result.reason and "No GitHub source" in result.reason:
+                    update_status = "[yellow]N/A[/yellow]"
+                    skipped += 1
+                else:
+                    update_status = "[dim]No[/dim]"
+                    up_to_date += 1
+
+                # Format merge strategy
+                strategy_display = result.merge_strategy.replace("_", " ").title()
+
+                table.add_row(
+                    result.artifact_name,
+                    current_sha_display,
+                    upstream_sha_display,
+                    update_status,
+                    strategy_display,
+                )
+
+            console.print(table)
+
+            # Display summary counts
+            console.print()
+            console.print(f"[bold cyan]Summary:[/bold cyan]")
+            console.print(f"  Updates available: [green]{updates_available}[/green]")
+            console.print(f"  Up-to-date: [dim]{up_to_date}[/dim]")
+            console.print(f"  Skipped (no source): [yellow]{skipped}[/yellow]")
+
+            # Exit with appropriate code for scripting
+            if updates_available > 0:
+                sys.exit(2)  # Exit code 2 indicates updates available
+            else:
+                sys.exit(0)  # Exit code 0 indicates no updates
+
+        # Determine refresh mode
+        if check:
+            mode = RefreshMode.CHECK_ONLY
+        elif metadata_only:
+            mode = RefreshMode.METADATA_ONLY
+        else:
+            mode = RefreshMode.METADATA_ONLY  # Default to metadata only
+
+        # Parse and validate fields
         field_list: Optional[List[str]] = None
         if fields:
+            from skillmeat.core.refresher import REFRESHABLE_FIELDS
+
             field_list = [f.strip() for f in fields.split(",") if f.strip()]
 
+            # Validate field names
+            invalid_fields = [f for f in field_list if f not in REFRESHABLE_FIELDS]
+            if invalid_fields:
+                console.print(
+                    f"[red]Error: Invalid field names: {', '.join(invalid_fields)}[/red]"
+                )
+                console.print(
+                    f"[yellow]Valid fields are: {', '.join(sorted(REFRESHABLE_FIELDS))}[/yellow]"
+                )
+                sys.exit(1)
+
         # Show what we're doing
-        display_name = collection_name or "default"
         action = "Checking" if check else ("Previewing" if dry_run else "Refreshing")
+
+        # Show which fields are being refreshed
+        if field_list:
+            console.print(f"[cyan]Refreshing fields: {', '.join(field_list)}[/cyan]")
 
         # Execute refresh with progress indicator
         with console.status(

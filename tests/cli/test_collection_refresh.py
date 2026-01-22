@@ -811,3 +811,222 @@ class TestEmptyCollection:
         # Should show summary with all zeros
         assert "Refresh Summary" in result.output
         assert "Total" in result.output
+
+
+# =============================================================================
+# BE-409: TestRollbackFlag
+# =============================================================================
+
+
+class TestRollbackFlag:
+    """Integration tests for --rollback flag (BE-409)."""
+
+    @patch("skillmeat.storage.snapshot.SnapshotManager")
+    @patch("skillmeat.cli.CollectionManager")
+    def test_rollback_flag_exclusive_with_other_flags(
+        self,
+        mock_manager_class,
+        mock_snapshot_manager_class,
+        isolated_cli_runner,
+    ):
+        """BE-409: Test --rollback cannot be combined with other flags."""
+        runner = isolated_cli_runner
+
+        mock_manager = MagicMock()
+        mock_manager.get_active_collection_name.return_value = "default"
+        mock_manager_class.return_value = mock_manager
+
+        # Test with dry-run
+        result = runner.invoke(main, ["collection", "refresh", "--rollback", "--dry-run"])
+        assert result.exit_code == 1
+        assert "cannot be combined" in result.output.lower()
+
+        # Test with check
+        result = runner.invoke(main, ["collection", "refresh", "--rollback", "--check"])
+        assert result.exit_code == 1
+        assert "cannot be combined" in result.output.lower()
+
+        # Test with type filter
+        result = runner.invoke(main, ["collection", "refresh", "--rollback", "-t", "skill"])
+        assert result.exit_code == 1
+        assert "cannot be combined" in result.output.lower()
+
+    @patch("skillmeat.storage.snapshot.SnapshotManager")
+    @patch("skillmeat.cli.CollectionManager")
+    def test_rollback_finds_pre_refresh_snapshot(
+        self,
+        mock_manager_class,
+        mock_snapshot_manager_class,
+        isolated_cli_runner,
+    ):
+        """BE-409: Test rollback finds most recent pre-refresh snapshot."""
+        from datetime import datetime
+        from skillmeat.storage.snapshot import Snapshot
+        from pathlib import Path
+
+        runner = isolated_cli_runner
+
+        mock_manager = MagicMock()
+        mock_manager.get_active_collection_name.return_value = "default"
+        mock_manager.config.get_collection_path.return_value = Path("/test/collection")
+        mock_manager_class.return_value = mock_manager
+
+        # Create mock snapshots
+        pre_refresh_snapshot = Snapshot(
+            id="20260122-120000-000000",
+            timestamp=datetime(2026, 1, 22, 12, 0, 0),
+            message="pre-refresh snapshot",
+            collection_name="default",
+            artifact_count=5,
+            tarball_path=Path("/test/snapshots/20260122-120000-000000.tar.gz"),
+        )
+
+        mock_snapshot_manager = MagicMock()
+        mock_snapshot_manager.list_snapshots.return_value = ([pre_refresh_snapshot], None)
+        mock_snapshot_manager_class.return_value = mock_snapshot_manager
+
+        # Run with -y to skip confirmation
+        result = runner.invoke(main, ["collection", "refresh", "--rollback", "-y"])
+
+        assert result.exit_code == 0
+        assert "Found pre-refresh snapshot" in result.output
+        # Check for ID parts (Rich may add formatting codes between them)
+        assert "20260122" in result.output
+        assert "120000" in result.output
+        assert "Successfully restored" in result.output
+
+        # Verify restore was called
+        mock_snapshot_manager.restore_snapshot.assert_called_once_with(
+            pre_refresh_snapshot, Path("/test/collection")
+        )
+
+    @patch("skillmeat.storage.snapshot.SnapshotManager")
+    @patch("skillmeat.cli.CollectionManager")
+    def test_rollback_no_snapshot_found(
+        self,
+        mock_manager_class,
+        mock_snapshot_manager_class,
+        isolated_cli_runner,
+    ):
+        """BE-409: Test error when no pre-refresh snapshot exists."""
+        runner = isolated_cli_runner
+
+        mock_manager = MagicMock()
+        mock_manager.get_active_collection_name.return_value = "default"
+        mock_manager_class.return_value = mock_manager
+
+        # No snapshots available
+        mock_snapshot_manager = MagicMock()
+        mock_snapshot_manager.list_snapshots.return_value = ([], None)
+        mock_snapshot_manager_class.return_value = mock_snapshot_manager
+
+        result = runner.invoke(main, ["collection", "refresh", "--rollback"])
+
+        assert result.exit_code == 1
+        assert "No pre-refresh snapshot found" in result.output
+        assert "Hint" in result.output
+
+    @patch("skillmeat.storage.snapshot.SnapshotManager")
+    @patch("skillmeat.cli.CollectionManager")
+    def test_rollback_requires_confirmation(
+        self,
+        mock_manager_class,
+        mock_snapshot_manager_class,
+        isolated_cli_runner,
+    ):
+        """BE-409: Test rollback prompts for confirmation when -y not provided."""
+        from datetime import datetime
+        from skillmeat.storage.snapshot import Snapshot
+        from pathlib import Path
+
+        runner = isolated_cli_runner
+
+        mock_manager = MagicMock()
+        mock_manager.get_active_collection_name.return_value = "default"
+        mock_manager.config.get_collection_path.return_value = Path("/test/collection")
+        mock_manager_class.return_value = mock_manager
+
+        # Create mock snapshot
+        pre_refresh_snapshot = Snapshot(
+            id="20260122-120000-000000",
+            timestamp=datetime(2026, 1, 22, 12, 0, 0),
+            message="Before refresh: pre-refresh snapshot",
+            collection_name="default",
+            artifact_count=5,
+            tarball_path=Path("/test/snapshots/20260122-120000-000000.tar.gz"),
+        )
+
+        mock_snapshot_manager = MagicMock()
+        mock_snapshot_manager.list_snapshots.return_value = ([pre_refresh_snapshot], None)
+        mock_snapshot_manager_class.return_value = mock_snapshot_manager
+
+        # Run without -y and simulate user cancelling
+        result = runner.invoke(
+            main, ["collection", "refresh", "--rollback"], input="n\n"
+        )
+
+        assert "Warning" in result.output
+        assert "Continue with rollback?" in result.output
+        assert "cancelled" in result.output.lower()
+
+        # Verify restore was NOT called
+        mock_snapshot_manager.restore_snapshot.assert_not_called()
+
+    @patch("skillmeat.storage.snapshot.SnapshotManager")
+    @patch("skillmeat.cli.CollectionManager")
+    def test_rollback_selects_most_recent(
+        self,
+        mock_manager_class,
+        mock_snapshot_manager_class,
+        isolated_cli_runner,
+    ):
+        """BE-409: Test rollback selects most recent pre-refresh snapshot."""
+        from datetime import datetime
+        from skillmeat.storage.snapshot import Snapshot
+        from pathlib import Path
+
+        runner = isolated_cli_runner
+
+        mock_manager = MagicMock()
+        mock_manager.get_active_collection_name.return_value = "default"
+        mock_manager.config.get_collection_path.return_value = Path("/test/collection")
+        mock_manager_class.return_value = mock_manager
+
+        # Create multiple pre-refresh snapshots (list_snapshots returns newest first)
+        recent_snapshot = Snapshot(
+            id="20260122-150000-000000",
+            timestamp=datetime(2026, 1, 22, 15, 0, 0),
+            message="pre-refresh snapshot",
+            collection_name="default",
+            artifact_count=5,
+            tarball_path=Path("/test/snapshots/20260122-150000-000000.tar.gz"),
+        )
+
+        old_snapshot = Snapshot(
+            id="20260122-120000-000000",
+            timestamp=datetime(2026, 1, 22, 12, 0, 0),
+            message="Before refresh: older pre-refresh",
+            collection_name="default",
+            artifact_count=5,
+            tarball_path=Path("/test/snapshots/20260122-120000-000000.tar.gz"),
+        )
+
+        mock_snapshot_manager = MagicMock()
+        mock_snapshot_manager.list_snapshots.return_value = (
+            [recent_snapshot, old_snapshot],
+            None,
+        )
+        mock_snapshot_manager_class.return_value = mock_snapshot_manager
+
+        # Run with -y
+        result = runner.invoke(main, ["collection", "refresh", "--rollback", "-y"])
+
+        assert result.exit_code == 0
+        # Check for ID parts (Rich may add formatting codes between them)
+        assert "20260122" in result.output
+        assert "150000" in result.output  # Most recent
+
+        # Verify correct snapshot was restored
+        mock_snapshot_manager.restore_snapshot.assert_called_once_with(
+            recent_snapshot, Path("/test/collection")
+        )
