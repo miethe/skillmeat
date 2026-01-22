@@ -19,6 +19,7 @@ from skillmeat.api.schemas.collections import (
     RefreshModeEnum,
     RefreshRequest,
     RefreshResponse,
+    UpdateCheckResponse,
 )
 from skillmeat.api.schemas.common import ErrorResponse, PageInfo
 from skillmeat.api.schemas.user_collections import (
@@ -34,7 +35,7 @@ from skillmeat.api.schemas.user_collections import (
     UserCollectionWithGroupsResponse,
 )
 from skillmeat.api.services import get_artifact_metadata
-from skillmeat.core.refresher import CollectionRefresher, RefreshMode
+from skillmeat.core.refresher import CollectionRefresher, RefreshMode, validate_fields
 from skillmeat.cache.models import (
     DEFAULT_COLLECTION_ID,
     DEFAULT_COLLECTION_NAME,
@@ -1499,12 +1500,40 @@ async def list_collection_entities(
 
 @router.post(
     "/{collection_id}/refresh",
-    response_model=RefreshResponse,
     status_code=status.HTTP_200_OK,
     summary="Refresh collection artifact metadata",
-    description="Refresh metadata for artifacts in a collection from their upstream GitHub sources.",
+    description="Refresh metadata for artifacts in a collection from their upstream GitHub sources. Use mode=check to detect updates without applying changes.",
     responses={
-        200: {"description": "Refresh completed successfully"},
+        200: {
+            "description": "Refresh completed successfully",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "metadata_refresh": {
+                            "summary": "Metadata refresh (default)",
+                            "value": {
+                                "collection_id": "default",
+                                "status": "completed",
+                                "mode": "metadata_only",
+                                "summary": {
+                                    "refreshed_count": 5,
+                                    "unchanged_count": 10,
+                                },
+                            },
+                        },
+                        "check_updates": {
+                            "summary": "Check for updates (mode=check)",
+                            "value": {
+                                "collection_id": "default",
+                                "updates_available": 3,
+                                "up_to_date": 12,
+                                "results": [],
+                            },
+                        },
+                    }
+                }
+            },
+        },
         400: {"model": ErrorResponse, "description": "Invalid request parameters"},
         404: {"model": ErrorResponse, "description": "Collection not found"},
         500: {
@@ -1521,8 +1550,13 @@ async def refresh_collection(
     mode: Optional[RefreshModeEnum] = Query(
         None, description="Override request body mode"
     ),
-) -> RefreshResponse:
+):
     """Refresh artifact metadata for a collection from upstream GitHub sources.
+
+    Supports three modes:
+    - metadata_only: Update metadata fields without version changes (default)
+    - check_only: Detect available updates without applying changes
+    - sync: Full synchronization including version updates (reserved)
 
     Args:
         collection_id: Collection identifier
@@ -1532,13 +1566,44 @@ async def refresh_collection(
         token: Authentication token
 
     Returns:
-        RefreshResponse with summary statistics and per-artifact details
+        RefreshResponse (for metadata_only/sync) or UpdateCheckResponse (for check_only)
 
     Raises:
         HTTPException: If collection not found or on error
     """
     try:
         logger.info(f"Starting refresh for collection {collection_id}")
+
+        # Validate field names if provided
+        if request.fields is not None:
+            try:
+                validated_fields, invalid_fields = validate_fields(
+                    request.fields, strict=False
+                )
+                if invalid_fields:
+                    # Return 422 with details about invalid fields
+                    from skillmeat.core.refresher import REFRESHABLE_FIELDS
+
+                    valid_list = ", ".join(sorted(REFRESHABLE_FIELDS))
+                    logger.warning(
+                        f"Invalid field names in refresh request: {invalid_fields}"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            f"Invalid field name(s): {', '.join(invalid_fields)}. "
+                            f"Valid fields: {valid_list}"
+                        ),
+                    )
+                # Use validated (case-normalized) fields
+                request.fields = validated_fields
+            except ValueError as e:
+                # This shouldn't happen with strict=False, but handle it anyway
+                logger.error(f"Unexpected validation error: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=str(e),
+                )
 
         # Check if collection exists in collection manager
         if collection_id not in collection_mgr.list_collections():
@@ -1559,27 +1624,50 @@ async def refresh_collection(
         }
         core_mode = mode_mapping[effective_mode]
 
-        # Create CollectionRefresher and execute refresh
+        # Create CollectionRefresher
         refresher = CollectionRefresher(collection_mgr)
-        result = refresher.refresh_collection(
-            collection_name=collection_id,
-            mode=core_mode,
-            dry_run=request.dry_run,
-            artifact_filter=request.artifact_filter,
-        )
 
-        logger.info(
-            f"Refresh completed: {result.refreshed_count} refreshed, "
-            f"{result.unchanged_count} unchanged"
-        )
+        # Branch based on mode
+        if effective_mode == RefreshModeEnum.CHECK_ONLY:
+            # Check mode - detect updates without applying changes
+            logger.info(f"Running update check for collection {collection_id}")
+            update_results = refresher.check_updates(
+                collection_name=collection_id,
+                artifact_filter=request.artifact_filter,
+            )
 
-        # Convert result to response using the schema's factory method
-        return RefreshResponse.from_refresh_result(
-            collection_id=collection_id,
-            result=result,
-            mode=effective_mode,
-            dry_run=request.dry_run,
-        )
+            logger.info(
+                f"Update check completed: "
+                f"{sum(1 for r in update_results if r.update_available)} updates available"
+            )
+
+            # Return UpdateCheckResponse
+            return UpdateCheckResponse.from_update_results(
+                collection_id=collection_id,
+                results=update_results,
+            )
+        else:
+            # Metadata or sync mode - execute refresh
+            result = refresher.refresh_collection(
+                collection_name=collection_id,
+                mode=core_mode,
+                dry_run=request.dry_run,
+                fields=request.fields,
+                artifact_filter=request.artifact_filter,
+            )
+
+            logger.info(
+                f"Refresh completed: {result.refreshed_count} refreshed, "
+                f"{result.unchanged_count} unchanged"
+            )
+
+            # Return RefreshResponse
+            return RefreshResponse.from_refresh_result(
+                collection_id=collection_id,
+                result=result,
+                mode=effective_mode,
+                dry_run=request.dry_run,
+            )
 
     except HTTPException:
         raise

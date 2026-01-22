@@ -31,6 +31,7 @@ from skillmeat.core.refresher import (
     RefreshEntryResult,
     RefreshMode,
     RefreshResult,
+    UpdateAvailableResult,
 )
 
 
@@ -92,6 +93,27 @@ def sample_local_artifact():
         ),
         added=datetime.now(),
         tags=["local"],
+    )
+
+
+@pytest.fixture
+def sample_artifact_with_sha():
+    """Create a sample artifact with a resolved SHA."""
+    return Artifact(
+        name="versioned-skill",
+        type=ArtifactType.SKILL,
+        path="skills/versioned-skill",
+        origin="github",
+        metadata=ArtifactMetadata(
+            title="Versioned Skill",
+            description="A skill with version tracking",
+        ),
+        added=datetime.now(),
+        upstream="https://github.com/user/repo/tree/main/path/to/skill",
+        resolved_sha="abc123def456789012345678901234567890abcd",
+        version_spec="latest",
+        tags=["versioned"],
+        origin_source=None,
     )
 
 
@@ -330,11 +352,19 @@ class TestDetectChanges:
         assert new_values["license"] == "MIT"
 
     def test_detect_no_changes(self, refresher, sample_artifact):
-        """Test that identical metadata returns no changes."""
+        """Test that identical metadata returns no changes.
+
+        Note: _detect_changes() now always checks ALL fields regardless of the
+        fields parameter. The fields parameter is used later by _apply_updates()
+        to filter which changes get applied.
+        """
+        # Set origin_source to match the upstream URL so origin_source doesn't change
+        sample_artifact.origin_source = "https://github.com/test"
+
         upstream = GitHubMetadata(
             description="Original description",  # Same as artifact
             topics=["old-tag"],  # Same as artifact
-            url="https://github.com/test",
+            url="https://github.com/test",  # Same as artifact.origin_source
             fetched_at=datetime.now(),
         )
 
@@ -342,11 +372,18 @@ class TestDetectChanges:
             sample_artifact, upstream, fields=["description", "tags"]
         )
 
+        # When all fields match, no changes should be detected
         assert old_values == {}
         assert new_values == {}
 
     def test_detect_multiple_changes(self, refresher, sample_artifact):
-        """Test detecting multiple field changes at once."""
+        """Test detecting multiple field changes at once.
+
+        Note: _detect_changes() always checks ALL fields, so origin_source will
+        also be detected as a change even though we only requested specific fields.
+        The fields parameter is used later by _apply_updates() to filter which
+        changes get applied.
+        """
         sample_artifact.metadata.license = "Apache-2.0"
 
         upstream = GitHubMetadata(
@@ -361,10 +398,12 @@ class TestDetectChanges:
             sample_artifact, upstream, fields=["description", "license", "tags"]
         )
 
-        assert len(new_values) == 3
+        # ALL changed fields are detected, not just the ones in fields parameter
+        assert len(new_values) == 4  # description, license, tags, origin_source
         assert "description" in new_values
         assert "license" in new_values
         assert "tags" in new_values
+        assert "origin_source" in new_values  # Always detected even if not requested
 
     def test_handle_none_values(self, refresher, sample_artifact):
         """Test handling None values in either current or upstream."""
@@ -423,7 +462,15 @@ class TestDetectChanges:
         assert new_values["tags"] == ["new-tag"]
 
     def test_field_filtering_only_specified_fields(self, refresher, sample_artifact):
-        """Test that only specified fields are checked."""
+        """Test that ALL changed fields are detected regardless of fields parameter.
+
+        The new behavior is:
+        1. _detect_changes() always detects ALL changed fields
+        2. The fields parameter is used by _apply_updates() to filter which changes get applied
+
+        This test verifies that all changes are detected even when only one field
+        is specified in the fields parameter.
+        """
         upstream = GitHubMetadata(
             description="New description",
             license="MIT",
@@ -432,15 +479,19 @@ class TestDetectChanges:
             fetched_at=datetime.now(),
         )
 
-        # Only check description
+        # Specify only description, but ALL changes are detected
         old_values, new_values = refresher._detect_changes(
             sample_artifact, upstream, fields=["description"]
         )
 
-        assert len(new_values) == 1
+        # ALL changed fields are detected (description, tags, origin_source)
+        # Note: license is not detected because artifact.metadata.license is None
+        # and upstream.license is "MIT", but the artifact doesn't have a license set initially
+        assert len(new_values) == 4  # description, tags, license (None->MIT), origin_source
         assert "description" in new_values
-        assert "license" not in new_values
-        assert "tags" not in new_values
+        assert "license" in new_values  # License changes from None to MIT
+        assert "tags" in new_values
+        assert "origin_source" in new_values
 
     def test_field_filtering_all_fields_default(self, refresher, sample_artifact):
         """Test that all REFRESH_FIELD_MAPPING fields are checked when fields=None."""
@@ -644,14 +695,21 @@ class TestRefreshMetadata:
         assert result.new_values is not None
 
     def test_refresh_no_changes(self, refresher, sample_artifact):
-        """Test refresh when upstream metadata matches current."""
+        """Test refresh when upstream metadata matches current.
+
+        Note: _detect_changes() now always checks ALL fields, so we need to ensure
+        origin_source also matches to avoid detecting a change.
+        """
+        # Set origin_source to match the upstream URL
+        sample_artifact.origin_source = "https://github.com/user/repo/tree/main/path/to/skill"
+
         # Create matching metadata - matching the artifact's current values
         matching_metadata = GitHubMetadata(
             description="Original description",  # Same as sample_artifact
             topics=["old-tag"],  # Same as sample_artifact.tags
             author=None,  # Same as sample_artifact.metadata.author
             license=None,  # Same as sample_artifact.metadata.license
-            url="https://github.com/user/repo/tree/main/path/to/skill",  # Same as upstream
+            url="https://github.com/user/repo/tree/main/path/to/skill",  # Same as origin_source
             fetched_at=datetime.now(),
         )
 
@@ -661,11 +719,11 @@ class TestRefreshMetadata:
         )
         refresher._metadata_extractor.fetch_metadata.return_value = matching_metadata
 
-        # Only check fields that we've matched to avoid origin_source comparison
+        # All fields will be checked, but since they all match, no changes detected
         result = refresher.refresh_metadata(
             sample_artifact,
             mode=RefreshMode.METADATA_ONLY,
-            fields=["description", "tags", "author", "license"],  # Exclude origin_source
+            fields=["description", "tags", "author", "license"],  # Fields to apply (if any changes)
         )
 
         assert result.status == "unchanged"
@@ -1557,3 +1615,1233 @@ class TestLazyInitialization:
 
         assert client is not None
         assert isinstance(client, GitHubClient)
+
+
+# =============================================================================
+# BE-401: TestUpdateAvailableResult
+# =============================================================================
+
+
+class TestUpdateAvailableResult:
+    """Tests for UpdateAvailableResult data class."""
+
+    def test_to_dict(self):
+        """Test converting UpdateAvailableResult to dictionary."""
+        result = UpdateAvailableResult(
+            artifact_id="skill:test",
+            artifact_name="test",
+            current_sha="abc123",
+            upstream_sha="def456",
+            update_available=True,
+            reason="SHA mismatch",
+            merge_strategy="safe_update",
+        )
+
+        data = result.to_dict()
+
+        assert data["artifact_id"] == "skill:test"
+        assert data["artifact_name"] == "test"
+        assert data["current_sha"] == "abc123"
+        assert data["upstream_sha"] == "def456"
+        assert data["update_available"] is True
+        assert data["reason"] == "SHA mismatch"
+        assert data["merge_strategy"] == "safe_update"
+        assert data["has_local_changes"] is False
+
+    def test_from_dict(self):
+        """Test creating UpdateAvailableResult from dictionary."""
+        data = {
+            "artifact_id": "skill:test",
+            "artifact_name": "test",
+            "current_sha": "abc123",
+            "upstream_sha": "def456",
+            "update_available": True,
+            "reason": "SHA mismatch",
+            "merge_strategy": "safe_update",
+        }
+
+        result = UpdateAvailableResult.from_dict(data)
+
+        assert result.artifact_id == "skill:test"
+        assert result.artifact_name == "test"
+        assert result.current_sha == "abc123"
+        assert result.upstream_sha == "def456"
+        assert result.update_available is True
+        assert result.reason == "SHA mismatch"
+        assert result.merge_strategy == "safe_update"
+
+    def test_default_values(self):
+        """Test default values for UpdateAvailableResult."""
+        result = UpdateAvailableResult(
+            artifact_id="skill:test",
+            artifact_name="test",
+        )
+
+        assert result.current_sha is None
+        assert result.upstream_sha is None
+        assert result.update_available is False
+        assert result.reason is None
+        assert result.drift_info is None
+        assert result.has_local_changes is False
+        assert result.merge_strategy == "no_update"
+
+    def test_from_dict_missing_optional_fields(self):
+        """Test creating from dict with missing optional fields."""
+        data = {
+            "artifact_id": "skill:test",
+            "artifact_name": "test",
+        }
+
+        result = UpdateAvailableResult.from_dict(data)
+
+        assert result.current_sha is None
+        assert result.upstream_sha is None
+        assert result.update_available is False
+        assert result.reason is None
+        assert result.merge_strategy == "no_update"
+
+    def test_invalid_merge_strategy_raises_error(self):
+        """Test that invalid merge_strategy raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid merge_strategy"):
+            UpdateAvailableResult(
+                artifact_id="skill:test",
+                artifact_name="test",
+                merge_strategy="invalid_strategy",
+            )
+
+    def test_valid_merge_strategies(self):
+        """Test all valid merge strategies."""
+        valid_strategies = ["safe_update", "review_required", "conflict", "no_update"]
+
+        for strategy in valid_strategies:
+            result = UpdateAvailableResult(
+                artifact_id="skill:test",
+                artifact_name="test",
+                merge_strategy=strategy,
+            )
+            assert result.merge_strategy == strategy
+
+
+# =============================================================================
+# BE-401: TestCheckUpdates
+# =============================================================================
+
+
+class TestCheckUpdates:
+    """Tests for check_updates() method (BE-401)."""
+
+    def test_check_updates_no_update_available(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test checking updates when artifact is up to date."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        # Mock the metadata extractor and github_client
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return the same SHA as the artifact has
+        mock_github_client.resolve_version.return_value = (
+            "abc123def456789012345678901234567890abcd"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:versioned-skill"
+        assert results[0].update_available is False
+        assert results[0].reason == "Up to date"
+
+    def test_check_updates_update_available(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test checking updates when an update is available."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return a different SHA
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:versioned-skill"
+        assert results[0].update_available is True
+        assert results[0].reason == "SHA mismatch"
+        assert results[0].current_sha == "abc123def456789012345678901234567890abcd"
+        assert results[0].upstream_sha == "new789sha456789012345678901234567890new1"
+
+    def test_check_updates_skips_local_artifacts(
+        self, refresher, mock_collection, sample_local_artifact
+    ):
+        """Test that local artifacts are skipped with reason."""
+        mock_collection.artifacts = [sample_local_artifact]
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:local-skill"
+        assert results[0].update_available is False
+        assert results[0].reason == "No GitHub source"
+
+    def test_check_updates_no_current_sha(
+        self, refresher, mock_collection, sample_artifact
+    ):
+        """Test checking updates when artifact has no resolved_sha."""
+        # sample_artifact doesn't have a resolved_sha
+        mock_collection.artifacts = [sample_artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "upstream123456789012345678901234567890ab"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].reason == "No current SHA stored"
+
+    def test_check_updates_rate_limit_error(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of rate limit errors during update check."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        error = GitHubRateLimitError("Rate limit exceeded")
+        error.message = "Rate limit exceeded"
+        mock_github_client.resolve_version.side_effect = error
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Rate limit exceeded" in results[0].reason
+
+    def test_check_updates_not_found_error(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of not found errors during update check."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        error = GitHubNotFoundError("Resource not found")
+        error.message = "Resource not found"
+        mock_github_client.resolve_version.side_effect = error
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Upstream not found" in results[0].reason
+
+    def test_check_updates_generic_github_error(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of generic GitHub errors during update check."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        error = GitHubClientError("API error")
+        error.message = "API error"
+        mock_github_client.resolve_version.side_effect = error
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Error" in results[0].reason
+
+    def test_check_updates_with_type_filter(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test filtering check_updates by artifact type."""
+        # Create a command artifact
+        command_artifact = Artifact(
+            name="test-command",
+            type=ArtifactType.COMMAND,
+            path="commands/test-command.md",
+            origin="github",
+            metadata=ArtifactMetadata(title="Test Command"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/command",
+            resolved_sha="cmd123456789012345678901234567890abcdef",
+        )
+
+        mock_collection.artifacts = [sample_artifact_with_sha, command_artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "abc123def456789012345678901234567890abcd"
+        )
+        refresher._github_client = mock_github_client
+
+        # Filter by skill type only
+        results = refresher.check_updates(artifact_filter={"type": "skill"})
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:versioned-skill"
+
+    def test_check_updates_with_name_filter(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test filtering check_updates by name pattern."""
+        another_artifact = Artifact(
+            name="other-skill",
+            type=ArtifactType.SKILL,
+            path="skills/other-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Other Skill"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/other",
+            resolved_sha="other23456789012345678901234567890abcdef",
+        )
+
+        mock_collection.artifacts = [sample_artifact_with_sha, another_artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "abc123def456789012345678901234567890abcd"
+        )
+        refresher._github_client = mock_github_client
+
+        # Filter by name pattern
+        results = refresher.check_updates(artifact_filter={"name": "versioned-*"})
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:versioned-skill"
+
+    def test_check_updates_empty_collection(self, refresher, mock_collection):
+        """Test check_updates with empty collection."""
+        mock_collection.artifacts = []
+
+        results = refresher.check_updates()
+
+        assert results == []
+
+    def test_check_updates_short_sha_comparison(
+        self, refresher, mock_collection
+    ):
+        """Test that short SHA is properly compared against full SHA."""
+        artifact = Artifact(
+            name="short-sha-skill",
+            type=ArtifactType.SKILL,
+            path="skills/short-sha-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Short SHA Skill"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skill",
+            resolved_sha="abc1234",  # Short SHA (7 chars)
+            version_spec="latest",
+        )
+
+        mock_collection.artifacts = [artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return full SHA (40 chars) that starts with same prefix
+        mock_github_client.resolve_version.return_value = (
+            "abc1234def456789012345678901234567890abc"  # Exactly 40 chars
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False  # Should match prefix
+        assert results[0].reason == "Up to date"
+
+    def test_check_updates_short_sha_mismatch(
+        self, refresher, mock_collection
+    ):
+        """Test that short SHA mismatch is detected."""
+        artifact = Artifact(
+            name="short-sha-skill",
+            type=ArtifactType.SKILL,
+            path="skills/short-sha-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Short SHA Skill"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skill",
+            resolved_sha="abc1234",  # Short SHA (7 chars)
+            version_spec="latest",
+        )
+
+        mock_collection.artifacts = [artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return full SHA that does NOT start with same prefix
+        mock_github_client.resolve_version.return_value = (
+            "def5678def456789012345678901234567890ab"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].reason == "SHA mismatch"
+
+    def test_check_updates_marketplace_artifact(
+        self, refresher, mock_collection, sample_marketplace_artifact
+    ):
+        """Test check_updates with marketplace artifact (has origin_source=github)."""
+        # Add resolved_sha to marketplace artifact
+        sample_marketplace_artifact.resolved_sha = "mkt123456789012345678901234567890abcdef"
+        mock_collection.artifacts = [sample_marketplace_artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="marketplace", repo="skills", path="popular-skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return different SHA to simulate update
+        mock_github_client.resolve_version.return_value = (
+            "newupstream789012345678901234567890abcd"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].artifact_id == "skill:marketplace-skill"
+        assert results[0].update_available is True
+
+    def test_check_updates_invalid_source_format(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of invalid source format."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        # Return None to simulate invalid source format
+        refresher._metadata_extractor.parse_github_url.return_value = None
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Invalid source format" in results[0].reason
+
+    def test_check_updates_parse_source_error(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of source parsing errors."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.side_effect = ValueError(
+            "Malformed URL"
+        )
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Error parsing source" in results[0].reason
+
+    def test_check_updates_collection_load_error(
+        self, mock_collection_manager, mock_metadata_extractor
+    ):
+        """Test handling of collection load errors."""
+        mock_collection_manager.load_collection.side_effect = ValueError(
+            "Collection not found"
+        )
+
+        refresher = CollectionRefresher(
+            collection_manager=mock_collection_manager,
+            metadata_extractor=mock_metadata_extractor,
+        )
+
+        with pytest.raises(ValueError, match="Collection not found"):
+            refresher.check_updates()
+
+    def test_check_updates_both_short_sha_match(self, refresher, mock_collection):
+        """Test that two short SHAs (both <40 chars) are compared correctly when matching."""
+        artifact = Artifact(
+            name="short-sha-skill",
+            type=ArtifactType.SKILL,
+            path="skills/short-sha-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Short SHA Skill"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skill",
+            resolved_sha="abc1234",  # Short SHA (7 chars)
+            version_spec="latest",
+        )
+
+        mock_collection.artifacts = [artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return a different short SHA (7 chars)
+        mock_github_client.resolve_version.return_value = "abc1234"  # Matches current
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False  # Should match
+        assert results[0].reason == "Up to date"
+
+    def test_check_updates_both_short_sha_mismatch(self, refresher, mock_collection):
+        """Test that two short SHAs (both <40 chars) are compared correctly when different."""
+        artifact = Artifact(
+            name="short-sha-skill",
+            type=ArtifactType.SKILL,
+            path="skills/short-sha-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Short SHA Skill"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/skill",
+            resolved_sha="abc1234",  # Short SHA (7 chars)
+            version_spec="latest",
+        )
+
+        mock_collection.artifacts = [artifact]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return a different short SHA (7 chars)
+        mock_github_client.resolve_version.return_value = "def5678"  # Different prefix
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is True  # Should detect mismatch
+        assert results[0].reason == "SHA mismatch"
+
+    def test_check_updates_unexpected_exception(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test handling of unexpected exceptions during update check."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path"
+        )
+
+        mock_github_client = MagicMock()
+        # Simulate unexpected exception (not a GitHub-specific error)
+        mock_github_client.resolve_version.side_effect = RuntimeError(
+            "Unexpected network issue"
+        )
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert "Error" in results[0].reason
+        assert "Unexpected network issue" in results[0].reason
+
+    def test_check_updates_marketplace_artifact_no_origin_source(
+        self, refresher, mock_collection
+    ):
+        """Test that marketplace artifact without origin_source is skipped."""
+        artifact = Artifact(
+            name="marketplace-no-source",
+            type=ArtifactType.SKILL,
+            path="skills/marketplace-no-source",
+            origin="marketplace",
+            origin_source=None,  # No origin_source specified
+            metadata=ArtifactMetadata(title="Marketplace Skill No Source"),
+            added=datetime.now(),
+            upstream="https://some-marketplace-url.com/skill",
+            resolved_sha="mkt123456789012345678901234567890abcdef",
+        )
+
+        mock_collection.artifacts = [artifact]
+
+        results = refresher.check_updates()
+
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert results[0].reason == "No GitHub source"
+        # Should be skipped because origin=marketplace but origin_source != "github"
+
+    def test_check_updates_multiple_artifacts_mixed_results(
+        self, refresher, mock_collection, sample_artifact_with_sha, sample_local_artifact
+    ):
+        """Test check_updates with multiple artifacts having different statuses."""
+        # Create another GitHub artifact that will have an update
+        updated_artifact = Artifact(
+            name="needs-update-skill",
+            type=ArtifactType.SKILL,
+            path="skills/needs-update-skill",
+            origin="github",
+            metadata=ArtifactMetadata(title="Needs Update"),
+            added=datetime.now(),
+            upstream="https://github.com/user/repo/tree/main/needs-update",
+            resolved_sha="old123456789012345678901234567890abcdef",
+        )
+
+        mock_collection.artifacts = [
+            sample_artifact_with_sha,
+            sample_local_artifact,
+            updated_artifact,
+        ]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="skill"
+        )
+
+        mock_github_client = MagicMock()
+
+        def resolve_version_mock(owner_repo, version):
+            # First call (versioned-skill) - return same SHA (up to date)
+            # Second call (needs-update-skill) - return different SHA (update available)
+            if resolve_version_mock.call_count == 1:
+                return "abc123def456789012345678901234567890abcd"
+            else:
+                return "new456789012345678901234567890abcdefgh"
+
+        resolve_version_mock.call_count = 0
+
+        def side_effect_wrapper(*args, **kwargs):
+            resolve_version_mock.call_count += 1
+            return resolve_version_mock(*args, **kwargs)
+
+        mock_github_client.resolve_version.side_effect = side_effect_wrapper
+        refresher._github_client = mock_github_client
+
+        results = refresher.check_updates()
+
+        assert len(results) == 3
+
+        # Find each result by artifact name
+        result_map = {r.artifact_name: r for r in results}
+
+        # versioned-skill should be up to date
+        assert result_map["versioned-skill"].update_available is False
+
+        # local-skill should be skipped
+        assert result_map["local-skill"].update_available is False
+        assert "No GitHub source" in result_map["local-skill"].reason
+
+        # needs-update-skill should have an update
+        assert result_map["needs-update-skill"].update_available is True
+
+
+# =============================================================================
+# BE-402: TestCheckUpdatesDriftIntegration
+# =============================================================================
+
+
+class TestCheckUpdatesDriftIntegration:
+    """Tests for check_updates() integration with SyncManager.check_drift() (BE-402).
+
+    These tests verify that check_updates() correctly enriches UpdateAvailableResult
+    with drift detection information when project_path is provided.
+    """
+
+    def test_check_updates_with_project_path_no_drift(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates with project_path when no drift detected."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Return different SHA to simulate update available
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Mock SyncManager to return empty drift results (no drift)
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.return_value = []  # No drift
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info is None
+        assert results[0].has_local_changes is False
+        assert results[0].merge_strategy == "safe_update"
+
+    def test_check_updates_with_drift_modified(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates with drift detection showing local modifications."""
+        from skillmeat.models import DriftDetectionResult
+
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Create drift result indicating local modifications
+        drift_result = DriftDetectionResult(
+            artifact_name="versioned-skill",
+            artifact_type="skill",
+            drift_type="modified",  # Local changes
+            collection_sha="abc123def456789012345678901234567890abcd",
+            project_sha="local123456789012345678901234567890ab",
+            recommendation="review_manually",
+            change_origin="local_modification",
+        )
+
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.return_value = [drift_result]
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info is not None
+        assert results[0].drift_info.drift_type == "modified"
+        assert results[0].has_local_changes is True
+        assert results[0].merge_strategy == "review_required"
+
+    def test_check_updates_with_drift_conflict(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates with drift detection showing conflict."""
+        from skillmeat.models import DriftDetectionResult
+
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Create drift result indicating conflict
+        drift_result = DriftDetectionResult(
+            artifact_name="versioned-skill",
+            artifact_type="skill",
+            drift_type="conflict",  # Both local and upstream changed
+            collection_sha="coll123456789012345678901234567890ab",
+            project_sha="proj123456789012345678901234567890ab",
+            recommendation="manual_merge_required",
+        )
+
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.return_value = [drift_result]
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info.drift_type == "conflict"
+        assert results[0].has_local_changes is True
+        assert results[0].merge_strategy == "conflict"
+
+    def test_check_updates_with_drift_outdated(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates with drift detection showing outdated (collection changed)."""
+        from skillmeat.models import DriftDetectionResult
+
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Create drift result indicating outdated (collection changed, project unchanged)
+        drift_result = DriftDetectionResult(
+            artifact_name="versioned-skill",
+            artifact_type="skill",
+            drift_type="outdated",
+            collection_sha="newcoll3456789012345678901234567890ab",
+            project_sha="abc123def456789012345678901234567890abcd",
+            recommendation="update_from_collection",
+        )
+
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.return_value = [drift_result]
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info.drift_type == "outdated"
+        assert results[0].has_local_changes is False
+        assert results[0].merge_strategy == "safe_update"
+
+    def test_check_updates_sync_manager_not_available(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates gracefully handles SyncManager import failure."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Mock SyncManager import to fail
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            MockSyncManager.side_effect = ImportError("SyncManager not available")
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        # Should still work but without drift info
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info is None
+        assert results[0].has_local_changes is False
+        assert results[0].merge_strategy == "safe_update"
+
+    def test_check_updates_check_drift_failure(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates gracefully handles check_drift() failure."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Mock SyncManager.check_drift to fail
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.side_effect = ValueError("Project not found")
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        # Should still work but without drift info
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info is None
+        assert results[0].has_local_changes is False
+        assert results[0].merge_strategy == "safe_update"
+
+    def test_check_updates_artifact_not_in_drift_results(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test check_updates when artifact is not in drift results (not deployed)."""
+        from skillmeat.models import DriftDetectionResult
+
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        mock_github_client.resolve_version.return_value = (
+            "new789sha456789012345678901234567890new1"
+        )
+        refresher._github_client = mock_github_client
+
+        # Create drift result for a different artifact
+        other_drift = DriftDetectionResult(
+            artifact_name="other-skill",
+            artifact_type="skill",
+            drift_type="modified",
+        )
+
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            mock_sync_manager.check_drift.return_value = [other_drift]
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        # Artifact not in drift results - assume safe update
+        assert len(results) == 1
+        assert results[0].update_available is True
+        assert results[0].drift_info is None
+        assert results[0].has_local_changes is False
+        assert results[0].merge_strategy == "safe_update"
+
+    def test_check_updates_no_update_available_with_project_path(
+        self, refresher, mock_collection, sample_artifact_with_sha
+    ):
+        """Test that drift check is skipped when no update is available."""
+        mock_collection.artifacts = [sample_artifact_with_sha]
+
+        refresher._metadata_extractor = MagicMock()
+        refresher._metadata_extractor.parse_github_url.return_value = GitHubSourceSpec(
+            owner="user", repo="repo", path="path/to/skill"
+        )
+
+        mock_github_client = MagicMock()
+        # Same SHA - no update
+        mock_github_client.resolve_version.return_value = (
+            "abc123def456789012345678901234567890abcd"
+        )
+        refresher._github_client = mock_github_client
+
+        with patch("skillmeat.core.sync.SyncManager") as MockSyncManager:
+            mock_sync_manager = MagicMock()
+            MockSyncManager.return_value = mock_sync_manager
+
+            from pathlib import Path
+
+            results = refresher.check_updates(project_path=Path("/tmp/test-project"))
+
+        # No update available - merge_strategy should be no_update
+        assert len(results) == 1
+        assert results[0].update_available is False
+        assert results[0].merge_strategy == "no_update"
+        # check_drift should still be called for pre-fetching
+        mock_sync_manager.check_drift.assert_called_once()
+
+
+class TestDetermineMergeStrategy:
+    """Tests for _determine_merge_strategy() method (BE-402)."""
+
+    def test_strategy_outdated(self, refresher):
+        """Test that outdated drift type maps to safe_update."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="outdated",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "safe_update"
+
+    def test_strategy_modified(self, refresher):
+        """Test that modified drift type maps to review_required."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="modified",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "review_required"
+
+    def test_strategy_conflict(self, refresher):
+        """Test that conflict drift type maps to conflict."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="conflict",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "conflict"
+
+    def test_strategy_added(self, refresher):
+        """Test that added drift type maps to safe_update."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="added",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "safe_update"
+
+    def test_strategy_removed(self, refresher):
+        """Test that removed drift type maps to no_update."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="removed",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "no_update"
+
+    def test_strategy_version_mismatch(self, refresher):
+        """Test that version_mismatch drift type maps to review_required."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="version_mismatch",
+        )
+
+        strategy = refresher._determine_merge_strategy(drift)
+
+        assert strategy == "review_required"
+
+    def test_strategy_unknown_defaults_to_review_required(self, refresher):
+        """Test that unknown drift types default to review_required.
+
+        Since DriftDetectionResult validates drift_type, we use a MagicMock
+        to simulate an unknown/unexpected drift_type that isn't in our strategy map.
+        """
+        # Create a mock with an unknown drift_type to test fallback behavior
+        mock_drift = MagicMock()
+        mock_drift.drift_type = "future_unknown_type"  # Not in strategy_map
+
+        strategy = refresher._determine_merge_strategy(mock_drift)
+
+        assert strategy == "review_required"
+
+
+class TestUpdateAvailableResultDriftFields:
+    """Tests for UpdateAvailableResult drift-related fields (BE-402)."""
+
+    def test_default_drift_fields(self):
+        """Test default values for new drift-related fields."""
+        result = UpdateAvailableResult(
+            artifact_id="skill:test",
+            artifact_name="test",
+        )
+
+        assert result.drift_info is None
+        assert result.has_local_changes is False
+        assert result.merge_strategy == "no_update"
+
+    def test_valid_merge_strategies(self):
+        """Test that all valid merge strategies are accepted."""
+        valid_strategies = ["safe_update", "review_required", "conflict", "no_update"]
+
+        for strategy in valid_strategies:
+            result = UpdateAvailableResult(
+                artifact_id="skill:test",
+                artifact_name="test",
+                merge_strategy=strategy,
+            )
+            assert result.merge_strategy == strategy
+
+    def test_invalid_merge_strategy_raises(self):
+        """Test that invalid merge strategy raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid merge_strategy"):
+            UpdateAvailableResult(
+                artifact_id="skill:test",
+                artifact_name="test",
+                merge_strategy="invalid_strategy",
+            )
+
+    def test_to_dict_with_drift_info(self):
+        """Test to_dict() includes drift_info when present."""
+        from skillmeat.models import DriftDetectionResult
+
+        drift = DriftDetectionResult(
+            artifact_name="test",
+            artifact_type="skill",
+            drift_type="modified",
+            collection_sha="coll123",
+            project_sha="proj456",
+            recommendation="review_manually",
+            change_origin="local_modification",
+        )
+
+        result = UpdateAvailableResult(
+            artifact_id="skill:test",
+            artifact_name="test",
+            current_sha="abc123",
+            upstream_sha="def456",
+            update_available=True,
+            reason="SHA mismatch",
+            drift_info=drift,
+            has_local_changes=True,
+            merge_strategy="review_required",
+        )
+
+        data = result.to_dict()
+
+        assert data["has_local_changes"] is True
+        assert data["merge_strategy"] == "review_required"
+        assert "drift_info" in data
+        assert data["drift_info"]["drift_type"] == "modified"
+        assert data["drift_info"]["artifact_name"] == "test"
+        assert data["drift_info"]["collection_sha"] == "coll123"
+        assert data["drift_info"]["project_sha"] == "proj456"
+
+    def test_to_dict_without_drift_info(self):
+        """Test to_dict() excludes drift_info when None."""
+        result = UpdateAvailableResult(
+            artifact_id="skill:test",
+            artifact_name="test",
+            update_available=False,
+            merge_strategy="no_update",
+        )
+
+        data = result.to_dict()
+
+        assert "drift_info" not in data
+        assert data["has_local_changes"] is False
+        assert data["merge_strategy"] == "no_update"
+
+    def test_from_dict_with_drift_info(self):
+        """Test from_dict() reconstructs drift_info correctly."""
+        data = {
+            "artifact_id": "skill:test",
+            "artifact_name": "test",
+            "current_sha": "abc123",
+            "upstream_sha": "def456",
+            "update_available": True,
+            "reason": "SHA mismatch",
+            "drift_info": {
+                "artifact_name": "test",
+                "artifact_type": "skill",
+                "drift_type": "conflict",
+                "collection_sha": "coll123",
+                "project_sha": "proj456",
+                "recommendation": "manual_merge_required",
+                "change_origin": "local_modification",
+            },
+            "has_local_changes": True,
+            "merge_strategy": "conflict",
+        }
+
+        result = UpdateAvailableResult.from_dict(data)
+
+        assert result.has_local_changes is True
+        assert result.merge_strategy == "conflict"
+        assert result.drift_info is not None
+        assert result.drift_info.drift_type == "conflict"
+        assert result.drift_info.artifact_name == "test"
+        assert result.drift_info.collection_sha == "coll123"
+
+    def test_from_dict_without_drift_info(self):
+        """Test from_dict() handles missing drift_info."""
+        data = {
+            "artifact_id": "skill:test",
+            "artifact_name": "test",
+            "update_available": False,
+        }
+
+        result = UpdateAvailableResult.from_dict(data)
+
+        assert result.drift_info is None
+        assert result.has_local_changes is False
+        assert result.merge_strategy == "no_update"

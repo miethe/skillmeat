@@ -175,6 +175,16 @@ class RefreshRequest(BaseModel):
         examples=[False],
     )
 
+    fields: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Optional list of specific fields to refresh. "
+            "Valid fields: description, tags, author, license, origin_source. "
+            "If not provided, all fields will be refreshed."
+        ),
+        examples=[["description", "tags"], ["author"]],
+    )
+
     class Config:
         """Pydantic model configuration."""
 
@@ -458,4 +468,187 @@ class RefreshResponse(BaseModel):
             summary=summary,
             details=details,
             duration_ms=result.duration_ms,
+        )
+
+
+# ============================================================================
+# Update Check Schemas
+# ============================================================================
+
+
+class UpdateCheckResultResponse(BaseModel):
+    """Response schema for a single artifact update check.
+
+    Provides information about whether an update is available for an artifact.
+    """
+
+    artifact_id: str = Field(
+        description="Unique identifier for the artifact (format: 'type:name')",
+        examples=["skill:canvas-design"],
+    )
+
+    artifact_name: str = Field(
+        description="Human-readable name of the artifact",
+        examples=["canvas-design"],
+    )
+
+    current_sha: Optional[str] = Field(
+        default=None,
+        description="Current resolved SHA of the artifact",
+        examples=["abc123def456"],
+    )
+
+    upstream_sha: Optional[str] = Field(
+        default=None,
+        description="Latest SHA from upstream GitHub source",
+        examples=["def456abc789"],
+    )
+
+    update_available: bool = Field(
+        description="Whether an update is available (SHAs differ)",
+        examples=[True],
+    )
+
+    reason: Optional[str] = Field(
+        default=None,
+        description=(
+            "Explanation of the result (e.g., 'SHA mismatch', "
+            "'No GitHub source', 'Up to date')"
+        ),
+        examples=["SHA mismatch"],
+    )
+
+    has_local_changes: bool = Field(
+        default=False,
+        description="Whether local modifications exist that might conflict with update",
+        examples=[False],
+    )
+
+    merge_strategy: str = Field(
+        description=(
+            "Recommended action: 'safe_update' (no conflicts), "
+            "'review_required' (local changes exist), "
+            "'conflict' (both changed), 'no_update' (no update available)"
+        ),
+        examples=["safe_update"],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "skill:canvas-design",
+                "artifact_name": "canvas-design",
+                "current_sha": "abc123def456",
+                "upstream_sha": "def456abc789",
+                "update_available": True,
+                "reason": "SHA mismatch",
+                "has_local_changes": False,
+                "merge_strategy": "safe_update",
+            }
+        }
+
+
+class UpdateCheckResponse(BaseModel):
+    """Response schema for collection update check operation.
+
+    Provides a list of update availability results for artifacts in a collection.
+    """
+
+    collection_id: str = Field(
+        description="Unique identifier for the checked collection",
+        examples=["default"],
+    )
+
+    timestamp: datetime = Field(
+        description="When the update check operation completed",
+    )
+
+    results: List[UpdateCheckResultResponse] = Field(
+        description="Update availability results for each artifact",
+    )
+
+    updates_available: int = Field(
+        description="Total number of artifacts with updates available",
+        examples=[3],
+    )
+
+    up_to_date: int = Field(
+        description="Total number of artifacts already up to date",
+        examples=[12],
+    )
+
+    skipped: int = Field(
+        description="Total number of artifacts skipped (e.g., no GitHub source)",
+        examples=[2],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "collection_id": "default",
+                "timestamp": "2024-11-16T15:30:00Z",
+                "results": [
+                    {
+                        "artifact_id": "skill:canvas-design",
+                        "artifact_name": "canvas-design",
+                        "current_sha": "abc123",
+                        "upstream_sha": "def456",
+                        "update_available": True,
+                        "reason": "SHA mismatch",
+                        "has_local_changes": False,
+                        "merge_strategy": "safe_update",
+                    }
+                ],
+                "updates_available": 3,
+                "up_to_date": 12,
+                "skipped": 2,
+            }
+        }
+
+    @classmethod
+    def from_update_results(
+        cls,
+        collection_id: str,
+        results: List[Any],  # List[UpdateAvailableResult] (avoiding import)
+    ) -> "UpdateCheckResponse":
+        """Create UpdateCheckResponse from core UpdateAvailableResult list.
+
+        Args:
+            collection_id: Collection identifier
+            results: List of UpdateAvailableResult from CollectionRefresher.check_updates()
+
+        Returns:
+            UpdateCheckResponse with all fields populated
+        """
+        # Convert UpdateAvailableResult list to UpdateCheckResultResponse list
+        result_responses = [
+            UpdateCheckResultResponse(
+                artifact_id=result.artifact_id,
+                artifact_name=result.artifact_name,
+                current_sha=result.current_sha,
+                upstream_sha=result.upstream_sha,
+                update_available=result.update_available,
+                reason=result.reason,
+                has_local_changes=result.has_local_changes,
+                merge_strategy=result.merge_strategy,
+            )
+            for result in results
+        ]
+
+        # Calculate summary counts
+        updates_available = sum(1 for r in results if r.update_available)
+        skipped = sum(1 for r in results if r.reason and "No GitHub source" in r.reason)
+        up_to_date = len(results) - updates_available - skipped
+
+        return cls(
+            collection_id=collection_id,
+            timestamp=datetime.now(),
+            results=result_responses,
+            updates_available=updates_available,
+            up_to_date=up_to_date,
+            skipped=skipped,
         )

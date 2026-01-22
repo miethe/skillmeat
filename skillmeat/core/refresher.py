@@ -14,7 +14,11 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from skillmeat.storage.snapshot import SnapshotManager
 
 from skillmeat.core.artifact import Artifact, ArtifactMetadata
 from skillmeat.core.artifact_detection import ArtifactType
@@ -31,6 +35,8 @@ from skillmeat.core.github_metadata import (
     GitHubMetadataExtractor,
     GitHubSourceSpec,
 )
+from skillmeat.models import DriftDetectionResult
+from skillmeat.sources.base import UpdateInfo
 
 
 class RefreshMode(str, Enum):
@@ -66,6 +72,261 @@ REFRESH_FIELD_MAPPING: Dict[str, str] = {
     "origin_source": "url",  # artifact.origin_source -> github.html_url
 }
 
+# Set of all valid refreshable field names for validation
+REFRESHABLE_FIELDS = frozenset(REFRESH_FIELD_MAPPING.keys())
+
+
+def validate_fields(
+    fields: Optional[List[str]],
+    strict: bool = True,
+) -> Tuple[List[str], List[str]]:
+    """Validate field names for refresh operations.
+
+    Args:
+        fields: List of field names to validate (None = all fields valid)
+        strict: If True, raise ValueError on invalid fields. If False, return
+               invalid fields for logging/warning.
+
+    Returns:
+        Tuple of (valid_fields, invalid_fields) where:
+        - valid_fields: List of validated field names (case-normalized)
+        - invalid_fields: List of invalid field names
+
+    Raises:
+        ValueError: If any invalid fields found and strict=True
+
+    Example:
+        >>> validate_fields(["description", "tags"])
+        (["description", "tags"], [])
+
+        >>> validate_fields(["description", "invalid"])
+        ValueError: Invalid field names: invalid. Valid fields: description, tags, author, license, origin_source
+
+        >>> validate_fields(["DESCRIPTION", "Tags"])  # Case-insensitive
+        (["description", "tags"], [])
+    """
+    # If no fields specified, all fields are valid
+    if fields is None:
+        return list(REFRESHABLE_FIELDS), []
+
+    # Normalize to lowercase for case-insensitive matching
+    field_map = {f.lower(): f for f in REFRESHABLE_FIELDS}
+
+    valid_fields = []
+    invalid_fields = []
+
+    for field in fields:
+        normalized = field.lower().strip()
+        if normalized in field_map:
+            # Use the canonical field name (not the user-provided casing)
+            valid_fields.append(field_map[normalized])
+        else:
+            invalid_fields.append(field)
+
+    if invalid_fields and strict:
+        # Build error message with suggestions
+        valid_list = ", ".join(sorted(REFRESHABLE_FIELDS))
+        error_msg = (
+            f"Invalid field name(s): {', '.join(invalid_fields)}. "
+            f"Valid fields: {valid_list}"
+        )
+
+        # Add closest match suggestions for typos
+        suggestions = []
+        for invalid_field in invalid_fields:
+            closest = _find_closest_field(invalid_field)
+            if closest:
+                suggestions.append(f"'{invalid_field}' -> did you mean '{closest}'?")
+
+        if suggestions:
+            error_msg += f"\n\nSuggestions: {'; '.join(suggestions)}"
+
+        raise ValueError(error_msg)
+
+    return valid_fields, invalid_fields
+
+
+def _find_closest_field(field_name: str) -> Optional[str]:
+    """Find the closest matching valid field name using simple distance heuristic.
+
+    Args:
+        field_name: Invalid field name to find match for
+
+    Returns:
+        Closest valid field name, or None if no close match found
+
+    Example:
+        >>> _find_closest_field("descriptio")
+        "description"
+        >>> _find_closest_field("tgs")
+        "tags"
+    """
+    field_lower = field_name.lower()
+
+    # Simple heuristics for common typos:
+    # 1. Prefix match (e.g., "desc" -> "description")
+    # 2. Contains match (e.g., "icense" -> "license")
+    # 3. Levenshtein distance (basic implementation)
+
+    candidates = []
+
+    for valid_field in REFRESHABLE_FIELDS:
+        score = 0
+
+        # Exact prefix match (highest priority)
+        if valid_field.startswith(field_lower):
+            score = 100 - len(valid_field) + len(field_lower)
+        # Field contains input
+        elif field_lower in valid_field:
+            score = 50 - len(valid_field) + len(field_lower)
+        # Input contains field (e.g., "tagss" -> "tags")
+        elif valid_field in field_lower:
+            score = 40
+        else:
+            # Simple character overlap score
+            overlap = sum(1 for c in field_lower if c in valid_field)
+            if overlap > len(field_lower) * 0.5:  # >50% character overlap
+                score = overlap
+
+        if score > 0:
+            candidates.append((score, valid_field))
+
+    if not candidates:
+        return None
+
+    # Return highest scoring match
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+
+@dataclass
+class UpdateAvailableResult:
+    """Result for checking if an update is available for a single artifact.
+
+    Tracks the outcome of an update check operation, comparing the artifact's
+    current SHA with the upstream SHA to determine if an update is available.
+    When an update is available, optionally includes drift detection details
+    from SyncManager.check_drift() for three-way merge analysis.
+
+    Attributes:
+        artifact_id: Unique identifier for the artifact (format: "type:name").
+        artifact_name: Human-readable name of the artifact.
+        current_sha: Current resolved SHA of the artifact (or version if SHA not stored).
+        upstream_sha: Latest SHA from upstream GitHub source.
+        update_available: Whether an update is available (SHAs differ).
+        reason: Human-readable explanation of the result
+               (e.g., "SHA mismatch", "No upstream data", "No GitHub source").
+        drift_info: Optional DriftDetectionResult with detailed field-level changes
+                   when drift is detected via SyncManager.check_drift().
+        has_local_changes: Whether local modifications exist in the project
+                          deployment that might conflict with the update.
+        merge_strategy: Suggested action for handling the update:
+                       - "safe_update": No local changes, update can be applied safely
+                       - "review_required": Local changes exist but no conflict
+                       - "conflict": Both local and upstream changed (three-way conflict)
+                       - "no_update": No update available
+
+    Example:
+        >>> result = UpdateAvailableResult(
+        ...     artifact_id="skill:canvas",
+        ...     artifact_name="canvas",
+        ...     current_sha="abc123",
+        ...     upstream_sha="def456",
+        ...     update_available=True,
+        ...     reason="SHA mismatch",
+        ...     has_local_changes=False,
+        ...     merge_strategy="safe_update"
+        ... )
+    """
+
+    artifact_id: str
+    artifact_name: str
+    current_sha: Optional[str] = None
+    upstream_sha: Optional[str] = None
+    update_available: bool = False
+    reason: Optional[str] = None
+    drift_info: Optional[DriftDetectionResult] = None
+    has_local_changes: bool = False
+    merge_strategy: str = "no_update"
+
+    def __post_init__(self):
+        """Validate merge_strategy value."""
+        valid_strategies = {"safe_update", "review_required", "conflict", "no_update"}
+        if self.merge_strategy not in valid_strategies:
+            raise ValueError(
+                f"Invalid merge_strategy '{self.merge_strategy}'. "
+                f"Must be one of {valid_strategies}"
+            )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation suitable for JSON/TOML serialization.
+        """
+        result: Dict[str, Any] = {
+            "artifact_id": self.artifact_id,
+            "artifact_name": self.artifact_name,
+            "current_sha": self.current_sha,
+            "upstream_sha": self.upstream_sha,
+            "update_available": self.update_available,
+            "reason": self.reason,
+            "has_local_changes": self.has_local_changes,
+            "merge_strategy": self.merge_strategy,
+        }
+        # Include drift_info only if present (avoid serializing None)
+        if self.drift_info is not None:
+            result["drift_info"] = {
+                "artifact_name": self.drift_info.artifact_name,
+                "artifact_type": self.drift_info.artifact_type,
+                "drift_type": self.drift_info.drift_type,
+                "collection_sha": self.drift_info.collection_sha,
+                "project_sha": self.drift_info.project_sha,
+                "recommendation": self.drift_info.recommendation,
+                "change_origin": self.drift_info.change_origin,
+                "baseline_hash": self.drift_info.baseline_hash,
+                "current_hash": self.drift_info.current_hash,
+            }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UpdateAvailableResult":
+        """Create instance from dictionary.
+
+        Args:
+            data: Dictionary with UpdateAvailableResult fields.
+
+        Returns:
+            New UpdateAvailableResult instance.
+        """
+        # Reconstruct DriftDetectionResult if present
+        drift_info = None
+        if data.get("drift_info"):
+            drift_data = data["drift_info"]
+            drift_info = DriftDetectionResult(
+                artifact_name=drift_data["artifact_name"],
+                artifact_type=drift_data["artifact_type"],
+                drift_type=drift_data["drift_type"],
+                collection_sha=drift_data.get("collection_sha"),
+                project_sha=drift_data.get("project_sha"),
+                recommendation=drift_data.get("recommendation", "review_manually"),
+                change_origin=drift_data.get("change_origin"),
+                baseline_hash=drift_data.get("baseline_hash"),
+                current_hash=drift_data.get("current_hash"),
+            )
+
+        return cls(
+            artifact_id=data["artifact_id"],
+            artifact_name=data["artifact_name"],
+            current_sha=data.get("current_sha"),
+            upstream_sha=data.get("upstream_sha"),
+            update_available=data.get("update_available", False),
+            reason=data.get("reason"),
+            drift_info=drift_info,
+            has_local_changes=data.get("has_local_changes", False),
+            merge_strategy=data.get("merge_strategy", "no_update"),
+        )
+
 
 @dataclass
 class RefreshEntryResult:
@@ -81,12 +342,16 @@ class RefreshEntryResult:
             - "unchanged": Artifact metadata matches upstream (no changes needed).
             - "skipped": Artifact was skipped (e.g., no GitHub source).
             - "error": Refresh failed with an error.
-        changes: List of field names that were changed (e.g., ["description", "tags"]).
-        old_values: Previous values for changed fields (None if no changes).
-        new_values: New values applied for changed fields (None if no changes).
+        changes: List of ALL field names that differ from upstream, including
+                both applied and non-applied fields when using field whitelist.
+                This provides complete visibility into what has changed upstream.
+        old_values: Previous values for ALL changed fields (None if no changes).
+        new_values: New values for ALL changed fields (None if no changes).
+                   When field whitelist is used, this includes non-whitelisted
+                   fields for informational purposes.
         error: Error message if status is "error", None otherwise.
-        reason: Human-readable explanation for skip/error status
-               (e.g., "No GitHub source", "Rate limited", "Private repository").
+        reason: Human-readable explanation for skip/error status or filtering
+               (e.g., "No GitHub source", "Rate limited", "Filtered by whitelist").
         duration_ms: Time taken to refresh this artifact in milliseconds.
 
     Example:
@@ -162,6 +427,7 @@ class RefreshResult:
         error_count: Number of artifacts that failed with errors.
         entries: List of individual RefreshEntryResult for each artifact.
         duration_ms: Total time for the refresh operation in milliseconds.
+        snapshot_id: Optional ID of pre-refresh snapshot created for rollback.
 
     Properties:
         total_processed: Total number of artifacts processed (sum of all counts).
@@ -174,7 +440,8 @@ class RefreshResult:
         ...     skipped_count=2,
         ...     error_count=1,
         ...     entries=[...],
-        ...     duration_ms=2500.0
+        ...     duration_ms=2500.0,
+        ...     snapshot_id="20250122-103045-123456"
         ... )
         >>> result.total_processed
         18
@@ -188,6 +455,7 @@ class RefreshResult:
     error_count: int = 0
     entries: List[RefreshEntryResult] = field(default_factory=list)
     duration_ms: float = 0.0
+    snapshot_id: Optional[str] = None
 
     @property
     def total_processed(self) -> int:
@@ -234,6 +502,7 @@ class RefreshResult:
             "error_count": self.error_count,
             "entries": [e.to_dict() for e in self.entries],
             "duration_ms": self.duration_ms,
+            "snapshot_id": self.snapshot_id,
             "total_processed": self.total_processed,
             "success_rate": self.success_rate,
         }
@@ -256,6 +525,7 @@ class RefreshResult:
             error_count=data.get("error_count", 0),
             entries=entries,
             duration_ms=data.get("duration_ms", 0.0),
+            snapshot_id=data.get("snapshot_id"),
         )
 
 
@@ -296,6 +566,7 @@ class CollectionRefresher:
         collection_manager: CollectionManager,
         metadata_extractor: Optional[GitHubMetadataExtractor] = None,
         github_client: Optional[GitHubClient] = None,
+        snapshot_manager: Optional["SnapshotManager"] = None,
     ):
         """Initialize the refresher with required dependencies.
 
@@ -303,10 +574,12 @@ class CollectionRefresher:
             collection_manager: Manager for collection operations
             metadata_extractor: Extractor for GitHub metadata (created lazily if None)
             github_client: GitHub API client (created lazily if None)
+            snapshot_manager: Manager for snapshot operations (optional, for rollback support)
         """
         self._collection_manager = collection_manager
         self._metadata_extractor = metadata_extractor
         self._github_client = github_client
+        self._snapshot_manager = snapshot_manager
         self._logger = logging.getLogger(__name__)
 
     @property
@@ -476,11 +749,16 @@ class CollectionRefresher:
         metadata and identifies which fields have changed. Uses the
         REFRESH_FIELD_MAPPING to map between artifact and GitHub fields.
 
+        Always detects changes for ALL fields regardless of the fields parameter.
+        The fields parameter is used later by _apply_updates() to filter which
+        changes actually get applied.
+
         Args:
             artifact: Current artifact to compare
             upstream: Fresh metadata from GitHub
-            fields: Optional list of fields to check. If None, checks all
-                   fields defined in REFRESH_FIELD_MAPPING.
+            fields: Optional list of fields to apply (used for filtering during
+                   apply, not during detection). If None, all changed fields
+                   will be applied.
 
         Returns:
             Tuple of (old_values, new_values) dictionaries containing only
@@ -490,6 +768,7 @@ class CollectionRefresher:
             - Handles None vs empty list comparisons correctly
             - Tags are compared as sorted lists for consistency
             - License is normalized to lowercase for comparison
+            - Always detects ALL changes for reporting purposes
 
         Example:
             >>> old, new = refresher._detect_changes(artifact, upstream)
@@ -501,8 +780,9 @@ class CollectionRefresher:
         old_values: Dict[str, Any] = {}
         new_values: Dict[str, Any] = {}
 
-        # Determine which fields to check
-        fields_to_check = fields if fields else list(REFRESH_FIELD_MAPPING.keys())
+        # Always check ALL fields to detect and report all changes
+        # The fields parameter is used later by _apply_updates() to filter
+        fields_to_check = list(REFRESH_FIELD_MAPPING.keys())
 
         for artifact_field in fields_to_check:
             if artifact_field not in REFRESH_FIELD_MAPPING:
@@ -617,6 +897,7 @@ class CollectionRefresher:
         artifact: Artifact,
         old_values: Dict[str, Any],
         new_values: Dict[str, Any],
+        fields: Optional[List[str]] = None,
     ) -> Artifact:
         """Apply metadata updates to artifact (in-memory, does not persist).
 
@@ -624,17 +905,24 @@ class CollectionRefresher:
         This method modifies the artifact in place but does not persist
         changes to disk - the caller is responsible for saving.
 
+        When fields parameter is provided, only applies updates for the
+        whitelisted fields. Other fields are skipped even if they have changes.
+
         Args:
             artifact: Artifact to update (modified in place)
             old_values: Previous values (for validation/logging)
             new_values: New values to apply
+            fields: Optional list of field names to apply. If None, all fields
+                   in new_values are applied. If provided, only whitelisted
+                   fields are applied.
 
         Returns:
             Updated artifact (same instance, modified in place)
 
         Note:
             Only fields present in new_values are updated. Other fields
-            remain unchanged.
+            remain unchanged. When fields parameter is provided, non-whitelisted
+            fields are skipped even if present in new_values.
 
         Example:
             >>> old = {"description": "Old desc", "tags": []}
@@ -642,8 +930,19 @@ class CollectionRefresher:
             >>> updated = refresher._apply_updates(artifact, old, new)
             >>> assert updated.metadata.description == "New desc"
             >>> assert updated.tags == ["python"]
+            >>>
+            >>> # Selective update: only description
+            >>> updated = refresher._apply_updates(artifact, old, new, fields=["description"])
+            >>> assert updated.metadata.description == "New desc"
+            >>> assert updated.tags == []  # tags not updated
         """
         for field_name, new_value in new_values.items():
+            # Skip non-whitelisted fields if whitelist provided
+            if fields is not None and field_name not in fields:
+                self._logger.debug(
+                    f"Skipping {artifact.name}.{field_name}: not in whitelist {fields}"
+                )
+                continue
             old_value = old_values.get(field_name)
             self._logger.debug(
                 f"Updating {artifact.name}.{field_name}: "
@@ -733,6 +1032,22 @@ class CollectionRefresher:
             f"Starting metadata refresh for {artifact_id}",
             extra={"mode": mode.value, "dry_run": dry_run, "fields": fields},
         )
+
+        # Validate field names if provided
+        try:
+            validated_fields, _ = validate_fields(fields, strict=True)
+            # Use validated fields (normalized) for the rest of the operation
+            fields = validated_fields if fields else None
+        except ValueError as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            self._logger.error(f"Field validation failed for {artifact_id}: {e}")
+            return RefreshEntryResult(
+                artifact_id=artifact_id,
+                status="error",
+                changes=[],
+                error=str(e),
+                duration_ms=duration_ms,
+            )
 
         # 1. Determine GitHub source URL based on origin type
         # - origin="github": Direct GitHub artifact, source URL in `upstream`
@@ -835,7 +1150,7 @@ class CollectionRefresher:
             )
 
         # 6. Apply updates (in-memory)
-        self._apply_updates(artifact, old_values, new_values)
+        self._apply_updates(artifact, old_values, new_values, fields)
 
         duration_ms = (time.perf_counter() - start_time) * 1000
         self._logger.debug(
@@ -907,6 +1222,7 @@ class CollectionRefresher:
         dry_run: bool = False,
         fields: Optional[List[str]] = None,
         artifact_filter: Optional[Dict[str, Any]] = None,
+        create_snapshot_before_refresh: bool = True,
     ) -> RefreshResult:
         """Refresh metadata for all artifacts in a collection.
 
@@ -925,6 +1241,9 @@ class CollectionRefresher:
             artifact_filter: Optional filter dict with keys:
                 - type: ArtifactType or str to filter by type
                 - name: str pattern to filter by name (supports glob)
+            create_snapshot_before_refresh: If True, create a snapshot of collection
+                state before applying refresh changes. Defaults to True for rollback
+                support. Set to False to skip snapshot creation.
 
         Returns:
             RefreshResult with aggregated counts and per-artifact results:
@@ -966,6 +1285,17 @@ class CollectionRefresher:
                 "filter": artifact_filter,
             },
         )
+
+        # Validate field names if provided
+        try:
+            validated_fields, _ = validate_fields(fields, strict=True)
+            # Use validated fields (normalized) for the rest of the operation
+            fields = validated_fields if fields else None
+        except ValueError as e:
+            self._logger.error(
+                f"Field validation failed for collection {display_name}: {e}"
+            )
+            raise
 
         # Initialize result
         result = RefreshResult(
@@ -1014,10 +1344,54 @@ class CollectionRefresher:
             f"Refreshing {len(artifacts)} artifacts in collection '{collection.name}'"
         )
 
-        # 3. Track whether any artifact was actually modified
+        # 3. Create snapshot before refresh if requested (and not dry_run)
+        snapshot_id: Optional[str] = None
+        if (
+            create_snapshot_before_refresh
+            and not dry_run
+            and mode != RefreshMode.CHECK_ONLY
+            and self._snapshot_manager is not None
+        ):
+            try:
+                from datetime import datetime
+
+                timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+                snapshot_message = f"pre-refresh-{timestamp}"
+
+                # Get collection path from config
+                collection_path = self._collection_manager.config.get_collection_path(
+                    collection.name
+                )
+
+                self._logger.info(
+                    f"Creating snapshot before refresh: {snapshot_message}"
+                )
+
+                snapshot = self._snapshot_manager.create_snapshot(
+                    collection_path=collection_path,
+                    collection_name=collection.name,
+                    message=snapshot_message,
+                )
+
+                snapshot_id = snapshot.id
+                self._logger.info(
+                    f"Snapshot created successfully: {snapshot_id} "
+                    f"({snapshot.artifact_count} artifacts)"
+                )
+
+            except Exception as e:
+                # Log warning but continue with refresh
+                # Snapshot failure shouldn't block the refresh operation
+                self._logger.warning(
+                    f"Failed to create pre-refresh snapshot: {e}. "
+                    "Continuing with refresh without rollback support.",
+                    exc_info=True,
+                )
+
+        # 4. Track whether any artifact was actually modified
         any_modified = False
 
-        # 4. Iterate and refresh each artifact
+        # 5. Iterate and refresh each artifact
         for artifact in artifacts:
             artifact_id = f"{artifact.type.value}:{artifact.name}"
 
@@ -1093,8 +1467,9 @@ class CollectionRefresher:
                 # Don't raise - we've already modified artifacts in memory
                 # Log the error but return the results showing what was refreshed
 
-        # 6. Calculate total duration
+        # 6. Calculate total duration and set snapshot_id
         result.duration_ms = (time.perf_counter() - start_time) * 1000
+        result.snapshot_id = snapshot_id
 
         # 7. Log summary
         self._logger.info(
@@ -1107,3 +1482,456 @@ class CollectionRefresher:
         )
 
         return result
+
+    def check_updates(
+        self,
+        collection_name: Optional[str] = None,
+        artifact_filter: Optional[Dict[str, Any]] = None,
+        project_path: Optional["Path"] = None,
+    ) -> List[UpdateAvailableResult]:
+        """Check for available updates for all artifacts in a collection.
+
+        Compares each artifact's current resolved SHA with the upstream SHA
+        from GitHub to determine if updates are available. Does not apply
+        any changes - this is a read-only check operation.
+
+        When project_path is provided, integrates with SyncManager.check_drift()
+        to provide detailed field-level change information and merge strategy
+        recommendations based on three-way comparison (BE-402).
+
+        For each artifact with a GitHub source:
+        1. Parse the source spec to get owner/repo/path/version
+        2. Fetch current upstream SHA using GitHubClient.resolve_version()
+        3. Compare with artifact.resolved_sha (or artifact.version if SHA not stored)
+        4. If update available and project_path provided, check drift via SyncManager
+        5. Return update availability status with drift info and merge strategy
+
+        Args:
+            collection_name: Name of collection to check (None = default collection)
+            artifact_filter: Optional filter dict with keys:
+                - type: ArtifactType or str to filter by type
+                - name: str pattern to filter by name (supports glob)
+            project_path: Optional path to project where artifacts are deployed.
+                         When provided, enables drift detection via SyncManager
+                         to include has_local_changes and merge_strategy fields.
+
+        Returns:
+            List of UpdateAvailableResult objects, one per artifact, containing:
+            - artifact_id: Artifact identifier (e.g., "skill:canvas")
+            - artifact_name: Human-readable name
+            - current_sha: Current SHA stored in artifact
+            - upstream_sha: Latest SHA from upstream
+            - update_available: True if SHAs differ
+            - reason: Explanation of result
+            - drift_info: DriftDetectionResult if project_path provided and drift detected
+            - has_local_changes: Whether local modifications exist in project
+            - merge_strategy: Recommended action ("safe_update", "review_required",
+                             "conflict", "no_update")
+
+        Raises:
+            ValueError: If collection cannot be loaded
+
+        Example:
+            >>> refresher = CollectionRefresher(collection_manager)
+            >>> # Simple update check (no drift detection)
+            >>> updates = refresher.check_updates()
+            >>> for result in updates:
+            ...     if result.update_available:
+            ...         print(f"Update available: {result.artifact_name}")
+            ...         print(f"  Current: {result.current_sha[:7]}")
+            ...         print(f"  Upstream: {result.upstream_sha[:7]}")
+            >>>
+            >>> # With drift detection for deployed project
+            >>> updates = refresher.check_updates(
+            ...     project_path=Path("/path/to/project")
+            ... )
+            >>> for result in updates:
+            ...     if result.update_available:
+            ...         print(f"Update: {result.artifact_name}")
+            ...         print(f"  Local changes: {result.has_local_changes}")
+            ...         print(f"  Strategy: {result.merge_strategy}")
+        """
+        display_name = collection_name or "default"
+
+        self._logger.debug(
+            f"Checking for updates in collection: {display_name}",
+            extra={"filter": artifact_filter},
+        )
+
+        results: List[UpdateAvailableResult] = []
+
+        # 1. Load collection
+        try:
+            collection = self._collection_manager.load_collection(collection_name)
+            self._logger.debug(
+                f"Loaded collection '{collection.name}' with "
+                f"{len(collection.artifacts)} artifacts"
+            )
+        except ValueError as e:
+            self._logger.error(f"Failed to load collection '{display_name}': {e}")
+            raise
+        except Exception as e:
+            self._logger.error(
+                f"Unexpected error loading collection '{display_name}': {e}",
+                exc_info=True,
+            )
+            raise ValueError(f"Failed to load collection: {e}") from e
+
+        # 2. Get and filter artifacts
+        artifacts = collection.artifacts
+        if artifact_filter:
+            artifacts = self._filter_artifacts(artifacts, artifact_filter)
+            self._logger.debug(
+                f"Filter applied: {len(artifacts)} of "
+                f"{len(collection.artifacts)} artifacts selected"
+            )
+
+        if not artifacts:
+            self._logger.info(
+                f"No artifacts to check in collection '{collection.name}'"
+            )
+            return results
+
+        self._logger.info(
+            f"Checking updates for {len(artifacts)} artifacts in "
+            f"collection '{collection.name}'"
+        )
+
+        # 3. Pre-fetch drift results if project_path provided (BE-402)
+        # This avoids calling check_drift() for each artifact individually
+        drift_results_map: Dict[Tuple[str, str], DriftDetectionResult] = {}
+        if project_path:
+            from pathlib import Path
+
+            project_path_resolved = (
+                Path(project_path) if isinstance(project_path, str) else project_path
+            )
+
+            try:
+                from skillmeat.core.sync import SyncManager
+
+                sync_manager = SyncManager(
+                    collection_manager=self._collection_manager,
+                )
+                drift_results = sync_manager.check_drift(project_path_resolved)
+
+                # Build lookup map by (artifact_name, artifact_type)
+                for drift in drift_results:
+                    key = (drift.artifact_name, drift.artifact_type)
+                    drift_results_map[key] = drift
+
+                self._logger.debug(
+                    f"Pre-fetched drift results for {len(drift_results_map)} artifacts"
+                )
+
+            except ImportError:
+                self._logger.debug(
+                    "SyncManager not available, skipping drift detection"
+                )
+            except Exception as e:
+                self._logger.warning(
+                    f"Failed to check drift for project: {e}. "
+                    "Continuing without drift detection."
+                )
+
+        # 4. Check each artifact
+        for artifact in artifacts:
+            result = self._check_artifact_update(artifact, drift_results_map)
+            results.append(result)
+
+        # 5. Log summary
+        updates_available = sum(1 for r in results if r.update_available)
+        skipped = sum(1 for r in results if r.reason and "No GitHub source" in r.reason)
+        errors = sum(1 for r in results if r.reason and "Error" in r.reason)
+        with_local_changes = sum(1 for r in results if r.has_local_changes)
+
+        self._logger.info(
+            f"Update check complete for collection '{collection.name}': "
+            f"{updates_available} updates available, "
+            f"{len(results) - updates_available - skipped - errors} up-to-date, "
+            f"{skipped} skipped, {errors} errors"
+            + (f", {with_local_changes} with local changes" if project_path else "")
+        )
+
+        return results
+
+    def _check_artifact_update(
+        self,
+        artifact: Artifact,
+        drift_results_map: Optional[Dict[Tuple[str, str], DriftDetectionResult]] = None,
+    ) -> UpdateAvailableResult:
+        """Check if an update is available for a single artifact.
+
+        Compares the artifact's current resolved SHA with the upstream SHA
+        to determine if an update is available. When drift_results_map is
+        provided, enriches the result with drift detection info (BE-402).
+
+        Args:
+            artifact: Artifact to check for updates
+            drift_results_map: Optional map of (artifact_name, artifact_type) to
+                              DriftDetectionResult from SyncManager.check_drift().
+                              When provided and update is available, the result
+                              will include drift_info, has_local_changes, and
+                              merge_strategy fields.
+
+        Returns:
+            UpdateAvailableResult with update status, details, and drift info
+        """
+        artifact_id = f"{artifact.type.value}:{artifact.name}"
+
+        # 1. Determine GitHub source URL based on origin type
+        source_url: Optional[str] = None
+
+        if artifact.origin == "github":
+            source_url = artifact.upstream
+        elif artifact.origin == "marketplace" and artifact.origin_source == "github":
+            source_url = artifact.upstream
+
+        if not source_url:
+            self._logger.debug(
+                f"Skipping {artifact_id}: No GitHub source "
+                f"(origin={artifact.origin}, origin_source={artifact.origin_source})"
+            )
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=artifact.resolved_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason="No GitHub source",
+                merge_strategy="no_update",
+            )
+
+        # 2. Parse source spec
+        try:
+            spec = self._parse_source_spec(source_url)
+            if spec is None:
+                self._logger.debug(
+                    f"Skipping {artifact_id}: Invalid source format ({source_url})"
+                )
+                return UpdateAvailableResult(
+                    artifact_id=artifact_id,
+                    artifact_name=artifact.name,
+                    current_sha=artifact.resolved_sha,
+                    upstream_sha=None,
+                    update_available=False,
+                    reason="Invalid source format",
+                    merge_strategy="no_update",
+                )
+        except ValueError as e:
+            self._logger.error(f"Error parsing source for {artifact_id}: {e}")
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=artifact.resolved_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason=f"Error parsing source: {e}",
+                merge_strategy="no_update",
+            )
+
+        # 3. Get current SHA (use resolved_sha if available, else version)
+        current_sha = artifact.resolved_sha or artifact.version_spec
+
+        # 4. Fetch upstream SHA using GitHubClient
+        try:
+            owner_repo = f"{spec.owner}/{spec.repo}"
+            version = spec.version or "latest"
+
+            self._logger.debug(
+                f"Resolving upstream version for {artifact_id}: "
+                f"{owner_repo}@{version}"
+            )
+
+            upstream_sha = self.github_client.resolve_version(owner_repo, version)
+
+            self._logger.debug(
+                f"Resolved upstream SHA for {artifact_id}: {upstream_sha[:7]}..."
+            )
+
+        except GitHubRateLimitError as e:
+            self._logger.warning(
+                f"Rate limit exceeded checking {artifact_id}: {e.message}"
+            )
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=current_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason="Error: Rate limit exceeded",
+                merge_strategy="no_update",
+            )
+
+        except GitHubNotFoundError as e:
+            self._logger.warning(
+                f"GitHub resource not found for {artifact_id}: {e.message}"
+            )
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=current_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason="Error: Upstream not found",
+                merge_strategy="no_update",
+            )
+
+        except GitHubClientError as e:
+            self._logger.error(f"GitHub error checking {artifact_id}: {e.message}")
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=current_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason=f"Error: {e.message}",
+                merge_strategy="no_update",
+            )
+
+        except Exception as e:
+            self._logger.error(
+                f"Unexpected error checking {artifact_id}: {e}",
+                exc_info=True,
+            )
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=current_sha,
+                upstream_sha=None,
+                update_available=False,
+                reason=f"Error: {e}",
+                merge_strategy="no_update",
+            )
+
+        # 5. Compare SHAs
+        if not current_sha:
+            # No current SHA stored - consider update available
+            self._logger.debug(
+                f"{artifact_id}: No current SHA stored, update available"
+            )
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=None,
+                upstream_sha=upstream_sha,
+                update_available=True,
+                reason="No current SHA stored",
+                merge_strategy="safe_update",  # No local state to conflict with
+            )
+
+        # Compare SHAs (case-insensitive, handle short SHAs)
+        current_normalized = current_sha.lower()
+        upstream_normalized = upstream_sha.lower()
+
+        # Handle short SHA comparison
+        if len(current_normalized) < 40 and len(upstream_normalized) >= 40:
+            # Current is short SHA, compare prefix
+            update_available = not upstream_normalized.startswith(current_normalized)
+        elif len(upstream_normalized) < 40 and len(current_normalized) >= 40:
+            # Upstream is short SHA, compare prefix
+            update_available = not current_normalized.startswith(upstream_normalized)
+        else:
+            # Both are same length, direct comparison
+            update_available = current_normalized != upstream_normalized
+
+        if update_available:
+            self._logger.debug(
+                f"{artifact_id}: Update available "
+                f"(current={current_sha[:7]}..., upstream={upstream_sha[:7]}...)"
+            )
+            reason = "SHA mismatch"
+        else:
+            self._logger.debug(f"{artifact_id}: Up to date")
+            reason = "Up to date"
+            return UpdateAvailableResult(
+                artifact_id=artifact_id,
+                artifact_name=artifact.name,
+                current_sha=current_sha,
+                upstream_sha=upstream_sha,
+                update_available=False,
+                reason=reason,
+                merge_strategy="no_update",
+            )
+
+        # 6. If update available and drift_results_map provided, enrich with drift info (BE-402)
+        drift_info: Optional[DriftDetectionResult] = None
+        has_local_changes = False
+        merge_strategy = "safe_update"  # Default: assume safe update
+
+        if drift_results_map:
+            # Look up drift result for this artifact
+            drift_key = (artifact.name, artifact.type.value)
+            artifact_drift = drift_results_map.get(drift_key)
+
+            if artifact_drift:
+                drift_info = artifact_drift
+                has_local_changes = artifact_drift.drift_type in (
+                    "modified",
+                    "conflict",
+                )
+                merge_strategy = self._determine_merge_strategy(artifact_drift)
+
+                self._logger.debug(
+                    f"{artifact_id}: Drift detected - type={artifact_drift.drift_type}, "
+                    f"has_local_changes={has_local_changes}, "
+                    f"merge_strategy={merge_strategy}"
+                )
+            else:
+                # No drift info for this artifact - may not be deployed
+                self._logger.debug(
+                    f"{artifact_id}: No drift info available (artifact may not be deployed)"
+                )
+
+        return UpdateAvailableResult(
+            artifact_id=artifact_id,
+            artifact_name=artifact.name,
+            current_sha=current_sha,
+            upstream_sha=upstream_sha,
+            update_available=True,
+            reason=reason,
+            drift_info=drift_info,
+            has_local_changes=has_local_changes,
+            merge_strategy=merge_strategy,
+        )
+
+    def _determine_merge_strategy(self, drift: DriftDetectionResult) -> str:
+        """Determine merge strategy based on drift detection result.
+
+        Maps DriftDetectionResult.drift_type to a merge strategy recommendation
+        that indicates how the update should be handled.
+
+        Args:
+            drift: DriftDetectionResult from SyncManager.check_drift()
+
+        Returns:
+            Merge strategy string:
+            - "safe_update": No local changes, update can proceed safely
+            - "review_required": Local changes exist but no conflict
+            - "conflict": Both local and upstream changed (three-way conflict)
+            - "no_update": No update available or artifact removed
+
+        Strategy mapping:
+            - "outdated" -> "safe_update": Collection changed, project unchanged
+            - "modified" -> "review_required": Project changed, may want to preserve
+            - "conflict" -> "conflict": Both changed, manual resolution needed
+            - "added" -> "safe_update": New in collection, can deploy
+            - "removed" -> "no_update": Artifact removed upstream
+            - "version_mismatch" -> "review_required": Version differs, check intent
+        """
+        strategy_map = {
+            "outdated": "safe_update",  # Collection changed, project unchanged
+            "modified": "review_required",  # Project has local changes
+            "conflict": "conflict",  # Both changed - needs resolution
+            "added": "safe_update",  # New artifact - can deploy
+            "removed": "no_update",  # Artifact removed upstream
+            "version_mismatch": "review_required",  # Version differs
+        }
+
+        strategy = strategy_map.get(drift.drift_type, "review_required")
+
+        self._logger.debug(
+            f"Mapped drift_type '{drift.drift_type}' to merge_strategy '{strategy}'"
+        )
+
+        return strategy
