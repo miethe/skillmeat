@@ -39,6 +39,7 @@ type ViewMode = 'grid' | 'list' | 'grouped';
  *
  * @param summary - Lightweight artifact summary from collection endpoint
  * @param allArtifacts - Full artifact list from catalog
+ * @param collectionInfo - Optional collection context to attach
  * @returns Full Artifact object or enriched fallback
  */
 function enrichArtifactSummary(
@@ -59,14 +60,21 @@ function enrichArtifactSummary(
 
   // Fallback: Convert summary to Artifact-like structure with defaults
   // This ensures cards still render even if full data isn't available
+  // Note: source may be in "type:name" format if backend doesn't have the real source
+  // We detect this and leave source empty rather than showing the ID format
+  const artifactId = `${summary.type}:${summary.name}`;
+  const isSourceMissingOrSynthetic =
+    !summary.source || summary.source === artifactId || summary.source === summary.name;
+
   return {
-    id: `${summary.type}:${summary.name}`,
+    id: artifactId,
     name: summary.name,
     type: summary.type as any,
     scope: 'user',
     status: 'active',
     version: summary.version || undefined,
-    source: summary.source,
+    // If source looks like the ID format, don't use it - prefer undefined
+    source: isSourceMissingOrSynthetic ? undefined : summary.source,
     metadata: {
       title: summary.name,
       description: '',
