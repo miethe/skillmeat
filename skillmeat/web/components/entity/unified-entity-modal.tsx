@@ -297,6 +297,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [_isDeploying, _setIsDeploying] = useState(false);
   const [_isSyncing, _setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [localTags, setLocalTags] = useState<string[] | null>(null);
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -675,6 +676,11 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Auto-select first deployment's project when viewing from collection mode
   // This ensures the Sync Status tab shows data immediately instead of "No project deployment found"
+  // Reset local tags when entity changes
+  useEffect(() => {
+    setLocalTags(null);
+  }, [entity?.id]);
+
   useEffect(() => {
     // Only auto-select if:
     // 1. Entity has no projectPath (collection mode)
@@ -1131,6 +1137,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       },
       {
         onSuccess: () => {
+          // Update local state immediately for instant UI update
+          setLocalTags(newTags);
           toast({
             title: 'Tags Updated',
             description: `Updated tags for ${entity.name}`,
@@ -1678,7 +1686,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                       Tags
                     </h3>
                     <TagEditor
-                      tags={entity.tags || []}
+                      tags={localTags ?? entity.tags ?? []}
                       onTagsChange={handleTagsChange}
                       availableTags={availableTags}
                       isLoading={isTagsLoading || isUpdatingTags}
