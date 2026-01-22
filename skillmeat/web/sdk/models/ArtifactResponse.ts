@@ -30,6 +30,14 @@ export type ArtifactResponse = {
      */
     source: string;
     /**
+     * Origin category: 'local', 'github', or 'marketplace'
+     */
+    origin: string;
+    /**
+     * Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')
+     */
+    origin_source?: (string | null);
+    /**
      * Version specification
      */
     version: string;

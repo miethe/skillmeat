@@ -1258,6 +1258,11 @@ class MarketplaceSource(Base):
         nullable=True,
         comment="JSON-serialized list of tags for categorization",
     )
+    auto_tags: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON: {extracted: [{value, normalized, status, source}]} for GitHub topics",
+    )
 
     # Extended configuration
     manual_map: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1382,6 +1387,7 @@ class MarketplaceSource(Base):
             "repo_description": self.repo_description,
             "repo_readme": self.repo_readme,
             "tags": tags_list,
+            "auto_tags": self.get_auto_tags_dict(),
             "manual_map": manual_map_dict,
             "access_token_id": self.access_token_id,
             "trust_level": self.trust_level,
@@ -1465,6 +1471,31 @@ class MarketplaceSource(Base):
             tags_list: List of tag strings to serialize as JSON
         """
         self.tags = json.dumps(tags_list)
+
+    def get_auto_tags_dict(self) -> Optional[Dict[str, Any]]:
+        """Parse and return auto_tags as dictionary.
+
+        Returns:
+            Parsed auto_tags dict with 'extracted' list, or None if invalid/missing.
+            Structure: {"extracted": [{"value": str, "normalized": str,
+                        "status": str, "source": str}]}
+        """
+        if not self.auto_tags:
+            return None
+
+        try:
+            return json.loads(self.auto_tags)
+        except json.JSONDecodeError:
+            return None
+
+    def set_auto_tags_dict(self, auto_tags_dict: Dict[str, Any]) -> None:
+        """Set auto_tags from dictionary.
+
+        Args:
+            auto_tags_dict: Dictionary with 'extracted' key containing list of
+                           auto-tag segments
+        """
+        self.auto_tags = json.dumps(auto_tags_dict)
 
 
 class MarketplaceCatalogEntry(Base):

@@ -180,6 +180,99 @@ class TestArtifact:
                 added=now,
             )
 
+    def test_marketplace_origin(self):
+        """Test creating artifact with marketplace origin."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        artifact = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+            origin_source="github",
+        )
+        assert artifact.origin == "marketplace"
+        assert artifact.origin_source == "github"
+
+    def test_marketplace_origin_with_gitlab(self):
+        """Test creating artifact with marketplace origin from gitlab."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        artifact = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+            origin_source="gitlab",
+        )
+        assert artifact.origin == "marketplace"
+        assert artifact.origin_source == "gitlab"
+
+    def test_marketplace_origin_with_bitbucket(self):
+        """Test creating artifact with marketplace origin from bitbucket."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        artifact = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+            origin_source="bitbucket",
+        )
+        assert artifact.origin == "marketplace"
+        assert artifact.origin_source == "bitbucket"
+
+    def test_origin_source_requires_marketplace_origin(self):
+        """Test that origin_source raises error when origin is not marketplace."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        with pytest.raises(ValueError, match="origin_source can only be set when origin is 'marketplace'"):
+            Artifact(
+                name="test",
+                type=ArtifactType.SKILL,
+                path="skills/test/",
+                origin="github",
+                metadata=metadata,
+                added=now,
+                origin_source="github",
+            )
+
+    def test_origin_source_invalid_value(self):
+        """Test that invalid origin_source raises ValueError."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        with pytest.raises(ValueError, match="Invalid origin_source"):
+            Artifact(
+                name="test",
+                type=ArtifactType.SKILL,
+                path="skills/test/",
+                origin="marketplace",
+                metadata=metadata,
+                added=now,
+                origin_source="invalid",
+            )
+
+    def test_marketplace_without_origin_source(self):
+        """Test that marketplace origin can be created without origin_source."""
+        now = datetime.utcnow()
+        metadata = ArtifactMetadata()
+        artifact = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+        )
+        assert artifact.origin == "marketplace"
+        assert artifact.origin_source is None
+
     def test_composite_key(self):
         """Test composite key generation."""
         now = datetime.utcnow()
@@ -325,3 +418,59 @@ class TestArtifact:
         assert restored.tags == original.tags
         assert restored.metadata.title == original.metadata.title
         assert restored.metadata.tags == original.metadata.tags
+
+    def test_to_dict_marketplace_with_origin_source(self):
+        """Test serializing artifact with marketplace origin and origin_source."""
+        now = datetime(2025, 11, 7, 12, 0, 0)
+        metadata = ArtifactMetadata(title="Test")
+        artifact = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+            upstream="https://github.com/user/repo",
+            origin_source="github",
+        )
+        result = artifact.to_dict()
+        assert result["origin"] == "marketplace"
+        assert result["origin_source"] == "github"
+
+    def test_from_dict_marketplace_with_origin_source(self):
+        """Test deserializing artifact with marketplace origin and origin_source."""
+        data = {
+            "name": "test-skill",
+            "type": "skill",
+            "path": "skills/test-skill/",
+            "origin": "marketplace",
+            "added": "2025-11-07T12:00:00",
+            "upstream": "https://github.com/user/repo",
+            "origin_source": "github",
+        }
+        artifact = Artifact.from_dict(data)
+        assert artifact.origin == "marketplace"
+        assert artifact.origin_source == "github"
+
+    def test_roundtrip_marketplace_origin_source(self):
+        """Test roundtrip serialization with marketplace origin and origin_source."""
+        now = datetime(2025, 11, 7, 12, 0, 0)
+        metadata = ArtifactMetadata(title="Test")
+        original = Artifact(
+            name="test-skill",
+            type=ArtifactType.SKILL,
+            path="skills/test-skill/",
+            origin="marketplace",
+            metadata=metadata,
+            added=now,
+            upstream="https://github.com/user/repo",
+            origin_source="gitlab",
+        )
+
+        # Serialize and deserialize
+        data = original.to_dict()
+        restored = Artifact.from_dict(data)
+
+        # Check origin fields match
+        assert restored.origin == original.origin
+        assert restored.origin_source == original.origin_source

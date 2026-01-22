@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .common import PaginatedResponse
 
@@ -184,6 +184,15 @@ class ArtifactResponse(BaseModel):
         description="Source specification",
         examples=["anthropics/skills/pdf"],
     )
+    origin: str = Field(
+        description="Origin category: 'local', 'github', or 'marketplace'",
+        examples=["github"],
+    )
+    origin_source: Optional[str] = Field(
+        default=None,
+        description="Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket')",
+        examples=["github"],
+    )
     version: str = Field(
         description="Version specification",
         examples=["latest"],
@@ -230,6 +239,8 @@ class ArtifactResponse(BaseModel):
                 "name": "pdf",
                 "type": "skill",
                 "source": "anthropics/skills/pdf",
+                "origin": "github",
+                "origin_source": None,
                 "version": "latest",
                 "aliases": ["pdf-processor"],
                 "metadata": {
@@ -1075,5 +1086,43 @@ class FileUpdateRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "content": "# Updated PDF Processor Skill\n\nThis skill processes PDF files with enhanced features...",
+            }
+        }
+
+
+class ArtifactTagsUpdate(BaseModel):
+    """Request schema for updating artifact tags.
+
+    Accepts a list of tag names which will be normalized and synced
+    with the artifact's tag associations. Tags that don't exist will
+    be created automatically.
+    """
+
+    tags: List[str] = Field(
+        description="List of tag names to assign to the artifact",
+        examples=[["productivity", "ai-tools", "automation"]],
+    )
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, v):
+        """Normalize tag names: trim, lowercase, spaces to underscores."""
+        if isinstance(v, list):
+            normalized = []
+            for tag in v:
+                if tag and isinstance(tag, str):
+                    # Trim first, then lowercase, then replace spaces
+                    cleaned = tag.strip().lower().replace(" ", "_")
+                    if cleaned:  # Only add non-empty tags
+                        normalized.append(cleaned)
+            return normalized
+        return v
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "tags": ["productivity", "ai_tools", "automation"],
             }
         }

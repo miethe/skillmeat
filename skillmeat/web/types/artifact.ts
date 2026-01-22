@@ -51,6 +51,10 @@ export interface Artifact {
   status: ArtifactStatus;
   version?: string;
   source?: string;
+  /** Origin category: 'local', 'github', or 'marketplace' */
+  origin?: string;
+  /** Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab', 'bitbucket') */
+  origin_source?: string;
   metadata: ArtifactMetadata;
   upstreamStatus: UpstreamStatus;
   usageStats: UsageStats;
@@ -80,6 +84,8 @@ export interface ArtifactFilters {
   search?: string;
   /** Group ID for filtering artifacts by group (only applicable in specific collection context) */
   groupId?: string;
+  /** Tag IDs to filter artifacts by (multi-select) */
+  tags?: string[];
 }
 
 export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';

@@ -56,9 +56,12 @@ import {
   deploymentKeys,
   useProjects,
   usePendingContextChanges,
+  useTags,
+  useUpdateArtifactTags,
 } from '@/hooks';
 import { apiRequest } from '@/lib/api';
 import { ModalCollectionsTab } from '@/components/entity/modal-collections-tab';
+import { TagEditor } from '@/components/shared/tag-editor';
 import { DeploymentCard, DeploymentCardSkeleton } from '@/components/deployments/deployment-card';
 import { listDeployments, removeProjectDeployment } from '@/lib/api/deployments';
 import { ContextSyncStatus } from '@/components/entity/context-sync-status';
@@ -294,6 +297,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [_isDeploying, _setIsDeploying] = useState(false);
   const [_isSyncing, _setIsSyncing] = useState(false);
   const [showRollbackDialog, setShowRollbackDialog] = useState(false);
+  const [localTags, setLocalTags] = useState<string[] | null>(null);
   const [showMergeWorkflow, setShowMergeWorkflow] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -321,6 +325,16 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch available tags for autocomplete
+  const { data: tagsData, isLoading: isTagsLoading } = useTags(100);
+  const availableTags = useMemo(() => {
+    if (!tagsData?.items) return [];
+    return tagsData.items.map((tag) => tag.name);
+  }, [tagsData]);
+
+  // Tag update mutation
+  const { mutate: updateTags, isPending: isUpdatingTags } = useUpdateArtifactTags();
 
   // Generate mock history entries
   const historyEntries = useMemo(() => {
@@ -610,7 +624,7 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Get pending context changes count if this is a context entity
   const pendingContextCount = usePendingContextChanges(
-    isContextEntity(entity) ? entity.id : undefined,
+    entity && isContextEntity(entity) ? entity.id : undefined,
     entity?.projectPath
   );
 
@@ -662,13 +676,18 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
 
   // Auto-select first deployment's project when viewing from collection mode
   // This ensures the Sync Status tab shows data immediately instead of "No project deployment found"
+  // Reset local tags when entity changes
+  useEffect(() => {
+    setLocalTags(null);
+  }, [entity?.id]);
+
   useEffect(() => {
     // Only auto-select if:
     // 1. Entity has no projectPath (collection mode)
     // 2. selectedProjectForDiff is not already set
     // 3. We have at least one deployment with a project_path
     if (!entity?.projectPath && !selectedProjectForDiff && artifactDeployments.length > 0) {
-      const firstProjectPath = artifactDeployments[0].project_path;
+      const firstProjectPath = artifactDeployments[0]?.project_path;
       if (firstProjectPath) {
         setSelectedProjectForDiff(firstProjectPath);
       }
@@ -1104,6 +1123,39 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
       });
       throw error;
     }
+  };
+
+  // Handle tag changes from TagEditor
+  const handleTagsChange = (newTags: string[]) => {
+    if (!entity) return;
+
+    updateTags(
+      {
+        artifactId: entity.id,
+        tags: newTags,
+        collection: entity.collection || undefined,
+      },
+      {
+        onSuccess: () => {
+          // Update local state immediately for instant UI update
+          setLocalTags(newTags);
+          toast({
+            title: 'Tags Updated',
+            description: `Updated tags for ${entity.name}`,
+          });
+          // Refresh entity data
+          refetch();
+        },
+        onError: (error) => {
+          console.error('Tag update failed:', error);
+          toast({
+            title: 'Update Failed',
+            description: error instanceof Error ? error.message : 'Failed to update tags',
+            variant: 'destructive',
+          });
+        },
+      }
+    );
   };
 
   // ============================================================================
@@ -1574,6 +1626,21 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   )}
 
+                  {/* Origin */}
+                  {entity.origin && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Origin</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">
+                          {entity.origin}
+                        </Badge>
+                        {entity.origin === 'marketplace' && entity.origin_source && (
+                          <Badge variant="secondary">{entity.origin_source}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Source */}
                   <div>
                     <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
@@ -1593,22 +1660,39 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                     </div>
                   )}
 
-                  {/* Tags */}
-                  {entity.tags && entity.tags.length > 0 && (
+                  {/* Author */}
+                  {entity.author && (
                     <div>
                       <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                        <Tag className="h-4 w-4" />
-                        Tags
+                        <User className="h-4 w-4" />
+                        Author
                       </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {entity.tags.map((tag) => (
-                          <Badge key={tag} variant="outline">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
+                      <p className="text-sm text-muted-foreground">{entity.author}</p>
                     </div>
                   )}
+
+                  {/* License */}
+                  {entity.license && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">License</h3>
+                      <Badge variant="outline">{entity.license}</Badge>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  <div>
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Tag className="h-4 w-4" />
+                      Tags
+                    </h3>
+                    <TagEditor
+                      tags={localTags ?? entity.tags ?? []}
+                      onTagsChange={handleTagsChange}
+                      availableTags={availableTags}
+                      isLoading={isTagsLoading || isUpdatingTags}
+                      disabled={isUpdatingTags}
+                    />
+                  </div>
 
                   {/* Aliases */}
                   {entity.aliases && entity.aliases.length > 0 && (
@@ -1618,6 +1702,20 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                         {entity.aliases.map((alias) => (
                           <Badge key={alias} variant="secondary">
                             {alias}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dependencies */}
+                  {entity.dependencies && entity.dependencies.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-medium">Dependencies</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {entity.dependencies.map((dep) => (
+                          <Badge key={dep} variant="secondary">
+                            {dep}
                           </Badge>
                         ))}
                       </div>

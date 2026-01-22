@@ -111,7 +111,7 @@ export {
 export { useDeploy, useUndeploy } from './useDeploy';
 
 // ============================================================================
-// ARTIFACTS (5 hooks)
+// ARTIFACTS (6 hooks)
 // ============================================================================
 // Core artifact operations, bulk import, and infinite scroll
 export {
@@ -119,6 +119,7 @@ export {
   useArtifact,
   useUpdateArtifact,
   useDeleteArtifact,
+  useUpdateArtifactTags,
   useInfiniteArtifacts,
   type InfiniteAllArtifactsOptions,
 } from './useArtifacts';
@@ -376,6 +377,11 @@ export { bulkTagKeys, useBulkTagApply } from './use-bulk-tag-apply';
  * Path-based tag operations
  */
 export { pathTagKeys, usePathTags, useUpdatePathTagStatus } from './use-path-tags';
+
+/**
+ * Source auto-tag operations (GitHub topics)
+ */
+export { autoTagsKeys, useSourceAutoTags, useUpdateAutoTag } from './use-auto-tags';
 
 /**
  * Merge operations for collections and contexts

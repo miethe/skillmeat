@@ -43,6 +43,7 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactSourceType,
     ArtifactSyncRequest,
     ArtifactSyncResponse,
+    ArtifactTagsUpdate,
     ArtifactUpdateRequest,
     ArtifactUpstreamDiffResponse,
     ArtifactUpstreamInfo,
@@ -539,6 +540,8 @@ def artifact_to_response(
         name=artifact.name,
         type=artifact.type.value,
         source=artifact.upstream if artifact.upstream else "local",
+        origin=artifact.origin,
+        origin_source=artifact.origin_source,
         version=version,
         aliases=[],  # TODO: Add alias support when implemented
         tags=artifact.tags or [],
@@ -6150,13 +6153,131 @@ async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.put(
+    "/{artifact_id}/tags",
+    response_model=ArtifactResponse,
+    summary="Update artifact tags",
+    description="""
+    Update all tags for an artifact.
+
+    Accepts a list of tag names which will be normalized (lowercase, spaces to
+    underscores, trimmed). For each tag:
+    - If it exists in the tags table, the existing tag is used
+    - If it doesn't exist, a new tag is created with the normalized name as slug
+
+    This operation replaces all existing tags with the provided list.
+    """,
+    responses={
+        200: {"description": "Successfully updated artifact tags"},
+        400: {"model": ErrorResponse, "description": "Invalid request"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def update_artifact_tags(
+    artifact_id: str,
+    request: ArtifactTagsUpdate,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses default if not specified)",
+    ),
+) -> ArtifactResponse:
+    """Update all tags for an artifact.
+
+    This endpoint replaces the artifact's current tags with the provided list.
+    Tags are normalized (lowercase, spaces to underscores) by the schema validator.
+
+    Args:
+        artifact_id: Unique identifier of the artifact (format: type:name)
+        request: Request body containing list of tag names
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
+        collection: Optional collection name
+
+    Returns:
+        Updated artifact with new tags
+
+    Raises:
+        HTTPException 400: If request data is invalid
+        HTTPException 404: If artifact not found
+        HTTPException 500: If operation fails
+    """
+    try:
+        logger.info(f"Updating tags for artifact {artifact_id}: {request.tags}")
+
+        # Parse artifact ID (format: type:name)
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Find artifact
+        try:
+            artifact = coll.find_artifact(artifact_name, artifact_type)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),  # Ambiguous artifact name
+            )
+
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found in collection",
+            )
+
+        # Update tags (request.tags is already normalized by the validator)
+        artifact.tags = request.tags
+
+        # Save collection back to disk
+        collection_mgr.save_collection(coll)
+
+        logger.info(
+            f"Successfully updated tags for artifact {artifact_id}: {artifact.tags}"
+        )
+
+        # Return updated artifact response
+        return artifact_to_response(artifact)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update tags for artifact {artifact_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update artifact tags: {str(e)}",
+        )
+
+
 @router.post(
     "/{artifact_id}/tags/{tag_id}",
     status_code=status.HTTP_201_CREATED,
     summary="Add tag to artifact",
     description="Associate a tag with an artifact",
 )
-async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict:
+async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict[str, str]:
     """Add a tag to an artifact.
 
     Args:

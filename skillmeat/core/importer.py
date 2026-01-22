@@ -360,6 +360,8 @@ class ArtifactImporter:
         Note:
             Only applies segments with status='approved' or 'pending'.
             Skips if artifact has no path or path extraction fails.
+            For local filesystem paths, skips the first few segments
+            which typically contain system paths and usernames.
         """
         from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 
@@ -368,8 +370,24 @@ class ArtifactImporter:
         if not source_path:
             return 0
 
+        # Detect and handle local filesystem paths
+        # If path looks like a local filesystem path (starts with / or contains common prefixes),
+        # we need to skip the leading segments that are system/user paths
+        config = PathTagConfig.defaults()
+
+        # Check if this is a local filesystem path (absolute path or contains system dirs)
+        local_fs_prefixes = ("/Users/", "/home/", "/var/", "/tmp/", "/opt/")
+        is_local_fs = source_path.startswith("/") or any(
+            prefix in source_path for prefix in local_fs_prefixes
+        )
+
+        if is_local_fs:
+            # For local filesystem paths, skip first 3 segments (e.g., /Users/username/dev)
+            # to avoid tagging with system paths and usernames
+            config.skip_segments = [0, 1, 2]
+
         # Extract segments
-        extractor = PathSegmentExtractor(PathTagConfig.defaults())
+        extractor = PathSegmentExtractor(config)
         segments = extractor.extract(source_path)
 
         # Filter to approved/pending segments (not excluded)
