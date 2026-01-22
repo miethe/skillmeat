@@ -28,7 +28,7 @@ related:
 
 Implement systematic extraction, caching, and intelligent leveraging of Claude Code frontmatter metadata to enrich artifacts with tool dependencies, platform tracking, and automatic artifact linking. This feature bridges the gap between raw artifact content and marketplace discoverability by enabling structured metadata exploitation, reducing manual data entry, and enabling intelligent artifact dependency visualization.
 
-The implementation follows MeatyPrompts layered architecture (Database → Repository → Service → API → UI → Testing → Docs → Deployment) with significant parallel opportunities in Phases 2-4 and again in Phases 5-6.
+The implementation follows project's layered architecture (Database → Repository → Service → API → UI → Testing → Docs → Deployment) with significant parallel opportunities in Phases 2-4 and again in Phases 5-6.
 
 **Key Deliverables**:
 1. Platform & Tool enums with complete Claude Code tool inventory
@@ -44,7 +44,7 @@ The implementation follows MeatyPrompts layered architecture (Database → Repos
 
 ### Architecture Sequence
 
-Following MeatyPrompts layered architecture:
+Following project's layered architecture:
 
 1. **Database Layer** - Artifact schema extension for tools and linked_artifacts fields, indexes, constraints
 2. **Repository Layer** - Data access patterns for artifact updates, linked artifact queries

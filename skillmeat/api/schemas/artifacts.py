@@ -116,6 +116,11 @@ class ArtifactMetadataResponse(BaseModel):
         description="Required dependencies",
         examples=[["python-magic", "PyPDF2"]],
     )
+    tools: List[str] = Field(
+        default_factory=list,
+        description="Claude Code tools used by this artifact",
+        examples=[["Bash", "Read", "Write", "Edit"]],
+    )
 
 
 class ArtifactCollectionInfo(BaseModel):
@@ -249,6 +254,7 @@ class ArtifactResponse(BaseModel):
                     "author": "Anthropic",
                     "license": "MIT",
                     "tags": ["document", "pdf"],
+                    "tools": ["Read", "Write", "Bash"],
                 },
                 "upstream": {
                     "tracking_enabled": True,

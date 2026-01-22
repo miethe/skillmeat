@@ -499,6 +499,11 @@ def artifact_to_response(
             version=artifact.metadata.version,
             tags=artifact.metadata.tags,
             dependencies=artifact.metadata.dependencies,
+            tools=(
+                [tool.value for tool in artifact.metadata.tools]
+                if artifact.metadata.tools
+                else []
+            ),
         )
 
     # Convert upstream info
