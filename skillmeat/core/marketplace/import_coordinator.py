@@ -56,6 +56,9 @@ class ImportEntry:
     error_message: Optional[str] = None
     local_path: Optional[str] = None
     conflict_with: Optional[str] = None
+    # Metadata from source artifact (frontmatter)
+    description: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -187,6 +190,8 @@ class ImportCoordinator:
                 artifact_type=entry_data.get("artifact_type", ""),
                 name=entry_data.get("name", ""),
                 upstream_url=entry_data.get("upstream_url", ""),
+                description=entry_data.get("description"),
+                tags=entry_data.get("tags", []),
             )
 
             try:
@@ -381,26 +386,31 @@ class ImportCoordinator:
                 f"Invalid artifact type '{entry.artifact_type}': {e}"
             ) from e
 
-        # Create artifact metadata (minimal for imported artifacts)
+        # Create artifact metadata using source artifact's description if available
         metadata = ArtifactMetadata(
             title=entry.name,
-            description=f"Imported from marketplace",
+            description=entry.description,  # Use source artifact description (may be None)
         )
+
+        # Use tags from source artifact, fallback to empty list
+        # Do NOT add generic tags like "marketplace" or "imported" - use origin field for provenance
+        artifact_tags = entry.tags if entry.tags else []
 
         # Create Artifact object
         artifact = Artifact(
             name=entry.name,
             type=artifact_type,
             path=str(local_path),
-            origin="github",  # Imported from marketplace (GitHub sources)
+            origin="marketplace",  # Track provenance via origin field, not tags
             metadata=metadata,
             added=datetime.utcnow(),
-            upstream=entry.upstream_url,
+            upstream=entry.upstream_url,  # Keep full GitHub URL
             version_spec="latest",  # Default to latest
             resolved_sha=None,  # Will be set after actual download
             resolved_version=None,
             last_updated=None,
-            tags=["marketplace", "imported"],
+            tags=artifact_tags,
+            origin_source="github",  # Currently all marketplace sources are GitHub-based
         )
 
         # Add artifact to collection

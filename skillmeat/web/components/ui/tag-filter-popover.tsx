@@ -10,9 +10,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useTags } from '@/hooks/use-tags';
 
+interface AvailableTag {
+  name: string;
+  artifact_count: number;
+}
+
 interface TagFilterPopoverProps {
   selectedTags: string[];
   onChange: (tags: string[]) => void;
+  /** Optional: If provided, use these tags instead of fetching from API */
+  availableTags?: AvailableTag[];
   className?: string;
 }
 
@@ -28,24 +35,39 @@ interface TagFilterPopoverProps {
  * <TagFilterPopover selectedTags={selectedTags} onChange={setSelectedTags} />
  * ```
  */
-export function TagFilterPopover({ selectedTags, onChange, className }: TagFilterPopoverProps) {
+export function TagFilterPopover({
+  selectedTags,
+  onChange,
+  availableTags,
+  className,
+}: TagFilterPopoverProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
-  const { data: tagsData, isLoading } = useTags(100);
 
-  const tags = tagsData?.items || [];
+  // Only fetch from API if availableTags not provided
+  const { data: tagsData, isLoading: isLoadingFromApi } = useTags(availableTags ? 0 : 100);
 
-  // Filter tags by search
+  // Use provided tags or fall back to API response
+  const tags = availableTags ?? (tagsData?.items || []);
+  const isLoading = !availableTags && isLoadingFromApi;
+
+  // Filter tags by search, and only show tags that have at least one artifact
   const filteredTags = React.useMemo(() => {
-    if (!search) return tags;
-    return tags.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
+    // First filter to only tags with artifacts
+    let result = tags.filter((tag) => (tag.artifact_count ?? 0) > 0);
+    // Then filter by search query
+    if (search) {
+      result = result.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
+    }
+    return result;
   }, [tags, search]);
 
-  const toggleTag = (tagId: string) => {
-    if (selectedTags.includes(tagId)) {
-      onChange(selectedTags.filter((id) => id !== tagId));
+  // Toggle tag by name (not ID) since artifact tags are stored as string names
+  const toggleTag = (tagName: string) => {
+    if (selectedTags.includes(tagName)) {
+      onChange(selectedTags.filter((name) => name !== tagName));
     } else {
-      onChange([...selectedTags, tagId]);
+      onChange([...selectedTags, tagName]);
     }
   };
 
@@ -95,15 +117,18 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
               <div className="py-4 text-center text-sm text-muted-foreground">No tags found</div>
             ) : (
               filteredTags.map((tag) => {
-                const isSelected = selectedTags.includes(tag.id);
+                // Use tag.name for selection since artifact tags are stored as string names
+                const isSelected = selectedTags.includes(tag.name);
+                // Check if tag has color property (API tags have it, computed tags don't)
+                const tagColor = 'color' in tag ? (tag as { color?: string }).color : undefined;
                 return (
                   <div
-                    key={tag.id}
+                    key={tag.name}
                     className={cn(
                       'flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent',
                       isSelected && 'bg-accent'
                     )}
-                    onClick={() => toggleTag(tag.id)}
+                    onClick={() => toggleTag(tag.name)}
                   >
                     <div className="flex items-center gap-2">
                       <div
@@ -114,7 +139,7 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
                       >
                         {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                       </div>
-                      <Badge variant="secondary" colorStyle={tag.color}>
+                      <Badge variant="secondary" colorStyle={tagColor}>
                         {tag.name}
                       </Badge>
                     </div>
@@ -144,26 +169,36 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
  * <TagFilterBar selectedTags={selectedTags} onChange={setSelectedTags} />
  * ```
  */
-export function TagFilterBar({ selectedTags, onChange, className }: TagFilterPopoverProps) {
-  const { data: tagsData } = useTags(100);
-  const tags = tagsData?.items || [];
-
-  const selectedTagDetails = tags.filter((t) => selectedTags.includes(t.id));
+export function TagFilterBar({
+  selectedTags,
+  onChange,
+  availableTags,
+  className,
+}: TagFilterPopoverProps) {
+  // Only fetch from API if availableTags not provided
+  const { data: tagsData } = useTags(availableTags ? 0 : 100);
+  const tags = availableTags ?? (tagsData?.items || []);
 
   if (selectedTags.length === 0) return null;
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <span className="text-sm text-muted-foreground">Filtering by:</span>
-      {selectedTagDetails.map((tag) => (
-        <Badge key={tag.id} variant="secondary" colorStyle={tag.color} className="gap-1">
-          {tag.name}
-          <X
-            className="h-3 w-3 cursor-pointer hover:opacity-70"
-            onClick={() => onChange(selectedTags.filter((id) => id !== tag.id))}
-          />
-        </Badge>
-      ))}
+      {/* Show selected tags - use availableTags if provided, otherwise show simple badges */}
+      {selectedTags.map((tagName) => {
+        const tagInfo = tags.find((t) => t.name === tagName);
+        const tagColor =
+          tagInfo && 'color' in tagInfo ? (tagInfo as { color?: string }).color : undefined;
+        return (
+          <Badge key={tagName} variant="secondary" colorStyle={tagColor} className="gap-1">
+            {tagName}
+            <X
+              className="h-3 w-3 cursor-pointer hover:opacity-70"
+              onClick={() => onChange(selectedTags.filter((name) => name !== tagName))}
+            />
+          </Badge>
+        );
+      })}
       <Button variant="ghost" size="sm" onClick={() => onChange([])} className="h-6 text-xs">
         Clear all
       </Button>

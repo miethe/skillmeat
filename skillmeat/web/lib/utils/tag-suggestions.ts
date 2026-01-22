@@ -151,3 +151,34 @@ export function isValidTag(tag: string): boolean {
 export function normalizeTag(tag: string): string {
   return tag.trim().toLowerCase();
 }
+
+/**
+ * Normalize a tag string for storage with stricter formatting.
+ *
+ * - Converts to lowercase
+ * - Replaces spaces with underscores
+ * - Trims whitespace
+ * - Removes special characters except underscores and hyphens
+ *
+ * @param tag - Raw tag string
+ * @returns Normalized tag ready for storage
+ *
+ * @example
+ * ```ts
+ * normalizeTagForStorage("  My Tag  ")
+ * // Returns: "my_tag"
+ *
+ * normalizeTagForStorage("React.js & TypeScript")
+ * // Returns: "reactjs_typescript"
+ *
+ * normalizeTagForStorage("AI-Powered Tools")
+ * // Returns: "ai-powered_tools"
+ * ```
+ */
+export function normalizeTagForStorage(tag: string): string {
+  return tag
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .replace(/[^a-z0-9_-]/g, ''); // Remove special chars except _ and -
+}

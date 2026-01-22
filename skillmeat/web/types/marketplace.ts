@@ -283,3 +283,55 @@ export interface InferUrlResponse {
   root_hint: string | null;
   error: string | null;
 }
+
+// ============================================================================
+// Source Auto-Tags (GitHub Topics)
+// ============================================================================
+
+/**
+ * Represents a single auto-tag segment extracted from GitHub repository topics
+ */
+export interface AutoTagSegment {
+  /** Original tag value from GitHub topics */
+  value: string;
+  /** Normalized version for tag use */
+  normalized: string;
+  /** Current status of the auto-tag */
+  status: 'pending' | 'approved' | 'rejected';
+  /** Source of the tag (e.g., 'github_topics') */
+  source: string;
+}
+
+/**
+ * Response containing auto-tag suggestions for a source
+ */
+export interface AutoTagsResponse {
+  /** Source ID */
+  source_id: string;
+  /** List of auto-tag segments with their statuses */
+  segments: AutoTagSegment[];
+  /** Whether there are pending auto-tags to review */
+  has_pending: boolean;
+}
+
+/**
+ * Request to update the status of an auto-tag
+ */
+export interface UpdateAutoTagRequest {
+  /** Tag value to update */
+  value: string;
+  /** New status for the tag */
+  status: 'approved' | 'rejected';
+}
+
+/**
+ * Response after updating auto-tag status
+ */
+export interface UpdateAutoTagResponse {
+  /** Source ID */
+  source_id: string;
+  /** The updated auto-tag segment */
+  updated_tag: AutoTagSegment;
+  /** Tags that were added to the source (when approved) */
+  tags_added: string[];
+}

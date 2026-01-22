@@ -98,7 +98,7 @@ class Artifact:
     name: str
     type: ArtifactType
     path: str  # relative to collection root (e.g., "skills/python-skill/")
-    origin: str  # "local" or "github"
+    origin: str  # "local", "github", or "marketplace"
     metadata: ArtifactMetadata
     added: datetime
     upstream: Optional[str] = None  # GitHub URL if from GitHub
@@ -108,6 +108,7 @@ class Artifact:
     last_updated: Optional[datetime] = None
     discovered_at: Optional[datetime] = None  # When artifact was first discovered or last changed
     tags: List[str] = field(default_factory=list)
+    origin_source: Optional[str] = None  # Platform type when origin="marketplace" (e.g., "github", "gitlab", "bitbucket")
 
     def __post_init__(self):
         """Validate artifact configuration.
@@ -140,10 +141,25 @@ class Artifact:
                 "artifact names cannot start with '.'"
             )
 
-        if self.origin not in ("local", "github"):
+        if self.origin not in ("local", "github", "marketplace"):
             raise ValueError(
-                f"Invalid origin: {self.origin}. Must be 'local' or 'github'."
+                f"Invalid origin: {self.origin}. Must be 'local', 'github', or 'marketplace'."
             )
+
+        # Validate origin_source: only allowed when origin is "marketplace"
+        valid_origin_sources = ("github", "gitlab", "bitbucket")
+        if self.origin_source is not None:
+            if self.origin != "marketplace":
+                raise ValueError(
+                    f"origin_source can only be set when origin is 'marketplace', "
+                    f"but origin is '{self.origin}'"
+                )
+            if self.origin_source not in valid_origin_sources:
+                raise ValueError(
+                    f"Invalid origin_source: {self.origin_source}. "
+                    f"Must be one of: {', '.join(valid_origin_sources)}"
+                )
+
         # Ensure type is ArtifactType enum
         if isinstance(self.type, str):
             self.type = ArtifactType(self.type)
@@ -182,6 +198,8 @@ class Artifact:
             result["discovered_at"] = self.discovered_at.isoformat()
         if self.tags:
             result["tags"] = self.tags
+        if self.origin_source is not None:
+            result["origin_source"] = self.origin_source
 
         return result
 
@@ -215,6 +233,7 @@ class Artifact:
             last_updated=last_updated,
             discovered_at=discovered_at,
             tags=data.get("tags", []),
+            origin_source=data.get("origin_source"),
         )
 
 

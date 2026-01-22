@@ -329,6 +329,16 @@ export interface Entity {
   aliases?: string[];
   /** Collections this artifact belongs to */
   collections?: Collection[];
+  /** Origin category: 'local', 'github', or 'marketplace' */
+  origin?: string;
+  /** Platform source when origin is 'marketplace' (e.g., 'github', 'gitlab') */
+  origin_source?: string;
+  /** Author from metadata */
+  author?: string;
+  /** License from metadata */
+  license?: string;
+  /** Required dependencies from metadata */
+  dependencies?: string[];
 }
 
 /**
