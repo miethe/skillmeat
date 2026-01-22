@@ -35,17 +35,23 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
 
   const tags = tagsData?.items || [];
 
-  // Filter tags by search
+  // Filter tags by search, and only show tags that have at least one artifact
   const filteredTags = React.useMemo(() => {
-    if (!search) return tags;
-    return tags.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
+    // First filter to only tags with artifacts
+    let result = tags.filter((tag) => (tag.artifact_count ?? 0) > 0);
+    // Then filter by search query
+    if (search) {
+      result = result.filter((tag) => tag.name.toLowerCase().includes(search.toLowerCase()));
+    }
+    return result;
   }, [tags, search]);
 
-  const toggleTag = (tagId: string) => {
-    if (selectedTags.includes(tagId)) {
-      onChange(selectedTags.filter((id) => id !== tagId));
+  // Toggle tag by name (not ID) since artifact tags are stored as string names
+  const toggleTag = (tagName: string) => {
+    if (selectedTags.includes(tagName)) {
+      onChange(selectedTags.filter((name) => name !== tagName));
     } else {
-      onChange([...selectedTags, tagId]);
+      onChange([...selectedTags, tagName]);
     }
   };
 
@@ -95,7 +101,8 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
               <div className="py-4 text-center text-sm text-muted-foreground">No tags found</div>
             ) : (
               filteredTags.map((tag) => {
-                const isSelected = selectedTags.includes(tag.id);
+                // Use tag.name for selection since artifact tags are stored as string names
+                const isSelected = selectedTags.includes(tag.name);
                 return (
                   <div
                     key={tag.id}
@@ -103,7 +110,7 @@ export function TagFilterPopover({ selectedTags, onChange, className }: TagFilte
                       'flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-accent',
                       isSelected && 'bg-accent'
                     )}
-                    onClick={() => toggleTag(tag.id)}
+                    onClick={() => toggleTag(tag.name)}
                   >
                     <div className="flex items-center gap-2">
                       <div
@@ -148,7 +155,8 @@ export function TagFilterBar({ selectedTags, onChange, className }: TagFilterPop
   const { data: tagsData } = useTags(100);
   const tags = tagsData?.items || [];
 
-  const selectedTagDetails = tags.filter((t) => selectedTags.includes(t.id));
+  // Match by tag name since artifact tags are stored as string names
+  const selectedTagDetails = tags.filter((t) => selectedTags.includes(t.name));
 
   if (selectedTags.length === 0) return null;
 
@@ -160,10 +168,22 @@ export function TagFilterBar({ selectedTags, onChange, className }: TagFilterPop
           {tag.name}
           <X
             className="h-3 w-3 cursor-pointer hover:opacity-70"
-            onClick={() => onChange(selectedTags.filter((id) => id !== tag.id))}
+            onClick={() => onChange(selectedTags.filter((name) => name !== tag.name))}
           />
         </Badge>
       ))}
+      {/* Show any selected tags that aren't in the tag system (legacy/orphan tags) */}
+      {selectedTags
+        .filter((name) => !tags.some((t) => t.name === name))
+        .map((name) => (
+          <Badge key={name} variant="secondary" className="gap-1">
+            {name}
+            <X
+              className="h-3 w-3 cursor-pointer hover:opacity-70"
+              onClick={() => onChange(selectedTags.filter((n) => n !== name))}
+            />
+          </Badge>
+        ))}
       <Button variant="ghost" size="sm" onClick={() => onChange([])} className="h-6 text-xs">
         Clear all
       </Button>
