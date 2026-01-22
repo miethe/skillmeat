@@ -49,6 +49,8 @@ interface ApiArtifact {
   name: string;
   type: ArtifactType;
   source: string;
+  origin?: string;
+  origin_source?: string | null;
   version?: string;
   tags?: string[];
   aliases?: string[];
@@ -314,6 +316,8 @@ const mapApiArtifact = (artifact: ApiArtifact): Artifact => {
     status: isOutdated ? 'outdated' : 'active',
     version: artifact.version || metadata.version,
     source: artifact.source,
+    origin: artifact.origin,
+    origin_source: artifact.origin_source || undefined,
     metadata: {
       title: metadata.title || artifact.name,
       description: metadata.description || '',

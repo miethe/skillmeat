@@ -43,6 +43,8 @@ export interface ArtifactsPaginatedResponse {
     name: string;
     type: string;
     source: string;
+    origin?: string;
+    origin_source?: string | null;
     version?: string;
     tags?: string[];
     aliases?: string[];
