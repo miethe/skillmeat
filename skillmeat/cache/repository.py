@@ -1146,12 +1146,14 @@ class CacheRepository:
             session.close()
 
     def list_marketplace_entries(
-        self, type_filter: Optional[str] = None
+        self, type_filter: Optional[str] = None, skip: int = 0, limit: int = 100
     ) -> List[MarketplaceEntry]:
         """List marketplace entries with optional type filter.
 
         Args:
             type_filter: Optional artifact type filter
+            skip: Number of records to skip (for pagination)
+            limit: Maximum number of records to return
 
         Returns:
             List of MarketplaceEntry objects
@@ -1169,9 +1171,9 @@ class CacheRepository:
             if type_filter:
                 q = q.filter(MarketplaceEntry.type == type_filter)
 
-            entries = q.all()
+            entries = q.offset(skip).limit(limit).all()
             logger.debug(
-                f"Listed {len(entries)} marketplace entries (type={type_filter})"
+                f"Listed {len(entries)} marketplace entries (type={type_filter}, skip={skip}, limit={limit})"
             )
             return entries
         finally:
