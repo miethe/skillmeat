@@ -3413,6 +3413,12 @@ async def get_artifact_file_tree(
     validate_source_id(source_id)
     artifact_path = validate_file_path(artifact_path)
 
+    # Normalize "." (repository root) to empty string
+    # When artifacts are at repository root, their path is stored as "." in the database
+    # but empty string is the canonical representation for API operations
+    if artifact_path == ".":
+        artifact_path = ""
+
     source_repo = MarketplaceSourceRepository()
 
     try:
@@ -3629,6 +3635,12 @@ async def get_artifact_file_content(
     validate_source_id(source_id)
     artifact_path = validate_file_path(artifact_path)
     file_path = validate_file_path(file_path)
+
+    # Normalize "." (repository root) to empty string
+    # When artifacts are at repository root, their path is stored as "." in the database
+    # but empty string is the canonical representation for API operations
+    if artifact_path == ".":
+        artifact_path = ""
 
     source_repo = MarketplaceSourceRepository()
 

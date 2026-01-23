@@ -80,8 +80,13 @@ export async function fetchCatalogFileTree(
   sourceId: string,
   artifactPath: string
 ): Promise<FileTreeResponse> {
+  // Normalize "." (repository root) to empty string to prevent URL issues
+  // "." gets normalized away in URLs: "/artifacts/./files" -> "/artifacts/files"
+  // which would match the wrong route
+  const normalizedPath = artifactPath === '.' ? '' : artifactPath;
+
   // Encode the artifact path for URL safety
-  const encodedPath = encodeURIComponent(artifactPath);
+  const encodedPath = encodeURIComponent(normalizedPath);
   const response = await fetch(
     buildUrl(`/marketplace/sources/${sourceId}/artifacts/${encodedPath}/files`)
   );
@@ -113,8 +118,13 @@ export async function fetchCatalogFileContent(
   artifactPath: string,
   filePath: string
 ): Promise<FileContentResponse> {
+  // Normalize "." (repository root) to empty string to prevent URL issues
+  // "." gets normalized away in URLs: "/artifacts/./files" -> "/artifacts/files"
+  // which would match the wrong route
+  const normalizedArtifactPath = artifactPath === '.' ? '' : artifactPath;
+
   // Encode both paths for URL safety
-  const encodedArtifactPath = encodeURIComponent(artifactPath);
+  const encodedArtifactPath = encodeURIComponent(normalizedArtifactPath);
   const encodedFilePath = encodeURIComponent(filePath);
   const response = await fetch(
     buildUrl(
