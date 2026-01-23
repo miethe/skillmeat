@@ -111,6 +111,7 @@ export async function fetchArtifactsPaginated(options?: {
   status?: string;
   scope?: string;
   search?: string;
+  tools?: string[];
 }): Promise<ArtifactsPaginatedResponse> {
   const params = new URLSearchParams();
   if (options?.limit) params.set('limit', options.limit.toString());
@@ -119,6 +120,9 @@ export async function fetchArtifactsPaginated(options?: {
   if (options?.status) params.set('status', options.status);
   if (options?.scope) params.set('scope', options.scope);
   if (options?.search) params.set('search', options.search);
+  if (options?.tools && options.tools.length > 0) {
+    params.set('tools', options.tools.join(','));
+  }
 
   const queryString = params.toString();
   const path = queryString ? `/artifacts?${queryString}` : '/artifacts';

@@ -55,3 +55,10 @@ export { ConflictResolver } from './conflict-resolver';
 export type { ConflictResolverProps } from './conflict-resolver';
 export { MergeWorkflow } from './merge-workflow';
 export { ProjectSelectorForDiff } from './project-selector-for-diff';
+export { ArtifactLinkingDialog } from './artifact-linking-dialog';
+export type { LinkType } from './artifact-linking-dialog';
+export { LinkedArtifactsSection } from './linked-artifacts-section';
+export type {
+  LinkedArtifactsSectionProps,
+  LinkedArtifactReference,
+} from './linked-artifacts-section';

@@ -89,6 +89,8 @@ export interface ArtifactFilters {
   groupId?: string;
   /** Tag IDs to filter artifacts by (multi-select) */
   tags?: string[];
+  /** Tool names to filter artifacts by (multi-select) */
+  tools?: string[];
 }
 
 export type SortField = 'name' | 'updatedAt' | 'usageCount' | 'confidence';

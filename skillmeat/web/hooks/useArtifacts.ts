@@ -635,6 +635,8 @@ export interface InfiniteAllArtifactsOptions {
   scope?: string;
   /** Search query */
   search?: string;
+  /** Filter by tools (Claude Code tools used by artifact) */
+  tools?: string[];
   /** Whether the query should be enabled */
   enabled?: boolean;
 }
@@ -677,6 +679,7 @@ export function useInfiniteArtifacts(options?: InfiniteAllArtifactsOptions) {
         status: filters.status,
         scope: filters.scope,
         search: filters.search,
+        tools: filters.tools,
       });
     },
     initialPageParam: undefined as string | undefined,

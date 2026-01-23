@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { GroupFilterSelect } from '@/components/shared/group-filter-select';
 import { TagFilterPopover, TagFilterBar } from '@/components/ui/tag-filter-popover';
+import { ToolFilterPopover, ToolFilterBar } from '@/components/ui/tool-filter-popover';
 import { useCollectionContext } from '@/hooks';
 import type { ArtifactFilters, ArtifactSort, SortField, SortOrder } from '@/types/artifact';
 
@@ -35,6 +36,13 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
     onFiltersChange({
       ...filters,
       tags: tags.length > 0 ? tags : undefined,
+    });
+  };
+
+  const handleToolsChange = (tools: string[]) => {
+    onFiltersChange({
+      ...filters,
+      tools: tools.length > 0 ? tools : undefined,
     });
   };
 
@@ -72,7 +80,7 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
       {/* Filter Controls */}
       <div
         className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${
-          isSpecificCollectionContext ? 'md:grid-cols-6' : 'md:grid-cols-5'
+          isSpecificCollectionContext ? 'lg:grid-cols-7' : 'lg:grid-cols-6'
         }`}
       >
         {/* Type Filter */}
@@ -164,6 +172,16 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
           />
         </div>
 
+        {/* Tools Filter */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Tools</label>
+          <ToolFilterPopover
+            selectedTools={filters.tools || []}
+            onChange={handleToolsChange}
+            className="w-full justify-start"
+          />
+        </div>
+
         {/* Sort Controls */}
         <div>
           <label htmlFor="sort-field" className="mb-1.5 block text-sm font-medium">
@@ -195,6 +213,9 @@ export function Filters({ filters, sort, onFiltersChange, onSortChange }: Filter
 
       {/* Selected Tags Bar */}
       <TagFilterBar selectedTags={filters.tags || []} onChange={handleTagsChange} />
+
+      {/* Selected Tools Bar */}
+      <ToolFilterBar selectedTools={filters.tools || []} onChange={handleToolsChange} />
     </div>
   );
 }

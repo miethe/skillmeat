@@ -47,7 +47,7 @@ export interface DeploymentCardProps {
   /** Callback when deployment should be updated */
   onUpdate?: () => void;
   /** Callback when deployment should be removed */
-  onRemove?: () => void;
+  onRemove?: (removeFiles: boolean) => void;
   /** Callback to view source artifact in collection */
   onViewSource?: () => void;
   /** Callback to view deployment diff */

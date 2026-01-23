@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SplitPreview } from '@/components/editor/split-preview';
 import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
-import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
+import { parseFrontmatter, detectFrontmatter, stripFrontmatter } from '@/lib/frontmatter';
 
 // ============================================================================
 // Types
@@ -64,6 +64,12 @@ export interface ContentPaneProps {
    * @default "File content viewer"
    */
   ariaLabel?: string;
+  /**
+   * When true, strips raw frontmatter from content display.
+   * Use this when FrontmatterDisplay is shown separately to avoid duplication.
+   * @default false
+   */
+  showFrontmatter?: boolean;
 }
 
 // ============================================================================
@@ -342,6 +348,7 @@ export function ContentPane({
   onSave,
   onCancel,
   ariaLabel,
+  showFrontmatter = false,
 }: ContentPaneProps) {
   // Generate unique ID for breadcrumb to use in aria-labelledby
   const breadcrumbId = path
@@ -367,6 +374,15 @@ export function ContentPane({
     }
     return parseFrontmatter(content);
   }, [content]);
+
+  // Content to display: strip frontmatter when FrontmatterDisplay is shown separately
+  const displayContent = useMemo(() => {
+    if (!content || typeof content !== 'string') {
+      return content || '';
+    }
+    // Strip frontmatter when showFrontmatter is true (FrontmatterDisplay handles it)
+    return showFrontmatter ? stripFrontmatter(content) : content;
+  }, [content, showFrontmatter]);
 
   // Handle edit button click
   const handleEditClick = () => {
@@ -515,7 +531,7 @@ export function ContentPane({
           )}
           <div className="min-w-0">
             <SplitPreview
-              content={isEditing ? editedContent : content}
+              content={isEditing ? editedContent : displayContent}
               onChange={(newContent) => onEditChange?.(newContent)}
               isEditing={isEditing}
             />
@@ -564,7 +580,7 @@ export function ContentPane({
             />
           )}
           <div className="max-w-full">
-            <ContentDisplay content={content} showLineNumbers={false} />
+            <ContentDisplay content={displayContent} showLineNumbers={false} />
           </div>
         </div>
       </ScrollArea>

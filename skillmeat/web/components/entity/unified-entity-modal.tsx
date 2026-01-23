@@ -23,6 +23,7 @@ import {
   FolderOpen,
   Rocket,
   Trash2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
@@ -50,6 +51,11 @@ import { ArtifactDeletionDialog } from '@/components/entity/artifact-deletion-di
 import { ProjectSelectorForDiff } from '@/components/entity/project-selector-for-diff';
 import { SyncStatusTab } from '@/components/sync-status';
 import { ParameterEditorModal } from '@/components/discovery/ParameterEditorModal';
+import {
+  LinkedArtifactsSection,
+  ArtifactLinkingDialog,
+  type LinkedArtifactReference,
+} from '@/components/entity';
 import {
   useEditArtifactParameters,
   useToast,
@@ -89,6 +95,11 @@ interface HistoryEntry {
   timestamp: string;
   filesChanged?: number;
   user?: string;
+}
+
+interface LinkedArtifactsResponse {
+  linked_artifacts: LinkedArtifactReference[];
+  unlinked_references: string[];
 }
 
 // ============================================================================
@@ -278,6 +289,7 @@ function _EntityModalSkeleton() {
  * - History tab with timeline of deploy/sync/rollback events
  * - Collections tab with collection membership and management
  * - Deployments tab showing where this artifact is deployed
+ * - Links tab showing artifact dependencies and relationships
  * - Skeleton loading state
  * - Rollback dialog integration
  * - Full TypeScript support
@@ -322,6 +334,8 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
   const [showDeletionDialog, setShowDeletionDialog] = useState(false);
   // Deploy dialog state
   const [showDeployDialog, setShowDeployDialog] = useState(false);
+  // Artifact linking dialog state
+  const [showLinkingDialog, setShowLinkingDialog] = useState(false);
   const { mutateAsync: updateParameters } = useEditArtifactParameters();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -394,6 +408,33 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     enabled: !!entity?.id && !!selectedPath,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+  });
+
+  // Fetch linked artifacts when Links tab is active
+  const {
+    data: linkedArtifactsData,
+    isLoading: isLinkedArtifactsLoading,
+    error: linkedArtifactsError,
+    refetch: refetchLinkedArtifacts,
+  } = useQuery<LinkedArtifactsResponse>({
+    queryKey: ['linked-artifacts', entity?.id],
+    queryFn: async () => {
+      if (!entity?.id) {
+        throw new Error('Missing entity ID');
+      }
+
+      const params = new URLSearchParams();
+      if (entity.collection) {
+        params.set('collection', entity.collection);
+      }
+
+      return await apiRequest<LinkedArtifactsResponse>(
+        `/artifacts/${encodeURIComponent(entity.id)}/linked-artifacts?${params.toString()}`
+      );
+    },
+    enabled: !!entity?.id && activeTab === 'links',
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   // Check if there are unsaved changes
@@ -1158,6 +1199,13 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
     );
   };
 
+  // Handle linked artifacts callbacks
+  const handleLinkChange = () => {
+    // Invalidate linked artifacts query to refetch
+    queryClient.invalidateQueries({ queryKey: ['linked-artifacts', entity.id] });
+    refetchLinkedArtifacts();
+  };
+
   // ============================================================================
   // Status Helpers
   // ============================================================================
@@ -1553,6 +1601,19 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                 )}
               </TabsTrigger>
               <TabsTrigger
+                value="links"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+              >
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Links
+                {linkedArtifactsData?.linked_artifacts &&
+                  linkedArtifactsData.linked_artifacts.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {linkedArtifactsData.linked_artifacts.length}
+                    </Badge>
+                  )}
+              </TabsTrigger>
+              <TabsTrigger
                 value="history"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
               >
@@ -1836,6 +1897,31 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
                   onClose={onClose}
                 />
               )}
+            </TabsContent>
+
+            {/* Links Tab */}
+            <TabsContent value="links" className="mt-0 flex-1">
+              <ScrollArea className="h-[calc(90vh-12rem)]">
+                <div className="py-4">
+                  <LinkedArtifactsSection
+                    artifactId={entity.id}
+                    linkedArtifacts={linkedArtifactsData?.linked_artifacts || []}
+                    unlinkedReferences={linkedArtifactsData?.unlinked_references || []}
+                    onLinkCreated={handleLinkChange}
+                    onLinkDeleted={handleLinkChange}
+                    onAddLinkClick={() => setShowLinkingDialog(true)}
+                    isLoading={isLinkedArtifactsLoading}
+                    error={
+                      linkedArtifactsError instanceof Error
+                        ? linkedArtifactsError.message
+                        : linkedArtifactsError
+                          ? 'Failed to load linked artifacts'
+                          : null
+                    }
+                    onRetry={() => refetchLinkedArtifacts()}
+                  />
+                </div>
+              </ScrollArea>
             </TabsContent>
 
             {/* History Tab */}
@@ -2166,6 +2252,14 @@ export function UnifiedEntityModal({ entity, open, onClose }: UnifiedEntityModal
           // Refresh deployments list
           queryClient.invalidateQueries({ queryKey: ['deployments'] });
         }}
+      />
+
+      {/* Artifact Linking Dialog */}
+      <ArtifactLinkingDialog
+        artifactId={entity.id}
+        open={showLinkingDialog}
+        onOpenChange={setShowLinkingDialog}
+        onSuccess={handleLinkChange}
       />
     </>
   );
