@@ -50,12 +50,14 @@ from skillmeat.api.schemas.artifacts import (
     ArtifactUpstreamResponse,
     ArtifactVersionInfo,
     ConflictInfo,
+    CreateLinkedArtifactRequest,
     DeploymentStatistics,
     FileDiff,
     FileContentResponse,
     FileListResponse,
     FileNode,
     FileUpdateRequest,
+    LinkedArtifactReferenceSchema,
     ProjectDeploymentInfo,
     VersionGraphNodeResponse,
     VersionGraphResponse,
@@ -88,7 +90,7 @@ from skillmeat.api.utils.error_handlers import (
     create_validation_error,
     validate_artifact_request,
 )
-from skillmeat.core.artifact import ArtifactType
+from skillmeat.core.artifact import ArtifactType, LinkedArtifactReference
 from skillmeat.core.cache import MetadataCache
 from skillmeat.core.deployment import Deployment, DeploymentManager
 from skillmeat.core.discovery import ArtifactDiscoveryService
@@ -99,7 +101,6 @@ from skillmeat.core.importer import (
     BulkImportResultData,
     ImportResultData,
 )
-from skillmeat.core.services import TagService
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
@@ -1675,6 +1676,10 @@ async def list_artifacts(
         default=None,
         description="Filter by tags (comma-separated)",
     ),
+    tools: Optional[str] = Query(
+        default=None,
+        description="Filter by tools (comma-separated). Returns artifacts that use any of the specified tools.",
+    ),
     check_drift: bool = Query(
         default=False,
         description="Check for local modifications and drift status (may impact performance)",
@@ -1682,6 +1687,10 @@ async def list_artifacts(
     project_path: Optional[str] = Query(
         default=None,
         description="Project path for drift detection (required if check_drift=true)",
+    ),
+    has_unlinked: Optional[bool] = Query(
+        default=None,
+        description="Filter for artifacts with unlinked references (true) or without (false)",
     ),
 ) -> ArtifactListResponse:
     """List all artifacts with filters and pagination.
@@ -1696,8 +1705,10 @@ async def list_artifacts(
         artifact_type: Optional type filter
         collection: Optional collection filter
         tags: Optional tag filter (comma-separated)
+        tools: Optional tools filter (comma-separated)
         check_drift: Whether to check for drift and local modifications
         project_path: Project path for drift detection
+        has_unlinked: Filter for artifacts with/without unlinked references
 
     Returns:
         Paginated list of artifacts
@@ -1708,7 +1719,7 @@ async def list_artifacts(
     try:
         logger.info(
             f"Listing artifacts (limit={limit}, after={after}, "
-            f"type={artifact_type}, collection={collection}, tags={tags})"
+            f"type={artifact_type}, collection={collection}, tags={tags}, tools={tools})"
         )
 
         # Parse filters
@@ -1756,6 +1767,37 @@ async def list_artifacts(
                     )
                     continue
             artifacts = all_artifacts
+
+        # Filter by tools if specified
+        if tools:
+            tools_filter = [t.strip().lower() for t in tools.split(",") if t.strip()]
+            if tools_filter:
+                filtered_artifacts = []
+                for artifact in artifacts:
+                    if artifact.metadata and artifact.metadata.tools:
+                        # Get tool values as lowercase strings for comparison
+                        artifact_tools = [
+                            (t.value.lower() if hasattr(t, "value") else str(t).lower())
+                            for t in artifact.metadata.tools
+                        ]
+                        # Check if any of the specified tools match
+                        if any(tool in artifact_tools for tool in tools_filter):
+                            filtered_artifacts.append(artifact)
+                artifacts = filtered_artifacts
+
+        # Filter by unlinked references if specified
+        if has_unlinked is not None:
+            filtered_artifacts = []
+            for artifact in artifacts:
+                if artifact.metadata and artifact.metadata.unlinked_references:
+                    # Has unlinked references (non-empty array)
+                    if has_unlinked and len(artifact.metadata.unlinked_references) > 0:
+                        filtered_artifacts.append(artifact)
+                else:
+                    # No unlinked references (empty or None)
+                    if not has_unlinked:
+                        filtered_artifacts.append(artifact)
+            artifacts = filtered_artifacts
 
         # Sort artifacts for consistent pagination
         artifacts = sorted(artifacts, key=lambda a: (a.type.value, a.name))
@@ -2612,6 +2654,7 @@ async def update_artifact_parameters(
 
             if pending_tag_sync is not None:
                 try:
+                    from skillmeat.core.services import TagService
                     TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
                 except Exception as e:
                     logger.warning(
@@ -6149,6 +6192,8 @@ async def get_artifact_tags(artifact_id: str) -> List[TagResponse]:
     Raises:
         HTTPException: 500 if operation fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -6296,6 +6341,8 @@ async def add_tag_to_artifact(artifact_id: str, tag_id: str) -> dict[str, str]:
         HTTPException: 400 if association already exists or invalid request
         HTTPException: 404 if artifact or tag not found
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -6327,6 +6374,8 @@ async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
         HTTPException: 400 if invalid request
         HTTPException: 404 if tag association not found
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -6334,3 +6383,566 @@ async def remove_tag_from_artifact(artifact_id: str, tag_id: str) -> None:
             raise HTTPException(status_code=404, detail="Tag association not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# =============================================================================
+# Linked Artifacts Endpoints
+# =============================================================================
+
+
+@router.post(
+    "/{artifact_id}/linked-artifacts",
+    response_model=LinkedArtifactReferenceSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create artifact link",
+    description="Create a link from this artifact to another artifact.",
+    responses={
+        201: {"description": "Successfully created artifact link"},
+        400: {"model": ErrorResponse, "description": "Invalid request or self-linking"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        409: {"model": ErrorResponse, "description": "Link already exists"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def create_linked_artifact(
+    artifact_id: str,
+    request: CreateLinkedArtifactRequest,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses default if not specified)",
+    ),
+) -> LinkedArtifactReferenceSchema:
+    """Create a link from one artifact to another.
+
+    Validates:
+    - Both artifacts exist
+    - Not linking to self
+    - Link doesn't already exist
+
+    Args:
+        artifact_id: Source artifact identifier (format: type:name)
+        request: Request body with target artifact ID and link type
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
+        collection: Optional collection name
+
+    Returns:
+        Created linked artifact reference
+
+    Raises:
+        HTTPException 400: If self-linking or invalid request
+        HTTPException 404: If source or target artifact not found
+        HTTPException 409: If link already exists
+        HTTPException 500: If operation fails
+    """
+    try:
+        logger.info(
+            f"Creating link from {artifact_id} to {request.target_artifact_id} "
+            f"with type '{request.link_type}'"
+        )
+
+        # Parse source artifact ID
+        try:
+            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type = ArtifactType(source_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Parse target artifact ID
+        try:
+            target_type_str, target_name = request.target_artifact_id.split(":", 1)
+            target_type = ArtifactType(target_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid target artifact ID format. Expected 'type:name'",
+            )
+
+        # Prevent self-linking
+        if artifact_id == request.target_artifact_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot link artifact to itself",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Find source artifact
+        source_artifact = coll.find_artifact(source_name, source_type)
+        if source_artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source artifact '{artifact_id}' not found",
+            )
+
+        # Find target artifact
+        target_artifact = coll.find_artifact(target_name, target_type)
+        if target_artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Target artifact '{request.target_artifact_id}' not found",
+            )
+
+        # Ensure source artifact has metadata
+        if source_artifact.metadata is None:
+            from skillmeat.core.artifact import ArtifactMetadata
+
+            source_artifact.metadata = ArtifactMetadata()
+
+        # Resolve linked_artifacts if needed
+        source_artifact.metadata.resolve_linked_artifacts()
+
+        # Check if link already exists
+        existing_links = source_artifact.metadata.linked_artifacts or []
+        for existing_link in existing_links:
+            existing_id = (
+                existing_link.artifact_id
+                if hasattr(existing_link, "artifact_id")
+                else existing_link.get("artifact_id")
+            )
+            if existing_id == request.target_artifact_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Link to '{request.target_artifact_id}' already exists",
+                )
+
+        # Create new link
+        new_link = LinkedArtifactReference(
+            artifact_id=request.target_artifact_id,
+            artifact_name=target_artifact.name,
+            artifact_type=target_artifact.type,
+            source_name=(
+                target_artifact.upstream if target_artifact.upstream else "local"
+            ),
+            link_type=request.link_type,
+            created_at=datetime.now(timezone.utc),
+        )
+
+        # Add to source artifact's linked_artifacts
+        source_artifact.metadata.linked_artifacts.append(new_link)
+
+        # Clear matching unlinked reference if present
+        # Check if target was in unlinked_references and remove it
+        unlinked = source_artifact.metadata.unlinked_references or []
+        target_name_lower = target_artifact.name.lower()
+
+        # Check for variations of the name (exact match and plural handling)
+        updated_unlinked = [
+            ref
+            for ref in unlinked
+            if ref.lower() != target_name_lower
+            and ref.lower().rstrip("s") != target_name_lower.rstrip("s")
+        ]
+
+        if len(updated_unlinked) != len(unlinked):
+            source_artifact.metadata.unlinked_references = updated_unlinked
+            logger.info(
+                f"Cleared unlinked reference for {target_artifact.name} from {source_artifact.name}"
+            )
+
+        # Save collection back to disk
+        collection_mgr.save_collection(coll)
+
+        logger.info(
+            f"Successfully created link from {artifact_id} to {request.target_artifact_id}"
+        )
+
+        # Return the created link as response
+        return LinkedArtifactReferenceSchema(
+            artifact_id=new_link.artifact_id,
+            artifact_name=new_link.artifact_name,
+            artifact_type=(
+                new_link.artifact_type.value
+                if hasattr(new_link.artifact_type, "value")
+                else str(new_link.artifact_type)
+            ),
+            source_name=new_link.source_name,
+            link_type=new_link.link_type,
+            created_at=new_link.created_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to create link from {artifact_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create artifact link: {str(e)}",
+        )
+
+
+@router.delete(
+    "/{artifact_id}/linked-artifacts/{target_artifact_id:path}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete artifact link",
+    description="Remove a link from this artifact to another.",
+    responses={
+        204: {"description": "Successfully deleted artifact link"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact or link not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def delete_linked_artifact(
+    artifact_id: str,
+    target_artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses default if not specified)",
+    ),
+) -> None:
+    """Delete a link from one artifact to another.
+
+    Args:
+        artifact_id: Source artifact identifier (format: type:name)
+        target_artifact_id: Target artifact identifier (format: type:name)
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
+        collection: Optional collection name
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        HTTPException 404: If artifact or link not found
+        HTTPException 500: If operation fails
+    """
+    try:
+        logger.info(f"Deleting link from {artifact_id} to {target_artifact_id}")
+
+        # Parse source artifact ID
+        try:
+            source_type_str, source_name = artifact_id.split(":", 1)
+            source_type = ArtifactType(source_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Find source artifact
+        source_artifact = coll.find_artifact(source_name, source_type)
+        if source_artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Check if artifact has linked_artifacts
+        if source_artifact.metadata is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Link to '{target_artifact_id}' not found",
+            )
+
+        # Resolve linked_artifacts if needed
+        source_artifact.metadata.resolve_linked_artifacts()
+
+        # Get current links
+        current_links = source_artifact.metadata.linked_artifacts or []
+        original_count = len(current_links)
+
+        # Filter out the target link
+        new_links = []
+        for link in current_links:
+            link_id = (
+                link.artifact_id
+                if hasattr(link, "artifact_id")
+                else link.get("artifact_id")
+            )
+            if link_id != target_artifact_id:
+                new_links.append(link)
+
+        # Check if link was found
+        if len(new_links) == original_count:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Link to '{target_artifact_id}' not found",
+            )
+
+        # Update linked_artifacts
+        source_artifact.metadata.linked_artifacts = new_links
+
+        # Save collection back to disk
+        collection_mgr.save_collection(coll)
+
+        logger.info(
+            f"Successfully deleted link from {artifact_id} to {target_artifact_id}"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to delete link from {artifact_id} to {target_artifact_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete artifact link: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/linked-artifacts",
+    response_model=List[LinkedArtifactReferenceSchema],
+    summary="List artifact links",
+    description="Get all artifacts linked from this artifact.",
+    responses={
+        200: {"description": "Successfully retrieved artifact links"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def list_linked_artifacts(
+    artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    link_type: Optional[str] = Query(
+        default=None,
+        description="Filter by link type (requires, enables, related)",
+        pattern="^(requires|enables|related)$",
+    ),
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses default if not specified)",
+    ),
+) -> List[LinkedArtifactReferenceSchema]:
+    """List all artifacts linked from this artifact.
+
+    Args:
+        artifact_id: Artifact identifier (format: type:name)
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
+        link_type: Optional filter by link type
+        collection: Optional collection name
+
+    Returns:
+        List of linked artifact references
+
+    Raises:
+        HTTPException 404: If artifact not found
+        HTTPException 500: If operation fails
+    """
+    try:
+        logger.info(
+            f"Listing linked artifacts for {artifact_id} (link_type={link_type})"
+        )
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Find artifact
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get linked artifacts
+        links = []
+        if artifact.metadata and artifact.metadata.linked_artifacts:
+            # Resolve linked_artifacts if needed
+            artifact.metadata.resolve_linked_artifacts()
+
+            for link in artifact.metadata.linked_artifacts:
+                # Get link type - handle both object and dict
+                current_link_type = (
+                    link.link_type
+                    if hasattr(link, "link_type")
+                    else link.get("link_type", "requires")
+                )
+
+                # Filter by link_type if specified
+                if link_type and current_link_type != link_type:
+                    continue
+
+                # Convert to response schema
+                if hasattr(link, "artifact_id"):
+                    # It's a LinkedArtifactReference object
+                    links.append(
+                        LinkedArtifactReferenceSchema(
+                            artifact_id=link.artifact_id,
+                            artifact_name=link.artifact_name,
+                            artifact_type=(
+                                link.artifact_type.value
+                                if hasattr(link.artifact_type, "value")
+                                else str(link.artifact_type)
+                            ),
+                            source_name=link.source_name,
+                            link_type=link.link_type,
+                            created_at=link.created_at,
+                        )
+                    )
+                else:
+                    # It's a dict
+                    links.append(
+                        LinkedArtifactReferenceSchema(
+                            artifact_id=link.get("artifact_id"),
+                            artifact_name=link.get("artifact_name", ""),
+                            artifact_type=link.get("artifact_type", "skill"),
+                            source_name=link.get("source_name"),
+                            link_type=link.get("link_type", "requires"),
+                            created_at=link.get("created_at"),
+                        )
+                    )
+
+        return links
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to list linked artifacts for {artifact_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list linked artifacts: {str(e)}",
+        )
+
+
+@router.get(
+    "/{artifact_id}/unlinked-references",
+    response_model=Dict[str, List[str]],
+    summary="Get unlinked references",
+    description="Get references that couldn't be auto-linked.",
+    responses={
+        200: {"description": "Successfully retrieved unlinked references"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        404: {"model": ErrorResponse, "description": "Artifact not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_unlinked_references(
+    artifact_id: str,
+    collection_mgr: CollectionManagerDep,
+    token: TokenDep,
+    collection: Optional[str] = Query(
+        default=None,
+        description="Collection name (uses default if not specified)",
+    ),
+) -> Dict[str, List[str]]:
+    """Get list of unlinked artifact references.
+
+    These are references that were found in the artifact's content or frontmatter
+    but couldn't be automatically linked to existing artifacts in the collection.
+
+    Args:
+        artifact_id: Artifact identifier (format: type:name)
+        collection_mgr: Collection manager dependency
+        token: API token for authentication
+        collection: Optional collection name
+
+    Returns:
+        Dictionary with 'unlinked_references' key containing list of reference strings
+
+    Raises:
+        HTTPException 404: If artifact not found
+        HTTPException 500: If operation fails
+    """
+    try:
+        logger.info(f"Getting unlinked references for {artifact_id}")
+
+        # Parse artifact ID
+        try:
+            artifact_type_str, artifact_name = artifact_id.split(":", 1)
+            artifact_type = ArtifactType(artifact_type_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid artifact ID format. Expected 'type:name'",
+            )
+
+        # Resolve collection
+        collection_name = collection or collection_mgr.get_active_collection_name()
+
+        # Load collection
+        try:
+            coll = collection_mgr.load_collection(collection_name)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Collection '{collection_name}' not found",
+            )
+
+        # Find artifact
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact '{artifact_id}' not found",
+            )
+
+        # Get unlinked references
+        unlinked = []
+        if artifact.metadata and artifact.metadata.unlinked_references:
+            unlinked = artifact.metadata.unlinked_references
+
+        return {"unlinked_references": unlinked}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to get unlinked references for {artifact_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get unlinked references: {str(e)}",
+        )
