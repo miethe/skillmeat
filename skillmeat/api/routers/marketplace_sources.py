@@ -491,6 +491,48 @@ def parse_rate_limit_retry_after(error: RateLimitError) -> int:
     return 60  # Default to 60 seconds if parsing fails
 
 
+def get_effective_indexing_state(indexing_enabled: Optional[bool], mode: str) -> bool:
+    """Resolve effective indexing state from global mode and per-source flag.
+
+    This function implements the indexing state resolution logic based on the
+    global marketplace indexing mode and per-source override flag:
+
+    - "off" mode: Global disable overrides all per-source settings
+    - "on" mode: Default enabled, sources can opt-out by setting indexing_enabled=False
+    - "opt_in" mode: Default disabled, sources must opt-in by setting indexing_enabled=True
+
+    Args:
+        indexing_enabled: Per-source flag (None = use mode default, True/False = override)
+        mode: Global indexing mode ("off", "on", or "opt_in")
+
+    Returns:
+        bool: Whether indexing should be enabled for this source
+
+    Examples:
+        >>> get_effective_indexing_state(None, "off")
+        False
+        >>> get_effective_indexing_state(True, "off")  # Global disable overrides
+        False
+        >>> get_effective_indexing_state(None, "on")
+        True
+        >>> get_effective_indexing_state(False, "on")  # Can opt-out
+        False
+        >>> get_effective_indexing_state(None, "opt_in")
+        False
+        >>> get_effective_indexing_state(True, "opt_in")  # Can opt-in
+        True
+    """
+    if mode == "off":
+        # Global disable overrides all per-source settings
+        return False
+    elif mode == "on":
+        # Default enabled, can opt-out per-source
+        return indexing_enabled if indexing_enabled is not None else True
+    else:  # opt_in
+        # Default disabled, can opt-in per-source
+        return indexing_enabled if indexing_enabled is not None else False
+
+
 # =============================================================================
 # Shared Scan Logic
 # =============================================================================
@@ -920,6 +962,7 @@ async def create_source(request: CreateSourceRequest) -> SourceResponse:
         description=request.description,
         notes=request.notes,
         enable_frontmatter_detection=request.enable_frontmatter_detection,
+        indexing_enabled=request.indexing_enabled,
     )
 
     # Store manual_map if provided
@@ -1393,6 +1436,7 @@ async def update_source(
             request.description,
             request.notes,
             request.enable_frontmatter_detection,
+            request.indexing_enabled,
             request.import_repo_description,
             request.import_repo_readme,
             request.tags,
@@ -1444,6 +1488,8 @@ async def update_source(
             source.notes = request.notes
         if request.enable_frontmatter_detection is not None:
             source.enable_frontmatter_detection = request.enable_frontmatter_detection
+        if request.indexing_enabled is not None:
+            source.indexing_enabled = request.indexing_enabled
         if request.tags is not None:
             source.set_tags_list(request.tags)
 
@@ -1555,6 +1601,7 @@ async def update_source(
                             "enable_frontmatter_detection",
                             request.enable_frontmatter_detection,
                         ),
+                        ("indexing_enabled", request.indexing_enabled),
                         ("import_repo_description", request.import_repo_description),
                         ("import_repo_readme", request.import_repo_readme),
                         ("tags", request.tags),

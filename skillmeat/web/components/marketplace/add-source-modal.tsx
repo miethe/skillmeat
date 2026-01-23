@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react';
-import { useCreateSource, useInferUrl } from '@/hooks';
+import { useCreateSource, useInferUrl, useIndexingMode } from '@/hooks';
 import { Loader2, AlertCircle, X, HelpCircle } from 'lucide-react';
 import type { TrustLevel, ArtifactType } from '@/types/marketplace';
 
@@ -86,6 +86,21 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
 
   const createSource = useCreateSource();
   const inferUrl = useInferUrl();
+
+  // Indexing mode state
+  const { indexingMode, showToggle, isGloballyEnabled } = useIndexingMode();
+  const [indexingEnabled, setIndexingEnabled] = useState<boolean | null>(() => {
+    // Default based on mode: on → true, opt_in → false
+    return indexingMode === 'on' ? true : false;
+  });
+
+  // Reset indexing enabled state when modal opens or indexing mode changes
+  useEffect(() => {
+    if (open) {
+      // Reset based on current mode when modal opens
+      setIndexingEnabled(indexingMode === 'on' ? true : false);
+    }
+  }, [open, indexingMode]);
 
   // Stable reference to mutation function to avoid infinite loop
   const inferUrlRef = useRef(inferUrl.mutateAsync);
@@ -201,6 +216,7 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         single_artifact_mode: singleArtifactMode || undefined,
         single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
+        indexing_enabled: showToggle ? indexingEnabled : undefined,
       });
 
       // Reset form
@@ -226,6 +242,7 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
         single_artifact_mode: singleArtifactMode || undefined,
         single_artifact_type: singleArtifactMode ? singleArtifactType : undefined,
         tags: tags.length > 0 ? tags : undefined,
+        indexing_enabled: showToggle ? indexingEnabled : undefined,
       });
 
       // Reset form
@@ -251,6 +268,8 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
     setTagInput('');
     setTagError(null);
     setInferError(null);
+    // Reset indexing state based on current mode
+    setIndexingEnabled(indexingMode === 'on' ? true : false);
   };
 
   const isValidUrl = repoUrl.match(/^https:\/\/github\.com\/[^/]+\/[^/]+$/);
@@ -536,6 +555,40 @@ export function AddSourceModal({ open, onOpenChange, onSuccess }: AddSourceModal
                             <SelectItem value="hook">Hook</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+
+                    {/* Search Indexing Toggle (shown when mode is "on" or "opt_in") */}
+                    {showToggle && (
+                      <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="flex-1 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="indexing-enabled" className="text-sm">
+                              Enable artifact search indexing
+                            </Label>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p>
+                                  Index artifacts for cross-source search. Adds approximately 850
+                                  bytes per artifact to enable fast full-text search across all your
+                                  sources.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Enable full-text search across artifacts from this source
+                          </p>
+                        </div>
+                        <Switch
+                          id="indexing-enabled"
+                          checked={indexingEnabled ?? false}
+                          onCheckedChange={setIndexingEnabled}
+                          aria-label="Enable artifact search indexing"
+                        />
                       </div>
                     )}
 

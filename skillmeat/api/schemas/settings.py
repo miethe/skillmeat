@@ -80,6 +80,18 @@ class GitHubTokenValidationResponse(BaseModel):
     )
 
 
+class IndexingModeResponse(BaseModel):
+    """Response for indexing mode configuration.
+
+    Returns the current global artifact search indexing mode.
+    """
+
+    indexing_mode: str = Field(
+        description="Global indexing mode: 'off', 'on', or 'opt_in'",
+        examples=["opt_in"],
+    )
+
+
 class MessageResponse(BaseModel):
     """Generic message response for simple operations.
 

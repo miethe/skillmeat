@@ -435,6 +435,30 @@ Results grouped by source using shadcn Accordion:
 
 ## Implementation Plan
 
+### Phase 0: Configurable Frontmatter Indexing (✅ COMPLETE)
+
+**Status**: Implementation complete as of January 2026
+
+The configurable indexing foundation has been implemented to support flexible artifact indexing across sources. This phase provides the infrastructure that Phase 1+ depends on:
+
+**Features Implemented**:
+- Global indexing mode configuration (`artifact_search.indexing_mode`) - controls how frontmatter is extracted
+- Per-source `indexing_enabled` override flag - allows fine-grained control per data source
+- UI toggles in add/edit source modals - enables users to control indexing behavior
+- API endpoint for frontend mode detection - allows frontend to adapt based on configuration
+
+**Why This Matters for Phase 1+**:
+- Provides the groundwork for extracting and persisting frontmatter
+- Supports hybrid indexing strategies (some sources indexed, others not)
+- Allows users to control compute/storage trade-offs per source
+- Sets up infrastructure for future search enhancements
+
+**Related Documents**:
+- [Configurable Frontmatter Caching PRD](/docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md)
+- [Implementation Plan](/docs/project_plans/implementation_plans/enhancements/configurable-frontmatter-caching-v1.md)
+
+---
+
 ### Phase 1: Foundation (Est. 3 days)
 
 1. **Database migration** - Add search columns to `MarketplaceCatalogEntry`

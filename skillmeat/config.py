@@ -1,5 +1,6 @@
 """Configuration management for SkillMeat."""
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -17,6 +18,8 @@ else:
 import tomli_w
 
 TOML_DUMPS = tomli_w.dumps
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -47,6 +50,9 @@ class ConfigManager:
                 "analytics": {
                     "enabled": True,
                     "retention-days": 90,
+                },
+                "artifact_search": {
+                    "indexing_mode": "opt_in",
                 },
             }
             self.write(default_config)
@@ -122,6 +128,10 @@ class ConfigManager:
             >>> config.set("settings.github-token", "ghp_...")
             >>> config.set("settings.default-collection", "my-collection")
         """
+        # Validate artifact_search.indexing_mode
+        if key == "artifact_search.indexing_mode":
+            value = self._validate_indexing_mode(value)
+
         config = self.read()
         parts = key.split(".")
 
@@ -291,3 +301,63 @@ class ConfigManager:
             API base URL string
         """
         return self.get("api.base_url", "http://localhost:8080")
+
+    def _validate_indexing_mode(self, value: str) -> str:
+        """Validate the indexing mode value.
+
+        Args:
+            value: The indexing mode to validate. Valid values are:
+                - "off": Disable indexing for all sources
+                - "on": Enable indexing by default (sources can opt-out)
+                - "opt_in": Disable indexing by default (sources must opt-in)
+
+        Returns:
+            The validated mode, or "opt_in" if the value was invalid.
+
+        Note:
+            Invalid values log a warning and return "opt_in" as the default.
+        """
+        valid_modes = {"off", "on", "opt_in"}
+        if value not in valid_modes:
+            logger.warning(
+                f"Invalid indexing_mode '{value}'. "
+                f"Valid values: {valid_modes}. Defaulting to 'opt_in'."
+            )
+            return "opt_in"
+        return value
+
+    def get_indexing_mode(self) -> str:
+        """Get the current artifact search indexing mode.
+
+        Returns:
+            The indexing mode ("off", "on", or "opt_in"). Defaults to "opt_in"
+            if not configured.
+
+        Example:
+            >>> config = ConfigManager()
+            >>> mode = config.get_indexing_mode()
+            >>> print(mode)
+            'opt_in'
+        """
+        return self.get("artifact_search.indexing_mode", "opt_in")
+
+    def set_indexing_mode(self, value: str) -> str:
+        """Set the artifact search indexing mode.
+
+        Args:
+            value: The indexing mode. Valid values:
+                - "off": Disable indexing for all sources
+                - "on": Enable indexing by default (sources can opt-out)
+                - "opt_in": Disable indexing by default (sources must opt-in)
+
+        Returns:
+            The actual value that was set (after validation).
+
+        Example:
+            >>> config = ConfigManager()
+            >>> config.set_indexing_mode("on")
+            'on'
+        """
+        logger.info(f"Setting artifact_search.indexing_mode to '{value}'")
+        self.set("artifact_search.indexing_mode", value)
+        return self.get_indexing_mode()

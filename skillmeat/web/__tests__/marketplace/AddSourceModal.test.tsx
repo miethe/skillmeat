@@ -17,10 +17,20 @@ jest.mock('@/hooks', () => ({
     data: null,
     reset: jest.fn(),
   })),
+  useIndexingMode: jest.fn(() => ({
+    indexingMode: 'opt_in',
+    showToggle: true,
+    isGloballyEnabled: false,
+    isDisabled: false,
+    isLoading: false,
+  })),
   useToast: () => ({
     toast: jest.fn(),
   }),
 }));
+
+// Get a typed reference to the mock
+const mockUseIndexingMode = jest.requireMock('@/hooks').useIndexingMode as jest.Mock;
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -56,6 +66,15 @@ describe('AddSourceModal', () => {
       isSuccess: false,
       data: null,
       reset: jest.fn(),
+    });
+
+    // Reset useIndexingMode mock to default opt_in state
+    mockUseIndexingMode.mockReturnValue({
+      indexingMode: 'opt_in',
+      showToggle: true,
+      isGloballyEnabled: false,
+      isDisabled: false,
+      isLoading: false,
     });
   });
 
@@ -488,6 +507,216 @@ describe('AddSourceModal', () => {
 
       const rootInput = screen.getByLabelText('Root Directory (optional)') as HTMLInputElement;
       expect(rootInput.value).toBe('');
+    });
+  });
+
+  describe('Indexing Toggle Visibility', () => {
+    beforeEach(() => {
+      // Reset the indexing mode mock to default opt_in
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+    });
+
+    it('shows indexing toggle when mode is "opt_in"', () => {
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      // Toggle should be visible with aria-label
+      expect(screen.getByLabelText('Enable artifact search indexing')).toBeInTheDocument();
+      // And the label text should be visible
+      expect(screen.getByText('Enable artifact search indexing')).toBeInTheDocument();
+    });
+
+    it('hides indexing toggle when mode is "off"', () => {
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'off',
+        showToggle: false,
+        isGloballyEnabled: false,
+        isDisabled: true,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      // Toggle should NOT be visible
+      expect(screen.queryByLabelText('Enable artifact search indexing')).not.toBeInTheDocument();
+      expect(screen.queryByText('Enable artifact search indexing')).not.toBeInTheDocument();
+    });
+
+    it('hides indexing toggle when mode is "on" (globally enabled)', () => {
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'on',
+        showToggle: false,
+        isGloballyEnabled: true,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      // Toggle should NOT be visible when globally enabled
+      expect(screen.queryByLabelText('Enable artifact search indexing')).not.toBeInTheDocument();
+    });
+
+    it('toggle defaults to unchecked in "opt_in" mode', () => {
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      const toggle = screen.getByLabelText('Enable artifact search indexing');
+      // Switch component uses aria-checked for state
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('includes indexing_enabled in submission when toggle is visible', async () => {
+      const user = userEvent.setup();
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      mockMutateAsync.mockResolvedValue({
+        id: 'source-123',
+        owner: 'owner',
+        repo_name: 'repo',
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      const urlInput = screen.getByLabelText('Repository URL');
+      await user.type(urlInput, 'https://github.com/owner/repo');
+
+      // Enable the indexing toggle
+      const toggle = screen.getByLabelText('Enable artifact search indexing');
+      await user.click(toggle);
+
+      // Use getAllByRole and select the form submit button (type="submit")
+      const submitButtons = screen.getAllByRole('button', { name: /add source/i });
+      const submitButton = submitButtons.find((btn) => btn.getAttribute('type') === 'submit');
+      expect(submitButton).toBeInTheDocument();
+      await user.click(submitButton!);
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            indexing_enabled: true,
+          })
+        );
+      });
+    });
+
+    it('does not include indexing_enabled in submission when toggle is hidden', async () => {
+      const user = userEvent.setup();
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'off',
+        showToggle: false,
+        isGloballyEnabled: false,
+        isDisabled: true,
+        isLoading: false,
+      });
+
+      mockMutateAsync.mockResolvedValue({
+        id: 'source-123',
+        owner: 'owner',
+        repo_name: 'repo',
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      const urlInput = screen.getByLabelText('Repository URL');
+      await user.type(urlInput, 'https://github.com/owner/repo');
+
+      // Use getAllByRole and select the form submit button (type="submit")
+      const submitButtons = screen.getAllByRole('button', { name: /add source/i });
+      const submitButton = submitButtons.find((btn) => btn.getAttribute('type') === 'submit');
+      expect(submitButton).toBeInTheDocument();
+      await user.click(submitButton!);
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalled();
+        const callArgs = mockMutateAsync.mock.calls[0][0];
+        expect(callArgs.indexing_enabled).toBeUndefined();
+      });
+    });
+
+    it('toggle can be toggled on and off', async () => {
+      const user = userEvent.setup();
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      const toggle = screen.getByLabelText('Enable artifact search indexing');
+
+      // Initially unchecked
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+      // Click to enable
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+      // Click to disable again
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
+
+    it('shows help tooltip content for indexing toggle', () => {
+      mockUseIndexingMode.mockReturnValue({
+        indexingMode: 'opt_in',
+        showToggle: true,
+        isGloballyEnabled: false,
+        isDisabled: false,
+        isLoading: false,
+      });
+
+      renderWithClient(
+        <AddSourceModal open={true} onOpenChange={mockOnOpenChange} onSuccess={mockOnSuccess} />
+      );
+
+      // The helper text should be visible
+      expect(
+        screen.getByText('Enable full-text search across artifacts from this source')
+      ).toBeInTheDocument();
     });
   });
 });

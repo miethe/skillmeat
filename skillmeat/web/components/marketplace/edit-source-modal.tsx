@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffect, useState, useCallback, KeyboardEvent } from 'react';
-import { useUpdateSource, useRescanSource } from '@/hooks';
+import { useUpdateSource, useRescanSource, useIndexingMode } from '@/hooks';
 import { Loader2, X, Plus, HelpCircle, AlertCircle } from 'lucide-react';
 import type { GitHubSource, TrustLevel } from '@/types/marketplace';
 
@@ -58,6 +58,12 @@ export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditS
   const [tagInput, setTagInput] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
 
+  // Indexing mode state
+  const { indexingMode, showToggle } = useIndexingMode();
+  const [indexingEnabled, setIndexingEnabled] = useState<boolean | null>(
+    source?.indexing_enabled ?? (indexingMode === 'on' ? true : false)
+  );
+
   const updateSource = useUpdateSource(source?.id || '');
   const rescanSource = useRescanSource(source?.id || '');
 
@@ -78,8 +84,10 @@ export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditS
       setTags(source.tags || []);
       setTagInput('');
       setTagError(null);
+      // Initialize indexing state from source
+      setIndexingEnabled(source.indexing_enabled ?? (indexingMode === 'on' ? true : false));
     }
-  }, [source]);
+  }, [source, indexingMode]);
 
   // Tag validation: alphanumeric with hyphens/underscores, 1-50 chars
   const validateTag = useCallback(
@@ -158,6 +166,7 @@ export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditS
         import_repo_description: importRepoDescription,
         import_repo_readme: importRepoReadme,
         tags: tags.length > 0 ? tags : undefined,
+        indexing_enabled: showToggle ? indexingEnabled : undefined,
       });
 
       // Auto-trigger rescan after successful edit
@@ -323,6 +332,42 @@ export function EditSourceModal({ source, open, onOpenChange, onSuccess }: EditS
                   </div>
                 </div>
               </div>
+
+              {/* Search Indexing Toggle (shown when mode is "on" or "opt_in") */}
+              {showToggle && (
+                <div className="mt-2 border-t pt-4">
+                  <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="flex-1 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="indexing-enabled" className="text-sm">
+                          Enable artifact search indexing
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p>
+                              Index artifacts for cross-source search. Adds approximately 850
+                              bytes per artifact to enable fast full-text search across all your
+                              sources.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enable full-text search across artifacts from this source
+                      </p>
+                    </div>
+                    <Switch
+                      id="indexing-enabled"
+                      checked={indexingEnabled ?? false}
+                      onCheckedChange={setIndexingEnabled}
+                      aria-label="Enable artifact search indexing"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Tags Management */}
               <div className="mt-2 border-t pt-4">

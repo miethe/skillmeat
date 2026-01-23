@@ -15,6 +15,7 @@ from skillmeat.api.schemas.settings import (
     GitHubTokenRequest,
     GitHubTokenStatusResponse,
     GitHubTokenValidationResponse,
+    IndexingModeResponse,
     MessageResponse,
 )
 from skillmeat.core.github_client import (
@@ -324,3 +325,33 @@ async def delete_github_token(
     else:
         logger.debug("No GitHub token was configured to clear")
     # Return 204 regardless of whether token existed
+
+
+@router.get(
+    "/indexing-mode",
+    response_model=IndexingModeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get global artifact search indexing mode",
+    description="""
+    Get the global artifact search indexing mode setting.
+
+    Returns:
+    - "off": Indexing is disabled globally
+    - "on": Indexing is enabled globally
+    - "opt_in": Indexing is opt-in per artifact (default)
+    """,
+)
+async def get_indexing_mode(
+    config: ConfigManagerDep,
+) -> IndexingModeResponse:
+    """Get global artifact search indexing mode.
+
+    Args:
+        config: Configuration manager dependency
+
+    Returns:
+        Current indexing mode configuration
+    """
+    indexing_mode = config.get_indexing_mode()
+    logger.debug(f"Retrieved indexing mode: {indexing_mode}")
+    return IndexingModeResponse(indexing_mode=indexing_mode)

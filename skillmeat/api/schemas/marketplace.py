@@ -532,6 +532,10 @@ class CreateSourceRequest(BaseModel):
         default=False,
         description="Enable parsing markdown frontmatter for artifact type hints",
     )
+    indexing_enabled: Optional[bool] = Field(
+        default=None,
+        description="Enable frontmatter indexing for artifacts from this source (None = use global config default)",
+    )
     import_repo_description: bool = Field(
         default=False,
         description="Fetch repository description from GitHub on import",
@@ -811,6 +815,10 @@ class UpdateSourceRequest(BaseModel):
         default=None,
         description="Enable parsing markdown frontmatter for artifact type hints",
     )
+    indexing_enabled: Optional[bool] = Field(
+        default=None,
+        description="Enable frontmatter indexing for artifacts from this source (None = use global config default)",
+    )
     import_repo_description: Optional[bool] = Field(
         default=None,
         description="Fetch repository description from GitHub",
@@ -1085,6 +1093,12 @@ class SourceResponse(BaseModel):
         default=None,
         description="Artifact type when single_artifact_mode is enabled",
     )
+    indexing_enabled: Optional[bool] = Field(
+        default=None,
+        description="Whether indexing is enabled for this source. "
+        "None indicates default indexing behavior (typically enabled).",
+        examples=[True, False, None],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -1115,6 +1129,7 @@ class SourceResponse(BaseModel):
                 "counts_by_type": {"skill": 8, "command": 3, "agent": 1},
                 "single_artifact_mode": False,
                 "single_artifact_type": None,
+                "indexing_enabled": True,
             }
         }
 

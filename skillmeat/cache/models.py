@@ -1201,6 +1201,11 @@ class MarketplaceSource(Base):
         access_token_id: Optional encrypted PAT reference
         trust_level: Trust level ("untrusted", "basic", "verified", "official")
         visibility: Visibility level ("private", "internal", "public")
+        enable_frontmatter_detection: Parse markdown frontmatter for artifact type hints
+        indexing_enabled: Tri-state control for search indexing (None=use global mode, True=enable, False=disable)
+        path_tag_config: JSON config for path-based tag extraction rules
+        single_artifact_mode: Treat entire repo (or root_hint dir) as single artifact
+        single_artifact_type: Artifact type when single_artifact_mode is True
         last_sync_at: Timestamp of last successful scan
         last_error: Last error message if scan failed
         scan_status: Current scan status ("pending", "scanning", "success", "error")
@@ -1284,6 +1289,15 @@ class MarketplaceSource(Base):
         server_default="false",
         comment="Parse markdown frontmatter for artifact type hints",
     )
+    indexing_enabled: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Enable frontmatter indexing for search",
+    )
+    # indexing_enabled: Per-source override for search indexing.
+    # - None: Use global mode default
+    # - True: Enable indexing regardless of mode
+    # - False: Disable indexing regardless of mode
     path_tag_config: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,
@@ -1393,6 +1407,7 @@ class MarketplaceSource(Base):
             "trust_level": self.trust_level,
             "visibility": self.visibility,
             "enable_frontmatter_detection": self.enable_frontmatter_detection,
+            "indexing_enabled": self.indexing_enabled,
             "single_artifact_mode": self.single_artifact_mode,
             "single_artifact_type": self.single_artifact_type,
             "last_sync_at": (

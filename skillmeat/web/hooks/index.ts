@@ -165,6 +165,17 @@ export { useCacheRefresh } from './useCacheRefresh';
 export { useCacheStatus } from './useCacheStatus';
 
 // ============================================================================
+// SETTINGS (1 hook)
+// ============================================================================
+// Application configuration and settings
+export {
+  settingsKeys,
+  useIndexingMode,
+  type IndexingMode,
+  type IndexingModeResponse,
+} from './useIndexingMode';
+
+// ============================================================================
 // MARKETPLACE (5 hooks + 13 source hooks)
 // ============================================================================
 // Marketplace listings, brokers, and artifact sourcing

@@ -206,3 +206,56 @@ def test_get_analytics_db_path_custom(config_manager, tmp_path):
     config_manager.set("analytics.db-path", str(custom_path))
     path = config_manager.get_analytics_db_path()
     assert path == custom_path
+
+
+def test_get_indexing_mode_default(config_manager):
+    """Test that indexing mode defaults to opt_in when not set."""
+    mode = config_manager.get_indexing_mode()
+    assert mode == "opt_in"
+
+
+def test_set_indexing_mode_valid_values(config_manager):
+    """Test setting all valid indexing modes."""
+    valid_modes = ["off", "on", "opt_in"]
+
+    for mode in valid_modes:
+        result = config_manager.set_indexing_mode(mode)
+        assert result == mode
+        assert config_manager.get_indexing_mode() == mode
+
+
+def test_set_indexing_mode_persistence(config_manager):
+    """Test that indexing mode value persists after being set."""
+    config_manager.set_indexing_mode("on")
+    assert config_manager.get_indexing_mode() == "on"
+
+    # Set to different value and verify persistence
+    config_manager.set_indexing_mode("off")
+    assert config_manager.get_indexing_mode() == "off"
+
+    # Verify it's actually in the config file
+    config = config_manager.read()
+    assert config["artifact_search"]["indexing_mode"] == "off"
+
+
+def test_indexing_mode_roundtrip(config_manager):
+    """Test setting indexing mode and reading it back maintains integrity."""
+    config_manager.set_indexing_mode("opt_in")
+
+    # Read directly from config to ensure persistence
+    stored_value = config_manager.get("artifact_search.indexing_mode")
+    assert stored_value == "opt_in"
+
+    # Verify getter returns the same value
+    assert config_manager.get_indexing_mode() == "opt_in"
+
+
+def test_multiple_managers_share_indexing_mode(temp_config_dir):
+    """Test multiple ConfigManager instances share same indexing mode setting."""
+    manager1 = ConfigManager(config_dir=temp_config_dir)
+    manager2 = ConfigManager(config_dir=temp_config_dir)
+
+    manager1.set_indexing_mode("on")
+    value = manager2.get_indexing_mode()
+
+    assert value == "on"

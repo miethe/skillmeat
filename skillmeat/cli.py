@@ -3511,11 +3511,13 @@ def config_set(key: str, value: str):
       - default-collection: Default collection name
       - update-strategy: Default update strategy (prompt/upstream/local)
       - score-weights: Scoring weights as 'trust=0.3,quality=0.3,match=0.4'
+      - artifact_search.indexing_mode: Search indexing mode (off/on/opt_in)
 
     Examples:
       skillmeat config set github-token ghp_xxxxx
       skillmeat config set default-collection work
       skillmeat config set score-weights 'trust=0.25,quality=0.25,match=0.50'
+      skillmeat config set artifact_search.indexing_mode opt_in
     """
     try:
         config_mgr = ConfigManager()
