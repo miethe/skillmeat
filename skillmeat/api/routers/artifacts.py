@@ -104,6 +104,7 @@ from skillmeat.core.importer import (
 from skillmeat.storage.deployment import DeploymentTracker
 from skillmeat.utils.filesystem import compute_content_hash
 from skillmeat.cache.models import Collection, CollectionArtifact, get_session
+from skillmeat.cache.repositories import MarketplaceCatalogRepository
 
 logger = logging.getLogger(__name__)
 
@@ -2655,6 +2656,7 @@ async def update_artifact_parameters(
             if pending_tag_sync is not None:
                 try:
                     from skillmeat.core.services import TagService
+
                     TagService().sync_artifact_tags(artifact_id, pending_tag_sync)
                 except Exception as e:
                     logger.warning(
@@ -2783,6 +2785,31 @@ async def delete_artifact(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{artifact_id}' not found: {str(e)}",
+            )
+
+        # Reset any linked marketplace catalog entry status to allow re-import
+        # This enables re-importing artifacts that were previously imported then deleted
+        try:
+            catalog_repo = MarketplaceCatalogRepository()
+            catalog_entry = catalog_repo.find_by_artifact_name_and_type(
+                name=artifact_name,
+                artifact_type=artifact_type_str,
+            )
+            if catalog_entry:
+                reset_result = catalog_repo.reset_import_status(
+                    entry_id=catalog_entry.id,
+                    source_id=catalog_entry.source_id,
+                )
+                if reset_result:
+                    logger.info(
+                        f"Reset catalog entry status for deleted artifact: "
+                        f"{artifact_id} (entry_id: {catalog_entry.id})"
+                    )
+        except Exception as catalog_error:
+            # Don't fail deletion if catalog reset fails - just log it
+            logger.warning(
+                f"Failed to reset catalog entry for deleted artifact {artifact_id}: "
+                f"{catalog_error}"
             )
 
         # Return 204 No Content (no body)

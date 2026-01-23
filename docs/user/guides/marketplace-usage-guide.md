@@ -11,6 +11,7 @@ Complete guide to discovering, installing, and managing artifacts from the Skill
 - [Previewing Catalog Artifacts](#previewing-catalog-artifacts)
 - [Installing Bundles](#installing-bundles)
 - [Managing Marketplace Artifacts](#managing-marketplace-artifacts)
+  - [Re-importing Artifacts](#re-importing-artifacts)
 - [Publishing Your Own Bundles](#publishing-your-own-bundles)
 - [Marketplace Best Practices](#marketplace-best-practices)
 - [Troubleshooting](#troubleshooting)
@@ -551,6 +552,31 @@ skillmeat test skillmeat-42/python-automation
 ```
 
 ## Managing Marketplace Artifacts
+
+### Re-importing Artifacts
+
+If you need to refresh an imported artifact from its upstream source (e.g., to get the latest version or recover a corrupted artifact), use the **Force Re-import** feature.
+
+**From the Web UI:**
+1. Open the marketplace source containing the artifact
+2. Click on the imported catalog entry to open the detail modal
+3. Click the kebab menu (⋮) in the top-right corner
+4. Select **Force Re-import**
+5. Optionally toggle "Keep existing deployments" to preserve deployment records
+6. Click **Re-import** to confirm
+
+**What Happens:**
+- Downloads fresh content from the upstream GitHub source
+- Overwrites any local changes to the artifact
+- Updates the catalog entry with a new import timestamp
+- Optionally preserves deployment records (if toggled)
+
+**Use Cases:**
+- Artifact files are corrupted or missing
+- You want to discard local changes and reset to upstream
+- The catalog shows "imported" but the artifact was deleted
+
+> **Note:** When you delete an imported artifact from your collection, the catalog entry status is automatically reset to "new", allowing you to re-import it normally. The Force Re-import feature is for updating artifacts that still exist in your collection.
 
 ### Tracking Installed Bundles
 

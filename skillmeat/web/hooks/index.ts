@@ -193,6 +193,12 @@ export {
   useInferUrl,
 } from './useMarketplaceSources';
 
+export {
+  useReimportCatalogEntry,
+  type ReimportRequest,
+  type ReimportResponse,
+} from './useReimportCatalogEntry';
+
 // ============================================================================
 // MCP (9 hooks)
 // ============================================================================

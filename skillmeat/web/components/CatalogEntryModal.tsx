@@ -15,9 +15,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { ScoreBadge } from '@/components/ScoreBadge';
 import {
   GitBranch,
@@ -32,11 +50,17 @@ import {
   RefreshCw,
   Tag,
   Pencil,
+  MoreVertical,
 } from 'lucide-react';
 import { HeuristicScoreBreakdown } from '@/components/HeuristicScoreBreakdown';
 import { FileTree, type FileNode } from '@/components/entity/file-tree';
 import { ContentPane } from '@/components/entity/content-pane';
-import { useCatalogFileTree, useCatalogFileContent, useUpdateCatalogEntryName } from '@/hooks';
+import {
+  useCatalogFileTree,
+  useCatalogFileContent,
+  useUpdateCatalogEntryName,
+  useReimportCatalogEntry,
+} from '@/hooks';
 import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
@@ -310,6 +334,8 @@ export function CatalogEntryModal({
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [showReimportDialog, setShowReimportDialog] = useState(false);
+  const [keepDeployments, setKeepDeployments] = useState(false);
 
   // Use source_id directly as string for API calls
   const sourceId = entry?.source_id ?? null;
@@ -317,6 +343,7 @@ export function CatalogEntryModal({
   const artifactPath = entry?.path ?? null;
 
   const updateNameMutation = useUpdateCatalogEntryName(nameSourceId);
+  const reimportMutation = useReimportCatalogEntry(nameSourceId);
 
   // Fetch file tree when modal opens (needed for both Contents and Overview tabs)
   const {
@@ -427,6 +454,8 @@ export function CatalogEntryModal({
       setActiveTab('overview');
       setIsEditingName(false);
       setNameError(null);
+      setShowReimportDialog(false);
+      setKeepDeployments(false);
     }
     onOpenChange(newOpen);
   };
@@ -471,22 +500,65 @@ export function CatalogEntryModal({
     }
   };
 
+  const handleReimport = async () => {
+    try {
+      await reimportMutation.mutateAsync({
+        entryId: entry.id,
+        keepDeployments,
+      });
+      setShowReimportDialog(false);
+      setKeepDeployments(false);
+      // Close the modal after successful reimport
+      handleOpenChange(false);
+    } catch {
+      // Error is handled by the mutation's onError callback
+    }
+  };
+
   // Determine if import button should be disabled
   const isImportDisabled = entry.status === 'imported' || entry.status === 'removed' || isImporting;
   const isSavingName = updateNameMutation.isPending;
   const isSaveDisabled = isSavingName || !draftName.trim() || draftName.trim() === entry.name;
+  const isReimporting = reimportMutation.isPending;
+  const canReimport = entry.status === 'imported';
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex h-[85vh] max-h-[85vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-5xl">
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="flex h-[85vh] max-h-[85vh] min-h-0 max-w-4xl flex-col overflow-hidden p-0 lg:max-w-5xl">
         {/* Header Section - Fixed */}
         <div className="border-b px-6 pb-4 pt-6">
-          <DialogHeader>
-            <DialogTitle>Catalog Entry Details</DialogTitle>
-            <DialogDescription className="sr-only">
-              Detailed view of the {entry.name} artifact including confidence scores, metadata, and
-              import options
-            </DialogDescription>
+          <DialogHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="flex-1">
+              <DialogTitle>Catalog Entry Details</DialogTitle>
+              <DialogDescription className="sr-only">
+                Detailed view of the {entry.name} artifact including confidence scores, metadata, and
+                import options
+              </DialogDescription>
+            </div>
+            {canReimport && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    aria-label="More options"
+                  >
+                    <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setShowReimportDialog(true)}
+                    disabled={isReimporting}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Force Re-import
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </DialogHeader>
         </div>
 
@@ -886,7 +958,47 @@ export function CatalogEntryModal({
             </Button>
           )}
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Force Re-import Confirmation Dialog */}
+      <AlertDialog open={showReimportDialog} onOpenChange={setShowReimportDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force Re-import Artifact</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will re-download the artifact from the upstream source. Any local changes will be
+              overwritten.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex items-center space-x-3 py-4">
+            <Switch
+              id="keep-deployments"
+              checked={keepDeployments}
+              onCheckedChange={setKeepDeployments}
+              disabled={isReimporting}
+            />
+            <Label htmlFor="keep-deployments" className="cursor-pointer">
+              Keep existing deployments
+            </Label>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReimporting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReimport} disabled={isReimporting}>
+              {isReimporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Re-importing...
+                </>
+              ) : (
+                'Re-import'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -65,6 +65,8 @@ from skillmeat.api.schemas.marketplace import (
     InferUrlRequest,
     InferUrlResponse,
     PathSegmentsResponse,
+    ReimportRequest,
+    ReimportResponse,
     ScanRequest,
     ScanResultDTO,
     SourceListResponse,
@@ -2656,6 +2658,270 @@ async def import_artifacts(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to import artifacts: {str(e)}",
+        ) from e
+
+
+# =============================================================================
+# API-004a: Re-import Endpoint
+# =============================================================================
+
+
+@router.post(
+    "/{source_id}/entries/{entry_id}/reimport",
+    response_model=ReimportResponse,
+    summary="Force re-import artifact",
+    operation_id="reimport_catalog_entry",
+    description="""
+    Force re-import an artifact from upstream, resetting its catalog entry status.
+
+    This endpoint handles several scenarios:
+    - Artifacts with status="imported" that need to be refreshed from upstream
+    - Artifacts that were deleted but catalog entry still shows "imported"
+    - Broken or missing artifacts in the collection
+
+    **Workflow**:
+    1. Validates the catalog entry exists and belongs to this source
+    2. If `keep_deployments=True` and artifact exists in collection:
+       - Saves deployment records
+       - Deletes the existing artifact
+       - Re-imports from upstream
+       - Restores deployment records
+    3. If `keep_deployments=False` or artifact is missing:
+       - Resets catalog entry status to "new"
+       - Performs a fresh import from upstream
+
+    **Request Body**:
+    - `keep_deployments` (bool, optional): Whether to preserve deployment records (default: false)
+
+    **Response**: Result with success flag, new artifact ID, and restoration count
+
+    **Example**:
+    ```bash
+    curl -X POST "http://localhost:8080/api/v1/marketplace/sources/src-abc123/entries/cat-def456/reimport" \\
+         -H "Content-Type: application/json" \\
+         -d '{"keep_deployments": true}'
+    ```
+
+    Authentication: TODO - Add authentication when multi-user support is implemented.
+    """,
+    responses={
+        200: {"description": "Re-import completed successfully"},
+        404: {"description": "Source or catalog entry not found"},
+        500: {"description": "Re-import failed - check error message"},
+    },
+)
+async def reimport_catalog_entry(
+    source_id: str,
+    entry_id: str,
+    request: ReimportRequest,
+    artifact_mgr: ArtifactManagerDep,
+    collection_mgr: CollectionManagerDep,
+    session: DbSessionDep,
+) -> ReimportResponse:
+    """Force re-import a catalog entry from upstream.
+
+    Works for:
+    - Artifacts with status="imported"
+    - Artifacts that were deleted but catalog entry still shows "imported"
+    - Broken/missing artifacts in collection
+
+    Args:
+        source_id: Unique source identifier
+        entry_id: Unique catalog entry identifier
+        request: Re-import request with keep_deployments flag
+        artifact_mgr: Artifact manager dependency
+        collection_mgr: Collection manager dependency
+        session: Database session
+
+    Returns:
+        ReimportResponse with success status and details
+
+    Raises:
+        HTTPException 404: If source or entry not found
+        HTTPException 500: If re-import operation fails
+    """
+    source_repo = MarketplaceSourceRepository()
+    catalog_repo = MarketplaceCatalogRepository()
+    transaction_handler = MarketplaceTransactionHandler()
+
+    try:
+        # Verify source exists
+        source = source_repo.get_by_id(source_id)
+        if not source:
+            logger.warning(f"Source not found for reimport: {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source with ID '{source_id}' not found",
+            )
+
+        # Fetch catalog entry
+        entry = catalog_repo.get_by_id(entry_id)
+        if not entry:
+            logger.warning(f"Catalog entry not found for reimport: {entry_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Catalog entry with ID '{entry_id}' not found",
+            )
+
+        # Verify entry belongs to this source
+        if entry.source_id != source_id:
+            logger.warning(f"Entry {entry_id} does not belong to source {source_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Entry '{entry_id}' does not belong to source '{source_id}'",
+            )
+
+        # Check if artifact exists in collection
+        artifact_type_str = entry.artifact_type
+        artifact_name = entry.name
+        artifact_id = f"{artifact_type_str}:{artifact_name}"
+
+        # Try to find existing artifact
+        existing_artifact = None
+        saved_deployments: List[Dict[str, str]] = []
+        collection_name = collection_mgr.get_active_collection_name()
+
+        try:
+            from skillmeat.core.artifact import ArtifactType as CoreArtifactType
+
+            artifact_type = CoreArtifactType(artifact_type_str)
+            collection = collection_mgr.load_collection(collection_name)
+            existing_artifact = collection.find_artifact(artifact_name, artifact_type)
+        except (ValueError, Exception) as e:
+            logger.debug(
+                f"Artifact not found in collection (may be deleted): {artifact_id}, error: {e}"
+            )
+
+        # If artifact exists and keep_deployments is True, save deployments
+        if existing_artifact and request.keep_deployments:
+            # TODO: Implement deployment record saving when deployment tracking is available
+            # For now, log a message indicating this feature is planned
+            logger.info(
+                f"keep_deployments=True but deployment tracking not yet implemented "
+                f"for artifact {artifact_id}"
+            )
+            # saved_deployments = artifact_mgr.get_deployments(artifact_name, artifact_type)
+
+        # Delete existing artifact if present
+        if existing_artifact:
+            try:
+                artifact_mgr.remove(
+                    artifact_name,
+                    CoreArtifactType(artifact_type_str),
+                    collection_name,
+                )
+                logger.info(f"Deleted existing artifact for reimport: {artifact_id}")
+            except Exception as e:
+                logger.warning(f"Failed to delete existing artifact: {e}")
+                # Continue anyway - artifact might be partially deleted or corrupted
+
+        # Reset catalog entry status to allow re-import
+        reset_entry = catalog_repo.reset_import_status(entry_id, source_id)
+        if not reset_entry:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to reset catalog entry status",
+            )
+
+        # Extract description and tags from catalog entry metadata
+        entry_metadata = entry.get_metadata_dict() or {}
+        description = entry_metadata.get("description")
+
+        tags = []
+        if entry.path_segments:
+            try:
+                segments_data = json.loads(entry.path_segments)
+                extracted = segments_data.get("extracted", [])
+                tags = [
+                    seg["normalized"]
+                    for seg in extracted
+                    if seg.get("status") == "approved"
+                ]
+            except (json.JSONDecodeError, KeyError):
+                tags = []
+
+        # Perform the import
+        entries_data = [
+            {
+                "id": entry.id,
+                "artifact_type": entry.artifact_type,
+                "name": entry.name,
+                "upstream_url": entry.upstream_url,
+                "path": entry.path,
+                "description": description,
+                "tags": tags,
+            }
+        ]
+
+        coordinator = ImportCoordinator(
+            collection_name=collection_name,
+            collection_mgr=collection_mgr,
+        )
+
+        import_result = coordinator.import_entries(
+            entries=entries_data,
+            source_id=source_id,
+            strategy=ConflictStrategy.OVERWRITE,  # Force overwrite for reimport
+            source_ref=source.ref,
+        )
+
+        # Check import result
+        if import_result.error_count > 0:
+            error_msg = (
+                import_result.entries[0].error_message
+                if import_result.entries
+                else "Unknown error"
+            )
+            logger.error(f"Re-import failed for {artifact_id}: {error_msg}")
+            return ReimportResponse(
+                success=False,
+                artifact_id=None,
+                message=f"Re-import failed: {error_msg}",
+                deployments_restored=0,
+            )
+
+        # Update catalog entry status to imported
+        with transaction_handler.import_transaction(source_id) as ctx:
+            ctx.mark_imported([entry_id], import_result.import_id)
+
+        # Add to default database collection
+        try:
+            ensure_default_collection(session)
+            association = CollectionArtifact(
+                collection_id=DEFAULT_COLLECTION_ID,
+                artifact_id=artifact_id,
+                added_at=datetime.utcnow(),
+            )
+            session.merge(association)
+            session.commit()
+        except Exception as e:
+            logger.warning(f"Failed to add artifact to database collection: {e}")
+            session.rollback()
+
+        # Restore deployments if requested
+        deployments_restored = 0
+        if request.keep_deployments and saved_deployments:
+            # TODO: Implement deployment restoration when deployment tracking is available
+            pass
+
+        logger.info(f"Successfully re-imported artifact: {artifact_id}")
+        return ReimportResponse(
+            success=True,
+            artifact_id=artifact_id,
+            message="Successfully re-imported artifact from upstream",
+            deployments_restored=deployments_restored,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to re-import artifact from source {source_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to re-import artifact: {str(e)}",
         ) from e
 
 

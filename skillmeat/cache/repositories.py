@@ -1750,6 +1750,131 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         finally:
             session.close()
 
+    def reset_import_status(
+        self, entry_id: str, source_id: str
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Reset a catalog entry's import status to allow re-import.
+
+        Sets status back to 'new', clears import_date, and removes import_id
+        from metadata. This allows an artifact to be re-imported after deletion.
+
+        Args:
+            entry_id: Unique catalog entry identifier
+            source_id: Source ID for validation
+
+        Returns:
+            Updated MarketplaceCatalogEntry if found and reset, None if not found
+
+        Example:
+            >>> # Reset entry to allow re-import
+            >>> entry = repo.reset_import_status("entry-123", "source-456")
+            >>> if entry:
+            ...     print(f"Entry {entry.name} reset to status: {entry.status}")
+        """
+        session = self._get_session()
+        try:
+            entry = (
+                session.query(MarketplaceCatalogEntry)
+                .filter_by(id=entry_id, source_id=source_id)
+                .first()
+            )
+            if not entry:
+                logger.warning(
+                    f"Catalog entry not found for reset: {entry_id} (source: {source_id})"
+                )
+                return None
+
+            # Reset status to 'new'
+            entry.status = "new"
+            entry.import_date = None
+            entry.updated_at = datetime.utcnow()
+
+            # Remove import_id from metadata
+            metadata = entry.get_metadata_dict() or {}
+            if "import_id" in metadata:
+                del metadata["import_id"]
+            entry.set_metadata_dict(metadata)
+
+            session.commit()
+            session.refresh(entry)
+            logger.info(f"Reset catalog entry import status: {entry_id} -> new")
+            return entry
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to reset import status for {entry_id}: {e}")
+            raise
+        finally:
+            session.close()
+
+    def find_by_import_id(self, import_id: str) -> Optional[MarketplaceCatalogEntry]:
+        """Find catalog entry by import_id in metadata.
+
+        Useful for finding the catalog entry linked to an imported artifact.
+
+        Args:
+            import_id: Import ID stored in metadata
+
+        Returns:
+            MarketplaceCatalogEntry if found, None otherwise
+
+        Example:
+            >>> entry = repo.find_by_import_id("imp-abc-123")
+        """
+        session = self._get_session()
+        try:
+            # Search for entries where metadata contains the import_id
+            # Since metadata is JSON, we use LIKE for SQLite compatibility
+            entries = (
+                session.query(MarketplaceCatalogEntry)
+                .filter(
+                    MarketplaceCatalogEntry.status == "imported",
+                    MarketplaceCatalogEntry.metadata_json.like(
+                        f'%"import_id": "{import_id}"%'
+                    ),
+                )
+                .all()
+            )
+
+            # Verify the match by parsing metadata
+            for entry in entries:
+                metadata = entry.get_metadata_dict() or {}
+                if metadata.get("import_id") == import_id:
+                    return entry
+
+            return None
+        finally:
+            session.close()
+
+    def find_by_artifact_name_and_type(
+        self, name: str, artifact_type: str, source_id: Optional[str] = None
+    ) -> Optional[MarketplaceCatalogEntry]:
+        """Find catalog entry by artifact name and type.
+
+        Useful for finding the catalog entry that matches an artifact
+        being deleted from the collection.
+
+        Args:
+            name: Artifact name
+            artifact_type: Artifact type (skill, command, agent, etc.)
+            source_id: Optional source ID to filter by
+
+        Returns:
+            MarketplaceCatalogEntry if found, None otherwise
+        """
+        session = self._get_session()
+        try:
+            query = session.query(MarketplaceCatalogEntry).filter(
+                MarketplaceCatalogEntry.name == name,
+                MarketplaceCatalogEntry.artifact_type == artifact_type,
+                MarketplaceCatalogEntry.status == "imported",
+            )
+            if source_id:
+                query = query.filter(MarketplaceCatalogEntry.source_id == source_id)
+
+            return query.first()
+        finally:
+            session.close()
+
     # =========================================================================
     # REPO-002: Enhanced Query Methods
     # =========================================================================

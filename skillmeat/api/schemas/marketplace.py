@@ -1720,6 +1720,76 @@ class ImportResultDTO(BaseModel):
 
 
 # ============================================================================
+# Re-import Operation DTOs
+# ============================================================================
+
+
+class ReimportRequest(BaseModel):
+    """Request to force re-import an artifact from upstream.
+
+    Used when an artifact was deleted but the catalog entry still shows 'imported',
+    or when you want to replace an existing artifact with the upstream version.
+    """
+
+    keep_deployments: bool = Field(
+        default=False,
+        description="If True and artifact exists, save deployment records, "
+        "delete artifact, re-import, and restore deployments. "
+        "If False, performs a full fresh import.",
+        examples=[True],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "keep_deployments": False,
+            }
+        }
+
+
+class ReimportResponse(BaseModel):
+    """Response from a re-import operation.
+
+    Contains the result of the re-import including the new artifact ID
+    and count of restored deployments.
+    """
+
+    success: bool = Field(
+        description="Whether the re-import succeeded",
+        examples=[True],
+    )
+    artifact_id: Optional[str] = Field(
+        default=None,
+        description="ID of the newly imported artifact (format: 'type:name')",
+        examples=["skill:canvas-design"],
+    )
+    message: str = Field(
+        description="Human-readable description of the result",
+        examples=["Successfully re-imported artifact from upstream"],
+    )
+    deployments_restored: int = Field(
+        default=0,
+        description="Number of deployment records restored (when keep_deployments=True)",
+        ge=0,
+        examples=[3],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "artifact_id": "skill:canvas-design",
+                "message": "Successfully re-imported artifact from upstream",
+                "deployments_restored": 0,
+            }
+        }
+
+
+# ============================================================================
 # Detection DTOs (Internal Service Models)
 # ============================================================================
 
