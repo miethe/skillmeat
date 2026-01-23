@@ -2557,7 +2557,11 @@ async def import_artifacts(
             )
 
         # Perform import using ImportCoordinator
-        coordinator = ImportCoordinator(collection_mgr=collection_mgr)
+        # Always import to "default" collection - other collections not supported yet
+        coordinator = ImportCoordinator(
+            collection_name="default",
+            collection_mgr=collection_mgr,
+        )
         strategy = ConflictStrategy(request.conflict_strategy)
 
         import_result = coordinator.import_entries(

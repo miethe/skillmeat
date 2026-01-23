@@ -4029,8 +4029,9 @@ async def get_artifact_upstream_diff(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
@@ -4422,8 +4423,9 @@ async def list_artifact_files(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
@@ -4656,8 +4658,9 @@ async def get_artifact_file_content(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
@@ -4928,8 +4931,9 @@ async def update_artifact_file_content(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
@@ -5204,8 +5208,9 @@ async def create_artifact_file(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
@@ -5472,8 +5477,9 @@ async def delete_artifact_file(
                 try:
                     coll = collection_mgr.load_collection(coll_name)
                     artifact = coll.find_artifact(artifact_name, artifact_type)
-                    collection_name = coll_name
-                    break
+                    if artifact:  # Only break when actually found
+                        collection_name = coll_name
+                        break
                 except ValueError:
                     continue
 
