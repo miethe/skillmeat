@@ -4,7 +4,7 @@ import logging
 import shutil
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -56,6 +56,8 @@ class ArtifactMetadata:
     dependencies: List[str] = field(default_factory=list)
     tools: List[Tool] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
+    linked_artifacts: List["LinkedArtifactReference"] = field(default_factory=list)
+    unlinked_references: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for TOML serialization."""
@@ -78,6 +80,10 @@ class ArtifactMetadata:
             result["tools"] = [tool.value for tool in self.tools]
         if self.extra:
             result["extra"] = self.extra
+        if self.linked_artifacts:
+            result["linked_artifacts"] = [la.to_dict() for la in self.linked_artifacts]
+        if self.unlinked_references:
+            result["unlinked_references"] = self.unlinked_references
         return result
 
     @classmethod
@@ -93,6 +99,18 @@ class ArtifactMetadata:
                 # Unknown tool - skip (graceful handling)
                 pass
 
+        # Parse linked_artifacts - deferred to avoid circular reference
+        # LinkedArtifactReference.from_dict is called after that class is defined
+        linked_artifacts_data = data.get("linked_artifacts", [])
+        # Store raw data; will be parsed in __post_init__ or lazily
+        # For now, we'll parse them here since LinkedArtifactReference is defined below
+        linked_artifacts = []
+        for la_data in linked_artifacts_data:
+            if isinstance(la_data, dict):
+                # Defer to LinkedArtifactReference.from_dict (forward reference)
+                # This will work at runtime since the class is defined by then
+                linked_artifacts.append(la_data)  # Store as dict, parse later
+
         return cls(
             title=data.get("title"),
             description=data.get("description"),
@@ -103,6 +121,96 @@ class ArtifactMetadata:
             dependencies=data.get("dependencies", []),
             tools=tools,
             extra=data.get("extra", {}),
+            linked_artifacts=linked_artifacts,  # Will be parsed in resolve_linked_artifacts()
+            unlinked_references=data.get("unlinked_references", []),
+        )
+
+    def resolve_linked_artifacts(self) -> None:
+        """Resolve linked_artifacts from dict to LinkedArtifactReference objects.
+
+        Called after LinkedArtifactReference is available to convert raw dicts
+        to proper dataclass instances.
+        """
+        resolved = []
+        for la in self.linked_artifacts:
+            if isinstance(la, dict):
+                resolved.append(LinkedArtifactReference.from_dict(la))
+            else:
+                resolved.append(la)
+        self.linked_artifacts = resolved
+
+
+@dataclass
+class LinkedArtifactReference:
+    """Reference to a linked artifact.
+
+    Represents a relationship between two artifacts. Used for:
+    - Skills required by agents (link_type='requires')
+    - Agents enabled by skills (link_type='enables')
+    - General related artifacts (link_type='related')
+
+    Attributes:
+        artifact_name: Display name of target artifact
+        artifact_type: Type of target artifact (skill, agent, etc.)
+        artifact_id: ID of target artifact (None if external/unresolved)
+        source_name: Source where target was found (GitHub repo, etc.)
+        link_type: Type of relationship (requires, enables, related)
+        created_at: When link was created
+    """
+
+    artifact_name: str
+    artifact_type: "ArtifactType"
+    artifact_id: Optional[str] = None
+    source_name: Optional[str] = None
+    link_type: str = "requires"  # requires, enables, related
+    created_at: Optional[datetime] = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+    def __post_init__(self):
+        """Validate link_type."""
+        valid_types = ("requires", "enables", "related")
+        if self.link_type not in valid_types:
+            raise ValueError(
+                f"link_type must be one of {valid_types}, got {self.link_type}"
+            )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "artifact_id": self.artifact_id,
+            "artifact_name": self.artifact_name,
+            "artifact_type": (
+                self.artifact_type.value
+                if isinstance(self.artifact_type, ArtifactType)
+                else str(self.artifact_type)
+            ),
+            "source_name": self.source_name,
+            "link_type": self.link_type,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LinkedArtifactReference":
+        """Deserialize from dictionary."""
+        artifact_type = data.get("artifact_type")
+        if isinstance(artifact_type, str):
+            try:
+                artifact_type = ArtifactType(artifact_type)
+            except ValueError:
+                artifact_type = ArtifactType.SKILL  # Default fallback
+
+        created_at = data.get("created_at")
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+
+        return cls(
+            artifact_id=data.get("artifact_id"),
+            artifact_name=data["artifact_name"],
+            artifact_type=artifact_type,
+            source_name=data.get("source_name"),
+            link_type=data.get("link_type", "requires"),
+            created_at=created_at,
         )
 
 
@@ -387,6 +495,18 @@ class ArtifactManager:
             fetch_result.artifact_path, artifact_storage_path, artifact_type
         )
 
+        # Apply auto-linking (non-blocking)
+        # Extract source name from spec for link tracking
+        parsed_spec = ArtifactSpec.parse(spec)
+        source_name = f"{parsed_spec.username}/{parsed_spec.repo}"
+        self._apply_auto_linking(
+            metadata=fetch_result.metadata,
+            artifact_type=artifact_type,
+            artifact_name=artifact_name,
+            collection_name=collection_name,
+            source_name=source_name,
+        )
+
         # Create Artifact object
         artifact = Artifact(
             name=artifact_name,
@@ -487,6 +607,17 @@ class ArtifactManager:
         # Copy artifact to collection
         self.filesystem_mgr.copy_artifact(
             fetch_result.artifact_path, artifact_storage_path, artifact_type
+        )
+
+        # Apply auto-linking (non-blocking)
+        # For local imports, use the path as source identifier
+        source_name = f"local:{Path(path).name}"
+        self._apply_auto_linking(
+            metadata=fetch_result.metadata,
+            artifact_type=artifact_type,
+            artifact_name=artifact_name,
+            collection_name=collection_name,
+            source_name=source_name,
         )
 
         # Create Artifact object (no upstream)
@@ -1929,3 +2060,91 @@ class ArtifactManager:
                 "Rollback may not be available if update fails."
             )
             return None
+
+    def _apply_auto_linking(
+        self,
+        metadata: ArtifactMetadata,
+        artifact_type: ArtifactType,
+        artifact_name: str,
+        collection_name: Optional[str] = None,
+        source_name: Optional[str] = None,
+    ) -> None:
+        """Apply auto-linking to artifact metadata based on frontmatter references.
+
+        Resolves artifact references (skills, agents, related) from frontmatter
+        and populates the metadata's linked_artifacts and unlinked_references fields.
+
+        This operation is non-blocking - failures are logged but do not prevent import.
+
+        Args:
+            metadata: ArtifactMetadata to enrich with linking information
+            artifact_type: Type of the artifact being imported
+            artifact_name: Name of the artifact (for logging)
+            collection_name: Collection to search for linkable artifacts (uses active if None)
+            source_name: Source identifier for the linked references (e.g., GitHub repo)
+
+        Note:
+            - Auto-linking failures do NOT prevent artifact import
+            - Linked artifacts are stored in metadata.linked_artifacts
+            - Unlinked references are stored in metadata.unlinked_references
+            - Performance target: < 100ms per artifact
+        """
+        import logging
+        import time
+
+        start_time = time.perf_counter()
+
+        try:
+            # Check if metadata has frontmatter to process
+            if not metadata.extra or "frontmatter" not in metadata.extra:
+                logging.debug(f"No frontmatter for {artifact_name}, skipping auto-linking")
+                return
+
+            frontmatter = metadata.extra["frontmatter"]
+            if not frontmatter:
+                return
+
+            # Import linking utilities (deferred to avoid circular imports)
+            from skillmeat.utils.metadata import resolve_artifact_references
+
+            # Get available artifacts from collection for matching
+            try:
+                collection = self.collection_mgr.load_collection(collection_name)
+                available_artifacts = collection.artifacts
+            except Exception as e:
+                logging.debug(f"Could not load collection for linking: {e}")
+                available_artifacts = []
+
+            # Resolve references
+            linked, unlinked = resolve_artifact_references(
+                frontmatter=frontmatter,
+                artifact_type=artifact_type,
+                available_artifacts=available_artifacts,
+                source_name=source_name,
+            )
+
+            # Store results in metadata
+            if linked:
+                metadata.linked_artifacts = linked
+                logging.info(
+                    f"Auto-linked {len(linked)} artifacts for {artifact_name}: "
+                    f"{[la.artifact_name for la in linked]}"
+                )
+
+            if unlinked:
+                metadata.unlinked_references = unlinked
+                logging.debug(
+                    f"Unlinked references for {artifact_name}: {unlinked}"
+                )
+
+        except Exception as e:
+            # Non-blocking: log warning and continue without linking
+            logging.warning(f"Auto-linking failed for {artifact_name}: {e}")
+
+        finally:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            if elapsed_ms > 100:
+                logging.warning(
+                    f"Auto-linking for {artifact_name} took {elapsed_ms:.1f}ms "
+                    "(exceeds 100ms target)"
+                )

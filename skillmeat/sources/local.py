@@ -7,7 +7,9 @@ from typing import Optional
 from skillmeat.core.artifact import Artifact, ArtifactMetadata, ArtifactType
 from skillmeat.sources.base import ArtifactSource, FetchResult, UpdateInfo
 from skillmeat.utils.metadata import extract_artifact_metadata
-from skillmeat.utils.validator import ArtifactValidator
+
+# Note: ArtifactValidator import moved to function-level to avoid circular imports
+# (utils.validator -> core.artifact_detection -> core.__init__ -> ... -> sources.local)
 
 
 class LocalSource(ArtifactSource):
@@ -34,6 +36,7 @@ class LocalSource(ArtifactSource):
             raise ValueError(f"Path does not exist: {path}")
 
         # Validate artifact structure
+        from skillmeat.utils.validator import ArtifactValidator
         validation = ArtifactValidator.validate(source_path, artifact_type)
         if not validation.is_valid:
             raise ValueError(f"Invalid artifact: {validation.error_message}")
@@ -81,5 +84,6 @@ class LocalSource(ArtifactSource):
         Returns:
             True if valid, False otherwise
         """
+        from skillmeat.utils.validator import ArtifactValidator
         result = ArtifactValidator.validate(path, artifact_type)
         return result.is_valid

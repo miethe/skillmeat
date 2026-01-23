@@ -78,6 +78,76 @@ class ArtifactCreateResponse(BaseModel):
         }
 
 
+class LinkedArtifactReferenceSchema(BaseModel):
+    """Schema for linked artifact reference.
+
+    Represents a relationship between two artifacts, such as skills
+    required by agents or agents enabled by skills.
+    """
+
+    artifact_id: Optional[str] = Field(
+        default=None,
+        description="ID of target artifact (None if external/unresolved)",
+    )
+    artifact_name: str = Field(
+        description="Display name of target artifact",
+    )
+    artifact_type: str = Field(
+        description="Type of target artifact (skill, agent, command, etc.)",
+    )
+    source_name: Optional[str] = Field(
+        default=None,
+        description="Source where target was found (GitHub repo, etc.)",
+    )
+    link_type: str = Field(
+        default="requires",
+        pattern="^(requires|enables|related)$",
+        description="Type of relationship: requires, enables, or related",
+    )
+    created_at: Optional[datetime] = Field(
+        default=None,
+        description="When link was created",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "artifact_id": "abc123",
+                "artifact_name": "python-utils",
+                "artifact_type": "skill",
+                "source_name": "anthropics/skills",
+                "link_type": "requires",
+                "created_at": "2026-01-22T10:00:00Z",
+            }
+        }
+
+
+class CreateLinkedArtifactRequest(BaseModel):
+    """Request schema for creating artifact link."""
+
+    target_artifact_id: str = Field(
+        description="ID of artifact to link to",
+    )
+    link_type: str = Field(
+        default="requires",
+        pattern="^(requires|enables|related)$",
+        description="Type of relationship: requires, enables, or related",
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "target_artifact_id": "abc123",
+                "link_type": "requires",
+            }
+        }
+
+
 class ArtifactMetadataResponse(BaseModel):
     """Artifact metadata from SKILL.md / COMMAND.md / AGENT.md."""
 
@@ -120,6 +190,25 @@ class ArtifactMetadataResponse(BaseModel):
         default_factory=list,
         description="Claude Code tools used by this artifact",
         examples=[["Bash", "Read", "Write", "Edit"]],
+    )
+    linked_artifacts: List[LinkedArtifactReferenceSchema] = Field(
+        default_factory=list,
+        description="Artifacts this artifact links to (requires, enables, or related)",
+        examples=[
+            [
+                {
+                    "artifact_id": "skill:python-utils",
+                    "artifact_name": "python-utils",
+                    "artifact_type": "skill",
+                    "link_type": "requires",
+                }
+            ]
+        ],
+    )
+    unlinked_references: List[str] = Field(
+        default_factory=list,
+        description="References that could not be auto-matched to artifacts in the collection",
+        examples=[["some-external-skill", "unknown-tool"]],
     )
 
 

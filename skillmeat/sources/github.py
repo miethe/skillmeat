@@ -20,7 +20,9 @@ from skillmeat.core.github_client import (
 )
 from skillmeat.sources.base import ArtifactSource, FetchResult, UpdateInfo
 from skillmeat.utils.metadata import extract_artifact_metadata
-from skillmeat.utils.validator import ArtifactValidator
+
+# Note: ArtifactValidator import moved to function-level to avoid circular imports
+# (utils.validator -> core.artifact_detection -> core.__init__ -> ... -> sources.github)
 
 console = Console()
 
@@ -244,6 +246,7 @@ class GitHubClient:
             )
 
         # Validate artifact structure
+        from skillmeat.utils.validator import ArtifactValidator
         validation = ArtifactValidator.validate(artifact_path, artifact_type)
         if not validation.is_valid:
             shutil.rmtree(dest_dir, ignore_errors=True)
@@ -416,5 +419,6 @@ class GitHubSource(ArtifactSource):
         Returns:
             True if valid, False otherwise
         """
+        from skillmeat.utils.validator import ArtifactValidator
         result = ArtifactValidator.validate(path, artifact_type)
         return result.is_valid

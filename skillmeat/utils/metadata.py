@@ -8,13 +8,17 @@ name normalization.
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
 # Note: We intentionally do NOT import from skillmeat.core.* at module level
 # to avoid circular imports. This module is imported by skillmeat.core.search
 # which is imported by skillmeat.core.__init__.py
+
+if TYPE_CHECKING:
+    from skillmeat.core.artifact import Artifact, LinkedArtifactReference
+    from skillmeat.core.artifact_detection import ArtifactType
 
 logger = logging.getLogger(__name__)
 
@@ -821,3 +825,266 @@ def extract_artifact_metadata(
         metadata.description = extract_description_from_content(body_content)
 
     return metadata
+
+
+# =============================================================================
+# Artifact Linking Functions
+# =============================================================================
+
+
+def extract_artifact_references(
+    frontmatter: Dict[str, Any],
+    artifact_type: "ArtifactType",
+) -> Dict[str, List[str]]:
+    """Extract artifact references from frontmatter.
+
+    Identifies references to other artifacts based on artifact type:
+    - Agents: 'skills' field indicates required skills
+    - Skills/Agents: 'tools' field indicates tool dependencies (handled separately)
+    - Skills: 'agent' field indicates which agent this skill enables
+
+    Args:
+        frontmatter: Parsed frontmatter dictionary
+        artifact_type: Type of the artifact (SKILL, AGENT, COMMAND, etc.)
+
+    Returns:
+        Dict with keys 'requires', 'enables', 'related' containing lists of
+        reference names to match against collection artifacts.
+
+    Example:
+        >>> from skillmeat.core.artifact_detection import ArtifactType
+        >>> extract_artifact_references(
+        ...     {'skills': ['code-review', 'testing']},
+        ...     ArtifactType.AGENT
+        ... )
+        {'requires': ['code-review', 'testing'], 'enables': [], 'related': []}
+    """
+    # Import at function level to avoid circular imports
+    from skillmeat.core.artifact_detection import ArtifactType
+
+    references: Dict[str, List[str]] = {"requires": [], "enables": [], "related": []}
+
+    if not frontmatter:
+        return references
+
+    # Agent-specific: skills field indicates "requires"
+    if artifact_type == ArtifactType.AGENT:
+        skills = frontmatter.get("skills", [])
+        if isinstance(skills, str):
+            skills = [s.strip() for s in skills.split(",") if s.strip()]
+        elif isinstance(skills, list):
+            skills = [str(s).strip() for s in skills if s]
+        else:
+            skills = []
+        references["requires"].extend(skills)
+
+    # Skill-specific: agent field indicates "enables"
+    if artifact_type == ArtifactType.SKILL:
+        agent = frontmatter.get("agent")
+        if agent:
+            if isinstance(agent, str):
+                references["enables"].append(agent.strip())
+            elif isinstance(agent, list):
+                references["enables"].extend([str(a).strip() for a in agent if a])
+
+    # Any artifact: related field indicates "related"
+    related = frontmatter.get("related", [])
+    if isinstance(related, str):
+        related = [r.strip() for r in related.split(",") if r.strip()]
+    elif isinstance(related, list):
+        related = [str(r).strip() for r in related if r]
+    else:
+        related = []
+    references["related"].extend(related)
+
+    return references
+
+
+def match_artifact_reference(
+    reference: str,
+    source_artifacts: List["Artifact"],
+    artifact_type: Optional["ArtifactType"] = None,
+) -> Optional["Artifact"]:
+    """Match artifact reference to a collection artifact.
+
+    Tries matching in order:
+    1. Exact name match (case-insensitive)
+    2. Plural/singular form match (skill <-> skills)
+    3. Hyphen/underscore normalization
+    4. Type-filtered match if artifact_type specified
+
+    Args:
+        reference: Reference name to match (e.g., "code-review")
+        source_artifacts: List of artifacts to search
+        artifact_type: Optional type filter for the match
+
+    Returns:
+        Matched Artifact or None if no match found.
+
+    Example:
+        >>> # Assuming artifacts contains an artifact named 'code-review'
+        >>> match_artifact_reference("Code-Review", artifacts)
+        <Artifact name='code-review'>
+    """
+    if not reference or not source_artifacts:
+        return None
+
+    reference_lower = reference.lower().strip()
+    if not reference_lower:
+        return None
+
+    # Filter by type if specified
+    candidates = source_artifacts
+    if artifact_type:
+        candidates = [a for a in source_artifacts if a.type == artifact_type]
+
+    if not candidates:
+        return None
+
+    # 1. Exact name match (case-insensitive)
+    for artifact in candidates:
+        if artifact.name.lower() == reference_lower:
+            return artifact
+
+    # 2. Plural/singular form match
+    singular = reference_lower.rstrip("s")
+    plural = (
+        reference_lower + "s" if not reference_lower.endswith("s") else reference_lower
+    )
+
+    for artifact in candidates:
+        artifact_name_lower = artifact.name.lower()
+        if artifact_name_lower == singular or artifact_name_lower == plural:
+            return artifact
+
+    # 3. Hyphen/underscore normalization
+    # Normalize both reference and artifact names to use same separator
+    def normalize_separators(name: str) -> str:
+        return name.replace("-", "_").replace(" ", "_")
+
+    normalized_ref = normalize_separators(reference_lower)
+    for artifact in candidates:
+        artifact_normalized = normalize_separators(artifact.name.lower())
+        if artifact_normalized == normalized_ref:
+            return artifact
+
+    return None
+
+
+def create_linked_artifact_reference(
+    target_artifact: "Artifact",
+    link_type: str = "requires",
+    source_name: Optional[str] = None,
+) -> "LinkedArtifactReference":
+    """Create a LinkedArtifactReference from a matched artifact.
+
+    Args:
+        target_artifact: The matched artifact to link to
+        link_type: Type of relationship (requires, enables, related)
+        source_name: Optional source identifier
+
+    Returns:
+        LinkedArtifactReference instance
+
+    Example:
+        >>> # Assuming target_artifact is a valid Artifact
+        >>> link = create_linked_artifact_reference(target_artifact, 'requires')
+        >>> link.link_type
+        'requires'
+    """
+    # Import at function level to avoid circular imports
+    from skillmeat.core.artifact import LinkedArtifactReference
+
+    # Get artifact_id - may be stored as 'id' attribute or derive from name/type
+    artifact_id = getattr(target_artifact, "id", None)
+    if artifact_id is None:
+        # Generate a composite identifier if no id attribute exists
+        artifact_id = f"{target_artifact.type.value}::{target_artifact.name}"
+
+    # Get origin/source from artifact if not provided
+    if source_name is None:
+        source_name = getattr(target_artifact, "origin", None)
+
+    return LinkedArtifactReference(
+        artifact_id=artifact_id,
+        artifact_name=target_artifact.name,
+        artifact_type=target_artifact.type,
+        source_name=source_name,
+        link_type=link_type,
+    )
+
+
+def resolve_artifact_references(
+    frontmatter: Dict[str, Any],
+    artifact_type: "ArtifactType",
+    available_artifacts: List["Artifact"],
+    source_name: Optional[str] = None,
+) -> Tuple[List["LinkedArtifactReference"], List[str]]:
+    """Extract and resolve artifact references from frontmatter.
+
+    This is the main entry point for the linking logic. It:
+    1. Extracts references from frontmatter based on artifact type
+    2. Attempts to match each reference to available artifacts
+    3. Returns both matched links and unmatched reference names
+
+    Args:
+        frontmatter: Parsed frontmatter dictionary
+        artifact_type: Type of the source artifact
+        available_artifacts: List of artifacts to match against
+        source_name: Optional source identifier for links
+
+    Returns:
+        Tuple of (linked_artifacts, unlinked_references)
+        - linked_artifacts: List of successfully matched LinkedArtifactReference
+        - unlinked_references: List of reference names that couldn't be matched
+
+    Example:
+        >>> from skillmeat.core.artifact_detection import ArtifactType
+        >>> linked, unlinked = resolve_artifact_references(
+        ...     {'skills': ['code-review', 'unknown-skill']},
+        ...     ArtifactType.AGENT,
+        ...     collection_artifacts
+        ... )
+        >>> len(linked)
+        1
+        >>> unlinked
+        ['unknown-skill']
+    """
+    # Import at function level to avoid circular imports
+    from skillmeat.core.artifact import LinkedArtifactReference
+    from skillmeat.core.artifact_detection import ArtifactType
+
+    linked_artifacts: List[LinkedArtifactReference] = []
+    unlinked_references: List[str] = []
+
+    if not frontmatter or not available_artifacts:
+        return linked_artifacts, unlinked_references
+
+    # Extract references by type
+    references = extract_artifact_references(frontmatter, artifact_type)
+
+    # Process each link type
+    for link_type, ref_names in references.items():
+        for ref_name in ref_names:
+            if not ref_name:
+                continue
+
+            # Determine expected artifact type for matching
+            expected_type: Optional[ArtifactType] = None
+            if link_type == "requires" and artifact_type == ArtifactType.AGENT:
+                expected_type = ArtifactType.SKILL
+            elif link_type == "enables" and artifact_type == ArtifactType.SKILL:
+                expected_type = ArtifactType.AGENT
+
+            # Try to match
+            matched = match_artifact_reference(
+                ref_name, available_artifacts, expected_type
+            )
+
+            if matched:
+                link = create_linked_artifact_reference(matched, link_type, source_name)
+                linked_artifacts.append(link)
+            else:
+                unlinked_references.append(ref_name)
+
+    return linked_artifacts, unlinked_references
