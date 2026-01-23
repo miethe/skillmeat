@@ -598,3 +598,119 @@ useEffect(() => {
 **Commit**: 2654b98
 
 **Status**: RESOLVED
+
+---
+
+## Artifact File Listing Returns 404 for Valid Artifacts (Collection Search Bug)
+
+**Date Fixed**: 2026-01-23
+**Severity**: high
+**Component**: api/artifacts, api/marketplace_sources
+
+**Issue**: When viewing artifacts from the `/collection` page, clicking on an artifact to view its files returns 404 error: `GET /api/v1/artifacts/skill:webgl/files - 404`. The artifact files actually exist in the filesystem, but the API cannot find them.
+
+**Root Cause (Bug 1 - Search Loop)**: The collection search loop in `artifacts.py` broke on the first collection even when the artifact wasn't found there. The `find_artifact()` method returns `None` when not found (not a ValueError), but the loop structure unconditionally broke after the first iteration:
+
+```python
+# BUG: Breaks on first collection regardless of whether artifact found
+for coll_name in collection_mgr.list_collections():
+    try:
+        coll = collection_mgr.load_collection(coll_name)
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+        collection_name = coll_name
+        break  # Always breaks, even if artifact is None!
+    except ValueError:
+        continue
+```
+
+With collection order `['personal', 'default', ...]`, if artifact was in `default` but not `personal`, the loop would:
+1. Search `personal` → `artifact = None`
+2. Break immediately (never searches `default`)
+3. Return 404 because `artifact is None`
+
+**Root Cause (Bug 2 - Import Mismatch)**: The `import_artifacts` endpoint used `ImportCoordinator` which downloaded files to the **active collection** (determined by `collection_mgr.get_active_collection_name()`), but always added database records pointing to **DEFAULT_COLLECTION_ID**. When active collection ≠ "default":
+
+| Component | Location Used |
+|-----------|---------------|
+| ImportCoordinator (files) | Active collection (e.g., "personal") |
+| Database CollectionArtifact | DEFAULT_COLLECTION_ID ("default") |
+
+Result: Files at `~/.skillmeat/collections/personal/skills/webgl` but DB says `default` collection → 404.
+
+**Fix (Bug 1)**: Changed all 6 occurrences of the search loop to only break when artifact is actually found:
+
+```python
+# FIXED: Only break when actually found
+for coll_name in collection_mgr.list_collections():
+    try:
+        coll = collection_mgr.load_collection(coll_name)
+        artifact = coll.find_artifact(artifact_name, artifact_type)
+        if artifact:  # Only break when actually found
+            collection_name = coll_name
+            break
+    except ValueError:
+        continue
+```
+
+**Fix (Bug 2)**: Explicitly pass `collection_name="default"` to `ImportCoordinator` so files are always downloaded to the default collection, matching where DB records point:
+
+```python
+# FIXED: Always import to "default" collection
+coordinator = ImportCoordinator(
+    collection_name="default",
+    collection_mgr=collection_mgr,
+)
+```
+
+**Files Modified**:
+- `skillmeat/api/routers/artifacts.py`:
+  - 6 search loops updated to check `if artifact:` before breaking
+  - Affects: get_artifact_upstream_diff, list_artifact_files, get_artifact_file_content, update_artifact_file_content, create_artifact_file, delete_artifact_file
+- `skillmeat/api/routers/marketplace_sources.py`:
+  - `import_artifacts` function now passes `collection_name="default"` to ImportCoordinator
+
+**Testing**:
+- `GET /api/v1/artifacts/skill:aesthetic/files` now returns 200 (previously 404)
+- Module imports successfully
+- Going forward, all imports will correctly download to "default" collection
+
+**Note**: Artifacts imported before this fix may have files in wrong collection. A one-off migration script (`scripts/fix-misplaced-artifacts.py`) is available to move them.
+
+**Commit**: 7cf7972
+
+**Status**: RESOLVED
+
+---
+
+## Root Path Artifacts Return 405 Method Not Allowed
+
+**Date Fixed**: 2026-01-23
+**Severity**: medium
+**Component**: api/marketplace_sources, web/catalog
+
+**Issue**: When viewing file trees for artifacts at the repository root (path="."), the API returns 405 Method Not Allowed instead of the file listing.
+
+**Root Cause**: HTTP URL path normalization removes `./` from paths. A request to `/artifacts/./files` becomes `/artifacts/files` after normalization, which matches a different route (PATCH-only) instead of the intended file tree endpoint.
+
+**Fix**: Normalize "." to empty string in both frontend and backend before URL construction:
+
+Frontend (`catalog.ts`):
+```typescript
+// Normalize "." (repository root) to empty string
+const normalizedPath = artifactPath === '.' ? '' : artifactPath;
+```
+
+Backend (`marketplace_sources.py`):
+```python
+# Normalize "." (repository root) to empty string
+if artifact_path == ".":
+    artifact_path = ""
+```
+
+**Files Modified**:
+- `skillmeat/api/routers/marketplace_sources.py` - Two endpoints normalized
+- `skillmeat/web/lib/api/catalog.ts` - Two functions normalized
+
+**Commit**: 880f232
+
+**Status**: RESOLVED
