@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContentPane } from '@/components/entity/content-pane';
 
@@ -25,7 +25,15 @@ jest.mock('@/components/editor/split-preview', () => ({
 
 // Mock the FrontmatterDisplay component
 jest.mock('@/components/entity/frontmatter-display', () => ({
-  FrontmatterDisplay: ({ frontmatter, defaultCollapsed, className }: any) => (
+  FrontmatterDisplay: ({
+    frontmatter,
+    defaultCollapsed: _defaultCollapsed,
+    className,
+  }: {
+    frontmatter: unknown;
+    defaultCollapsed?: boolean;
+    className?: string;
+  }) => (
     <div data-testid="frontmatter-display" className={className}>
       <pre>{JSON.stringify(frontmatter, null, 2)}</pre>
     </div>
@@ -173,8 +181,8 @@ describe('ContentPane', () => {
       });
     });
 
-    describe('When showFrontmatter=false', () => {
-      it('displays content with raw frontmatter when showFrontmatter=false', () => {
+    describe('When showFrontmatter=false (deprecated prop)', () => {
+      it('still strips frontmatter from content (prop is deprecated)', () => {
         render(
           <ContentPane
             path="test.md"
@@ -183,13 +191,17 @@ describe('ContentPane', () => {
           />
         );
 
-        // The FrontmatterDisplay is still shown because frontmatter is detected
-        // but the content passed to SplitPreview should include the raw frontmatter
+        // FrontmatterDisplay is shown because frontmatter is detected
+        expect(screen.getByTestId('frontmatter-display')).toBeInTheDocument();
+
+        // Frontmatter is ALWAYS stripped when FrontmatterDisplay is shown
+        // to prevent duplication (showFrontmatter prop is deprecated)
         const splitPreview = screen.getByTestId('split-preview-content');
 
-        // The body should include the raw frontmatter
-        expect(splitPreview.textContent).toContain('---');
-        expect(splitPreview.textContent).toContain('title: Test Document');
+        // The body should NOT include the raw frontmatter (it's shown in FrontmatterDisplay)
+        expect(splitPreview.textContent).not.toContain('---');
+        expect(splitPreview.textContent).not.toContain('title: Test Document');
+        // But the body content should be present
         expect(splitPreview.textContent).toContain('# Main Content');
       });
     });

@@ -65,9 +65,11 @@ export interface ContentPaneProps {
    */
   ariaLabel?: string;
   /**
-   * When true, strips raw frontmatter from content display.
-   * Use this when FrontmatterDisplay is shown separately to avoid duplication.
+   * Deprecated. Frontmatter is now automatically stripped from content
+   * when FrontmatterDisplay component is shown (when frontmatter exists).
+   * This prop is kept for backwards compatibility but no longer affects behavior.
    * @default false
+   * @deprecated
    */
   showFrontmatter?: boolean;
 }
@@ -348,7 +350,7 @@ export function ContentPane({
   onSave,
   onCancel,
   ariaLabel,
-  showFrontmatter = false,
+  showFrontmatter: _showFrontmatter = false,
 }: ContentPaneProps) {
   // Generate unique ID for breadcrumb to use in aria-labelledby
   const breadcrumbId = path
@@ -375,14 +377,18 @@ export function ContentPane({
     return parseFrontmatter(content);
   }, [content]);
 
-  // Content to display: strip frontmatter when FrontmatterDisplay is shown separately
+  // Content to display: always strip frontmatter when FrontmatterDisplay will be shown
   const displayContent = useMemo(() => {
     if (!content || typeof content !== 'string') {
       return content || '';
     }
-    // Strip frontmatter when showFrontmatter is true (FrontmatterDisplay handles it)
-    return showFrontmatter ? stripFrontmatter(content) : content;
-  }, [content, showFrontmatter]);
+    // Always strip frontmatter when FrontmatterDisplay will be shown (when frontmatter exists)
+    // This prevents duplication between FrontmatterDisplay and raw content
+    if (detectFrontmatter(content)) {
+      return stripFrontmatter(content);
+    }
+    return content;
+  }, [content]);
 
   // Handle edit button click
   const handleEditClick = () => {

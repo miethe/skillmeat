@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,8 @@ import type { FileTreeEntry } from '@/lib/api/catalog';
 import type { CatalogEntry, ArtifactType, CatalogStatus } from '@/types/marketplace';
 import { PathTagReview } from '@/components/marketplace/path-tag-review';
 import { Input } from '@/components/ui/input';
+import { FrontmatterDisplay } from '@/components/entity/frontmatter-display';
+import { parseFrontmatter, detectFrontmatter } from '@/lib/frontmatter';
 
 interface CatalogEntryModalProps {
   entry: CatalogEntry | null;
@@ -316,15 +318,15 @@ export function CatalogEntryModal({
 
   const updateNameMutation = useUpdateCatalogEntryName(nameSourceId);
 
-  // Fetch file tree when Contents tab is active
+  // Fetch file tree when modal opens (needed for both Contents and Overview tabs)
   const {
     data: fileTreeData,
     isLoading: isTreeLoading,
     error: treeError,
     refetch: refetchTree,
   } = useCatalogFileTree(
-    activeTab === 'contents' ? sourceId : null,
-    activeTab === 'contents' ? artifactPath : null
+    entry ? sourceId : null,
+    entry ? artifactPath : null
   );
 
   // Fetch file content when a file is selected
@@ -334,6 +336,44 @@ export function CatalogEntryModal({
     error: contentError,
     refetch: refetchContent,
   } = useCatalogFileContent(sourceId, artifactPath, selectedFilePath);
+
+  // Find the primary markdown file path for frontmatter extraction
+  // Priority: SKILL.md > README.md > first .md file
+  const primaryMdPath = useMemo(() => {
+    if (!fileTreeData?.entries) return null;
+
+    const files = fileTreeData.entries;
+    // Priority: SKILL.md > README.md > first .md file
+    const skillMd = files.find(
+      (f) => f.type === 'file' && f.path.toLowerCase() === 'skill.md'
+    );
+    if (skillMd) return skillMd.path;
+
+    const readmeMd = files.find(
+      (f) => f.type === 'file' && f.path.toLowerCase() === 'readme.md'
+    );
+    if (readmeMd) return readmeMd.path;
+
+    const firstMd = files.find(
+      (f) => f.type === 'file' && f.path.toLowerCase().endsWith('.md')
+    );
+    return firstMd?.path ?? null;
+  }, [fileTreeData?.entries]);
+
+  // Fetch frontmatter from primary markdown file for Overview tab
+  const { data: frontmatterContent, isLoading: isFrontmatterLoading } = useCatalogFileContent(
+    activeTab === 'overview' ? sourceId : null,
+    activeTab === 'overview' ? artifactPath : null,
+    activeTab === 'overview' ? primaryMdPath : null
+  );
+
+  // Parse frontmatter from the content
+  const parsedFrontmatter = useMemo(() => {
+    if (!frontmatterContent?.content) return null;
+    if (!detectFrontmatter(frontmatterContent.content)) return null;
+    const { frontmatter } = parseFrontmatter(frontmatterContent.content);
+    return frontmatter;
+  }, [frontmatterContent?.content]);
 
   // Transform flat file list to hierarchical structure for FileTree component
   const fileStructure = fileTreeData?.entries ? buildFileStructure(fileTreeData.entries) : [];
@@ -575,6 +615,29 @@ export function CatalogEntryModal({
                   </div>
                 </div>
               </div>
+
+              {/* Frontmatter Metadata Section */}
+              {isFrontmatterLoading && (
+                <section aria-label="Loading artifact metadata" className="space-y-3">
+                  <h3 className="text-sm font-medium">Artifact Metadata</h3>
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-4 w-1/3 rounded bg-muted" />
+                    <div className="h-4 w-2/3 rounded bg-muted" />
+                    <div className="h-4 w-1/2 rounded bg-muted" />
+                  </div>
+                </section>
+              )}
+
+              {parsedFrontmatter && Object.keys(parsedFrontmatter).length > 0 && (
+                <section aria-label="Artifact metadata from frontmatter" className="space-y-3">
+                  <h3 className="text-sm font-medium">Artifact Metadata</h3>
+                  <FrontmatterDisplay
+                    frontmatter={parsedFrontmatter}
+                    defaultCollapsed={false}
+                    className="bg-background"
+                  />
+                </section>
+              )}
 
               {/* Confidence Section */}
               <section aria-label="Confidence score breakdown" className="space-y-3 border-t pt-4">
