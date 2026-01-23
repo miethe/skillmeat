@@ -1,25 +1,28 @@
 ---
-title: "Implementation Plan: Configurable Frontmatter Caching for Cross-Source Artifact Search"
-description: "Detailed phased implementation with task breakdown and subagent assignments"
+title: "Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Artifact Search"
+description: "Detailed phased implementation with task breakdown and subagent assignments for search indexing controls"
 audience: [ai-agents, developers]
-tags: [implementation, planning, phases, tasks, marketplace, search, configuration]
+tags: [implementation, planning, phases, tasks, marketplace, search, configuration, indexing]
 created: 2026-01-20
-updated: 2026-01-20
+updated: 2026-01-23
 category: "product-planning"
 status: draft
 related:
   - /docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md
   - /docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md
+  - /docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md
 ---
 
-# Implementation Plan: Configurable Frontmatter Caching
+# Implementation Plan: Configurable Frontmatter Indexing for Cross-Source Search
 
 **Plan ID**: `IMPL-2026-01-20-configurable-frontmatter-caching`
 **Date**: 2026-01-20
+**Updated**: 2026-01-23
 **Author**: Implementation Planner (Sonnet 4.5)
 **Related Documents**:
 - **PRD**: `/docs/project_plans/PRDs/enhancements/configurable-frontmatter-caching-v1.md`
 - **SPIKE**: `/docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md`
+- **Prerequisite (Complete)**: `/docs/project_plans/implementation_plans/features/enhanced-frontmatter-utilization-v1.md`
 
 **Complexity**: Medium
 **Total Estimated Effort**: 26 story points (~3-4 days)
@@ -27,13 +30,25 @@ related:
 
 ## Executive Summary
 
-This implementation adds configurable frontmatter caching control as "Phase 0" of the cross-source artifact search feature. Users can choose between three global modes (off/on/opt_in) and override behavior per-source, balancing storage costs against search capabilities. The implementation follows MeatyPrompts layered architecture: ConfigManager → Database → API → Frontend, with parallel execution opportunities in testing and documentation phases.
+This implementation adds configurable search indexing control for cross-source artifact search. Users can choose between three global modes (off/on/opt_in) and override behavior per-source, balancing storage costs against search capabilities.
+
+**Prerequisite Context**: The `enhanced-frontmatter-utilization` feature (complete) already implements:
+- Frontmatter extraction and caching in `artifact.metadata.extra['frontmatter']`
+- Platform and Tool enums (17 Claude Code tools)
+- Artifact linking system with UI components
+
+This plan adds the **search indexing layer** on top of that foundation, enabling:
+- Configurable control over whether extracted frontmatter is indexed for search
+- Per-source granularity for indexing decisions
+- Storage optimization for users who want frontmatter display but not search indexing
+
+The implementation follows SkillMeat's layered architecture: ConfigManager → Database → API → Frontend, with parallel execution opportunities in testing and documentation phases.
 
 ## Implementation Strategy
 
 ### Architecture Sequence
 
-Following MeatyPrompts layered architecture:
+Following SkillMeat's layered architecture:
 1. **Configuration Layer** - Add `artifact_search.indexing_mode` config key with validation
 2. **Database Layer** - Add `indexing_enabled` column to MarketplaceSource model
 3. **API Layer** - Update schemas and endpoints to handle per-source flag
@@ -289,9 +304,11 @@ def get_effective_indexing_state(source: MarketplaceSource, mode: str) -> bool:
 
 **Documentation Locations:**
 - `skillmeat/config.py` - ConfigManager class docstring
-- `skillmeat/cache/models.py` - MarketplaceSource class docstring
+- `skillmeat/cache/models.py` - MarketplaceSource class docstring (lines 1182+)
 - `skillmeat/api/routers/marketplace_sources.py` - Inline comments in endpoints
-- `docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md` - Phase 0 reference
+- `docs/project_plans/SPIKEs/cross-source-artifact-search-spike.md` - Reference this implementation
+
+**Note**: The existing `enable_frontmatter_detection` flag in MarketplaceSource controls whether frontmatter is parsed for display. The new `indexing_enabled` flag controls whether frontmatter is indexed for cross-source search - a separate concern.
 
 ---
 
@@ -375,15 +392,19 @@ def get_effective_indexing_state(source: MarketplaceSource, mode: str) -> bool:
 - Source creation with `indexing_enabled` flag distribution (analytics)
 - Storage usage over time (validate savings when disabled)
 
-### Iteration Planning
-- **Phase 1 (SPIKE)**: Schema extension + frontmatter extraction (conditional on `indexing_enabled`)
+### Iteration Planning (Cross-Source Search)
+
+**Note**: Frontmatter extraction and caching is already complete via the `enhanced-frontmatter-utilization` feature. The SPIKE phases below build on both that work AND this configurable indexing feature.
+
+- **Phase 1 (SPIKE)**: Schema extension for search columns (title, description, search_tags, search_text) - conditional on `indexing_enabled`
 - **Phase 2 (SPIKE)**: FTS5 full-text search (conditional on `indexing_enabled`)
-- **Phase 3 (SPIKE)**: Frontend search UI (show "indexing disabled" message if needed)
+- **Phase 3 (SPIKE)**: Frontend search UI with dual-mode toggle (show "indexing disabled" message if needed)
 
 ### Technical Debt
 - Add API endpoint for fetching global mode (currently may be hardcoded in UI)
 - Consider bulk update tool if users request changing many sources at once
 - Analytics on mode usage distribution (off vs on vs opt_in)
+- Consider relationship with existing `enable_frontmatter_detection` flag (display vs search indexing)
 
 ---
 
@@ -468,9 +489,14 @@ def get_effective_indexing_state(source: MarketplaceSource, mode: str) -> bool:
 
 **Progress Tracking:**
 
-See `.claude/progress/configurable-frontmatter-caching-v1/phase-0-progress.md`
+See `.claude/progress/configurable-frontmatter-caching-v1/` (create when implementation begins)
 
 ---
 
-**Implementation Plan Version**: 1.0
-**Last Updated**: 2026-01-20
+**Implementation Plan Version**: 1.1
+**Last Updated**: 2026-01-23
+
+### Changelog
+
+- **v1.1 (2026-01-23)**: Updated to reflect completed `enhanced-frontmatter-utilization` feature. Reframed plan as enhancement building on existing frontmatter infrastructure. Fixed project name references (MeatyPrompts → SkillMeat). Added prerequisite documentation link.
+- **v1.0 (2026-01-20)**: Initial plan creation as "Phase 0" of cross-source search.

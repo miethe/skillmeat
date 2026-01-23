@@ -521,6 +521,6 @@ Cross-source artifact search is **highly feasible** with the recommended phased 
 - **Reuses existing infrastructure** (SQLite, SQLAlchemy, React Query)
 - **Has zero GitHub API impact** (frontmatter already available during scan)
 - **Provides acceptable performance** (<50ms at 50K scale with Phase 1; <10ms with Phase 2)
-- **Follows MP architecture patterns** (repository → service → router)
+- **Follows SkillMeat architecture patterns** (repository → service → router)
 
 **Recommended next step**: Create PRD and implementation plan for Phase 1 delivery.

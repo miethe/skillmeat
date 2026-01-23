@@ -2216,6 +2216,24 @@
             "description": "Filter by tags (comma-separated)"
           },
           {
+            "name": "tools",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tools (comma-separated). Returns artifacts that use any of the specified tools.",
+              "title": "Tools"
+            },
+            "description": "Filter by tools (comma-separated). Returns artifacts that use any of the specified tools."
+          },
+          {
             "name": "check_drift",
             "in": "query",
             "required": false,
@@ -2244,6 +2262,24 @@
               "title": "Project Path"
             },
             "description": "Project path for drift detection (required if check_drift=true)"
+          },
+          {
+            "name": "has_unlinked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter for artifacts with unlinked references (true) or without (false)",
+              "title": "Has Unlinked"
+            },
+            "description": "Filter for artifacts with unlinked references (true) or without (false)"
           }
         ],
         "responses": {
@@ -4645,6 +4681,124 @@
             }
           }
         }
+      },
+      "put": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Update artifact tags",
+        "description": "Update all tags for an artifact.\n\n    Accepts a list of tag names which will be normalized (lowercase, spaces to\n    underscores, trimmed). For each tag:\n    - If it exists in the tags table, the existing tag is used\n    - If it doesn't exist, a new tag is created with the normalized name as slug\n\n    This operation replaces all existing tags with the provided list.",
+        "operationId": "update_artifact_tags_api_v1_artifacts__artifact_id__tags_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactTagsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully updated artifact tags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/artifacts/{artifact_id}/tags/{tag_id}": {
@@ -4688,7 +4842,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
+                  "additionalProperties": {
+                    "type": "string"
+                  },
                   "title": "Response Add Tag To Artifact Api V1 Artifacts  Artifact Id  Tags  Tag Id  Post"
                 }
               }
@@ -4742,6 +4898,466 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/linked-artifacts": {
+      "post": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Create artifact link",
+        "description": "Create a link from this artifact to another artifact.",
+        "operationId": "create_linked_artifact_api_v1_artifacts__artifact_id__linked_artifacts_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkedArtifactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successfully created artifact link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedArtifactReferenceSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or self-linking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Link already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "List artifact links",
+        "description": "Get all artifacts linked from this artifact.",
+        "operationId": "list_linked_artifacts_api_v1_artifacts__artifact_id__linked_artifacts_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "link_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(requires|enables|related)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by link type (requires, enables, related)",
+              "title": "Link Type"
+            },
+            "description": "Filter by link type (requires, enables, related)"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved artifact links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LinkedArtifactReferenceSchema"
+                  },
+                  "title": "Response List Linked Artifacts Api V1 Artifacts  Artifact Id  Linked Artifacts Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/linked-artifacts/{target_artifact_id}": {
+      "delete": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Delete artifact link",
+        "description": "Remove a link from this artifact to another.",
+        "operationId": "delete_linked_artifact_api_v1_artifacts__artifact_id__linked_artifacts__target_artifact_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "target_artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successfully deleted artifact link"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact or link not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/artifacts/{artifact_id}/unlinked-references": {
+      "get": {
+        "tags": [
+          "artifacts",
+          "artifacts"
+        ],
+        "summary": "Get unlinked references",
+        "description": "Get references that couldn't be auto-linked.",
+        "operationId": "get_unlinked_references_api_v1_artifacts__artifact_id__unlinked_references_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collection name (uses default if not specified)",
+              "title": "Collection"
+            },
+            "description": "Collection name (uses default if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved unlinked references",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "title": "Response Get Unlinked References Api V1 Artifacts  Artifact Id  Unlinked References Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Artifact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -15177,6 +15793,54 @@
                 "PyPDF2"
               ]
             ]
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "Claude Code tools used by this artifact",
+            "examples": [
+              [
+                "Bash",
+                "Read",
+                "Write",
+                "Edit"
+              ]
+            ]
+          },
+          "linked_artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedArtifactReferenceSchema"
+            },
+            "type": "array",
+            "title": "Linked Artifacts",
+            "description": "Artifacts this artifact links to (requires, enables, or related)",
+            "examples": [
+              [
+                {
+                  "artifact_id": "skill:python-utils",
+                  "artifact_name": "python-utils",
+                  "artifact_type": "skill",
+                  "link_type": "requires"
+                }
+              ]
+            ]
+          },
+          "unlinked_references": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unlinked References",
+            "description": "References that could not be auto-matched to artifacts in the collection",
+            "examples": [
+              [
+                "some-external-skill",
+                "unknown-tool"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -15536,7 +16200,12 @@
               "document",
               "pdf"
             ],
-            "title": "PDF Processing Skill"
+            "title": "PDF Processing Skill",
+            "tools": [
+              "Read",
+              "Write",
+              "Bash"
+            ]
           },
           "name": "pdf",
           "origin": "github",
@@ -15771,6 +16440,38 @@
           "success": true,
           "synced_files_count": 5,
           "updated_version": "1.2.0"
+        }
+      },
+      "ArtifactTagsUpdate": {
+        "properties": {
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "List of tag names to assign to the artifact",
+            "examples": [
+              [
+                "productivity",
+                "ai-tools",
+                "automation"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "title": "ArtifactTagsUpdate",
+        "description": "Request schema for updating artifact tags.\n\nAccepts a list of tag names which will be normalized and synced\nwith the artifact's tag associations. Tags that don't exist will\nbe created automatically.",
+        "example": {
+          "tags": [
+            "productivity",
+            "ai_tools",
+            "automation"
+          ]
         }
       },
       "ArtifactUpdateMetadataRequest": {
@@ -20324,6 +21025,32 @@
         "title": "CopyGroupRequest",
         "description": "Request schema for copying a group to another collection.\n\nCreates a copy of the group (with name + \" (Copy)\") in the target collection,\nincluding all artifacts from the source group."
       },
+      "CreateLinkedArtifactRequest": {
+        "properties": {
+          "target_artifact_id": {
+            "type": "string",
+            "title": "Target Artifact Id",
+            "description": "ID of artifact to link to"
+          },
+          "link_type": {
+            "type": "string",
+            "pattern": "^(requires|enables|related)$",
+            "title": "Link Type",
+            "description": "Type of relationship: requires, enables, or related",
+            "default": "requires"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_artifact_id"
+        ],
+        "title": "CreateLinkedArtifactRequest",
+        "description": "Request schema for creating artifact link.",
+        "example": {
+          "link_type": "requires",
+          "target_artifact_id": "abc123"
+        }
+      },
       "CreateSourceRequest": {
         "properties": {
           "repo_url": {
@@ -24277,6 +25004,79 @@
           "listing_id": "skillmeat-123",
           "message": "Successfully installed 2 artifacts",
           "success": true
+        }
+      },
+      "LinkedArtifactReferenceSchema": {
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id",
+            "description": "ID of target artifact (None if external/unresolved)"
+          },
+          "artifact_name": {
+            "type": "string",
+            "title": "Artifact Name",
+            "description": "Display name of target artifact"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "Type of target artifact (skill, agent, command, etc.)"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name",
+            "description": "Source where target was found (GitHub repo, etc.)"
+          },
+          "link_type": {
+            "type": "string",
+            "pattern": "^(requires|enables|related)$",
+            "title": "Link Type",
+            "description": "Type of relationship: requires, enables, or related",
+            "default": "requires"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "When link was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_name",
+          "artifact_type"
+        ],
+        "title": "LinkedArtifactReferenceSchema",
+        "description": "Schema for linked artifact reference.\n\nRepresents a relationship between two artifacts, such as skills\nrequired by agents or agents enabled by skills.",
+        "example": {
+          "artifact_id": "abc123",
+          "artifact_name": "python-utils",
+          "artifact_type": "skill",
+          "created_at": "2026-01-22T10:00:00Z",
+          "link_type": "requires",
+          "source_name": "anthropics/skills"
         }
       },
       "ListingDetailResponse": {
