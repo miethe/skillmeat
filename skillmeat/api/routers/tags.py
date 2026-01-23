@@ -30,7 +30,6 @@ from skillmeat.api.schemas.tags import (
     TagResponse,
     TagUpdateRequest,
 )
-from skillmeat.core.services import TagService
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +110,8 @@ async def create_tag(request: TagCreateRequest) -> TagResponse:
         HTTPException 409: If tag name or slug already exists
         HTTPException 500: If creation fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -183,6 +184,8 @@ async def list_tags(
         HTTPException 400: If cursor is invalid
         HTTPException 500: If listing fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -233,6 +236,8 @@ async def get_tag(tag_id: str) -> TagResponse:
         HTTPException 404: If tag not found
         HTTPException 500: If retrieval fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -287,6 +292,8 @@ async def get_tag_by_slug(slug: str) -> TagResponse:
         HTTPException 404: If tag not found
         HTTPException 500: If retrieval fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -350,6 +357,8 @@ async def update_tag(tag_id: str, request: TagUpdateRequest) -> TagResponse:
         HTTPException 409: If updated slug already exists
         HTTPException 500: If update fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -425,6 +434,8 @@ async def delete_tag(tag_id: str) -> None:
         HTTPException 404: If tag not found
         HTTPException 500: If deletion fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
@@ -494,6 +505,8 @@ async def search_tags(
         HTTPException 400: If query is invalid
         HTTPException 500: If search fails
     """
+    from skillmeat.core.services import TagService
+
     service = TagService()
 
     try:
