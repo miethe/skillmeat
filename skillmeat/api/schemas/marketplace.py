@@ -1886,6 +1886,23 @@ class DetectedArtifact(BaseModel):
         default=None,
         description="Artifact status (e.g., 'new', 'excluded')",
     )
+    # Cross-source search fields (populated during frontmatter indexing)
+    title: Optional[str] = Field(
+        default=None,
+        description="Artifact title from frontmatter for search display",
+    )
+    frontmatter_description: Optional[str] = Field(
+        default=None,
+        description="Artifact description from frontmatter for search",
+    )
+    search_tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags from frontmatter for search filtering",
+    )
+    search_text: Optional[str] = Field(
+        default=None,
+        description="Concatenated searchable text (title + description + tags)",
+    )
 
     class Config:
         """Pydantic model configuration."""

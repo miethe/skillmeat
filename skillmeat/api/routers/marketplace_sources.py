@@ -30,7 +30,7 @@ import re
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Annotated, Dict, List, Literal, Optional, Set
+from typing import Annotated, Any, Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -106,6 +106,7 @@ from skillmeat.core.marketplace.import_coordinator import (
 from skillmeat.core.marketplace.source_manager import SourceManager
 from skillmeat.core.path_tags import PathSegmentExtractor, PathTagConfig
 from skillmeat.core.validation import validate_artifact_name
+from skillmeat.utils.metadata import extract_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -534,6 +535,112 @@ def get_effective_indexing_state(indexing_enabled: Optional[bool], mode: str) ->
 
 
 # =============================================================================
+# Frontmatter Extraction for Search Indexing
+# =============================================================================
+
+
+def _extract_frontmatter_for_artifact(
+    scanner: GitHubScanner,
+    source: MarketplaceSource,
+    artifact: DetectedArtifact,
+) -> Dict[str, Any]:
+    """Extract frontmatter from artifact's manifest file for search indexing.
+
+    For skill artifacts, fetches SKILL.md and extracts frontmatter fields.
+    Returns empty dict for non-skill artifacts or on failure.
+
+    Args:
+        scanner: GitHubScanner instance for fetching file content
+        source: MarketplaceSource with owner/repo_name info
+        artifact: DetectedArtifact with path and type info
+
+    Returns:
+        Dict with keys: title, description, search_tags (list), search_text
+        All values may be None if extraction fails or not applicable.
+    """
+    result: Dict[str, Optional[str]] = {
+        "title": None,
+        "description": None,
+        "search_tags": None,
+        "search_text": None,
+    }
+
+    # Only extract frontmatter for skill artifacts
+    if artifact.artifact_type != "skill":
+        return result
+
+    # Build path to SKILL.md
+    artifact_path = artifact.path.rstrip("/")
+    skill_md_path = f"{artifact_path}/SKILL.md" if artifact_path else "SKILL.md"
+
+    try:
+        # Fetch SKILL.md content
+        file_result = scanner.get_file_content(
+            owner=source.owner,
+            repo=source.repo_name,
+            path=skill_md_path,
+            ref=source.ref,
+        )
+
+        if not file_result or file_result.get("is_binary"):
+            logger.debug(f"SKILL.md not found or binary: {skill_md_path}")
+            return result
+
+        content = file_result.get("content", "")
+        if not content:
+            return result
+
+        # Extract frontmatter
+        frontmatter = extract_frontmatter(content)
+        if not frontmatter:
+            return result
+
+        # Extract title (try 'title' then 'name')
+        title = frontmatter.get("title") or frontmatter.get("name")
+        if title:
+            # Truncate to 200 chars (model field limit)
+            result["title"] = str(title)[:200]
+
+        # Extract description
+        description = frontmatter.get("description")
+        if description:
+            result["description"] = str(description)
+
+        # Extract tags
+        tags = frontmatter.get("tags", [])
+        if tags:
+            if isinstance(tags, list):
+                result["search_tags"] = [str(t) for t in tags if t]
+            elif isinstance(tags, str):
+                result["search_tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+
+        # Build search_text from all fields
+        search_parts = [artifact.name]
+        if result["title"]:
+            search_parts.append(result["title"])
+        if result["description"]:
+            search_parts.append(result["description"])
+        if result["search_tags"]:
+            search_parts.extend(result["search_tags"])
+
+        result["search_text"] = " ".join(search_parts)
+
+        logger.debug(
+            f"Extracted frontmatter for {artifact_path}: "
+            f"title={result['title']}, tags={result['search_tags']}"
+        )
+
+    except Exception as e:
+        logger.warning(
+            f"Failed to extract frontmatter for {skill_md_path}: {e}",
+            exc_info=False,
+        )
+        # Return empty result on failure - non-blocking
+
+    return result
+
+
+# =============================================================================
 # Shared Scan Logic
 # =============================================================================
 
@@ -689,6 +796,14 @@ async def _perform_scan(
             if source_in_session:
                 source_in_session.set_counts_by_type_dict(counts_by_type)
 
+            # Determine if frontmatter indexing is enabled for this source
+            indexing_enabled = source.indexing_enabled is True
+            if indexing_enabled:
+                logger.info(
+                    f"Frontmatter indexing enabled for source {source_id}, "
+                    f"extracting search metadata from artifacts"
+                )
+
             # Convert detected artifacts to catalog entries
             new_entries = []
             for artifact in scan_result.artifacts:
@@ -709,6 +824,23 @@ async def _perform_scan(
                             f"Failed to extract path segments for {artifact.path}: {e}"
                         )
                         # Continue without path_segments; extraction is non-blocking
+
+                # Extract frontmatter for search indexing if enabled
+                search_metadata: Dict[str, Any] = {
+                    "title": None,
+                    "description": None,
+                    "search_tags": None,
+                    "search_text": None,
+                }
+                if indexing_enabled:
+                    search_metadata = _extract_frontmatter_for_artifact(
+                        scanner, source, artifact
+                    )
+
+                # Serialize search_tags as JSON if present
+                search_tags_json = None
+                if search_metadata.get("search_tags"):
+                    search_tags_json = json.dumps(search_metadata["search_tags"])
 
                 entry = MarketplaceCatalogEntry(
                     id=str(uuid.uuid4()),
@@ -731,6 +863,11 @@ async def _perform_scan(
                     ),
                     excluded_reason=artifact.excluded_reason,
                     path_segments=path_segments_json,
+                    # Cross-source search fields from frontmatter
+                    title=search_metadata.get("title"),
+                    description=search_metadata.get("description"),
+                    search_tags=search_tags_json,
+                    search_text=search_metadata.get("search_text"),
                 )
                 new_entries.append(entry)
 
