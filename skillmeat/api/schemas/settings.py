@@ -28,7 +28,7 @@ class GitHubTokenStatusResponse(BaseModel):
     """Response for GitHub token status check.
 
     Returns whether a token is configured and, if so, a masked version
-    along with the associated GitHub username.
+    along with the associated GitHub username and rate limit information.
     """
 
     is_set: bool = Field(
@@ -44,6 +44,16 @@ class GitHubTokenStatusResponse(BaseModel):
         default=None,
         description="GitHub username associated with the token",
         examples=["octocat"],
+    )
+    rate_limit: Optional[int] = Field(
+        default=None,
+        description="Maximum requests per hour (5000 with token, 60 without)",
+        examples=[5000],
+    )
+    rate_remaining: Optional[int] = Field(
+        default=None,
+        description="Remaining requests in current rate limit window",
+        examples=[4999],
     )
 
 

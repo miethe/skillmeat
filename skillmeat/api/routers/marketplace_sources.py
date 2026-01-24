@@ -27,9 +27,13 @@ API Endpoints:
 import json
 import logging
 import re
+import shutil
+import subprocess
+import tempfile
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -641,6 +645,291 @@ def _extract_frontmatter_for_artifact(
 
 
 # =============================================================================
+# Clone-Based Batch Frontmatter Extraction
+# =============================================================================
+
+# Minimum number of skill artifacts to use batch clone approach
+BATCH_CLONE_THRESHOLD = 3
+
+
+def _clone_repo_sparse(
+    owner: str,
+    repo: str,
+    ref: str,
+    patterns: List[str],
+    timeout: int = 60,
+) -> Optional[Path]:
+    """Clone repository with sparse checkout to temp directory.
+
+    Uses git's sparse-checkout and partial clone features to minimize
+    data transfer, fetching only files matching the specified patterns.
+
+    Args:
+        owner: Repository owner (GitHub username or org)
+        repo: Repository name
+        ref: Git ref to checkout (branch, tag, or SHA)
+        patterns: List of sparse-checkout patterns (e.g., ["**/SKILL.md"])
+        timeout: Timeout in seconds for git operations (default: 60)
+
+    Returns:
+        Path to temporary directory containing the sparse clone,
+        or None if clone fails. Caller is responsible for cleanup.
+    """
+    from skillmeat.core.github_client import get_github_client
+
+    client = get_github_client()
+    token = client.token
+
+    # Create temp directory
+    temp_dir = tempfile.mkdtemp(prefix="skillmeat-sparse-")
+    temp_path = Path(temp_dir)
+
+    try:
+        # Build authenticated URL if token available
+        if token:
+            repo_url = f"https://oauth2:{token}@github.com/{owner}/{repo}.git"
+        else:
+            repo_url = f"https://github.com/{owner}/{repo}.git"
+
+        # Initialize empty repo with sparse-checkout
+        subprocess.run(
+            ["git", "init"],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+
+        # Configure sparse-checkout
+        subprocess.run(
+            ["git", "config", "core.sparseCheckout", "true"],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+
+        # Configure partial clone filter
+        subprocess.run(
+            ["git", "config", "extensions.partialClone", "origin"],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+
+        # Write sparse-checkout patterns
+        sparse_checkout_file = temp_path / ".git" / "info" / "sparse-checkout"
+        sparse_checkout_file.parent.mkdir(parents=True, exist_ok=True)
+        sparse_checkout_file.write_text("\n".join(patterns) + "\n")
+
+        # Add remote
+        subprocess.run(
+            ["git", "remote", "add", "origin", repo_url],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True,
+        )
+
+        # Fetch with blob filter (minimal data transfer)
+        result = subprocess.run(
+            [
+                "git",
+                "fetch",
+                "--depth=1",
+                "--filter=blob:none",
+                "origin",
+                ref,
+            ],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"Git fetch failed for {owner}/{repo}: {result.stderr}")
+            shutil.rmtree(temp_path, ignore_errors=True)
+            return None
+
+        # Checkout the fetched ref
+        result = subprocess.run(
+            ["git", "checkout", "FETCH_HEAD"],
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"Git checkout failed for {owner}/{repo}: {result.stderr}")
+            shutil.rmtree(temp_path, ignore_errors=True)
+            return None
+
+        return temp_path
+
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Git operation timed out for {owner}/{repo}")
+        shutil.rmtree(temp_path, ignore_errors=True)
+        return None
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"Git operation failed for {owner}/{repo}: {e}")
+        shutil.rmtree(temp_path, ignore_errors=True)
+        return None
+    except Exception as e:
+        logger.warning(f"Unexpected error cloning {owner}/{repo}: {e}")
+        shutil.rmtree(temp_path, ignore_errors=True)
+        return None
+
+
+def _extract_frontmatter_batch(
+    source: MarketplaceSource,
+    artifacts: List[DetectedArtifact],
+) -> Dict[str, Dict[str, Any]]:
+    """Extract frontmatter for multiple artifacts using git sparse clone.
+
+    Uses a single git clone operation to fetch all SKILL.md files from the
+    repository, then reads them from disk. This is much more efficient than
+    making individual API calls for each artifact.
+
+    Args:
+        source: MarketplaceSource with owner/repo_name info
+        artifacts: List of DetectedArtifacts to extract frontmatter for
+            (should be pre-filtered to skill artifacts only)
+
+    Returns:
+        Dict mapping artifact name to frontmatter dict with keys:
+        - title: Extracted title (str or None)
+        - description: Extracted description (str or None)
+        - search_tags: List of tags (list or None)
+        - search_text: Combined search text (str or None)
+
+        Missing or failed extractions will have None values.
+    """
+    result: Dict[str, Dict[str, Any]] = {}
+
+    # Initialize all artifacts with empty results
+    for artifact in artifacts:
+        result[artifact.name] = {
+            "title": None,
+            "description": None,
+            "search_tags": None,
+            "search_text": None,
+        }
+
+    if not artifacts:
+        return result
+
+    logger.info(
+        f"Using clone-based frontmatter extraction for {len(artifacts)} skills "
+        f"from {source.owner}/{source.repo_name}"
+    )
+
+    # Clone with sparse checkout for SKILL.md files only
+    clone_path = _clone_repo_sparse(
+        owner=source.owner,
+        repo=source.repo_name,
+        ref=source.ref,
+        patterns=["**/SKILL.md", "SKILL.md"],
+        timeout=60,
+    )
+
+    if clone_path is None:
+        logger.warning(
+            f"Clone failed for {source.owner}/{source.repo_name}, "
+            f"will fall back to API calls"
+        )
+        return result
+
+    try:
+        # Read SKILL.md for each artifact from disk
+        for artifact in artifacts:
+            artifact_path = artifact.path.rstrip("/")
+            if artifact_path:
+                skill_md_path = clone_path / artifact_path / "SKILL.md"
+            else:
+                skill_md_path = clone_path / "SKILL.md"
+
+            if not skill_md_path.exists():
+                logger.debug(f"SKILL.md not found at {skill_md_path}")
+                continue
+
+            try:
+                content = skill_md_path.read_text(encoding="utf-8")
+                if not content:
+                    continue
+
+                # Extract frontmatter using existing utility
+                frontmatter = extract_frontmatter(content)
+                if not frontmatter:
+                    continue
+
+                # Extract title (try 'title' then 'name')
+                title = frontmatter.get("title") or frontmatter.get("name")
+                if title:
+                    result[artifact.name]["title"] = str(title)[:200]
+
+                # Extract description
+                description = frontmatter.get("description")
+                if description:
+                    result[artifact.name]["description"] = str(description)
+
+                # Extract tags
+                tags = frontmatter.get("tags", [])
+                if tags:
+                    if isinstance(tags, list):
+                        result[artifact.name]["search_tags"] = [
+                            str(t) for t in tags if t
+                        ]
+                    elif isinstance(tags, str):
+                        result[artifact.name]["search_tags"] = [
+                            t.strip() for t in tags.split(",") if t.strip()
+                        ]
+
+                # Build search_text from all fields
+                search_parts = [artifact.name]
+                if result[artifact.name]["title"]:
+                    search_parts.append(result[artifact.name]["title"])
+                if result[artifact.name]["description"]:
+                    search_parts.append(result[artifact.name]["description"])
+                if result[artifact.name]["search_tags"]:
+                    search_parts.extend(result[artifact.name]["search_tags"])
+
+                result[artifact.name]["search_text"] = " ".join(search_parts)
+
+                logger.debug(
+                    f"Extracted frontmatter for {artifact_path}: "
+                    f"title={result[artifact.name]['title']}, "
+                    f"tags={result[artifact.name]['search_tags']}"
+                )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to read SKILL.md for {artifact.path}: {e}",
+                    exc_info=False,
+                )
+                # Continue with next artifact - extraction is non-blocking
+
+        logger.info(
+            f"Batch frontmatter extraction complete for "
+            f"{source.owner}/{source.repo_name}: "
+            f"{sum(1 for v in result.values() if v.get('title'))} of "
+            f"{len(artifacts)} skills had frontmatter"
+        )
+
+    finally:
+        # Always clean up the temp directory
+        shutil.rmtree(clone_path, ignore_errors=True)
+
+    return result
+
+
+# =============================================================================
 # Shared Scan Logic
 # =============================================================================
 
@@ -804,6 +1093,20 @@ async def _perform_scan(
                     f"extracting search metadata from artifacts"
                 )
 
+            # Pre-compute batch frontmatter for skills if above threshold
+            # This uses a single git clone instead of N API calls
+            batch_frontmatter: Dict[str, Dict[str, Any]] = {}
+            use_batch_extraction = False
+            if indexing_enabled:
+                skill_artifacts = [
+                    a for a in scan_result.artifacts if a.artifact_type == "skill"
+                ]
+                if len(skill_artifacts) >= BATCH_CLONE_THRESHOLD:
+                    use_batch_extraction = True
+                    batch_frontmatter = _extract_frontmatter_batch(
+                        source, skill_artifacts
+                    )
+
             # Convert detected artifacts to catalog entries
             new_entries = []
             for artifact in scan_result.artifacts:
@@ -833,9 +1136,17 @@ async def _perform_scan(
                     "search_text": None,
                 }
                 if indexing_enabled:
-                    search_metadata = _extract_frontmatter_for_artifact(
-                        scanner, source, artifact
-                    )
+                    # Use batch result for skills if available, otherwise per-artifact
+                    if (
+                        use_batch_extraction
+                        and artifact.artifact_type == "skill"
+                        and artifact.name in batch_frontmatter
+                    ):
+                        search_metadata = batch_frontmatter[artifact.name]
+                    else:
+                        search_metadata = _extract_frontmatter_for_artifact(
+                            scanner, source, artifact
+                        )
 
                 # Serialize search_tags as JSON if present
                 search_tags_json = None

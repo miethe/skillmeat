@@ -85,6 +85,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app_state.initialize(settings)
     logger.info("Application state initialized")
 
+    # Log GitHub API status
+    try:
+        from skillmeat.core.github_client import get_github_client
+
+        github_client = get_github_client()
+        rate_limit = github_client.get_rate_limit()
+        if github_client.is_authenticated():
+            logger.info(
+                f"GitHub API: Token configured ({rate_limit['remaining']}/{rate_limit['limit']} requests remaining)"
+            )
+        else:
+            logger.info(
+                f"GitHub API: No token configured ({rate_limit['limit']} requests/hour limit)"
+            )
+    except Exception as e:
+        logger.warning(f"GitHub API: Could not check status - {e}")
+
     # Set service start time for health checks
     from .routers.health import set_service_start_time
 
