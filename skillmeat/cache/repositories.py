@@ -132,6 +132,7 @@ class PaginatedResult(Generic[T]):
         next_cursor: Cursor value for fetching next page (None if no more)
         has_more: True if more items exist after this page
         total: Optional total count of items (expensive to compute)
+        snippets: Optional dict mapping item ID to snippet data (FTS5 search only)
 
     Example:
         >>> # First page
@@ -148,6 +149,7 @@ class PaginatedResult(Generic[T]):
     next_cursor: Optional[str]
     has_more: bool
     total: Optional[int] = None  # Optional total count
+    snippets: Optional[Dict[str, Dict[str, Optional[str]]]] = None  # FTS5 snippets
 
 
 @dataclass
@@ -2663,9 +2665,13 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             # FTS5 query using external content table
             # bm25() returns negative values (higher = better match)
             # We use rank which is already the bm25 score
+            # snippet() generates highlighted text around matched terms
+            # Column indices: 0=name, 1=artifact_type, 2=title, 3=description, 4=search_text, 5=tags
             sql = text(
                 f"""
-                SELECT ce.*, fts.rank AS relevance
+                SELECT ce.*, fts.rank AS relevance,
+                    snippet(catalog_fts, 2, '<mark>', '</mark>', '...', 32) AS title_snippet,
+                    snippet(catalog_fts, 3, '<mark>', '</mark>', '...', 64) AS description_snippet
                 FROM catalog_fts fts
                 JOIN marketplace_catalog_entries ce ON ce.rowid = fts.rowid
                 WHERE fts MATCH :query
@@ -2682,6 +2688,14 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             has_more = len(rows) > limit
             if has_more:
                 rows = rows[:limit]
+
+            # Extract snippets from rows before re-querying for ORM objects
+            snippets: Dict[str, Dict[str, Optional[str]]] = {}
+            for row in rows:
+                snippets[row.id] = {
+                    "title_snippet": row.title_snippet,
+                    "description_snippet": row.description_snippet,
+                }
 
             # Convert rows to MarketplaceCatalogEntry objects
             # We need to load the entries properly to get the source relationship
@@ -2715,6 +2729,7 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 items=items,
                 next_cursor=next_cursor,
                 has_more=has_more,
+                snippets=snippets,
             )
         except Exception as e:
             # If FTS5 query fails (e.g., syntax error), fall back to LIKE

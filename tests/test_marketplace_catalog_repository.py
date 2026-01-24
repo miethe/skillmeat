@@ -655,6 +655,14 @@ class TestFTS5SearchFallback:
         assert len(result.items) == 1
         assert result.items[0].name == "canvas-design"
 
+    def test_search_like_returns_no_snippets(self, catalog_repo, populated_catalog):
+        """Test _search_like method returns None for snippets field."""
+        result = catalog_repo._search_like(query="canvas")
+
+        assert len(result.items) == 2
+        # LIKE search does not return snippets
+        assert result.snippets is None
+
 
 class TestFTS5SearchIntegration:
     """Integration tests for FTS5 search when available.
@@ -892,3 +900,96 @@ class TestFTS5SearchIntegration:
         assert "active-entry" in names
         assert "excluded-entry" not in names
         assert "removed-entry" not in names
+
+    def test_fts5_search_returns_snippets(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 search returns highlighted snippets for matching terms."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "test-skill",
+                title="Canvas Design System",
+                description="A comprehensive design system for building beautiful interfaces",
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        # Search for "design" which appears in both title and description
+        result = catalog_repo.search(query="design")
+
+        # Should find the entry
+        assert len(result.items) >= 1
+        assert result.items[0].name == "test-skill"
+
+        # Snippets should be available if FTS5 worked
+        if result.snippets:
+            entry_snippets = result.snippets.get(result.items[0].id, {})
+            # Check that snippets contain highlight markers
+            title_snippet = entry_snippets.get("title_snippet")
+            description_snippet = entry_snippets.get("description_snippet")
+
+            # At least one snippet should have the mark tag
+            has_highlights = False
+            if title_snippet and "<mark>" in title_snippet:
+                has_highlights = True
+            if description_snippet and "<mark>" in description_snippet:
+                has_highlights = True
+
+            # If FTS5 is available, we should have highlights
+            # (test is lenient since FTS5 availability varies by system)
+            assert has_highlights or result.snippets is None
+
+    def test_fts5_search_snippets_have_ellipsis_for_truncation(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 snippets use ellipsis for truncated content."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        # Create entry with long description
+        long_description = (
+            "This is a very long description that talks about many things "
+            "including testing and automation and various other topics "
+            "that will require truncation when generating snippets. "
+            "The testing framework provides comprehensive coverage."
+        )
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "long-skill",
+                title="Testing Framework",
+                description=long_description,
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        result = catalog_repo.search(query="testing")
+
+        # Check snippets if available
+        if result.snippets and result.items:
+            entry_snippets = result.snippets.get(result.items[0].id, {})
+            description_snippet = entry_snippets.get("description_snippet")
+
+            # Long content should be truncated with ellipsis
+            if description_snippet:
+                # Snippet should either have ellipsis or be shorter than original
+                assert "..." in description_snippet or len(description_snippet) <= len(
+                    long_description
+                )

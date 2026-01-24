@@ -308,3 +308,69 @@ class TestCatalogSearch:
 
         assert response.status_code == 500
         assert "Search operation failed" in response.json()["detail"]
+
+    def test_search_catalog_returns_snippets_from_fts5(
+        self, client, mock_catalog_entries
+    ):
+        """Test search returns snippets when FTS5 search returns them."""
+        # Create snippets mapping for FTS5 results
+        snippets = {
+            mock_catalog_entries[0].id: {
+                "title_snippet": "<mark>Test</mark> Skill 0",
+                "description_snippet": "A <mark>test</mark> skill number 0",
+            },
+            mock_catalog_entries[1].id: {
+                "title_snippet": "<mark>Test</mark> Skill 1",
+                "description_snippet": "A <mark>test</mark> skill number 1",
+            },
+            mock_catalog_entries[2].id: {
+                "title_snippet": "<mark>Test</mark> Skill 2",
+                "description_snippet": "A <mark>test</mark> skill number 2",
+            },
+        }
+
+        with patch.object(
+            MarketplaceCatalogRepository,
+            "search",
+            return_value=PaginatedResult(
+                items=mock_catalog_entries,
+                next_cursor=None,
+                has_more=False,
+                snippets=snippets,
+            ),
+        ):
+            response = client.get("/api/v1/marketplace/catalog/search?q=test")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 3
+
+        # Verify snippets are included in response
+        item = data["items"][0]
+        assert item["title_snippet"] == "<mark>Test</mark> Skill 0"
+        assert item["description_snippet"] == "A <mark>test</mark> skill number 0"
+
+    def test_search_catalog_snippets_null_for_like_search(
+        self, client, mock_catalog_entries
+    ):
+        """Test search returns null snippets when using LIKE search (no FTS5)."""
+        with patch.object(
+            MarketplaceCatalogRepository,
+            "search",
+            return_value=PaginatedResult(
+                items=mock_catalog_entries,
+                next_cursor=None,
+                has_more=False,
+                snippets=None,  # LIKE search returns no snippets
+            ),
+        ):
+            response = client.get("/api/v1/marketplace/catalog/search?q=test")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 3
+
+        # Verify snippets are null when LIKE search is used
+        for item in data["items"]:
+            assert item["title_snippet"] is None
+            assert item["description_snippet"] is None

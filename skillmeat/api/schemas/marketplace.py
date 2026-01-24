@@ -2793,6 +2793,18 @@ class CatalogSearchResult(BaseModel):
         description="Tags from frontmatter for filtering",
         examples=[["design", "ui", "components"]],
     )
+    title_snippet: Optional[str] = Field(
+        default=None,
+        description="Highlighted title snippet with <mark> tags around matched terms (FTS5 search only)",
+        examples=["<mark>Canvas</mark> Design System"],
+    )
+    description_snippet: Optional[str] = Field(
+        default=None,
+        description="Highlighted description snippet with <mark> tags around matched terms (FTS5 search only)",
+        examples=[
+            "A comprehensive <mark>design</mark> system for building...interfaces"
+        ],
+    )
 
     class Config:
         """Pydantic model configuration."""
@@ -2812,6 +2824,8 @@ class CatalogSearchResult(BaseModel):
                 "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
                 "status": "new",
                 "search_tags": ["design", "ui", "components"],
+                "title_snippet": "<mark>Canvas</mark> Design System",
+                "description_snippet": "A comprehensive <mark>design</mark> system for building...interfaces",
             }
         }
 

@@ -46,13 +46,19 @@ def get_db_session():
 DbSessionDep = Annotated[Session, Depends(get_db_session)]
 
 
-def entry_to_search_result(entry: MarketplaceCatalogEntry) -> CatalogSearchResult:
+def entry_to_search_result(
+    entry: MarketplaceCatalogEntry,
+    title_snippet: Optional[str] = None,
+    description_snippet: Optional[str] = None,
+) -> CatalogSearchResult:
     """Convert MarketplaceCatalogEntry ORM model to CatalogSearchResult DTO.
 
     Includes source context (owner, repo) from the related MarketplaceSource.
 
     Args:
         entry: MarketplaceCatalogEntry ORM instance with source relationship loaded
+        title_snippet: Optional highlighted title snippet from FTS5 search
+        description_snippet: Optional highlighted description snippet from FTS5 search
 
     Returns:
         CatalogSearchResult DTO for API response
@@ -86,6 +92,8 @@ def entry_to_search_result(entry: MarketplaceCatalogEntry) -> CatalogSearchResul
         upstream_url=entry.upstream_url,
         status=entry.status,
         search_tags=search_tags_list,
+        title_snippet=title_snippet,
+        description_snippet=description_snippet,
     )
 
 
@@ -205,8 +213,18 @@ async def search_catalog(
             cursor=cursor,
         )
 
-        # Convert entries to DTOs
-        items = [entry_to_search_result(entry) for entry in result.items]
+        # Convert entries to DTOs, including snippets if available (FTS5 search)
+        items = []
+        for entry in result.items:
+            # Get snippets for this entry if available (FTS5 search returns snippets)
+            snippets = result.snippets.get(entry.id, {}) if result.snippets else {}
+            items.append(
+                entry_to_search_result(
+                    entry,
+                    title_snippet=snippets.get("title_snippet"),
+                    description_snippet=snippets.get("description_snippet"),
+                )
+            )
 
         logger.debug(
             f"Catalog search returned {len(items)} results "

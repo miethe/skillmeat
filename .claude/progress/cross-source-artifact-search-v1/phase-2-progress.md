@@ -3,13 +3,13 @@ type: progress
 prd: cross-source-artifact-search-v1
 phase: 2
 title: FTS5 Enhancement
-status: pending
+status: completed
 started: null
 completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 3
+completed_tasks: 4
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -49,7 +49,7 @@ tasks:
   file: skillmeat/cache/repositories/marketplace_catalog_repository.py
 - id: FTS-004
   description: Add snippet generation for result highlighting
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -93,7 +93,7 @@ files_modified:
 - skillmeat/api/utils/fts5.py
 - skillmeat/cache/repositories/marketplace_catalog_repository.py
 - skillmeat/api/routers/marketplace_catalog.py
-progress: 75
+progress: 100
 updated: '2026-01-24'
 ---
 
