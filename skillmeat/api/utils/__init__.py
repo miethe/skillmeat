@@ -13,6 +13,11 @@ from .error_handlers import (
     create_validation_error,
     validate_artifact_request,
 )
+from .fts5 import (
+    check_fts5_available,
+    is_fts5_available,
+    reset_fts5_check,
+)
 from .github_cache import (
     DEFAULT_CONTENT_TTL,
     DEFAULT_TREE_TTL,
@@ -43,4 +48,8 @@ __all__ = [
     "create_rate_limit_error",
     "create_validation_error",
     "validate_artifact_request",
+    # FTS5 detection
+    "check_fts5_available",
+    "is_fts5_available",
+    "reset_fts5_check",
 ]

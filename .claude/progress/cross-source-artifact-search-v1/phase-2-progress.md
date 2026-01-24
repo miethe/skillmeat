@@ -9,7 +9,7 @@ completed: null
 overall_progress: 0
 completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 1
+completed_tasks: 2
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
@@ -29,7 +29,7 @@ tasks:
   file: skillmeat/api/alembic/versions/xxx_add_fts5_catalog_search.py
 - id: FTS-002
   description: Implement FTS5 feature detection at app startup
-  status: pending
+  status: completed
   assigned_to:
   - python-backend-engineer
   dependencies:
@@ -93,7 +93,7 @@ files_modified:
 - skillmeat/api/utils/fts5.py
 - skillmeat/cache/repositories/marketplace_catalog_repository.py
 - skillmeat/api/routers/marketplace_catalog.py
-progress: 25
+progress: 50
 updated: '2026-01-24'
 ---
 

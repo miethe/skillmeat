@@ -96,12 +96,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ensure_default_collection,
             migrate_artifacts_to_default_collection,
         )
+        from skillmeat.api.utils.fts5 import check_fts5_available
         from skillmeat.cache.models import get_session
 
         session = get_session()
         try:
             ensure_default_collection(session)
             logger.info("Default collection verified/created")
+
+            # Check FTS5 availability at startup
+            check_fts5_available(session)
 
             # Migrate existing artifacts to default collection
             if app_state.artifact_manager and app_state.collection_manager:
