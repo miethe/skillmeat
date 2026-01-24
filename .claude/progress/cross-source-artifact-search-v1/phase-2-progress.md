@@ -1,93 +1,100 @@
 ---
 type: progress
-prd: "cross-source-artifact-search-v1"
+prd: cross-source-artifact-search-v1
 phase: 2
-title: "FTS5 Enhancement"
-status: "pending"
+title: FTS5 Enhancement
+status: pending
 started: null
 completed: null
-
 overall_progress: 0
-completion_estimate: "on-track"
-
+completion_estimate: on-track
 total_tasks: 4
-completed_tasks: 0
+completed_tasks: 1
 in_progress_tasks: 0
 blocked_tasks: 0
 at_risk_tasks: 0
-
-owners: ["data-layer-expert", "python-backend-engineer"]
+owners:
+- data-layer-expert
+- python-backend-engineer
 contributors: []
-
 tasks:
-  - id: "FTS-001"
-    description: "Create FTS5 virtual table with sync triggers via Alembic migration"
-    status: "pending"
-    assigned_to: ["data-layer-expert"]
-    dependencies: []
-    estimated_effort: "2h"
-    priority: "critical"
-    file: "skillmeat/api/alembic/versions/xxx_add_fts5_catalog_search.py"
-
-  - id: "FTS-002"
-    description: "Implement FTS5 feature detection at app startup"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FTS-001"]
-    estimated_effort: "1h"
-    priority: "high"
-    file: "skillmeat/api/utils/fts5.py"
-
-  - id: "FTS-003"
-    description: "Add FTS5 MATCH query path to repository search method"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FTS-002"]
-    estimated_effort: "2h"
-    priority: "critical"
-    file: "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-
-  - id: "FTS-004"
-    description: "Add snippet generation for result highlighting"
-    status: "pending"
-    assigned_to: ["python-backend-engineer"]
-    dependencies: ["FTS-003"]
-    estimated_effort: "1h"
-    priority: "medium"
-    file: "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-
+- id: FTS-001
+  description: Create FTS5 virtual table with sync triggers via Alembic migration
+  status: completed
+  assigned_to:
+  - data-layer-expert
+  dependencies: []
+  estimated_effort: 2h
+  priority: critical
+  file: skillmeat/api/alembic/versions/xxx_add_fts5_catalog_search.py
+- id: FTS-002
+  description: Implement FTS5 feature detection at app startup
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FTS-001
+  estimated_effort: 1h
+  priority: high
+  file: skillmeat/api/utils/fts5.py
+- id: FTS-003
+  description: Add FTS5 MATCH query path to repository search method
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FTS-002
+  estimated_effort: 2h
+  priority: critical
+  file: skillmeat/cache/repositories/marketplace_catalog_repository.py
+- id: FTS-004
+  description: Add snippet generation for result highlighting
+  status: pending
+  assigned_to:
+  - python-backend-engineer
+  dependencies:
+  - FTS-003
+  estimated_effort: 1h
+  priority: medium
+  file: skillmeat/cache/repositories/marketplace_catalog_repository.py
 parallelization:
-  batch_1: ["FTS-001"]
-  batch_2: ["FTS-002"]
-  batch_3: ["FTS-003"]
-  batch_4: ["FTS-004"]
-  critical_path: ["FTS-001", "FTS-002", "FTS-003"]
-  estimated_total_time: "6h"
-
+  batch_1:
+  - FTS-001
+  batch_2:
+  - FTS-002
+  batch_3:
+  - FTS-003
+  batch_4:
+  - FTS-004
+  critical_path:
+  - FTS-001
+  - FTS-002
+  - FTS-003
+  estimated_total_time: 6h
 blockers: []
-
 success_criteria:
-  - id: "SC-1"
-    description: "FTS5 virtual table created with sync triggers"
-    status: "pending"
-  - id: "SC-2"
-    description: "Feature detection correctly identifies FTS5 availability"
-    status: "pending"
-  - id: "SC-3"
-    description: "FTS5 queries return <10ms at 50K scale"
-    status: "pending"
-  - id: "SC-4"
-    description: "Snippet highlights match terms correctly"
-    status: "pending"
-  - id: "SC-5"
-    description: "Fallback to LIKE works when FTS5 unavailable"
-    status: "pending"
-
+- id: SC-1
+  description: FTS5 virtual table created with sync triggers
+  status: pending
+- id: SC-2
+  description: Feature detection correctly identifies FTS5 availability
+  status: pending
+- id: SC-3
+  description: FTS5 queries return <10ms at 50K scale
+  status: pending
+- id: SC-4
+  description: Snippet highlights match terms correctly
+  status: pending
+- id: SC-5
+  description: Fallback to LIKE works when FTS5 unavailable
+  status: pending
 files_modified:
-  - "skillmeat/api/alembic/versions/"
-  - "skillmeat/api/utils/fts5.py"
-  - "skillmeat/cache/repositories/marketplace_catalog_repository.py"
-  - "skillmeat/api/routers/marketplace_catalog.py"
+- skillmeat/api/alembic/versions/
+- skillmeat/api/utils/fts5.py
+- skillmeat/cache/repositories/marketplace_catalog_repository.py
+- skillmeat/api/routers/marketplace_catalog.py
+progress: 25
+updated: '2026-01-24'
 ---
 
 # Phase 2: FTS5 Enhancement
