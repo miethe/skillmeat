@@ -459,6 +459,18 @@ The configurable indexing foundation has been implemented to support flexible ar
 
 ---
 
+### Phases 1-3: Cross-Source Artifact Search (📋 PLANNED)
+
+**Status**: PRD and Implementation Plan created January 2026
+
+Full cross-source artifact search implementation covering database schema, FTS5 search, and frontend UI.
+
+**Related Documents**:
+- [Cross-Source Artifact Search PRD](/docs/project_plans/PRDs/features/cross-source-artifact-search-v1.md)
+- [Implementation Plan](/docs/project_plans/implementation_plans/features/cross-source-artifact-search-v1.md)
+
+---
+
 ### Phase 1: Foundation (Est. 3 days)
 
 1. **Database migration** - Add search columns to `MarketplaceCatalogEntry`
