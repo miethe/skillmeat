@@ -541,3 +541,354 @@ class TestSearchEdgeCases:
 
         # No entries have score of 100
         assert len(result.items) == 0
+
+
+# =============================================================================
+# FTS5 Search Tests
+# =============================================================================
+
+
+class TestFTS5QueryBuilder:
+    """Tests for FTS5 query building and escaping."""
+
+    def test_build_fts5_query_simple(self, catalog_repo):
+        """Test simple query building with prefix matching."""
+        result = catalog_repo._build_fts5_query("canvas")
+        assert result == "canvas*"
+
+    def test_build_fts5_query_multiple_terms(self, catalog_repo):
+        """Test multiple terms get prefix matching."""
+        result = catalog_repo._build_fts5_query("canvas design")
+        assert result == "canvas* design*"
+
+    def test_build_fts5_query_escapes_special_chars(self, catalog_repo):
+        """Test special characters are escaped."""
+        result = catalog_repo._build_fts5_query('test-skill "quoted"')
+        # Dashes and quotes should be replaced with spaces
+        assert "-" not in result
+        assert '"' not in result
+        assert "test*" in result
+        assert "skill*" in result
+
+    def test_build_fts5_query_removes_operators(self, catalog_repo):
+        """Test FTS5 operators are removed."""
+        result = catalog_repo._build_fts5_query("canvas AND design OR testing")
+        # FTS5 operators should be removed
+        assert "AND" not in result
+        assert "OR" not in result
+        assert "canvas*" in result
+        assert "design*" in result
+        assert "testing*" in result
+
+    def test_build_fts5_query_empty_after_stripping(self, catalog_repo):
+        """Test query returns wildcard when all terms stripped."""
+        result = catalog_repo._build_fts5_query("AND OR NOT")
+        assert result == "*"
+
+    def test_build_fts5_query_handles_parentheses(self, catalog_repo):
+        """Test parentheses are escaped."""
+        result = catalog_repo._build_fts5_query("test(skill)")
+        assert "(" not in result
+        assert ")" not in result
+
+    def test_build_fts5_query_handles_colons(self, catalog_repo):
+        """Test colons are escaped (column specifiers in FTS5)."""
+        result = catalog_repo._build_fts5_query("title:canvas")
+        assert ":" not in result
+
+    def test_build_fts5_query_handles_asterisks(self, catalog_repo):
+        """Test existing asterisks are handled."""
+        result = catalog_repo._build_fts5_query("canvas*")
+        # Should not have double asterisks
+        assert "**" not in result
+
+    def test_build_fts5_query_case_insensitive_operators(self, catalog_repo):
+        """Test operator removal is case-insensitive."""
+        result = catalog_repo._build_fts5_query("canvas and design or test")
+        assert "and" not in result.lower().split()
+        assert "or" not in result.lower().split()
+
+
+class TestFTS5SearchFallback:
+    """Tests for FTS5/LIKE fallback behavior."""
+
+    def test_search_uses_like_when_no_query(self, catalog_repo, populated_catalog):
+        """Test that search uses LIKE path when no query provided."""
+        # Without a query, should use LIKE path regardless of FTS5 availability
+        result = catalog_repo.search()
+
+        # Should return all valid entries
+        assert len(result.items) == 5
+
+    def test_search_uses_like_when_fts5_unavailable(
+        self, catalog_repo, populated_catalog, monkeypatch
+    ):
+        """Test that search falls back to LIKE when FTS5 unavailable."""
+        # Mock FTS5 as unavailable - patch at the source module where it's imported from
+        monkeypatch.setattr("skillmeat.api.utils.fts5.is_fts5_available", lambda: False)
+
+        result = catalog_repo.search(query="canvas")
+
+        # Should still return results via LIKE
+        assert len(result.items) == 2
+        names = [e.name for e in result.items]
+        assert "canvas-design" in names
+        assert "canvas-renderer" in names
+
+    def test_search_like_method_directly(self, catalog_repo, populated_catalog):
+        """Test _search_like method can be called directly."""
+        result = catalog_repo._search_like(query="canvas")
+
+        assert len(result.items) == 2
+        names = [e.name for e in result.items]
+        assert "canvas-design" in names
+        assert "canvas-renderer" in names
+
+    def test_search_like_with_filters(self, catalog_repo, populated_catalog):
+        """Test _search_like with filters."""
+        result = catalog_repo._search_like(
+            query="canvas",
+            artifact_type="skill",
+            min_confidence=90,
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].name == "canvas-design"
+
+
+class TestFTS5SearchIntegration:
+    """Integration tests for FTS5 search when available.
+
+    Note: These tests depend on FTS5 being available in the SQLite installation.
+    They may be skipped if FTS5 is not available.
+    """
+
+    def test_fts5_search_returns_results(
+        self, source_repo, catalog_repo, sample_source, monkeypatch
+    ):
+        """Test FTS5 search returns relevant results when available."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        # Reset FTS5 check state
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        # Create entries with search_text populated (required for FTS5)
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "test-skill",
+                title="Test Skill",
+                description="A skill for testing",
+                tags=["test"],
+            ),
+        ]
+        # Manually set search_text for FTS5
+        entries[0].search_text = "Test Skill A skill for testing test"
+
+        catalog_repo.bulk_create(entries)
+
+        # Try to search - will use LIKE fallback if FTS5 unavailable
+        result = catalog_repo.search(query="testing")
+
+        # Should find the entry
+        assert len(result.items) >= 1
+        names = [e.name for e in result.items]
+        assert "test-skill" in names
+
+    def test_fts5_search_with_type_filter(
+        self, source_repo, catalog_repo, sample_source, monkeypatch
+    ):
+        """Test FTS5 search respects artifact_type filter."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "test-skill",
+                artifact_type="skill",
+                title="Test Skill",
+                description="A skill for testing",
+            ),
+            create_catalog_entry(
+                sample_source.id,
+                "test-command",
+                artifact_type="command",
+                title="Test Command",
+                description="A command for testing",
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        # Search with type filter
+        result = catalog_repo.search(query="test", artifact_type="skill")
+
+        names = [e.name for e in result.items]
+        assert "test-skill" in names
+        assert "test-command" not in names
+
+    def test_fts5_search_with_source_filter(
+        self, source_repo, catalog_repo, sample_source, second_source
+    ):
+        """Test FTS5 search respects source_ids filter."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+        source_repo.create(second_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "test-one",
+                title="Test One",
+                description="First test",
+            ),
+            create_catalog_entry(
+                second_source.id,
+                "test-two",
+                title="Test Two",
+                description="Second test",
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        # Search with source filter
+        result = catalog_repo.search(query="test", source_ids=[sample_source.id])
+
+        names = [e.name for e in result.items]
+        assert "test-one" in names
+        assert "test-two" not in names
+
+    def test_fts5_search_with_confidence_filter(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 search respects min_confidence filter."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "high-confidence",
+                confidence_score=95,
+                title="High Confidence Test",
+                description="Very confident",
+            ),
+            create_catalog_entry(
+                sample_source.id,
+                "low-confidence",
+                confidence_score=50,
+                title="Low Confidence Test",
+                description="Not so confident",
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        # Search with confidence filter
+        result = catalog_repo.search(query="confidence", min_confidence=80)
+
+        names = [e.name for e in result.items]
+        assert "high-confidence" in names
+        assert "low-confidence" not in names
+
+    def test_fts5_search_with_tags_filter(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 search respects tags filter."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "tagged-design",
+                title="Design Skill",
+                description="UI design",
+                tags=["design", "ui"],
+            ),
+            create_catalog_entry(
+                sample_source.id,
+                "tagged-backend",
+                title="Backend Skill",
+                description="API backend",
+                tags=["backend", "api"],
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        # Search with tags filter
+        result = catalog_repo.search(query="skill", tags=["design"])
+
+        names = [e.name for e in result.items]
+        assert "tagged-design" in names
+        assert "tagged-backend" not in names
+
+    def test_fts5_search_excludes_removed_entries(
+        self, source_repo, catalog_repo, sample_source
+    ):
+        """Test FTS5 search excludes removed and excluded entries."""
+        from skillmeat.api.utils.fts5 import reset_fts5_check
+
+        reset_fts5_check()
+
+        source_repo.create(sample_source)
+
+        entries = [
+            create_catalog_entry(
+                sample_source.id,
+                "active-entry",
+                status="new",
+                title="Active Test",
+                description="Should appear",
+            ),
+            create_catalog_entry(
+                sample_source.id,
+                "excluded-entry",
+                status="excluded",
+                title="Excluded Test",
+                description="Should not appear",
+            ),
+            create_catalog_entry(
+                sample_source.id,
+                "removed-entry",
+                status="removed",
+                title="Removed Test",
+                description="Should not appear",
+            ),
+        ]
+        for e in entries:
+            e.search_text = f"{e.title} {e.description}"
+
+        catalog_repo.bulk_create(entries)
+
+        result = catalog_repo.search(query="test")
+
+        names = [e.name for e in result.items]
+        assert "active-entry" in names
+        assert "excluded-entry" not in names
+        assert "removed-entry" not in names

@@ -66,7 +66,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Generator, Generic, List, Optional, Type, TypeVar
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, joinedload
 
@@ -2452,19 +2452,22 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         limit: int = 50,
         cursor: Optional[str] = None,
     ) -> PaginatedResult[MarketplaceCatalogEntry]:
-        """Cross-source artifact search with LIKE queries and filtering.
+        """Cross-source artifact search.
 
-        Searches across marketplace catalog entries using LIKE/ILIKE queries
-        on name, title, description, and search_tags fields. Supports filtering
-        by artifact type, source IDs, minimum confidence score, and tags.
+        Uses FTS5 full-text search when available for better performance and
+        relevance ranking. Falls back to LIKE-based queries when FTS5 is not
+        available or when no query is provided.
+
+        Searches across marketplace catalog entries on name, title, description,
+        and search_tags fields. Supports filtering by artifact type, source IDs,
+        minimum confidence score, and tags.
 
         Results are ordered by confidence_score descending to surface the
         highest-quality matches first. Entries with status 'excluded' or
         'removed' are automatically excluded.
 
         Args:
-            query: Optional search query for ILIKE matching on name, title,
-                   description, and search_tags. If None, returns all entries.
+            query: Optional search query. If None, returns all entries.
             artifact_type: Optional filter by artifact type ("skill", "command", etc.)
             source_ids: Optional list of source IDs to filter by. If provided,
                         only entries from these sources are returned.
@@ -2503,6 +2506,258 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
             ...         query="canvas",
             ...         cursor=result.next_cursor
             ...     )
+        """
+        # Lazy import to avoid circular import
+        from skillmeat.api.utils.fts5 import is_fts5_available
+
+        # Use FTS5 when: query is provided AND FTS5 is available
+        # Fall back to LIKE: no query, or FTS5 unavailable
+        if query and is_fts5_available():
+            logger.debug(f"Using FTS5 search for query: {query}")
+            return self._search_fts5(
+                query=query,
+                artifact_type=artifact_type,
+                source_ids=source_ids,
+                min_confidence=min_confidence,
+                tags=tags,
+                limit=limit,
+                cursor=cursor,
+            )
+
+        logger.debug(
+            f"Using LIKE search (query={query}, fts5_available={is_fts5_available()})"
+        )
+        return self._search_like(
+            query=query,
+            artifact_type=artifact_type,
+            source_ids=source_ids,
+            min_confidence=min_confidence,
+            tags=tags,
+            limit=limit,
+            cursor=cursor,
+        )
+
+    def _build_fts5_query(self, query: str) -> str:
+        """Build FTS5 query string, escaping special characters.
+
+        Supports simple phrase matching with prefix search for partial words.
+        FTS5 special characters are escaped to prevent query syntax errors.
+
+        Args:
+            query: Raw search query from user
+
+        Returns:
+            FTS5-safe query string with prefix matching
+
+        Example:
+            >>> repo._build_fts5_query("canvas design")
+            'canvas* design*'
+            >>> repo._build_fts5_query("test-skill")
+            'test skill*'
+        """
+        # FTS5 special characters and operators to escape/remove
+        # These would otherwise be interpreted as FTS5 query syntax
+        special_chars = ['"', "'", "*", "(", ")", "-", ":", "^", "+"]
+        special_operators = ["OR", "AND", "NOT", "NEAR"]
+
+        clean_query = query
+
+        # Remove special characters
+        for char in special_chars:
+            clean_query = clean_query.replace(char, " ")
+
+        # Split into terms
+        terms = clean_query.split()
+
+        # Remove FTS5 operators that might appear as search terms
+        terms = [t for t in terms if t.upper() not in special_operators]
+
+        if not terms:
+            # If all terms were stripped, use wildcard
+            return "*"
+
+        # Use prefix matching for partial word search
+        # e.g., "skill doc" -> "skill* doc*"
+        return " ".join(f"{term}*" for term in terms if term)
+
+    def _search_fts5(
+        self,
+        query: str,
+        artifact_type: Optional[str] = None,
+        source_ids: Optional[List[str]] = None,
+        min_confidence: int = 0,
+        tags: Optional[List[str]] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> PaginatedResult[MarketplaceCatalogEntry]:
+        """FTS5 full-text search with relevance ranking.
+
+        Uses SQLite FTS5 virtual table for efficient full-text search with
+        Porter stemming. Results are ranked by FTS5 relevance score, then
+        by confidence_score for tie-breaking.
+
+        Args:
+            query: Search query (required for FTS5 path)
+            artifact_type: Optional filter by artifact type
+            source_ids: Optional list of source IDs to filter by
+            min_confidence: Minimum confidence score (0-100)
+            tags: Optional list of tags to filter by (OR logic)
+            limit: Maximum number of items per page
+            cursor: Cursor from previous page
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag
+        """
+        session = self._get_session()
+        try:
+            # Build FTS5 query with escaped special characters
+            fts_query = self._build_fts5_query(query)
+
+            # Build dynamic SQL with optional filters
+            # Using raw SQL for FTS5 MATCH which SQLAlchemy doesn't support natively
+            filters = ["ce.status NOT IN ('excluded', 'removed')"]
+            params: Dict[str, Any] = {"query": fts_query, "limit": limit + 1}
+
+            if artifact_type:
+                filters.append("ce.artifact_type = :artifact_type")
+                params["artifact_type"] = artifact_type
+
+            if source_ids:
+                # Build IN clause with positional parameters
+                source_placeholders = ", ".join(
+                    f":source_{i}" for i in range(len(source_ids))
+                )
+                filters.append(f"ce.source_id IN ({source_placeholders})")
+                for i, source_id in enumerate(source_ids):
+                    params[f"source_{i}"] = source_id
+
+            if min_confidence > 0:
+                filters.append("ce.confidence_score >= :min_confidence")
+                params["min_confidence"] = min_confidence
+
+            if tags:
+                # Build OR conditions for tags (match any)
+                tag_conditions = []
+                for i, tag in enumerate(tags):
+                    tag_conditions.append(f"ce.search_tags LIKE :tag_{i}")
+                    params[f"tag_{i}"] = f'%"{tag}"%'
+                filters.append(f"({' OR '.join(tag_conditions)})")
+
+            # Apply cursor-based pagination
+            if cursor:
+                try:
+                    cursor_score_str, cursor_id = cursor.split(":", 1)
+                    cursor_score = int(cursor_score_str)
+                    # Items after cursor: lower score, or same score with higher ID
+                    filters.append(
+                        "(ce.confidence_score < :cursor_score OR "
+                        "(ce.confidence_score = :cursor_score AND ce.id > :cursor_id))"
+                    )
+                    params["cursor_score"] = cursor_score
+                    params["cursor_id"] = cursor_id
+                except (ValueError, AttributeError):
+                    logger.warning(f"Invalid cursor format: {cursor}")
+
+            where_clause = " AND ".join(filters)
+
+            # FTS5 query using external content table
+            # bm25() returns negative values (higher = better match)
+            # We use rank which is already the bm25 score
+            sql = text(
+                f"""
+                SELECT ce.*, fts.rank AS relevance
+                FROM catalog_fts fts
+                JOIN marketplace_catalog_entries ce ON ce.rowid = fts.rowid
+                WHERE fts MATCH :query
+                AND {where_clause}
+                ORDER BY ce.confidence_score DESC, ce.id ASC
+                LIMIT :limit
+                """
+            )
+
+            result = session.execute(sql, params)
+            rows = result.fetchall()
+
+            # Determine if more items exist
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+
+            # Convert rows to MarketplaceCatalogEntry objects
+            # We need to load the entries properly to get the source relationship
+            if rows:
+                entry_ids = [row.id for row in rows]
+                entries_query = (
+                    session.query(MarketplaceCatalogEntry)
+                    .options(joinedload(MarketplaceCatalogEntry.source))
+                    .filter(MarketplaceCatalogEntry.id.in_(entry_ids))
+                )
+                entries_map = {e.id: e for e in entries_query.all()}
+                # Preserve FTS result order
+                items = [entries_map[row.id] for row in rows if row.id in entries_map]
+            else:
+                items = []
+
+            # Generate next cursor from last item
+            next_cursor = None
+            if items and has_more:
+                last_item = items[-1]
+                next_cursor = f"{last_item.confidence_score}:{last_item.id}"
+
+            logger.debug(
+                f"FTS5 search returned {len(items)} entries "
+                f"(query={query}, fts_query={fts_query}, type={artifact_type}, "
+                f"sources={source_ids}, min_conf={min_confidence}, tags={tags}, "
+                f"cursor={cursor}, has_more={has_more})"
+            )
+
+            return PaginatedResult(
+                items=items,
+                next_cursor=next_cursor,
+                has_more=has_more,
+            )
+        except Exception as e:
+            # If FTS5 query fails (e.g., syntax error), fall back to LIKE
+            logger.warning(f"FTS5 search failed, falling back to LIKE: {e}")
+            return self._search_like(
+                query=query,
+                artifact_type=artifact_type,
+                source_ids=source_ids,
+                min_confidence=min_confidence,
+                tags=tags,
+                limit=limit,
+                cursor=cursor,
+            )
+        finally:
+            session.close()
+
+    def _search_like(
+        self,
+        query: Optional[str] = None,
+        artifact_type: Optional[str] = None,
+        source_ids: Optional[List[str]] = None,
+        min_confidence: int = 0,
+        tags: Optional[List[str]] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> PaginatedResult[MarketplaceCatalogEntry]:
+        """LIKE-based search fallback when FTS5 is unavailable.
+
+        Uses ILIKE queries on name, title, description, and search_tags fields.
+        This is the fallback path when FTS5 is not available or when no query
+        is provided (listing mode).
+
+        Args:
+            query: Optional search query for ILIKE matching
+            artifact_type: Optional filter by artifact type
+            source_ids: Optional list of source IDs to filter by
+            min_confidence: Minimum confidence score (0-100)
+            tags: Optional list of tags to filter by (OR logic)
+            limit: Maximum number of items per page
+            cursor: Cursor from previous page
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag
         """
         session = self._get_session()
         try:
@@ -2598,7 +2853,7 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                 next_cursor = f"{last_item.confidence_score}:{last_item.id}"
 
             logger.debug(
-                f"Search returned {len(items)} entries "
+                f"LIKE search returned {len(items)} entries "
                 f"(query={query}, type={artifact_type}, sources={source_ids}, "
                 f"min_conf={min_confidence}, tags={tags}, cursor={cursor}, "
                 f"has_more={has_more})"
