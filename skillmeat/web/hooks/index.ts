@@ -176,7 +176,7 @@ export {
 } from './useIndexingMode';
 
 // ============================================================================
-// MARKETPLACE (5 hooks + 13 source hooks)
+// MARKETPLACE (5 hooks + 13 source hooks + 1 search hook)
 // ============================================================================
 // Marketplace listings, brokers, and artifact sourcing
 export {
@@ -209,6 +209,17 @@ export {
   type ReimportRequest,
   type ReimportResponse,
 } from './useReimportCatalogEntry';
+
+// Cross-source artifact search with FTS5
+export {
+  artifactSearchKeys,
+  useArtifactSearch,
+  type ArtifactSearchParams,
+  type ArtifactSearchResult,
+  type ArtifactSearchResponse,
+  type UseArtifactSearchOptions,
+  type UseArtifactSearchReturn,
+} from './use-artifact-search';
 
 // ============================================================================
 // MCP (9 hooks)
