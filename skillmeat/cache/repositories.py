@@ -2674,7 +2674,7 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                     snippet(catalog_fts, 3, '<mark>', '</mark>', '...', 64) AS description_snippet
                 FROM catalog_fts fts
                 JOIN marketplace_catalog_entries ce ON ce.rowid = fts.rowid
-                WHERE fts MATCH :query
+                WHERE catalog_fts MATCH :query
                 AND {where_clause}
                 ORDER BY ce.confidence_score DESC, ce.id ASC
                 LIMIT :limit
