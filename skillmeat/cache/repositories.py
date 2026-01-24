@@ -68,7 +68,7 @@ from typing import Any, Dict, Generator, Generic, List, Optional, Type, TypeVar
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from skillmeat.cache.models import (
     Artifact,
@@ -2507,8 +2507,11 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         session = self._get_session()
         try:
             # Build base query - exclude removed and excluded entries
-            base_query = session.query(MarketplaceCatalogEntry).filter(
-                MarketplaceCatalogEntry.status.notin_(["excluded", "removed"])
+            # Eagerly load source relationship for cross-source search results
+            base_query = (
+                session.query(MarketplaceCatalogEntry)
+                .options(joinedload(MarketplaceCatalogEntry.source))
+                .filter(MarketplaceCatalogEntry.status.notin_(["excluded", "removed"]))
             )
 
             # Apply text search filter using ILIKE for case-insensitive matching
@@ -2564,7 +2567,8 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
                         or_(
                             MarketplaceCatalogEntry.confidence_score < cursor_score,
                             and_(
-                                MarketplaceCatalogEntry.confidence_score == cursor_score,
+                                MarketplaceCatalogEntry.confidence_score
+                                == cursor_score,
                                 MarketplaceCatalogEntry.id > cursor_id,
                             ),
                         )

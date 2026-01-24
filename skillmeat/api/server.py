@@ -30,6 +30,7 @@ from .routers import (
     groups,
     health,
     marketplace,
+    marketplace_catalog,
     marketplace_sources,
     match,
     mcp,
@@ -296,6 +297,11 @@ def create_app(settings: APISettings = None) -> FastAPI:
     app.include_router(mcp.router, prefix=settings.api_prefix, tags=["mcp"])
     app.include_router(
         marketplace.router, prefix=settings.api_prefix, tags=["marketplace"]
+    )
+    app.include_router(
+        marketplace_catalog.router,
+        prefix=settings.api_prefix,
+        tags=["marketplace-catalog"],
     )
     app.include_router(
         marketplace_sources.router,

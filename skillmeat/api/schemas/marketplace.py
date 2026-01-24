@@ -2719,5 +2719,149 @@ class DeduplicationStats(BaseModel):
         }
 
 
+# =============================================================================
+# Catalog Search Schemas (Cross-Source Search)
+# =============================================================================
+
+
+class CatalogSearchResult(BaseModel):
+    """Individual search result from cross-source catalog search.
+
+    Includes artifact metadata and source context (owner/repo) for display
+    and navigation purposes.
+    """
+
+    id: str = Field(
+        description="Unique catalog entry identifier",
+        examples=["cat_abc123"],
+    )
+    name: str = Field(
+        description="Artifact name",
+        examples=["canvas-design"],
+    )
+    artifact_type: Literal["skill", "command", "agent", "mcp", "mcp_server", "hook"] = (
+        Field(
+            description="Type of artifact",
+            examples=["skill"],
+        )
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Artifact title from frontmatter",
+        examples=["Canvas Design System"],
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Artifact description from frontmatter",
+        examples=["A comprehensive design system for building beautiful interfaces"],
+    )
+    confidence_score: int = Field(
+        ge=0,
+        le=100,
+        description="Confidence score of detection (0-100)",
+        examples=[95],
+    )
+    source_owner: str = Field(
+        description="GitHub repository owner/organization",
+        examples=["anthropics"],
+    )
+    source_repo: str = Field(
+        description="GitHub repository name",
+        examples=["quickstarts"],
+    )
+    source_id: str = Field(
+        description="ID of the source this artifact belongs to",
+        examples=["src_anthropics_quickstarts"],
+    )
+    path: str = Field(
+        description="Path to artifact within repository",
+        examples=["skills/canvas-design"],
+    )
+    upstream_url: Optional[str] = Field(
+        default=None,
+        description="Full URL to artifact in source repository",
+        examples=[
+            "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design"
+        ],
+    )
+    status: Literal["new", "updated", "removed", "imported", "excluded"] = Field(
+        description="Lifecycle status of the catalog entry",
+        examples=["new"],
+    )
+    search_tags: Optional[List[str]] = Field(
+        default=None,
+        description="Tags from frontmatter for filtering",
+        examples=[["design", "ui", "components"]],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "id": "cat_abc123",
+                "name": "canvas-design",
+                "artifact_type": "skill",
+                "title": "Canvas Design System",
+                "description": "A comprehensive design system for building interfaces",
+                "confidence_score": 95,
+                "source_owner": "anthropics",
+                "source_repo": "quickstarts",
+                "source_id": "src_anthropics_quickstarts",
+                "path": "skills/canvas-design",
+                "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
+                "status": "new",
+                "search_tags": ["design", "ui", "components"],
+            }
+        }
+
+
+class CatalogSearchResponse(BaseModel):
+    """Response model for cross-source catalog search.
+
+    Returns paginated search results with cursor-based pagination support.
+    """
+
+    items: List[CatalogSearchResult] = Field(
+        description="List of matching catalog entries",
+    )
+    next_cursor: Optional[str] = Field(
+        default=None,
+        description="Cursor for fetching next page (None if no more results)",
+        examples=["95:cat_xyz789"],
+    )
+    has_more: bool = Field(
+        description="True if more results exist beyond this page",
+        examples=[True],
+    )
+
+    class Config:
+        """Pydantic model configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "items": [
+                    {
+                        "id": "cat_abc123",
+                        "name": "canvas-design",
+                        "artifact_type": "skill",
+                        "title": "Canvas Design System",
+                        "description": "Design system for interfaces",
+                        "confidence_score": 95,
+                        "source_owner": "anthropics",
+                        "source_repo": "quickstarts",
+                        "source_id": "src_anthropics_quickstarts",
+                        "path": "skills/canvas-design",
+                        "upstream_url": "https://github.com/anthropics/quickstarts/tree/main/skills/canvas-design",
+                        "status": "new",
+                        "search_tags": ["design", "ui"],
+                    }
+                ],
+                "next_cursor": "95:cat_xyz789",
+                "has_more": True,
+            }
+        }
+
+
 # Rebuild models to resolve forward references
 ScanResultDTO.model_rebuild()
