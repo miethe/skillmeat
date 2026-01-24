@@ -169,29 +169,34 @@ Clone: skills/**/*
 - May clone unnecessary files
 - No benefit for scattered artifacts
 
-### Option D: Hybrid API + Clone (Pragmatic)
+### Option D: Hybrid API + Clone (Pragmatic) — SELECTED
 
-Use API for small operations, clone for large batches.
+Use API for small operations, sparse clone for larger batches. **Never clone full repository.**
 
 **Approach**:
 ```python
 if artifact_count < 3:
-    use_api_calls()
+    use_api_calls()           # Simple, no clone overhead
 elif artifact_count < 20:
-    use_sparse_clone()
+    use_sparse_manifest()     # Clone only manifest files (SKILL.md, etc.)
 else:
-    use_full_shallow_clone()
+    use_sparse_directory()    # Clone artifact root directories (.claude/**)
 ```
+
+**Critical**: Even `sparse_directory` only clones artifact-containing directories, not the
+entire codebase. This handles the common case of normal codebases with `.claude/` or `.codex/`
+directories containing artifacts.
 
 **Pros**:
 - Optimal for each case
-- Graceful degradation
+- Never clones unnecessary code
+- Handles mixed codebases (app code + artifacts)
 
 **Cons**:
 - More complex logic
 - Multiple code paths to maintain
 
-## Recommended Design: Option A with Enhancements
+## Recommended Design: Hybrid Sparse Clone (Option D + Option A Enhancements)
 
 ### 1. Universal Manifest Extraction
 
@@ -276,27 +281,90 @@ def get_changed_artifacts(source: MarketplaceSource, new_artifacts: List[Detecte
 
 ### 4. Clone Strategy Selection
 
+**Critical Constraint**: Never clone unnecessary code. Many repositories are normal codebases
+that happen to contain artifacts in directories like `.claude/`, `.codex/`, or similar. We must
+only clone artifact directories, not the entire codebase.
+
 ```python
 CLONE_THRESHOLD = 3  # Minimum artifacts to use clone
 
 def select_indexing_strategy(
     source: MarketplaceSource,
     artifacts: List[DetectedArtifact],
-) -> Literal["api", "sparse_clone", "full_clone"]:
-    """Select optimal indexing strategy."""
+) -> Literal["api", "sparse_manifest", "sparse_directory"]:
+    """Select optimal indexing strategy.
+
+    Strategies:
+    - api: Individual API calls for each manifest file
+    - sparse_manifest: Sparse clone fetching only manifest files (e.g., SKILL.md)
+    - sparse_directory: Sparse clone of artifact root directories (e.g., .claude/**)
+
+    NOTE: We NEVER do a full repository clone. Even for large repos (>20 artifacts),
+    we use sparse checkout targeting only the artifact directories. This is critical
+    for repos that are normal codebases with artifacts in .claude/, .codex/, etc.
+    """
     count = len(artifacts)
 
     if count < CLONE_THRESHOLD:
         return "api"
 
-    # Use pre-computed root if available
-    if source.artifacts_root:
-        # Single directory - full clone of that path is efficient
-        return "full_clone" if count > 20 else "sparse_clone"
+    # For large artifact counts, clone the common ancestor directory
+    # This is more efficient than many individual file patterns
+    if source.artifacts_root and count > 20:
+        # Example: artifacts_root = ".claude/skills" → clone ".claude/skills/**"
+        # This avoids cloning the entire codebase
+        return "sparse_directory"
 
-    # Scattered artifacts - sparse is more efficient
-    return "sparse_clone"
+    # For moderate counts or scattered artifacts, fetch only manifest files
+    return "sparse_manifest"
+
+
+def get_sparse_checkout_patterns(
+    strategy: str,
+    artifacts: List[DetectedArtifact],
+    artifacts_root: str | None,
+) -> List[str]:
+    """Generate sparse-checkout patterns based on strategy.
+
+    Examples:
+        sparse_manifest with 5 skills:
+            [".claude/skills/foo/SKILL.md", ".claude/skills/bar/SKILL.md", ...]
+
+        sparse_directory with artifacts_root=".claude":
+            [".claude/**"]
+
+        sparse_directory with multiple roots (.claude/, .codex/):
+            [".claude/**", ".codex/**"]
+    """
+    if strategy == "sparse_directory":
+        if artifacts_root:
+            return [f"{artifacts_root}/**"]
+        # Multiple roots - find unique top-level directories
+        roots = set()
+        for artifact in artifacts:
+            parts = artifact.path.split("/")
+            if parts:
+                roots.add(parts[0])
+        return [f"{root}/**" for root in sorted(roots)]
+
+    # sparse_manifest - individual files only
+    patterns = []
+    for artifact in artifacts:
+        manifests = MANIFEST_PATTERNS.get(artifact.artifact_type, [])
+        for manifest in manifests:
+            patterns.append(f"{artifact.path}/{manifest}")
+    return patterns
 ```
+
+**Strategy Examples**:
+
+| Scenario | Artifact Count | Strategy | Patterns |
+|----------|---------------|----------|----------|
+| Small skill repo | 2 | api | N/A (use API) |
+| Dedicated artifact repo | 15 | sparse_manifest | `skills/*/SKILL.md` |
+| Large artifact repo | 50 | sparse_directory | `.claude/**` |
+| Normal codebase + artifacts | 30 | sparse_directory | `.claude/**`, `.codex/**` |
+| Scattered artifacts | 10 | sparse_manifest | Individual manifest paths |
 
 ### 5. Implementation Flow
 
@@ -313,8 +381,8 @@ def select_indexing_strategy(
 │                                                             │
 │  3. Select indexing strategy                                │
 │     ├─> <3 artifacts: API calls                            │
-│     ├─> 3-20 artifacts: Sparse clone                       │
-│     └─> >20 artifacts: Full shallow clone of root          │
+│     ├─> 3-20 artifacts: sparse_manifest (individual files) │
+│     └─> >20 artifacts: sparse_directory (root dirs only)   │
 │                                                             │
 │  4. Execute clone (if selected)                             │
 │     └─> git clone --depth 1 --sparse ...                   │
@@ -369,7 +437,7 @@ class MarketplaceSourceResponse(BaseModel):
     # New computed metadata (read-only)
     artifacts_root: str | None
     artifact_count: int
-    indexing_strategy: Literal["api", "sparse_clone", "full_clone"] | None
+    indexing_strategy: Literal["api", "sparse_manifest", "sparse_directory"] | None
 ```
 
 ## Risk Assessment
