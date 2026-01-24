@@ -1539,6 +1539,10 @@ class MarketplaceCatalogEntry(Base):
         import_id: Reference to imported artifact ID
         excluded_at: Timestamp when entry was marked as "not an artifact" (None if not excluded)
         excluded_reason: User-provided reason for exclusion (optional, max 500 chars)
+        title: Artifact title from frontmatter for search display (max 200 chars)
+        description: Artifact description from frontmatter for search
+        search_tags: JSON array of tags from frontmatter for search filtering
+        search_text: Concatenated searchable text (title + description + tags)
         metadata_json: Additional detection metadata as JSON
         created_at: Timestamp when entry was created
         updated_at: Timestamp when entry was last updated
@@ -1606,6 +1610,28 @@ class MarketplaceCatalogEntry(Base):
         comment="JSON array of extracted path segments with approval status",
     )
 
+    # Cross-source search fields (populated from frontmatter indexing)
+    title: Mapped[Optional[str]] = mapped_column(
+        String(200),
+        nullable=True,
+        comment="Artifact title from frontmatter for search display",
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Artifact description from frontmatter for search",
+    )
+    search_tags: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON array of tags from frontmatter for search filtering",
+    )
+    search_text: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Concatenated searchable text (title + description + tags)",
+    )
+
     # Additional metadata
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -1660,6 +1686,14 @@ class MarketplaceCatalogEntry(Base):
             except json.JSONDecodeError:
                 metadata_dict = None
 
+        # Parse search_tags JSON if present
+        search_tags_list = None
+        if self.search_tags:
+            try:
+                search_tags_list = json.loads(self.search_tags)
+            except json.JSONDecodeError:
+                search_tags_list = None
+
         return {
             "id": self.id,
             "source_id": self.source_id,
@@ -1678,6 +1712,10 @@ class MarketplaceCatalogEntry(Base):
             "import_id": self.import_id,
             "excluded_at": self.excluded_at.isoformat() if self.excluded_at else None,
             "excluded_reason": self.excluded_reason,
+            "title": self.title,
+            "description": self.description,
+            "search_tags": search_tags_list,
+            "search_text": self.search_text,
             "metadata": metadata_dict,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -1704,6 +1742,34 @@ class MarketplaceCatalogEntry(Base):
             metadata_dict: Dictionary to serialize as JSON
         """
         self.metadata_json = json.dumps(metadata_dict)
+
+    def get_search_tags_list(self) -> List[str]:
+        """Parse and return search_tags as a list.
+
+        Returns:
+            List of tag strings or empty list if invalid/missing
+        """
+        if not self.search_tags:
+            return []
+
+        try:
+            tags = json.loads(self.search_tags)
+            if isinstance(tags, list):
+                return tags
+            return []
+        except json.JSONDecodeError:
+            return []
+
+    def set_search_tags_list(self, tags: List[str]) -> None:
+        """Set search_tags from a list.
+
+        Args:
+            tags: List of tag strings to serialize as JSON
+        """
+        if not tags:
+            self.search_tags = None
+        else:
+            self.search_tags = json.dumps(tags)
 
 
 class ProjectTemplate(Base):
