@@ -5,6 +5,13 @@ middleware configuration, and route registration. It serves as the entry point
 for the web service layer.
 """
 
+# Load .env file into os.environ BEFORE any other imports
+# This ensures environment variables are available to all modules
+# including GitHubClientWrapper which checks os.environ for tokens
+from dotenv import load_dotenv
+
+load_dotenv()  # Loads .env from current directory or parents
+
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
