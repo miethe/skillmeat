@@ -403,27 +403,83 @@ def get_sparse_checkout_patterns(
 
 ## Database Schema Changes
 
-### New Migration: Add Clone Metadata Fields
+### Migration 1: Add Clone Target and Deep Indexing Fields
 
 ```python
-# Alembic migration
+# Alembic migration: add_clone_target_fields
 def upgrade():
+    # MarketplaceSource: Clone target (replaces individual fields with structured JSON)
     op.add_column('marketplace_sources', sa.Column(
-        'artifacts_root', sa.String(500), nullable=True,
-        comment='Computed common ancestor path of all artifacts'
+        'clone_target_json', sa.Text(), nullable=True,
+        comment='JSON-serialized CloneTarget for rapid re-indexing'
+    ))
+
+    # MarketplaceSource: Deep indexing toggle
+    op.add_column('marketplace_sources', sa.Column(
+        'deep_indexing_enabled', sa.Boolean(), nullable=False,
+        server_default='false',
+        comment='Clone entire artifact directories for enhanced search'
+    ))
+
+    # MarketplaceSource: Webhook pre-wiring (for future use)
+    op.add_column('marketplace_sources', sa.Column(
+        'webhook_secret', sa.String(64), nullable=True,
+        comment='Secret for GitHub webhook verification (future use)'
     ))
     op.add_column('marketplace_sources', sa.Column(
-        'artifact_paths_json', sa.Text(), nullable=True,
-        comment='JSON array of artifact paths for diff detection'
+        'last_webhook_event_at', sa.DateTime(), nullable=True,
+        comment='Timestamp of last webhook event received'
     ))
-    op.add_column('marketplace_sources', sa.Column(
-        'sparse_patterns_json', sa.Text(), nullable=True,
-        comment='JSON array of sparse-checkout patterns'
+
+    # MarketplaceCatalogEntry: Deep index fields
+    op.add_column('marketplace_catalog_entries', sa.Column(
+        'deep_search_text', sa.Text(), nullable=True,
+        comment='Full-text content from deep indexing'
     ))
-    op.add_column('marketplace_sources', sa.Column(
-        'last_tree_sha', sa.String(64), nullable=True,
-        comment='SHA of repo tree at last scan for change detection'
+    op.add_column('marketplace_catalog_entries', sa.Column(
+        'deep_indexed_at', sa.DateTime(), nullable=True,
+        comment='Timestamp of last deep indexing'
     ))
+    op.add_column('marketplace_catalog_entries', sa.Column(
+        'deep_index_files', sa.Text(), nullable=True,
+        comment='JSON array of files included in deep index'
+    ))
+
+
+def downgrade():
+    op.drop_column('marketplace_catalog_entries', 'deep_index_files')
+    op.drop_column('marketplace_catalog_entries', 'deep_indexed_at')
+    op.drop_column('marketplace_catalog_entries', 'deep_search_text')
+    op.drop_column('marketplace_sources', 'last_webhook_event_at')
+    op.drop_column('marketplace_sources', 'webhook_secret')
+    op.drop_column('marketplace_sources', 'deep_indexing_enabled')
+    op.drop_column('marketplace_sources', 'clone_target_json')
+```
+
+### Migration 2: Update FTS5 Virtual Table
+
+```python
+# Alembic migration: add_deep_search_to_fts5
+def upgrade():
+    # Drop and recreate FTS5 table with new column
+    # Note: FTS5 tables cannot be altered, must recreate
+    op.execute("DROP TABLE IF EXISTS catalog_fts")
+    op.execute("""
+        CREATE VIRTUAL TABLE catalog_fts USING fts5(
+            name UNINDEXED,
+            artifact_type UNINDEXED,
+            title,
+            description,
+            search_text,
+            tags,
+            deep_search_text,
+            content='marketplace_catalog_entries',
+            content_rowid='rowid',
+            tokenize='porter unicode61 remove_diacritics 2'
+        )
+    """)
+    # Rebuild FTS index
+    op.execute("INSERT INTO catalog_fts(catalog_fts) VALUES('rebuild')")
 ```
 
 ## API Changes
@@ -450,36 +506,293 @@ class MarketplaceSourceResponse(BaseModel):
 | Private repo auth failure | Medium | Medium | Validate token before clone |
 | Manifest format changes | Low | Low | Flexible parsing with defaults |
 
+## Resolved Decisions
+
+1. **Threshold**: 3 artifacts is the initial threshold. Performance benchmarks during
+   implementation will validate or adjust this.
+
+2. **Clone caching**: Do NOT cache the cloned files. DO cache the **clone targets** as a
+   structured object with all information needed for rapid re-sync. See Clone Target Structure.
+
+3. **Webhook integration**: Add as future enhancement with pre-wiring during implementation.
+
+## Clone Target Structure
+
+Store a structured object on `MarketplaceSource` containing everything needed for rapid re-indexing:
+
+```python
+@dataclass
+class CloneTarget:
+    """Structured clone configuration for rapid re-sync."""
+
+    # Clone strategy
+    strategy: Literal["api", "sparse_manifest", "sparse_directory"]
+
+    # Sparse checkout patterns (computed from artifacts)
+    sparse_patterns: List[str]  # e.g., [".claude/**"] or ["skills/foo/SKILL.md", ...]
+
+    # Common ancestor path (if exists)
+    artifacts_root: str | None  # e.g., ".claude/skills"
+
+    # All artifact paths for differential detection
+    artifact_paths: List[str]  # e.g., [".claude/skills/foo", ".claude/skills/bar"]
+
+    # Tree state for change detection
+    tree_sha: str  # SHA of repo tree at computation time
+
+    # Timestamp for staleness checks
+    computed_at: datetime
+
+
+# Serialized as JSON in MarketplaceSource.clone_target_json
+```
+
+**Database Field**:
+```python
+class MarketplaceSource:
+    # ... existing fields ...
+
+    clone_target_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-serialized CloneTarget for rapid re-indexing"
+    )
+
+    @property
+    def clone_target(self) -> Optional[CloneTarget]:
+        """Deserialize clone target configuration."""
+        if not self.clone_target_json:
+            return None
+        return CloneTarget(**json.loads(self.clone_target_json))
+```
+
+**Re-sync Flow**:
+```python
+def resync_source(source: MarketplaceSource) -> None:
+    """Rapid re-sync using cached clone target."""
+    target = source.clone_target
+    if not target:
+        # No cached target - perform full scan
+        return full_scan(source)
+
+    # Check if tree changed
+    current_sha = fetch_tree_sha(source)
+    if current_sha == target.tree_sha:
+        logger.info("Tree unchanged, skipping re-index")
+        return
+
+    # Use cached strategy and patterns for clone
+    clone_with_patterns(source, target.strategy, target.sparse_patterns)
+    extract_manifests(...)
+    update_clone_target(source, current_sha)
+```
+
+## Full-Artifact Indexing (Enhanced Search)
+
+### Feature Description
+
+Add an optional **deep indexing mode** that clones and indexes the entire artifact directory,
+not just the manifest file. This enables full-text search across all artifact content.
+
+**Use Case**: Find skills based on code patterns, examples, or implementation details that
+aren't in the SKILL.md frontmatter.
+
+### Configuration
+
+```python
+class MarketplaceSource:
+    # ... existing fields ...
+
+    # Indexing depth control
+    deep_indexing_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        comment="Clone entire artifact directories for enhanced search"
+    )
+```
+
+### Behavior Comparison
+
+| Mode | What's Cloned | What's Indexed | Search Coverage |
+|------|--------------|----------------|-----------------|
+| Standard | `skills/foo/SKILL.md` | Frontmatter only | Title, description, tags |
+| Deep | `skills/foo/**` | All text files | Full content, examples, code |
+
+### Deep Indexing Implementation
+
+```python
+def get_deep_sparse_patterns(artifacts: List[DetectedArtifact]) -> List[str]:
+    """Generate patterns for full artifact directory clone."""
+    return [f"{artifact.path}/**" for artifact in artifacts]
+
+
+def extract_deep_search_text(artifact_dir: Path) -> str:
+    """Extract searchable text from all files in artifact directory."""
+    text_parts = []
+
+    # Define indexable file patterns
+    indexable = ["*.md", "*.yaml", "*.yml", "*.json", "*.txt", "*.py", "*.ts", "*.js"]
+
+    for pattern in indexable:
+        for file_path in artifact_dir.glob(pattern):
+            if file_path.stat().st_size < 100_000:  # Skip large files
+                content = file_path.read_text(errors="ignore")
+                # Strip code comments and normalize whitespace
+                text_parts.append(normalize_for_search(content))
+
+    return " ".join(text_parts)
+```
+
+### Database Schema for Deep Index
+
+```python
+class MarketplaceCatalogEntry:
+    # ... existing fields ...
+
+    # Enhanced search fields
+    deep_search_text: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Full-text content from deep indexing"
+    )
+    deep_indexed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="Timestamp of last deep indexing"
+    )
+    deep_index_files: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON array of files included in deep index"
+    )
+```
+
+### FTS5 Integration
+
+Update the FTS5 virtual table to include deep search text:
+
+```sql
+CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fts USING fts5(
+    name UNINDEXED,
+    artifact_type UNINDEXED,
+    title,
+    description,
+    search_text,
+    tags,
+    deep_search_text,  -- NEW: Full content from deep indexing
+    content='marketplace_catalog_entries',
+    content_rowid='rowid',
+    tokenize='porter unicode61 remove_diacritics 2'
+);
+```
+
+### API Exposure
+
+```python
+class SourceCreateRequest(BaseModel):
+    # ... existing fields ...
+    deep_indexing_enabled: bool = Field(
+        default=False,
+        description="Enable deep indexing for enhanced full-text search"
+    )
+
+class ArtifactSearchResponse(BaseModel):
+    # ... existing fields ...
+    deep_match: bool = Field(
+        default=False,
+        description="Whether match came from deep-indexed content"
+    )
+    matched_file: Optional[str] = Field(
+        default=None,
+        description="File path where match was found (deep index only)"
+    )
+```
+
+## Future Enhancements
+
+### GitHub Webhook Integration
+
+**Goal**: Auto-reindex sources when commits are pushed to the repository.
+
+**Pre-wiring during implementation**:
+1. Add `webhook_secret` field to `MarketplaceSource` (nullable, for future use)
+2. Add `last_webhook_event_at` timestamp field
+3. Design webhook endpoint structure (not implemented yet)
+
+```python
+class MarketplaceSource:
+    # Pre-wired for future webhook support
+    webhook_secret: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="Secret for GitHub webhook verification (future use)"
+    )
+    last_webhook_event_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="Timestamp of last webhook event received"
+    )
+```
+
+**Future webhook endpoint** (not in current scope):
+```python
+@router.post("/sources/{source_id}/webhook")
+async def handle_github_webhook(
+    source_id: UUID,
+    request: Request,
+    x_hub_signature_256: str = Header(...),
+):
+    """Handle GitHub push webhook for auto-reindex."""
+    # Verify signature using webhook_secret
+    # Queue re-index job
+    pass
+```
+
 ## Open Questions
 
-1. **Threshold tuning**: Is 3 artifacts the right threshold for clone mode?
-2. **Parallel clones**: Should we support cloning multiple sources simultaneously?
-3. **Cache persistence**: Should clones be cached for rapid re-indexing?
-4. **Webhook integration**: Auto-reindex on push via GitHub webhooks?
+1. **Deep indexing file size limits**: What's the max file size to include? (Proposed: 100KB)
+2. **Deep indexing file types**: Should we include more than text files? (e.g., Jupyter notebooks)
+3. **Parallel clones**: Should we support cloning multiple sources simultaneously?
 
 ## Implementation Plan
 
 ### Phase 1: Foundation (1-2 days)
-- [ ] Add database migration for new fields
+- [ ] Add database migration for new fields:
+  - `clone_target_json` on MarketplaceSource
+  - `deep_indexing_enabled` on MarketplaceSource
+  - `deep_search_text`, `deep_indexed_at`, `deep_index_files` on MarketplaceCatalogEntry
+  - Pre-wire: `webhook_secret`, `last_webhook_event_at` on MarketplaceSource
+- [ ] Implement `CloneTarget` dataclass and serialization
 - [ ] Implement `compute_clone_metadata()` function
-- [ ] Update `_perform_scan()` to compute and store metadata
+- [ ] Update `_perform_scan()` to compute and store clone target
 
 ### Phase 2: Universal Clone (2-3 days)
 - [ ] Refactor `_clone_repo_sparse()` to accept pattern list
+- [ ] Implement `get_sparse_checkout_patterns()` with strategy selection
 - [ ] Implement `_extract_all_manifests_batch()` for all artifact types
 - [ ] Add manifest parsers for command, agent, hook, mcp types
 - [ ] Update scan flow to use universal extraction
 
 ### Phase 3: Optimization (1-2 days)
-- [ ] Implement differential re-indexing
-- [ ] Add strategy selection logic
+- [ ] Implement differential re-indexing using `CloneTarget.tree_sha`
+- [ ] Add strategy selection logic (`sparse_manifest` vs `sparse_directory`)
 - [ ] Add metrics/logging for indexing performance
-- [ ] Expose indexing_strategy in API responses
+- [ ] Expose `clone_target` summary in API responses
 
-### Phase 4: Testing (1 day)
+### Phase 4: Deep Indexing (1-2 days)
+- [ ] Implement `get_deep_sparse_patterns()` for full artifact cloning
+- [ ] Implement `extract_deep_search_text()` with file type filtering
+- [ ] Update FTS5 virtual table to include `deep_search_text`
+- [ ] Add `deep_indexing_enabled` toggle to source create/update API
+- [ ] Add `deep_match` and `matched_file` to search responses
+
+### Phase 5: Testing & Benchmarks (1 day)
+- [ ] Unit tests for CloneTarget serialization
 - [ ] Unit tests for metadata computation
 - [ ] Integration tests for clone strategies
-- [ ] Performance benchmarks with large repos
+- [ ] Performance benchmarks with large repos (validate 3-artifact threshold)
+- [ ] Deep indexing integration tests
 
 ## Success Criteria
 
