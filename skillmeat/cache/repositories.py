@@ -2438,6 +2438,176 @@ class MarketplaceCatalogRepository(BaseRepository[MarketplaceCatalogEntry]):
         finally:
             session.close()
 
+    # =========================================================================
+    # REPO-001: Cross-Source Artifact Search
+    # =========================================================================
+
+    def search(
+        self,
+        query: Optional[str] = None,
+        artifact_type: Optional[str] = None,
+        source_ids: Optional[List[str]] = None,
+        min_confidence: int = 0,
+        tags: Optional[List[str]] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> PaginatedResult[MarketplaceCatalogEntry]:
+        """Cross-source artifact search with LIKE queries and filtering.
+
+        Searches across marketplace catalog entries using LIKE/ILIKE queries
+        on name, title, description, and search_tags fields. Supports filtering
+        by artifact type, source IDs, minimum confidence score, and tags.
+
+        Results are ordered by confidence_score descending to surface the
+        highest-quality matches first. Entries with status 'excluded' or
+        'removed' are automatically excluded.
+
+        Args:
+            query: Optional search query for ILIKE matching on name, title,
+                   description, and search_tags. If None, returns all entries.
+            artifact_type: Optional filter by artifact type ("skill", "command", etc.)
+            source_ids: Optional list of source IDs to filter by. If provided,
+                        only entries from these sources are returned.
+            min_confidence: Minimum confidence score (0-100, default: 0).
+                           Only entries with score >= min_confidence are returned.
+            tags: Optional list of tags to filter by. Matches entries where
+                  search_tags contains ANY of the specified tags (OR logic).
+            limit: Maximum number of items per page (default: 50)
+            cursor: Cursor from previous page (None for first page).
+                   Cursor format: "score:id" for stable pagination.
+
+        Returns:
+            PaginatedResult with items, next_cursor, and has_more flag
+
+        Example:
+            >>> # Search for "canvas" skills with high confidence
+            >>> result = repo.search(
+            ...     query="canvas",
+            ...     artifact_type="skill",
+            ...     min_confidence=80,
+            ...     limit=20
+            ... )
+            >>> for entry in result.items:
+            ...     print(f"{entry.name}: {entry.confidence_score}%")
+            >>>
+            >>> # Filter by source and tags
+            >>> result = repo.search(
+            ...     source_ids=["source-1", "source-2"],
+            ...     tags=["automation", "testing"],
+            ...     limit=50
+            ... )
+            >>>
+            >>> # Pagination
+            >>> if result.has_more:
+            ...     next_page = repo.search(
+            ...         query="canvas",
+            ...         cursor=result.next_cursor
+            ...     )
+        """
+        session = self._get_session()
+        try:
+            # Build base query - exclude removed and excluded entries
+            base_query = session.query(MarketplaceCatalogEntry).filter(
+                MarketplaceCatalogEntry.status.notin_(["excluded", "removed"])
+            )
+
+            # Apply text search filter using ILIKE for case-insensitive matching
+            if query:
+                pattern = f"%{query}%"
+                base_query = base_query.filter(
+                    or_(
+                        MarketplaceCatalogEntry.name.ilike(pattern),
+                        MarketplaceCatalogEntry.title.ilike(pattern),
+                        MarketplaceCatalogEntry.description.ilike(pattern),
+                        MarketplaceCatalogEntry.search_tags.ilike(pattern),
+                    )
+                )
+
+            # Apply artifact type filter
+            if artifact_type:
+                base_query = base_query.filter(
+                    MarketplaceCatalogEntry.artifact_type == artifact_type
+                )
+
+            # Apply source IDs filter
+            if source_ids:
+                base_query = base_query.filter(
+                    MarketplaceCatalogEntry.source_id.in_(source_ids)
+                )
+
+            # Apply minimum confidence filter
+            if min_confidence > 0:
+                base_query = base_query.filter(
+                    MarketplaceCatalogEntry.confidence_score >= min_confidence
+                )
+
+            # Apply tags filter (OR logic - matches if ANY tag is present)
+            if tags:
+                # For SQLite JSON, search_tags is stored as JSON array string
+                # Use multiple LIKE conditions with OR for each tag
+                tag_conditions = []
+                for tag in tags:
+                    # Match tag in JSON array: ["tag1", "tag2"] contains "tag"
+                    tag_conditions.append(
+                        MarketplaceCatalogEntry.search_tags.ilike(f'%"{tag}"%')
+                    )
+                base_query = base_query.filter(or_(*tag_conditions))
+
+            # Apply cursor-based pagination
+            # Cursor format: "confidence_score:id" for stable ordering
+            if cursor:
+                try:
+                    cursor_score_str, cursor_id = cursor.split(":", 1)
+                    cursor_score = int(cursor_score_str)
+                    # Items after cursor: lower score, or same score with higher ID
+                    base_query = base_query.filter(
+                        or_(
+                            MarketplaceCatalogEntry.confidence_score < cursor_score,
+                            and_(
+                                MarketplaceCatalogEntry.confidence_score == cursor_score,
+                                MarketplaceCatalogEntry.id > cursor_id,
+                            ),
+                        )
+                    )
+                except (ValueError, AttributeError):
+                    # Invalid cursor format - ignore and return from start
+                    logger.warning(f"Invalid cursor format: {cursor}")
+
+            # Order by confidence_score descending, then by id for stability
+            base_query = base_query.order_by(
+                MarketplaceCatalogEntry.confidence_score.desc(),
+                MarketplaceCatalogEntry.id.asc(),
+            )
+
+            # Fetch limit + 1 to check if more items exist
+            items = base_query.limit(limit + 1).all()
+
+            # Determine if more items exist
+            has_more = len(items) > limit
+            if has_more:
+                items = items[:limit]
+
+            # Generate next cursor from last item
+            next_cursor = None
+            if items and has_more:
+                last_item = items[-1]
+                next_cursor = f"{last_item.confidence_score}:{last_item.id}"
+
+            logger.debug(
+                f"Search returned {len(items)} entries "
+                f"(query={query}, type={artifact_type}, sources={source_ids}, "
+                f"min_conf={min_confidence}, tags={tags}, cursor={cursor}, "
+                f"has_more={has_more})"
+            )
+
+            return PaginatedResult(
+                items=items,
+                next_cursor=next_cursor,
+                has_more=has_more,
+            )
+        finally:
+            session.close()
+
 
 # =============================================================================
 # Tag Repository
